@@ -424,6 +424,28 @@ pub fn select_company_scoped_sql(
     ))
 }
 
+/// Scope by both `organization_id` and `company_id`. Use for tables that carry
+/// both fields and where company-private rows must never be visible across
+/// company boundaries within the same organization.
+pub fn select_org_and_company_scoped_sql(
+    resource_key: &str,
+    table: &str,
+    organization_id: u64,
+    company_id: u64,
+    field_access: Option<&FieldAccessContext>,
+    extra_where: &str,
+    order_by: &str,
+) -> Result<String, String> {
+    let cols = resolve_http_sql_columns(resource_key, field_access)?;
+    let col_part = cols.join(", ");
+    let where_clause = format!(
+        "organization_id = {organization_id} AND company_id = {company_id}{extra_where}"
+    );
+    Ok(format!(
+        "SELECT {col_part} FROM {table} WHERE {where_clause}{order_by}"
+    ))
+}
+
 pub fn select_roles_active_sql(
     field_access: Option<&FieldAccessContext>,
 ) -> Result<String, String> {

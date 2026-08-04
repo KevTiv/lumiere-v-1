@@ -348,7 +348,7 @@ function InventoryClientLoaded({
   useInventoryModuleSubscription()
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
-  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [editProductRow, setEditProductRow] = useState<Record<string, unknown> | null>(null)
   const [variantProductId, setVariantProductId] = useState<ScalarId | null>(null)
@@ -994,7 +994,7 @@ function InventoryClientLoaded({
                       const productId = record.productId ?? record.product_id
                       if (productId == null) return "—"
                       return (
-                        productLabelById.get(String(productId)) ?? `Product ${String(productId)}`
+                        productLabelById.get(String(productId)) ?? "(deleted)"
                       )
                     },
                   }
@@ -1006,8 +1006,7 @@ function InventoryClientLoaded({
                       const locationId = record.locationId ?? record.location_id
                       if (locationId == null) return "—"
                       return (
-                        locationLabelById.get(String(locationId)) ??
-                        `Location ${String(locationId)}`
+                        locationLabelById.get(String(locationId)) ?? "(deleted)"
                       )
                     },
                   }
@@ -1042,10 +1041,10 @@ function InventoryClientLoaded({
                     render: (_value: unknown, record: Record<string, unknown>) => {
                       const locationId = record.locationId ?? record.location_id
                       if (locationId == null) return "—"
-                      return (
-                        locationLabelById.get(String(locationId)) ??
-                        String(record.locationIdName ?? record.location_id_name ?? locationId)
-                      )
+                      const cached = locationLabelById.get(String(locationId))
+                      if (cached != null) return cached
+                      const embedded = record.locationIdName ?? record.location_id_name
+                      return embedded != null ? String(embedded) : "(deleted)"
                     },
                   }
                 }
@@ -1055,12 +1054,10 @@ function InventoryClientLoaded({
                     render: (_value: unknown, record: Record<string, unknown>) => {
                       const locationId = record.locationDestId ?? record.location_dest_id
                       if (locationId == null) return "—"
-                      return (
-                        locationLabelById.get(String(locationId)) ??
-                        String(
-                          record.locationDestIdName ?? record.location_dest_id_name ?? locationId,
-                        )
-                      )
+                      const cached = locationLabelById.get(String(locationId))
+                      if (cached != null) return cached
+                      const embedded = record.locationDestIdName ?? record.location_dest_id_name
+                      return embedded != null ? String(embedded) : "(deleted)"
                     },
                   }
                 }
@@ -1925,7 +1922,7 @@ function InventoryClientLoaded({
                     }
                     void createStockMove.mutateAsync(
                       toCreateStockMoveParams({
-                        companyId: operatingCompanyId ?? undefined,
+                        companyId: operatingCompanyId,
                         name:
                           promptText(t("inventory.stockMoveActions.namePrompt"), "Manual Stock Move") ??
                           "Manual Stock Move",
@@ -2063,27 +2060,18 @@ function InventoryClientLoaded({
                   requiresSelection: false,
                   onClick: () => {
                     const name = promptText(t("inventory.stockInventoryActions.namePrompt"), "Cycle Count")
-                    if (name == null) return
+                    if (name == null || operatingCompanyId == null) return
                     void createStockInventory.mutateAsync({
-                      company_id: Number(operatingCompanyId ?? 0),
+                      company_id: Number(operatingCompanyId),
                       name,
                       location_ids: [],
                       product_ids: [],
                       lot_ids: [],
                       owner_ids: [],
                       package_ids: [],
-                      state: "draft",
                       accounting_date: null,
                       category_id: null,
                       counted_mode: "all",
-                      done_move_ids: [],
-                      move_ids: [],
-                      adjustment_count: 0,
-                      has_account_moves: false,
-                      exhausted: false,
-                      prefilled_count: 0,
-                      started: false,
-                      is_editable: true,
                       is_stock_check: true,
                       metadata: null,
                     })
@@ -2230,9 +2218,9 @@ function InventoryClientLoaded({
                   onClick: () => {
                     const name = promptText(t("inventory.lotActions.namePrompt"))
                     const productId = promptScalarId(t("inventory.lotActions.productIdPrompt"))
-                    if (name == null || productId == null) return
+                    if (name == null || productId == null || operatingCompanyId == null) return
                     void createStockProductionLot.mutateAsync({
-                      company_id: Number(operatingCompanyId ?? 0),
+                      company_id: Number(operatingCompanyId),
                       name,
                       product_id: Number(productId),
                       product_variant_id: null,
@@ -2303,9 +2291,9 @@ function InventoryClientLoaded({
                   onClick: () => {
                     const name = promptText(t("inventory.serialActions.namePrompt"))
                     const productId = promptScalarId(t("inventory.serialActions.productIdPrompt"))
-                    if (name == null || productId == null) return
+                    if (name == null || productId == null || operatingCompanyId == null) return
                     void createStockProductionSerial.mutateAsync({
-                      company_id: Number(operatingCompanyId ?? 0),
+                      company_id: Number(operatingCompanyId),
                       name,
                       product_id: Number(productId),
                       product_variant_id: null,
@@ -3190,9 +3178,13 @@ function InventoryClientLoaded({
         const productId = record.productId ?? record.product_id
         const locationId = record.locationId ?? record.location_id
         const productLabel =
-          productId != null ? productLabelById.get(String(productId)) : undefined
+          productId != null
+            ? (productLabelById.get(String(productId)) ?? "(deleted)")
+            : undefined
         const locationLabel =
-          locationId != null ? locationLabelById.get(String(locationId)) : undefined
+          locationId != null
+            ? (locationLabelById.get(String(locationId)) ?? "(deleted)")
+            : undefined
         return {
           ...record,
           sheetTitle:
@@ -3530,7 +3522,10 @@ function InventoryClientLoaded({
 
   return (
     <>
+      {/* key={operatingCompanyId} forces React to remount ModuleView when the operating company
+          changes, preventing stale inventory rows from a previous company leaking into the new view. */}
       <ModuleView
+        key={operatingCompanyId != null ? String(operatingCompanyId) : "no-company"}
         config={config}
         data={data}
         dataLoading={{

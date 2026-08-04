@@ -8,7 +8,8 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company_id_from_scope, CompanyScopeParams};
-use crate::core::reference::convert_uom_quantity;
+use crate::core::reference::{convert_uom_quantity, currency};
+use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
 use crate::inventory::product::product;
@@ -561,6 +562,129 @@ pub(crate) fn product_requires_stock(ctx: &ReducerContext, product_id: u64) -> b
         .find(&product_id)
         .map(|p| p.type_ != "service")
         .unwrap_or(true)
+}
+
+// ── Relation Loaders ─────────────────────────────────────────────────────────
+
+/// Check that a product exists, belongs to the org, and has not been archived.
+pub(crate) fn require_product_in_org(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    product_id: u64,
+) -> Result<(), String> {
+    let p = ctx
+        .db
+        .product()
+        .id()
+        .find(&product_id)
+        .ok_or_else(|| format!("product {} not found", product_id))?;
+    if p.organization_id != organization_id {
+        return Err("product does not belong to this organization".to_string());
+    }
+    if !p.active {
+        return Err(format!("product {} is archived", product_id));
+    }
+    Ok(())
+}
+
+/// Reject NaN and infinite quantity values before any stock mutation.
+fn require_finite_qty(qty: f64, label: &str) -> Result<(), String> {
+    if !qty.is_finite() {
+        return Err(format!("{label} must be a finite number, got {qty}"));
+    }
+    Ok(())
+}
+
+/// Check that a stock location exists, belongs to the org, and is active.
+pub(crate) fn require_location_in_org(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    location_id: u64,
+) -> Result<(), String> {
+    let loc = ctx
+        .db
+        .stock_location()
+        .id()
+        .find(&location_id)
+        .ok_or_else(|| format!("location {} not found", location_id))?;
+    if loc.organization_id != organization_id {
+        return Err("location does not belong to this organization".to_string());
+    }
+    if !loc.active {
+        return Err(format!("location {} is not active", location_id));
+    }
+    Ok(())
+}
+
+/// Check that a warehouse exists, belongs to the org and company, and is active.
+pub(crate) fn require_warehouse_in_org_and_company(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    warehouse_id: u64,
+) -> Result<(), String> {
+    let wh = ctx
+        .db
+        .warehouse()
+        .id()
+        .find(&warehouse_id)
+        .ok_or_else(|| format!("warehouse {} not found", warehouse_id))?;
+    if wh.organization_id != organization_id {
+        return Err("warehouse does not belong to this organization".to_string());
+    }
+    if wh.company_id != company_id {
+        return Err("warehouse does not belong to this company".to_string());
+    }
+    if !wh.is_active {
+        return Err(format!("warehouse {} is not active", warehouse_id));
+    }
+    Ok(())
+}
+
+/// Check that a stock picking exists, belongs to the org and company, and is not cancelled.
+pub(crate) fn require_picking_in_company(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    picking_id: u64,
+) -> Result<(), String> {
+    let picking = ctx
+        .db
+        .stock_picking()
+        .id()
+        .find(&picking_id)
+        .ok_or_else(|| format!("picking {} not found", picking_id))?;
+    if picking.organization_id != organization_id {
+        return Err("picking does not belong to this organization".to_string());
+    }
+    if picking.company_id != company_id {
+        return Err("picking does not belong to this company".to_string());
+    }
+    if picking.state == "cancel" {
+        return Err(format!("picking {} is cancelled", picking_id));
+    }
+    Ok(())
+}
+
+/// Check that a CRM contact exists in the org and has not been soft-deleted.
+pub(crate) fn require_active_partner_in_org(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    partner_id: u64,
+) -> Result<(), String> {
+    let c = ctx
+        .db
+        .contact()
+        .id()
+        .find(&partner_id)
+        .ok_or_else(|| format!("partner {} not found", partner_id))?;
+    if c.organization_id != organization_id {
+        return Err("partner does not belong to this organization".to_string());
+    }
+    if c.deleted_at.is_some() {
+        return Err(format!("partner {} has been deleted", partner_id));
+    }
+    Ok(())
 }
 
 /// Company-owned ATP quant (`owner_id` is None). Vendor-consigned stock is excluded.
@@ -1716,6 +1840,45 @@ pub fn create_stock_quant(
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
+    assert_inventory_writable(ctx, organization_id, company_id)?;
+
+    // Finite-input guard
+    require_finite_qty(params.quantity, "quantity")?;
+    require_finite_qty(params.reserved_quantity, "reserved_quantity")?;
+    require_finite_qty(params.cost, "cost")?;
+
+    // Reservation invariants
+    if params.reserved_quantity < 0.0 {
+        return Err("reserved_quantity cannot be negative".to_string());
+    }
+    if params.reserved_quantity > params.quantity {
+        return Err(format!(
+            "reserved_quantity ({:.4}) cannot exceed quantity ({:.4})",
+            params.reserved_quantity, params.quantity
+        ));
+    }
+
+    require_product_in_org(ctx, organization_id, params.product_id)?;
+    require_location_in_org(ctx, organization_id, params.location_id)?;
+    if let Some(lot_id) = params.lot_id {
+        ensure_lot_for_product(ctx, organization_id, company_id, params.product_id, lot_id)?;
+    }
+
+    // Validate currency is active if provided
+    if let Some(currency_id) = params.currency_id {
+        let currency_active = ctx
+            .db
+            .currency()
+            .id()
+            .find(&currency_id)
+            .map(|c| c.active)
+            .unwrap_or(false);
+        if !currency_active {
+            return Err(format!("currency {} not found or not active", currency_id));
+        }
+    }
+
+    // Recompute derived fields server-side; ignore caller-supplied projections
     let available_quantity = params.quantity - params.reserved_quantity;
     let value = params.quantity * params.cost;
 
@@ -1795,6 +1958,17 @@ pub fn update_stock_quant_quantity(
         return Err("Quant does not belong to this company".to_string());
     }
 
+    assert_inventory_writable(ctx, organization_id, company_id)?;
+
+    require_finite_qty(params.quantity, "quantity")?;
+
+    if params.quantity < quant.reserved_quantity {
+        return Err(format!(
+            "Cannot set quantity {:.4} below reserved quantity {:.4}",
+            params.quantity, quant.reserved_quantity
+        ));
+    }
+
     let quantity = params.quantity;
     let available_quantity = quantity - quant.reserved_quantity;
     let value = quantity * quant.cost;
@@ -1846,7 +2020,17 @@ pub fn reserve_stock_quant(
         return Err("Quant does not belong to this company".to_string());
     }
 
+    assert_inventory_writable(ctx, organization_id, company_id)?;
+
     let reserve_qty = params.reserve_qty;
+    require_finite_qty(reserve_qty, "reserve_qty")?;
+    if reserve_qty < 0.0 {
+        return Err(
+            "reserve_qty must be non-negative; use unreserve_stock_quant to reduce reservations"
+                .to_string(),
+        );
+    }
+
     let new_reserved = quant.reserved_quantity + reserve_qty;
     if new_reserved > quant.quantity {
         return Err("Cannot reserve more than available quantity".to_string());
@@ -1912,7 +2096,14 @@ pub fn unreserve_stock_quant(
         return Err("Quant does not belong to this company".to_string());
     }
 
+    assert_inventory_writable(ctx, organization_id, company_id)?;
+
     let unreserve_qty = params.unreserve_qty;
+    require_finite_qty(unreserve_qty, "unreserve_qty")?;
+    if unreserve_qty < 0.0 {
+        return Err("unreserve_qty must be non-negative".to_string());
+    }
+
     if product_tracking_mode(ctx, quant.product_id)? == "serial" {
         let n = whole_unit_qty(unreserve_qty, quant.product_id)?;
         let _ = release_reserved_serials(ctx, organization_id, company_id, quant.product_id, n);
@@ -1956,6 +2147,7 @@ pub fn move_stock_quant(
     check_permission(ctx, organization_id, "stock_quant", "write")?;
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
+    require_finite_qty(params.quantity, "quantity")?;
     if params.quantity <= 0.0 {
         return Err("Quantity must be positive".to_string());
     }
@@ -1974,8 +2166,27 @@ pub fn move_stock_quant(
         return Err("Quant does not belong to this company".to_string());
     }
 
+    assert_inventory_writable(ctx, organization_id, company_id)?;
+
     if params.dest_location_id == src.location_id {
         return Ok(());
+    }
+
+    // Validate destination location belongs to org and is active
+    let dest_loc = ctx
+        .db
+        .stock_location()
+        .id()
+        .find(&params.dest_location_id)
+        .ok_or("Destination location not found")?;
+    if dest_loc.organization_id != organization_id {
+        return Err("Destination location does not belong to this organization".to_string());
+    }
+    if !dest_loc.active {
+        return Err(format!(
+            "Destination location {} is not active",
+            params.dest_location_id
+        ));
     }
 
     if params.quantity > src.available_quantity {
@@ -2025,6 +2236,12 @@ pub fn move_stock_quant(
                 .id()
                 .find(&did)
                 .ok_or("Destination quant disappeared")?;
+            // Guard: destination quant must belong to the same company
+            if dest.company_id != company_id {
+                return Err(
+                    "Destination quant does not belong to this company".to_string(),
+                );
+            }
             let new_dest_qty = dest.quantity + qty;
             let new_dest_reserved = dest.reserved_quantity;
             let new_dest_available = new_dest_qty - new_dest_reserved;
@@ -2145,6 +2362,22 @@ pub fn create_stock_move(
 
     if params.name.is_empty() {
         return Err("Move name cannot be empty".to_string());
+    }
+
+    require_product_in_org(ctx, organization_id, params.product_id)?;
+    require_location_in_org(ctx, organization_id, params.location_id)?;
+    require_location_in_org(ctx, organization_id, params.location_dest_id)?;
+    if let Some(picking_id) = params.picking_id {
+        require_picking_in_company(ctx, organization_id, company_id, picking_id)?;
+    }
+    if let Some(warehouse_id) = params.warehouse_id {
+        require_warehouse_in_org_and_company(ctx, organization_id, company_id, warehouse_id)?;
+    }
+    if let Some(lot_id) = params.lot_id {
+        ensure_lot_for_product(ctx, organization_id, company_id, params.product_id, lot_id)?;
+    }
+    if let Some(partner_id) = params.partner_id {
+        require_active_partner_in_org(ctx, organization_id, partner_id)?;
     }
 
     ProcureMethod::from_str(&params.procure_method)?;
@@ -2400,6 +2633,8 @@ pub fn done_stock_move(
         return Err("Move does not belong to this company".to_string());
     }
 
+    assert_inventory_writable(ctx, organization_id, company_id)?;
+
     if move_record.state != "assigned" {
         return Err("Move must be assigned before marking as done".to_string());
     }
@@ -2511,6 +2746,37 @@ pub fn create_stock_picking(
         return Err("Picking name cannot be empty".to_string());
     }
 
+    require_location_in_org(ctx, organization_id, params.location_id)?;
+    require_location_in_org(ctx, organization_id, params.location_dest_id)?;
+    if let Some(sale_id) = params.sale_id {
+        let so = ctx
+            .db
+            .sale_order()
+            .id()
+            .find(&sale_id)
+            .ok_or_else(|| format!("sale order {} not found", sale_id))?;
+        if so.organization_id != organization_id {
+            return Err("sale order does not belong to this organization".to_string());
+        }
+        if so.company_id != company_id {
+            return Err("sale order does not belong to this company".to_string());
+        }
+    }
+    if let Some(purchase_id) = params.purchase_id {
+        let po = ctx
+            .db
+            .purchase_order()
+            .id()
+            .find(&purchase_id)
+            .ok_or_else(|| format!("purchase order {} not found", purchase_id))?;
+        if po.organization_id != organization_id {
+            return Err("purchase order does not belong to this organization".to_string());
+        }
+        if po.company_id != company_id {
+            return Err("purchase order does not belong to this company".to_string());
+        }
+    }
+
     let picking = ctx.db.stock_picking().insert(StockPicking {
         id: 0,
         organization_id,
@@ -2620,6 +2886,16 @@ pub fn confirm_stock_picking(
         return Err("Picking must be in draft state to confirm".to_string());
     }
 
+    // Pre-flight: validate every child move belongs to the same company before mutating any
+    for move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
+        if move_record.organization_id != organization_id || move_record.company_id != company_id {
+            return Err(format!(
+                "Child move {} does not belong to this company; aborting confirm",
+                move_record.id
+            ));
+        }
+    }
+
     ctx.db.stock_picking().id().update(StockPicking {
         state: "confirmed".to_string(),
         show_mark_as_todo: false,
@@ -2678,6 +2954,16 @@ pub fn assign_stock_picking(
 
     if picking.state != "confirmed" {
         return Err("Picking must be confirmed before assignment".to_string());
+    }
+
+    // Pre-flight: validate every child move belongs to the same company before reserving any stock
+    for move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
+        if move_record.organization_id != organization_id || move_record.company_id != company_id {
+            return Err(format!(
+                "Child move {} does not belong to this company; aborting assign",
+                move_record.id
+            ));
+        }
     }
 
     let is_incoming = picking.picking_code.as_deref() == Some("incoming");

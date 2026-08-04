@@ -6,6 +6,8 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::inventory_close::assert_inventory_writable;
+use crate::inventory::product::product;
 use crate::inventory::stock::{stock_quant, StockQuant};
 use serde_json;
 
@@ -113,9 +115,14 @@ pub struct RecordCycleCountLineParams {
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
-fn find_quant_for_sheet(ctx: &ReducerContext, sheet: &StockCountSheet) -> Option<StockQuant> {
+fn find_quant_for_sheet(
+    ctx: &ReducerContext,
+    sheet: &StockCountSheet,
+    company_id: u64,
+) -> Option<StockQuant> {
     ctx.db.stock_quant().iter().find(|q| {
         q.organization_id == sheet.organization_id
+            && q.company_id == company_id
             && q.product_id == sheet.product_id
             && q.location_id == sheet.location_id
             && q.lot_id == sheet.lot_id
@@ -285,30 +292,26 @@ pub fn record_cycle_count_line(
         return Err("Cycle count must be in_progress to record lines".to_string());
     }
 
-    let expected_qty = ctx
-        .db
-        .stock_quant()
-        .iter()
-        .find(|q| {
-            q.organization_id == organization_id
-                && q.product_id == params.product_id
-                && q.location_id == params.location_id
-                && q.lot_id == params.lot_id
-        })
-        .map(|q| q.quantity)
-        .unwrap_or(0.0);
+    // Non-negative finite counted quantity
+    if !params.qty_counted.is_finite() || params.qty_counted < 0.0 {
+        return Err("qty_counted must be a non-negative finite number".to_string());
+    }
 
-    let quant_cost = ctx
+    // Scope expected-qty and cost lookups to both organization and company
+    let existing_quant = ctx
         .db
         .stock_quant()
         .iter()
         .find(|q| {
             q.organization_id == organization_id
+                && q.company_id == company_id
                 && q.product_id == params.product_id
                 && q.location_id == params.location_id
                 && q.lot_id == params.lot_id
-        })
-        .map(|q| q.cost);
+        });
+
+    let expected_qty = existing_quant.as_ref().map(|q| q.quantity).unwrap_or(0.0);
+    let quant_cost = existing_quant.map(|q| q.cost);
 
     let variance = params.qty_counted - expected_qty;
     let variance_value = compute_sheet_variance_value(expected_qty, params.qty_counted, quant_cost);
@@ -460,6 +463,8 @@ pub fn post_cycle_count_adjustments(
         return Err("Cycle count must be validated before posting adjustments".to_string());
     }
 
+    assert_inventory_writable(ctx, organization_id, cycle.company_id)?;
+
     let sheet_ids = cycle.line_ids.clone();
     for sheet_id in sheet_ids {
         let sheet = ctx
@@ -473,7 +478,7 @@ pub fn post_cycle_count_adjustments(
             continue;
         }
 
-        if let Some(quant) = find_quant_for_sheet(ctx, &sheet) {
+        if let Some(quant) = find_quant_for_sheet(ctx, &sheet, cycle.company_id) {
             let new_qty = sheet.counted_qty;
             let new_available = (new_qty - quant.reserved_quantity).max(0.0);
             let new_value = new_qty * quant.cost;
@@ -490,6 +495,15 @@ pub fn post_cycle_count_adjustments(
                 ..quant
             });
         } else {
+            // New quant: inherit cost and currency from product rather than defaulting to zero
+            let (unit_cost, quant_currency_id) = ctx
+                .db
+                .product()
+                .id()
+                .find(&sheet.product_id)
+                .map(|p| (p.standard_price, Some(p.currency_id)))
+                .unwrap_or((0.0, None));
+
             let qty = sheet.counted_qty;
             ctx.db.stock_quant().insert(StockQuant {
                 id: 0,
@@ -511,11 +525,11 @@ pub fn post_cycle_count_adjustments(
                 is_outdated: false,
                 user_id: Some(ctx.sender()),
                 inventory_date: Some(ctx.timestamp),
-                cost: 0.0,
-                value: 0.0,
+                cost: unit_cost,
+                value: qty * unit_cost,
                 cost_method: None,
                 accounting_date: None,
-                currency_id: None,
+                currency_id: quant_currency_id,
                 accounting_entry_ids: vec![],
                 metadata: Some("{\"source\":\"cycle_count_post\"}".to_string()),
             });

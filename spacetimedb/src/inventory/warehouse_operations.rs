@@ -7,13 +7,14 @@
 ///   - CartonizationResult
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::CompanyScopeParams;
+use crate::core::organization::{require_company_in_organization, CompanyScopeParams};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
 use crate::inventory::packing::stock_package;
 use crate::inventory::product::product;
 use crate::inventory::stock::{
-    assign_stock_picking, confirm_stock_picking, stock_move, stock_picking, StockMove,
+    assign_stock_picking, confirm_stock_picking, require_picking_in_company, stock_move,
+    stock_picking, StockMove,
 };
 use serde_json;
 
@@ -233,9 +234,31 @@ pub fn create_picking_wave(
     params: CreatePickingWaveParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "picking_wave", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     if params.name.is_empty() {
         return Err("Wave name cannot be empty".to_string());
+    }
+
+    // Validate and deduplicate picking_ids
+    {
+        let mut seen = std::collections::HashSet::new();
+        for &pid in &params.picking_ids {
+            if !seen.insert(pid) {
+                return Err(format!("duplicate picking id {} in wave", pid));
+            }
+            require_picking_in_company(ctx, organization_id, company_id, pid)?;
+        }
+    }
+
+    // Deduplicate move_line_ids
+    {
+        let mut seen = std::collections::HashSet::new();
+        for &mlid in &params.move_line_ids {
+            if !seen.insert(mlid) {
+                return Err(format!("duplicate move line id {} in wave", mlid));
+            }
+        }
     }
 
     let wave = ctx.db.picking_wave().insert(PickingWave {
@@ -290,6 +313,7 @@ pub fn create_warehouse_task(
     params: CreateWarehouseTaskParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "warehouse_task", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     if params.name.is_empty() {
         return Err("Task name cannot be empty".to_string());

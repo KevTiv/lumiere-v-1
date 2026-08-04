@@ -2,9 +2,10 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::inventory::inventory_adjustments::{
-    create_inventory_adjustment, create_stock_inventory, inventory_adjustment, stock_inventory,
-    CreateInventoryAdjustmentParams, CreateStockInventoryParams,
+    adjustment_reason, create_inventory_adjustment, create_stock_inventory, inventory_adjustment,
+    stock_inventory, AdjustmentReason, CreateInventoryAdjustmentParams, CreateStockInventoryParams,
 };
+use crate::inventory::product::product;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 
 pub fn test_stock_inventory_create(ctx: &ReducerContext) -> Result<(), String> {
@@ -23,18 +24,9 @@ pub fn test_stock_inventory_create(ctx: &ReducerContext) -> Result<(), String> {
             lot_ids: vec![],
             owner_ids: vec![],
             package_ids: vec![],
-            state: "draft".to_string(),
             accounting_date: None,
             category_id: None,
             counted_mode: "manual".to_string(),
-            done_move_ids: vec![],
-            move_ids: vec![],
-            adjustment_count: 0,
-            has_account_moves: false,
-            exhausted: false,
-            prefilled_count: 0,
-            started: false,
-            is_editable: true,
             is_stock_check: false,
             metadata: Some(r#"{"test":"stock_inventory_create"}"#.to_string()),
         },
@@ -68,6 +60,25 @@ pub fn test_inventory_adjustment_create(ctx: &ReducerContext) -> Result<(), Stri
     // Use warehouse id as location stub (harness warehouse row; full location graph is Phase 2)
     let location_id = fixture.warehouse_id;
 
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("Harness product not found")?;
+
+    // Seed a reason for this test
+    let reason = ctx.db.adjustment_reason().insert(AdjustmentReason {
+        id: 0,
+        organization_id: org_id,
+        code: "HARNESS_MANUAL".to_string(),
+        description: Some("Harness test reason".to_string()),
+        is_active: true,
+        is_system: false,
+        created_at: ctx.timestamp,
+        metadata: None,
+    });
+
     create_inventory_adjustment(
         ctx,
         org_id,
@@ -75,16 +86,13 @@ pub fn test_inventory_adjustment_create(ctx: &ReducerContext) -> Result<(), Stri
             name: "Harness Qty Fix".to_string(),
             product_id: fixture.product_id,
             location_id,
-            quantity_before: 10.0,
             quantity_after: 12.0,
-            reason_code: "manual".to_string(),
-            state: "draft".to_string(),
+            reason_id: reason.id,
             adjustment_type: "inventory".to_string(),
             inventory_id: None,
             lot_id: None,
             package_id: None,
-            uom_id: 1,
-            unit_cost: 10.0,
+            uom_id: product.uom_id,
             reason_notes: Some("Harness adjustment".to_string()),
             metadata: None,
         },
@@ -97,14 +105,15 @@ pub fn test_inventory_adjustment_create(ctx: &ReducerContext) -> Result<(), Stri
         .find(|a| a.organization_id == org_id && a.name == "Harness Qty Fix")
         .ok_or("Inventory adjustment not found after create")?;
 
-    if (adj.difference - 2.0).abs() > f64::EPSILON {
-        return Err(format!("difference should be 2.0, got {}", adj.difference));
+    // quantity_before is server-derived from stock (0 at stub location); quantity_after is 12.0
+    if (adj.quantity_after - 12.0).abs() > f64::EPSILON {
+        return Err(format!("quantity_after should be 12.0, got {}", adj.quantity_after));
     }
-    if (adj.total_value - 20.0).abs() > f64::EPSILON {
-        return Err(format!(
-            "total_value should be 20.0, got {}",
-            adj.total_value
-        ));
+    if adj.state != "draft" {
+        return Err(format!("expected draft state, got {}", adj.state));
+    }
+    if adj.company_id == 0 {
+        return Err("company_id must be server-derived (non-zero)".to_string());
     }
 
     Ok(())

@@ -763,42 +763,42 @@
     "table": "uom"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "stock-quants",
     "order_by": "",
     "resource_key": "stock-quants",
     "table": "stock_quant"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "stock-pickings",
     "order_by": "",
     "resource_key": "stock-pickings",
     "table": "stock_picking"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "warehouses",
     "order_by": "",
     "resource_key": "warehouses",
     "table": "warehouse"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "inventory-adjustments",
     "order_by": "",
     "resource_key": "inventory-adjustments",
     "table": "inventory_adjustment"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "stock-locations",
     "order_by": "",
     "resource_key": "stock-locations",
     "table": "stock_location"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "stock-moves",
     "order_by": "",
     "resource_key": "stock-moves",
@@ -819,70 +819,70 @@
     "table": "stock_production_serial"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "stock-cycle-counts",
     "order_by": "",
     "resource_key": "stock-cycle-counts",
     "table": "stock_cycle_count"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "stock-inventories",
     "order_by": "",
     "resource_key": "stock-inventories",
     "table": "stock_inventory"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "stock-routes",
     "order_by": "",
     "resource_key": "stock-routes",
     "table": "stock_route"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "stock-rules",
     "order_by": "",
     "resource_key": "stock-rules",
     "table": "stock_rule"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "picking-waves",
     "order_by": "",
     "resource_key": "picking-waves",
     "table": "picking_wave"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "warehouse-tasks",
     "order_by": "",
     "resource_key": "warehouse-tasks",
     "table": "warehouse_task"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "warehouse-3d-zones",
     "order_by": "",
     "resource_key": "warehouse-3d-zones",
     "table": "warehouse_3d_zone"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "quality-checks",
     "order_by": "",
     "resource_key": "quality-checks",
     "table": "quality_check"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "quality-alerts",
     "order_by": "",
     "resource_key": "quality-alerts",
     "table": "quality_alert"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "replenishment-rules",
     "order_by": "",
     "resource_key": "replenishment-rules",
@@ -924,7 +924,7 @@
     "table": "stock_traceability_report"
   },
   {
-    "extra_where": "",
+    "extra_where": " AND company_id = :company_id",
     "mapKey": "stock-packages",
     "order_by": "",
     "resource_key": "stock-packages",

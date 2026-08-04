@@ -10,6 +10,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::stock::{increase_quant_at_location, stock_quant};
 use serde_json;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -115,6 +116,7 @@ pub struct InventoryAdjustment {
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub name: String,
     pub state: String,
     pub adjustment_type: String,
@@ -173,18 +175,9 @@ pub struct CreateStockInventoryParams {
     pub lot_ids: Vec<u64>,
     pub owner_ids: Vec<u64>,
     pub package_ids: Vec<u64>,
-    pub state: String,
     pub accounting_date: Option<Timestamp>,
     pub category_id: Option<u64>,
     pub counted_mode: String,
-    pub done_move_ids: Vec<u64>,
-    pub move_ids: Vec<u64>,
-    pub adjustment_count: i32,
-    pub has_account_moves: bool,
-    pub exhausted: bool,
-    pub prefilled_count: i32,
-    pub started: bool,
-    pub is_editable: bool,
     pub is_stock_check: bool,
     pub metadata: Option<String>,
 }
@@ -194,16 +187,14 @@ pub struct CreateInventoryAdjustmentParams {
     pub name: String,
     pub product_id: u64,
     pub location_id: u64,
-    pub quantity_before: f64,
     pub quantity_after: f64,
-    pub reason_code: String,
-    pub state: String,
+    /// References a validated `AdjustmentReason.id`; the code is looked up server-side.
+    pub reason_id: u64,
     pub adjustment_type: String,
     pub inventory_id: Option<u64>,
     pub lot_id: Option<u64>,
     pub package_id: Option<u64>,
     pub uom_id: u64,
-    pub unit_cost: f64,
     pub reason_notes: Option<String>,
     pub metadata: Option<String>,
 }
@@ -273,7 +264,7 @@ pub fn create_stock_inventory(
         id: 0,
         organization_id,
         name: params.name.clone(),
-        state: params.state.clone(),
+        state: "draft".to_string(),
         location_ids: params.location_ids,
         product_ids: params.product_ids,
         lot_ids: params.lot_ids,
@@ -282,16 +273,16 @@ pub fn create_stock_inventory(
         company_id,
         date: ctx.timestamp,
         accounting_date: params.accounting_date,
-        done_move_ids: params.done_move_ids,
-        move_ids: params.move_ids,
-        adjustment_count: params.adjustment_count,
+        done_move_ids: vec![],
+        move_ids: vec![],
+        adjustment_count: 0,
         category_id: params.category_id,
-        has_account_moves: params.has_account_moves,
-        exhausted: params.exhausted,
-        prefilled_count: params.prefilled_count,
+        has_account_moves: false,
+        exhausted: false,
+        prefilled_count: 0,
         counted_mode: params.counted_mode,
-        started: params.started,
-        is_editable: params.is_editable,
+        started: false,
+        is_editable: true,
         is_stock_check: params.is_stock_check,
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
@@ -311,7 +302,7 @@ pub fn create_stock_inventory(
             new_values: Some(
                 serde_json::json!({
                     "name": params.name,
-                    "state": params.state,
+                    "state": "draft",
                     "location_count": location_count,
                     "product_count": product_count,
                 })
@@ -338,29 +329,66 @@ pub fn create_inventory_adjustment(
         return Err("Adjustment name cannot be empty".to_string());
     }
 
-    let difference = params.quantity_after - params.quantity_before;
-    let total_value = difference * params.unit_cost;
+    // Resolve company_id server-side; never trust caller-supplied value.
+    let company_id = company_id_from_scope(ctx, organization_id, None)?;
+
+    // Validate reason via relation and derive reason_code server-side.
+    let reason = ctx
+        .db
+        .adjustment_reason()
+        .id()
+        .find(&params.reason_id)
+        .ok_or_else(|| format!("AdjustmentReason {} not found", params.reason_id))?;
+    if reason.organization_id != organization_id {
+        return Err("AdjustmentReason does not belong to this organization".to_string());
+    }
+    if !reason.is_active {
+        return Err("AdjustmentReason is inactive".to_string());
+    }
+    let reason_code = reason.code.clone();
+
+    // Derive quantity_before and unit_cost from the current on-hand stock quant (server-authoritative).
+    let existing_quant = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&params.product_id)
+        .find(|q| {
+            q.organization_id == organization_id
+                && q.company_id == company_id
+                && q.location_id == params.location_id
+                && q.lot_id == params.lot_id
+                && q.owner_id.is_none()
+        });
+
+    let quantity_before = existing_quant.as_ref().map(|q| q.quantity).unwrap_or(0.0);
+    let unit_cost = existing_quant.map(|q| q.cost).unwrap_or(0.0);
+
+    let difference = params.quantity_after - quantity_before;
+    let total_value = difference * unit_cost;
 
     // approved_by, posted_by, move_id, accounting_entry_id, approved_at, posted_at
-    // are system-managed; set by dedicated approve/process reducers
+    // are system-managed; set by dedicated approve/process reducers.
+    // state is always "draft" on create; never trusted from client.
     let adjustment = ctx.db.inventory_adjustment().insert(InventoryAdjustment {
         id: 0,
         organization_id,
+        company_id,
         name: params.name.clone(),
-        state: params.state.clone(),
+        state: "draft".to_string(),
         adjustment_type: params.adjustment_type.clone(),
         inventory_id: params.inventory_id,
         product_id: params.product_id,
         location_id: params.location_id,
         lot_id: params.lot_id,
         package_id: params.package_id,
-        quantity_before: params.quantity_before,
+        quantity_before,
         quantity_after: params.quantity_after,
         difference,
         uom_id: params.uom_id,
-        unit_cost: params.unit_cost,
+        unit_cost,
         total_value,
-        reason_code: params.reason_code,
+        reason_code,
         reason_notes: params.reason_notes,
         requested_by: Some(ctx.sender()),
         approved_by: None,
@@ -377,7 +405,7 @@ pub fn create_inventory_adjustment(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id: Some(company_id),
             table_name: "inventory_adjustment",
             record_id: adjustment.id,
             action: "CREATE",
@@ -386,10 +414,10 @@ pub fn create_inventory_adjustment(
                 serde_json::json!({
                     "name": params.name,
                     "product_id": params.product_id,
-                    "quantity_before": params.quantity_before,
+                    "quantity_before": quantity_before,
                     "quantity_after": params.quantity_after,
                     "adjustment_type": params.adjustment_type,
-                    "state": params.state,
+                    "state": "draft",
                 })
                 .to_string(),
             ),
@@ -629,11 +657,71 @@ pub fn process_inventory_adjustment(
     if adjustment.organization_id != organization_id {
         return Err("Adjustment does not belong to this organization".to_string());
     }
+
+    // Idempotency guard: already processed, return early without error.
+    if adjustment.state == "processed" {
+        return Ok(());
+    }
+
     if adjustment.state != "draft" {
         return Err("Only draft adjustments can be processed".to_string());
     }
 
     let old_state = adjustment.state.clone();
+    let company_id = adjustment.company_id;
+    let delta = adjustment.quantity_after - adjustment.quantity_before;
+
+    // Apply stock mutation based on the signed delta.
+    if delta > 0.0 {
+        // Stock increased: add on-hand quantity at the location.
+        increase_quant_at_location(
+            ctx,
+            organization_id,
+            company_id,
+            adjustment.product_id,
+            adjustment.location_id,
+            delta,
+            adjustment.unit_cost,
+        )?;
+    } else if delta < 0.0 {
+        // Stock decreased: consume on-hand quantity at the location.
+        // We model a negative delta as a negative-qty increase (write-down).
+        // TODO: replace with a dedicated decrease_quant_at_location once available.
+        increase_quant_at_location(
+            ctx,
+            organization_id,
+            company_id,
+            adjustment.product_id,
+            adjustment.location_id,
+            delta, // negative value: increase_quant_at_location guards qty <= 0 as no-op,
+            adjustment.unit_cost, // so we update the quant directly instead.
+        )
+        .ok(); // increase_quant_at_location skips qty <= 0; handle via direct quant update below.
+
+        // Direct quant write-down for the negative delta case.
+        if let Some(quant) = ctx
+            .db
+            .stock_quant()
+            .quant_by_product()
+            .filter(&adjustment.product_id)
+            .find(|q| {
+                q.organization_id == organization_id
+                    && q.company_id == company_id
+                    && q.location_id == adjustment.location_id
+                    && q.lot_id == adjustment.lot_id
+                    && q.owner_id.is_none()
+            })
+        {
+            let new_qty = (quant.quantity + delta).max(0.0);
+            let available_qty = (new_qty - quant.reserved_quantity).max(0.0);
+            ctx.db.stock_quant().id().update(crate::inventory::stock::StockQuant {
+                quantity: new_qty,
+                available_quantity: available_qty,
+                ..quant
+            });
+        }
+    }
+    // delta == 0.0: quantities are equal, no stock move needed.
 
     ctx.db
         .inventory_adjustment()
@@ -642,6 +730,7 @@ pub fn process_inventory_adjustment(
             state: "processed".to_string(),
             posted_at: Some(ctx.timestamp),
             posted_by: Some(ctx.sender()),
+            // move_id and accounting_entry_id remain None until accounting integration is wired.
             ..adjustment
         });
 
@@ -649,13 +738,19 @@ pub fn process_inventory_adjustment(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id: Some(company_id),
             table_name: "inventory_adjustment",
             record_id: adjustment_id,
             action: "UPDATE",
             old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
-            new_values: Some(serde_json::json!({ "state": "processed" }).to_string()),
-            changed_fields: vec!["state".to_string()],
+            new_values: Some(
+                serde_json::json!({
+                    "state": "processed",
+                    "delta": delta,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["state".to_string(), "posted_at".to_string(), "posted_by".to_string()],
             metadata: None,
         },
     );

@@ -36,6 +36,7 @@ pub struct InventoryIntegrationIntent {
     pub last_error: Option<String>,
     pub external_reference: Option<String>,
     pub attempt_count: u32,
+    pub applied: bool,
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
@@ -99,7 +100,7 @@ pub fn create_inventory_integration_intent(
         .inventory_integration_intent()
         .inventory_integration_intent_by_key()
         .filter(&params.idempotency_key)
-        .find(|i| i.organization_id == organization_id);
+        .find(|i| i.organization_id == organization_id && i.company_id == company_id);
     if existing.is_some() {
         return Ok(());
     }
@@ -121,6 +122,7 @@ pub fn create_inventory_integration_intent(
             last_error: None,
             external_reference: None,
             attempt_count: 0,
+            applied: false,
             create_uid: ctx.sender(),
             create_date: ctx.timestamp,
             write_uid: ctx.sender(),
@@ -180,12 +182,21 @@ pub fn record_inventory_integration_result(
         ));
     }
 
+    if status == "failed" && intent.applied {
+        return Err(
+            "Cannot mark as failed: integration has already been applied".to_string(),
+        );
+    }
+
     if status == "succeeded"
         && intent.intent_type == "asn_inbound"
         && params.product_id.is_some()
         && params.location_id.is_some()
         && params.quantity.unwrap_or(0.0) > 0.0
     {
+        if intent.applied {
+            return Ok(());
+        }
         assert_inventory_writable(ctx, organization_id, company_id)?;
         let product_id = params.product_id.unwrap();
         let location_id = params.location_id.unwrap();
@@ -200,6 +211,13 @@ pub fn record_inventory_integration_result(
             qty,
             cost,
         )?;
+        ctx.db
+            .inventory_integration_intent()
+            .id()
+            .update(InventoryIntegrationIntent {
+                applied: true,
+                ..intent.clone()
+            });
     }
 
     ctx.db

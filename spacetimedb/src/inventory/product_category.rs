@@ -6,7 +6,9 @@
 /// | **ProductCategory** | Product classification hierarchy with parent-child relationships |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::product::product;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -69,16 +71,31 @@ pub fn create_product_category(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "product_category", "create")?;
 
+    if let Some(cid) = params.company_id {
+        require_company_in_organization(ctx, organization_id, cid)?;
+    }
+
     if params.name.trim().is_empty() {
         return Err("Category name cannot be empty".to_string());
     }
 
     if let Some(parent_id) = params.parent_id {
-        ctx.db
+        let parent = ctx
+            .db
             .product_category()
             .id()
             .find(&parent_id)
             .ok_or("Parent category not found")?;
+        if parent.organization_id != organization_id {
+            return Err("Parent category does not belong to this organization".to_string());
+        }
+        if let (Some(new_cid), Some(parent_cid)) = (params.company_id, parent.company_id) {
+            if new_cid != parent_cid {
+                return Err(
+                    "Category company must match parent category company".to_string(),
+                );
+            }
+        }
     }
 
     let category = ctx.db.product_category().insert(ProductCategory {
@@ -225,6 +242,19 @@ pub fn delete_product_category(
 
     if category.deleted_at.is_some() {
         return Ok(()); // Idempotent
+    }
+
+    // Reject if any active product still references this category
+    let in_use = ctx
+        .db
+        .product()
+        .product_by_categ()
+        .filter(&category_id)
+        .any(|p| p.organization_id == organization_id && p.active);
+    if in_use {
+        return Err(
+            "Category is in use by one or more active products and cannot be deleted".to_string(),
+        );
     }
 
     let category_name = category.name.clone();

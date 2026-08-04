@@ -8,11 +8,15 @@ export function u64FromRow(
   snake: string,
 ): bigint {
   const v = row[camel] ?? row[snake]
-  if (v == null || v === "") return 0n
+  if (v == null || v === "") {
+    throw new Error(`warehouse field '${camel}' is required but was missing`)
+  }
   try {
     return BigInt(String(v))
   } catch {
-    return 0n
+    throw new Error(
+      `warehouse field '${camel}' could not be parsed as a u64: ${String(v)}`,
+    )
   }
 }
 

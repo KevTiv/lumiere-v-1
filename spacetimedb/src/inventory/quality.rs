@@ -8,8 +8,12 @@
 ///   - QualityTeam
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::inventory::stock::{quarantine_quantity, stock_picking, stock_quant};
+use crate::inventory::stock::{
+    ensure_lot_for_product, quarantine_quantity, require_picking_in_company,
+    require_product_in_org, stock_picking, stock_quant,
+};
 use crate::inventory::warehouse::warehouse;
 use serde_json;
 
@@ -307,6 +311,17 @@ pub fn create_quality_check(
     params: CreateQualityCheckParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "quality_check", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
+
+    if let Some(pid) = params.product_id {
+        require_product_in_org(ctx, organization_id, pid)?;
+    }
+    if let Some(picking_id) = params.picking_id {
+        require_picking_in_company(ctx, organization_id, company_id, picking_id)?;
+    }
+    if let (Some(lot_id), Some(prod_id)) = (params.lot_id, params.product_id) {
+        ensure_lot_for_product(ctx, organization_id, company_id, prod_id, lot_id)?;
+    }
 
     if params.name.is_empty() {
         return Err("Check name cannot be empty".to_string());
@@ -749,6 +764,7 @@ pub fn create_quality_alert(
     params: CreateQualityAlertParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "quality_alert", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     if params.title.is_empty() {
         return Err("Alert title cannot be empty".to_string());

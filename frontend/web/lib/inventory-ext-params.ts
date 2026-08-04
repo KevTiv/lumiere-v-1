@@ -253,10 +253,10 @@ export function toCreateInventoryAdjustmentParamsFromForm(
   if (productRaw === "" || productRaw == null || locRaw === "" || locRaw == null) return null
   const qtyAfter = Number(formData.countQty ?? formData.inventoryQuantity ?? 0)
   const bookRaw = formData.bookQuantity
-  const qtyBefore =
-    bookRaw !== "" && bookRaw != null && String(bookRaw).trim() !== ""
-      ? Number(bookRaw)
-      : qtyAfter
+  if (bookRaw === "" || bookRaw == null || String(bookRaw).trim() === "") {
+    throw new Error("Book quantity is required to create an inventory adjustment")
+  }
+  const qtyBefore = Number(bookRaw)
   return {
     name: String(formData.name ?? "Inventory Adjustment"),
     productId: Number(productRaw),

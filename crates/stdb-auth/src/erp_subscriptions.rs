@@ -456,6 +456,16 @@ pub fn subscription_queries_for_resource(
     let Some(line) = erp_org_line(r, org, ctx.field_access)? else {
         return Ok(None);
     };
+    // Inventory resources embed `:company_id` in their extra_where clause. Substitute the
+    // first available company id from the subscription context; absent context → no query.
+    let line = if line.contains(":company_id") {
+        let Some(cid) = ctx.company_ids.and_then(|ids| ids.first()) else {
+            return Ok(None);
+        };
+        line.replace(":company_id", &cid.to_string())
+    } else {
+        line
+    };
     Ok(Some(vec![line]))
 }
 

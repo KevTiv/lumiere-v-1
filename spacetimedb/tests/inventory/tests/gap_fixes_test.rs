@@ -28,6 +28,11 @@ use crate::inventory::integration::{
     record_inventory_integration_result, CreateInventoryIntegrationIntentParams,
     RecordInventoryIntegrationResultParams,
 };
+use crate::inventory::inventory_adjustments::{
+    adjustment_reason, create_inventory_adjustment, create_stock_inventory, inventory_adjustment,
+    process_inventory_adjustment, stock_inventory, AdjustmentReason,
+    CreateInventoryAdjustmentParams, CreateStockInventoryParams,
+};
 use crate::inventory::inventory_close::{
     create_inventory_close, inventory_close, reopen_inventory_close, run_inventory_close,
     CreateInventoryCloseParams, RunInventoryCloseParams,
@@ -1552,7 +1557,7 @@ pub fn test_replenishment_creates_draft_po(ctx: &ReducerContext) -> Result<(), S
         .map(|r| r.id)
         .ok_or("rule missing")?;
 
-    execute_replenishment_rule(ctx, org_id, company_id, rule_id)?;
+    execute_replenishment_rule(ctx, org_id, company_id, rule_id, format!("test-replenish-{rule_id}"))?;
 
     let po = ctx
         .db
@@ -4061,6 +4066,439 @@ pub fn test_multi_wh_promise_atp(ctx: &ReducerContext) -> Result<(), String> {
     });
     if !xfer {
         return Err("expected draft INT ATP transfer demand".into());
+    }
+    Ok(())
+}
+
+// ── Phase 3+4 integrity proof tests (INV-RI-017) ────────────────────────────
+
+/// INV-RI-017-1: Server owns StockInventory state — draft/started/is_editable set server-side.
+pub fn test_stock_inventory_server_owns_state(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+
+    create_stock_inventory(
+        ctx,
+        org_id,
+        CreateStockInventoryParams {
+            company_id: Some(fixture.company_id),
+            name: "Server-owned state test".to_string(),
+            location_ids: vec![],
+            product_ids: vec![],
+            lot_ids: vec![],
+            owner_ids: vec![],
+            package_ids: vec![],
+            accounting_date: None,
+            category_id: None,
+            counted_mode: "all".to_string(),
+            is_stock_check: false,
+            metadata: None,
+        },
+    )?;
+
+    let inv = ctx
+        .db
+        .stock_inventory()
+        .iter()
+        .find(|i| i.organization_id == org_id && i.name == "Server-owned state test")
+        .ok_or("stock inventory not found")?;
+
+    if inv.state != "draft" {
+        return Err(format!("expected state=draft, got {}", inv.state));
+    }
+    if inv.started {
+        return Err("started should be false on create".to_string());
+    }
+    if inv.adjustment_count != 0 {
+        return Err(format!("adjustment_count should be 0, got {}", inv.adjustment_count));
+    }
+    if !inv.is_editable {
+        return Err("is_editable should be true on create".to_string());
+    }
+    Ok(())
+}
+
+/// INV-RI-017-2: company_id on InventoryAdjustment is server-derived (non-zero).
+pub fn test_adjustment_company_derived(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("product not found")?;
+
+    let reason = ctx.db.adjustment_reason().insert(AdjustmentReason {
+        id: 0,
+        organization_id: org_id,
+        code: "COMPANY_DERIVED_TEST".to_string(),
+        description: Some("company_id derivation test".to_string()),
+        is_active: true,
+        is_system: false,
+        created_at: ctx.timestamp,
+        metadata: None,
+    });
+
+    create_inventory_adjustment(
+        ctx,
+        org_id,
+        CreateInventoryAdjustmentParams {
+            name: "CompanyDerived-001".to_string(),
+            product_id: fixture.product_id,
+            location_id: fixture.warehouse_id,
+            quantity_after: 5.0,
+            reason_id: reason.id,
+            adjustment_type: "inventory".to_string(),
+            inventory_id: None,
+            lot_id: None,
+            package_id: None,
+            uom_id: product.uom_id,
+            reason_notes: None,
+            metadata: None,
+        },
+    )?;
+
+    let adj = ctx
+        .db
+        .inventory_adjustment()
+        .iter()
+        .find(|a| a.organization_id == org_id && a.name == "CompanyDerived-001")
+        .ok_or("adjustment not found")?;
+
+    if adj.company_id == 0 {
+        return Err("company_id must be server-derived (non-zero)".to_string());
+    }
+    if adj.company_id != fixture.company_id {
+        return Err(format!(
+            "company_id mismatch: expected {}, got {}",
+            fixture.company_id, adj.company_id
+        ));
+    }
+    Ok(())
+}
+
+/// INV-RI-017-3: process_inventory_adjustment is idempotent — second call returns Ok, quant
+/// changes only once.
+pub fn test_adjustment_process_idempotency(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("product not found")?;
+
+    let reason = ctx.db.adjustment_reason().insert(AdjustmentReason {
+        id: 0,
+        organization_id: org_id,
+        code: "IDEMPOTENCY_TEST".to_string(),
+        description: Some("idempotency test".to_string()),
+        is_active: true,
+        is_system: false,
+        created_at: ctx.timestamp,
+        metadata: None,
+    });
+
+    create_inventory_adjustment(
+        ctx,
+        org_id,
+        CreateInventoryAdjustmentParams {
+            name: "Idem-Adj-001".to_string(),
+            product_id: fixture.product_id,
+            location_id: fixture.warehouse_id,
+            quantity_after: 8.0,
+            reason_id: reason.id,
+            adjustment_type: "inventory".to_string(),
+            inventory_id: None,
+            lot_id: None,
+            package_id: None,
+            uom_id: product.uom_id,
+            reason_notes: None,
+            metadata: None,
+        },
+    )?;
+
+    let adj_id = ctx
+        .db
+        .inventory_adjustment()
+        .iter()
+        .find(|a| a.organization_id == org_id && a.name == "Idem-Adj-001")
+        .map(|a| a.id)
+        .ok_or("adjustment not found")?;
+
+    // First process
+    process_inventory_adjustment(ctx, org_id, adj_id)?;
+
+    let qty_after_first: f64 = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| {
+            q.organization_id == org_id
+                && q.product_id == fixture.product_id
+                && q.location_id == fixture.warehouse_id
+        })
+        .map(|q| q.quantity)
+        .sum();
+
+    // Second process — must return Ok (idempotent guard)
+    process_inventory_adjustment(ctx, org_id, adj_id)?;
+
+    let qty_after_second: f64 = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| {
+            q.organization_id == org_id
+                && q.product_id == fixture.product_id
+                && q.location_id == fixture.warehouse_id
+        })
+        .map(|q| q.quantity)
+        .sum();
+
+    if (qty_after_first - qty_after_second).abs() > 1e-9 {
+        return Err(format!(
+            "second process changed quant: {} -> {}",
+            qty_after_first, qty_after_second
+        ));
+    }
+
+    let adj = ctx
+        .db
+        .inventory_adjustment()
+        .id()
+        .find(&adj_id)
+        .ok_or("adjustment missing after double process")?;
+    if adj.state != "processed" {
+        return Err(format!("expected state=processed, got {}", adj.state));
+    }
+    Ok(())
+}
+
+/// INV-RI-017-4: reopen_inventory_close is blocked when account_move_id is set (GL move exists).
+pub fn test_inventory_close_reopen_blocked_with_gl_move(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    // Directly insert a closed InventoryClose row that has a fake GL move reference.
+    let row = ctx.db.inventory_close().insert(crate::inventory::inventory_close::InventoryClose {
+        id: 0,
+        organization_id: org_id,
+        company_id,
+        name: "CLOSE-GL-GUARD".to_string(),
+        as_of: ctx.timestamp,
+        state: "closed".to_string(),
+        locked: true,
+        line_count: 0,
+        total_quantity: 0.0,
+        total_value: 0.0,
+        journal_id: None,
+        inventory_account_id: None,
+        valuation_account_id: None,
+        account_move_id: Some(1), // fake GL move id — reopen must be blocked
+        closed_at: Some(ctx.timestamp),
+        create_uid: ctx.sender(),
+        create_date: ctx.timestamp,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        metadata: None,
+    });
+
+    let result = reopen_inventory_close(ctx, org_id, company_id, row.id);
+    if result.is_ok() {
+        return Err(
+            "expected Err when reopening close with account_move_id set, got Ok".to_string(),
+        );
+    }
+    let msg = result.unwrap_err();
+    if !msg.to_lowercase().contains("gl") && !msg.to_lowercase().contains("valuation")
+        && !msg.to_lowercase().contains("reverse") && !msg.to_lowercase().contains("move")
+    {
+        return Err(format!("error message should mention GL/move; got: {msg}"));
+    }
+    Ok(())
+}
+
+/// INV-RI-017-5: execute_replenishment_rule returns Err for a non-existent rule_id.
+pub fn test_replenishment_rule_not_found(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let result = execute_replenishment_rule(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        9_999_999u64,
+        "test-key-notfound".to_string(),
+    );
+    if result.is_ok() {
+        return Err("expected Err for non-existent replenishment rule, got Ok".to_string());
+    }
+    Ok(())
+}
+
+/// INV-RI-017-6: record_inventory_integration_result with status="failed" on an applied intent
+/// returns Err (applied guard).
+pub fn test_integration_applied_guard(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    // Create an intent
+    create_inventory_integration_intent(
+        ctx,
+        org_id,
+        company_id,
+        CreateInventoryIntegrationIntentParams {
+            provider: "test-wms".to_string(),
+            intent_type: "asn_inbound".to_string(),
+            warehouse_id: Some(fixture.warehouse_id),
+            picking_id: None,
+            idempotency_key: "ri017-applied-guard".to_string(),
+            request_payload: None,
+            metadata: None,
+        },
+    )?;
+
+    let intent_id = ctx
+        .db
+        .inventory_integration_intent()
+        .iter()
+        .find(|i| {
+            i.organization_id == org_id && i.idempotency_key == "ri017-applied-guard"
+        })
+        .map(|i| i.id)
+        .ok_or("integration intent not found")?;
+
+    // Mark it applied directly so we can test the guard
+    let intent = ctx
+        .db
+        .inventory_integration_intent()
+        .id()
+        .find(&intent_id)
+        .ok_or("intent missing")?;
+    ctx.db
+        .inventory_integration_intent()
+        .id()
+        .update(crate::inventory::integration::InventoryIntegrationIntent {
+            applied: true,
+            ..intent
+        });
+
+    // Attempting to record "failed" on an applied intent must be rejected
+    let result = record_inventory_integration_result(
+        ctx,
+        org_id,
+        company_id,
+        intent_id,
+        RecordInventoryIntegrationResultParams {
+            status: "failed".to_string(),
+            external_reference: None,
+            last_error: Some("simulated failure".to_string()),
+            product_id: None,
+            location_id: None,
+            quantity: None,
+            cost: None,
+            metadata: None,
+        },
+    );
+    if result.is_ok() {
+        return Err(
+            "expected Err when marking applied intent as failed, got Ok".to_string(),
+        );
+    }
+    Ok(())
+}
+
+/// INV-RI-017-7: create_inventory_close starts with account_move_id=None and state="draft".
+pub fn test_inventory_close_no_gl_on_create(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    create_inventory_close(
+        ctx,
+        org_id,
+        company_id,
+        CreateInventoryCloseParams {
+            name: "CLOSE-NO-GL".to_string(),
+            as_of: None,
+            journal_id: None,
+            inventory_account_id: None,
+            valuation_account_id: None,
+            metadata: None,
+        },
+    )?;
+
+    let close = ctx
+        .db
+        .inventory_close()
+        .iter()
+        .find(|c| c.organization_id == org_id && c.name == "CLOSE-NO-GL")
+        .ok_or("inventory close not found after create")?;
+
+    if close.state != "draft" {
+        return Err(format!("expected state=draft on create, got {}", close.state));
+    }
+    if close.account_move_id.is_some() {
+        return Err(format!(
+            "account_move_id should be None on create, got {:?}",
+            close.account_move_id
+        ));
+    }
+    if close.locked {
+        return Err("locked should be false on create".to_string());
+    }
+    Ok(())
+}
+
+/// INV-RI-017-8: create_inventory_adjustment with a non-existent reason_id returns Err.
+pub fn test_adjustment_requires_valid_reason_id(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("product not found")?;
+
+    let result = create_inventory_adjustment(
+        ctx,
+        org_id,
+        CreateInventoryAdjustmentParams {
+            name: "BadReason-Adj-001".to_string(),
+            product_id: fixture.product_id,
+            location_id: fixture.warehouse_id,
+            quantity_after: 3.0,
+            reason_id: 9_999_999u64, // non-existent
+            adjustment_type: "inventory".to_string(),
+            inventory_id: None,
+            lot_id: None,
+            package_id: None,
+            uom_id: product.uom_id,
+            reason_notes: None,
+            metadata: None,
+        },
+    );
+    if result.is_ok() {
+        return Err(
+            "expected Err when reason_id does not exist, got Ok".to_string(),
+        );
     }
     Ok(())
 }

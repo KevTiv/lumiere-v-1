@@ -81,29 +81,55 @@ fn row_id_u64(row: &Value) -> u64 {
         .unwrap_or(0)
 }
 
-fn optional_u64(value: Option<&Value>) -> Option<u64> {
-    let value = value?;
+/// Strict variant of `row_id_u64` that surfaces parse failures instead of
+/// silently returning zero. Use this wherever the ID feeds a business
+/// operation rather than a sort comparator.
+fn row_id_u64_strict(row: &Value) -> Result<u64, String> {
+    let v = row
+        .get("id")
+        .ok_or_else(|| "row missing id field".to_string())?;
+    if v.is_null() {
+        return Err("row id is null".to_string());
+    }
+    v.as_u64()
+        .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+        .ok_or_else(|| format!("row id is not a valid u64: {v}"))
+}
+
+fn optional_u64(value: Option<&Value>) -> Result<Option<u64>, String> {
+    let value = match value {
+        None => return Ok(None),
+        Some(v) => v,
+    };
+    if value.is_null() {
+        return Ok(None);
+    }
+    // SpacetimeDB None encoding: {none: ...}
+    if let Some(obj) = value.as_object() {
+        if obj.contains_key("none") {
+            return Ok(None);
+        }
+        // SpacetimeDB Some encoding: {some: [v]} or {Some: [v]}
+        if let Some(some_val) = obj.get("some").or_else(|| obj.get("Some")) {
+            let inner = some_val
+                .as_array()
+                .and_then(|arr| arr.first())
+                .unwrap_or(some_val);
+            let parsed = inner
+                .as_u64()
+                .or_else(|| inner.as_str().and_then(|s| s.parse().ok()))
+                .ok_or_else(|| format!("cannot parse Some value as u64: {inner}"))?;
+            return Ok(Some(parsed));
+        }
+    }
     value
         .as_u64()
         .or_else(|| value.as_str().and_then(|s| s.parse().ok()))
-        .or_else(|| {
-            value
-                .as_object()
-                .and_then(|obj| obj.get("some").or_else(|| obj.get("Some")))
-                .and_then(|some| {
-                    some.as_array()
-                        .and_then(|values| values.first())
-                        .or(Some(some))
-                })
-                .and_then(|inner| {
-                    inner
-                        .as_u64()
-                        .or_else(|| inner.as_str().and_then(|s| s.parse().ok()))
-                })
-        })
+        .ok_or_else(|| format!("cannot parse value as u64: {value}"))
+        .map(Some)
 }
 
-fn row_u64(row: &Value, camel: &str, snake: &str) -> Option<u64> {
+fn row_u64(row: &Value, camel: &str, snake: &str) -> Result<Option<u64>, String> {
     optional_u64(row.get(camel).or_else(|| row.get(snake)))
 }
 
@@ -207,7 +233,8 @@ pub async fn resolve_crm_company_id(
         .first()
         .ok_or_else(|| ApiError::Forbidden("No active organization membership".into()))?;
 
-    let membership_company = row_u64(membership, "companyId", "company_id");
+    let membership_company = row_u64(membership, "companyId", "company_id")
+        .map_err(ApiError::Internal)?;
     let allowed = match membership_company {
         Some(company_id) if company_id > 0 => company_id,
         _ => default_company_id(client, organization_id)
@@ -218,6 +245,46 @@ pub async fn resolve_crm_company_id(
     if requested_company_id.is_some_and(|requested| requested != allowed) {
         return Err(ApiError::Forbidden(
             "Cannot query another company's CRM data".into(),
+        ));
+    }
+    Ok(allowed)
+}
+
+/// Resolve the inventory company for the authenticated membership.
+///
+/// Company-bound memberships are restricted to that company. Organization-level
+/// memberships fall back to the default company. A requested browser company
+/// must equal the server-derived scope.
+pub async fn resolve_inventory_company_id(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+    requested_company_id: Option<u64>,
+) -> Result<u64, ApiError> {
+    let identity = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+    let sql = format!(
+        "SELECT id, organization_id, company_id, is_active FROM user_organization WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
+    );
+    let memberships = client
+        .query_sql(&sql)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let membership = memberships
+        .first()
+        .ok_or_else(|| ApiError::Forbidden("No active organization membership".into()))?;
+
+    let membership_company = row_u64(membership, "companyId", "company_id")
+        .map_err(ApiError::Internal)?;
+    let allowed = match membership_company {
+        Some(company_id) if company_id > 0 => company_id,
+        _ => default_company_id(client, organization_id)
+            .await?
+            .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
+    };
+
+    if requested_company_id.is_some_and(|requested| requested != allowed) {
+        return Err(ApiError::Forbidden(
+            "Cannot query another company's inventory data".into(),
         ));
     }
     Ok(allowed)
@@ -262,8 +329,39 @@ pub(crate) fn crm_resource(resource: &str) -> bool {
     )
 }
 
+pub(crate) fn inventory_resource(resource: &str) -> bool {
+    matches!(
+        resource,
+        "stock-quants"
+            | "stock-moves"
+            | "stock-pickings"
+            | "stock-production-lots"
+            | "stock-production-serials"
+            | "stock-packages"
+            | "stock-locations"
+            | "stock-routes"
+            | "stock-rules"
+            | "stock-inventories"
+            | "stock-cycle-counts"
+            | "stock-traceability-reports"
+            | "warehouses"
+            | "warehouse-tasks"
+            | "warehouse-3d-zones"
+            | "warehouse-geo"
+            | "warehouse-sync-intents"
+            | "warehouse-sync-intents-pending"
+            | "picking-waves"
+            | "quality-checks"
+            | "quality-alerts"
+            | "quality-teams"
+            | "replenishment-rules"
+            | "picking-batches"
+            | "product-categories"
+    )
+}
+
 fn row_company_matches(row: &Value, company_id: u64, allow_shared: bool) -> bool {
-    match row_u64(row, "companyId", "company_id") {
+    match row_u64(row, "companyId", "company_id").ok().flatten() {
         Some(id) => id == company_id,
         None => allow_shared,
     }
@@ -291,6 +389,13 @@ fn visible_parent_ids_from_rows(rows: &[Value], company_id: u64) -> HashSet<u64>
         .map(row_id_u64)
         .filter(|id| *id > 0)
         .collect()
+}
+
+fn filter_inventory_company_rows(resource: &str, company_id: u64, rows: &mut Vec<Value>) {
+    // product-categories with no company_id are org-shared and visible to all
+    // company members within the organization.
+    let allow_shared = matches!(resource, "product-categories");
+    rows.retain(|row| row_company_matches(row, company_id, allow_shared));
 }
 
 async fn filter_crm_company_rows(
@@ -405,6 +510,19 @@ pub async fn execute_resource_query_for_company(
         Some(
             resolve_crm_company_id(client, organization_id, identity_hex, requested_company_id)
                 .await?,
+        )
+    } else {
+        None
+    };
+    let inventory_company_id = if inventory_resource(resource) {
+        Some(
+            resolve_inventory_company_id(
+                client,
+                organization_id,
+                identity_hex,
+                requested_company_id,
+            )
+            .await?,
         )
     } else {
         None
@@ -971,11 +1089,22 @@ pub async fn execute_resource_query_for_company(
         "delivery-carriers"
         | "delivery-price-rules"
         | "shipping-methods"
-        | "pos-payment-methods"
-        | "picking-batches" => {
+        | "pos-payment-methods" => {
             let Some(cid) = default_company_id(client, organization_id).await? else {
                 return Ok(vec![]);
             };
+            let reg = registry_get(resource)
+                .ok_or_else(|| ApiError::NotFound(format!("unknown resource: {resource}")))?;
+            let sql = select_company_scoped_sql(resource, &reg.table, cid, fa, "", "")
+                .map_err(ApiError::Internal)?;
+            return client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()));
+        }
+        "picking-batches" => {
+            // inventory_company_id is already resolved for this resource above
+            let cid = inventory_company_id.expect("picking-batches is an inventory resource");
             let reg = registry_get(resource)
                 .ok_or_else(|| ApiError::NotFound(format!("unknown resource: {resource}")))?;
             let sql = select_company_scoped_sql(resource, &reg.table, cid, fa, "", "")
@@ -1047,7 +1176,7 @@ pub async fn execute_resource_query_for_company(
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
             let job_ids: Vec<u64> = job_rows
                 .iter()
-                .map(row_id_u64)
+                .filter_map(|r| row_id_u64_strict(r).ok())
                 .filter(|id| *id > 0)
                 .collect();
             if job_ids.is_empty() {
@@ -1079,7 +1208,7 @@ pub async fn execute_resource_query_for_company(
             let config_ids: HashSet<u64> = config_rows
                 .iter()
                 .filter_map(|r| {
-                    let id = row_id_u64(r);
+                    let id = row_id_u64_strict(r).ok()?;
                     (id > 0).then_some(id)
                 })
                 .collect();
@@ -1119,7 +1248,7 @@ pub async fn execute_resource_query_for_company(
             let config_ids: HashSet<u64> = config_rows
                 .iter()
                 .filter_map(|r| {
-                    let id = row_id_u64(r);
+                    let id = row_id_u64_strict(r).ok()?;
                     (id > 0).then_some(id)
                 })
                 .collect();
@@ -1384,7 +1513,16 @@ pub async fn execute_resource_query_for_company(
     };
 
     // Bounded exception resources (and any erp-org-sql extraWhere) share SQL with WS subscriptions.
-    let extra_where = erp_org_extra_where(resource).unwrap_or("");
+    // Inventory resources carry `:company_id` as a placeholder in extra_where; substitute the
+    // resolved company id so the WHERE clause filters at the SQL level, not post-fetch.
+    let extra_where_raw = erp_org_extra_where(resource).unwrap_or("");
+    let extra_where_owned;
+    let extra_where = if let Some(cid) = inventory_company_id {
+        extra_where_owned = extra_where_raw.replace(":company_id", &cid.to_string());
+        extra_where_owned.as_str()
+    } else {
+        extra_where_raw
+    };
     let mut sql = select_org_scoped_sql(
         resource,
         &reg.table,
@@ -1409,6 +1547,9 @@ pub async fn execute_resource_query_for_company(
 
     if let Some(company_id) = crm_company_id {
         filter_crm_company_rows(client, resource, organization_id, company_id, &mut rows).await?;
+    }
+    if let Some(company_id) = inventory_company_id {
+        filter_inventory_company_rows(resource, company_id, &mut rows);
     }
 
     if resource == "activities"
@@ -1656,5 +1797,99 @@ mod tests {
         assert!(crm_resource("contacts"));
         assert!(crm_resource("crm-conversation-messages"));
         assert!(!crm_resource("account-moves"));
+    }
+
+    #[test]
+    fn row_id_u64_strict_roundtrips_boundary_values() {
+        // 2^53 — largest JS-safe integer
+        let at_boundary = json!({ "id": "9007199254740992" });
+        assert_eq!(row_id_u64_strict(&at_boundary).unwrap(), 9007199254740992u64);
+
+        // 2^53 + 1 — first value that JS Number silently truncates
+        let above_boundary = json!({ "id": "9007199254740993" });
+        assert_eq!(
+            row_id_u64_strict(&above_boundary).unwrap(),
+            9007199254740993u64
+        );
+
+        // near u64::MAX
+        let near_max = json!({ "id": "18446744073709551614" });
+        assert_eq!(
+            row_id_u64_strict(&near_max).unwrap(),
+            18446744073709551614u64
+        );
+
+        // numeric form also accepted
+        let numeric = json!({ "id": 42u64 });
+        assert_eq!(row_id_u64_strict(&numeric).unwrap(), 42u64);
+    }
+
+    #[test]
+    fn row_id_u64_strict_rejects_bad_inputs() {
+        assert!(row_id_u64_strict(&json!({})).is_err(), "missing id field");
+        assert!(row_id_u64_strict(&json!({ "id": null })).is_err(), "null id");
+        assert!(
+            row_id_u64_strict(&json!({ "id": "" })).is_err(),
+            "empty string"
+        );
+        assert!(
+            row_id_u64_strict(&json!({ "id": "-1" })).is_err(),
+            "negative string"
+        );
+        assert!(
+            row_id_u64_strict(&json!({ "id": "3.14" })).is_err(),
+            "float string"
+        );
+        assert!(
+            row_id_u64_strict(&json!({ "id": "not_a_number" })).is_err(),
+            "non-numeric string"
+        );
+    }
+
+    #[test]
+    fn optional_u64_returns_ok_none_for_absent_and_null() {
+        assert_eq!(optional_u64(None).unwrap(), None);
+        assert_eq!(optional_u64(Some(&json!(null))).unwrap(), None);
+        assert_eq!(optional_u64(Some(&json!({ "none": [] }))).unwrap(), None);
+    }
+
+    #[test]
+    fn optional_u64_parses_string_at_boundary_values() {
+        let v = json!("9007199254740993");
+        assert_eq!(optional_u64(Some(&v)).unwrap(), Some(9007199254740993u64));
+
+        let v2 = json!({ "some": ["18446744073709551614"] });
+        assert_eq!(
+            optional_u64(Some(&v2)).unwrap(),
+            Some(18446744073709551614u64)
+        );
+    }
+
+    #[test]
+    fn optional_u64_errors_on_present_but_unparseable_value() {
+        assert!(
+            optional_u64(Some(&json!("not_a_number"))).is_err(),
+            "non-numeric string should be an error"
+        );
+        assert!(
+            optional_u64(Some(&json!("-5"))).is_err(),
+            "negative string should be an error"
+        );
+        assert!(
+            optional_u64(Some(&json!({ "some": ["bad"] }))).is_err(),
+            "invalid some value should be an error"
+        );
+    }
+
+    #[test]
+    fn inventory_resource_classification_covers_expected_resources() {
+        assert!(inventory_resource("stock-quants"));
+        assert!(inventory_resource("stock-pickings"));
+        assert!(inventory_resource("warehouses"));
+        assert!(inventory_resource("quality-checks"));
+        assert!(inventory_resource("replenishment-rules"));
+        assert!(inventory_resource("picking-batches"));
+        assert!(!inventory_resource("account-moves"));
+        assert!(!inventory_resource("contacts"));
     }
 }

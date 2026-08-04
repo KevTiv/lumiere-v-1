@@ -9619,6 +9619,7 @@ Prioritize high-severity findings and cite related records."#,
     let _ = ctx.db.inventory_adjustment().insert(InventoryAdjustment {
         id: 0,
         organization_id: org_id,
+        company_id,
         name: "Mouse shelf variance".to_string(),
         state: "posted".to_string(),
         adjustment_type: "decrease".to_string(),

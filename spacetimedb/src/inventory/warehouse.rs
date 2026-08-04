@@ -7,6 +7,7 @@
 ///   - StockRule
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use serde_json;
 
@@ -368,9 +369,77 @@ pub fn create_warehouse(
     params: CreateWarehouseParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "warehouse", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     if params.name.is_empty() || params.code.is_empty() {
         return Err("Warehouse name and code cannot be empty".to_string());
+    }
+
+    // ── FK validation: required stock location (lot_stock_id) ────────────────
+    {
+        let loc = ctx
+            .db
+            .stock_location()
+            .id()
+            .find(&params.lot_stock_id)
+            .ok_or_else(|| {
+                format!(
+                    "lot_stock_id {} not found in stock_location",
+                    params.lot_stock_id
+                )
+            })?;
+        if loc.organization_id != organization_id {
+            return Err(format!(
+                "lot_stock_id {} does not belong to this organization",
+                params.lot_stock_id
+            ));
+        }
+    }
+
+    // ── FK validation: optional stock locations ───────────────────────────────
+    for (field_name, opt_id) in [
+        ("wh_input_stock_loc_id", params.wh_input_stock_loc_id),
+        ("wh_pack_stock_loc_id", params.wh_pack_stock_loc_id),
+        ("wh_output_stock_loc_id", params.wh_output_stock_loc_id),
+        ("wh_qc_stock_loc_id", params.wh_qc_stock_loc_id),
+        ("wh_scrap_loc_id", params.wh_scrap_loc_id),
+        ("view_location_id", params.view_location_id),
+    ] {
+        if let Some(loc_id) = opt_id {
+            let loc = ctx
+                .db
+                .stock_location()
+                .id()
+                .find(&loc_id)
+                .ok_or_else(|| format!("{} {} not found in stock_location", field_name, loc_id))?;
+            if loc.organization_id != organization_id {
+                return Err(format!(
+                    "{} {} does not belong to this organization",
+                    field_name, loc_id
+                ));
+            }
+        }
+    }
+
+    // ── FK validation: optional stock rules (mto_pull_id, buy_pull_id) ───────
+    for (field_name, opt_id) in [
+        ("mto_pull_id", params.mto_pull_id),
+        ("buy_pull_id", params.buy_pull_id),
+    ] {
+        if let Some(rule_id) = opt_id {
+            let rule = ctx
+                .db
+                .stock_rule()
+                .id()
+                .find(&rule_id)
+                .ok_or_else(|| format!("{} {} not found in stock_rule", field_name, rule_id))?;
+            if rule.organization_id != organization_id {
+                return Err(format!(
+                    "{} {} does not belong to this organization",
+                    field_name, rule_id
+                ));
+            }
+        }
     }
 
     let warehouse = ctx.db.warehouse().insert(Warehouse {

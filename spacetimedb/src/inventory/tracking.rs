@@ -9,6 +9,8 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::product::product;
+use crate::inventory::stock::{require_product_in_org, stock_move, stock_quant};
 use serde_json;
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -306,6 +308,23 @@ pub fn create_stock_production_lot(
         return Err("Lot name cannot be empty".to_string());
     }
 
+    // Validate product belongs to this organization
+    require_product_in_org(ctx, organization_id, params.product_id)?;
+
+    // Enforce product tracking policy: lots require tracking = "lot"
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&params.product_id)
+        .ok_or("Product not found")?;
+    if product.tracking != "lot" && product.tracking != "serial" {
+        return Err(format!(
+            "Product {} has tracking '{}'; lots can only be created for products tracked by lot or serial",
+            params.product_id, product.tracking
+        ));
+    }
+
     let lot = ctx.db.stock_production_lot().insert(StockProductionLot {
         id: 0,
         organization_id,
@@ -431,6 +450,34 @@ pub fn delete_stock_production_lot(
         return Err("Lot does not belong to this organization".to_string());
     }
 
+    // Guard: reject if any quants reference this lot
+    let quant_count = ctx
+        .db
+        .stock_quant()
+        .iter()
+        .filter(|q| q.lot_id == Some(lot_id))
+        .count();
+    if quant_count > 0 {
+        return Err(format!(
+            "Cannot delete lot {} — {} quant(s) reference it; archive the lot instead",
+            lot_id, quant_count
+        ));
+    }
+
+    // Guard: reject if any traceability records reference this lot
+    let trace_count = ctx
+        .db
+        .serial_lot_traceability()
+        .iter()
+        .filter(|t| t.lot_id == Some(lot_id))
+        .count();
+    if trace_count > 0 {
+        return Err(format!(
+            "Cannot delete lot {} — {} traceability record(s) reference it",
+            lot_id, trace_count
+        ));
+    }
+
     ctx.db.stock_production_lot().id().delete(&lot_id);
 
     write_audit_log_v2(
@@ -467,6 +514,41 @@ pub fn create_stock_production_serial(
 
     if params.name.is_empty() {
         return Err("Serial name cannot be empty".to_string());
+    }
+
+    // Validate product belongs to this organization
+    require_product_in_org(ctx, organization_id, params.product_id)?;
+
+    // Enforce product tracking policy: serials require tracking = "serial"
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&params.product_id)
+        .ok_or("Product not found")?;
+    if product.tracking != "serial" {
+        return Err(format!(
+            "Product {} has tracking '{}'; serials can only be created for products tracked by serial",
+            params.product_id, product.tracking
+        ));
+    }
+
+    // Enforce serial uniqueness: no other active serial with the same name for this product+company
+    let duplicate = ctx
+        .db
+        .stock_production_serial()
+        .iter()
+        .any(|s| {
+            s.organization_id == organization_id
+                && s.company_id == company_id
+                && s.product_id == params.product_id
+                && s.name == params.name
+        });
+    if duplicate {
+        return Err(format!(
+            "Serial '{}' already exists for this product in this company",
+            params.name
+        ));
     }
 
     let serial = ctx
@@ -780,6 +862,20 @@ pub fn delete_stock_production_serial(
         return Err("Serial does not belong to this organization".to_string());
     }
 
+    // Guard: reject if any traceability records reference this serial
+    let trace_count = ctx
+        .db
+        .serial_lot_traceability()
+        .iter()
+        .filter(|t| t.serial_id == Some(serial_id))
+        .count();
+    if trace_count > 0 {
+        return Err(format!(
+            "Cannot delete serial {} — {} traceability record(s) reference it",
+            serial_id, trace_count
+        ));
+    }
+
     let serial_company_id = serial.company_id;
     let serial_name = serial.name.clone();
 
@@ -815,8 +911,56 @@ pub fn create_traceability_record(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "serial_lot_traceability", "create")?;
 
-    if params.document_type.is_empty() {
-        return Err("Document type cannot be empty".to_string());
+    // document_type must be one of the documented source types
+    let valid_doc_types = ["stock_move", "stock_picking", "purchase_order", "sale_order"];
+    if !valid_doc_types.contains(&params.document_type.as_str()) {
+        return Err(format!(
+            "Unknown document_type '{}'; valid types: {}",
+            params.document_type,
+            valid_doc_types.join(", ")
+        ));
+    }
+
+    // Validate product belongs to this organization
+    require_product_in_org(ctx, organization_id, params.product_id)?;
+
+    // Validate serial if supplied
+    if let Some(sid) = params.serial_id {
+        let serial = ctx
+            .db
+            .stock_production_serial()
+            .id()
+            .find(&sid)
+            .ok_or("Serial not found")?;
+        if serial.organization_id != organization_id {
+            return Err("Serial does not belong to this organization".to_string());
+        }
+    }
+
+    // Validate lot if supplied
+    if let Some(lid) = params.lot_id {
+        let lot = ctx
+            .db
+            .stock_production_lot()
+            .id()
+            .find(&lid)
+            .ok_or("Lot not found")?;
+        if lot.organization_id != organization_id {
+            return Err("Lot does not belong to this organization".to_string());
+        }
+    }
+
+    // Validate stock move if supplied
+    if let Some(mid) = params.move_id {
+        let mv = ctx
+            .db
+            .stock_move()
+            .id()
+            .find(&mid)
+            .ok_or("Stock move not found")?;
+        if mv.organization_id != organization_id {
+            return Err("Stock move does not belong to this organization".to_string());
+        }
     }
 
     let trace = ctx

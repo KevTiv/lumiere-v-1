@@ -44,6 +44,14 @@ pub fn run_all_inventory_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_inventory_receipt_fifo_layers_test(ctx)?;
     run_inventory_warehouse_sync_test(ctx)?;
     run_inventory_multi_wh_promise_atp_test(ctx)?;
+    run_inventory_server_owns_state_test(ctx)?;
+    run_inventory_adjustment_company_derived_test(ctx)?;
+    run_inventory_adjustment_process_idempotency_test(ctx)?;
+    run_inventory_close_reopen_blocked_gl_test(ctx)?;
+    run_inventory_replenishment_rule_not_found_test(ctx)?;
+    run_inventory_integration_applied_guard_test(ctx)?;
+    run_inventory_close_no_gl_on_create_test(ctx)?;
+    run_inventory_adjustment_requires_valid_reason_test(ctx)?;
     log::info!("✅ run_all_inventory_tests complete");
     Ok(())
 }
@@ -229,4 +237,58 @@ pub fn run_inventory_warehouse_sync_test(ctx: &ReducerContext) -> Result<(), Str
 #[spacetimedb::reducer]
 pub fn run_inventory_multi_wh_promise_atp_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_multi_wh_promise_atp(ctx).map_err(|e| format!("multi_wh_promise_atp: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_server_owns_state_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_stock_inventory_server_owns_state(ctx)
+        .map_err(|e| format!("server_owns_state: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_adjustment_company_derived_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_adjustment_company_derived(ctx)
+        .map_err(|e| format!("adjustment_company_derived: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_adjustment_process_idempotency_test(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    gap_fixes_test::test_adjustment_process_idempotency(ctx)
+        .map_err(|e| format!("adjustment_process_idempotency: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_close_reopen_blocked_gl_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_inventory_close_reopen_blocked_with_gl_move(ctx)
+        .map_err(|e| format!("close_reopen_blocked_gl: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_replenishment_rule_not_found_test(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    gap_fixes_test::test_replenishment_rule_not_found(ctx)
+        .map_err(|e| format!("replenishment_rule_not_found: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_integration_applied_guard_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_integration_applied_guard(ctx)
+        .map_err(|e| format!("integration_applied_guard: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_close_no_gl_on_create_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_inventory_close_no_gl_on_create(ctx)
+        .map_err(|e| format!("close_no_gl_on_create: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_adjustment_requires_valid_reason_test(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    gap_fixes_test::test_adjustment_requires_valid_reason_id(ctx)
+        .map_err(|e| format!("adjustment_requires_valid_reason: {e}"))
 }

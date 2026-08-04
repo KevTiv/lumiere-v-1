@@ -30,6 +30,7 @@
 /// | warehouse_sync | Offline remote warehouse sync intents                        |
 /// | atp_promise | Multi-WH promise dates + network ATP                            |
 pub mod atp_promise;
+pub mod audit;
 pub mod barcode;
 pub mod consignment;
 pub mod costing;

@@ -5,17 +5,22 @@
 ///   - StockReorderGroup
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::idempotency::{record_result, replayed_result};
+use crate::accounting::relations::require_active_currency_id;
+use crate::core::organization::require_company_in_organization;
 use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::{product, product_supplier_info};
 use crate::inventory::stock::{
-    create_stock_move, create_stock_picking, stock_picking, stock_quant, CreateStockMoveParams,
+    create_stock_move, create_stock_picking, require_location_in_org, require_product_in_org,
+    require_warehouse_in_org_and_company, stock_picking, stock_quant, CreateStockMoveParams,
     CreateStockPickingParams,
 };
 use crate::purchasing::purchase_orders::{
     add_purchase_order_line, create_purchase_order, purchase_order, AddPurchaseOrderLineParams,
     CreatePurchaseOrderParams,
 };
+use crate::types::PoState;
 use serde_json;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -147,7 +152,7 @@ fn find_supplier_for_product(
     organization_id: u64,
     company_id: u64,
     product_id: u64,
-) -> Option<(u64, f64, u64)> {
+) -> Result<Option<(u64, f64, u64)>, String> {
     // Returns (partner_id, price, currency_id)
     let mut infos: Vec<_> = ctx
         .db
@@ -164,11 +169,12 @@ fn find_supplier_for_product(
     for info in infos {
         if let Some(partner) = ctx.db.contact().id().find(&info.partner_id) {
             if partner.is_vendor {
-                return Some((info.partner_id, info.price, info.currency_id));
+                require_active_currency_id(ctx, info.currency_id, "supplier")?;
+                return Ok(Some((info.partner_id, info.price, info.currency_id)));
             }
         }
     }
-    None
+    Ok(None)
 }
 
 fn find_source_location_with_stock(
@@ -203,6 +209,23 @@ fn create_buy_demand(
     price: f64,
     currency_id: u64,
 ) -> Result<(String, u64), String> {
+    let origin_key = format!("REPLENISH-{}", rule.id);
+
+    // Deduplication: return existing open PO with same origin to prevent duplicates on retry.
+    if let Some(existing_po) = ctx
+        .db
+        .purchase_order()
+        .iter()
+        .find(|po| {
+            po.organization_id == organization_id
+                && po.company_id == company_id
+                && po.origin.as_deref() == Some(&origin_key)
+                && !matches!(po.state, PoState::Done | PoState::Cancelled)
+        })
+    {
+        return Ok(("buy".to_string(), existing_po.id));
+    }
+
     let product = ctx
         .db
         .product()
@@ -298,6 +321,24 @@ fn create_transfer_demand(
     order_qty: f64,
     source_location_id: u64,
 ) -> Result<(String, u64), String> {
+    let picking_name = format!("INT-RPL-{}", rule.id);
+
+    // Deduplication: return existing open picking with same name to prevent duplicates on retry.
+    if let Some(existing_picking) = ctx
+        .db
+        .stock_picking()
+        .iter()
+        .find(|p| {
+            p.organization_id == organization_id
+                && p.company_id == company_id
+                && p.name == picking_name
+                && p.state != "done"
+                && p.state != "cancel"
+        })
+    {
+        return Ok(("transfer".to_string(), existing_picking.id));
+    }
+
     let product = ctx
         .db
         .product()
@@ -305,7 +346,6 @@ fn create_transfer_demand(
         .find(&rule.product_id)
         .ok_or("Product not found for replenishment transfer")?;
 
-    let picking_name = format!("INT-RPL-{}", rule.id);
     create_stock_picking(
         ctx,
         organization_id,
@@ -458,6 +498,13 @@ pub fn create_replenishment_rule(
     params: CreateReplenishmentRuleParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "replenishment_rule", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
+
+    require_product_in_org(ctx, organization_id, params.product_id)?;
+    require_location_in_org(ctx, organization_id, params.location_id)?;
+    if let Some(wid) = params.warehouse_id {
+        require_warehouse_in_org_and_company(ctx, organization_id, company_id, wid)?;
+    }
 
     // qty_to_order derived from min/max quantities
     let qty_to_order = if params.product_max_qty > params.product_min_qty {
@@ -530,8 +577,10 @@ pub fn execute_replenishment_rule(
     organization_id: u64,
     company_id: u64,
     rule_id: u64,
+    idempotency_key: String,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "replenishment_rule", "execute")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     let rule = ctx
         .db
@@ -550,6 +599,23 @@ pub fn execute_replenishment_rule(
         return Err("Rule is not active".to_string());
     }
 
+    let fingerprint = format!("{}:{}:{}", rule.id, rule.product_id, rule.product_min_qty);
+    if let Some(existing_id) = replayed_result(
+        ctx,
+        organization_id,
+        company_id,
+        "replenishment_demand",
+        &idempotency_key,
+        &fingerprint,
+    )? {
+        log::info!(
+            "Replenishment rule {} already executed, returning existing demand {}",
+            rule.id,
+            existing_id
+        );
+        return Ok(());
+    }
+
     let available = available_qty_at_location(
         ctx,
         organization_id,
@@ -564,7 +630,7 @@ pub fn execute_replenishment_rule(
 
     if order_qty > 1e-9 {
         if let Some((partner_id, price, currency_id)) =
-            find_supplier_for_product(ctx, organization_id, company_id, rule.product_id)
+            find_supplier_for_product(ctx, organization_id, company_id, rule.product_id)?
         {
             let (dtype, id) = create_buy_demand(
                 ctx,
@@ -602,6 +668,24 @@ pub fn execute_replenishment_rule(
                 rule.product_id, order_qty
             ));
         }
+    }
+
+    if let Some(did) = demand_id {
+        let result_table = if demand_type == "buy" {
+            "purchase_order"
+        } else {
+            "stock_picking"
+        };
+        record_result(
+            ctx,
+            organization_id,
+            company_id,
+            "replenishment_demand",
+            idempotency_key,
+            fingerprint,
+            result_table,
+            did,
+        );
     }
 
     let last_run = ctx.timestamp;

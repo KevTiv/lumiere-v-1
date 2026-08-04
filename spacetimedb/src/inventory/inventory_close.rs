@@ -1,9 +1,11 @@
 //! Inventory period close — snapshot quants, lock stock mutations, optional GL valuation.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, AccountMove, AccountMoveLine,
 };
+use crate::accounting::relations::{require_active_account, require_active_journal};
 use crate::core::organization::company;
 use crate::core::reference::require_active_currency_by_id;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
@@ -216,12 +218,29 @@ fn post_close_valuation_move(
     inventory_account_id: u64,
     valuation_account_id: u64,
 ) -> Result<u64, String> {
+    let idempotency_key = format!("INV-CLOSE-{}", close_id);
+    let fingerprint = format!("{organization_id}:{company_id}:{close_id}");
+    if let Some(existing_id) = replayed_result(
+        ctx,
+        organization_id,
+        company_id,
+        "inventory_close_valuation",
+        &idempotency_key,
+        &fingerprint,
+    )? {
+        return Ok(existing_id);
+    }
+
     if total_value.abs() < 1e-9 {
         return Err("total_value is zero — nothing to post".to_string());
     }
     if inventory_account_id == valuation_account_id {
         return Err("inventory_account_id and valuation_account_id must differ".to_string());
     }
+
+    require_active_journal(ctx, organization_id, company_id, journal_id, "inventory close journal")?;
+    require_active_account(ctx, organization_id, company_id, inventory_account_id, "inventory account")?;
+    require_active_account(ctx, organization_id, company_id, valuation_account_id, "valuation account")?;
 
     let amount = total_value.abs();
     let name = next_doc_number(ctx, "INVCLS");
@@ -359,6 +378,17 @@ fn post_close_valuation_move(
             2,
         );
     }
+
+    record_result(
+        ctx,
+        organization_id,
+        company_id,
+        "inventory_close_valuation",
+        idempotency_key,
+        fingerprint,
+        "account_move",
+        move_record.id,
+    );
 
     Ok(move_record.id)
 }
@@ -585,6 +615,9 @@ pub fn reopen_inventory_close(
     }
     if close.state != "closed" {
         return Err("Only closed periods can be reopened".to_string());
+    }
+    if close.account_move_id.is_some() {
+        return Err("Cannot reopen: GL valuation move exists — reverse it first through the accounting module".to_string());
     }
 
     ctx.db.inventory_close().id().update(InventoryClose {
