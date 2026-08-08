@@ -65,7 +65,6 @@ export function toCreateStockInventoryParams(
     lotIds: u64IdArrayFromForm(field(formData, "lotIds", "lot_ids")),
     ownerIds: u64IdArrayFromForm(field(formData, "ownerIds", "owner_ids")),
     packageIds: u64IdArrayFromForm(field(formData, "packageIds", "package_ids")),
-    state: String(field(formData, "state", "state") ?? "draft"),
     accountingDate: (() => {
       const raw = field(formData, "accountingDate", "accounting_date")
       if (raw == null || raw === "") return undefined
@@ -74,14 +73,6 @@ export function toCreateStockInventoryParams(
     })(),
     categoryId: optionalBigIntU64(field(formData, "categoryId", "category_id")),
     countedMode: String(field(formData, "countedMode", "counted_mode") ?? "all"),
-    doneMoveIds: u64IdArrayFromForm(field(formData, "doneMoveIds", "done_move_ids")),
-    moveIds: u64IdArrayFromForm(field(formData, "moveIds", "move_ids")),
-    adjustmentCount: Math.trunc(num(field(formData, "adjustmentCount", "adjustment_count"), 0)),
-    hasAccountMoves: bool(field(formData, "hasAccountMoves", "has_account_moves")),
-    exhausted: bool(field(formData, "exhausted", "exhausted")),
-    prefilledCount: Math.trunc(num(field(formData, "prefilledCount", "prefilled_count"), 0)),
-    started: bool(field(formData, "started", "started")),
-    isEditable: field(formData, "isEditable", "is_editable") !== false,
     isStockCheck: field(formData, "isStockCheck", "is_stock_check") !== false,
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
   }

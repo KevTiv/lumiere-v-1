@@ -1,8 +1,18 @@
 /**
  * Maps Manufacturing module form payloads to SpacetimeDB Create*Params types.
+ *
+ * # Mapper contract
+ *
+ * - Required fields return null from the mapper (handled by caller with early-return).
+ * - Server-derived fields (lifecycle state, projections, counters, reverse arrays) are
+ *   owned by the server and must not be sent by the client.
+ * - Dates must be explicitly supplied; there is no fallback to the current time.
+ * - Company is derived from the ManufacturingOrderMapperContext; caller must supply a
+ *   validated active-company ID — the mapper never defaults to zero.
  */
 
 import type {
+  BomLineInput,
   BomType,
   CreateBomParams,
   CreateMrpProductionParams,
@@ -10,8 +20,6 @@ import type {
   CreateWorkcenterParams,
   CreateWorkcenterProductivityParams,
   CreateWorkorderParams,
-  MoState,
-  WorkorderState,
 } from "@lumiere/stdb/types"
 
 import { formValue as field, optionalBigIntU64, u64IdArrayFromForm } from "./form-coercion"
@@ -33,10 +41,14 @@ function num(v: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback
 }
 
-function timestampFromFormDate(v: unknown, fallback: Date) {
-  if (v == null || String(v).trim() === "") return stbTimestampFromDate(fallback)
+/**
+ * Parse a date from form input.
+ * Returns null if the value is absent or unparseable — no fallback to current time.
+ */
+function requiredTimestampFromForm(v: unknown): ReturnType<typeof stbTimestampFromDate> | null {
+  if (v == null || String(v).trim() === "") return null
   const d = new Date(String(v))
-  if (Number.isNaN(d.getTime())) return stbTimestampFromDate(fallback)
+  if (Number.isNaN(d.getTime())) return null
   return stbTimestampFromDate(d)
 }
 
@@ -46,8 +58,6 @@ function optionalTimestampFromForm(v: unknown) {
   if (Number.isNaN(d.getTime())) return undefined
   return stbTimestampFromDate(d)
 }
-
-const MO_STATE_DRAFT: MoState = { tag: "Draft" }
 
 function bomTypeFromForm(raw: unknown): BomType {
   const value = String(raw ?? "Manufacture").trim()
@@ -67,6 +77,7 @@ function bomTypeFromForm(raw: unknown): BomType {
 
 export type ManufacturingOrderMapperContext = {
   productUomId: bigint
+  /** Active company ID. Must be non-zero; mapper returns null if absent. */
   companyId?: bigint
 }
 
@@ -89,16 +100,17 @@ export function toCreateMrpProductionParams(
     return null
   }
 
-  const now = new Date()
-  const plannedStart = timestampFromFormDate(field(formData, "datePlannedStart", "date_planned_start"), now)
-  const plannedFinished = timestampFromFormDate(
+  // Dates are required — no fallback to current time.
+  const plannedStart = requiredTimestampFromForm(field(formData, "datePlannedStart", "date_planned_start"))
+  const plannedFinished = requiredTimestampFromForm(
     field(formData, "datePlannedFinished", "date_planned_finished") ??
       field(formData, "datePlannedStart", "date_planned_start"),
-    now,
   )
+  if (plannedStart === null || plannedFinished === null) return null
 
   return {
-    companyId: optionalBigIntU64(field(formData, "companyId", "company_id")) ?? context.companyId,
+    // Context-derived — company must come from caller; never zero.
+    companyId: context.companyId,
     productId,
     productQty: num(field(formData, "productQty", "product_qty"), 1),
     productUomId: context.productUomId,
@@ -109,23 +121,6 @@ export function toCreateMrpProductionParams(
     warehouseId,
     pickingTypeId,
     consumption: optionalTrimmedString(field(formData, "consumption", "consumption")),
-    state: MO_STATE_DRAFT,
-    availability: String(field(formData, "availability", "availability") ?? "available"),
-    reservationState: String(field(formData, "reservationState", "reservation_state") ?? "confirmed"),
-    componentsAvailability: String(
-      field(formData, "componentsAvailability", "components_availability") ?? "available",
-    ),
-    componentsAvailabilityState: String(
-      field(formData, "componentsAvailabilityState", "components_availability_state") ?? "available",
-    ),
-    isPlanned: field(formData, "isPlanned", "is_planned") !== false,
-    isLocked: Boolean(field(formData, "isLocked", "is_locked")),
-    isWorkorder: field(formData, "isWorkorder", "is_workorder") !== false,
-    delayAlert: Boolean(field(formData, "delayAlert", "delay_alert")),
-    lotProducingCount: Math.trunc(num(field(formData, "lotProducingCount", "lot_producing_count"), 0)),
-    qtyProducing: num(field(formData, "qtyProducing", "qty_producing"), 0),
-    qtyProduced: num(field(formData, "qtyProduced", "qty_produced"), 0),
-    productUomQtyProducing: num(field(formData, "productUomQtyProducing", "product_uom_qty_producing"), 0),
     bomId: optionalBigIntU64(field(formData, "bomId", "bom_id")),
     routingId: optionalBigIntU64(field(formData, "routingId", "routing_id")),
     procGroupId: optionalBigIntU64(field(formData, "procGroupId", "proc_group_id")),
@@ -147,6 +142,55 @@ export type BomMapperContext = {
   companyId?: bigint
 }
 
+export type BomLineFormEntry = {
+  productId: bigint
+  productQty: number
+  productUomId: bigint
+  sequence: number
+  operationId?: bigint
+}
+
+export function toBomLineInput(entry: BomLineFormEntry): BomLineInput {
+  return {
+    productId: entry.productId,
+    productQty: entry.productQty,
+    productUomId: entry.productUomId,
+    sequence: entry.sequence,
+    manualConsumption: false,
+    attachmentsCount: 0,
+    operationId: entry.operationId,
+    childBomId: undefined,
+    bomProductTemplateAttributeValueIds: [],
+    possibleBomProductTemplateAttributeValueIds: [],
+    metadata: undefined,
+  }
+}
+
+function parseBomLines(raw: unknown, defaultUomId: bigint): BomLineInput[] {
+  if (raw == null || raw === "") return []
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw
+    if (!Array.isArray(parsed)) return []
+    return parsed.flatMap((entry: Record<string, unknown>, idx: number): BomLineInput[] => {
+      const productId = optionalBigIntU64(entry.productId ?? entry.product_id)
+      const productUomId =
+        optionalBigIntU64(entry.productUomId ?? entry.product_uom_id) ?? defaultUomId
+      if (!productId) return []
+      return [
+        toBomLineInput({
+          productId,
+          productQty: num(entry.productQty ?? entry.product_qty, 1),
+          productUomId,
+          sequence: Math.trunc(num(entry.sequence, (idx + 1) * 10)),
+          operationId: optionalBigIntU64(entry.operationId ?? entry.operation_id),
+        }),
+      ]
+    })
+  } catch {
+    return []
+  }
+}
+
 export function toCreateBomParams(
   formData: Record<string, unknown>,
   context: BomMapperContext,
@@ -155,17 +199,15 @@ export function toCreateBomParams(
   if (productTmplId === null) return null
 
   return {
-    companyId: optionalBigIntU64(field(formData, "companyId", "company_id")) ?? context.companyId,
+    companyId: context.companyId,
     type: bomTypeFromForm(field(formData, "type", "type_")),
     productId: productTmplId,
-    productTmplId,
     productQty: num(field(formData, "productQty", "product_qty"), 1),
     productUomId: context.productUomId,
     readyToProduce: String(field(formData, "readyToProduce", "ready_to_produce") ?? "asap"),
     consumption: String(field(formData, "consumption", "consumption") ?? "flexible"),
     sequence: Math.trunc(num(field(formData, "sequence", "sequence"), 1)),
-    estimatedCost: num(field(formData, "estimatedCost", "estimated_cost"), 0),
-    lines: [],
+    lines: parseBomLines(field(formData, "bomLines", "bom_lines"), context.productUomId),
     pickingTypeId: optionalBigIntU64(field(formData, "pickingTypeId", "picking_type_id")),
     locationSrcId: optionalBigIntU64(field(formData, "locationSrcId", "location_src_id")),
     locationDestId: optionalBigIntU64(field(formData, "locationDestId", "location_dest_id")),
@@ -187,7 +229,7 @@ export function toCreateWorkcenterParams(
   const capacity = num(field(formData, "capacity", "capacity"), 1)
 
   return {
-    companyId: optionalBigIntU64(field(formData, "companyId", "company_id")) ?? companyId,
+    companyId,
     name,
     active: field(formData, "active", "active") !== false,
     code: optionalTrimmedString(field(formData, "code", "code")),
@@ -196,25 +238,6 @@ export function toCreateWorkcenterParams(
     timeEfficiency,
     capacity,
     capacityIds: u64IdArrayFromForm(field(formData, "capacityIds", "capacity_ids")),
-    oee: num(field(formData, "oee", "oee"), 0),
-    performance: num(field(formData, "performance", "performance"), 0),
-    blockedTime: num(field(formData, "blockedTime", "blocked_time"), 0),
-    productiveTime: num(field(formData, "productiveTime", "productive_time"), 0),
-    productivityIds: u64IdArrayFromForm(field(formData, "productivityIds", "productivity_ids")),
-    orderIds: u64IdArrayFromForm(field(formData, "orderIds", "order_ids")),
-    workorderCount: Math.trunc(num(field(formData, "workorderCount", "workorder_count"), 0)),
-    workorderReadyCount: Math.trunc(
-      num(field(formData, "workorderReadyCount", "workorder_ready_count"), 0),
-    ),
-    workorderProgressCount: Math.trunc(
-      num(field(formData, "workorderProgressCount", "workorder_progress_count"), 0),
-    ),
-    workorderPendingCount: Math.trunc(
-      num(field(formData, "workorderPendingCount", "workorder_pending_count"), 0),
-    ),
-    workorderLateCount: Math.trunc(
-      num(field(formData, "workorderLateCount", "workorder_late_count"), 0),
-    ),
     alternativeWorkcenterIds: u64IdArrayFromForm(
       field(formData, "alternativeWorkcenterIds", "alternative_workcenter_ids"),
     ),
@@ -237,8 +260,6 @@ export function toCreateWorkcenterParams(
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
   }
 }
-
-const WO_STATE_READY: WorkorderState = { tag: "Ready" }
 
 function parseU64List(raw: unknown): bigint[] {
   const str = String(raw ?? "").trim()
@@ -337,15 +358,6 @@ export function toCreateWorkorderParams(
       Math.trunc(
         num(field(formData, "woSequence", "wo_sequence") ?? field(formData, "sequence", "sequence"), 1),
       ) || 1,
-    state: WO_STATE_READY,
-    productionAvailability: String(
-      field(formData, "productionAvailability", "production_availability") ?? "available",
-    ),
-    isUserWorking: field(formData, "isUserWorking", "is_user_working") === true,
-    isProduced: field(formData, "isProduced", "is_produced") === true,
-    isLastUnfinishedWo: field(formData, "isLastUnfinishedWo", "is_last_unfinished_wo") === true,
-    qualityCheckTodo: field(formData, "qualityCheckTodo", "quality_check_todo") === true,
-    qualityCheckFail: field(formData, "qualityCheckFail", "quality_check_fail") === true,
     capacity: (() => {
       const v = field(formData, "capacity", "capacity")
       return v == null || v === "" ? undefined : num(v)
@@ -355,7 +367,6 @@ export function toCreateWorkorderParams(
     operationNote: optionalTrimmedString(field(formData, "operationNote", "operation_note")),
     operationId: optionalBigIntU64(field(formData, "operationId", "operation_id")),
     blockedByWorkorderId: optionalBigIntU64(field(formData, "blockedByWorkorderId", "blocked_by_workorder_id")),
-    qualityState: optionalTrimmedString(field(formData, "qualityState", "quality_state")),
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
   }
 }
@@ -367,13 +378,12 @@ export function toCreateWorkcenterProductivityParams(
     field(formData, "workorderId", "workorder_id") ??
       field(formData, "logWorkorderId", "log_workorder_id"),
   )
-  const lossId = requiredBigIntU64(
-    field(formData, "lossId", "loss_id") ?? field(formData, "logLossId", "log_loss_id"),
-  )
-  if (workorderId === null || lossId === null) return null
+  if (workorderId === null) return null
   return {
     workorderId,
-    lossId,
+    lossId: optionalBigIntU64(
+      field(formData, "lossId", "loss_id") ?? field(formData, "logLossId", "log_loss_id"),
+    ),
     duration: num(
       field(formData, "duration", "duration") ?? field(formData, "logDuration", "log_duration"),
       0,

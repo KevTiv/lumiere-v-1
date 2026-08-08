@@ -21,9 +21,21 @@ import type {
 } from "@lumiere/stdb/types"
 
 function invalidateMrpBomsAndLines(qc: QueryClient, organizationId: bigint) {
-  const key = organizationId
+  const key = rqBigIntKey(organizationId)
   void qc.invalidateQueries({ queryKey: ['mrp-boms', key] })
   void qc.invalidateQueries({ queryKey: ['mrp-bom-lines', key] })
+}
+
+function invalidateMrpProductions(qc: QueryClient, organizationId: bigint) {
+  void qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] })
+}
+
+function invalidateMrpWorkorders(qc: QueryClient, organizationId: bigint) {
+  void qc.invalidateQueries({ queryKey: ['mrp-workorders', rqBigIntKey(organizationId)] })
+}
+
+function invalidateMrpWorkcenters(qc: QueryClient, organizationId: bigint) {
+  void qc.invalidateQueries({ queryKey: ['mrp-workcenters', rqBigIntKey(organizationId)] })
 }
 
 // ── Reads ────────────────────────────────────────────────────────────────────
@@ -178,6 +190,7 @@ export function useConfirmManufacturingOrder(organizationId: bigint, companyId: 
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (productionId: string | number | bigint) => {
+      if (!companyId) throw new Error("Active company required")
       const { urlPath, init } = manufacturingBffPost('confirm_manufacturing_order', [
         organizationId,
         companyId,
@@ -186,8 +199,10 @@ export function useConfirmManufacturingOrder(organizationId: bigint, companyId: 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to confirm manufacturing order')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      invalidateMrpProductions(qc, organizationId)
+      invalidateMrpWorkorders(qc, organizationId)
+    },
   })
 }
 
@@ -195,6 +210,7 @@ export function useStartManufacturingOrder(organizationId: bigint, companyId: bi
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (productionId: string | number | bigint) => {
+      if (!companyId) throw new Error("Active company required")
       const { urlPath, init } = manufacturingBffPost('start_manufacturing_order', [
         organizationId,
         companyId,
@@ -203,8 +219,10 @@ export function useStartManufacturingOrder(organizationId: bigint, companyId: bi
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start manufacturing order')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      invalidateMrpProductions(qc, organizationId)
+      invalidateMrpWorkorders(qc, organizationId)
+    },
   })
 }
 
@@ -212,6 +230,7 @@ export function useFinishManufacturingOrder(organizationId: bigint, companyId: b
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (productionId: string | number | bigint) => {
+      if (!companyId) throw new Error("Active company required")
       const { urlPath, init } = manufacturingBffPost('finish_manufacturing_order', [
         organizationId,
         companyId,
@@ -220,8 +239,12 @@ export function useFinishManufacturingOrder(organizationId: bigint, companyId: b
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to finish manufacturing order')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      invalidateMrpProductions(qc, organizationId)
+      invalidateMrpWorkorders(qc, organizationId)
+      // Finishing an MO posts finished-goods stock moves — refresh inventory quants.
+      void qc.invalidateQueries({ queryKey: ['stock-quants', rqBigIntKey(organizationId)] })
+    },
   })
 }
 
@@ -229,6 +252,7 @@ export function useCancelManufacturingOrder(organizationId: bigint, companyId: b
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (productionId: string | number | bigint) => {
+      if (!companyId) throw new Error("Active company required")
       const { urlPath, init } = manufacturingBffPost('cancel_manufacturing_order', [
         organizationId,
         companyId,
@@ -237,8 +261,10 @@ export function useCancelManufacturingOrder(organizationId: bigint, companyId: b
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel manufacturing order')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      invalidateMrpProductions(qc, organizationId)
+      invalidateMrpWorkorders(qc, organizationId)
+    },
   })
 }
 
@@ -246,6 +272,7 @@ export function useStartWorkorder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (workorderId: string | number | bigint) => {
+      if (!companyId) throw new Error("Active company required")
       const { urlPath, init } = manufacturingBffPost('start_workorder', [
         organizationId,
         companyId,
@@ -254,8 +281,10 @@ export function useStartWorkorder(organizationId: bigint, companyId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start workorder')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workorders', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      invalidateMrpWorkorders(qc, organizationId)
+      invalidateMrpProductions(qc, organizationId)
+    },
   })
 }
 
@@ -263,6 +292,7 @@ export function useFinishWorkorder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (workorderId: string | number | bigint) => {
+      if (!companyId) throw new Error("Active company required")
       const { urlPath, init } = manufacturingBffPost('finish_workorder', [
         organizationId,
         companyId,
@@ -271,8 +301,11 @@ export function useFinishWorkorder(organizationId: bigint, companyId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to finish workorder')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workorders', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      invalidateMrpWorkorders(qc, organizationId)
+      invalidateMrpProductions(qc, organizationId)
+      invalidateMrpWorkcenters(qc, organizationId)
+    },
   })
 }
 
@@ -316,6 +349,7 @@ export function useCheckMoAvailability(organizationId: bigint, companyId: bigint
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (moId: string | number | bigint) => {
+      if (!companyId) throw new Error("Active company required")
       const { urlPath, init } = manufacturingBffPost('check_mo_availability', [
         organizationId,
         companyId,
@@ -324,8 +358,11 @@ export function useCheckMoAvailability(organizationId: bigint, companyId: bigint
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      invalidateMrpProductions(qc, organizationId)
+      // Availability check may move stock reservations.
+      void qc.invalidateQueries({ queryKey: ['stock-quants', rqBigIntKey(organizationId)] })
+    },
   })
 }
 
@@ -333,6 +370,7 @@ export function useProduceManufacturingOrder(organizationId: bigint, companyId: 
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ moId, qty }: { moId: string | number | bigint; qty: number }) => {
+      if (!companyId) throw new Error("Active company required")
       const { urlPath, init } = manufacturingBffPost('produce_manufacturing_order', [
         organizationId,
         companyId,
@@ -342,8 +380,11 @@ export function useProduceManufacturingOrder(organizationId: bigint, companyId: 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      invalidateMrpProductions(qc, organizationId)
+      // Producing posts stock moves — refresh quants.
+      void qc.invalidateQueries({ queryKey: ['stock-quants', rqBigIntKey(organizationId)] })
+    },
   })
 }
 
@@ -351,6 +392,7 @@ export function useConsumeMoMaterials(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (moId: string | number | bigint) => {
+      if (!companyId) throw new Error("Active company required")
       const { urlPath, init } = manufacturingBffPost('consume_mo_materials', [
         organizationId,
         companyId,
@@ -359,8 +401,11 @@ export function useConsumeMoMaterials(organizationId: bigint, companyId: bigint)
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-productions', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      invalidateMrpProductions(qc, organizationId)
+      // Consumption moves material stock — refresh quants.
+      void qc.invalidateQueries({ queryKey: ['stock-quants', rqBigIntKey(organizationId)] })
+    },
   })
 }
 
@@ -485,6 +530,7 @@ export function useLogWorkcenterProductivity(organizationId: bigint, companyId: 
       workcenterId: string | number | bigint
       params: Record<string, unknown>
     }) => {
+      if (!companyId) throw new Error("Active company required")
       const { urlPath, init } = manufacturingBffPost('log_workcenter_productivity', [
         organizationId,
         companyId,
@@ -494,21 +540,27 @@ export function useLogWorkcenterProductivity(organizationId: bigint, companyId: 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['mrp-workcenters', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      invalidateMrpWorkcenters(qc, organizationId)
+      // Productivity log targets a workorder — workorder totals may update.
+      invalidateMrpWorkorders(qc, organizationId)
+    },
   })
 }
 
 export function useCompleteProductivityLog(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
-  const orgKey = rqBigIntKey(organizationId)
   return useMutation({
     mutationFn: async (logId: string | number | bigint) => {
+      if (!companyId) throw new Error("Active company required")
       const { urlPath, init } = manufacturingBffPost('complete_productivity_log', [organizationId, companyId, logId])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['mrp-workcenters', orgKey] }),
+    onSuccess: () => {
+      invalidateMrpWorkcenters(qc, organizationId)
+      invalidateMrpWorkorders(qc, organizationId)
+    },
   })
 }
 

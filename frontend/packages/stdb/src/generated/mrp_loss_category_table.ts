@@ -10,13 +10,13 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-import {
-  CreateRoutingWorkcenterParams,
-} from "./types";
-
-export default {
-  organizationId: __t.u64(),
-  get params() {
-    return CreateRoutingWorkcenterParams;
-  },
-};
+export default __t.row({
+  id: __t.u64().primaryKey(),
+  organizationId: __t.u64().name("organization_id"),
+  companyId: __t.u64().name("company_id"),
+  name: __t.string(),
+  category: __t.string(),
+  active: __t.bool(),
+  sequence: __t.u32(),
+  metadata: __t.option(__t.string()),
+});

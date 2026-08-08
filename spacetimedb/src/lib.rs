@@ -139,6 +139,10 @@ pub mod workflow_tests;
 #[path = "../tests/core/tests/mod.rs"]
 pub mod core_tests;
 
+/// Manufacturing domain tests — call `run_all_manufacturing_tests` reducer to execute.
+#[path = "../tests/manufacturing/mod.rs"]
+pub mod manufacturing_tests;
+
 use crate::core::migrations::apply_pending_global_migrations;
 use crate::core::reference::{currency, Currency};
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
@@ -163,6 +167,8 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
     projects_tests::run_all_projects_tests(ctx).map_err(|e| format!("projects: {e}"))?;
     fleet_tests::run_all_fleet_tests(ctx).map_err(|e| format!("fleet: {e}"))?;
     proposals_tests::run_all_proposals_tests(ctx).map_err(|e| format!("proposals: {e}"))?;
+    manufacturing_tests::run_all_manufacturing_tests(ctx)
+        .map_err(|e| format!("manufacturing: {e}"))?;
     platform_tests::run_all_platform_tests(ctx).map_err(|e| format!("platform: {e}"))?;
     workflow_tests::run_all_workflow_foundation_tests(ctx)
         .map_err(|e| format!("workflow foundations: {e}"))?;

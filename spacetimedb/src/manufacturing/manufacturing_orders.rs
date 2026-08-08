@@ -15,7 +15,11 @@ use crate::inventory::stock::{
     DoneStockMoveParams, StockMove, StockQuant,
 };
 use crate::manufacturing::bill_of_materials::mrp_bom_line;
-use crate::manufacturing::work_centers::mrp_workcenter;
+use crate::manufacturing::relations::{
+    require_active_workcenter_in_company, require_bom_in_company,
+    require_product_for_manufacturing, require_routing_workcenter_in_company,
+    require_warehouse_for_manufacturing, validate_positive_duration, validate_positive_qty,
+};
 use crate::types::{ConsumptionMode, MoState, WorkorderState};
 use serde_json;
 
@@ -164,6 +168,13 @@ pub struct MrpWorkorder {
 
 // ── Input Params ─────────────────────────────────────────────────────────────
 
+/// Intent-shaped create params for manufacturing orders.
+///
+/// Server-managed projection fields are excluded — the server always derives:
+/// `state` (always Draft), `availability`, `reservation_state`,
+/// `components_availability`, `components_availability_state`, `is_planned`,
+/// `is_locked`, `is_workorder`, `delay_alert`, `lot_producing_count`,
+/// `qty_producing`, `qty_produced`, `product_uom_qty_producing`.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateMrpProductionParams {
     pub company_id: Option<u64>,
@@ -177,19 +188,6 @@ pub struct CreateMrpProductionParams {
     pub warehouse_id: u64,
     pub picking_type_id: u64,
     pub consumption: Option<String>,
-    pub state: MoState,
-    pub availability: String,
-    pub reservation_state: String,
-    pub components_availability: String,
-    pub components_availability_state: String,
-    pub is_planned: bool,
-    pub is_locked: bool,
-    pub is_workorder: bool,
-    pub delay_alert: bool,
-    pub lot_producing_count: u32,
-    pub qty_producing: f64,
-    pub qty_produced: f64,
-    pub product_uom_qty_producing: f64,
     pub bom_id: Option<u64>,
     pub routing_id: Option<u64>,
     pub proc_group_id: Option<u64>,
@@ -200,6 +198,12 @@ pub struct CreateMrpProductionParams {
     pub metadata: Option<String>,
 }
 
+/// Intent-shaped create params for work orders.
+///
+/// Server-managed state fields are excluded — the server always derives:
+/// `state` (always Pending), `production_availability`, `is_user_working`,
+/// `is_produced`, `is_last_unfinished_wo`, `quality_check_todo`,
+/// `quality_check_fail`, `quality_state`.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateWorkorderParams {
     pub workcenter_id: u64,
@@ -207,20 +211,12 @@ pub struct CreateWorkorderParams {
     pub duration_expected: f64,
     pub name: String,
     pub sequence: u32,
-    pub state: WorkorderState,
-    pub production_availability: String,
-    pub is_user_working: bool,
-    pub is_produced: bool,
-    pub is_last_unfinished_wo: bool,
-    pub quality_check_todo: bool,
-    pub quality_check_fail: bool,
     pub capacity: Option<f64>,
     pub worksheet: Option<String>,
     pub worksheet_url: Option<String>,
     pub operation_note: Option<String>,
     pub operation_id: Option<u64>,
     pub blocked_by_workorder_id: Option<u64>,
-    pub quality_state: Option<String>,
     pub metadata: Option<String>,
 }
 
@@ -378,15 +374,33 @@ pub fn create_manufacturing_order(
         .unwrap_or_else(|| "use_created".to_string());
     ConsumptionMode::from_str(&consumption_str)?;
 
-    // Get product info — product_tmpl_id and product_tracking are derived from params.product_id
-    let product = ctx
-        .db
-        .product()
-        .id()
-        .find(&params.product_id)
-        .ok_or("Product not found")?;
-    if product.organization_id != organization_id {
-        return Err("Product does not belong to this organization".to_string());
+    validate_positive_qty(params.product_qty, "product_qty")?;
+
+    // Validate and derive product fields — product_tmpl_id and product_tracking
+    // come from the loaded product row, never from caller input.
+    let product = require_product_for_manufacturing(
+        ctx,
+        organization_id,
+        params.product_id,
+        "MO product",
+    )?;
+
+    require_warehouse_for_manufacturing(
+        ctx,
+        organization_id,
+        company_id,
+        params.warehouse_id,
+        "MO warehouse",
+    )?;
+
+    // Validate optional BOM: must belong to same company and reference same product.
+    if let Some(bom_id) = params.bom_id {
+        let bom = require_bom_in_company(ctx, organization_id, company_id, bom_id, "MO BOM")?;
+        if bom.product_id != params.product_id {
+            return Err(
+                "MO BOM product does not match the manufacturing order product".to_string(),
+            );
+        }
     }
 
     let mo = ctx.db.mrp_production().insert(MrpProduction {
@@ -400,13 +414,13 @@ pub fn create_manufacturing_order(
         product_uom_qty: params.product_qty,
         product_tracking: product.tracking.clone(),
         lot_producing_id: None,
-        lot_producing_count: params.lot_producing_count,
-        qty_producing: params.qty_producing,
-        qty_produced: params.qty_produced,
-        product_uom_qty_producing: params.product_uom_qty_producing,
+        lot_producing_count: 0,
+        qty_producing: 0.0,
+        qty_produced: 0.0,
+        product_uom_qty_producing: 0.0,
         company_id,
-        state: params.state,
-        availability: params.availability,
+        state: MoState::Draft,
+        availability: "none".to_string(),
         date_planned_start: params.date_planned_start,
         date_planned_finished: params.date_planned_finished,
         date_deadline: params.date_deadline,
@@ -424,23 +438,23 @@ pub fn create_manufacturing_order(
         move_finished_ids: Vec::new(),
         finished_move_line_ids: Vec::new(),
         workorder_ids: Vec::new(),
-        is_planned: params.is_planned,
-        is_locked: params.is_locked,
+        is_planned: false,
+        is_locked: false,
         is_delayed: false,
         delay_alert_date: None,
         procurement_group_id: params.procurement_group_id,
-        reservation_state: params.reservation_state,
+        reservation_state: "none".to_string(),
         user_id: params.responsible_user_id.unwrap_or_else(|| ctx.sender()),
         activity_user_id: None,
         activity_date_deadline: None,
         activity_state: None,
         activity_type_id: None,
         activity_summary: None,
-        delay_alert: params.delay_alert,
+        delay_alert: false,
         message_follower_ids: Vec::new(),
         activity_ids: Vec::new(),
         message_ids: Vec::new(),
-        is_workorder: params.is_workorder,
+        is_workorder: false,
         mo_count: 0,
         move_raw_count: 0,
         move_finished_count: 0,
@@ -451,8 +465,8 @@ pub fn create_manufacturing_order(
         picking_ids: Vec::new(),
         delivery_count: 0,
         confirm_cancel_backorder: false,
-        components_availability: params.components_availability,
-        components_availability_state: params.components_availability_state,
+        components_availability: "".to_string(),
+        components_availability_state: "none".to_string(),
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
@@ -996,8 +1010,10 @@ pub fn finish_manufacturing_order(
                                     ..raw_move
                                 });
                             }
-                            // done_stock_move re-fetches the move internally
-                            if done_stock_move(
+                            // done_stock_move re-fetches the move internally.
+                            // Fail closed: propagate errors rather than silently
+                            // skipping stock deductions for failed moves.
+                            done_stock_move(
                                 ctx,
                                 organization_id,
                                 *raw_move_id,
@@ -1005,18 +1021,15 @@ pub fn finish_manufacturing_order(
                                     company_id: Some(company_id),
                                     quantity_done: qty,
                                 },
-                            )
-                            .is_ok()
-                            {
-                                upsert_stock_quant(
-                                    ctx,
-                                    organization_id,
-                                    company_id,
-                                    component_product_id,
-                                    component_location_id,
-                                    -qty,
-                                )?;
-                            }
+                            )?;
+                            upsert_stock_quant(
+                                ctx,
+                                organization_id,
+                                company_id,
+                                component_product_id,
+                                component_location_id,
+                                -qty,
+                            )?;
                         }
                     }
                 }
@@ -1130,15 +1143,30 @@ pub fn create_workorder(
 
     let company_id = mo.company_id;
 
-    // Resolve capacity: use supplied value, fall back to work center's capacity, then 1.0
-    let resolved_capacity = params.capacity.unwrap_or_else(|| {
-        ctx.db
-            .mrp_workcenter()
-            .id()
-            .find(&params.workcenter_id)
-            .map(|wc| wc.capacity)
-            .unwrap_or(1.0)
-    });
+    validate_positive_duration(params.duration_expected, "duration_expected")?;
+
+    // Validate workcenter belongs to the same company as the MO and is active.
+    let wc = require_active_workcenter_in_company(
+        ctx,
+        organization_id,
+        company_id,
+        params.workcenter_id,
+        "workorder workcenter",
+    )?;
+
+    // Validate routing operation if supplied.
+    if let Some(op_id) = params.operation_id {
+        require_routing_workcenter_in_company(
+            ctx,
+            organization_id,
+            company_id,
+            op_id,
+            "workorder operation",
+        )?;
+    }
+
+    // Resolve capacity: use supplied value, fall back to validated workcenter capacity.
+    let resolved_capacity = params.capacity.unwrap_or(wc.capacity);
 
     let wo = ctx.db.mrp_workorder().insert(MrpWorkorder {
         id: 0,
@@ -1148,26 +1176,26 @@ pub fn create_workorder(
         product_id: mo.product_id,
         product_tracking: mo.product_tracking.clone(),
         worksheet: params.worksheet,
-        state: params.state,
+        state: WorkorderState::Pending,
         date_start: None,
         date_finished: None,
         duration_expected: params.duration_expected,
         duration: 0.0,
         duration_percent: 0.0,
         progress: 0.0,
-        is_user_working: params.is_user_working,
+        is_user_working: false,
         time_ids: Vec::new(),
-        is_produced: params.is_produced,
+        is_produced: false,
         operation_id: params.operation_id,
         blocked_by_workorder_id: params.blocked_by_workorder_id,
         worksheet_url: params.worksheet_url,
         operation_note: params.operation_note,
         leave_ids: Vec::new(),
         capacity: resolved_capacity,
-        production_availability: params.production_availability,
-        quality_check_todo: params.quality_check_todo,
-        quality_check_fail: params.quality_check_fail,
-        quality_state: params.quality_state,
+        production_availability: "none".to_string(),
+        quality_check_todo: false,
+        quality_check_fail: false,
+        quality_state: None,
         quality_alert_count: 0,
         quality_alert_ids: Vec::new(),
         check_ids: Vec::new(),
@@ -1175,7 +1203,7 @@ pub fn create_workorder(
         company_id,
         working_user_ids: Vec::new(),
         last_working_user_id: None,
-        is_last_unfinished_wo: params.is_last_unfinished_wo,
+        is_last_unfinished_wo: false,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),

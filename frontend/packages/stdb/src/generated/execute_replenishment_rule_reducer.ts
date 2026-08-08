@@ -14,4 +14,5 @@ export default {
   organizationId: __t.u64(),
   companyId: __t.u64(),
   ruleId: __t.u64(),
+  idempotencyKey: __t.string(),
 };

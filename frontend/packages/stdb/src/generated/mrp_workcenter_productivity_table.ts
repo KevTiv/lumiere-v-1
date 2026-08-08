@@ -16,7 +16,7 @@ export default __t.row({
   workcenterId: __t.u64().name("workcenter_id"),
   workorderId: __t.u64().name("workorder_id"),
   description: __t.option(__t.string()),
-  lossId: __t.u64().name("loss_id"),
+  lossId: __t.option(__t.u64()).name("loss_id"),
   dateStart: __t.timestamp().name("date_start"),
   dateEnd: __t.option(__t.timestamp()).name("date_end"),
   duration: __t.f64(),

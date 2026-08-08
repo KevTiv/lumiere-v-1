@@ -9,10 +9,34 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::manufacturing::relations::{
+    require_workorder_in_company, validate_positive_capacity, validate_positive_duration,
+};
 use crate::types::WorkingState;
 use serde_json;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
+
+/// Authoritative loss category for workcenter productivity tracking (MFG-009).
+#[spacetimedb::table(
+    accessor = mrp_loss_category,
+    public,
+    index(accessor = loss_cat_by_org, btree(columns = [organization_id])),
+    index(accessor = loss_cat_by_company, btree(columns = [organization_id, company_id]))
+)]
+pub struct MrpLossCategory {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub name: String,
+    /// Canonical category type: "availability", "performance", "quality", "productive"
+    pub category: String,
+    pub active: bool,
+    pub sequence: u32,
+    pub metadata: Option<String>,
+}
 
 /// Work Center — Manufacturing resource where operations are performed
 #[spacetimedb::table(
@@ -79,7 +103,9 @@ pub struct MrpWorkcenterProductivity {
     pub workcenter_id: u64,
     pub workorder_id: u64,
     pub description: Option<String>,
-    pub loss_id: u64,
+    /// Loss category ID. None until an authoritative MrpLossCategory table is
+    /// introduced (MFG-009). Required once the domain table exists.
+    pub loss_id: Option<u64>,
     pub date_start: Timestamp,
     pub date_end: Option<Timestamp>,
     pub duration: f64,
@@ -94,8 +120,13 @@ pub struct MrpWorkcenterProductivity {
 
 // ── Input Params ─────────────────────────────────────────────────────────────
 
-/// Params for creating a new work center. Covers all MrpWorkcenter fields
-/// except id (auto_inc) and audit fields (from ctx).
+/// Intent-shaped create params for work centers.
+///
+/// Server-computed aggregate fields are excluded — the server always
+/// initializes them to zero/empty: `oee`, `performance`, `blocked_time`,
+/// `productive_time`, `productivity_ids`, `order_ids`, `workorder_count`,
+/// `workorder_ready_count`, `workorder_progress_count`,
+/// `workorder_pending_count`, `workorder_late_count`.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateWorkcenterParams {
     pub company_id: Option<u64>,
@@ -107,17 +138,6 @@ pub struct CreateWorkcenterParams {
     pub time_efficiency: f64,
     pub capacity: f64,
     pub capacity_ids: Vec<u64>,
-    pub oee: f64,
-    pub performance: f64,
-    pub blocked_time: f64,
-    pub productive_time: f64,
-    pub productivity_ids: Vec<u64>,
-    pub order_ids: Vec<u64>,
-    pub workorder_count: u32,
-    pub workorder_ready_count: u32,
-    pub workorder_progress_count: u32,
-    pub workorder_pending_count: u32,
-    pub workorder_late_count: u32,
     pub alternative_workcenter_ids: Vec<u64>,
     pub color: Option<u8>,
     pub resource_calendar_id: Option<u64>,
@@ -158,9 +178,19 @@ pub struct UpdateWorkcenterParams {
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateWorkcenterProductivityParams {
     pub workorder_id: u64,
-    pub loss_id: u64,
+    pub loss_id: Option<u64>,
     pub description: Option<String>,
     pub duration: f64,
+    pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateLossCategoryParams {
+    pub company_id: Option<u64>,
+    pub name: String,
+    /// One of: "availability", "performance", "quality", "productive"
+    pub category: String,
+    pub sequence: u32,
     pub metadata: Option<String>,
 }
 
@@ -179,6 +209,8 @@ pub fn create_workcenter(
 
     WorkingState::from_str(&params.working_state)?;
 
+    validate_positive_capacity(params.capacity, "capacity")?;
+
     let wc = ctx.db.mrp_workcenter().insert(MrpWorkcenter {
         id: 0,
         organization_id,
@@ -191,17 +223,17 @@ pub fn create_workcenter(
         time_efficiency: params.time_efficiency,
         capacity: params.capacity,
         capacity_ids: params.capacity_ids,
-        oee: params.oee,
-        performance: params.performance,
-        blocked_time: params.blocked_time,
-        productive_time: params.productive_time,
-        productivity_ids: params.productivity_ids,
-        order_ids: params.order_ids,
-        workorder_count: params.workorder_count,
-        workorder_ready_count: params.workorder_ready_count,
-        workorder_progress_count: params.workorder_progress_count,
-        workorder_pending_count: params.workorder_pending_count,
-        workorder_late_count: params.workorder_late_count,
+        oee: 0.0,
+        performance: 0.0,
+        blocked_time: 0.0,
+        productive_time: 0.0,
+        productivity_ids: Vec::new(),
+        order_ids: Vec::new(),
+        workorder_count: 0,
+        workorder_ready_count: 0,
+        workorder_progress_count: 0,
+        workorder_pending_count: 0,
+        workorder_late_count: 0,
         alternative_workcenter_ids: params.alternative_workcenter_ids,
         color: params.color,
         resource_calendar_id: params.resource_calendar_id,
@@ -415,12 +447,55 @@ pub fn unblock_workcenter(
     Ok(())
 }
 
-/// Log productivity time for a work center
+/// Create a loss category for productivity tracking (MFG-009).
+#[reducer]
+pub fn create_loss_category(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateLossCategoryParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "mrp_loss_category", "create")?;
+    let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
+    let name = params.name.trim().to_string();
+    if name.is_empty() {
+        return Err("loss category name is required".to_string());
+    }
+
+    let category = params.category.trim().to_string();
+    match category.as_str() {
+        "availability" | "performance" | "quality" | "productive" => {}
+        other => {
+            return Err(format!(
+                "invalid loss category type '{}'; expected availability, performance, quality, or productive",
+                other
+            ))
+        }
+    }
+
+    let cat = ctx.db.mrp_loss_category().insert(MrpLossCategory {
+        id: 0,
+        organization_id,
+        company_id,
+        name,
+        category,
+        active: true,
+        sequence: params.sequence,
+        metadata: params.metadata,
+    });
+
+    log::info!("Loss category created: id={}", cat.id);
+    Ok(())
+}
+
+/// Log productivity time for a work center.
+///
+/// Company is derived from the loaded workcenter — callers do not supply it.
+/// The workorder must belong to the same company as the workcenter.
 #[reducer]
 pub fn log_workcenter_productivity(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     workcenter_id: u64,
     params: CreateWorkcenterProductivityParams,
 ) -> Result<(), String> {
@@ -431,6 +506,8 @@ pub fn log_workcenter_productivity(
         "create",
     )?;
 
+    validate_positive_duration(params.duration, "duration")?;
+
     let wc = ctx
         .db
         .mrp_workcenter()
@@ -440,6 +517,37 @@ pub fn log_workcenter_productivity(
 
     if wc.organization_id != organization_id {
         return Err("Work center does not belong to this organization".to_string());
+    }
+
+    // Derive company from the workcenter — never trust a parallel caller argument.
+    let company_id = wc.company_id;
+
+    // Validate workorder belongs to the same company as the workcenter.
+    require_workorder_in_company(
+        ctx,
+        organization_id,
+        company_id,
+        params.workorder_id,
+        "productivity workorder",
+    )?;
+
+    // Validate loss_id against the authoritative loss category table (MFG-009).
+    if let Some(lid) = params.loss_id {
+        let cat = ctx
+            .db
+            .mrp_loss_category()
+            .id()
+            .find(&lid)
+            .ok_or("loss category not found")?;
+        if cat.organization_id != organization_id {
+            return Err("loss category does not belong to this organization".to_string());
+        }
+        if cat.company_id != company_id {
+            return Err("loss category does not belong to this company".to_string());
+        }
+        if !cat.active {
+            return Err("loss category is inactive".to_string());
+        }
     }
 
     let productivity = ctx
@@ -512,12 +620,13 @@ pub fn log_workcenter_productivity(
     Ok(())
 }
 
-/// Complete a productivity log entry
+/// Complete a productivity log entry.
+///
+/// Company is derived from the stored log entry — callers do not supply it.
 #[reducer]
 pub fn complete_productivity_log(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
     log_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_workcenter_productivity", "write")?;
@@ -532,6 +641,9 @@ pub fn complete_productivity_log(
     if log_entry.organization_id != organization_id {
         return Err("Log does not belong to this organization".to_string());
     }
+
+    // Derive company from the log entry for audit attribution.
+    let company_id = log_entry.company_id;
 
     ctx.db
         .mrp_workcenter_productivity()

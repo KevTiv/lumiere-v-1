@@ -2068,11 +2068,9 @@ export const BomLineInput = __t.object("BomLineInput", {
   manualConsumption: __t.bool(),
   attachmentsCount: __t.u32(),
   operationId: __t.option(__t.u64()),
-  parentProductTmplId: __t.option(__t.u64()),
   childBomId: __t.option(__t.u64()),
   bomProductTemplateAttributeValueIds: __t.array(__t.u64()),
   possibleBomProductTemplateAttributeValueIds: __t.array(__t.u64()),
-  childLineIds: __t.array(__t.u64()),
   metadata: __t.option(__t.string()),
 });
 export type BomLineInput = __Infer<typeof BomLineInput>;
@@ -3696,13 +3694,11 @@ export const CreateBomParams = __t.object("CreateBomParams", {
     return BomType;
   },
   productId: __t.u64(),
-  productTmplId: __t.u64(),
   productQty: __t.f64(),
   productUomId: __t.u64(),
   readyToProduce: __t.string(),
   consumption: __t.string(),
   sequence: __t.u32(),
-  estimatedCost: __t.f64(),
   get lines() {
     return __t.array(BomLineInput);
   },
@@ -4645,16 +4641,13 @@ export const CreateInventoryAdjustmentParams = __t.object("CreateInventoryAdjust
   name: __t.string(),
   productId: __t.u64(),
   locationId: __t.u64(),
-  quantityBefore: __t.f64(),
   quantityAfter: __t.f64(),
-  reasonCode: __t.string(),
-  state: __t.string(),
+  reasonId: __t.u64(),
   adjustmentType: __t.string(),
   inventoryId: __t.option(__t.u64()),
   lotId: __t.option(__t.u64()),
   packageId: __t.option(__t.u64()),
   uomId: __t.u64(),
-  unitCost: __t.f64(),
   reasonNotes: __t.option(__t.string()),
   metadata: __t.option(__t.string()),
 });
@@ -4840,6 +4833,15 @@ export const CreateLeaveTypeParams = __t.object("CreateLeaveTypeParams", {
 });
 export type CreateLeaveTypeParams = __Infer<typeof CreateLeaveTypeParams>;
 
+export const CreateLossCategoryParams = __t.object("CreateLossCategoryParams", {
+  companyId: __t.option(__t.u64()),
+  name: __t.string(),
+  category: __t.string(),
+  sequence: __t.u32(),
+  metadata: __t.option(__t.string()),
+});
+export type CreateLossCategoryParams = __Infer<typeof CreateLossCategoryParams>;
+
 export const CreateLoyaltyProgramParams = __t.object("CreateLoyaltyProgramParams", {
   name: __t.string(),
   currencyId: __t.u64(),
@@ -4907,21 +4909,6 @@ export const CreateMrpProductionParams = __t.object("CreateMrpProductionParams",
   warehouseId: __t.u64(),
   pickingTypeId: __t.u64(),
   consumption: __t.option(__t.string()),
-  get state() {
-    return MoState;
-  },
-  availability: __t.string(),
-  reservationState: __t.string(),
-  componentsAvailability: __t.string(),
-  componentsAvailabilityState: __t.string(),
-  isPlanned: __t.bool(),
-  isLocked: __t.bool(),
-  isWorkorder: __t.bool(),
-  delayAlert: __t.bool(),
-  lotProducingCount: __t.u32(),
-  qtyProducing: __t.f64(),
-  qtyProduced: __t.f64(),
-  productUomQtyProducing: __t.f64(),
   bomId: __t.option(__t.u64()),
   routingId: __t.option(__t.u64()),
   procGroupId: __t.option(__t.u64()),
@@ -6259,18 +6246,9 @@ export const CreateStockInventoryParams = __t.object("CreateStockInventoryParams
   lotIds: __t.array(__t.u64()),
   ownerIds: __t.array(__t.u64()),
   packageIds: __t.array(__t.u64()),
-  state: __t.string(),
   accountingDate: __t.option(__t.timestamp()),
   categoryId: __t.option(__t.u64()),
   countedMode: __t.string(),
-  doneMoveIds: __t.array(__t.u64()),
-  moveIds: __t.array(__t.u64()),
-  adjustmentCount: __t.i32(),
-  hasAccountMoves: __t.bool(),
-  exhausted: __t.bool(),
-  prefilledCount: __t.i32(),
-  started: __t.bool(),
-  isEditable: __t.bool(),
   isStockCheck: __t.bool(),
   metadata: __t.option(__t.string()),
 });
@@ -7051,17 +7029,6 @@ export const CreateWorkcenterParams = __t.object("CreateWorkcenterParams", {
   timeEfficiency: __t.f64(),
   capacity: __t.f64(),
   capacityIds: __t.array(__t.u64()),
-  oee: __t.f64(),
-  performance: __t.f64(),
-  blockedTime: __t.f64(),
-  productiveTime: __t.f64(),
-  productivityIds: __t.array(__t.u64()),
-  orderIds: __t.array(__t.u64()),
-  workorderCount: __t.u32(),
-  workorderReadyCount: __t.u32(),
-  workorderProgressCount: __t.u32(),
-  workorderPendingCount: __t.u32(),
-  workorderLateCount: __t.u32(),
   alternativeWorkcenterIds: __t.array(__t.u64()),
   color: __t.option(__t.u8()),
   resourceCalendarId: __t.option(__t.u64()),
@@ -7076,7 +7043,7 @@ export type CreateWorkcenterParams = __Infer<typeof CreateWorkcenterParams>;
 
 export const CreateWorkcenterProductivityParams = __t.object("CreateWorkcenterProductivityParams", {
   workorderId: __t.u64(),
-  lossId: __t.u64(),
+  lossId: __t.option(__t.u64()),
   description: __t.option(__t.string()),
   duration: __t.f64(),
   metadata: __t.option(__t.string()),
@@ -7149,22 +7116,12 @@ export const CreateWorkorderParams = __t.object("CreateWorkorderParams", {
   durationExpected: __t.f64(),
   name: __t.string(),
   sequence: __t.u32(),
-  get state() {
-    return WorkorderState;
-  },
-  productionAvailability: __t.string(),
-  isUserWorking: __t.bool(),
-  isProduced: __t.bool(),
-  isLastUnfinishedWo: __t.bool(),
-  qualityCheckTodo: __t.bool(),
-  qualityCheckFail: __t.bool(),
   capacity: __t.option(__t.f64()),
   worksheet: __t.option(__t.string()),
   worksheetUrl: __t.option(__t.string()),
   operationNote: __t.option(__t.string()),
   operationId: __t.option(__t.u64()),
   blockedByWorkorderId: __t.option(__t.u64()),
-  qualityState: __t.option(__t.string()),
   metadata: __t.option(__t.string()),
 });
 export type CreateWorkorderParams = __Infer<typeof CreateWorkorderParams>;
@@ -9545,6 +9502,7 @@ export type InvalidateWorkflowHumanTaskParams = __Infer<typeof InvalidateWorkflo
 export const InventoryAdjustment = __t.object("InventoryAdjustment", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  companyId: __t.u64(),
   name: __t.string(),
   state: __t.string(),
   adjustmentType: __t.string(),
@@ -9572,6 +9530,32 @@ export const InventoryAdjustment = __t.object("InventoryAdjustment", {
   metadata: __t.option(__t.string()),
 });
 export type InventoryAdjustment = __Infer<typeof InventoryAdjustment>;
+
+export const InventoryAuditRun = __t.object("InventoryAuditRun", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
+  startedAt: __t.timestamp(),
+  completedAt: __t.option(__t.timestamp()),
+  violationCount: __t.u32(),
+  runBy: __t.identity(),
+});
+export type InventoryAuditRun = __Infer<typeof InventoryAuditRun>;
+
+export const InventoryAuditViolation = __t.object("InventoryAuditViolation", {
+  id: __t.u64(),
+  runId: __t.u64(),
+  organizationId: __t.u64(),
+  violationType: __t.string(),
+  tableName: __t.string(),
+  recordId: __t.u64(),
+  fieldName: __t.option(__t.string()),
+  description: __t.string(),
+  severity: __t.string(),
+  resolved: __t.bool(),
+  createdAt: __t.timestamp(),
+});
+export type InventoryAuditViolation = __Infer<typeof InventoryAuditViolation>;
 
 export const InventoryClose = __t.object("InventoryClose", {
   id: __t.u64(),
@@ -9647,6 +9631,7 @@ export const InventoryIntegrationIntent = __t.object("InventoryIntegrationIntent
   lastError: __t.option(__t.string()),
   externalReference: __t.option(__t.string()),
   attemptCount: __t.u32(),
+  applied: __t.bool(),
   createUid: __t.identity(),
   createDate: __t.timestamp(),
   writeUid: __t.identity(),
@@ -10373,6 +10358,18 @@ export const MrpBomLine = __t.object("MrpBomLine", {
 });
 export type MrpBomLine = __Infer<typeof MrpBomLine>;
 
+export const MrpLossCategory = __t.object("MrpLossCategory", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  name: __t.string(),
+  category: __t.string(),
+  active: __t.bool(),
+  sequence: __t.u32(),
+  metadata: __t.option(__t.string()),
+});
+export type MrpLossCategory = __Infer<typeof MrpLossCategory>;
+
 export const MrpProduction = __t.object("MrpProduction", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -10516,7 +10513,7 @@ export const MrpWorkcenterProductivity = __t.object("MrpWorkcenterProductivity",
   workcenterId: __t.u64(),
   workorderId: __t.u64(),
   description: __t.option(__t.string()),
-  lossId: __t.u64(),
+  lossId: __t.option(__t.u64()),
   dateStart: __t.timestamp(),
   dateEnd: __t.option(__t.timestamp()),
   duration: __t.f64(),
@@ -16415,12 +16412,12 @@ export const UpdateBomParams = __t.object("UpdateBomParams", {
   readyToProduce: __t.option(__t.string()),
   consumption: __t.option(__t.string()),
   sequence: __t.option(__t.u32()),
-  pickingTypeId: __t.option(__t.u64()),
-  locationSrcId: __t.option(__t.u64()),
-  locationDestId: __t.option(__t.u64()),
-  warehouseId: __t.option(__t.u64()),
-  routingId: __t.option(__t.u64()),
-  metadata: __t.option(__t.string()),
+  pickingTypeId: __t.option(__t.option(__t.u64())),
+  locationSrcId: __t.option(__t.option(__t.u64())),
+  locationDestId: __t.option(__t.option(__t.u64())),
+  warehouseId: __t.option(__t.option(__t.u64())),
+  routingId: __t.option(__t.option(__t.u64())),
+  metadata: __t.option(__t.option(__t.string())),
 });
 export type UpdateBomParams = __Infer<typeof UpdateBomParams>;
 

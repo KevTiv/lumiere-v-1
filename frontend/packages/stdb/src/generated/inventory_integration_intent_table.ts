@@ -24,6 +24,7 @@ export default __t.row({
   lastError: __t.option(__t.string()).name("last_error"),
   externalReference: __t.option(__t.string()).name("external_reference"),
   attemptCount: __t.u32().name("attempt_count"),
+  applied: __t.bool(),
   createUid: __t.identity().name("create_uid"),
   createDate: __t.timestamp().name("create_date"),
   writeUid: __t.identity().name("write_uid"),

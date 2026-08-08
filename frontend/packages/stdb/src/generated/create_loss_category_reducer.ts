@@ -11,12 +11,12 @@ import {
 } from "spacetimedb";
 
 import {
-  CreateRoutingWorkcenterParams,
+  CreateLossCategoryParams,
 } from "./types";
 
 export default {
   organizationId: __t.u64(),
   get params() {
-    return CreateRoutingWorkcenterParams;
+    return CreateLossCategoryParams;
   },
 };

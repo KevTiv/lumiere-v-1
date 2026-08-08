@@ -10,13 +10,7 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-import {
-  CreateRoutingWorkcenterParams,
-} from "./types";
-
 export default {
   organizationId: __t.u64(),
-  get params() {
-    return CreateRoutingWorkcenterParams;
-  },
+  runId: __t.option(__t.u64()),
 };

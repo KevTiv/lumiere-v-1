@@ -12,6 +12,7 @@
 /// | **MrpWorkcenterProductivity** | Work center productivity tracking |
 pub mod bill_of_materials;
 pub mod manufacturing_orders;
+pub mod relations;
 pub mod work_centers;
 
 pub use bill_of_materials::*;

@@ -13,6 +13,7 @@ import {
 export default __t.row({
   id: __t.u64().primaryKey(),
   organizationId: __t.u64().name("organization_id"),
+  companyId: __t.u64().name("company_id"),
   name: __t.string(),
   state: __t.string(),
   adjustmentType: __t.string().name("adjustment_type"),

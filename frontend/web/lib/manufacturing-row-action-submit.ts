@@ -1,6 +1,10 @@
 import type { ManufacturingMutations } from "@lumiere/query-hooks/hooks/manufacturing"
 import { i18n } from "@lumiere/i18n"
-import { toCreateWorkcenterProductivityParams } from "@lumiere/erp-shared/manufacturing-create-params"
+import {
+  toCreateWorkcenterProductivityParams,
+  toCreateWorkorderParams,
+} from "@lumiere/erp-shared/manufacturing-create-params"
+import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 
 /** Coverage tracker: manufacturing reducers reachable via row actions + create/import forms. */
 export const MANUFACTURING_UI_REDUCERS = [
@@ -93,22 +97,16 @@ export async function submitManufacturingRowAction(
         await m.cancelMo.mutateAsync(moId)
         return
       case "create_workorder": {
-        const wc = String(values.woWorkcenterId ?? "")
-        if (!wc) throw new Error("Select a work center")
-        await m.createWorkorder.mutateAsync({
-          workcenterId: Number(wc),
-          productionId: Number(moId),
-          durationExpected: num(values.woDuration, 0),
-          name: String(values.woName ?? "Operation"),
-          sequence: num(values.woSequence, 1) || 1,
-          state: { Ready: [] },
-          productionAvailability: "available",
-          isUserWorking: false,
-          isProduced: false,
-          isLastUnfinishedWo: false,
-          qualityCheckTodo: false,
-          qualityCheckFail: false,
+        const wcRaw = optionalBigIntU64(values.woWorkcenterId)
+        const moRaw = optionalBigIntU64(moId)
+        if (!wcRaw) throw new Error("Select a work center")
+        if (!moRaw) throw new Error("Manufacturing order ID is required")
+        const params = toCreateWorkorderParams(values, {
+          productionId: moRaw,
+          workcenterId: wcRaw,
         })
+        if (!params) throw new Error("Work order name is required")
+        await m.createWorkorder.mutateAsync(params as unknown as Record<string, unknown>)
         return
       }
       default:

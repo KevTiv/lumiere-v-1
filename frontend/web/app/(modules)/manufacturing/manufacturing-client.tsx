@@ -97,6 +97,7 @@ function ManufacturingClientLoaded({
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
+  const hasActiveCompany = operatingCompanyId > 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [rowPick, setRowPick] = useState<{ tabId: string; row: Record<string, unknown> } | null>(null)
   const [csvKind, setCsvKind] = useState<ManufacturingCsvImportKind | null>(null)
@@ -196,12 +197,71 @@ function ManufacturingClientLoaded({
 
   const workcenterFormConfig = useMemo(() => newWorkcenterForm(t), [t])
 
+  // Enrich rows with resolved relation labels so entity tables show names, not IDs.
+  const enrichedProductions = useMemo(
+    () =>
+      productions.map((p) => ({
+        ...p,
+        productName: (() => {
+          const product = products.find((pr) => String(pr.id) === String(p.productId))
+          return product != null ? String(product.name ?? p.productId) : String(p.productId ?? "—")
+        })(),
+        workcenterName: (() => {
+          const workcenter = workcenters.find((wc) => String(wc.id) === String(p.workcenterId))
+          return workcenter != null ? String(workcenter.name ?? p.workcenterId) : undefined
+        })(),
+      })) as Record<string, unknown>[],
+    [productions, products, workcenters],
+  )
+
+  const enrichedWorkorders = useMemo(
+    () =>
+      workorders.map((wo) => ({
+        ...wo,
+        workcenterName: (() => {
+          const workcenter = workcenters.find((wc) => String(wc.id) === String(wo.workcenterId))
+          return workcenter != null ? String(workcenter.name ?? wo.workcenterId) : String(wo.workcenterId ?? "—")
+        })(),
+        productionRef: (() => {
+          const production = productions.find((p) => String(p.id) === String(wo.productionId))
+          return production != null
+            ? String(production.name ?? `MO-${String(production.id).slice(-6)}`)
+            : String(wo.productionId ?? "—")
+        })(),
+      })) as Record<string, unknown>[],
+    [workorders, workcenters, productions],
+  )
+
+  const enrichedBoms = useMemo(
+    () =>
+      boms.map((b) => ({
+        ...b,
+        productName: (() => {
+          const product = products.find((pr) => String(pr.id) === String(b.productId))
+          return product != null ? String(product.name ?? b.productId) : String(b.productId ?? "—")
+        })(),
+      })) as Record<string, unknown>[],
+    [boms, products],
+  )
+
+  const enrichedRoutingOperations = useMemo(
+    () =>
+      routingOperations.map((op) => ({
+        ...op,
+        workcenterName: (() => {
+          const workcenter = workcenters.find((wc) => String(wc.id) === String(op.workcenterId))
+          return workcenter != null ? String(workcenter.name ?? op.workcenterId) : String(op.workcenterId ?? "—")
+        })(),
+      })) as Record<string, unknown>[],
+    [routingOperations, workcenters],
+  )
+
   const liveSections = useMemo(() => {
-    const activeOrders = productions.filter(
+    const activeOrders = enrichedProductions.filter(
       (p) => String(p.state) === "Confirmed" || String(p.state) === "Progress"
     )
-    const doneOrders = productions.filter((p) => String(p.state) === "Done")
-    const totalOrders = productions.length
+    const doneOrders = enrichedProductions.filter((p) => String(p.state) === "Done")
+    const totalOrders = enrichedProductions.length
     const onTimeRate =
       totalOrders > 0 ? Math.round((doneOrders.length / totalOrders) * 100) : 0
 
@@ -254,7 +314,7 @@ function ManufacturingClientLoaded({
               return { ...w, data: { metrics } }
             }
             if (w.id === "mfg-orders-table") {
-              const activeOrdersRows = productions
+              const activeOrdersRows = enrichedProductions
                 .filter((p) => {
                   const s = String(p.state ?? "")
                   return s === "Confirmed" || s === "Progress" || s === "InProgress"
@@ -271,8 +331,8 @@ function ManufacturingClientLoaded({
                       ? new Date(dueDateMs).toLocaleDateString("en", { month: "short", day: "numeric" })
                       : "—"
                   return {
-                    ref: `MO-${String(p.id).slice(-6)}`,
-                    product: t("manufacturing.dashboard.productFallback", { id: String(p.productId ?? "?").slice(-4) }),
+                    ref: String(p.name ?? `MO-${String(p.id).slice(-6)}`),
+                    product: String(p.productName ?? p.productId ?? "—"),
                     qty: Math.round(Number(p.qtyProducing ?? 0)),
                     progress,
                     due: dueStr,
@@ -284,7 +344,7 @@ function ManufacturingClientLoaded({
             return w
               })
   }, [
-    productions,
+    enrichedProductions,
     workorders,
     workcenters,
     t,
@@ -338,15 +398,15 @@ function ManufacturingClientLoaded({
 
   const data = useMemo(
     () => ({
-      orders: productions as unknown as Record<string, unknown>[],
-      boms: boms as unknown as Record<string, unknown>[],
+      orders: enrichedProductions as unknown as Record<string, unknown>[],
+      boms: enrichedBoms as unknown as Record<string, unknown>[],
       "bom-lines": bomLines as unknown as Record<string, unknown>[],
-      workorders: workorders as unknown as Record<string, unknown>[],
+      workorders: enrichedWorkorders as unknown as Record<string, unknown>[],
       workcenters: workcenters as unknown as Record<string, unknown>[],
-      "routing-operations": routingOperations as unknown as Record<string, unknown>[],
+      "routing-operations": enrichedRoutingOperations as unknown as Record<string, unknown>[],
       quality: qualityChecks as unknown as Record<string, unknown>[],
     }),
-    [productions, boms, bomLines, workorders, workcenters, routingOperations, qualityChecks]
+    [enrichedProductions, enrichedBoms, bomLines, enrichedWorkorders, workcenters, enrichedRoutingOperations, qualityChecks],
   )
 
   const handleFormSubmit = async (
@@ -354,6 +414,9 @@ function ManufacturingClientLoaded({
     action: string,
     formData: Record<string, unknown>
   ) => {
+    if (!hasActiveCompany) {
+      throw new Error(t("manufacturing.errors.noActiveCompany"))
+    }
     if (action === "createManufacturingOrder") {
       const prodRaw = formData.productId
       const productRow = products.find((p) => String(p.id) === String(prodRaw))

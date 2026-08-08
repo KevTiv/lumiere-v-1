@@ -81,7 +81,7 @@ export const manufacturingOrdersTableConfig = (t: TFunction): EntityViewConfig =
     ],
     columns: [
       { key: "name", label: t("manufacturing.manufacturingOrders.columns.name"), width: "min-w-32" },
-      { key: "productId", label: t("manufacturing.manufacturingOrders.columns.productId"), width: "min-w-40" },
+      { key: "productName", label: t("manufacturing.manufacturingOrders.columns.productId"), width: "min-w-40" },
       { key: "productQty", label: t("manufacturing.manufacturingOrders.columns.productQty"), type: "number", align: "right" },
       { key: "qtyProducing", label: t("manufacturing.manufacturingOrders.columns.qtyProducing"), type: "number", align: "right" },
       { key: "state", label: t("manufacturing.manufacturingOrders.columns.state"), type: "badge", ...moStateBadges(t) },
@@ -118,7 +118,7 @@ export const bomsTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "productId", label: t("manufacturing.billsOfMaterials.columns.productId"), width: "min-w-40" },
+      { key: "productName", label: t("manufacturing.billsOfMaterials.columns.productId"), width: "min-w-40" },
       { key: "productTmplId", label: t("manufacturing.billsOfMaterials.columns.productTmplId"), width: "min-w-32" },
       { key: "type", label: t("manufacturing.billsOfMaterials.columns.type"), type: "badge", ...bomTypeBadges(t) },
       { key: "productQty", label: t("manufacturing.billsOfMaterials.columns.productQty"), type: "number", align: "right" },
@@ -181,8 +181,8 @@ export const workordersTableConfig = (t: TFunction): EntityViewConfig => ({
     ],
     columns: [
       { key: "name", label: t("manufacturing.workOrders.columns.name"), width: "min-w-36" },
-      { key: "productionId", label: t("manufacturing.workOrders.columns.productionId"), width: "min-w-28" },
-      { key: "workcenterId", label: t("manufacturing.workOrders.columns.workcenterId"), width: "min-w-32" },
+      { key: "productionRef", label: t("manufacturing.workOrders.columns.productionId"), width: "min-w-28" },
+      { key: "workcenterName", label: t("manufacturing.workOrders.columns.workcenterId"), width: "min-w-32" },
       { key: "state", label: t("manufacturing.workOrders.columns.state"), type: "badge", ...workorderStateBadges(t) },
       { key: "durationExpected", label: t("manufacturing.workOrders.columns.durationExpected"), type: "number", align: "right" },
       { key: "duration", label: t("manufacturing.workOrders.columns.duration"), type: "number", align: "right" },
@@ -229,7 +229,7 @@ export const routingOperationsTableConfig = (t: TFunction): EntityViewConfig => 
     searchKeys: ["name", "worksheetType", "timeMode"],
     columns: [
       {
-        key: "workcenterId",
+        key: "workcenterName",
         label: t("manufacturing.routingOperations.columns.workcenterId"),
         width: "min-w-28",
       },
