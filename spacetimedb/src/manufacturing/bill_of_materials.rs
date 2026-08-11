@@ -11,12 +11,12 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
+use crate::manufacturing::manufacturing_orders::mrp_production;
 use crate::manufacturing::relations::{
     require_bom_in_company, require_location_for_manufacturing, require_product_for_manufacturing,
     require_routing_workcenter_in_company, require_uom_compatible, require_uom_in_org,
     require_warehouse_for_manufacturing, validate_positive_qty,
 };
-use crate::manufacturing::manufacturing_orders::mrp_production;
 use crate::manufacturing::work_centers::mrp_workcenter;
 use crate::types::BomType;
 use serde_json;
@@ -386,10 +386,13 @@ pub fn create_bom(
     let product =
         require_product_for_manufacturing(ctx, organization_id, params.product_id, "BOM product")?;
 
-    let product_uom =
-        require_uom_in_org(ctx, organization_id, product.uom_id, "BOM product UOM")?;
-    let bom_uom =
-        require_uom_in_org(ctx, organization_id, params.product_uom_id, "BOM quantity UOM")?;
+    let product_uom = require_uom_in_org(ctx, organization_id, product.uom_id, "BOM product UOM")?;
+    let bom_uom = require_uom_in_org(
+        ctx,
+        organization_id,
+        params.product_uom_id,
+        "BOM quantity UOM",
+    )?;
     require_uom_compatible(&product_uom, &bom_uom, "BOM")?;
 
     if let Some(warehouse_id) = params.warehouse_id {
@@ -671,11 +674,7 @@ pub fn update_bom(
 ///
 /// Company is derived from the stored BOM — callers do not supply it.
 #[reducer]
-pub fn delete_bom(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    bom_id: u64,
-) -> Result<(), String> {
+pub fn delete_bom(ctx: &ReducerContext, organization_id: u64, bom_id: u64) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_bom", "delete")?;
 
     let bom = ctx.db.mrp_bom().id().find(&bom_id).ok_or("BOM not found")?;
@@ -952,11 +951,7 @@ pub fn compute_bom_cost(
 ///
 /// Company is derived from the stored BOM — callers do not supply it.
 #[reducer]
-pub fn explode_bom(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    bom_id: u64,
-) -> Result<(), String> {
+pub fn explode_bom(ctx: &ReducerContext, organization_id: u64, bom_id: u64) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_bom", "read")?;
 
     let bom = ctx.db.mrp_bom().id().find(&bom_id).ok_or("BOM not found")?;

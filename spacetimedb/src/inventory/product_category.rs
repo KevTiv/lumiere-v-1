@@ -91,9 +91,7 @@ pub fn create_product_category(
         }
         if let (Some(new_cid), Some(parent_cid)) = (params.company_id, parent.company_id) {
             if new_cid != parent_cid {
-                return Err(
-                    "Category company must match parent category company".to_string(),
-                );
+                return Err("Category company must match parent category company".to_string());
             }
         }
     }

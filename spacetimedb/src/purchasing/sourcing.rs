@@ -1,8 +1,9 @@
 /// RFQ / multi-vendor tender MVP — quote lines, vendor bids, award → PO.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::company;
-use crate::crm::contacts::contact;
+use crate::core::organization::require_company_in_organization;
+use crate::core::reference::{require_active_currency_by_id, uom};
+use crate::crm::contacts::{contact, Contact};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::purchasing::purchase_orders::{
@@ -153,6 +154,89 @@ fn rfq_lines(ctx: &ReducerContext, rfq_id: u64) -> Vec<PurchaseRfqLine> {
         .collect()
 }
 
+fn require_rfq_lines_in_parent_scope(
+    ctx: &ReducerContext,
+    rfq: &PurchaseRfq,
+) -> Result<Vec<PurchaseRfqLine>, String> {
+    let lines = rfq_lines(ctx, rfq.id);
+    if lines.iter().any(|line| {
+        line.organization_id != rfq.organization_id || line.company_id != rfq.company_id
+    }) {
+        return Err("RFQ has a line outside its organization or company scope".to_string());
+    }
+    Ok(lines)
+}
+
+fn require_purchasable_product_and_uom(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    product_id: u64,
+    product_uom: u64,
+) -> Result<(), String> {
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&product_id)
+        .ok_or("Product not found")?;
+    if product.organization_id != organization_id {
+        return Err("Product does not belong to this organization".to_string());
+    }
+    if !product.active || !product.purchase_ok {
+        return Err("Product is not active for purchasing".to_string());
+    }
+
+    let selected_uom = ctx
+        .db
+        .uom()
+        .id()
+        .find(&product_uom)
+        .ok_or("UoM not found")?;
+    if selected_uom.organization_id != organization_id || !selected_uom.is_active {
+        return Err("UoM is not active in this organization".to_string());
+    }
+    let purchase_uom = ctx
+        .db
+        .uom()
+        .id()
+        .find(&product.uom_po_id)
+        .ok_or("Product purchase UoM not found")?;
+    if purchase_uom.organization_id != organization_id || !purchase_uom.is_active {
+        return Err("Product purchase UoM is not active in this organization".to_string());
+    }
+    if selected_uom.category_id != purchase_uom.category_id {
+        return Err("UoM is incompatible with the product purchase UoM".to_string());
+    }
+    Ok(())
+}
+
+fn require_active_vendor_in_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    partner_id: u64,
+) -> Result<Contact, String> {
+    let vendor = ctx
+        .db
+        .contact()
+        .id()
+        .find(&partner_id)
+        .ok_or("Vendor contact not found")?;
+    if vendor.organization_id != organization_id {
+        return Err("Vendor contact does not belong to this organization".to_string());
+    }
+    if vendor.company_id.is_some_and(|id| id != company_id) {
+        return Err("Vendor contact does not belong to this company".to_string());
+    }
+    if vendor.deleted_at.is_some() || vendor.merge_target_id.is_some() {
+        return Err("Vendor contact is inactive".to_string());
+    }
+    if !vendor.is_vendor {
+        return Err("Partner is not a vendor".to_string());
+    }
+    Ok(vendor)
+}
+
 fn recompute_bid_amount(price_unit: f64, lines: &[PurchaseRfqLine]) -> f64 {
     lines.iter().map(|l| l.product_uom_qty * price_unit).sum()
 }
@@ -173,11 +257,8 @@ pub fn create_purchase_rfq(
         return Err("RFQ must have at least one line".to_string());
     }
 
-    ctx.db
-        .company()
-        .id()
-        .find(&company_id)
-        .ok_or("Company not found")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    require_active_currency_by_id(ctx, params.currency_id)?;
 
     if let Some(req_id) = params.requisition_id {
         let req = ctx
@@ -192,14 +273,26 @@ pub fn create_purchase_rfq(
         if req.company_id != company_id {
             return Err("Record does not belong to this company".to_string());
         }
-        if !matches!(
-            req.state,
-            RequisitionState::Approved | RequisitionState::InProgress | RequisitionState::Draft
-        ) {
-            return Err(
-                "Requisition must be Draft, InProgress, or Approved to create an RFQ".to_string(),
-            );
+        // The reachable selected-requisition action represents an approved
+        // procurement demand. Draft and in-progress requests must complete
+        // their approval workflow before vendor solicitation begins.
+        if req.state != RequisitionState::Approved {
+            return Err("Requisition must be approved to create an RFQ".to_string());
         }
+    }
+
+    // Validate the entire write set before creating the RFQ header so no
+    // partial document can survive an invalid product/UoM relation.
+    for line in &params.lines {
+        if line.product_uom_qty <= 0.0 {
+            return Err("RFQ line quantity must be greater than zero".to_string());
+        }
+        require_purchasable_product_and_uom(
+            ctx,
+            organization_id,
+            line.product_id,
+            line.product_uom,
+        )?;
     }
 
     let name = next_doc_number(ctx, "RFQ");
@@ -225,15 +318,6 @@ pub fn create_purchase_rfq(
 
     let mut line_ids = Vec::with_capacity(params.lines.len());
     for (idx, line) in params.lines.iter().enumerate() {
-        if line.product_uom_qty <= 0.0 {
-            return Err("RFQ line quantity must be greater than zero".to_string());
-        }
-        ctx.db
-            .product()
-            .id()
-            .find(&line.product_id)
-            .ok_or("Product not found")?;
-
         let row = ctx.db.purchase_rfq_line().insert(PurchaseRfqLine {
             id: 0,
             organization_id,
@@ -301,19 +385,27 @@ pub fn add_purchase_rfq_line(
     if params.product_uom_qty <= 0.0 {
         return Err("RFQ line quantity must be greater than zero".to_string());
     }
-    ctx.db
-        .product()
-        .id()
-        .find(&params.product_id)
-        .ok_or("Product not found")?;
+    require_purchasable_product_and_uom(
+        ctx,
+        rfq.organization_id,
+        params.product_id,
+        params.product_uom,
+    )?;
 
-    let sequence = params
-        .sequence
-        .unwrap_or_else(|| ((rfq.line_ids.len() + 1) as u32) * 10);
+    let sequence = params.sequence.unwrap_or_else(|| {
+        ((ctx
+            .db
+            .purchase_rfq_line()
+            .purchase_rfq_line_by_rfq()
+            .filter(&rfq_id)
+            .count()
+            + 1) as u32)
+            * 10
+    });
     let row = ctx.db.purchase_rfq_line().insert(PurchaseRfqLine {
         id: 0,
-        organization_id,
-        company_id,
+        organization_id: rfq.organization_id,
+        company_id: rfq.company_id,
         rfq_id,
         product_id: params.product_id,
         product_uom: params.product_uom,
@@ -375,17 +467,13 @@ pub fn add_purchase_rfq_bid(
         return Err("Bid price_unit must be non-negative".to_string());
     }
 
-    let vendor = ctx
-        .db
-        .contact()
-        .id()
-        .find(&params.partner_id)
-        .ok_or("Vendor contact not found")?;
-    if !vendor.is_vendor {
-        return Err("Partner is not a vendor".to_string());
+    require_active_vendor_in_scope(ctx, rfq.organization_id, rfq.company_id, params.partner_id)?;
+    require_active_currency_by_id(ctx, params.currency_id)?;
+    if params.currency_id != rfq.currency_id {
+        return Err("RFQ bid currency must match the RFQ currency".to_string());
     }
 
-    let lines = rfq_lines(ctx, rfq_id);
+    let lines = require_rfq_lines_in_parent_scope(ctx, &rfq)?;
     if lines.is_empty() {
         return Err("RFQ has no lines".to_string());
     }
@@ -393,8 +481,8 @@ pub fn add_purchase_rfq_bid(
 
     let bid = ctx.db.purchase_rfq_bid().insert(PurchaseRfqBid {
         id: 0,
-        organization_id,
-        company_id,
+        organization_id: rfq.organization_id,
+        company_id: rfq.company_id,
         rfq_id,
         partner_id: params.partner_id,
         currency_id: params.currency_id,
@@ -488,7 +576,16 @@ pub fn award_purchase_rfq_bid(
         return Err("Bid does not belong to this RFQ".to_string());
     }
 
-    let lines = rfq_lines(ctx, rfq_id);
+    if bid.state != "submitted" {
+        return Err("Only submitted RFQ bids can be awarded".to_string());
+    }
+    require_active_vendor_in_scope(ctx, rfq.organization_id, rfq.company_id, bid.partner_id)?;
+    require_active_currency_by_id(ctx, bid.currency_id)?;
+    if bid.currency_id != rfq.currency_id {
+        return Err("RFQ bid currency does not match the RFQ currency".to_string());
+    }
+
+    let lines = require_rfq_lines_in_parent_scope(ctx, &rfq)?;
     if lines.is_empty() {
         return Err("RFQ has no lines".to_string());
     }

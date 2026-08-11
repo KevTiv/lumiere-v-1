@@ -26,6 +26,16 @@ export const PURCHASING_WORKSPACE_RESOURCE_KEYS = [
   "purchase-rfq-bids",
   "purchase-returns",
   "purchase-return-lines",
+  "purchase-blanket-orders",
+  "purchase-blanket-order-lines",
+  "purchase-blanket-releases",
+  "purchase-contracts",
+  "vendor-scorecards",
+  "vendor-risk-flags",
+  "consignment-agreements",
+  "purchase-approval-delegates",
+  "commodity-price-indexes",
+  "purchasing-integration-intents",
   "supplier-intakes",
 ] as const;
 

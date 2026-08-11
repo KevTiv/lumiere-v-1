@@ -172,8 +172,14 @@ import ClearContactCategoriesReducer from "./clear_contact_categories_reducer";
 import ClearDocumentPresenceReducer from "./clear_document_presence_reducer";
 import ClearInventoryAuditViolationsReducer from "./clear_inventory_audit_violations_reducer";
 import ClearKnowledgeArticlePresenceReducer from "./clear_knowledge_article_presence_reducer";
+import ClearLandedCostFieldReducer from "./clear_landed_cost_field_reducer";
 import ClearOpportunityPresenceReducer from "./clear_opportunity_presence_reducer";
+import ClearPartnerBankFieldReducer from "./clear_partner_bank_field_reducer";
 import ClearProposalPresenceReducer from "./clear_proposal_presence_reducer";
+import ClearPurchaseOrderFieldReducer from "./clear_purchase_order_field_reducer";
+import ClearPurchaseOrderLineFieldReducer from "./clear_purchase_order_line_field_reducer";
+import ClearSupplierIntakeFieldReducer from "./clear_supplier_intake_field_reducer";
+import ClearVendorRiskReasonReducer from "./clear_vendor_risk_reason_reducer";
 import CloneWorkflowVersionToDraftReducer from "./clone_workflow_version_to_draft_reducer";
 import CloseAccountAssetReducer from "./close_account_asset_reducer";
 import CloseAccountPeriodReducer from "./close_account_period_reducer";
@@ -724,6 +730,7 @@ import ProduceManufacturingOrderReducer from "./produce_manufacturing_order_redu
 import PromoteAiSkillVersionReducer from "./promote_ai_skill_version_reducer";
 import PublishFormConfigurationReducer from "./publish_form_configuration_reducer";
 import PublishWorkflowVersionReducer from "./publish_workflow_version_reducer";
+import PurchasingIntegrityInventoryReducer from "./purchasing_integrity_inventory_reducer";
 import PurgeExpiredDocumentsReducer from "./purge_expired_documents_reducer";
 import QueueMailFromTemplateReducer from "./queue_mail_from_template_reducer";
 import RateSubscriptionUsageEventsReducer from "./rate_subscription_usage_events_reducer";
@@ -956,6 +963,13 @@ import RunPurchasingBillBalancedTestReducer from "./run_purchasing_bill_balanced
 import RunPurchasingCompanyIsolationTestReducer from "./run_purchasing_company_isolation_test_reducer";
 import RunPurchasingIncomingPickingTestReducer from "./run_purchasing_incoming_picking_test_reducer";
 import RunPurchasingLotReceiveTestReducer from "./run_purchasing_lot_receive_test_reducer";
+import RunPurchasingPhase0ContainmentTestReducer from "./run_purchasing_phase_0_containment_test_reducer";
+import RunPurchasingPhase0FixtureTestReducer from "./run_purchasing_phase_0_fixture_test_reducer";
+import RunPurchasingPhase1LandedCostsTestReducer from "./run_purchasing_phase_1_landed_costs_test_reducer";
+import RunPurchasingPhase1PurchaseOrdersTestReducer from "./run_purchasing_phase_1_purchase_orders_test_reducer";
+import RunPurchasingPhase1RelationalIntegrityTestReducer from "./run_purchasing_phase_1_relational_integrity_test_reducer";
+import RunPurchasingPhase1ReturnsAdvancedTestReducer from "./run_purchasing_phase_1_returns_advanced_test_reducer";
+import RunPurchasingPhase2BlanketReleaseTestReducer from "./run_purchasing_phase_2_blanket_release_test_reducer";
 import RunPurchasingWaveCSmokeTestReducer from "./run_purchasing_wave_c_smoke_test_reducer";
 import RunPurchasingWaveETestReducer from "./run_purchasing_wave_e_test_reducer";
 import RunQueueFoundationTestsReducer from "./run_queue_foundation_tests_reducer";
@@ -1582,6 +1596,8 @@ import ProposalVersionRow from "./proposal_version_table";
 import PublicHolidayRow from "./public_holiday_table";
 import PurchaseApprovalDelegateRow from "./purchase_approval_delegate_table";
 import PurchaseBlanketOrderRow from "./purchase_blanket_order_table";
+import PurchaseBlanketOrderLineRow from "./purchase_blanket_order_line_table";
+import PurchaseBlanketReleaseRow from "./purchase_blanket_release_table";
 import PurchaseContractRow from "./purchase_contract_table";
 import PurchaseOrderRow from "./purchase_order_table";
 import PurchaseOrderLineRow from "./purchase_order_line_table";
@@ -1638,6 +1654,8 @@ import StockCycleCountRow from "./stock_cycle_count_table";
 import StockInventoryRow from "./stock_inventory_table";
 import StockInventoryLineRow from "./stock_inventory_line_table";
 import StockLandedCostRow from "./stock_landed_cost_table";
+import StockLandedCostAllocationRow from "./stock_landed_cost_allocation_table";
+import StockLandedCostApplicationRow from "./stock_landed_cost_application_table";
 import StockLandedCostLinesRow from "./stock_landed_cost_lines_table";
 import StockLocationRow from "./stock_location_table";
 import StockMoveRow from "./stock_move_table";
@@ -7286,6 +7304,40 @@ const tablesSchema = __schema({
       { name: 'purchase_blanket_order_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, PurchaseBlanketOrderRow),
+  purchase_blanket_order_line: __table({
+    name: 'purchase_blanket_order_line',
+    indexes: [
+      { name: 'purchase_blanket_line_by_blanket', algorithm: 'btree', columns: [
+        'blanketOrderId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'purchase_blanket_line_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'purchase_blanket_order_line_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PurchaseBlanketOrderLineRow),
+  purchase_blanket_release: __table({
+    name: 'purchase_blanket_release',
+    indexes: [
+      { name: 'purchase_blanket_release_by_blanket', algorithm: 'btree', columns: [
+        'blanketOrderId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'purchase_blanket_release_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'purchase_blanket_release_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PurchaseBlanketReleaseRow),
   purchase_contract: __table({
     name: 'purchase_contract',
     indexes: [
@@ -8263,6 +8315,41 @@ const tablesSchema = __schema({
       { name: 'stock_landed_cost_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, StockLandedCostRow),
+  stock_landed_cost_allocation: __table({
+    name: 'stock_landed_cost_allocation',
+    indexes: [
+      { name: 'landed_cost_allocation_by_application', algorithm: 'btree', columns: [
+        'applicationId',
+      ] },
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'landed_cost_allocation_by_landed_cost', algorithm: 'btree', columns: [
+        'landedCostId',
+      ] },
+    ],
+    constraints: [
+      { name: 'stock_landed_cost_allocation_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, StockLandedCostAllocationRow),
+  stock_landed_cost_application: __table({
+    name: 'stock_landed_cost_application',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'landed_cost_id', algorithm: 'btree', columns: [
+        'landedCostId',
+      ] },
+      { name: 'landed_cost_application_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'stock_landed_cost_application_id_key', constraint: 'unique', columns: ['id'] },
+      { name: 'stock_landed_cost_application_landed_cost_id_key', constraint: 'unique', columns: ['landedCostId'] },
+    ],
+  }, StockLandedCostApplicationRow),
   stock_landed_cost_lines: __table({
     name: 'stock_landed_cost_lines',
     indexes: [
@@ -10058,8 +10145,14 @@ const reducersSchema = __reducers(
   __reducerSchema("clear_document_presence", ClearDocumentPresenceReducer),
   __reducerSchema("clear_inventory_audit_violations", ClearInventoryAuditViolationsReducer),
   __reducerSchema("clear_knowledge_article_presence", ClearKnowledgeArticlePresenceReducer),
+  __reducerSchema("clear_landed_cost_field", ClearLandedCostFieldReducer),
   __reducerSchema("clear_opportunity_presence", ClearOpportunityPresenceReducer),
+  __reducerSchema("clear_partner_bank_field", ClearPartnerBankFieldReducer),
   __reducerSchema("clear_proposal_presence", ClearProposalPresenceReducer),
+  __reducerSchema("clear_purchase_order_field", ClearPurchaseOrderFieldReducer),
+  __reducerSchema("clear_purchase_order_line_field", ClearPurchaseOrderLineFieldReducer),
+  __reducerSchema("clear_supplier_intake_field", ClearSupplierIntakeFieldReducer),
+  __reducerSchema("clear_vendor_risk_reason", ClearVendorRiskReasonReducer),
   __reducerSchema("clone_workflow_version_to_draft", CloneWorkflowVersionToDraftReducer),
   __reducerSchema("close_account_asset", CloseAccountAssetReducer),
   __reducerSchema("close_account_period", CloseAccountPeriodReducer),
@@ -10610,6 +10703,7 @@ const reducersSchema = __reducers(
   __reducerSchema("promote_ai_skill_version", PromoteAiSkillVersionReducer),
   __reducerSchema("publish_form_configuration", PublishFormConfigurationReducer),
   __reducerSchema("publish_workflow_version", PublishWorkflowVersionReducer),
+  __reducerSchema("purchasing_integrity_inventory", PurchasingIntegrityInventoryReducer),
   __reducerSchema("purge_expired_documents", PurgeExpiredDocumentsReducer),
   __reducerSchema("queue_mail_from_template", QueueMailFromTemplateReducer),
   __reducerSchema("rate_subscription_usage_events", RateSubscriptionUsageEventsReducer),
@@ -10842,6 +10936,13 @@ const reducersSchema = __reducers(
   __reducerSchema("run_purchasing_company_isolation_test", RunPurchasingCompanyIsolationTestReducer),
   __reducerSchema("run_purchasing_incoming_picking_test", RunPurchasingIncomingPickingTestReducer),
   __reducerSchema("run_purchasing_lot_receive_test", RunPurchasingLotReceiveTestReducer),
+  __reducerSchema("run_purchasing_phase_0_containment_test", RunPurchasingPhase0ContainmentTestReducer),
+  __reducerSchema("run_purchasing_phase_0_fixture_test", RunPurchasingPhase0FixtureTestReducer),
+  __reducerSchema("run_purchasing_phase_1_landed_costs_test", RunPurchasingPhase1LandedCostsTestReducer),
+  __reducerSchema("run_purchasing_phase_1_purchase_orders_test", RunPurchasingPhase1PurchaseOrdersTestReducer),
+  __reducerSchema("run_purchasing_phase_1_relational_integrity_test", RunPurchasingPhase1RelationalIntegrityTestReducer),
+  __reducerSchema("run_purchasing_phase_1_returns_advanced_test", RunPurchasingPhase1ReturnsAdvancedTestReducer),
+  __reducerSchema("run_purchasing_phase_2_blanket_release_test", RunPurchasingPhase2BlanketReleaseTestReducer),
   __reducerSchema("run_purchasing_wave_c_smoke_test", RunPurchasingWaveCSmokeTestReducer),
   __reducerSchema("run_purchasing_wave_e_test", RunPurchasingWaveETestReducer),
   __reducerSchema("run_queue_foundation_tests", RunQueueFoundationTestsReducer),

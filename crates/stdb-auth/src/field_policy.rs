@@ -438,9 +438,8 @@ pub fn select_org_and_company_scoped_sql(
 ) -> Result<String, String> {
     let cols = resolve_http_sql_columns(resource_key, field_access)?;
     let col_part = cols.join(", ");
-    let where_clause = format!(
-        "organization_id = {organization_id} AND company_id = {company_id}{extra_where}"
-    );
+    let where_clause =
+        format!("organization_id = {organization_id} AND company_id = {company_id}{extra_where}");
     Ok(format!(
         "SELECT {col_part} FROM {table} WHERE {where_clause}{order_by}"
     ))

@@ -183,9 +183,7 @@ pub fn record_inventory_integration_result(
     }
 
     if status == "failed" && intent.applied {
-        return Err(
-            "Cannot mark as failed: integration has already been applied".to_string(),
-        );
+        return Err("Cannot mark as failed: integration has already been applied".to_string());
     }
 
     if status == "succeeded"

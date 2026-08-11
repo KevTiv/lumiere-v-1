@@ -66,3 +66,44 @@ describe("CRM-RI-007: company-scoped live subscriptions", () => {
     assert.ok(sql.every((statement) => !/FROM (contact|lead_source)\b/.test(statement)))
   })
 })
+
+describe("PUR-RI-017: company-scoped Purchasing subscriptions", () => {
+  it("filters every direct Purchasing table to the single allowed company", () => {
+    for (const resource of [
+      "purchase-orders",
+      "purchase-order-lines",
+      "landed-costs",
+      "landed-cost-lines",
+      "partner-banks",
+      "purchase-requisitions",
+      "purchase-requisition-lines",
+      "purchase-rfqs",
+      "purchase-rfq-lines",
+      "purchase-rfq-bids",
+      "purchase-returns",
+      "purchase-return-lines",
+    ]) {
+      const sql = subscriptionQueriesForResource(resource, {
+        organizationId: 42,
+        companyIds: [7],
+      })
+      assert.ok(sql, `${resource} should produce company-scoped SQL`)
+      assert.match(sql![0], /organization_id\s*=\s*42/)
+      assert.match(sql![0], /company_id\s*=\s*7/)
+    }
+  })
+
+  it("fails closed without exactly one allowed company", () => {
+    assert.equal(
+      subscriptionQueriesForResource("purchase-orders", { organizationId: 42 }),
+      null,
+    )
+    assert.equal(
+      subscriptionQueriesForResource("purchase-orders", {
+        organizationId: 42,
+        companyIds: [7, 8],
+      }),
+      null,
+    )
+  })
+})

@@ -228,6 +228,16 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "purchase-rfq-bids",
   "purchase-returns",
   "purchase-return-lines",
+  "purchase-blanket-orders",
+  "purchase-blanket-order-lines",
+  "purchase-blanket-releases",
+  "purchase-contracts",
+  "vendor-scorecards",
+  "vendor-risk-flags",
+  "consignment-agreements",
+  "purchase-approval-delegates",
+  "commodity-price-indexes",
+  "purchasing-integration-intents",
   "mrp-productions",
   "mrp-boms",
   "mrp-workorders",
@@ -1117,6 +1127,26 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       fa,
       "",
     ),
+  "purchase-blanket-orders": (id, fa) =>
+    selectOrgScopedSql("purchase-blanket-orders", "purchase_blanket_order", id, fa, ""),
+  "purchase-blanket-order-lines": (id, fa) =>
+    selectOrgScopedSql("purchase-blanket-order-lines", "purchase_blanket_order_line", id, fa, ""),
+  "purchase-blanket-releases": (id, fa) =>
+    selectOrgScopedSql("purchase-blanket-releases", "purchase_blanket_release", id, fa, ""),
+  "purchase-contracts": (id, fa) =>
+    selectOrgScopedSql("purchase-contracts", "purchase_contract", id, fa, ""),
+  "vendor-scorecards": (id, fa) =>
+    selectOrgScopedSql("vendor-scorecards", "vendor_scorecard", id, fa, ""),
+  "vendor-risk-flags": (id, fa) =>
+    selectOrgScopedSql("vendor-risk-flags", "vendor_risk_flag", id, fa, ""),
+  "consignment-agreements": (id, fa) =>
+    selectOrgScopedSql("consignment-agreements", "consignment_agreement", id, fa, ""),
+  "purchase-approval-delegates": (id, fa) =>
+    selectOrgScopedSql("purchase-approval-delegates", "purchase_approval_delegate", id, fa, ""),
+  "commodity-price-indexes": (id, fa) =>
+    selectOrgScopedSql("commodity-price-indexes", "commodity_price_index", id, fa, ""),
+  "purchasing-integration-intents": (id, fa) =>
+    selectOrgScopedSql("purchasing-integration-intents", "purchasing_integration_intent", id, fa, ""),
   "mrp-productions": (id, fa) =>
     selectOrgScopedSql("mrp-productions", "mrp_production", id, fa, ""),
   "mrp-boms": (id, fa) => selectOrgScopedSql("mrp-boms", "mrp_bom", id, fa, ""),
@@ -1719,6 +1749,43 @@ function subscriptionSqlForCompanyScopedResource(
     "crm-conversations",
     "crm-conversation-messages",
   ])
+  const purchasingCompanyTables: Record<string, string> = {
+    "purchase-orders": "purchase_order",
+    "purchase-orders-to-approve": "purchase_order",
+    "purchase-orders-partial-receipt": "purchase_order",
+    "purchase-order-lines": "purchase_order_line",
+    "purchase-order-lines-over-billed": "purchase_order_line",
+    "landed-costs": "stock_landed_cost",
+    "landed-cost-lines": "stock_landed_cost_lines",
+    "partner-banks": "res_partner_bank",
+    "purchase-requisitions": "purchase_requisition",
+    "purchase-requisition-lines": "purchase_requisition_line",
+    "purchase-rfqs": "purchase_rfq",
+    "purchase-rfq-lines": "purchase_rfq_line",
+    "purchase-rfq-bids": "purchase_rfq_bid",
+    "purchase-returns": "purchase_return",
+    "purchase-return-lines": "purchase_return_line",
+    "purchase-blanket-orders": "purchase_blanket_order",
+    "purchase-blanket-order-lines": "purchase_blanket_order_line",
+    "purchase-blanket-releases": "purchase_blanket_release",
+    "purchase-contracts": "purchase_contract",
+    "vendor-scorecards": "vendor_scorecard",
+    "vendor-risk-flags": "vendor_risk_flag",
+    "consignment-agreements": "consignment_agreement",
+    "purchase-approval-delegates": "purchase_approval_delegate",
+    "commodity-price-indexes": "commodity_price_index",
+    "purchasing-integration-intents": "purchasing_integration_intent",
+  }
+
+  const purchasingTable = purchasingCompanyTables[resource]
+  if (purchasingTable) {
+    if (ctx.organizationId == null || ids?.length !== 1) return null
+    const companyId = ids[0]
+    const columns = resolveHttpSqlColumns(resource as QueryResourceKey, fa).join(", ")
+    return [
+      `SELECT ${columns} FROM ${purchasingTable} WHERE organization_id = ${ctx.organizationId} AND company_id = ${companyId}`,
+    ]
+  }
 
   const crmOptionalTable = crmOptionalCompanyTables[resource]
   if (crmOptionalTable) {

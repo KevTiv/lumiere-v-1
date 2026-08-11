@@ -378,12 +378,8 @@ pub fn create_manufacturing_order(
 
     // Validate and derive product fields — product_tmpl_id and product_tracking
     // come from the loaded product row, never from caller input.
-    let product = require_product_for_manufacturing(
-        ctx,
-        organization_id,
-        params.product_id,
-        "MO product",
-    )?;
+    let product =
+        require_product_for_manufacturing(ctx, organization_id, params.product_id, "MO product")?;
 
     require_warehouse_for_manufacturing(
         ctx,

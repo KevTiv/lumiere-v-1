@@ -61,19 +61,21 @@ fn record_violation(
     description: &str,
     severity: &str,
 ) {
-    ctx.db.inventory_audit_violation().insert(InventoryAuditViolation {
-        id: 0,
-        run_id,
-        organization_id,
-        violation_type: violation_type.to_string(),
-        table_name: table_name.to_string(),
-        record_id,
-        field_name: field_name.map(|s| s.to_string()),
-        description: description.to_string(),
-        severity: severity.to_string(),
-        resolved: false,
-        created_at: ctx.timestamp,
-    });
+    ctx.db
+        .inventory_audit_violation()
+        .insert(InventoryAuditViolation {
+            id: 0,
+            run_id,
+            organization_id,
+            violation_type: violation_type.to_string(),
+            table_name: table_name.to_string(),
+            record_id,
+            field_name: field_name.map(|s| s.to_string()),
+            description: description.to_string(),
+            severity: severity.to_string(),
+            resolved: false,
+            created_at: ctx.timestamp,
+        });
 }
 
 // ── Reducers ──────────────────────────────────────────────────────────────────
@@ -130,16 +132,9 @@ pub fn run_inventory_preflight_audit(
     }
 
     // ── Check B: processed adjustments without a stock-move linkage ──────────
-    for adj in ctx
-        .db
-        .inventory_adjustment()
-        .iter()
-        .filter(|a| {
-            a.organization_id == organization_id
-                && a.state == "processed"
-                && a.move_id.is_none()
-        })
-    {
+    for adj in ctx.db.inventory_adjustment().iter().filter(|a| {
+        a.organization_id == organization_id && a.state == "processed" && a.move_id.is_none()
+    }) {
         record_violation(
             ctx,
             run_id,
@@ -185,16 +180,9 @@ pub fn run_inventory_preflight_audit(
     }
 
     // ── Check D: inventory close rows marked closed with no GL move ───────────
-    for close in ctx
-        .db
-        .inventory_close()
-        .iter()
-        .filter(|c| {
-            c.organization_id == organization_id
-                && c.state == "closed"
-                && c.account_move_id.is_none()
-        })
-    {
+    for close in ctx.db.inventory_close().iter().filter(|c| {
+        c.organization_id == organization_id && c.state == "closed" && c.account_move_id.is_none()
+    }) {
         record_violation(
             ctx,
             run_id,
@@ -248,12 +236,10 @@ pub fn run_inventory_preflight_audit(
             record_id: run_id,
             action: "CREATE",
             old_values: None,
-            new_values: Some(
-                format!(
-                    r#"{{"run_id":{},"violation_count":{}}}"#,
-                    run_id, violation_count
-                ),
-            ),
+            new_values: Some(format!(
+                r#"{{"run_id":{},"violation_count":{}}}"#,
+                run_id, violation_count
+            )),
             changed_fields: vec!["violation_count".to_string(), "completed_at".to_string()],
             metadata: None,
         },

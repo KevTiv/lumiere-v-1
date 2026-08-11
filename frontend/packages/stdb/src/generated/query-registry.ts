@@ -55,8 +55,10 @@ export type QueryResourceKey =
   | "calendar-events"
   | "capacity-forecast-by-employee"
   | "cartonization-results"
+  | "commodity-price-indexes"
   | "companies"
   | "compensation-events"
+  | "consignment-agreements"
   | "consolidation-accounts"
   | "consolidation-elimination-entries"
   | "consolidation-journals"
@@ -233,6 +235,11 @@ export type QueryResourceKey =
   | "proposal-versions"
   | "proposals"
   | "public-holidays"
+  | "purchase-approval-delegates"
+  | "purchase-blanket-order-lines"
+  | "purchase-blanket-orders"
+  | "purchase-blanket-releases"
+  | "purchase-contracts"
   | "purchase-order-lines"
   | "purchase-order-lines-over-billed"
   | "purchase-orders"
@@ -245,6 +252,7 @@ export type QueryResourceKey =
   | "purchase-rfq-bids"
   | "purchase-rfq-lines"
   | "purchase-rfqs"
+  | "purchasing-integration-intents"
   | "quality-alerts"
   | "quality-checks"
   | "quality-teams"
@@ -322,6 +330,8 @@ export type QueryResourceKey =
   | "utm-campaigns"
   | "utm-media"
   | "utm-sources"
+  | "vendor-risk-flags"
+  | "vendor-scorecards"
   | "warehouse-3d-zones"
   | "warehouse-geo"
   | "warehouse-sync-intents"
@@ -613,6 +623,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     defaultRestricted: ["package_id", "packaging_material_id", "total_items", "utilization_percentage"],
     mandatory: ["id", "organization_id"],
   },
+  "commodity-price-indexes": {
+    table: "commodity_price_index",
+    aliases: ["commodity-price-indexes", "commodity_price_index"],
+    defaultRestricted: ["company_id", "code", "rate", "as_of"],
+    mandatory: ["id", "organization_id", "company_id"],
+  },
   "companies": {
     table: "company",
     aliases: ["companies", "company"],
@@ -624,6 +640,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     aliases: ["compensation-events", "hr_compensation_event"],
     defaultRestricted: ["employee_id", "contract_id", "wage", "currency_id", "effective_from", "reason", "company_id"],
     mandatory: ["id", "organization_id"],
+  },
+  "consignment-agreements": {
+    table: "consignment_agreement",
+    aliases: ["consignment-agreements", "consignment_agreement"],
+    defaultRestricted: ["company_id", "name", "partner_id", "product_id", "warehouse_id", "state"],
+    mandatory: ["id", "organization_id", "company_id"],
   },
   "consolidation-accounts": {
     table: "consolidation_account",
@@ -1681,6 +1703,36 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     defaultRestricted: ["name", "pack_key", "holiday_date", "company_id", "calendar_id"],
     mandatory: ["id", "organization_id"],
   },
+  "purchase-approval-delegates": {
+    table: "purchase_approval_delegate",
+    aliases: ["purchase-approval-delegates", "purchase_approval_delegate"],
+    defaultRestricted: ["company_id", "principal_identity", "delegate_identity", "is_active"],
+    mandatory: ["id", "organization_id", "company_id"],
+  },
+  "purchase-blanket-order-lines": {
+    table: "purchase_blanket_order_line",
+    aliases: ["purchase-blanket-order-lines", "purchase_blanket_order_line"],
+    defaultRestricted: ["company_id", "blanket_order_id", "product_id", "product_uom", "committed_quantity", "released_quantity", "price_unit"],
+    mandatory: ["id", "organization_id", "company_id"],
+  },
+  "purchase-blanket-orders": {
+    table: "purchase_blanket_order",
+    aliases: ["purchase-blanket-orders", "purchase_blanket_order"],
+    defaultRestricted: ["company_id", "name", "partner_id", "currency_id", "state", "date_start", "date_end", "release_count", "last_release_po_id"],
+    mandatory: ["id", "organization_id", "company_id"],
+  },
+  "purchase-blanket-releases": {
+    table: "purchase_blanket_release",
+    aliases: ["purchase-blanket-releases", "purchase_blanket_release"],
+    defaultRestricted: ["company_id", "blanket_order_id", "purchase_order_id", "idempotency_key", "request_fingerprint"],
+    mandatory: ["id", "organization_id", "company_id"],
+  },
+  "purchase-contracts": {
+    table: "purchase_contract",
+    aliases: ["purchase-contracts", "purchase_contract"],
+    defaultRestricted: ["company_id", "name", "partner_id", "state", "date_start", "date_end"],
+    mandatory: ["id", "organization_id", "company_id"],
+  },
   "purchase-order-lines": {
     table: "purchase_order_line",
     aliases: ["purchase-order-lines", "purchase_order_line"],
@@ -1752,6 +1804,12 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     aliases: ["purchase-rfqs", "purchase_rfq"],
     defaultRestricted: ["name", "state", "company_id", "requisition_id", "awarded_bid_id", "purchase_order_id"],
     mandatory: ["id", "organization_id"],
+  },
+  "purchasing-integration-intents": {
+    table: "purchasing_integration_intent",
+    aliases: ["purchasing-integration-intents", "purchasing_integration_intent"],
+    defaultRestricted: ["company_id", "provider", "intent_type", "purchase_order_id", "idempotency_key", "status", "external_reference", "attempt_count"],
+    mandatory: ["id", "organization_id", "company_id"],
   },
   "quality-alerts": {
     table: "quality_alert",
@@ -2215,6 +2273,18 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
     defaultRestricted: ["name", "is_active"],
     mandatory: ["id", "organization_id"],
   },
+  "vendor-risk-flags": {
+    table: "vendor_risk_flag",
+    aliases: ["vendor-risk-flags", "vendor_risk_flag"],
+    defaultRestricted: ["company_id", "partner_id", "is_flagged", "risk_level", "reason"],
+    mandatory: ["id", "organization_id", "company_id"],
+  },
+  "vendor-scorecards": {
+    table: "vendor_scorecard",
+    aliases: ["vendor-scorecards", "vendor_scorecard"],
+    defaultRestricted: ["company_id", "partner_id", "otif_score", "quality_score"],
+    mandatory: ["id", "organization_id", "company_id"],
+  },
   "warehouse-3d-zones": {
     table: "warehouse_3d_zone",
     aliases: ["warehouse-3d-zones", "warehouse_3d_zone"],
@@ -2295,4 +2365,4 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   }
 }
 
-export const QUERY_RESOURCE_KEYS: readonly QueryResourceKey[] = ["account-account-types", "account-accounts", "account-assets", "account-groups", "account-journals", "account-move-lines", "account-moves", "account-payment-term-lines", "account-payment-terms", "account-payments", "account-periods", "account-reconciliation-widgets", "account-taxes", "activities", "adjustment-reasons", "ai-agents", "ai-document-processing-jobs", "ai-insights", "ai-reducer-allowlist", "ai-skills", "ai-team-member-skills", "ai-team-members", "amortization-lines", "amortization-schedules", "analytic-accounts", "analytic-distribution-models", "analytic-lines", "analytics-metrics", "applicants", "assignment-rules", "attendance", "audit-log", "audit-rules", "bank-match-candidates", "bank-statement-lines", "bank-statements", "barcode-nomenclatures", "barcode-rules", "benefit-enrollments", "benefit-plans", "budget-lines", "budget-posts", "budgets", "calendar-events", "capacity-forecast-by-employee", "cartonization-results", "companies", "compensation-events", "consolidation-accounts", "consolidation-elimination-entries", "consolidation-journals", "contact-categories", "contact-category-assignments", "contact-communication-preferences", "contact-duplicate-candidates", "contact-phone-identities", "contact-relationship-insights", "contact-relationships", "contact-role-assignments", "contact-segment-rules", "contact-segments", "contact-tag-assignments", "contact-tags", "contacts", "contracts", "crm-conversation-messages", "crm-conversations", "crm-forecast-snapshots", "dashboard-widgets", "dashboards", "data-classification-rules", "data-classifications", "deferred-revenue-lines", "deferred-revenue-schedules", "delegated-admin-scopes", "delivery-carriers", "delivery-price-rules", "departments", "depreciation-lines", "direct-reports", "document-folders", "document-templates", "document-versions", "documents", "documents-deleted", "employee-documents", "employees", "expense-advances", "expense-card-statement-unmatched", "expense-mileage-rates", "expense-per-diem-rates", "expense-policy-exceptions", "expense-receipts", "expense-sheets", "expense-sheets-to-approve", "expenses", "expenses-missing-receipt", "field-permissions", "financial-reports", "fiscal-years", "fixed-assets", "fleet-vehicles", "form-config-fields", "form-configs", "form-field-labels", "form-role-configs", "fx-revaluation-runs", "global-assignments", "helpdesk-slas", "helpdesk-stages", "helpdesk-teams", "helpdesk-tickets", "hr-capacity-forecast", "hr-employee-skills", "hr-integration-intents", "hr-resources", "hr-skills", "hr-statutory-ids", "import-jobs", "intercompany-rules", "intercompany-transactions", "inventory-adjustments", "inventory-exceptions", "inventory-exceptions-expired-lots", "inventory-exceptions-open-qc", "inventory-exceptions-short-atp", "inventory-valuations", "iot-actions", "iot-alerts", "iot-devices", "iot-hubs", "iot-pairing-tokens", "iot-telemetry", "iot-thresholds", "job-positions", "knowledge-articles", "knowledge-categories", "labor-cost-snapshots", "landed-cost-lines", "landed-costs", "lead-lost-reasons", "lead-score-factors", "lead-scores", "lead-sources", "leads", "leave-requests", "leave-types", "leaves-to-approve", "mail-followers", "mail-messages", "mail-templates", "message-batches", "message-templates", "mrp-bom-lines", "mrp-boms", "mrp-productions", "mrp-routing-workcenters", "mrp-workcenters", "mrp-workorders", "my-employee", "onboarding-progress", "onboarding-template-items", "onboarding-templates", "operational-messages", "opportunities", "opportunity-lines", "opportunity-presence", "opportunity-stages", "packaging-materials", "partner-banks", "partner-credit-controls", "partner-credit-holds", "payment-accounts", "payment-fees", "payment-reconciliations", "payment-reversals", "payment-transactions", "payroll-structures", "payslips", "payslips-to-export", "performance-cycles", "performance-goals", "performance-reviews", "picking-batches", "picking-waves", "pos-configs", "pos-loyalty-cards", "pos-loyalty-programs", "pos-payment-methods", "pos-sessions", "pos-terminals", "pricelist-items", "pricelists", "privacy-consent", "product-categories", "products", "project-baselines", "project-change-orders", "project-earned-value-by-project", "project-integration-intents", "project-margin-by-project", "project-milestones", "project-rate-card-lines", "project-rate-cards", "project-revenue-lines", "project-revenue-schedules", "project-subcontractor-costs", "projects", "proposal-analyses", "proposal-bid-decisions", "proposal-clarifications", "proposal-clauses", "proposal-comments", "proposal-compliance-requirements", "proposal-integration-intents", "proposal-line-items", "proposal-presence", "proposal-procurement-scores", "proposal-sections", "proposal-source-docs", "proposal-templates", "proposal-versions", "proposals", "public-holidays", "purchase-order-lines", "purchase-order-lines-over-billed", "purchase-orders", "purchase-orders-partial-receipt", "purchase-orders-to-approve", "purchase-requisition-lines", "purchase-requisitions", "purchase-return-lines", "purchase-returns", "purchase-rfq-bids", "purchase-rfq-lines", "purchase-rfqs", "quality-alerts", "quality-checks", "quality-teams", "record-custom-field-values", "replenishment-rules", "report-templates", "resource-allocations", "resource-capacity-by-employee", "resource-utilisation-by-employee", "return-order-lines", "return-orders", "revenue-recognition-rules", "roles", "salary-rules", "sale-commissions", "sale-commissions-pending", "sale-order-lines", "sale-orders", "sale-orders-to-approve", "saved-reports", "scheduled-reports", "segment-members", "serial-lot-traceability", "shift-opt-jobs", "shipping-methods", "sod-conflict-rules", "stock-cycle-counts", "stock-inventories", "stock-locations", "stock-moves", "stock-packages", "stock-pickings", "stock-production-lots", "stock-production-serials", "stock-quants", "stock-routes", "stock-rules", "stock-traceability-reports", "subscription-amend-pending", "subscription-amendments", "subscription-billing-runs", "subscription-bundle-items", "subscription-bundles", "subscription-collections", "subscription-commitments", "subscription-due-to-bill", "subscription-entitlements", "subscription-lines", "subscription-past-due", "subscription-payment-intents", "subscription-plans", "subscription-price-indexes", "subscription-price-tiers", "subscription-rating-backlog", "subscription-tax-settle-intents", "subscription-usage-charges", "subscription-usage-events", "subscriptions", "supplier-intakes", "tasks", "tax-deadlines", "tax-groups", "tax-jurisdictions", "tax-schedules", "timesheets", "timesheets-to-validate", "timesheets-unbilled", "trial-balances", "uoms", "user-custom-fields", "user-organization", "user-profile", "user-role-assignment", "user-roles", "utm-campaigns", "utm-media", "utm-sources", "warehouse-3d-zones", "warehouse-geo", "warehouse-sync-intents", "warehouse-sync-intents-pending", "warehouse-tasks", "warehouses", "work-schedules", "workflow-edges", "workflow-instances", "workflow-nodes", "workflow-versions", "workflows", "working-calendars"]
+export const QUERY_RESOURCE_KEYS: readonly QueryResourceKey[] = ["account-account-types", "account-accounts", "account-assets", "account-groups", "account-journals", "account-move-lines", "account-moves", "account-payment-term-lines", "account-payment-terms", "account-payments", "account-periods", "account-reconciliation-widgets", "account-taxes", "activities", "adjustment-reasons", "ai-agents", "ai-document-processing-jobs", "ai-insights", "ai-reducer-allowlist", "ai-skills", "ai-team-member-skills", "ai-team-members", "amortization-lines", "amortization-schedules", "analytic-accounts", "analytic-distribution-models", "analytic-lines", "analytics-metrics", "applicants", "assignment-rules", "attendance", "audit-log", "audit-rules", "bank-match-candidates", "bank-statement-lines", "bank-statements", "barcode-nomenclatures", "barcode-rules", "benefit-enrollments", "benefit-plans", "budget-lines", "budget-posts", "budgets", "calendar-events", "capacity-forecast-by-employee", "cartonization-results", "commodity-price-indexes", "companies", "compensation-events", "consignment-agreements", "consolidation-accounts", "consolidation-elimination-entries", "consolidation-journals", "contact-categories", "contact-category-assignments", "contact-communication-preferences", "contact-duplicate-candidates", "contact-phone-identities", "contact-relationship-insights", "contact-relationships", "contact-role-assignments", "contact-segment-rules", "contact-segments", "contact-tag-assignments", "contact-tags", "contacts", "contracts", "crm-conversation-messages", "crm-conversations", "crm-forecast-snapshots", "dashboard-widgets", "dashboards", "data-classification-rules", "data-classifications", "deferred-revenue-lines", "deferred-revenue-schedules", "delegated-admin-scopes", "delivery-carriers", "delivery-price-rules", "departments", "depreciation-lines", "direct-reports", "document-folders", "document-templates", "document-versions", "documents", "documents-deleted", "employee-documents", "employees", "expense-advances", "expense-card-statement-unmatched", "expense-mileage-rates", "expense-per-diem-rates", "expense-policy-exceptions", "expense-receipts", "expense-sheets", "expense-sheets-to-approve", "expenses", "expenses-missing-receipt", "field-permissions", "financial-reports", "fiscal-years", "fixed-assets", "fleet-vehicles", "form-config-fields", "form-configs", "form-field-labels", "form-role-configs", "fx-revaluation-runs", "global-assignments", "helpdesk-slas", "helpdesk-stages", "helpdesk-teams", "helpdesk-tickets", "hr-capacity-forecast", "hr-employee-skills", "hr-integration-intents", "hr-resources", "hr-skills", "hr-statutory-ids", "import-jobs", "intercompany-rules", "intercompany-transactions", "inventory-adjustments", "inventory-exceptions", "inventory-exceptions-expired-lots", "inventory-exceptions-open-qc", "inventory-exceptions-short-atp", "inventory-valuations", "iot-actions", "iot-alerts", "iot-devices", "iot-hubs", "iot-pairing-tokens", "iot-telemetry", "iot-thresholds", "job-positions", "knowledge-articles", "knowledge-categories", "labor-cost-snapshots", "landed-cost-lines", "landed-costs", "lead-lost-reasons", "lead-score-factors", "lead-scores", "lead-sources", "leads", "leave-requests", "leave-types", "leaves-to-approve", "mail-followers", "mail-messages", "mail-templates", "message-batches", "message-templates", "mrp-bom-lines", "mrp-boms", "mrp-productions", "mrp-routing-workcenters", "mrp-workcenters", "mrp-workorders", "my-employee", "onboarding-progress", "onboarding-template-items", "onboarding-templates", "operational-messages", "opportunities", "opportunity-lines", "opportunity-presence", "opportunity-stages", "packaging-materials", "partner-banks", "partner-credit-controls", "partner-credit-holds", "payment-accounts", "payment-fees", "payment-reconciliations", "payment-reversals", "payment-transactions", "payroll-structures", "payslips", "payslips-to-export", "performance-cycles", "performance-goals", "performance-reviews", "picking-batches", "picking-waves", "pos-configs", "pos-loyalty-cards", "pos-loyalty-programs", "pos-payment-methods", "pos-sessions", "pos-terminals", "pricelist-items", "pricelists", "privacy-consent", "product-categories", "products", "project-baselines", "project-change-orders", "project-earned-value-by-project", "project-integration-intents", "project-margin-by-project", "project-milestones", "project-rate-card-lines", "project-rate-cards", "project-revenue-lines", "project-revenue-schedules", "project-subcontractor-costs", "projects", "proposal-analyses", "proposal-bid-decisions", "proposal-clarifications", "proposal-clauses", "proposal-comments", "proposal-compliance-requirements", "proposal-integration-intents", "proposal-line-items", "proposal-presence", "proposal-procurement-scores", "proposal-sections", "proposal-source-docs", "proposal-templates", "proposal-versions", "proposals", "public-holidays", "purchase-approval-delegates", "purchase-blanket-order-lines", "purchase-blanket-orders", "purchase-blanket-releases", "purchase-contracts", "purchase-order-lines", "purchase-order-lines-over-billed", "purchase-orders", "purchase-orders-partial-receipt", "purchase-orders-to-approve", "purchase-requisition-lines", "purchase-requisitions", "purchase-return-lines", "purchase-returns", "purchase-rfq-bids", "purchase-rfq-lines", "purchase-rfqs", "purchasing-integration-intents", "quality-alerts", "quality-checks", "quality-teams", "record-custom-field-values", "replenishment-rules", "report-templates", "resource-allocations", "resource-capacity-by-employee", "resource-utilisation-by-employee", "return-order-lines", "return-orders", "revenue-recognition-rules", "roles", "salary-rules", "sale-commissions", "sale-commissions-pending", "sale-order-lines", "sale-orders", "sale-orders-to-approve", "saved-reports", "scheduled-reports", "segment-members", "serial-lot-traceability", "shift-opt-jobs", "shipping-methods", "sod-conflict-rules", "stock-cycle-counts", "stock-inventories", "stock-locations", "stock-moves", "stock-packages", "stock-pickings", "stock-production-lots", "stock-production-serials", "stock-quants", "stock-routes", "stock-rules", "stock-traceability-reports", "subscription-amend-pending", "subscription-amendments", "subscription-billing-runs", "subscription-bundle-items", "subscription-bundles", "subscription-collections", "subscription-commitments", "subscription-due-to-bill", "subscription-entitlements", "subscription-lines", "subscription-past-due", "subscription-payment-intents", "subscription-plans", "subscription-price-indexes", "subscription-price-tiers", "subscription-rating-backlog", "subscription-tax-settle-intents", "subscription-usage-charges", "subscription-usage-events", "subscriptions", "supplier-intakes", "tasks", "tax-deadlines", "tax-groups", "tax-jurisdictions", "tax-schedules", "timesheets", "timesheets-to-validate", "timesheets-unbilled", "trial-balances", "uoms", "user-custom-fields", "user-organization", "user-profile", "user-role-assignment", "user-roles", "utm-campaigns", "utm-media", "utm-sources", "vendor-risk-flags", "vendor-scorecards", "warehouse-3d-zones", "warehouse-geo", "warehouse-sync-intents", "warehouse-sync-intents-pending", "warehouse-tasks", "warehouses", "work-schedules", "workflow-edges", "workflow-instances", "workflow-nodes", "workflow-versions", "workflows", "working-calendars"]

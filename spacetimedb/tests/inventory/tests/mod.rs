@@ -266,9 +266,7 @@ pub fn run_inventory_close_reopen_blocked_gl_test(ctx: &ReducerContext) -> Resul
 }
 
 #[spacetimedb::reducer]
-pub fn run_inventory_replenishment_rule_not_found_test(
-    ctx: &ReducerContext,
-) -> Result<(), String> {
+pub fn run_inventory_replenishment_rule_not_found_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_replenishment_rule_not_found(ctx)
         .map_err(|e| format!("replenishment_rule_not_found: {e}"))
 }

@@ -5653,12 +5653,24 @@ export const CreatePublicHolidayParams = __t.object("CreatePublicHolidayParams",
 });
 export type CreatePublicHolidayParams = __Infer<typeof CreatePublicHolidayParams>;
 
+export const CreatePurchaseBlanketOrderLineParams = __t.object("CreatePurchaseBlanketOrderLineParams", {
+  productId: __t.u64(),
+  productUom: __t.u64(),
+  committedQuantity: __t.f64(),
+  priceUnit: __t.f64(),
+  metadata: __t.option(__t.string()),
+});
+export type CreatePurchaseBlanketOrderLineParams = __Infer<typeof CreatePurchaseBlanketOrderLineParams>;
+
 export const CreatePurchaseBlanketOrderParams = __t.object("CreatePurchaseBlanketOrderParams", {
   name: __t.string(),
   partnerId: __t.u64(),
   currencyId: __t.u64(),
   dateStart: __t.option(__t.timestamp()),
   dateEnd: __t.option(__t.timestamp()),
+  get lines() {
+    return __t.array(CreatePurchaseBlanketOrderLineParams);
+  },
   metadata: __t.option(__t.string()),
 });
 export type CreatePurchaseBlanketOrderParams = __Infer<typeof CreatePurchaseBlanketOrderParams>;
@@ -12628,6 +12640,37 @@ export const PurchaseBlanketOrder = __t.object("PurchaseBlanketOrder", {
 });
 export type PurchaseBlanketOrder = __Infer<typeof PurchaseBlanketOrder>;
 
+export const PurchaseBlanketOrderLine = __t.object("PurchaseBlanketOrderLine", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  blanketOrderId: __t.u64(),
+  productId: __t.u64(),
+  productUom: __t.u64(),
+  committedQuantity: __t.f64(),
+  releasedQuantity: __t.f64(),
+  priceUnit: __t.f64(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+  writeUid: __t.identity(),
+  writeDate: __t.timestamp(),
+  metadata: __t.option(__t.string()),
+});
+export type PurchaseBlanketOrderLine = __Infer<typeof PurchaseBlanketOrderLine>;
+
+export const PurchaseBlanketRelease = __t.object("PurchaseBlanketRelease", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  blanketOrderId: __t.u64(),
+  purchaseOrderId: __t.u64(),
+  idempotencyKey: __t.string(),
+  requestFingerprint: __t.string(),
+  createUid: __t.identity(),
+  createDate: __t.timestamp(),
+});
+export type PurchaseBlanketRelease = __Infer<typeof PurchaseBlanketRelease>;
+
 export const PurchaseContract = __t.object("PurchaseContract", {
   id: __t.u64(),
   organizationId: __t.u64(),
@@ -13516,7 +13559,17 @@ export const RejectTimesheetsParams = __t.object("RejectTimesheetsParams", {
 });
 export type RejectTimesheetsParams = __Infer<typeof RejectTimesheetsParams>;
 
+export const ReleaseBlanketLineParams = __t.object("ReleaseBlanketLineParams", {
+  blanketLineId: __t.u64(),
+  quantity: __t.f64(),
+});
+export type ReleaseBlanketLineParams = __Infer<typeof ReleaseBlanketLineParams>;
+
 export const ReleaseBlanketToPoParams = __t.object("ReleaseBlanketToPoParams", {
+  idempotencyKey: __t.string(),
+  get lines() {
+    return __t.array(ReleaseBlanketLineParams);
+  },
   notes: __t.option(__t.string()),
   datePlanned: __t.option(__t.timestamp()),
   metadata: __t.option(__t.string()),
@@ -14874,6 +14927,33 @@ export const StockLandedCost = __t.object("StockLandedCost", {
   metadata: __t.option(__t.string()),
 });
 export type StockLandedCost = __Infer<typeof StockLandedCost>;
+
+export const StockLandedCostAllocation = __t.object("StockLandedCostAllocation", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  landedCostId: __t.u64(),
+  applicationId: __t.u64(),
+  costLineId: __t.u64(),
+  stockMoveId: __t.u64(),
+  stockQuantId: __t.u64(),
+  allocatedAmount: __t.f64(),
+  quantValueBefore: __t.f64(),
+  quantValueAfter: __t.f64(),
+  createdAt: __t.timestamp(),
+});
+export type StockLandedCostAllocation = __Infer<typeof StockLandedCostAllocation>;
+
+export const StockLandedCostApplication = __t.object("StockLandedCostApplication", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  companyId: __t.u64(),
+  landedCostId: __t.u64(),
+  allocationCount: __t.u32(),
+  appliedBy: __t.identity(),
+  appliedAt: __t.timestamp(),
+});
+export type StockLandedCostApplication = __Infer<typeof StockLandedCostApplication>;
 
 export const StockLandedCostLines = __t.object("StockLandedCostLines", {
   id: __t.u64(),

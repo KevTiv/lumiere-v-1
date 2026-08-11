@@ -1,3 +1,4 @@
+pub mod integrity_inventory;
 /// Purchasing & Supply Chain Module — Purchase Orders, Vendor Management, and Landed Costs
 ///
 /// # Phase 6 Submodules
@@ -28,6 +29,51 @@ pub mod purchase_orders;
 pub mod purchase_returns;
 pub mod sourcing;
 pub mod vendor_management;
+
+use spacetimedb::ReducerContext;
+
+use crate::core::organization::organization_settings;
+
+/// Explicit organization-level opt-in for the purchasing actions quarantined in
+/// the relational-integrity Phase 0 rollout.
+///
+/// This flag is intentionally not granted by plan or billing configuration. A
+/// real tenant may only enable it after its affected purchasing data has been
+/// assessed and a quarantine/backfill decision has been made.
+pub const PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG: &str = "purchasing_ri_phase0_unsafe_actions";
+
+const DEMO_MODE_FLAG: &str = "demo_mode";
+
+/// Blocks quarantined purchasing mutations for real tenants until they have
+/// explicitly opted in to the Phase 0 restriction override.
+///
+/// Seed/demo organizations retain their existing behavior through
+/// [`DEMO_MODE_FLAG`]. Missing settings fail closed so an existing real tenant
+/// cannot bypass the containment guard merely because it predates settings.
+pub fn require_purchasing_ri_phase0_unsafe_actions_enabled(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<(), String> {
+    let enabled = ctx
+        .db
+        .organization_settings()
+        .organization_id()
+        .find(&organization_id)
+        .map(|settings| {
+            settings.feature_flags.iter().any(|flag| {
+                flag == PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG || flag == DEMO_MODE_FLAG
+            })
+        })
+        .unwrap_or(false);
+
+    if enabled {
+        return Ok(());
+    }
+
+    Err(format!(
+        "purchasing action is disabled pending relational-integrity remediation; enable `{PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG}` only after the tenant quarantine/backfill decision"
+    ))
+}
 
 // Re-export commonly used types for convenience
 pub use landed_costs::{StockLandedCost, StockLandedCostLines};

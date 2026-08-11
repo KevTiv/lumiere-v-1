@@ -136,7 +136,10 @@ pub fn test_loss_category_create(ctx: &ReducerContext) -> Result<(), String> {
         .ok_or("Loss category not found after create")?;
 
     if cat.category != "availability" {
-        return Err(format!("Expected category=availability, got {}", cat.category));
+        return Err(format!(
+            "Expected category=availability, got {}",
+            cat.category
+        ));
     }
     if cat.company_id != company_id {
         return Err(format!(
@@ -174,8 +177,8 @@ pub fn test_loss_category_invalid_type_rejected(ctx: &ReducerContext) -> Result<
             log::info!("test_loss_category_invalid_type_rejected passed");
             Ok(())
         }
-        Ok(_) => Err(
-            "Expected error for invalid loss category type, but create succeeded".to_string(),
-        ),
+        Ok(_) => {
+            Err("Expected error for invalid loss category type, but create succeeded".to_string())
+        }
     }
 }

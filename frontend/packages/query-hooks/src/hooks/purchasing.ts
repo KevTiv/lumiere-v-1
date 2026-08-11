@@ -199,6 +199,7 @@ export function usePartnerBanks(organizationId: bigint, initialData?: QueryRows)
   })
 }
 
+
 // ── Mutations ────────────────────────────────────────────────────────────────
 
 export function useCreatePurchaseOrder(
@@ -1394,10 +1395,19 @@ export type CreatePurchaseBlanketOrderParams = {
   currencyId: bigint
   dateStart?: unknown | null
   dateEnd?: unknown | null
+  lines: Array<{
+    productId: bigint
+    productUom: bigint
+    committedQuantity: number
+    priceUnit: number
+    metadata?: string | null
+  }>
   metadata?: string | null
 }
 
 export type ReleaseBlanketToPoParams = {
+  idempotencyKey: string
+  lines: Array<{ blanketLineId: bigint; quantity: number }>
   notes?: string | null
   datePlanned?: unknown | null
   metadata?: string | null
@@ -1481,6 +1491,13 @@ export function useCreatePurchaseBlanketOrder(
         currencyId: params.currencyId,
         dateStart: optTs(params.dateStart),
         dateEnd: optTs(params.dateEnd),
+        lines: params.lines.map((line) => ({
+          productId: line.productId,
+          productUom: line.productUom,
+          committedQuantity: line.committedQuantity,
+          priceUnit: line.priceUnit,
+          metadata: encodeOptionalString(line.metadata),
+        })),
         metadata: encodeOptionalString(params.metadata),
       })
       const { urlPath, init } = purchasingBffPost("create_purchase_blanket_order", [
@@ -1499,13 +1516,15 @@ export function useReleaseBlanketToPo(organizationId: bigint, companyId: bigint)
   return useMutation<
     void,
     Error,
-    { blanketOrderId: ScalarId; params?: ReleaseBlanketToPoParams }
+    { blanketOrderId: ScalarId; params: ReleaseBlanketToPoParams }
   >({
     mutationFn: async ({ blanketOrderId, params }) => {
       const encoded = stdbParamsToJson({
-        notes: encodeOptionalString(params?.notes),
-        datePlanned: optTs(params?.datePlanned),
-        metadata: encodeOptionalString(params?.metadata),
+        idempotencyKey: params.idempotencyKey,
+        lines: params.lines,
+        notes: encodeOptionalString(params.notes),
+        datePlanned: optTs(params.datePlanned),
+        metadata: encodeOptionalString(params.metadata),
       })
       const { urlPath, init } = purchasingBffPost("release_blanket_to_po", [
         organizationId,

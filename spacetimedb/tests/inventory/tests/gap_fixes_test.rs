@@ -8,7 +8,10 @@ use crate::accounting::chart_of_accounts::{
     CreateAccountAccountTypeParams, CreateAccountJournalParams,
 };
 use crate::accounting::journal_entries::{account_move, account_move_line};
-use crate::core::organization::{company, create_company, CompanyScopeParams, CreateCompanyParams};
+use crate::core::organization::{
+    company, create_company, organization_settings, CompanyScopeParams, CreateCompanyParams,
+    OrganizationSettings,
+};
 use crate::core::reference::{
     create_uom, create_uom_conversion, uom, CreateUomConversionParams, CreateUomParams,
 };
@@ -82,6 +85,7 @@ use crate::purchasing::procurement_advanced::{
     consignment_agreement, create_consignment_agreement, CreateConsignmentAgreementParams,
 };
 use crate::purchasing::purchase_orders::purchase_order;
+use crate::purchasing::PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{AccountInternalGroup, JournalType};
 
@@ -1557,7 +1561,13 @@ pub fn test_replenishment_creates_draft_po(ctx: &ReducerContext) -> Result<(), S
         .map(|r| r.id)
         .ok_or("rule missing")?;
 
-    execute_replenishment_rule(ctx, org_id, company_id, rule_id, format!("test-replenish-{rule_id}"))?;
+    execute_replenishment_rule(
+        ctx,
+        org_id,
+        company_id,
+        rule_id,
+        format!("test-replenish-{rule_id}"),
+    )?;
 
     let po = ctx
         .db
@@ -2459,6 +2469,30 @@ pub fn test_consignment_excluded_from_atp(ctx: &ReducerContext) -> Result<(), St
         .id()
         .find(&fixture.warehouse_id)
         .ok_or("warehouse")?;
+
+    // This fixture intentionally exercises an advanced purchasing reducer.
+    // Production tenants must be explicitly opted in during the Phase 0
+    // containment window.
+    ctx.db.organization_settings().insert(OrganizationSettings {
+        organization_id: org_id,
+        module_config: None,
+        feature_flags: vec![PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG.to_string()],
+        integration_keys: None,
+        updated_at: ctx.timestamp,
+        metadata: Some(r#"{"test":"inventory-consignment"}"#.to_string()),
+    });
+    let partner = ctx
+        .db
+        .contact()
+        .id()
+        .find(&fixture.partner_id)
+        .ok_or("consignment vendor")?;
+    ctx.db.contact().id().update(crate::crm::contacts::Contact {
+        is_vendor: true,
+        deleted_at: None,
+        merge_target_id: None,
+        ..partner
+    });
 
     create_consignment_agreement(
         ctx,
@@ -4111,7 +4145,10 @@ pub fn test_stock_inventory_server_owns_state(ctx: &ReducerContext) -> Result<()
         return Err("started should be false on create".to_string());
     }
     if inv.adjustment_count != 0 {
-        return Err(format!("adjustment_count should be 0, got {}", inv.adjustment_count));
+        return Err(format!(
+            "adjustment_count should be 0, got {}",
+            inv.adjustment_count
+        ));
     }
     if !inv.is_editable {
         return Err("is_editable should be true on create".to_string());
@@ -4292,28 +4329,31 @@ pub fn test_inventory_close_reopen_blocked_with_gl_move(
     let company_id = fixture.company_id;
 
     // Directly insert a closed InventoryClose row that has a fake GL move reference.
-    let row = ctx.db.inventory_close().insert(crate::inventory::inventory_close::InventoryClose {
-        id: 0,
-        organization_id: org_id,
-        company_id,
-        name: "CLOSE-GL-GUARD".to_string(),
-        as_of: ctx.timestamp,
-        state: "closed".to_string(),
-        locked: true,
-        line_count: 0,
-        total_quantity: 0.0,
-        total_value: 0.0,
-        journal_id: None,
-        inventory_account_id: None,
-        valuation_account_id: None,
-        account_move_id: Some(1), // fake GL move id — reopen must be blocked
-        closed_at: Some(ctx.timestamp),
-        create_uid: ctx.sender(),
-        create_date: ctx.timestamp,
-        write_uid: ctx.sender(),
-        write_date: ctx.timestamp,
-        metadata: None,
-    });
+    let row = ctx
+        .db
+        .inventory_close()
+        .insert(crate::inventory::inventory_close::InventoryClose {
+            id: 0,
+            organization_id: org_id,
+            company_id,
+            name: "CLOSE-GL-GUARD".to_string(),
+            as_of: ctx.timestamp,
+            state: "closed".to_string(),
+            locked: true,
+            line_count: 0,
+            total_quantity: 0.0,
+            total_value: 0.0,
+            journal_id: None,
+            inventory_account_id: None,
+            valuation_account_id: None,
+            account_move_id: Some(1), // fake GL move id — reopen must be blocked
+            closed_at: Some(ctx.timestamp),
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+            metadata: None,
+        });
 
     let result = reopen_inventory_close(ctx, org_id, company_id, row.id);
     if result.is_ok() {
@@ -4322,8 +4362,10 @@ pub fn test_inventory_close_reopen_blocked_with_gl_move(
         );
     }
     let msg = result.unwrap_err();
-    if !msg.to_lowercase().contains("gl") && !msg.to_lowercase().contains("valuation")
-        && !msg.to_lowercase().contains("reverse") && !msg.to_lowercase().contains("move")
+    if !msg.to_lowercase().contains("gl")
+        && !msg.to_lowercase().contains("valuation")
+        && !msg.to_lowercase().contains("reverse")
+        && !msg.to_lowercase().contains("move")
     {
         return Err(format!("error message should mention GL/move; got: {msg}"));
     }
@@ -4375,9 +4417,7 @@ pub fn test_integration_applied_guard(ctx: &ReducerContext) -> Result<(), String
         .db
         .inventory_integration_intent()
         .iter()
-        .find(|i| {
-            i.organization_id == org_id && i.idempotency_key == "ri017-applied-guard"
-        })
+        .find(|i| i.organization_id == org_id && i.idempotency_key == "ri017-applied-guard")
         .map(|i| i.id)
         .ok_or("integration intent not found")?;
 
@@ -4388,13 +4428,12 @@ pub fn test_integration_applied_guard(ctx: &ReducerContext) -> Result<(), String
         .id()
         .find(&intent_id)
         .ok_or("intent missing")?;
-    ctx.db
-        .inventory_integration_intent()
-        .id()
-        .update(crate::inventory::integration::InventoryIntegrationIntent {
+    ctx.db.inventory_integration_intent().id().update(
+        crate::inventory::integration::InventoryIntegrationIntent {
             applied: true,
             ..intent
-        });
+        },
+    );
 
     // Attempting to record "failed" on an applied intent must be rejected
     let result = record_inventory_integration_result(
@@ -4414,9 +4453,7 @@ pub fn test_integration_applied_guard(ctx: &ReducerContext) -> Result<(), String
         },
     );
     if result.is_ok() {
-        return Err(
-            "expected Err when marking applied intent as failed, got Ok".to_string(),
-        );
+        return Err("expected Err when marking applied intent as failed, got Ok".to_string());
     }
     Ok(())
 }
@@ -4450,7 +4487,10 @@ pub fn test_inventory_close_no_gl_on_create(ctx: &ReducerContext) -> Result<(), 
         .ok_or("inventory close not found after create")?;
 
     if close.state != "draft" {
-        return Err(format!("expected state=draft on create, got {}", close.state));
+        return Err(format!(
+            "expected state=draft on create, got {}",
+            close.state
+        ));
     }
     if close.account_move_id.is_some() {
         return Err(format!(
@@ -4496,9 +4536,7 @@ pub fn test_adjustment_requires_valid_reason_id(ctx: &ReducerContext) -> Result<
         },
     );
     if result.is_ok() {
-        return Err(
-            "expected Err when reason_id does not exist, got Ok".to_string(),
-        );
+        return Err("expected Err when reason_id does not exist, got Ok".to_string());
     }
     Ok(())
 }

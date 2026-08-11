@@ -2238,9 +2238,7 @@ pub fn move_stock_quant(
                 .ok_or("Destination quant disappeared")?;
             // Guard: destination quant must belong to the same company
             if dest.company_id != company_id {
-                return Err(
-                    "Destination quant does not belong to this company".to_string(),
-                );
+                return Err("Destination quant does not belong to this company".to_string());
             }
             let new_dest_qty = dest.quantity + qty;
             let new_dest_reserved = dest.reserved_quantity;

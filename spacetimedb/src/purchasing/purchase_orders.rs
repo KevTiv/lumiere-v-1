@@ -8,13 +8,21 @@
 /// | **PurchaseRequisition** | Internal purchase requests/RFQs |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::company_id_from_scope;
-use crate::core::reference::{require_active_currency_by_id, uom};
+use crate::accounting::analytic_accounting::account_analytic_account;
+use crate::accounting::payment_terms::account_payment_term;
+use crate::accounting::tax_management::account_tax;
+use crate::core::organization::{company_id_from_scope, require_company_in_organization};
+use crate::core::reference::require_active_currency_by_id;
 use crate::crm::contacts::{contact, Contact};
 use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
 };
-use crate::inventory::product::{product, Product};
+use crate::hr::employees::hr_department;
+use crate::inventory::product::{product, product_variant, Product};
+use crate::inventory::tracking::stock_production_lot;
+use crate::manufacturing::relations::{require_uom_compatible, require_uom_in_org};
+use crate::sales::oms_extensions::{account_fiscal_position, account_incoterm};
+use crate::types::TaxTypeUse;
 use crate::types::{
     ExclusiveMode, IsQuantityCopy, LineState, PoInvoiceStatus, PoState, RequisitionState,
 };
@@ -358,6 +366,27 @@ fn validate_order_in_organization(
     Ok(order)
 }
 
+/// Load a requisition through its tenant-owned parent scope.  Lifecycle reducers
+/// deliberately take no caller company argument: the stored company is the
+/// authoritative audit and mutation scope.
+fn require_requisition_in_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    requisition_id: u64,
+) -> Result<PurchaseRequisition, String> {
+    let requisition = ctx
+        .db
+        .purchase_requisition()
+        .id()
+        .find(&requisition_id)
+        .ok_or("Purchase requisition not found")?;
+    if requisition.organization_id != organization_id {
+        return Err("Purchase requisition does not belong to this organization".to_string());
+    }
+    require_company_in_organization(ctx, organization_id, requisition.company_id)?;
+    Ok(requisition)
+}
+
 fn require_vendor_in_organization(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -378,6 +407,24 @@ fn require_vendor_in_organization(
     Ok(vendor)
 }
 
+fn require_vendor_for_company(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    partner_id: u64,
+) -> Result<Contact, String> {
+    let vendor = require_vendor_in_organization(ctx, organization_id, partner_id)?;
+    if vendor.deleted_at.is_some() || vendor.merge_target_id.is_some() {
+        return Err("Vendor is deleted or merged".to_string());
+    }
+    if let Some(vendor_company_id) = vendor.company_id {
+        if vendor_company_id != company_id {
+            return Err("Vendor does not belong to this company".to_string());
+        }
+    }
+    Ok(vendor)
+}
+
 fn require_product_and_uom_in_organization(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -393,14 +440,220 @@ fn require_product_and_uom_in_organization(
     if product.organization_id != organization_id {
         return Err("Product does not belong to this organization".to_string());
     }
-    if uom_id == 0 {
-        return Err("UoM is required".to_string());
+    if !product.active || !product.purchase_ok {
+        return Err("Product is inactive or not purchasable".to_string());
     }
-    let uom_row = ctx.db.uom().id().find(&uom_id).ok_or("UoM not found")?;
-    if uom_row.organization_id != organization_id {
-        return Err("UoM does not belong to this organization".to_string());
-    }
+    let product_uom = require_uom_in_org(ctx, organization_id, product.uom_id, "Product")?;
+    let requested_uom = require_uom_in_org(ctx, organization_id, uom_id, "Purchase")?;
+    require_uom_compatible(&product_uom, &requested_uom, "Purchase product")?;
     Ok(product)
+}
+
+fn require_purchase_taxes(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    tax_ids: &[u64],
+) -> Result<(), String> {
+    let mut seen = std::collections::HashSet::with_capacity(tax_ids.len());
+    for tax_id in tax_ids {
+        if !seen.insert(*tax_id) {
+            return Err("Duplicate purchase tax relation".to_string());
+        }
+        let tax = ctx
+            .db
+            .account_tax()
+            .id()
+            .find(tax_id)
+            .ok_or("Purchase tax not found")?;
+        if tax.organization_id != organization_id || tax.company_id != company_id {
+            return Err(
+                "Purchase tax does not belong to this organization and company".to_string(),
+            );
+        }
+        if !tax.active || !matches!(tax.type_tax_use, TaxTypeUse::Purchase | TaxTypeUse::None) {
+            return Err("Purchase tax is inactive or incompatible".to_string());
+        }
+    }
+    Ok(())
+}
+
+fn require_analytic_account_for_company(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    analytic_account_id: Option<u64>,
+) -> Result<(), String> {
+    let Some(analytic_account_id) = analytic_account_id else {
+        return Ok(());
+    };
+    let account = ctx
+        .db
+        .account_analytic_account()
+        .id()
+        .find(&analytic_account_id)
+        .ok_or("Analytic account not found")?;
+    if account.organization_id != organization_id || account.company_id != company_id {
+        return Err(
+            "Analytic account does not belong to this organization and company".to_string(),
+        );
+    }
+    if !account.active {
+        return Err("Analytic account is inactive".to_string());
+    }
+    Ok(())
+}
+
+fn require_product_variant_for_product(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    product_id: u64,
+    product_variant_id: Option<u64>,
+) -> Result<(), String> {
+    let Some(product_variant_id) = product_variant_id else {
+        return Ok(());
+    };
+    let variant = ctx
+        .db
+        .product_variant()
+        .id()
+        .find(&product_variant_id)
+        .ok_or("Product variant not found")?;
+    if variant.organization_id != organization_id || !variant.is_active {
+        return Err("Product variant is inactive or outside this organization".to_string());
+    }
+    if variant.product_tmpl_id != product_id {
+        return Err("Product variant does not belong to the supplied product".to_string());
+    }
+    Ok(())
+}
+
+fn require_lot_for_product_and_company(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    product_id: u64,
+    lot_id: Option<u64>,
+) -> Result<(), String> {
+    let Some(lot_id) = lot_id else {
+        return Ok(());
+    };
+    let lot = ctx
+        .db
+        .stock_production_lot()
+        .id()
+        .find(&lot_id)
+        .ok_or("Production lot not found")?;
+    if lot.organization_id != organization_id
+        || lot.company_id != company_id
+        || lot.product_id != product_id
+    {
+        return Err(
+            "Production lot does not match this organization, company, and product".to_string(),
+        );
+    }
+    if lot.is_locked || lot.is_scrap {
+        return Err("Production lot is locked or scrapped".to_string());
+    }
+    Ok(())
+}
+
+fn require_purchase_order_header_relations(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    partner_id: u64,
+    currency_id: u64,
+    payment_term_id: Option<u64>,
+    fiscal_position_id: Option<u64>,
+    incoterm_id: Option<u64>,
+) -> Result<(), String> {
+    require_vendor_for_company(ctx, organization_id, company_id, partner_id)?;
+    require_active_currency_by_id(ctx, currency_id)?;
+    if let Some(payment_term_id) = payment_term_id {
+        let term = ctx
+            .db
+            .account_payment_term()
+            .id()
+            .find(&payment_term_id)
+            .ok_or("Payment term not found")?;
+        if term.organization_id != organization_id || !term.is_active {
+            return Err("Payment term is inactive or outside this organization".to_string());
+        }
+    }
+    if let Some(fiscal_position_id) = fiscal_position_id {
+        let position = ctx
+            .db
+            .account_fiscal_position()
+            .id()
+            .find(&fiscal_position_id)
+            .ok_or("Fiscal position not found")?;
+        if position.organization_id != organization_id
+            || !position.is_active
+            || position.company_id.is_some_and(|id| id != company_id)
+        {
+            return Err(
+                "Fiscal position is inactive or incompatible with this company".to_string(),
+            );
+        }
+    }
+    if let Some(incoterm_id) = incoterm_id {
+        let incoterm = ctx
+            .db
+            .account_incoterm()
+            .id()
+            .find(&incoterm_id)
+            .ok_or("Incoterm not found")?;
+        if incoterm.organization_id != organization_id || !incoterm.is_active {
+            return Err("Incoterm is inactive or outside this organization".to_string());
+        }
+    }
+    Ok(())
+}
+
+fn require_line_matches_order(
+    line: &PurchaseOrderLine,
+    order: &PurchaseOrder,
+) -> Result<(), String> {
+    if line.organization_id != order.organization_id || line.company_id != order.company_id {
+        return Err("Purchase order line tenant scope does not match its parent order".to_string());
+    }
+    if line.partner_id != order.partner_id || line.currency_id != order.currency_id {
+        return Err(
+            "Purchase order line business scope does not match its parent order".to_string(),
+        );
+    }
+    Ok(())
+}
+
+fn require_requisition_relations(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    department_id: Option<u64>,
+    vendor_id: Option<u64>,
+) -> Result<(), String> {
+    if let Some(department_id) = department_id {
+        let department = ctx
+            .db
+            .hr_department()
+            .id()
+            .find(&department_id)
+            .ok_or("Department not found")?;
+        if department.organization_id != organization_id
+            || department.company_id != company_id
+            || !department.is_active
+        {
+            return Err(
+                "Department is inactive or does not belong to this organization and company"
+                    .to_string(),
+            );
+        }
+    }
+    if let Some(vendor_id) = vendor_id {
+        require_vendor_for_company(ctx, organization_id, company_id, vendor_id)?;
+    }
+    Ok(())
 }
 
 /// Effective qty match tolerance for a PO (`match_qty_tolerance` or default).
@@ -584,13 +837,23 @@ pub fn create_purchase_order(
     }
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
-    require_active_currency_by_id(ctx, params.currency_id)?;
+    require_purchase_order_header_relations(
+        ctx,
+        organization_id,
+        company_id,
+        params.partner_id,
+        params.currency_id,
+        params.payment_term_id,
+        params.fiscal_position_id,
+        params.incoterm_id,
+    )?;
 
-    require_vendor_in_organization(ctx, organization_id, params.partner_id)?;
-
-    let invoice_count = params.invoice_ids.len() as u32;
-    let picking_count = params.picking_ids.len() as u32;
-    let has_message = !params.message_ids.is_empty();
+    // Invoice, picking, activity, and message collections are lifecycle-owned
+    // reverse relations. They must be rebuilt from their authoritative child
+    // tables rather than accepted from a create command.
+    let invoice_count = 0;
+    let picking_count = 0;
+    let has_message = false;
     let is_quantity_copy = params
         .is_quantity_copy
         .unwrap_or_else(|| "none".to_string());
@@ -613,12 +876,14 @@ pub fn create_purchase_order(
         date_calendar_start: None,
         date_calendar_done: None,
         company_id,
-        user_id: params.user_id.unwrap_or_else(|| ctx.sender()),
+        // The PO owner/audit actor is authenticated server context. A command
+        // must not impersonate an arbitrary identity through `user_id`.
+        user_id: ctx.sender(),
         invoice_count,
-        invoice_ids: params.invoice_ids,
+        invoice_ids: Vec::new(),
         invoice_status: PoInvoiceStatus::No,
         picking_count,
-        picking_ids: params.picking_ids,
+        picking_ids: Vec::new(),
         effective_date: None,
         amount_untaxed: 0.0,
         amount_tax: 0.0,
@@ -629,10 +894,10 @@ pub fn create_purchase_order(
         receipt_status: "nothing".to_string(),
         notes: params.notes,
         message_main_attachment_id: None,
-        message_follower_ids: params.message_follower_ids,
-        message_ids: params.message_ids,
+        message_follower_ids: Vec::new(),
+        message_ids: Vec::new(),
         has_message,
-        activity_ids: params.activity_ids,
+        activity_ids: Vec::new(),
         activity_state: None,
         activity_date_deadline: None,
         activity_type_id: None,
@@ -1162,6 +1427,17 @@ pub fn update_purchase_order(
         return Err("Only draft purchase orders can be updated".to_string());
     }
 
+    require_purchase_order_header_relations(
+        ctx,
+        organization_id,
+        company_id,
+        params.partner_id.unwrap_or(order.partner_id),
+        params.currency_id.unwrap_or(order.currency_id),
+        params.payment_term_id.or(order.payment_term_id),
+        params.fiscal_position_id.or(order.fiscal_position_id),
+        params.incoterm_id.or(order.incoterm_id),
+    )?;
+
     let mut updated = order;
 
     if let Some(ref o) = params.origin {
@@ -1189,11 +1465,9 @@ pub fn update_purchase_order(
         updated.incoterm_location = Some(il.clone());
     }
     if let Some(pid) = params.partner_id {
-        require_vendor_in_organization(ctx, organization_id, pid)?;
         updated.partner_id = pid;
     }
     if let Some(cid) = params.currency_id {
-        require_active_currency_by_id(ctx, cid)?;
         updated.currency_id = cid;
     }
     if let Some(tol) = params.match_qty_tolerance {
@@ -1232,6 +1506,57 @@ pub fn update_purchase_order(
         },
     );
 
+    Ok(())
+}
+
+/// Explicitly clear one nullable purchase-order header relation/value.
+#[reducer]
+pub fn clear_purchase_order_field(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    order_id: u64,
+    field: String,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "purchase_order", "write")?;
+    let mut order = validate_order_in_organization(ctx, organization_id, order_id)?;
+    if order.company_id != company_id {
+        return Err("Record does not belong to this company".to_string());
+    }
+    if order.is_locked || order.state != PoState::Draft {
+        return Err("Only unlocked draft purchase orders can be cleared".to_string());
+    }
+    match field.trim() {
+        "origin" => order.origin = None,
+        "partner_ref" => order.partner_ref = None,
+        "notes" => order.notes = None,
+        "date_planned" => order.date_planned = None,
+        "payment_term" => order.payment_term_id = None,
+        "fiscal_position" => order.fiscal_position_id = None,
+        "incoterm" => order.incoterm_id = None,
+        "incoterm_location" => order.incoterm_location = None,
+        "match_qty_tolerance" => order.match_qty_tolerance = None,
+        "match_price_tolerance" => order.match_price_tolerance = None,
+        "metadata" => order.metadata = None,
+        _ => return Err("Unsupported purchase-order clear field".to_string()),
+    }
+    order.write_uid = ctx.sender();
+    order.write_date = ctx.timestamp;
+    ctx.db.purchase_order().id().update(order);
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "purchase_order",
+            record_id: order_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(format!(r#"{{"cleared":"{field:?}"}}"#)),
+            changed_fields: vec![format!("{field:?}")],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -1327,11 +1652,37 @@ pub fn add_purchase_order_line(
         return Err("Can only add lines to draft purchase orders".to_string());
     }
 
+    if !params.quantity.is_finite() || params.quantity <= 0.0 || !params.price_unit.is_finite() {
+        return Err(
+            "Purchase order line quantity must be positive and price must be finite".to_string(),
+        );
+    }
+
     require_product_and_uom_in_organization(
         ctx,
         organization_id,
         params.product_id,
         params.uom_id,
+    )?;
+    require_purchase_taxes(ctx, organization_id, order.company_id, &params.tax_ids)?;
+    require_product_variant_for_product(
+        ctx,
+        organization_id,
+        params.product_id,
+        params.product_variant_id,
+    )?;
+    require_analytic_account_for_company(
+        ctx,
+        organization_id,
+        order.company_id,
+        params.account_analytic_id,
+    )?;
+    require_lot_for_product_and_company(
+        ctx,
+        organization_id,
+        order.company_id,
+        params.product_id,
+        params.lot_id,
     )?;
 
     let subtotal = params.quantity * params.price_unit;
@@ -1441,6 +1792,7 @@ pub fn remove_purchase_order_line(
         .ok_or("Purchase order line not found")?;
 
     let order = validate_order_in_organization(ctx, organization_id, line.order_id)?;
+    require_line_matches_order(&line, &order)?;
 
     if order.state != PoState::Draft {
         return Err("Can only remove lines from draft purchase orders".to_string());
@@ -1496,6 +1848,7 @@ pub fn update_purchase_order_line(
     }
 
     let order = validate_order_in_organization(ctx, organization_id, line.order_id)?;
+    require_line_matches_order(&line, &order)?;
 
     if order.is_locked {
         return Err("Purchase order is locked".to_string());
@@ -1510,11 +1863,33 @@ pub fn update_purchase_order_line(
     let uom_id = params.uom_id.unwrap_or(line.product_uom);
     let price_unit = params.price_unit.unwrap_or(line.price_unit);
 
-    if quantity <= 0.0 {
-        return Err("Quantity must be greater than zero".to_string());
+    if !quantity.is_finite() || quantity <= 0.0 || !price_unit.is_finite() {
+        return Err(
+            "Purchase order line quantity must be positive and price must be finite".to_string(),
+        );
     }
 
     require_product_and_uom_in_organization(ctx, organization_id, product_id, uom_id)?;
+    if let Some(tax_ids) = &params.tax_ids {
+        require_purchase_taxes(ctx, organization_id, order.company_id, tax_ids)?;
+    }
+    let product_variant_id = params.product_variant_id.or(line.product_variant_id);
+    let account_analytic_id = params.account_analytic_id.or(line.account_analytic_id);
+    let lot_id = params.lot_id.or(line.lot_id);
+    require_product_variant_for_product(ctx, organization_id, product_id, product_variant_id)?;
+    require_analytic_account_for_company(
+        ctx,
+        organization_id,
+        order.company_id,
+        account_analytic_id,
+    )?;
+    require_lot_for_product_and_company(
+        ctx,
+        organization_id,
+        order.company_id,
+        product_id,
+        lot_id,
+    )?;
 
     let subtotal = quantity * price_unit;
     // Preserve existing tax when caller omits tax_ids (do not wipe to []).
@@ -1530,11 +1905,8 @@ pub fn update_purchase_order_line(
     };
 
     let date_planned = params.date_planned.or(line.date_planned);
-    let product_variant_id = params.product_variant_id.or(line.product_variant_id);
-    let account_analytic_id = params.account_analytic_id.or(line.account_analytic_id);
     let display_type = params.display_type.or(line.display_type.clone());
     let propagate_cancel = params.propagate_cancel.unwrap_or(line.propagate_cancel);
-    let lot_id = params.lot_id.or(line.lot_id);
     let metadata = params.metadata.or(line.metadata.clone());
     let order_id = line.order_id;
     let company_id = order.company_id;
@@ -1601,6 +1973,58 @@ pub fn update_purchase_order_line(
     );
 
     log::info!("Purchase order line {} updated", line_id);
+    Ok(())
+}
+
+/// Explicitly clear one nullable purchase-order line relation/value.
+#[reducer]
+pub fn clear_purchase_order_line_field(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    line_id: u64,
+    field: String,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "purchase_order_line", "write")?;
+    let mut line = ctx
+        .db
+        .purchase_order_line()
+        .id()
+        .find(&line_id)
+        .ok_or("Purchase order line not found")?;
+    if line.organization_id != organization_id {
+        return Err("Line does not belong to this organization".to_string());
+    }
+    let order = validate_order_in_organization(ctx, organization_id, line.order_id)?;
+    require_line_matches_order(&line, &order)?;
+    if order.is_locked || order.state != PoState::Draft {
+        return Err("Only lines on unlocked draft purchase orders can be cleared".to_string());
+    }
+    match field.trim() {
+        "date_planned" => line.date_planned = None,
+        "product_variant" => line.product_variant_id = None,
+        "analytic_account" => line.account_analytic_id = None,
+        "display_type" => line.display_type = None,
+        "lot" => line.lot_id = None,
+        "metadata" => line.metadata = None,
+        _ => return Err("Unsupported purchase-order-line clear field".to_string()),
+    }
+    line.write_uid = ctx.sender();
+    line.write_date = ctx.timestamp;
+    ctx.db.purchase_order_line().id().update(line);
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(order.company_id),
+            table_name: "purchase_order_line",
+            record_id: line_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(format!(r#"{{"cleared":"{field:?}"}}"#)),
+            changed_fields: vec![format!("{field:?}")],
+            metadata: None,
+        },
+    );
     Ok(())
 }
 
@@ -2230,6 +2654,13 @@ pub fn create_purchase_requisition(
     check_permission(ctx, organization_id, "purchase_requisition", "create")?;
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    require_requisition_relations(
+        ctx,
+        organization_id,
+        company_id,
+        params.department_id,
+        params.vendor_id,
+    )?;
 
     if let Some(ref excl) = params.exclusive {
         ExclusiveMode::from_str(excl)?;
@@ -2239,14 +2670,18 @@ pub fn create_purchase_requisition(
         if line.product_uom_qty <= 0.0 {
             return Err("Requisition line quantity must be greater than zero".to_string());
         }
-        ctx.db
-            .product()
-            .id()
-            .find(&line.product_id)
-            .ok_or("Product not found")?;
+        require_product_and_uom_in_organization(
+            ctx,
+            organization_id,
+            line.product_id,
+            line.product_uom,
+        )?;
     }
 
-    let order_count = params.purchase_ids.len() as u32;
+    // `line_ids`, `purchase_ids`, activities and messages are reverse
+    // collections. Child/relation reducers own them; create intent cannot seed
+    // arbitrary links.
+    let order_count = 0;
     let exclusive = params.exclusive.unwrap_or_else(|| "multiple".to_string());
     let multiple_product = params.multiple_product || params.lines.len() > 1;
 
@@ -2266,13 +2701,13 @@ pub fn create_purchase_requisition(
         account_analytic_id: None,
         picking_type_id: None,
         line_ids: vec![],
-        purchase_ids: params.purchase_ids,
+        purchase_ids: Vec::new(),
         order_count,
         vendor_id: params.vendor_id,
         multiple_product,
-        activity_ids: params.activity_ids,
-        message_follower_ids: params.message_follower_ids,
-        message_ids: params.message_ids,
+        activity_ids: Vec::new(),
+        message_follower_ids: Vec::new(),
+        message_ids: Vec::new(),
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
@@ -2342,7 +2777,7 @@ pub fn create_purchase_requisition(
 pub fn add_purchase_requisition_line(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
+    _company_id: u64,
     requisition_id: u64,
     params: AddPurchaseRequisitionLineParams,
 ) -> Result<(), String> {
@@ -2352,31 +2787,28 @@ pub fn add_purchase_requisition_line(
         return Err("Requisition line quantity must be greater than zero".to_string());
     }
 
-    let requisition = ctx
-        .db
-        .purchase_requisition()
-        .id()
-        .find(&requisition_id)
-        .ok_or("Purchase requisition not found")?;
-    if requisition.organization_id != organization_id {
-        return Err("Purchase requisition does not belong to this organization".to_string());
-    }
-    if requisition.company_id != company_id {
-        return Err("Record does not belong to this company".to_string());
-    }
+    let requisition = require_requisition_in_organization(ctx, organization_id, requisition_id)?;
     if !matches!(requisition.state, RequisitionState::Draft) {
         return Err("Can only add lines to draft purchase requisitions".to_string());
     }
 
-    ctx.db
-        .product()
-        .id()
-        .find(&params.product_id)
-        .ok_or("Product not found")?;
+    require_product_and_uom_in_organization(
+        ctx,
+        organization_id,
+        params.product_id,
+        params.product_uom,
+    )?;
 
-    let sequence = params
-        .sequence
-        .unwrap_or_else(|| ((requisition.line_ids.len() + 1) as u32) * 10);
+    let sequence = params.sequence.unwrap_or_else(|| {
+        ((ctx
+            .db
+            .purchase_requisition_line()
+            .purchase_requisition_line_by_req()
+            .filter(&requisition_id)
+            .count()
+            + 1) as u32)
+            * 10
+    });
 
     let row = ctx
         .db
@@ -2384,7 +2816,7 @@ pub fn add_purchase_requisition_line(
         .insert(PurchaseRequisitionLine {
             id: 0,
             organization_id,
-            company_id,
+            company_id: requisition.company_id,
             requisition_id,
             product_id: params.product_id,
             product_uom: params.product_uom,
@@ -2411,7 +2843,7 @@ pub fn add_purchase_requisition_line(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: Some(company_id),
+            company_id: Some(requisition.company_id),
             table_name: "purchase_requisition_line",
             record_id: row.id,
             action: "CREATE",
@@ -2445,12 +2877,7 @@ pub fn submit_purchase_requisition(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_requisition", "write")?;
 
-    let requisition = ctx
-        .db
-        .purchase_requisition()
-        .id()
-        .find(&requisition_id)
-        .ok_or("Purchase requisition not found")?;
+    let requisition = require_requisition_in_organization(ctx, organization_id, requisition_id)?;
 
     if !matches!(requisition.state, RequisitionState::Draft) {
         return Err("Purchase requisition must be in Draft state to submit".to_string());
@@ -2494,12 +2921,7 @@ pub fn approve_purchase_requisition(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_requisition", "approve")?;
 
-    let requisition = ctx
-        .db
-        .purchase_requisition()
-        .id()
-        .find(&requisition_id)
-        .ok_or("Purchase requisition not found")?;
+    let requisition = require_requisition_in_organization(ctx, organization_id, requisition_id)?;
 
     if !matches!(requisition.state, RequisitionState::InProgress) {
         return Err("Purchase requisition must be in InProgress state to approve".to_string());
@@ -2539,7 +2961,7 @@ pub fn approve_purchase_requisition(
 pub fn convert_purchase_requisition_to_po(
     ctx: &ReducerContext,
     organization_id: u64,
-    company_id: u64,
+    _company_id: u64,
     requisition_id: u64,
 ) -> Result<(), String> {
     use crate::core::organization::company;
@@ -2547,19 +2969,8 @@ pub fn convert_purchase_requisition_to_po(
     check_permission(ctx, organization_id, "purchase_order", "create")?;
     check_permission(ctx, organization_id, "purchase_requisition", "write")?;
 
-    let requisition = ctx
-        .db
-        .purchase_requisition()
-        .id()
-        .find(&requisition_id)
-        .ok_or("Purchase requisition not found")?;
-
-    if requisition.organization_id != organization_id {
-        return Err("Purchase requisition does not belong to this organization".to_string());
-    }
-    if requisition.company_id != company_id {
-        return Err("Record does not belong to this company".to_string());
-    }
+    let requisition = require_requisition_in_organization(ctx, organization_id, requisition_id)?;
+    let company_id = requisition.company_id;
     if !matches!(requisition.state, RequisitionState::Approved) {
         return Err("Purchase requisition must be Approved to convert to a PO".to_string());
     }
@@ -2708,12 +3119,7 @@ pub fn close_purchase_requisition(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_requisition", "write")?;
 
-    let requisition = ctx
-        .db
-        .purchase_requisition()
-        .id()
-        .find(&requisition_id)
-        .ok_or("Purchase requisition not found")?;
+    let requisition = require_requisition_in_organization(ctx, organization_id, requisition_id)?;
 
     if matches!(
         requisition.state,
@@ -2762,12 +3168,7 @@ pub fn cancel_purchase_requisition(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_requisition", "write")?;
 
-    let requisition = ctx
-        .db
-        .purchase_requisition()
-        .id()
-        .find(&requisition_id)
-        .ok_or("Purchase requisition not found")?;
+    let requisition = require_requisition_in_organization(ctx, organization_id, requisition_id)?;
 
     if matches!(
         requisition.state,

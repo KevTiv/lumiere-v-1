@@ -7,8 +7,12 @@
 /// | **SupplierIntakeRequest** | Supplier onboarding requests |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::chart_of_accounts::account_journal;
+use crate::core::organization::require_company_in_organization;
+use crate::core::reference::require_active_currency_by_id;
+use crate::crm::contacts::{contact, Contact};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::types::IntakeState;
+use crate::types::{IntakeState, JournalType};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -148,6 +152,121 @@ pub struct SubmitSupplierIntakeParams {
 
 // ── Reducers ──────────────────────────────────────────────────────────────────
 
+fn load_supplier_intake(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    intake_id: u64,
+) -> Result<SupplierIntakeRequest, String> {
+    let intake = ctx
+        .db
+        .supplier_intake_request()
+        .id()
+        .find(&intake_id)
+        .ok_or("Supplier intake request not found")?;
+    if intake.organization_id != organization_id {
+        return Err("Supplier intake does not belong to this organization".to_string());
+    }
+    Ok(intake)
+}
+
+fn require_active_partner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    partner_id: u64,
+    role: &str,
+) -> Result<Contact, String> {
+    let partner = ctx
+        .db
+        .contact()
+        .id()
+        .find(&partner_id)
+        .ok_or_else(|| format!("{role} partner not found"))?;
+    if partner.organization_id != organization_id {
+        return Err(format!(
+            "{role} partner does not belong to this organization"
+        ));
+    }
+    if partner.deleted_at.is_some() || partner.merge_target_id.is_some() {
+        return Err(format!("{role} partner is inactive"));
+    }
+    Ok(partner)
+}
+
+/// Validates the complete partner-bank payment chain before a row can enable
+/// outbound payments. `bank_id` deliberately remains unsupported: there is no
+/// authoritative bank table in this module to validate it against, so callers
+/// must omit it rather than persist an unchecked foreign key.
+fn validate_partner_bank_chain(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    partner_id: u64,
+    company_id: u64,
+    currency_id: Option<u64>,
+    journal_id: Option<u64>,
+    allow_out_payment: bool,
+    active: bool,
+) -> Result<(), String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    let partner = require_active_partner(ctx, organization_id, partner_id, "Bank account")?;
+    if partner.company_id.is_some_and(|id| id != company_id) {
+        return Err("Bank account partner does not belong to this company".to_string());
+    }
+
+    if allow_out_payment && !active {
+        return Err("Inactive bank accounts cannot allow outbound payments".to_string());
+    }
+    if allow_out_payment && !partner.is_vendor {
+        return Err("Outbound payment bank accounts require a vendor partner".to_string());
+    }
+
+    if let Some(currency_id) = currency_id {
+        require_active_currency_by_id(ctx, currency_id)?;
+    }
+
+    let journal = match journal_id {
+        Some(journal_id) => {
+            let journal = ctx
+                .db
+                .account_journal()
+                .id()
+                .find(&journal_id)
+                .ok_or("Payment journal not found")?;
+            if journal.organization_id != organization_id || journal.company_id != company_id {
+                return Err(
+                    "Payment journal does not belong to this organization and company".to_string(),
+                );
+            }
+            if !journal.active {
+                return Err("Payment journal is inactive".to_string());
+            }
+            if !matches!(journal.type_, JournalType::Bank | JournalType::Cash) {
+                return Err(
+                    "Partner bank accounts require a bank or cash payment journal".to_string(),
+                );
+            }
+            if let (Some(bank_currency), Some(journal_currency)) =
+                (currency_id, journal.currency_id)
+            {
+                if bank_currency != journal_currency {
+                    return Err(
+                        "Partner bank currency does not match the payment journal".to_string()
+                    );
+                }
+            }
+            journal
+        }
+        None if allow_out_payment => {
+            return Err("Outbound payment bank accounts require a payment journal".to_string())
+        }
+        None => return Ok(()),
+    };
+
+    if allow_out_payment && !journal.at_least_one_outbound {
+        return Err("Payment journal does not allow outbound payments".to_string());
+    }
+    Ok(())
+}
+
 /// Create a new bank account for a partner
 #[reducer]
 pub fn create_partner_bank(
@@ -156,6 +275,25 @@ pub fn create_partner_bank(
     params: CreatePartnerBankParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "res_partner_bank", "create")?;
+
+    if params.bank_id.is_some() {
+        return Err(
+            "bank_id is unsupported until an authoritative bank relation exists".to_string(),
+        );
+    }
+    let company_id = params
+        .company_id
+        .ok_or("Partner bank accounts require an explicit company_id")?;
+    validate_partner_bank_chain(
+        ctx,
+        organization_id,
+        params.partner_id,
+        company_id,
+        params.currency_id,
+        params.journal_id,
+        params.allow_out_payment,
+        true,
+    )?;
 
     let sanitized = params.acc_number.replace(' ', "").replace('-', "");
 
@@ -168,7 +306,7 @@ pub fn create_partner_bank(
         bank_id: params.bank_id,
         sequence: params.sequence.unwrap_or(0),
         currency_id: params.currency_id,
-        company_id: params.company_id,
+        company_id: Some(company_id),
         active: true,
         journal_id: params.journal_id,
         allow_out_payment: params.allow_out_payment,
@@ -185,7 +323,7 @@ pub fn create_partner_bank(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: params.company_id,
+            company_id: Some(company_id),
             table_name: "res_partner_bank",
             record_id: bank.id,
             action: "CREATE",
@@ -227,6 +365,22 @@ pub fn update_partner_bank(
         return Err("Bank account does not belong to this organization".to_string());
     }
 
+    let allow_out_payment = params.allow_out_payment.unwrap_or(bank.allow_out_payment);
+    let active = params.active.unwrap_or(bank.active);
+    let company_id = bank
+        .company_id
+        .ok_or("Partner bank account is missing its company relation")?;
+    validate_partner_bank_chain(
+        ctx,
+        organization_id,
+        bank.partner_id,
+        company_id,
+        bank.currency_id,
+        bank.journal_id,
+        allow_out_payment,
+        active,
+    )?;
+
     let sanitized = params
         .acc_number
         .map(|n| n.replace(' ', "").replace('-', ""));
@@ -234,8 +388,8 @@ pub fn update_partner_bank(
     ctx.db.res_partner_bank().id().update(ResPartnerBank {
         sanitized_acc_number: sanitized.or(bank.sanitized_acc_number.clone()),
         acc_holder_name: params.acc_holder_name.or(bank.acc_holder_name.clone()),
-        allow_out_payment: params.allow_out_payment.unwrap_or(bank.allow_out_payment),
-        active: params.active.unwrap_or(bank.active),
+        allow_out_payment,
+        active,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..bank
@@ -257,6 +411,34 @@ pub fn update_partner_bank(
     );
 
     log::info!("Bank account {} updated", bank_id);
+    Ok(())
+}
+
+/// Explicitly clear a nullable partner-bank value.
+#[reducer]
+pub fn clear_partner_bank_field(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    bank_id: u64,
+    field: String,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "res_partner_bank", "write")?;
+    let mut bank = ctx
+        .db
+        .res_partner_bank()
+        .id()
+        .find(&bank_id)
+        .ok_or("Bank account not found")?;
+    if bank.organization_id != organization_id {
+        return Err("Bank account does not belong to this organization".to_string());
+    }
+    match field.trim() {
+        "account_holder_name" => bank.acc_holder_name = None,
+        _ => return Err("Unsupported partner-bank clear field".to_string()),
+    }
+    bank.write_uid = ctx.sender();
+    bank.write_date = ctx.timestamp;
+    ctx.db.res_partner_bank().id().update(bank);
     Ok(())
 }
 
@@ -308,6 +490,25 @@ pub fn submit_supplier_intake(
     organization_id: u64,
     params: SubmitSupplierIntakeParams,
 ) -> Result<(), String> {
+    // The only discoverable submit route is the authenticated Purchasing
+    // workspace/BFF. Public submission has no invitation-token contract, so
+    // direct unauthenticated or cross-organization submission is unsupported.
+    check_permission(ctx, organization_id, "supplier_intake_request", "create")?;
+    if params.company_name.trim().is_empty()
+        || params.contact_name.trim().is_empty()
+        || params.email.trim().is_empty()
+    {
+        return Err("Supplier company, contact, and email are required".to_string());
+    }
+    if params.payment_terms_id.is_some() {
+        return Err(
+            "Supplier intake payment terms require a company-scoped onboarding step".to_string(),
+        );
+    }
+    if let Some(currency_id) = params.currency_id {
+        require_active_currency_by_id(ctx, currency_id)?;
+    }
+
     let intake = ctx
         .db
         .supplier_intake_request()
@@ -386,12 +587,7 @@ pub fn review_supplier_intake(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "supplier_intake_request", "review")?;
 
-    let intake = ctx
-        .db
-        .supplier_intake_request()
-        .id()
-        .find(&intake_id)
-        .ok_or("Supplier intake request not found")?;
+    let intake = load_supplier_intake(ctx, organization_id, intake_id)?;
 
     if !matches!(intake.state, IntakeState::Submitted | IntakeState::OnHold) {
         return Err("Can only review submitted or on-hold requests".to_string());
@@ -438,12 +634,12 @@ pub fn approve_supplier_intake(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "supplier_intake_request", "approve")?;
 
-    let intake = ctx
-        .db
-        .supplier_intake_request()
-        .id()
-        .find(&intake_id)
-        .ok_or("Supplier intake request not found")?;
+    let intake = load_supplier_intake(ctx, organization_id, intake_id)?;
+
+    let vendor = require_active_partner(ctx, organization_id, partner_id, "Approved")?;
+    if !vendor.is_vendor {
+        return Err("Approved partner is not a vendor".to_string());
+    }
 
     if !matches!(
         intake.state,
@@ -499,12 +695,7 @@ pub fn reject_supplier_intake(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "supplier_intake_request", "approve")?;
 
-    let intake = ctx
-        .db
-        .supplier_intake_request()
-        .id()
-        .find(&intake_id)
-        .ok_or("Supplier intake request not found")?;
+    let intake = load_supplier_intake(ctx, organization_id, intake_id)?;
 
     if matches!(intake.state, IntakeState::Approved | IntakeState::Rejected) {
         return Err("Cannot reject already approved or rejected requests".to_string());
@@ -553,12 +744,7 @@ pub fn hold_supplier_intake(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "supplier_intake_request", "review")?;
 
-    let intake = ctx
-        .db
-        .supplier_intake_request()
-        .id()
-        .find(&intake_id)
-        .ok_or("Supplier intake request not found")?;
+    let intake = load_supplier_intake(ctx, organization_id, intake_id)?;
 
     if !matches!(
         intake.state,
@@ -653,6 +839,15 @@ pub fn update_supplier_intake(
         return Err("Cannot update a finalized supplier intake".to_string());
     }
 
+    if params.payment_terms_id.is_some() {
+        return Err(
+            "Supplier intake payment terms require a company-scoped onboarding step".to_string(),
+        );
+    }
+    if let Some(currency_id) = params.currency_id {
+        require_active_currency_by_id(ctx, currency_id)?;
+    }
+
     let mut updated = intake;
 
     if let Some(v) = params.company_name {
@@ -744,6 +939,47 @@ pub fn update_supplier_intake(
         },
     );
 
+    Ok(())
+}
+
+/// Explicitly clear one nullable supplier-intake value before finalization.
+#[reducer]
+pub fn clear_supplier_intake_field(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    intake_id: u64,
+    field: String,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "supplier_intake_request", "write")?;
+    let mut intake = load_supplier_intake(ctx, organization_id, intake_id)?;
+    if matches!(
+        intake.state,
+        IntakeState::Approved | IntakeState::Rejected | IntakeState::Onboarded
+    ) {
+        return Err("Cannot clear a finalized supplier intake".to_string());
+    }
+    match field.trim() {
+        "phone" => intake.phone = None,
+        "website" => intake.website = None,
+        "industry" => intake.industry = None,
+        "tax_id" => intake.tax_id = None,
+        "company_registry" => intake.company_registry = None,
+        "street" => intake.street = None,
+        "city" => intake.city = None,
+        "zip" => intake.zip = None,
+        "country_code" => intake.country_code = None,
+        "bank_account_number" => intake.bank_account_number = None,
+        "bank_name" => intake.bank_name = None,
+        "payment_terms" => intake.payment_terms_id = None,
+        "currency" => intake.currency_id = None,
+        "minimum_order_value" => intake.min_order_value = None,
+        "lead_time_days" => intake.lead_time_days = None,
+        "notes" => intake.notes = None,
+        "metadata" => intake.metadata = None,
+        _ => return Err("Unsupported supplier-intake clear field".to_string()),
+    }
+    intake.updated_at = ctx.timestamp;
+    ctx.db.supplier_intake_request().id().update(intake);
     Ok(())
 }
 

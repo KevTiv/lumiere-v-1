@@ -238,9 +238,27 @@ fn post_close_valuation_move(
         return Err("inventory_account_id and valuation_account_id must differ".to_string());
     }
 
-    require_active_journal(ctx, organization_id, company_id, journal_id, "inventory close journal")?;
-    require_active_account(ctx, organization_id, company_id, inventory_account_id, "inventory account")?;
-    require_active_account(ctx, organization_id, company_id, valuation_account_id, "valuation account")?;
+    require_active_journal(
+        ctx,
+        organization_id,
+        company_id,
+        journal_id,
+        "inventory close journal",
+    )?;
+    require_active_account(
+        ctx,
+        organization_id,
+        company_id,
+        inventory_account_id,
+        "inventory account",
+    )?;
+    require_active_account(
+        ctx,
+        organization_id,
+        company_id,
+        valuation_account_id,
+        "valuation account",
+    )?;
 
     let amount = total_value.abs();
     let name = next_doc_number(ctx, "INVCLS");

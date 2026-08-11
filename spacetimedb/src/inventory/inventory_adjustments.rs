@@ -714,11 +714,14 @@ pub fn process_inventory_adjustment(
         {
             let new_qty = (quant.quantity + delta).max(0.0);
             let available_qty = (new_qty - quant.reserved_quantity).max(0.0);
-            ctx.db.stock_quant().id().update(crate::inventory::stock::StockQuant {
-                quantity: new_qty,
-                available_quantity: available_qty,
-                ..quant
-            });
+            ctx.db
+                .stock_quant()
+                .id()
+                .update(crate::inventory::stock::StockQuant {
+                    quantity: new_qty,
+                    available_quantity: available_qty,
+                    ..quant
+                });
         }
     }
     // delta == 0.0: quantities are equal, no stock move needed.
@@ -750,7 +753,11 @@ pub fn process_inventory_adjustment(
                 })
                 .to_string(),
             ),
-            changed_fields: vec!["state".to_string(), "posted_at".to_string(), "posted_by".to_string()],
+            changed_fields: vec![
+                "state".to_string(),
+                "posted_at".to_string(),
+                "posted_by".to_string(),
+            ],
             metadata: None,
         },
     );

@@ -17,10 +17,10 @@ import { nullableBigIntU64, optionalBigIntU64, optionalTrimmedString } from "@lu
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
-function timestampFromFormDate(v: unknown, fallback: Date): Timestamp {
-  if (v == null || String(v).trim() === "") return stbTimestampFromDate(fallback)
+function requiredTimestampFromForm(v: unknown): Timestamp | null {
+  if (v == null || String(v).trim() === "") return null
   const d = new Date(String(v))
-  if (Number.isNaN(d.getTime())) return stbTimestampFromDate(fallback)
+  if (Number.isNaN(d.getTime())) return null
   return stbTimestampFromDate(d)
 }
 
@@ -89,6 +89,8 @@ export function toCreateBillFromPurchaseOrderParams(
 
   const partnerId = order?.partnerId
   const payableLineName = optionalTrimmedString(formData.payableLineName) ?? ""
+  const invoiceDate = requiredTimestampFromForm(formData.invoiceDate)
+  if (invoiceDate == null) return null
 
   const expenseLine = emptyMoveLineParams(defaultExpenseAccountId)
   expenseLine.excludeFromInvoiceTab = checkboxFromForm(
@@ -109,7 +111,7 @@ export function toCreateBillFromPurchaseOrderParams(
   return {
     journalId,
     defaultExpenseAccountId,
-    invoiceDate: timestampFromFormDate(formData.invoiceDate, new Date()),
+    invoiceDate,
     expenseLine,
     payableLine,
     metadata: optionalTrimmedString(formData.narration),
@@ -129,10 +131,9 @@ export function toCreatePurchaseOrderParams(
   const currencyId = BigInt(Number(pl.currencyId))
 
   const datePlannedRaw = formData.datePlanned
-  const datePlanned =
-    datePlannedRaw != null && String(datePlannedRaw).trim() !== ""
-      ? timestampFromFormDate(datePlannedRaw, new Date())
-      : undefined
+  const hasDatePlanned = datePlannedRaw != null && String(datePlannedRaw).trim() !== ""
+  const datePlanned = hasDatePlanned ? requiredTimestampFromForm(datePlannedRaw) : undefined
+  if (hasDatePlanned && datePlanned == null) return null
 
   return {
     companyId: undefined,
@@ -309,9 +310,11 @@ export function toCreateLandedCostParams(
   const amountTotal = Number(formData.amountTotal)
   if (pickingRaw == null || pickingRaw === "" || currencyId == null) return null
   if (!Number.isFinite(amountTotal) || amountTotal < 0) return null
+  const date = requiredTimestampFromForm(formData.date)
+  if (date == null) return null
 
   return {
-    date: timestampFromFormDate(formData.date, new Date()),
+    date,
     targetMove: formData.targetMove ? String(formData.targetMove) : "receipt",
     currencyId,
     amountTotal,
@@ -341,7 +344,9 @@ export function toUpdateLandedCostParams(
   const amountTotal = Number(formData.amountTotal)
   if (Number.isFinite(amountTotal) && amountTotal >= 0) params.amountTotal = amountTotal
   if (formData.date != null && formData.date !== "") {
-    params.date = timestampFromFormDate(formData.date, new Date())
+    const date = requiredTimestampFromForm(formData.date)
+    if (date == null) return null
+    params.date = date
   }
   const description = optionalTrimmedString(formData.description)
   if (description != null) params.description = description

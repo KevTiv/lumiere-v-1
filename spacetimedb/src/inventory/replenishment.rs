@@ -212,17 +212,12 @@ fn create_buy_demand(
     let origin_key = format!("REPLENISH-{}", rule.id);
 
     // Deduplication: return existing open PO with same origin to prevent duplicates on retry.
-    if let Some(existing_po) = ctx
-        .db
-        .purchase_order()
-        .iter()
-        .find(|po| {
-            po.organization_id == organization_id
-                && po.company_id == company_id
-                && po.origin.as_deref() == Some(&origin_key)
-                && !matches!(po.state, PoState::Done | PoState::Cancelled)
-        })
-    {
+    if let Some(existing_po) = ctx.db.purchase_order().iter().find(|po| {
+        po.organization_id == organization_id
+            && po.company_id == company_id
+            && po.origin.as_deref() == Some(&origin_key)
+            && !matches!(po.state, PoState::Done | PoState::Cancelled)
+    }) {
         return Ok(("buy".to_string(), existing_po.id));
     }
 
@@ -324,18 +319,13 @@ fn create_transfer_demand(
     let picking_name = format!("INT-RPL-{}", rule.id);
 
     // Deduplication: return existing open picking with same name to prevent duplicates on retry.
-    if let Some(existing_picking) = ctx
-        .db
-        .stock_picking()
-        .iter()
-        .find(|p| {
-            p.organization_id == organization_id
-                && p.company_id == company_id
-                && p.name == picking_name
-                && p.state != "done"
-                && p.state != "cancel"
-        })
-    {
+    if let Some(existing_picking) = ctx.db.stock_picking().iter().find(|p| {
+        p.organization_id == organization_id
+            && p.company_id == company_id
+            && p.name == picking_name
+            && p.state != "done"
+            && p.state != "cancel"
+    }) {
         return Ok(("transfer".to_string(), existing_picking.id));
     }
 

@@ -406,12 +406,10 @@ pub fn create_warehouse(
         ("view_location_id", params.view_location_id),
     ] {
         if let Some(loc_id) = opt_id {
-            let loc = ctx
-                .db
-                .stock_location()
-                .id()
-                .find(&loc_id)
-                .ok_or_else(|| format!("{} {} not found in stock_location", field_name, loc_id))?;
+            let loc =
+                ctx.db.stock_location().id().find(&loc_id).ok_or_else(|| {
+                    format!("{} {} not found in stock_location", field_name, loc_id)
+                })?;
             if loc.organization_id != organization_id {
                 return Err(format!(
                     "{} {} does not belong to this organization",

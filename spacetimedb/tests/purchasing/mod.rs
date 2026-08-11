@@ -1,5 +1,12 @@
 //! Purchasing domain test suite — invoke via `run_purchasing_*_test` reducers.
 pub mod gap_fixes_test;
+pub mod phase0_containment_test;
+pub mod phase0_fixture_test;
+pub mod phase1_landed_costs_test;
+pub mod phase1_purchase_orders_test;
+pub mod phase1_relational_integrity_test;
+pub mod phase1_returns_advanced_test;
+pub mod phase2_blanket_release_test;
 pub mod purchase_bill_test;
 pub mod wave_e_test;
 
@@ -47,6 +54,48 @@ pub fn run_purchasing_lot_receive_test(ctx: &ReducerContext) -> Result<(), Strin
 }
 
 #[spacetimedb::reducer]
+pub fn run_purchasing_phase0_containment_test(ctx: &ReducerContext) -> Result<(), String> {
+    phase0_containment_test::test_phase0_unsafe_actions_require_explicit_tenant_opt_in(ctx)
+        .map_err(|e| format!("purchasing_phase0_containment: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_purchasing_phase0_fixture_test(ctx: &ReducerContext) -> Result<(), String> {
+    phase0_fixture_test::test_purchasing_integrity_fixture(ctx)
+        .map_err(|e| format!("purchasing_phase0_fixture: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_purchasing_phase1_landed_costs_test(ctx: &ReducerContext) -> Result<(), String> {
+    phase1_landed_costs_test::test_landed_cost_scope_and_create_contract(ctx)
+        .map_err(|e| format!("purchasing_phase1_landed_costs: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_purchasing_phase1_relational_integrity_test(ctx: &ReducerContext) -> Result<(), String> {
+    phase1_relational_integrity_test::test_phase1_vendor_and_rfq_relations(ctx)
+        .map_err(|e| format!("purchasing_phase1_relational_integrity: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_purchasing_phase1_purchase_orders_test(ctx: &ReducerContext) -> Result<(), String> {
+    phase1_purchase_orders_test::test_phase1_purchase_order_relations(ctx)
+        .map_err(|e| format!("purchasing_phase1_purchase_orders: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_purchasing_phase1_returns_advanced_test(ctx: &ReducerContext) -> Result<(), String> {
+    phase1_returns_advanced_test::test_phase1_returns_credits_and_integrations(ctx)
+        .map_err(|e| format!("purchasing_phase1_returns_advanced: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_purchasing_phase2_blanket_release_test(ctx: &ReducerContext) -> Result<(), String> {
+    phase2_blanket_release_test::test_blanket_release_lines_bounds_and_retry(ctx)
+        .map_err(|e| format!("purchasing_phase2_blanket_release: {e}"))
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_purchasing_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_purchasing_bill_balanced_test(ctx)?;
     run_purchasing_incoming_picking_test(ctx)?;
@@ -54,5 +103,6 @@ pub fn run_all_purchasing_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_purchasing_wave_c_smoke_test(ctx)?;
     run_purchasing_wave_e_test(ctx)?;
     run_purchasing_lot_receive_test(ctx)?;
+    run_purchasing_phase0_containment_test(ctx)?;
     Ok(())
 }

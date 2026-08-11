@@ -65,10 +65,25 @@ export default async function RootLayout({
   let companyIds: readonly number[] | undefined
   if (organizationId != null && session) {
     try {
-      const rows = await serverFetchQueryListAllowEmpty(session, "companies")
-      companyIds = rows
-        .map((r) => Number(r["id"]))
-        .filter((id) => Number.isFinite(id))
+      const [companies, memberships] = await Promise.all([
+        serverFetchQueryListAllowEmpty(session, "companies"),
+        serverFetchQueryListAllowEmpty(session, "user-organization"),
+      ])
+      const validCompanies = companies
+        .map((row) => ({
+          id: Number(row["id"]),
+          isParent: Boolean(row["isParent"]),
+        }))
+        .filter((company) => Number.isSafeInteger(company.id) && company.id > 0)
+      const validCompanyIds = new Set(validCompanies.map((company) => company.id))
+      const membershipCompanyId = memberships
+        .map((row) => Number(row["companyId"]))
+        .find((id) => Number.isSafeInteger(id) && id > 0 && validCompanyIds.has(id))
+      const fallbackCompanyId = [...validCompanies].sort(
+        (a, b) => Number(b.isParent) - Number(a.isParent) || a.id - b.id,
+      )[0]?.id
+      const allowedCompanyId = membershipCompanyId ?? fallbackCompanyId
+      companyIds = allowedCompanyId == null ? undefined : [allowedCompanyId]
     } catch {
       companyIds = undefined
     }

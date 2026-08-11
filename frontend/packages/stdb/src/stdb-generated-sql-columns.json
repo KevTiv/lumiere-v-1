@@ -1679,11 +1679,9 @@
     "manual_consumption",
     "attachments_count",
     "operation_id",
-    "parent_product_tmpl_id",
     "child_bom_id",
     "bom_product_template_attribute_value_ids",
     "possible_bom_product_template_attribute_value_ids",
-    "child_line_ids",
     "metadata"
   ],
   "BootstrapNewTenantParams": [
@@ -2899,13 +2897,11 @@
     "company_id",
     "type",
     "product_id",
-    "product_tmpl_id",
     "product_qty",
     "product_uom_id",
     "ready_to_produce",
     "consumption",
     "sequence",
-    "estimated_cost",
     "lines",
     "picking_type_id",
     "location_src_id",
@@ -3676,16 +3672,13 @@
     "name",
     "product_id",
     "location_id",
-    "quantity_before",
     "quantity_after",
-    "reason_code",
-    "state",
+    "reason_id",
     "adjustment_type",
     "inventory_id",
     "lot_id",
     "package_id",
     "uom_id",
-    "unit_cost",
     "reason_notes",
     "metadata"
   ],
@@ -3837,6 +3830,13 @@
     "validity_stop",
     "is_active"
   ],
+  "CreateLossCategoryParams": [
+    "company_id",
+    "name",
+    "category",
+    "sequence",
+    "metadata"
+  ],
   "CreateLoyaltyProgramParams": [
     "name",
     "currency_id",
@@ -3892,19 +3892,6 @@
     "warehouse_id",
     "picking_type_id",
     "consumption",
-    "state",
-    "availability",
-    "reservation_state",
-    "components_availability",
-    "components_availability_state",
-    "is_planned",
-    "is_locked",
-    "is_workorder",
-    "delay_alert",
-    "lot_producing_count",
-    "qty_producing",
-    "qty_produced",
-    "product_uom_qty_producing",
     "bom_id",
     "routing_id",
     "proc_group_id",
@@ -4517,12 +4504,20 @@
     "is_recurring",
     "metadata"
   ],
+  "CreatePurchaseBlanketOrderLineParams": [
+    "product_id",
+    "product_uom",
+    "committed_quantity",
+    "price_unit",
+    "metadata"
+  ],
   "CreatePurchaseBlanketOrderParams": [
     "name",
     "partner_id",
     "currency_id",
     "date_start",
     "date_end",
+    "lines",
     "metadata"
   ],
   "CreatePurchaseContractParams": [
@@ -5018,18 +5013,9 @@
     "lot_ids",
     "owner_ids",
     "package_ids",
-    "state",
     "accounting_date",
     "category_id",
     "counted_mode",
-    "done_move_ids",
-    "move_ids",
-    "adjustment_count",
-    "has_account_moves",
-    "exhausted",
-    "prefilled_count",
-    "started",
-    "is_editable",
     "is_stock_check",
     "metadata"
   ],
@@ -5716,17 +5702,6 @@
     "time_efficiency",
     "capacity",
     "capacity_ids",
-    "oee",
-    "performance",
-    "blocked_time",
-    "productive_time",
-    "productivity_ids",
-    "order_ids",
-    "workorder_count",
-    "workorder_ready_count",
-    "workorder_progress_count",
-    "workorder_pending_count",
-    "workorder_late_count",
     "alternative_workcenter_ids",
     "color",
     "resource_calendar_id",
@@ -5792,20 +5767,12 @@
     "duration_expected",
     "name",
     "sequence",
-    "state",
-    "production_availability",
-    "is_user_working",
-    "is_produced",
-    "is_last_unfinished_wo",
-    "quality_check_todo",
-    "quality_check_fail",
     "capacity",
     "worksheet",
     "worksheet_url",
     "operation_note",
     "operation_id",
     "blocked_by_workorder_id",
-    "quality_state",
     "metadata"
   ],
   "CrmConversation": [
@@ -7632,6 +7599,7 @@
   "InventoryAdjustment": [
     "id",
     "organization_id",
+    "company_id",
     "name",
     "state",
     "adjustment_type",
@@ -7657,6 +7625,28 @@
     "approved_at",
     "posted_at",
     "metadata"
+  ],
+  "InventoryAuditRun": [
+    "id",
+    "organization_id",
+    "company_id",
+    "started_at",
+    "completed_at",
+    "violation_count",
+    "run_by"
+  ],
+  "InventoryAuditViolation": [
+    "id",
+    "run_id",
+    "organization_id",
+    "violation_type",
+    "table_name",
+    "record_id",
+    "field_name",
+    "description",
+    "severity",
+    "resolved",
+    "created_at"
   ],
   "InventoryClose": [
     "id",
@@ -7726,6 +7716,7 @@
     "last_error",
     "external_reference",
     "attempt_count",
+    "applied",
     "create_uid",
     "create_date",
     "write_uid",
@@ -8366,6 +8357,16 @@
     "create_date",
     "write_uid",
     "write_date",
+    "metadata"
+  ],
+  "MrpLossCategory": [
+    "id",
+    "organization_id",
+    "company_id",
+    "name",
+    "category",
+    "active",
+    "sequence",
     "metadata"
   ],
   "MrpProduction": [
@@ -10190,6 +10191,33 @@
     "write_date",
     "metadata"
   ],
+  "PurchaseBlanketOrderLine": [
+    "id",
+    "organization_id",
+    "company_id",
+    "blanket_order_id",
+    "product_id",
+    "product_uom",
+    "committed_quantity",
+    "released_quantity",
+    "price_unit",
+    "create_uid",
+    "create_date",
+    "write_uid",
+    "write_date",
+    "metadata"
+  ],
+  "PurchaseBlanketRelease": [
+    "id",
+    "organization_id",
+    "company_id",
+    "blanket_order_id",
+    "purchase_order_id",
+    "idempotency_key",
+    "request_fingerprint",
+    "create_uid",
+    "create_date"
+  ],
   "PurchaseContract": [
     "id",
     "organization_id",
@@ -10911,7 +10939,13 @@
     "timesheet_ids",
     "reason"
   ],
+  "ReleaseBlanketLineParams": [
+    "blanket_line_id",
+    "quantity"
+  ],
   "ReleaseBlanketToPoParams": [
+    "idempotency_key",
+    "lines",
     "notes",
     "date_planned",
     "metadata"
@@ -11972,6 +12006,29 @@
     "write_uid",
     "write_date",
     "metadata"
+  ],
+  "StockLandedCostAllocation": [
+    "id",
+    "organization_id",
+    "company_id",
+    "landed_cost_id",
+    "application_id",
+    "cost_line_id",
+    "stock_move_id",
+    "stock_quant_id",
+    "allocated_amount",
+    "quant_value_before",
+    "quant_value_after",
+    "created_at"
+  ],
+  "StockLandedCostApplication": [
+    "id",
+    "organization_id",
+    "company_id",
+    "landed_cost_id",
+    "allocation_count",
+    "applied_by",
+    "applied_at"
   ],
   "StockLandedCostLines": [
     "id",

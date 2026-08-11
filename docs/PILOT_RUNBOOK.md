@@ -341,6 +341,15 @@ Other modules are reachable in UI but may lack E2E proof, incomplete audit cover
 - Generic `/api/call` cannot invoke `seed_dev_data`, domain test reducers, or `delete_organization` in strict mode.
 - Cross-org data access is rejected at api-server.
 - E2E and local dev use `seed_dev_data` + `seed-test-user` instead of live bootstrap ([`Makefile`](../Makefile) `e2e-smoke-setup`).
+- Purchasing Phase 0 containment blocks landed-cost application and all advanced
+  procurement reducers for ordinary tenants. The explicit organization feature
+  flag `purchasing_ri_phase0_unsafe_actions` may be added only after the tenant's
+  integrity inventory has been reviewed and every finding has a documented
+  quarantine/backfill decision. Seeded `demo_mode` organizations retain these
+  actions for isolated characterization; that flag is not a production bypass.
+- Before any Purchasing opt-in, run `purchasing_integrity_inventory` and preserve
+  the `[purchasing-integrity]` log lines as described in
+  [`purchasing-integrity-inventory-baseline.md`](integrity/purchasing-integrity-inventory-baseline.md).
 
 ---
 

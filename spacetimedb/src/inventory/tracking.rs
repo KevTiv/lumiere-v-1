@@ -534,16 +534,12 @@ pub fn create_stock_production_serial(
     }
 
     // Enforce serial uniqueness: no other active serial with the same name for this product+company
-    let duplicate = ctx
-        .db
-        .stock_production_serial()
-        .iter()
-        .any(|s| {
-            s.organization_id == organization_id
-                && s.company_id == company_id
-                && s.product_id == params.product_id
-                && s.name == params.name
-        });
+    let duplicate = ctx.db.stock_production_serial().iter().any(|s| {
+        s.organization_id == organization_id
+            && s.company_id == company_id
+            && s.product_id == params.product_id
+            && s.name == params.name
+    });
     if duplicate {
         return Err(format!(
             "Serial '{}' already exists for this product in this company",
@@ -912,7 +908,12 @@ pub fn create_traceability_record(
     check_permission(ctx, organization_id, "serial_lot_traceability", "create")?;
 
     // document_type must be one of the documented source types
-    let valid_doc_types = ["stock_move", "stock_picking", "purchase_order", "sale_order"];
+    let valid_doc_types = [
+        "stock_move",
+        "stock_picking",
+        "purchase_order",
+        "sale_order",
+    ];
     if !valid_doc_types.contains(&params.document_type.as_str()) {
         return Err(format!(
             "Unknown document_type '{}'; valid types: {}",

@@ -107,7 +107,10 @@ pub fn test_inventory_adjustment_create(ctx: &ReducerContext) -> Result<(), Stri
 
     // quantity_before is server-derived from stock (0 at stub location); quantity_after is 12.0
     if (adj.quantity_after - 12.0).abs() > f64::EPSILON {
-        return Err(format!("quantity_after should be 12.0, got {}", adj.quantity_after));
+        return Err(format!(
+            "quantity_after should be 12.0, got {}",
+            adj.quantity_after
+        ));
     }
     if adj.state != "draft" {
         return Err(format!("expected draft state, got {}", adj.state));

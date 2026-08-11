@@ -298,17 +298,13 @@ pub fn record_cycle_count_line(
     }
 
     // Scope expected-qty and cost lookups to both organization and company
-    let existing_quant = ctx
-        .db
-        .stock_quant()
-        .iter()
-        .find(|q| {
-            q.organization_id == organization_id
-                && q.company_id == company_id
-                && q.product_id == params.product_id
-                && q.location_id == params.location_id
-                && q.lot_id == params.lot_id
-        });
+    let existing_quant = ctx.db.stock_quant().iter().find(|q| {
+        q.organization_id == organization_id
+            && q.company_id == company_id
+            && q.product_id == params.product_id
+            && q.location_id == params.location_id
+            && q.lot_id == params.lot_id
+    });
 
     let expected_qty = existing_quant.as_ref().map(|q| q.quantity).unwrap_or(0.0);
     let quant_cost = existing_quant.map(|q| q.cost);

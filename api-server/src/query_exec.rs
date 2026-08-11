@@ -233,8 +233,8 @@ pub async fn resolve_crm_company_id(
         .first()
         .ok_or_else(|| ApiError::Forbidden("No active organization membership".into()))?;
 
-    let membership_company = row_u64(membership, "companyId", "company_id")
-        .map_err(ApiError::Internal)?;
+    let membership_company =
+        row_u64(membership, "companyId", "company_id").map_err(ApiError::Internal)?;
     let allowed = match membership_company {
         Some(company_id) if company_id > 0 => company_id,
         _ => default_company_id(client, organization_id)
@@ -273,8 +273,8 @@ pub async fn resolve_inventory_company_id(
         .first()
         .ok_or_else(|| ApiError::Forbidden("No active organization membership".into()))?;
 
-    let membership_company = row_u64(membership, "companyId", "company_id")
-        .map_err(ApiError::Internal)?;
+    let membership_company =
+        row_u64(membership, "companyId", "company_id").map_err(ApiError::Internal)?;
     let allowed = match membership_company {
         Some(company_id) if company_id > 0 => company_id,
         _ => default_company_id(client, organization_id)
@@ -285,6 +285,40 @@ pub async fn resolve_inventory_company_id(
     if requested_company_id.is_some_and(|requested| requested != allowed) {
         return Err(ApiError::Forbidden(
             "Cannot query another company's inventory data".into(),
+        ));
+    }
+    Ok(allowed)
+}
+
+/// Resolve the only Purchasing company visible to the authenticated membership.
+pub async fn resolve_purchasing_company_id(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+    requested_company_id: Option<u64>,
+) -> Result<u64, ApiError> {
+    let identity = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+    let sql = format!(
+        "SELECT id, organization_id, company_id, is_active FROM user_organization WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
+    );
+    let memberships = client
+        .query_sql(&sql)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let membership = memberships
+        .first()
+        .ok_or_else(|| ApiError::Forbidden("No active organization membership".into()))?;
+    let membership_company =
+        row_u64(membership, "companyId", "company_id").map_err(ApiError::Internal)?;
+    let allowed = match membership_company {
+        Some(company_id) if company_id > 0 => company_id,
+        _ => default_company_id(client, organization_id)
+            .await?
+            .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
+    };
+    if requested_company_id.is_some_and(|requested| requested != allowed) {
+        return Err(ApiError::Forbidden(
+            "Cannot query another company's Purchasing data".into(),
         ));
     }
     Ok(allowed)
@@ -357,6 +391,37 @@ pub(crate) fn inventory_resource(resource: &str) -> bool {
             | "replenishment-rules"
             | "picking-batches"
             | "product-categories"
+    )
+}
+
+pub(crate) fn purchasing_resource(resource: &str) -> bool {
+    matches!(
+        resource,
+        "purchase-orders"
+            | "purchase-orders-to-approve"
+            | "purchase-orders-partial-receipt"
+            | "purchase-order-lines"
+            | "purchase-order-lines-over-billed"
+            | "landed-costs"
+            | "landed-cost-lines"
+            | "partner-banks"
+            | "purchase-requisitions"
+            | "purchase-requisition-lines"
+            | "purchase-rfqs"
+            | "purchase-rfq-lines"
+            | "purchase-rfq-bids"
+            | "purchase-returns"
+            | "purchase-return-lines"
+            | "purchase-blanket-orders"
+            | "purchase-blanket-order-lines"
+            | "purchase-blanket-releases"
+            | "purchase-contracts"
+            | "vendor-scorecards"
+            | "vendor-risk-flags"
+            | "consignment-agreements"
+            | "purchase-approval-delegates"
+            | "commodity-price-indexes"
+            | "purchasing-integration-intents"
     )
 }
 
@@ -527,6 +592,19 @@ pub async fn execute_resource_query_for_company(
     } else {
         None
     };
+    let purchasing_company_id = if purchasing_resource(resource) {
+        Some(
+            resolve_purchasing_company_id(
+                client,
+                organization_id,
+                identity_hex,
+                requested_company_id,
+            )
+            .await?,
+        )
+    } else {
+        None
+    };
 
     if let Some(rows) = crate::workflow_reads::execute_private_workflow_query(
         client,
@@ -556,6 +634,18 @@ pub async fn execute_resource_query_for_company(
         "user-roles" => {
             let sql = stdb_auth::select_user_role_assignments_for_identity_sql(identity_hex, fa)
                 .map_err(ApiError::Internal)?;
+            return client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()));
+        }
+        "user-organization" => {
+            let identity = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+            let columns = resolve_http_sql_columns(resource, fa).map_err(ApiError::Internal)?;
+            let sql = format!(
+                "SELECT {} FROM user_organization WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true",
+                columns.join(", ")
+            );
             return client
                 .query_sql(&sql)
                 .await
@@ -1520,6 +1610,9 @@ pub async fn execute_resource_query_for_company(
     let extra_where = if let Some(cid) = inventory_company_id {
         extra_where_owned = extra_where_raw.replace(":company_id", &cid.to_string());
         extra_where_owned.as_str()
+    } else if let Some(cid) = purchasing_company_id {
+        extra_where_owned = format!("{extra_where_raw} AND company_id = {cid}");
+        extra_where_owned.as_str()
     } else {
         extra_where_raw
     };
@@ -1550,6 +1643,9 @@ pub async fn execute_resource_query_for_company(
     }
     if let Some(company_id) = inventory_company_id {
         filter_inventory_company_rows(resource, company_id, &mut rows);
+    }
+    if let Some(company_id) = purchasing_company_id {
+        rows.retain(|row| row_company_matches(row, company_id, false));
     }
 
     if resource == "activities"
@@ -1803,7 +1899,10 @@ mod tests {
     fn row_id_u64_strict_roundtrips_boundary_values() {
         // 2^53 — largest JS-safe integer
         let at_boundary = json!({ "id": "9007199254740992" });
-        assert_eq!(row_id_u64_strict(&at_boundary).unwrap(), 9007199254740992u64);
+        assert_eq!(
+            row_id_u64_strict(&at_boundary).unwrap(),
+            9007199254740992u64
+        );
 
         // 2^53 + 1 — first value that JS Number silently truncates
         let above_boundary = json!({ "id": "9007199254740993" });
@@ -1827,7 +1926,10 @@ mod tests {
     #[test]
     fn row_id_u64_strict_rejects_bad_inputs() {
         assert!(row_id_u64_strict(&json!({})).is_err(), "missing id field");
-        assert!(row_id_u64_strict(&json!({ "id": null })).is_err(), "null id");
+        assert!(
+            row_id_u64_strict(&json!({ "id": null })).is_err(),
+            "null id"
+        );
         assert!(
             row_id_u64_strict(&json!({ "id": "" })).is_err(),
             "empty string"

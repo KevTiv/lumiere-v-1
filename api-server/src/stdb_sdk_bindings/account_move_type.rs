@@ -2,15 +2,10 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{
-	self as __sdk,
-	__lib,
-	__sats,
-	__ws,
-};
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
-use super::move_type_type::MoveType;
 use super::account_move_state_type::AccountMoveState;
+use super::move_type_type::MoveType;
 use super::payment_state_type::PaymentState;
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
@@ -19,30 +14,30 @@ pub struct AccountMove {
     pub id: u64,
     pub organization_id: u64,
     pub name: String,
-    pub r#ref: Option::<String>,
+    pub r#ref: Option<String>,
     pub move_type: MoveType,
     pub auto_post: bool,
     pub state: AccountMoveState,
     pub date: __sdk::Timestamp,
-    pub invoice_date: Option::<__sdk::Timestamp>,
-    pub invoice_date_due: Option::<__sdk::Timestamp>,
-    pub invoice_payment_term_id: Option::<u64>,
-    pub invoice_origin: Option::<String>,
-    pub invoice_partner_display_name: Option::<String>,
-    pub invoice_cash_rounding_id: Option::<u64>,
-    pub payment_reference: Option::<String>,
-    pub partner_shipping_id: Option::<u64>,
-    pub sale_order_id: Option::<u64>,
-    pub partner_id: Option::<u64>,
-    pub commercial_partner_id: Option::<u64>,
-    pub partner_bank_id: Option::<u64>,
-    pub fiscal_position_id: Option::<u64>,
-    pub invoice_user_id: Option::<__sdk::Identity>,
-    pub invoice_incoterm_id: Option::<u64>,
-    pub incoterm_location: Option::<String>,
-    pub campaign_id: Option::<u64>,
-    pub source_id: Option::<u64>,
-    pub medium_id: Option::<u64>,
+    pub invoice_date: Option<__sdk::Timestamp>,
+    pub invoice_date_due: Option<__sdk::Timestamp>,
+    pub invoice_payment_term_id: Option<u64>,
+    pub invoice_origin: Option<String>,
+    pub invoice_partner_display_name: Option<String>,
+    pub invoice_cash_rounding_id: Option<u64>,
+    pub payment_reference: Option<String>,
+    pub partner_shipping_id: Option<u64>,
+    pub sale_order_id: Option<u64>,
+    pub partner_id: Option<u64>,
+    pub commercial_partner_id: Option<u64>,
+    pub partner_bank_id: Option<u64>,
+    pub fiscal_position_id: Option<u64>,
+    pub invoice_user_id: Option<__sdk::Identity>,
+    pub invoice_incoterm_id: Option<u64>,
+    pub incoterm_location: Option<String>,
+    pub campaign_id: Option<u64>,
+    pub source_id: Option<u64>,
+    pub medium_id: Option<u64>,
     pub company_id: u64,
     pub journal_id: u64,
     pub currency_id: u64,
@@ -60,22 +55,20 @@ pub struct AccountMove {
     pub posted_before: bool,
     pub is_storno: bool,
     pub is_move_sent: bool,
-    pub secure_sequence_number: Option::<u64>,
+    pub secure_sequence_number: Option<u64>,
     pub invoice_has_outstanding: bool,
     pub payment_state: PaymentState,
     pub restrict_mode_hash_table: bool,
-    pub create_uid: Option::<__sdk::Identity>,
-    pub create_date: Option::<__sdk::Timestamp>,
-    pub write_uid: Option::<__sdk::Identity>,
-    pub write_date: Option::<__sdk::Timestamp>,
-    pub metadata: Option::<String>,
+    pub create_uid: Option<__sdk::Identity>,
+    pub create_date: Option<__sdk::Timestamp>,
+    pub write_uid: Option<__sdk::Identity>,
+    pub write_date: Option<__sdk::Timestamp>,
+    pub metadata: Option<String>,
 }
-
 
 impl __sdk::InModule for AccountMove {
     type Module = super::RemoteModule;
 }
-
 
 /// Column accessor struct for the table `AccountMove`.
 ///
@@ -84,30 +77,30 @@ pub struct AccountMoveCols {
     pub id: __sdk::__query_builder::Col<AccountMove, u64>,
     pub organization_id: __sdk::__query_builder::Col<AccountMove, u64>,
     pub name: __sdk::__query_builder::Col<AccountMove, String>,
-    pub r#ref: __sdk::__query_builder::Col<AccountMove, Option::<String>>,
+    pub r#ref: __sdk::__query_builder::Col<AccountMove, Option<String>>,
     pub move_type: __sdk::__query_builder::Col<AccountMove, MoveType>,
     pub auto_post: __sdk::__query_builder::Col<AccountMove, bool>,
     pub state: __sdk::__query_builder::Col<AccountMove, AccountMoveState>,
     pub date: __sdk::__query_builder::Col<AccountMove, __sdk::Timestamp>,
-    pub invoice_date: __sdk::__query_builder::Col<AccountMove, Option::<__sdk::Timestamp>>,
-    pub invoice_date_due: __sdk::__query_builder::Col<AccountMove, Option::<__sdk::Timestamp>>,
-    pub invoice_payment_term_id: __sdk::__query_builder::Col<AccountMove, Option::<u64>>,
-    pub invoice_origin: __sdk::__query_builder::Col<AccountMove, Option::<String>>,
-    pub invoice_partner_display_name: __sdk::__query_builder::Col<AccountMove, Option::<String>>,
-    pub invoice_cash_rounding_id: __sdk::__query_builder::Col<AccountMove, Option::<u64>>,
-    pub payment_reference: __sdk::__query_builder::Col<AccountMove, Option::<String>>,
-    pub partner_shipping_id: __sdk::__query_builder::Col<AccountMove, Option::<u64>>,
-    pub sale_order_id: __sdk::__query_builder::Col<AccountMove, Option::<u64>>,
-    pub partner_id: __sdk::__query_builder::Col<AccountMove, Option::<u64>>,
-    pub commercial_partner_id: __sdk::__query_builder::Col<AccountMove, Option::<u64>>,
-    pub partner_bank_id: __sdk::__query_builder::Col<AccountMove, Option::<u64>>,
-    pub fiscal_position_id: __sdk::__query_builder::Col<AccountMove, Option::<u64>>,
-    pub invoice_user_id: __sdk::__query_builder::Col<AccountMove, Option::<__sdk::Identity>>,
-    pub invoice_incoterm_id: __sdk::__query_builder::Col<AccountMove, Option::<u64>>,
-    pub incoterm_location: __sdk::__query_builder::Col<AccountMove, Option::<String>>,
-    pub campaign_id: __sdk::__query_builder::Col<AccountMove, Option::<u64>>,
-    pub source_id: __sdk::__query_builder::Col<AccountMove, Option::<u64>>,
-    pub medium_id: __sdk::__query_builder::Col<AccountMove, Option::<u64>>,
+    pub invoice_date: __sdk::__query_builder::Col<AccountMove, Option<__sdk::Timestamp>>,
+    pub invoice_date_due: __sdk::__query_builder::Col<AccountMove, Option<__sdk::Timestamp>>,
+    pub invoice_payment_term_id: __sdk::__query_builder::Col<AccountMove, Option<u64>>,
+    pub invoice_origin: __sdk::__query_builder::Col<AccountMove, Option<String>>,
+    pub invoice_partner_display_name: __sdk::__query_builder::Col<AccountMove, Option<String>>,
+    pub invoice_cash_rounding_id: __sdk::__query_builder::Col<AccountMove, Option<u64>>,
+    pub payment_reference: __sdk::__query_builder::Col<AccountMove, Option<String>>,
+    pub partner_shipping_id: __sdk::__query_builder::Col<AccountMove, Option<u64>>,
+    pub sale_order_id: __sdk::__query_builder::Col<AccountMove, Option<u64>>,
+    pub partner_id: __sdk::__query_builder::Col<AccountMove, Option<u64>>,
+    pub commercial_partner_id: __sdk::__query_builder::Col<AccountMove, Option<u64>>,
+    pub partner_bank_id: __sdk::__query_builder::Col<AccountMove, Option<u64>>,
+    pub fiscal_position_id: __sdk::__query_builder::Col<AccountMove, Option<u64>>,
+    pub invoice_user_id: __sdk::__query_builder::Col<AccountMove, Option<__sdk::Identity>>,
+    pub invoice_incoterm_id: __sdk::__query_builder::Col<AccountMove, Option<u64>>,
+    pub incoterm_location: __sdk::__query_builder::Col<AccountMove, Option<String>>,
+    pub campaign_id: __sdk::__query_builder::Col<AccountMove, Option<u64>>,
+    pub source_id: __sdk::__query_builder::Col<AccountMove, Option<u64>>,
+    pub medium_id: __sdk::__query_builder::Col<AccountMove, Option<u64>>,
     pub company_id: __sdk::__query_builder::Col<AccountMove, u64>,
     pub journal_id: __sdk::__query_builder::Col<AccountMove, u64>,
     pub currency_id: __sdk::__query_builder::Col<AccountMove, u64>,
@@ -125,15 +118,15 @@ pub struct AccountMoveCols {
     pub posted_before: __sdk::__query_builder::Col<AccountMove, bool>,
     pub is_storno: __sdk::__query_builder::Col<AccountMove, bool>,
     pub is_move_sent: __sdk::__query_builder::Col<AccountMove, bool>,
-    pub secure_sequence_number: __sdk::__query_builder::Col<AccountMove, Option::<u64>>,
+    pub secure_sequence_number: __sdk::__query_builder::Col<AccountMove, Option<u64>>,
     pub invoice_has_outstanding: __sdk::__query_builder::Col<AccountMove, bool>,
     pub payment_state: __sdk::__query_builder::Col<AccountMove, PaymentState>,
     pub restrict_mode_hash_table: __sdk::__query_builder::Col<AccountMove, bool>,
-    pub create_uid: __sdk::__query_builder::Col<AccountMove, Option::<__sdk::Identity>>,
-    pub create_date: __sdk::__query_builder::Col<AccountMove, Option::<__sdk::Timestamp>>,
-    pub write_uid: __sdk::__query_builder::Col<AccountMove, Option::<__sdk::Identity>>,
-    pub write_date: __sdk::__query_builder::Col<AccountMove, Option::<__sdk::Timestamp>>,
-    pub metadata: __sdk::__query_builder::Col<AccountMove, Option::<String>>,
+    pub create_uid: __sdk::__query_builder::Col<AccountMove, Option<__sdk::Identity>>,
+    pub create_date: __sdk::__query_builder::Col<AccountMove, Option<__sdk::Timestamp>>,
+    pub write_uid: __sdk::__query_builder::Col<AccountMove, Option<__sdk::Identity>>,
+    pub write_date: __sdk::__query_builder::Col<AccountMove, Option<__sdk::Timestamp>>,
+    pub metadata: __sdk::__query_builder::Col<AccountMove, Option<String>>,
 }
 
 impl __sdk::__query_builder::HasCols for AccountMove {
@@ -150,19 +143,37 @@ impl __sdk::__query_builder::HasCols for AccountMove {
             date: __sdk::__query_builder::Col::new(table_name, "date"),
             invoice_date: __sdk::__query_builder::Col::new(table_name, "invoice_date"),
             invoice_date_due: __sdk::__query_builder::Col::new(table_name, "invoice_date_due"),
-            invoice_payment_term_id: __sdk::__query_builder::Col::new(table_name, "invoice_payment_term_id"),
+            invoice_payment_term_id: __sdk::__query_builder::Col::new(
+                table_name,
+                "invoice_payment_term_id",
+            ),
             invoice_origin: __sdk::__query_builder::Col::new(table_name, "invoice_origin"),
-            invoice_partner_display_name: __sdk::__query_builder::Col::new(table_name, "invoice_partner_display_name"),
-            invoice_cash_rounding_id: __sdk::__query_builder::Col::new(table_name, "invoice_cash_rounding_id"),
+            invoice_partner_display_name: __sdk::__query_builder::Col::new(
+                table_name,
+                "invoice_partner_display_name",
+            ),
+            invoice_cash_rounding_id: __sdk::__query_builder::Col::new(
+                table_name,
+                "invoice_cash_rounding_id",
+            ),
             payment_reference: __sdk::__query_builder::Col::new(table_name, "payment_reference"),
-            partner_shipping_id: __sdk::__query_builder::Col::new(table_name, "partner_shipping_id"),
+            partner_shipping_id: __sdk::__query_builder::Col::new(
+                table_name,
+                "partner_shipping_id",
+            ),
             sale_order_id: __sdk::__query_builder::Col::new(table_name, "sale_order_id"),
             partner_id: __sdk::__query_builder::Col::new(table_name, "partner_id"),
-            commercial_partner_id: __sdk::__query_builder::Col::new(table_name, "commercial_partner_id"),
+            commercial_partner_id: __sdk::__query_builder::Col::new(
+                table_name,
+                "commercial_partner_id",
+            ),
             partner_bank_id: __sdk::__query_builder::Col::new(table_name, "partner_bank_id"),
             fiscal_position_id: __sdk::__query_builder::Col::new(table_name, "fiscal_position_id"),
             invoice_user_id: __sdk::__query_builder::Col::new(table_name, "invoice_user_id"),
-            invoice_incoterm_id: __sdk::__query_builder::Col::new(table_name, "invoice_incoterm_id"),
+            invoice_incoterm_id: __sdk::__query_builder::Col::new(
+                table_name,
+                "invoice_incoterm_id",
+            ),
             incoterm_location: __sdk::__query_builder::Col::new(table_name, "incoterm_location"),
             campaign_id: __sdk::__query_builder::Col::new(table_name, "campaign_id"),
             source_id: __sdk::__query_builder::Col::new(table_name, "source_id"),
@@ -170,30 +181,53 @@ impl __sdk::__query_builder::HasCols for AccountMove {
             company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             journal_id: __sdk::__query_builder::Col::new(table_name, "journal_id"),
             currency_id: __sdk::__query_builder::Col::new(table_name, "currency_id"),
-            company_currency_id: __sdk::__query_builder::Col::new(table_name, "company_currency_id"),
+            company_currency_id: __sdk::__query_builder::Col::new(
+                table_name,
+                "company_currency_id",
+            ),
             amount_untaxed: __sdk::__query_builder::Col::new(table_name, "amount_untaxed"),
             amount_tax: __sdk::__query_builder::Col::new(table_name, "amount_tax"),
             amount_total: __sdk::__query_builder::Col::new(table_name, "amount_total"),
             amount_residual: __sdk::__query_builder::Col::new(table_name, "amount_residual"),
-            amount_untaxed_signed: __sdk::__query_builder::Col::new(table_name, "amount_untaxed_signed"),
+            amount_untaxed_signed: __sdk::__query_builder::Col::new(
+                table_name,
+                "amount_untaxed_signed",
+            ),
             amount_tax_signed: __sdk::__query_builder::Col::new(table_name, "amount_tax_signed"),
-            amount_total_signed: __sdk::__query_builder::Col::new(table_name, "amount_total_signed"),
-            amount_total_in_currency_signed: __sdk::__query_builder::Col::new(table_name, "amount_total_in_currency_signed"),
-            amount_residual_signed: __sdk::__query_builder::Col::new(table_name, "amount_residual_signed"),
+            amount_total_signed: __sdk::__query_builder::Col::new(
+                table_name,
+                "amount_total_signed",
+            ),
+            amount_total_in_currency_signed: __sdk::__query_builder::Col::new(
+                table_name,
+                "amount_total_in_currency_signed",
+            ),
+            amount_residual_signed: __sdk::__query_builder::Col::new(
+                table_name,
+                "amount_residual_signed",
+            ),
             to_check: __sdk::__query_builder::Col::new(table_name, "to_check"),
             posted_before: __sdk::__query_builder::Col::new(table_name, "posted_before"),
             is_storno: __sdk::__query_builder::Col::new(table_name, "is_storno"),
             is_move_sent: __sdk::__query_builder::Col::new(table_name, "is_move_sent"),
-            secure_sequence_number: __sdk::__query_builder::Col::new(table_name, "secure_sequence_number"),
-            invoice_has_outstanding: __sdk::__query_builder::Col::new(table_name, "invoice_has_outstanding"),
+            secure_sequence_number: __sdk::__query_builder::Col::new(
+                table_name,
+                "secure_sequence_number",
+            ),
+            invoice_has_outstanding: __sdk::__query_builder::Col::new(
+                table_name,
+                "invoice_has_outstanding",
+            ),
             payment_state: __sdk::__query_builder::Col::new(table_name, "payment_state"),
-            restrict_mode_hash_table: __sdk::__query_builder::Col::new(table_name, "restrict_mode_hash_table"),
+            restrict_mode_hash_table: __sdk::__query_builder::Col::new(
+                table_name,
+                "restrict_mode_hash_table",
+            ),
             create_uid: __sdk::__query_builder::Col::new(table_name, "create_uid"),
             create_date: __sdk::__query_builder::Col::new(table_name, "create_date"),
             write_uid: __sdk::__query_builder::Col::new(table_name, "write_uid"),
             write_date: __sdk::__query_builder::Col::new(table_name, "write_date"),
             metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
-
         }
     }
 }
@@ -208,7 +242,7 @@ pub struct AccountMoveIxCols {
     pub journal_id: __sdk::__query_builder::IxCol<AccountMove, u64>,
     pub name: __sdk::__query_builder::IxCol<AccountMove, String>,
     pub organization_id: __sdk::__query_builder::IxCol<AccountMove, u64>,
-    pub partner_id: __sdk::__query_builder::IxCol<AccountMove, Option::<u64>>,
+    pub partner_id: __sdk::__query_builder::IxCol<AccountMove, Option<u64>>,
     pub state: __sdk::__query_builder::IxCol<AccountMove, AccountMoveState>,
 }
 
@@ -224,10 +258,8 @@ impl __sdk::__query_builder::HasIxCols for AccountMove {
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             partner_id: __sdk::__query_builder::IxCol::new(table_name, "partner_id"),
             state: __sdk::__query_builder::IxCol::new(table_name, "state"),
-
         }
     }
 }
 
 impl __sdk::__query_builder::CanBeLookupTable for AccountMove {}
-

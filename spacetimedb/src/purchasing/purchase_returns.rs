@@ -1,11 +1,14 @@
 /// Purchase returns (vendor RMA) — create → confirm (OUT picking) → AP credit stub.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::chart_of_accounts::account_journal;
 use crate::accounting::journal_entries::{
     account_move, insert_draft_account_move_line, AccountMove, AddAccountMoveLineParams,
 };
-use crate::core::organization::company;
+use crate::accounting::relations::{
+    require_active_account, require_active_journal, require_contact_in_scope,
+};
+use crate::core::organization::{company, require_company_in_organization};
+use crate::core::reference::uom;
 use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
@@ -15,7 +18,10 @@ use crate::inventory::stock::{
 };
 use crate::inventory::warehouse::warehouse;
 use crate::purchasing::purchase_orders::{purchase_order, purchase_order_line};
-use crate::types::{AccountMoveState, MoveType, PaymentState};
+use crate::types::{
+    AccountInternalGroup, AccountMoveState, AccountTypeInternal, JournalType, MoveType,
+    PaymentState, PoState,
+};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -123,6 +129,102 @@ fn return_lines_for(ctx: &ReducerContext, purchase_return_id: u64) -> Vec<Purcha
         .collect()
 }
 
+fn require_return_product_and_uom(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    product_id: u64,
+    uom_id: u64,
+) -> Result<(), String> {
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&product_id)
+        .ok_or("Return product not found")?;
+    if product.organization_id != organization_id {
+        return Err("Return product does not belong to this organization".to_string());
+    }
+    if !product.active || !product.purchase_ok {
+        return Err("Return product is inactive or not purchasable".to_string());
+    }
+    let uom = ctx
+        .db
+        .uom()
+        .id()
+        .find(&uom_id)
+        .ok_or("Return UoM not found")?;
+    if uom.organization_id != organization_id || !uom.is_active {
+        return Err("Return UoM is outside the organization or inactive".to_string());
+    }
+    if uom_id != product.uom_id && uom_id != product.uom_po_id {
+        return Err("Return UoM is incompatible with the product".to_string());
+    }
+    Ok(())
+}
+
+fn already_returned_quantity(ctx: &ReducerContext, purchase_order_line_id: u64) -> f64 {
+    ctx.db
+        .purchase_return_line()
+        .iter()
+        .filter(|line| line.purchase_order_line_id == Some(purchase_order_line_id))
+        .filter(|line| {
+            ctx.db
+                .purchase_return()
+                .id()
+                .find(&line.purchase_return_id)
+                .is_some_and(|parent| parent.state != "cancelled")
+        })
+        .map(|line| line.product_uom_qty)
+        .sum()
+}
+
+fn source_return_warehouse(
+    ctx: &ReducerContext,
+    purchase_return: &PurchaseReturn,
+) -> Result<u64, String> {
+    let purchase_order_id = purchase_return.purchase_order_id.ok_or(
+        "Unsourced purchase returns cannot be confirmed until a warehouse selector is supported",
+    )?;
+    let order = ctx
+        .db
+        .purchase_order()
+        .id()
+        .find(&purchase_order_id)
+        .ok_or("Source purchase order not found")?;
+    if order.organization_id != purchase_return.organization_id
+        || order.company_id != purchase_return.company_id
+    {
+        return Err("Source purchase order scope does not match the return".to_string());
+    }
+    let receipt = ctx
+        .db
+        .stock_picking()
+        .iter()
+        .find(|picking| {
+            picking.organization_id == purchase_return.organization_id
+                && picking.company_id == purchase_return.company_id
+                && picking.purchase_id == Some(purchase_order_id)
+                && picking.picking_code.as_deref() == Some("incoming")
+        })
+        .ok_or("Source purchase order has no scoped incoming picking")?;
+    ctx.db
+        .warehouse()
+        .iter()
+        .find(|warehouse| {
+            warehouse.organization_id == purchase_return.organization_id
+                && warehouse.company_id == purchase_return.company_id
+                && warehouse.is_active
+                && [
+                    Some(warehouse.lot_stock_id),
+                    warehouse.wh_input_stock_loc_id,
+                    warehouse.wh_qc_stock_loc_id,
+                ]
+                .contains(&Some(receipt.location_dest_id))
+        })
+        .map(|warehouse| warehouse.id)
+        .ok_or_else(|| "Source receipt does not resolve to an active warehouse".to_string())
+}
+
 fn empty_move_line(account_id: u64, name: String) -> AddAccountMoveLineParams {
     AddAccountMoveLineParams {
         account_id,
@@ -169,13 +271,7 @@ fn create_outgoing_return_picking(
     purchase_return: &PurchaseReturn,
     lines: &[PurchaseReturnLine],
 ) -> Result<u64, String> {
-    let warehouse_id = ctx
-        .db
-        .warehouse()
-        .iter()
-        .find(|w| w.organization_id == organization_id && w.company_id == company_id)
-        .ok_or("No warehouse found for purchase return picking")?
-        .id;
+    let warehouse_id = source_return_warehouse(ctx, purchase_return)?;
 
     let stock_location =
         crate::inventory::stock::resolve_warehouse_stock_location(ctx, warehouse_id);
@@ -345,22 +441,24 @@ pub fn create_purchase_return(
     params: CreatePurchaseReturnParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     if params.lines.is_empty() {
         return Err("Purchase return must have at least one line".to_string());
     }
 
-    let vendor = ctx
-        .db
-        .contact()
-        .id()
-        .find(&params.partner_id)
-        .ok_or("Vendor contact not found")?;
-    if !vendor.is_vendor {
-        return Err("Partner is not a vendor".to_string());
+    let vendor = require_contact_in_scope(
+        ctx,
+        organization_id,
+        company_id,
+        params.partner_id,
+        "purchase return vendor",
+    )?;
+    if !vendor.is_vendor || vendor.deleted_at.is_some() || vendor.merge_target_id.is_some() {
+        return Err("Partner is not an active vendor".to_string());
     }
 
-    if let Some(po_id) = params.purchase_order_id {
+    let source_order = if let Some(po_id) = params.purchase_order_id {
         let order = ctx
             .db
             .purchase_order()
@@ -376,31 +474,66 @@ pub fn create_purchase_return(
         if order.partner_id != params.partner_id {
             return Err("Partner does not match the source purchase order".to_string());
         }
-        for line in &params.lines {
-            if line.product_uom_qty <= 0.0 {
-                return Err("Return quantity must be greater than zero".to_string());
-            }
-            if let Some(pol_id) = line.purchase_order_line_id {
-                let pol = ctx
-                    .db
-                    .purchase_order_line()
-                    .id()
-                    .find(&pol_id)
-                    .ok_or("Purchase order line not found")?;
-                if pol.order_id != po_id {
-                    return Err(
-                        "Purchase order line does not belong to the source purchase order"
-                            .to_string(),
-                    );
-                }
-            }
+        if !matches!(order.state, PoState::Purchase | PoState::Done) {
+            return Err("Source purchase order is not confirmed".to_string());
         }
+        Some(order)
     } else {
-        for line in &params.lines {
-            if line.product_uom_qty <= 0.0 {
-                return Err("Return quantity must be greater than zero".to_string());
-            }
+        None
+    };
+
+    let mut validated_lines = Vec::with_capacity(params.lines.len());
+    for line in &params.lines {
+        if !line.product_uom_qty.is_finite() || line.product_uom_qty <= 0.0 {
+            return Err("Return quantity must be a positive finite number".to_string());
         }
+        if !line.price_unit.is_finite() || line.price_unit < 0.0 {
+            return Err("Return price must be a non-negative finite number".to_string());
+        }
+        let validated = if let Some(pol_id) = line.purchase_order_line_id {
+            let order = source_order
+                .as_ref()
+                .ok_or("A sourced return line requires a source purchase order")?;
+            let source = ctx
+                .db
+                .purchase_order_line()
+                .id()
+                .find(&pol_id)
+                .ok_or("Purchase order line not found")?;
+            if source.organization_id != organization_id
+                || source.company_id != company_id
+                || source.order_id != order.id
+            {
+                return Err("Purchase order line does not belong to the source order scope".into());
+            }
+            if line.product_id != source.product_id
+                || line.product_uom != source.product_uom
+                || (line.price_unit - source.price_unit).abs() > 0.000_001
+            {
+                return Err("Sourced return product, UoM, and price must match the PO line".into());
+            }
+            let eligible = source.qty_received - already_returned_quantity(ctx, source.id);
+            if line.product_uom_qty > eligible + 0.000_001 {
+                return Err("Return quantity exceeds the eligible received quantity".into());
+            }
+            CreatePurchaseReturnLineParams {
+                purchase_order_line_id: Some(source.id),
+                product_id: source.product_id,
+                product_uom: source.product_uom,
+                product_uom_qty: line.product_uom_qty,
+                price_unit: source.price_unit,
+                to_refund: line.to_refund,
+            }
+        } else {
+            require_return_product_and_uom(
+                ctx,
+                organization_id,
+                line.product_id,
+                line.product_uom,
+            )?;
+            line.clone()
+        };
+        validated_lines.push(validated);
     }
 
     let name = next_doc_number(ctx, "VRMA");
@@ -423,13 +556,7 @@ pub fn create_purchase_return(
     });
 
     let mut line_ids = Vec::with_capacity(params.lines.len());
-    for line in &params.lines {
-        ctx.db
-            .product()
-            .id()
-            .find(&line.product_id)
-            .ok_or("Product not found")?;
-
+    for line in &validated_lines {
         let row = ctx.db.purchase_return_line().insert(PurchaseReturnLine {
             id: 0,
             organization_id,
@@ -466,7 +593,7 @@ pub fn create_purchase_return(
                     "name": return_name,
                     "partner_id": params.partner_id,
                     "purchase_order_id": params.purchase_order_id,
-                    "line_count": params.lines.len(),
+                    "line_count": validated_lines.len(),
                 })
                 .to_string(),
             ),
@@ -549,16 +676,17 @@ pub fn create_vendor_credit_from_purchase_return(
     params: CreateVendorCreditFromPurchaseReturnParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
 
     let purchase_return =
         load_purchase_return(ctx, organization_id, company_id, purchase_return_id)?;
+    if purchase_return.credit_move_id.is_some() {
+        return Ok(());
+    }
     if purchase_return.state != "confirmed" {
         return Err(
             "Purchase return must be confirmed before creating a vendor credit".to_string(),
         );
-    }
-    if purchase_return.credit_move_id.is_some() {
-        return Err("Vendor credit already linked to this purchase return".to_string());
     }
 
     let refund_lines: Vec<_> = return_lines_for(ctx, purchase_return_id)
@@ -569,12 +697,36 @@ pub fn create_vendor_credit_from_purchase_return(
         return Err("No purchase return lines marked for refund".to_string());
     }
 
-    let journal = ctx
-        .db
-        .account_journal()
-        .id()
-        .find(&params.journal_id)
-        .ok_or("Journal not found")?;
+    let journal = require_active_journal(
+        ctx,
+        organization_id,
+        company_id,
+        params.journal_id,
+        "vendor credit",
+    )?;
+    if journal.type_ != JournalType::Purchase {
+        return Err("Vendor credit requires an active purchase journal".to_string());
+    }
+    let expense_account = require_active_account(
+        ctx,
+        organization_id,
+        company_id,
+        params.expense_account_id,
+        "vendor credit expense",
+    )?;
+    if expense_account.internal_group != Some(AccountInternalGroup::Expense) {
+        return Err("Vendor credit expense account must have the expense role".to_string());
+    }
+    let payable_account = require_active_account(
+        ctx,
+        organization_id,
+        company_id,
+        params.payable_account_id,
+        "vendor credit payable",
+    )?;
+    if payable_account.internal_type != Some(AccountTypeInternal::Payable) {
+        return Err("Vendor credit payable account must have the payable role".to_string());
+    }
     let company_row = ctx
         .db
         .company()

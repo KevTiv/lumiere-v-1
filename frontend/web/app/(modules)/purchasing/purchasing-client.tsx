@@ -402,7 +402,10 @@ interface PurchasingClientProps {
 
 type PurchasingClientLoadedProps = Omit<PurchasingClientProps, "organizationId"> & {
   organizationId: number
+  operatingCompanyId: bigint
 }
+
+type PurchasingClientWithCompanyProps = Omit<PurchasingClientLoadedProps, "operatingCompanyId">
 
 type PurchasingCsvImportKind = "order" | "orderLine" | "supplierInfo"
 
@@ -410,7 +413,15 @@ export function PurchasingClient(props: PurchasingClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />
   }
-  return <PurchasingClientLoaded {...props} organizationId={props.organizationId} />
+  return <PurchasingClientWithCompany {...props} organizationId={props.organizationId} />
+}
+
+function PurchasingClientWithCompany(props: PurchasingClientWithCompanyProps) {
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(props.organizationId)
+  if (operatingCompanyId == null || operatingCompanyId <= 0n) {
+    return <MissingOrganization />
+  }
+  return <PurchasingClientLoaded {...props} operatingCompanyId={operatingCompanyId} />
 }
 
 function PurchasingClientLoaded({
@@ -424,13 +435,13 @@ function PurchasingClientLoaded({
   initialPartnerBanks,
   initialDepartments,
   organizationId,
+  operatingCompanyId,
 }: PurchasingClientLoadedProps) {
   usePurchasingModuleSubscription()
   const { t } = useTranslation()
   const { currentUser } = useRBAC()
   const runtimeRoleId = currentUser?.roles[0]
   const { orgId } = orgBigInts(organizationId)
-  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
 
   const purchaseOrdersTableRuntime = useRuntimeListConfig({
     base: purchaseOrdersTableConfig(t).view as EntityTableConfig,
@@ -539,7 +550,9 @@ function PurchasingClientLoaded({
 
   const updatePoReceiptStatus = useUpdatePoReceiptStatus(orgId)
   const updatePoInvoiceStatus = useUpdatePoInvoiceStatus(orgId)
-  const createPartnerBank = useCreatePartnerBank(orgId, { companyId: operatingCompanyId ?? undefined })
+  const createPartnerBank = useCreatePartnerBank(orgId, {
+    companyId: operatingCompanyId > 0n ? operatingCompanyId : undefined,
+  })
   const updatePartnerBank = useUpdatePartnerBank(orgId)
   const deletePartnerBank = useDeletePartnerBank(orgId)
 
@@ -813,48 +826,11 @@ function PurchasingClientLoaded({
   }
 
   const promptCreateBlanketOrder = async () => {
-    const name =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.blanketName", {
-            defaultValue: "Blanket order name",
-          }),
-        )
-        ?.trim() ?? ""
-    const partnerId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.partnerId", { defaultValue: "Vendor partner id" }),
-        )
-        ?.trim() ?? ""
-    const currencyId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.currencyId", { defaultValue: "Currency id" }),
-        )
-        ?.trim() ?? ""
-    if (!name || !partnerId || !currencyId) return
-    await createPurchaseBlanketOrder.mutateAsync({
-      name,
-      partnerId: BigInt(partnerId),
-      currencyId: BigInt(currencyId),
-      dateStart: null,
-      dateEnd: null,
-      metadata: null,
-    })
+    throw new Error("Blanket-order creation is disabled until the line selector UI is implemented")
   }
 
   const promptReleaseBlanketToPo = async () => {
-    const blanketOrderId =
-      window
-        .prompt(
-          t("purchasing.ops.prompt.blanketId", {
-            defaultValue: "Blanket order id",
-          }),
-        )
-        ?.trim() ?? ""
-    if (!blanketOrderId) return
-    await releaseBlanketToPo.mutateAsync({ blanketOrderId })
+    throw new Error("Blanket release is disabled until the bounded line selector UI is implemented")
   }
 
   const promptCreatePurchaseContract = async () => {
@@ -2675,8 +2651,11 @@ function PurchasingClientLoaded({
     } else if (action === "removeLandedCostLine") {
       const lineId = formData.lineId
       if (lineId === "" || lineId == null) return
+      const line = landedCostLines.find((row) => String(row.id) === String(lineId))
+      const landedCostId = line?.landedCostId ?? line?.landed_cost_id
+      if (landedCostId == null || String(landedCostId) === "") return
       await removeLandedCostLine.mutateAsync({
-        landedCostId: 0,
+        landedCostId: landedCostId as string | number | bigint,
         lineId: lineId as string | number | bigint,
       })
     } else if (action === "submitSupplierIntake") {

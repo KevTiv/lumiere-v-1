@@ -27,9 +27,7 @@ use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, recor
 use crate::helpers::check_permission;
 use crate::inventory::product::product;
 use crate::manufacturing::bill_of_materials::{mrp_bom, mrp_bom_line, MrpBom, MrpBomLine};
-use crate::manufacturing::manufacturing_orders::{
-    mrp_production, mrp_workorder, MrpProduction,
-};
+use crate::manufacturing::manufacturing_orders::{mrp_production, mrp_workorder, MrpProduction};
 use crate::manufacturing::relations::{
     require_bom_in_company, require_location_for_manufacturing, require_product_for_manufacturing,
     require_uom_compatible, require_uom_in_org, require_warehouse_for_manufacturing,
@@ -100,14 +98,7 @@ pub fn import_workcenter_csv(
                 ws_str.to_string()
             };
             if let Err(e) = WorkingState::from_str(&ws) {
-                record_import_error(
-                    ctx,
-                    job.id,
-                    row_num,
-                    Some("working_state"),
-                    Some(&ws),
-                    &e,
-                );
+                record_import_error(ctx, job.id, row_num, Some("working_state"), Some(&ws), &e);
                 errors += 1;
                 continue;
             }
@@ -268,31 +259,20 @@ pub fn import_bom_csv(
             continue;
         }
 
-        let product_uom = match require_uom_in_org(
-            ctx,
-            organization_id,
-            product.uom_id,
-            "BOM product UOM",
-        ) {
-            Ok(u) => u,
-            Err(e) => {
-                record_import_error(ctx, job.id, row_num, Some("product_uom_id"), None, &e);
-                errors += 1;
-                continue;
-            }
-        };
+        let product_uom =
+            match require_uom_in_org(ctx, organization_id, product.uom_id, "BOM product UOM") {
+                Ok(u) => u,
+                Err(e) => {
+                    record_import_error(ctx, job.id, row_num, Some("product_uom_id"), None, &e);
+                    errors += 1;
+                    continue;
+                }
+            };
         let bom_uom =
             match require_uom_in_org(ctx, organization_id, product_uom_id, "BOM quantity UOM") {
                 Ok(u) => u,
                 Err(e) => {
-                    record_import_error(
-                        ctx,
-                        job.id,
-                        row_num,
-                        Some("product_uom_id"),
-                        None,
-                        &e,
-                    );
+                    record_import_error(ctx, job.id, row_num, Some("product_uom_id"), None, &e);
                     errors += 1;
                     continue;
                 }
@@ -324,14 +304,7 @@ pub fn import_bom_csv(
                 ) {
                     Ok(_) => Some(wh_id),
                     Err(e) => {
-                        record_import_error(
-                            ctx,
-                            job.id,
-                            row_num,
-                            Some("warehouse_id"),
-                            None,
-                            &e,
-                        );
+                        record_import_error(ctx, job.id, row_num, Some("warehouse_id"), None, &e);
                         errors += 1;
                         continue;
                     }
@@ -576,16 +549,19 @@ pub fn import_bom_line_csv(
             continue;
         }
 
-        let line_product_uom =
-            match require_uom_in_org(ctx, organization_id, product.uom_id, "BOM line product UOM")
-            {
-                Ok(u) => u,
-                Err(e) => {
-                    record_import_error(ctx, job.id, row_num, Some("product_uom_id"), None, &e);
-                    errors += 1;
-                    continue;
-                }
-            };
+        let line_product_uom = match require_uom_in_org(
+            ctx,
+            organization_id,
+            product.uom_id,
+            "BOM line product UOM",
+        ) {
+            Ok(u) => u,
+            Err(e) => {
+                record_import_error(ctx, job.id, row_num, Some("product_uom_id"), None, &e);
+                errors += 1;
+                continue;
+            }
+        };
         let line_bom_uom = match require_uom_in_org(
             ctx,
             organization_id,
@@ -729,19 +705,16 @@ pub fn import_manufacturing_order_csv(
         }
 
         // Validate product; derive product_tmpl_id and product_tracking.
-        let product = match require_product_for_manufacturing(
-            ctx,
-            organization_id,
-            product_id,
-            "MO product",
-        ) {
-            Ok(p) => p,
-            Err(e) => {
-                record_import_error(ctx, job.id, row_num, Some("product_id"), None, &e);
-                errors += 1;
-                continue;
-            }
-        };
+        let product =
+            match require_product_for_manufacturing(ctx, organization_id, product_id, "MO product")
+            {
+                Ok(p) => p,
+                Err(e) => {
+                    record_import_error(ctx, job.id, row_num, Some("product_id"), None, &e);
+                    errors += 1;
+                    continue;
+                }
+            };
         // Server-derived — CSV columns for these are always ignored.
         let product_tmpl_id = product.id;
         let product_tracking = product.tracking.clone();
@@ -861,40 +834,39 @@ pub fn import_manufacturing_order_csv(
         }
 
         // --- Require date_planned_start (no fallback to ctx.timestamp) ---
-        let date_planned_start =
-            match opt_timestamp(col(&headers, row, "date_planned_start")) {
-                Some(ts) => ts,
-                None => {
-                    record_import_error(
-                        ctx,
-                        job.id,
-                        row_num,
-                        Some("date_planned_start"),
-                        None,
-                        "date_planned_start is required",
-                    );
-                    errors += 1;
-                    continue;
-                }
-            };
+        let date_planned_start = match opt_timestamp(col(&headers, row, "date_planned_start")) {
+            Some(ts) => ts,
+            None => {
+                record_import_error(
+                    ctx,
+                    job.id,
+                    row_num,
+                    Some("date_planned_start"),
+                    None,
+                    "date_planned_start is required",
+                );
+                errors += 1;
+                continue;
+            }
+        };
 
         // --- Require date_planned_finished (no fallback to ctx.timestamp) ---
-        let date_planned_finished =
-            match opt_timestamp(col(&headers, row, "date_planned_finished")) {
-                Some(ts) => ts,
-                None => {
-                    record_import_error(
-                        ctx,
-                        job.id,
-                        row_num,
-                        Some("date_planned_finished"),
-                        None,
-                        "date_planned_finished is required",
-                    );
-                    errors += 1;
-                    continue;
-                }
-            };
+        let date_planned_finished = match opt_timestamp(col(&headers, row, "date_planned_finished"))
+        {
+            Some(ts) => ts,
+            None => {
+                record_import_error(
+                    ctx,
+                    job.id,
+                    row_num,
+                    Some("date_planned_finished"),
+                    None,
+                    "date_planned_finished is required",
+                );
+                errors += 1;
+                continue;
+            }
+        };
 
         // --- Optional BOM (must belong to same company and same product) ---
         let bom_id = match opt_u64(col(&headers, row, "bom_id")) {
@@ -1033,10 +1005,7 @@ pub fn import_manufacturing_order_csv(
 /// 9. Divergence between stored `workorder_ids` and actual workorders selected
 ///    by `production_id`.
 #[reducer]
-pub fn audit_manufacturing_data(
-    ctx: &ReducerContext,
-    organization_id: u64,
-) -> Result<(), String> {
+pub fn audit_manufacturing_data(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     check_permission(ctx, organization_id, "mrp_bom", "read")?;
 
     let job = begin_import_job(
