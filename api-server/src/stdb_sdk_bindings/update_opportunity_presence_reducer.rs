@@ -9,7 +9,6 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub(super) struct UpdateOpportunityPresenceArgs {
     pub organization_id: u64,
     pub opportunity_id: u64,
-    pub user_name: String,
 }
 
 impl From<UpdateOpportunityPresenceArgs> for super::Reducer {
@@ -17,7 +16,6 @@ impl From<UpdateOpportunityPresenceArgs> for super::Reducer {
         Self::UpdateOpportunityPresence {
             organization_id: args.organization_id,
             opportunity_id: args.opportunity_id,
-            user_name: args.user_name,
         }
     }
 }
@@ -41,9 +39,8 @@ pub trait update_opportunity_presence {
         &self,
         organization_id: u64,
         opportunity_id: u64,
-        user_name: String,
     ) -> __sdk::Result<()> {
-        self.update_opportunity_presence_then(organization_id, opportunity_id, user_name, |_, _| {})
+        self.update_opportunity_presence_then(organization_id, opportunity_id, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `update_opportunity_presence` to run as soon as possible,
@@ -56,7 +53,6 @@ pub trait update_opportunity_presence {
         &self,
         organization_id: u64,
         opportunity_id: u64,
-        user_name: String,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -69,7 +65,6 @@ impl update_opportunity_presence for super::RemoteReducers {
         &self,
         organization_id: u64,
         opportunity_id: u64,
-        user_name: String,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -79,7 +74,6 @@ impl update_opportunity_presence for super::RemoteReducers {
             UpdateOpportunityPresenceArgs {
                 organization_id,
                 opportunity_id,
-                user_name,
             },
             callback,
         )

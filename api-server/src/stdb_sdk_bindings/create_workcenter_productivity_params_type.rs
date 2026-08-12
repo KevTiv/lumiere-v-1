@@ -8,7 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub struct CreateWorkcenterProductivityParams {
     pub workorder_id: u64,
-    pub loss_id: u64,
+    pub loss_id: Option<u64>,
     pub description: Option<String>,
     pub duration: f64,
     pub metadata: Option<String>,

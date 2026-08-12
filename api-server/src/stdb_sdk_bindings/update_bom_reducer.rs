@@ -10,7 +10,6 @@ use super::update_bom_params_type::UpdateBomParams;
 #[sats(crate = __lib)]
 pub(super) struct UpdateBomArgs {
     pub organization_id: u64,
-    pub company_id: u64,
     pub bom_id: u64,
     pub params: UpdateBomParams,
 }
@@ -19,7 +18,6 @@ impl From<UpdateBomArgs> for super::Reducer {
     fn from(args: UpdateBomArgs) -> Self {
         Self::UpdateBom {
             organization_id: args.organization_id,
-            company_id: args.company_id,
             bom_id: args.bom_id,
             params: args.params,
         }
@@ -44,11 +42,10 @@ pub trait update_bom {
     fn update_bom(
         &self,
         organization_id: u64,
-        company_id: u64,
         bom_id: u64,
         params: UpdateBomParams,
     ) -> __sdk::Result<()> {
-        self.update_bom_then(organization_id, company_id, bom_id, params, |_, _| {})
+        self.update_bom_then(organization_id, bom_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `update_bom` to run as soon as possible,
@@ -60,7 +57,6 @@ pub trait update_bom {
     fn update_bom_then(
         &self,
         organization_id: u64,
-        company_id: u64,
         bom_id: u64,
         params: UpdateBomParams,
 
@@ -74,7 +70,6 @@ impl update_bom for super::RemoteReducers {
     fn update_bom_then(
         &self,
         organization_id: u64,
-        company_id: u64,
         bom_id: u64,
         params: UpdateBomParams,
 
@@ -85,7 +80,6 @@ impl update_bom for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             UpdateBomArgs {
                 organization_id,
-                company_id,
                 bom_id,
                 params,
             },

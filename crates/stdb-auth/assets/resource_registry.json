@@ -1242,7 +1242,9 @@
       "email",
       "phone",
       "parent_id",
-      "company_id"
+      "company_id",
+      "is_vendor",
+      "supplier_rank"
     ],
     "mandatory": [
       "id",
@@ -3785,7 +3787,8 @@
       "list_price",
       "public_price",
       "type",
-      "barcode"
+      "barcode",
+      "purchase_ok"
     ],
     "mandatory": [
       "id",
@@ -5917,7 +5920,8 @@
     "default_restricted": [
       "name",
       "category_id",
-      "symbol"
+      "symbol",
+      "is_active"
     ],
     "mandatory": [
       "id",

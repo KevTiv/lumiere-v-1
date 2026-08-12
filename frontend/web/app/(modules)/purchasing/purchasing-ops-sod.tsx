@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { useErpSession } from '@lumiere/erp-session'
 import { useTranslation } from '@lumiere/i18n'
 import {
@@ -65,6 +65,8 @@ export interface PurchasingOpsSodProps {
   onSetCommodityPriceIndex?: () => Promise<void>
   onCreateIntegrationIntent?: () => Promise<void>
   onRecordIntegrationResult?: () => Promise<void>
+  /** Module-local inline action workspace rendered directly below Ops controls. */
+  children?: ReactNode
 }
 
 /** Slim SoD Approve/Reject for ToApprove purchase orders (mirrors Sales Ops). */
@@ -87,6 +89,7 @@ export function PurchasingOpsSod({
   onSetCommodityPriceIndex,
   onCreateIntegrationIntent,
   onRecordIntegrationResult,
+  children,
 }: PurchasingOpsSodProps) {
   const { t } = useTranslation()
   const { organizationId, identity } = useErpSession()
@@ -540,6 +543,7 @@ export function PurchasingOpsSod({
               })}
             </Button>
           </div>
+          {children ? <div className="pt-2">{children}</div> : null}
         </div>
       ) : null}
     </div>

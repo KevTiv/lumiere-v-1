@@ -4,6 +4,8 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::opportunity_state_type::OpportunityState;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct UpdateOpportunityParams {
@@ -12,14 +14,13 @@ pub struct UpdateOpportunityParams {
     pub probability: Option<f64>,
     pub stage_id: Option<u64>,
     pub priority: Option<String>,
-    pub is_won: Option<bool>,
-    pub is_lost: Option<bool>,
-    pub partner_id: Option<u64>,
-    pub contact_id: Option<u64>,
-    pub date_deadline: Option<__sdk::Timestamp>,
-    pub date_closed: Option<__sdk::Timestamp>,
-    pub lost_reason_id: Option<u64>,
-    pub description: Option<String>,
+    pub desired_state: Option<OpportunityState>,
+    pub partner_id: Option<Option<u64>>,
+    pub contact_id: Option<Option<u64>>,
+    pub date_deadline: Option<Option<__sdk::Timestamp>>,
+    pub date_closed: Option<Option<__sdk::Timestamp>>,
+    pub lost_reason_id: Option<Option<u64>>,
+    pub description: Option<Option<String>>,
     pub tag_ids: Option<Vec<u64>>,
 }
 

@@ -40,6 +40,16 @@ const COMPANY_SCOPED_RESOURCES = new Set<QueryResourceKey>([
   "pos-configs",
   "pos-sessions",
   "picking-batches",
+  "commodity-price-indexes",
+  "consignment-agreements",
+  "purchase-approval-delegates",
+  "purchase-blanket-order-lines",
+  "purchase-blanket-orders",
+  "purchase-blanket-releases",
+  "purchase-contracts",
+  "purchasing-integration-intents",
+  "vendor-risk-flags",
+  "vendor-scorecards",
 ])
 
 const INTERCOMPANY_RESOURCES = new Set<QueryResourceKey>([

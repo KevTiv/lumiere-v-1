@@ -15,6 +15,7 @@
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../http"
+import { invalidateResourceQueries, useSubscriptionAwareQuery } from "../subscription-query"
 import { purchasingBffPost } from "@lumiere/stdb/commands"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import {
@@ -197,6 +198,21 @@ export function usePartnerBanks(organizationId: bigint, initialData?: QueryRows)
     staleTime: 30_000,
     initialData: coalesceQueryInitialData(initialData),
   })
+}
+
+/** Subscription-aware blanket order list with an HTTP fallback. */
+export function usePurchaseBlanketOrders(organizationId: bigint, initialData?: QueryRows) {
+  return useSubscriptionAwareQuery("purchase-blanket-orders", organizationId, { initialData })
+}
+
+/** Subscription-aware blanket order line list with an HTTP fallback. */
+export function usePurchaseBlanketOrderLines(organizationId: bigint, initialData?: QueryRows) {
+  return useSubscriptionAwareQuery("purchase-blanket-order-lines", organizationId, { initialData })
+}
+
+/** Subscription-aware blanket release list with an HTTP fallback. */
+export function usePurchaseBlanketReleases(organizationId: bigint, initialData?: QueryRows) {
+  return useSubscriptionAwareQuery("purchase-blanket-releases", organizationId, { initialData })
 }
 
 
@@ -1483,6 +1499,7 @@ export function useCreatePurchaseBlanketOrder(
   organizationId: bigint,
   companyId: bigint,
 ) {
+  const qc = useQueryClient()
   return useMutation<void, Error, CreatePurchaseBlanketOrderParams>({
     mutationFn: async (params) => {
       const encoded = stdbParamsToJson({
@@ -1508,6 +1525,11 @@ export function useCreatePurchaseBlanketOrder(
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorPo(r))
     },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, [
+        "purchase-blanket-orders",
+        "purchase-blanket-order-lines",
+      ]),
   })
 }
 
@@ -1535,11 +1557,15 @@ export function useReleaseBlanketToPo(organizationId: bigint, companyId: bigint)
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorPo(r))
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({
-        queryKey: ["purchase-orders", rqBigIntKey(organizationId)],
-      })
-    },
+    onSuccess: () =>
+      invalidateResourceQueries(qc, organizationId, [
+        "purchase-orders",
+        "purchase-orders-to-approve",
+        "purchase-order-lines",
+        "purchase-blanket-orders",
+        "purchase-blanket-order-lines",
+        "purchase-blanket-releases",
+      ]),
   })
 }
 

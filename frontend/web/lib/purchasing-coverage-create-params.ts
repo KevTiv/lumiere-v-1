@@ -3,6 +3,7 @@
 import type {
   CreateConsignmentAgreementParams,
   CreatePurchaseBlanketOrderParams,
+  CreatePurchaseBlanketOrderLineParams,
   CreatePurchaseContractParams,
   CreatePurchaseRequisitionLineParams,
   CreatePurchaseReturnLineParams,
@@ -127,9 +128,39 @@ export function toCreatePurchaseBlanketOrderParams(
   formData: Record<string, unknown>,
 ): CreatePurchaseBlanketOrderParams | null {
   const name = optionalTrimmedString(field(formData, "name", "name"))
-  const partnerId = optionalBigIntU64(field(formData, "partnerId", "partner_id"))
-  const currencyId = optionalBigIntU64(field(formData, "currencyId", "currency_id"))
+  const partnerId = requiredFk(field(formData, "partnerId", "partner_id"))
+  const currencyId = requiredFk(field(formData, "currencyId", "currency_id"))
   if (!name || partnerId === undefined || currencyId === undefined) return null
+
+  const rawLines = field(formData, "lines", "lines")
+  if (!Array.isArray(rawLines) || rawLines.length === 0) return null
+  const lines: CreatePurchaseBlanketOrderLineParams[] = []
+  for (const rawLine of rawLines) {
+    const line = (rawLine ?? {}) as Record<string, unknown>
+    const productId = requiredFk(field(line, "productId", "product_id"))
+    const productUom = requiredFk(field(line, "productUom", "product_uom"))
+    const committedQuantityRaw = field(line, "committedQuantity", "committed_quantity")
+    const priceUnitRaw = field(line, "priceUnit", "price_unit")
+    const committedQuantity = Number(committedQuantityRaw)
+    const priceUnit = Number(priceUnitRaw)
+    if (
+      productId === undefined ||
+      productUom === undefined ||
+      !Number.isFinite(committedQuantity) ||
+      !Number.isFinite(priceUnit) ||
+      committedQuantity <= 0 ||
+      priceUnit < 0
+    ) {
+      return null
+    }
+    lines.push({
+      productId,
+      productUom,
+      committedQuantity,
+      priceUnit,
+      metadata: optionalTrimmedString(field(line, "metadata", "metadata")),
+    })
+  }
 
   return {
     name,
@@ -137,6 +168,7 @@ export function toCreatePurchaseBlanketOrderParams(
     currencyId,
     dateStart: optionalTimestampFromForm(field(formData, "dateStart", "date_start")),
     dateEnd: optionalTimestampFromForm(field(formData, "dateEnd", "date_end")),
+    lines,
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
   }
 }
@@ -240,4 +272,3 @@ export function toCreateVendorCreditFromPurchaseReturnParams(
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
   }
 }
-

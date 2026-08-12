@@ -55,6 +55,7 @@ import type { EntityViewConfig, EntityTableConfig, EntityRecordSheetConfig, Form
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { PurchasingOpsSod } from "./purchasing-ops-sod"
+import { PurchasingBlanketWorkspace } from "./purchasing-blanket-workspace"
 import { RecordDocumentAttachments } from "../../../components/record-document-attachments"
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
 import { groupBy } from "@/lib/utils"
@@ -124,6 +125,9 @@ import {
   useCreateVendorCreditFromPurchaseReturn,
   useCreatePurchaseBlanketOrder,
   useReleaseBlanketToPo,
+  usePurchaseBlanketOrders,
+  usePurchaseBlanketOrderLines,
+  usePurchaseBlanketReleases,
   useCreatePurchaseContract,
   useUpsertVendorScorecard,
   useSetVendorRiskFlag,
@@ -453,7 +457,7 @@ function PurchasingClientLoaded({
   })
   const moduleConfig = useMemo(() => purchasingModuleConfig(t), [t])
   const purchasingTabIds = useMemo(
-    () => [...moduleConfig.tabs.map((tab) => tab.id), "landed-costs", "supplier-intakes"],
+    () => [...moduleConfig.tabs.map((tab) => tab.id), "landed-costs", "supplier-intakes", "blanket-orders"],
     [moduleConfig],
   )
   const { activeTab, setActiveTab } = useModuleTab(
@@ -472,6 +476,10 @@ function PurchasingClientLoaded({
   const [billOrderError, setBillOrderError] = useState<string | null>(null)
   const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null)
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
+  const [blanketActionRequest, setBlanketActionRequest] = useState<{
+    kind: "create" | "release"
+    token: number
+  } | null>(null)
 
   useEffect(() => {
     if (quickActionForm != null) {
@@ -499,6 +507,9 @@ function PurchasingClientLoaded({
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId)
   const { data: currencies = [] } = useCurrencies()
+  const { data: blanketOrders = [] } = usePurchaseBlanketOrders(orgId)
+  const { data: blanketOrderLines = [] } = usePurchaseBlanketOrderLines(orgId)
+  const { data: blanketReleases = [] } = usePurchaseBlanketReleases(orgId)
 
   const createPurchaseOrder = useCreatePurchaseOrder(orgId, { companyId: operatingCompanyId ?? undefined })
   const createPurchaseRequisition = useCreatePurchaseRequisition(orgId, { companyId: operatingCompanyId ?? undefined })
@@ -825,12 +836,12 @@ function PurchasingClientLoaded({
     })
   }
 
-  const promptCreateBlanketOrder = async () => {
-    throw new Error("Blanket-order creation is disabled until the line selector UI is implemented")
+  const openBlanketOrderCreate = async () => {
+    setBlanketActionRequest((current) => ({ kind: "create", token: (current?.token ?? 0) + 1 }))
   }
 
-  const promptReleaseBlanketToPo = async () => {
-    throw new Error("Blanket release is disabled until the bounded line selector UI is implemented")
+  const openBlanketRelease = async () => {
+    setBlanketActionRequest((current) => ({ kind: "release", token: (current?.token ?? 0) + 1 }))
   }
 
   const promptCreatePurchaseContract = async () => {
@@ -2281,7 +2292,7 @@ function PurchasingClientLoaded({
               setQuickActionForm({ form: receiveLineFormConfig, action: "receivePurchaseOrderLine" }),
             view_vendors: () => setActiveTab("vendors"),
             create_purchase_blanket_order: () => {
-              void promptCreateBlanketOrder().catch((e: unknown) => {
+              void openBlanketOrderCreate().catch((e: unknown) => {
                 window.alert(e instanceof Error ? e.message : String(e))
               })
             },
@@ -2350,6 +2361,7 @@ function PurchasingClientLoaded({
     purchaseRequisitionFormConfig,
     receiveLineFormConfig,
     setActiveTab,
+    openBlanketOrderCreate,
     dashboardTimeRange,
   ])
 
@@ -2443,6 +2455,33 @@ function PurchasingClientLoaded({
             return tab
           }),
           {
+            id: "blanket-orders",
+            label: t("purchasing.blanketOrders.tab", { defaultValue: "Blanket Orders" }),
+            type: "custom" as const,
+            customContent: (
+              <PurchasingBlanketWorkspace
+                blanketOrders={blanketOrders as Record<string, unknown>[]}
+                blanketLines={blanketOrderLines as Record<string, unknown>[]}
+                blanketReleases={blanketReleases as Record<string, unknown>[]}
+                vendors={vendors as Record<string, unknown>[]}
+                products={products as Record<string, unknown>[]}
+                uoms={uoms as Record<string, unknown>[]}
+                currencies={currencies as Record<string, unknown>[]}
+                createBlanket={(params) => createPurchaseBlanketOrder.mutateAsync(params)}
+                releaseBlanket={(blanketOrderId, params) =>
+                  releaseBlanketToPo.mutateAsync({ blanketOrderId, params })
+                }
+                onOpenPurchaseOrder={(purchaseOrderId) => {
+                  if (typeof window !== "undefined") {
+                    window.location.assign(
+                      `/purchasing?tab=orders&recordId=${encodeURIComponent(purchaseOrderId)}`,
+                    )
+                  }
+                }}
+              />
+            ),
+          },
+          {
             id: "landed-costs",
             label: t("purchasing.landedCosts.title"),
             type: "entity",
@@ -2474,6 +2513,15 @@ function PurchasingClientLoaded({
       landedCostFormConfig,
       supplierIntakeFormConfig,
       partnerBankFormConfig,
+      blanketOrders,
+      blanketOrderLines,
+      blanketReleases,
+      vendors,
+      products,
+      uoms,
+      currencies,
+      createPurchaseBlanketOrder,
+      releaseBlanketToPo,
       editPartnerBankFormConfig,
       deletePartnerBank,
       t,
@@ -2802,8 +2850,8 @@ function PurchasingClientLoaded({
           onCreatePurchaseReturn={promptCreatePurchaseReturn}
           onConfirmPurchaseReturn={promptConfirmPurchaseReturn}
           onCreateVendorCreditFromReturn={promptVendorCreditFromReturn}
-          onCreateBlanketOrder={promptCreateBlanketOrder}
-          onReleaseBlanketToPo={promptReleaseBlanketToPo}
+          onCreateBlanketOrder={openBlanketOrderCreate}
+          onReleaseBlanketToPo={openBlanketRelease}
           onCreatePurchaseContract={promptCreatePurchaseContract}
           onUpsertVendorScorecard={promptUpsertVendorScorecard}
           onSetVendorRiskFlag={promptSetVendorRiskFlag}
@@ -2812,7 +2860,24 @@ function PurchasingClientLoaded({
           onSetCommodityPriceIndex={promptSetCommodityPriceIndex}
           onCreateIntegrationIntent={promptCreateIntegrationIntent}
           onRecordIntegrationResult={promptRecordIntegrationResult}
-        />
+        >
+          <PurchasingBlanketWorkspace
+            embedded
+            actionRequest={blanketActionRequest}
+            blanketOrders={blanketOrders as Record<string, unknown>[]}
+            blanketLines={blanketOrderLines as Record<string, unknown>[]}
+            blanketReleases={blanketReleases as Record<string, unknown>[]}
+            vendors={vendors as Record<string, unknown>[]}
+            products={products as Record<string, unknown>[]}
+            uoms={uoms as Record<string, unknown>[]}
+            currencies={currencies as Record<string, unknown>[]}
+            createBlanket={(params) => createPurchaseBlanketOrder.mutateAsync(params)}
+            releaseBlanket={(blanketOrderId, params) =>
+              releaseBlanketToPo.mutateAsync({ blanketOrderId, params })
+            }
+            onOpenPurchaseOrder={() => undefined}
+          />
+        </PurchasingOpsSod>
       )}
       <ModuleView
         config={config}

@@ -14,6 +14,7 @@ export const PURCHASING_WORKSPACE_RESOURCE_KEYS = [
   "landed-costs",
   "landed-cost-lines",
   "partner-banks",
+  "products",
   "purchase-order-lines",
   "purchase-order-lines-over-billed",
   "purchase-orders",
@@ -37,6 +38,7 @@ export const PURCHASING_WORKSPACE_RESOURCE_KEYS = [
   "commodity-price-indexes",
   "purchasing-integration-intents",
   "supplier-intakes",
+  "uoms",
 ] as const;
 
 export type PurchasingWorkspaceResourceKey =

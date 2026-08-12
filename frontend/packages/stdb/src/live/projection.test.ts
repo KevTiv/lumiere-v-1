@@ -6,6 +6,8 @@ import {
   rowNotSoftDeleted,
   sortRowsForResource,
 } from "./projection.ts"
+import { RESOURCE_REGISTRY } from "../generated/query-registry.ts"
+import { PURCHASING_WORKSPACE_RESOURCE_KEYS } from "../subscriptions/purchasing-workspace.ts"
 
 describe("live/projection", () => {
   it("rowNotSoftDeleted treats missing deletedAt as live", () => {
@@ -56,6 +58,56 @@ describe("live/projection", () => {
       ),
       [],
     )
+  })
+
+  it("fails closed for company-owned advanced purchasing resources", () => {
+    for (const resource of [
+      "commodity-price-indexes",
+      "consignment-agreements",
+      "purchase-approval-delegates",
+      "purchase-blanket-order-lines",
+      "purchase-blanket-orders",
+      "purchase-blanket-releases",
+      "purchase-contracts",
+      "purchasing-integration-intents",
+      "vendor-risk-flags",
+      "vendor-scorecards",
+    ] as const) {
+      assert.deepEqual(
+        filterRowsForResource(resource, [{ id: 1, organizationId: 10, companyId: 3 }], {
+          organizationId: 10,
+          companyIds: [],
+        }),
+        [],
+        `${resource} requires an authorized company`,
+      )
+      assert.equal(
+        filterRowsForResource(resource, [{ id: 1, organizationId: 10, companyId: 3 }], {
+          organizationId: 10,
+          companyIds: [3],
+        }).length,
+        1,
+        `${resource} retains rows from an authorized company`,
+      )
+      assert.deepEqual(
+        filterRowsForResource(resource, [{ id: 1, organizationId: 10, companyId: 4 }], {
+          organizationId: 10,
+          companyIds: [3],
+        }),
+        [],
+        `${resource} excludes rows from another company`,
+      )
+    }
+  })
+
+  it("projects purchasing selector fields and workspace master data", () => {
+    assert.ok(RESOURCE_REGISTRY.contacts.defaultRestricted.includes("is_vendor"))
+    assert.ok(RESOURCE_REGISTRY.contacts.defaultRestricted.includes("supplier_rank"))
+    assert.ok(RESOURCE_REGISTRY.products.defaultRestricted.includes("purchase_ok"))
+    assert.ok(RESOURCE_REGISTRY.uoms.defaultRestricted.includes("is_active"))
+    assert.ok(PURCHASING_WORKSPACE_RESOURCE_KEYS.includes("products"))
+    assert.ok(PURCHASING_WORKSPACE_RESOURCE_KEYS.includes("uoms"))
+    assert.ok(!PURCHASING_WORKSPACE_RESOURCE_KEYS.includes("contacts"))
   })
 
   it("sortRowsForResource orders opportunity stages by sequence", () => {

@@ -9,6 +9,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct ContactCategoryAssignment {
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub contact_id: u64,
     pub category_id: u64,
     pub assigned_at: __sdk::Timestamp,
@@ -26,6 +27,7 @@ impl __sdk::InModule for ContactCategoryAssignment {
 pub struct ContactCategoryAssignmentCols {
     pub id: __sdk::__query_builder::Col<ContactCategoryAssignment, u64>,
     pub organization_id: __sdk::__query_builder::Col<ContactCategoryAssignment, u64>,
+    pub company_id: __sdk::__query_builder::Col<ContactCategoryAssignment, u64>,
     pub contact_id: __sdk::__query_builder::Col<ContactCategoryAssignment, u64>,
     pub category_id: __sdk::__query_builder::Col<ContactCategoryAssignment, u64>,
     pub assigned_at: __sdk::__query_builder::Col<ContactCategoryAssignment, __sdk::Timestamp>,
@@ -39,6 +41,7 @@ impl __sdk::__query_builder::HasCols for ContactCategoryAssignment {
         ContactCategoryAssignmentCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             contact_id: __sdk::__query_builder::Col::new(table_name, "contact_id"),
             category_id: __sdk::__query_builder::Col::new(table_name, "category_id"),
             assigned_at: __sdk::__query_builder::Col::new(table_name, "assigned_at"),

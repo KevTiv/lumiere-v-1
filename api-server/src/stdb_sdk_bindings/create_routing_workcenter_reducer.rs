@@ -10,7 +10,6 @@ use super::create_routing_workcenter_params_type::CreateRoutingWorkcenterParams;
 #[sats(crate = __lib)]
 pub(super) struct CreateRoutingWorkcenterArgs {
     pub organization_id: u64,
-    pub company_id: u64,
     pub params: CreateRoutingWorkcenterParams,
 }
 
@@ -18,7 +17,6 @@ impl From<CreateRoutingWorkcenterArgs> for super::Reducer {
     fn from(args: CreateRoutingWorkcenterArgs) -> Self {
         Self::CreateRoutingWorkcenter {
             organization_id: args.organization_id,
-            company_id: args.company_id,
             params: args.params,
         }
     }
@@ -42,10 +40,9 @@ pub trait create_routing_workcenter {
     fn create_routing_workcenter(
         &self,
         organization_id: u64,
-        company_id: u64,
         params: CreateRoutingWorkcenterParams,
     ) -> __sdk::Result<()> {
-        self.create_routing_workcenter_then(organization_id, company_id, params, |_, _| {})
+        self.create_routing_workcenter_then(organization_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `create_routing_workcenter` to run as soon as possible,
@@ -57,7 +54,6 @@ pub trait create_routing_workcenter {
     fn create_routing_workcenter_then(
         &self,
         organization_id: u64,
-        company_id: u64,
         params: CreateRoutingWorkcenterParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -70,7 +66,6 @@ impl create_routing_workcenter for super::RemoteReducers {
     fn create_routing_workcenter_then(
         &self,
         organization_id: u64,
-        company_id: u64,
         params: CreateRoutingWorkcenterParams,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -80,7 +75,6 @@ impl create_routing_workcenter for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             CreateRoutingWorkcenterArgs {
                 organization_id,
-                company_id,
                 params,
             },
             callback,

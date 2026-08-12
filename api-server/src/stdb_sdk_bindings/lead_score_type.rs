@@ -15,6 +15,8 @@ pub struct LeadScore {
     pub scored_at: __sdk::Timestamp,
     pub scored_by: __sdk::Identity,
     pub metadata: Option<String>,
+    pub is_stale: bool,
+    pub stale_since: Option<__sdk::Timestamp>,
 }
 
 impl __sdk::InModule for LeadScore {
@@ -33,6 +35,8 @@ pub struct LeadScoreCols {
     pub scored_at: __sdk::__query_builder::Col<LeadScore, __sdk::Timestamp>,
     pub scored_by: __sdk::__query_builder::Col<LeadScore, __sdk::Identity>,
     pub metadata: __sdk::__query_builder::Col<LeadScore, Option<String>>,
+    pub is_stale: __sdk::__query_builder::Col<LeadScore, bool>,
+    pub stale_since: __sdk::__query_builder::Col<LeadScore, Option<__sdk::Timestamp>>,
 }
 
 impl __sdk::__query_builder::HasCols for LeadScore {
@@ -47,6 +51,8 @@ impl __sdk::__query_builder::HasCols for LeadScore {
             scored_at: __sdk::__query_builder::Col::new(table_name, "scored_at"),
             scored_by: __sdk::__query_builder::Col::new(table_name, "scored_by"),
             metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
+            is_stale: __sdk::__query_builder::Col::new(table_name, "is_stale"),
+            stale_since: __sdk::__query_builder::Col::new(table_name, "stale_since"),
         }
     }
 }

@@ -8,9 +8,9 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub struct UpdateCrmConversationParams {
     pub status: Option<String>,
-    pub assigned_user_id: Option<__sdk::Identity>,
+    pub assigned_user_id: Option<Option<__sdk::Identity>>,
     pub external_thread_id: Option<String>,
-    pub metadata: Option<String>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateCrmConversationParams {

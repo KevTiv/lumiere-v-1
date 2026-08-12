@@ -91,6 +91,8 @@ pub fn run_purchasing_phase1_returns_advanced_test(ctx: &ReducerContext) -> Resu
 
 #[spacetimedb::reducer]
 pub fn run_purchasing_phase2_blanket_release_test(ctx: &ReducerContext) -> Result<(), String> {
+    phase2_blanket_release_test::test_blanket_release_effective_window(ctx)
+        .map_err(|e| format!("purchasing_phase2_blanket_effective_window: {e}"))?;
     phase2_blanket_release_test::test_blanket_release_lines_bounds_and_retry(ctx)
         .map_err(|e| format!("purchasing_phase2_blanket_release: {e}"))
 }

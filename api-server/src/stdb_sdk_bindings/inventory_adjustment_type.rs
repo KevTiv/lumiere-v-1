@@ -9,6 +9,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct InventoryAdjustment {
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: u64,
     pub name: String,
     pub state: String,
     pub adjustment_type: String,
@@ -46,6 +47,7 @@ impl __sdk::InModule for InventoryAdjustment {
 pub struct InventoryAdjustmentCols {
     pub id: __sdk::__query_builder::Col<InventoryAdjustment, u64>,
     pub organization_id: __sdk::__query_builder::Col<InventoryAdjustment, u64>,
+    pub company_id: __sdk::__query_builder::Col<InventoryAdjustment, u64>,
     pub name: __sdk::__query_builder::Col<InventoryAdjustment, String>,
     pub state: __sdk::__query_builder::Col<InventoryAdjustment, String>,
     pub adjustment_type: __sdk::__query_builder::Col<InventoryAdjustment, String>,
@@ -79,6 +81,7 @@ impl __sdk::__query_builder::HasCols for InventoryAdjustment {
         InventoryAdjustmentCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             name: __sdk::__query_builder::Col::new(table_name, "name"),
             state: __sdk::__query_builder::Col::new(table_name, "state"),
             adjustment_type: __sdk::__query_builder::Col::new(table_name, "adjustment_type"),

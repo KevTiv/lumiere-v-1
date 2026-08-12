@@ -4,8 +4,6 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
-use super::mo_state_type::MoState;
-
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateMrpProductionParams {
@@ -20,19 +18,6 @@ pub struct CreateMrpProductionParams {
     pub warehouse_id: u64,
     pub picking_type_id: u64,
     pub consumption: Option<String>,
-    pub state: MoState,
-    pub availability: String,
-    pub reservation_state: String,
-    pub components_availability: String,
-    pub components_availability_state: String,
-    pub is_planned: bool,
-    pub is_locked: bool,
-    pub is_workorder: bool,
-    pub delay_alert: bool,
-    pub lot_producing_count: u32,
-    pub qty_producing: f64,
-    pub qty_produced: f64,
-    pub product_uom_qty_producing: f64,
     pub bom_id: Option<u64>,
     pub routing_id: Option<u64>,
     pub proc_group_id: Option<u64>,

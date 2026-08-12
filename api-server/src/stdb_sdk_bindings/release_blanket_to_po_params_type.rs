@@ -4,9 +4,13 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::release_blanket_line_params_type::ReleaseBlanketLineParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct ReleaseBlanketToPoParams {
+    pub idempotency_key: String,
+    pub lines: Vec<ReleaseBlanketLineParams>,
     pub notes: Option<String>,
     pub date_planned: Option<__sdk::Timestamp>,
     pub metadata: Option<String>,

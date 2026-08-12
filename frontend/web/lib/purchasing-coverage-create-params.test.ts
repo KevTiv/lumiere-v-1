@@ -1,7 +1,10 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-import { toCreateVendorCreditFromPurchaseReturnParams } from "./purchasing-coverage-create-params"
+import {
+  toCreatePurchaseBlanketOrderParams,
+  toCreateVendorCreditFromPurchaseReturnParams,
+} from "./purchasing-coverage-create-params"
 import { toReceivePoLineArgs } from "./purchasing-create-params"
 
 describe("purchasing coverage create params — fail-closed FKs", () => {
@@ -74,5 +77,53 @@ describe("toReceivePoLineArgs — lot_id plumbing", () => {
   it("returns null for invalid lotId sentinel", () => {
     assert.equal(toReceivePoLineArgs({ lineId: 10, qty: 2, lotId: 0 }), null)
     assert.equal(toReceivePoLineArgs({ lineId: 10, qty: 2, lotId: -1 }), null)
+  })
+})
+
+const validBlanket = {
+  name: "Annual packaging",
+  partnerId: 10n,
+  currencyId: 1n,
+  lines: [
+    {
+      productId: 20n,
+      productUom: 3n,
+      committedQuantity: 100,
+      priceUnit: 4.5,
+    },
+  ],
+}
+
+describe("toCreatePurchaseBlanketOrderParams", () => {
+  it("maps required authoritative lines", () => {
+    const params = toCreatePurchaseBlanketOrderParams(validBlanket)
+    assert.ok(params)
+    assert.equal(params.lines.length, 1)
+    assert.equal(params.lines[0]?.productId, 20n)
+  })
+
+  it("fails closed for absent, zero, or invalid blanket lines", () => {
+    assert.equal(toCreatePurchaseBlanketOrderParams({ ...validBlanket, lines: [] }), null)
+    assert.equal(
+      toCreatePurchaseBlanketOrderParams({
+        ...validBlanket,
+        lines: [{ ...validBlanket.lines[0], productId: 0 }],
+      }),
+      null,
+    )
+    assert.equal(
+      toCreatePurchaseBlanketOrderParams({
+        ...validBlanket,
+        lines: [{ ...validBlanket.lines[0], committedQuantity: 0 }],
+      }),
+      null,
+    )
+    assert.equal(
+      toCreatePurchaseBlanketOrderParams({
+        ...validBlanket,
+        lines: [{ ...validBlanket.lines[0], priceUnit: Number.POSITIVE_INFINITY }],
+      }),
+      null,
+    )
   })
 })

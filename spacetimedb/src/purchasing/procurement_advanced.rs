@@ -490,17 +490,32 @@ fn validate_blanket_product_uom(
     require_uom_compatible(&purchase_uom, &supplied_uom, "blanket line")
 }
 
-fn blanket_release_fingerprint(lines: &[ReleaseBlanketLineParams]) -> String {
-    let mut normalized: Vec<(u64, u64)> = lines
+fn blanket_release_fingerprint(params: &ReleaseBlanketToPoParams) -> String {
+    let mut normalized_lines: Vec<(u64, u64)> = params
+        .lines
         .iter()
         .map(|line| (line.blanket_line_id, line.quantity.to_bits()))
         .collect();
-    normalized.sort_unstable();
-    normalized
-        .into_iter()
-        .map(|(line_id, quantity_bits)| format!("{line_id}:{quantity_bits}"))
-        .collect::<Vec<_>>()
-        .join("|")
+    normalized_lines.sort_unstable();
+
+    // Keep the persisted fingerprint deterministic so retries tolerate line ordering
+    // differences while rejecting changes to any PO-affecting request field.
+    serde_json::json!({
+        "lines": normalized_lines
+            .into_iter()
+            .map(|(blanket_line_id, quantity_bits)| serde_json::json!({
+                "blanket_line_id": blanket_line_id,
+                "quantity_bits": quantity_bits,
+            }))
+            .collect::<Vec<_>>(),
+        "notes": params.notes.as_deref(),
+        "date_planned_micros": params
+            .date_planned
+            .as_ref()
+            .map(|timestamp| timestamp.to_micros_since_unix_epoch()),
+        "metadata": params.metadata.as_deref(),
+    })
+    .to_string()
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -625,7 +640,7 @@ pub fn release_blanket_to_po(
     if params.lines.is_empty() {
         return Err("Blanket release requires at least one line".to_string());
     }
-    let fingerprint = blanket_release_fingerprint(&params.lines);
+    let fingerprint = blanket_release_fingerprint(&params);
     if let Some(existing) = ctx.db.purchase_blanket_release().iter().find(|release| {
         release.organization_id == organization_id
             && release.company_id == company_id
@@ -633,9 +648,21 @@ pub fn release_blanket_to_po(
             && release.idempotency_key == idempotency_key
     }) {
         if existing.request_fingerprint != fingerprint {
-            return Err("Blanket release key was already used with different lines".to_string());
+            return Err(
+                "Blanket release key was already used with a different request".to_string(),
+            );
         }
         return Ok(());
+    }
+    if let Some(start) = blanket.date_start {
+        if ctx.timestamp < start {
+            return Err("Blanket order is not yet active".to_string());
+        }
+    }
+    if let Some(end) = blanket.date_end {
+        if ctx.timestamp > end {
+            return Err("Blanket order has expired".to_string());
+        }
     }
 
     let mut seen_line_ids = std::collections::HashSet::new();

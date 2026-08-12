@@ -4,6 +4,8 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::create_purchase_blanket_order_line_params_type::CreatePurchaseBlanketOrderLineParams;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreatePurchaseBlanketOrderParams {
@@ -12,6 +14,7 @@ pub struct CreatePurchaseBlanketOrderParams {
     pub currency_id: u64,
     pub date_start: Option<__sdk::Timestamp>,
     pub date_end: Option<__sdk::Timestamp>,
+    pub lines: Vec<CreatePurchaseBlanketOrderLineParams>,
     pub metadata: Option<String>,
 }
 

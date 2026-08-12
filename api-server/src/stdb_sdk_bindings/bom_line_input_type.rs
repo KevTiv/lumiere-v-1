@@ -14,11 +14,9 @@ pub struct BomLineInput {
     pub manual_consumption: bool,
     pub attachments_count: u32,
     pub operation_id: Option<u64>,
-    pub parent_product_tmpl_id: Option<u64>,
     pub child_bom_id: Option<u64>,
     pub bom_product_template_attribute_value_ids: Vec<u64>,
     pub possible_bom_product_template_attribute_value_ids: Vec<u64>,
-    pub child_line_ids: Vec<u64>,
     pub metadata: Option<String>,
 }
 

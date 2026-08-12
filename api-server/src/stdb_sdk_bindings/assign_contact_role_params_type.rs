@@ -11,8 +11,8 @@ pub struct AssignContactRoleParams {
     pub company_id: Option<u64>,
     pub role: String,
     pub active_from: Option<__sdk::Timestamp>,
-    pub active_until: Option<__sdk::Timestamp>,
-    pub metadata: Option<String>,
+    pub active_until: Option<Option<__sdk::Timestamp>>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for AssignContactRoleParams {

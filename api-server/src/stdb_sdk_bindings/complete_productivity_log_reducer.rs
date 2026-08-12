@@ -8,7 +8,6 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub(super) struct CompleteProductivityLogArgs {
     pub organization_id: u64,
-    pub company_id: u64,
     pub log_id: u64,
 }
 
@@ -16,7 +15,6 @@ impl From<CompleteProductivityLogArgs> for super::Reducer {
     fn from(args: CompleteProductivityLogArgs) -> Self {
         Self::CompleteProductivityLog {
             organization_id: args.organization_id,
-            company_id: args.company_id,
             log_id: args.log_id,
         }
     }
@@ -37,13 +35,8 @@ pub trait complete_productivity_log {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`complete_productivity_log:complete_productivity_log_then`] to run a callback after the reducer completes.
-    fn complete_productivity_log(
-        &self,
-        organization_id: u64,
-        company_id: u64,
-        log_id: u64,
-    ) -> __sdk::Result<()> {
-        self.complete_productivity_log_then(organization_id, company_id, log_id, |_, _| {})
+    fn complete_productivity_log(&self, organization_id: u64, log_id: u64) -> __sdk::Result<()> {
+        self.complete_productivity_log_then(organization_id, log_id, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `complete_productivity_log` to run as soon as possible,
@@ -55,7 +48,6 @@ pub trait complete_productivity_log {
     fn complete_productivity_log_then(
         &self,
         organization_id: u64,
-        company_id: u64,
         log_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -68,7 +60,6 @@ impl complete_productivity_log for super::RemoteReducers {
     fn complete_productivity_log_then(
         &self,
         organization_id: u64,
-        company_id: u64,
         log_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -78,7 +69,6 @@ impl complete_productivity_log for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             CompleteProductivityLogArgs {
                 organization_id,
-                company_id,
                 log_id,
             },
             callback,

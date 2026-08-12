@@ -10,7 +10,6 @@ use super::create_workcenter_productivity_params_type::CreateWorkcenterProductiv
 #[sats(crate = __lib)]
 pub(super) struct LogWorkcenterProductivityArgs {
     pub organization_id: u64,
-    pub company_id: u64,
     pub workcenter_id: u64,
     pub params: CreateWorkcenterProductivityParams,
 }
@@ -19,7 +18,6 @@ impl From<LogWorkcenterProductivityArgs> for super::Reducer {
     fn from(args: LogWorkcenterProductivityArgs) -> Self {
         Self::LogWorkcenterProductivity {
             organization_id: args.organization_id,
-            company_id: args.company_id,
             workcenter_id: args.workcenter_id,
             params: args.params,
         }
@@ -44,17 +42,10 @@ pub trait log_workcenter_productivity {
     fn log_workcenter_productivity(
         &self,
         organization_id: u64,
-        company_id: u64,
         workcenter_id: u64,
         params: CreateWorkcenterProductivityParams,
     ) -> __sdk::Result<()> {
-        self.log_workcenter_productivity_then(
-            organization_id,
-            company_id,
-            workcenter_id,
-            params,
-            |_, _| {},
-        )
+        self.log_workcenter_productivity_then(organization_id, workcenter_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `log_workcenter_productivity` to run as soon as possible,
@@ -66,7 +57,6 @@ pub trait log_workcenter_productivity {
     fn log_workcenter_productivity_then(
         &self,
         organization_id: u64,
-        company_id: u64,
         workcenter_id: u64,
         params: CreateWorkcenterProductivityParams,
 
@@ -80,7 +70,6 @@ impl log_workcenter_productivity for super::RemoteReducers {
     fn log_workcenter_productivity_then(
         &self,
         organization_id: u64,
-        company_id: u64,
         workcenter_id: u64,
         params: CreateWorkcenterProductivityParams,
 
@@ -91,7 +80,6 @@ impl log_workcenter_productivity for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             LogWorkcenterProductivityArgs {
                 organization_id,
-                company_id,
                 workcenter_id,
                 params,
             },

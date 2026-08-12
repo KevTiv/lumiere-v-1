@@ -93,6 +93,30 @@ describe("PUR-RI-017: company-scoped Purchasing subscriptions", () => {
     }
   })
 
+  it("covers every advanced Purchasing table with company-scoped SQL", () => {
+    for (const [resource, table] of [
+      ["commodity-price-indexes", "commodity_price_index"],
+      ["consignment-agreements", "consignment_agreement"],
+      ["purchase-approval-delegates", "purchase_approval_delegate"],
+      ["purchase-blanket-order-lines", "purchase_blanket_order_line"],
+      ["purchase-blanket-orders", "purchase_blanket_order"],
+      ["purchase-blanket-releases", "purchase_blanket_release"],
+      ["purchase-contracts", "purchase_contract"],
+      ["purchasing-integration-intents", "purchasing_integration_intent"],
+      ["vendor-risk-flags", "vendor_risk_flag"],
+      ["vendor-scorecards", "vendor_scorecard"],
+    ] as const) {
+      const sql = subscriptionQueriesForResource(resource, {
+        organizationId: 42,
+        companyIds: [7],
+      })
+      assert.ok(sql, `${resource} should produce company-scoped SQL`)
+      assert.match(sql![0], new RegExp(`FROM ${table}\\b`))
+      assert.match(sql![0], /organization_id\s*=\s*42/)
+      assert.match(sql![0], /company_id\s*=\s*7/)
+    }
+  })
+
   it("fails closed without exactly one allowed company", () => {
     assert.equal(
       subscriptionQueriesForResource("purchase-orders", { organizationId: 42 }),

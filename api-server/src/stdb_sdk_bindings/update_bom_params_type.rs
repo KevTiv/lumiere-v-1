@@ -11,12 +11,12 @@ pub struct UpdateBomParams {
     pub ready_to_produce: Option<String>,
     pub consumption: Option<String>,
     pub sequence: Option<u32>,
-    pub picking_type_id: Option<u64>,
-    pub location_src_id: Option<u64>,
-    pub location_dest_id: Option<u64>,
-    pub warehouse_id: Option<u64>,
-    pub routing_id: Option<u64>,
-    pub metadata: Option<String>,
+    pub picking_type_id: Option<Option<u64>>,
+    pub location_src_id: Option<Option<u64>>,
+    pub location_dest_id: Option<Option<u64>>,
+    pub warehouse_id: Option<Option<u64>>,
+    pub routing_id: Option<Option<u64>>,
+    pub metadata: Option<Option<String>>,
 }
 
 impl __sdk::InModule for UpdateBomParams {

@@ -10,6 +10,7 @@ pub(super) struct ExecuteReplenishmentRuleArgs {
     pub organization_id: u64,
     pub company_id: u64,
     pub rule_id: u64,
+    pub idempotency_key: String,
 }
 
 impl From<ExecuteReplenishmentRuleArgs> for super::Reducer {
@@ -18,6 +19,7 @@ impl From<ExecuteReplenishmentRuleArgs> for super::Reducer {
             organization_id: args.organization_id,
             company_id: args.company_id,
             rule_id: args.rule_id,
+            idempotency_key: args.idempotency_key,
         }
     }
 }
@@ -42,8 +44,15 @@ pub trait execute_replenishment_rule {
         organization_id: u64,
         company_id: u64,
         rule_id: u64,
+        idempotency_key: String,
     ) -> __sdk::Result<()> {
-        self.execute_replenishment_rule_then(organization_id, company_id, rule_id, |_, _| {})
+        self.execute_replenishment_rule_then(
+            organization_id,
+            company_id,
+            rule_id,
+            idempotency_key,
+            |_, _| {},
+        )
     }
 
     /// Request that the remote module invoke the reducer `execute_replenishment_rule` to run as soon as possible,
@@ -57,6 +66,7 @@ pub trait execute_replenishment_rule {
         organization_id: u64,
         company_id: u64,
         rule_id: u64,
+        idempotency_key: String,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -70,6 +80,7 @@ impl execute_replenishment_rule for super::RemoteReducers {
         organization_id: u64,
         company_id: u64,
         rule_id: u64,
+        idempotency_key: String,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -80,6 +91,7 @@ impl execute_replenishment_rule for super::RemoteReducers {
                 organization_id,
                 company_id,
                 rule_id,
+                idempotency_key,
             },
             callback,
         )

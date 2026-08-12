@@ -8,7 +8,6 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub(super) struct ExplodeBomArgs {
     pub organization_id: u64,
-    pub company_id: u64,
     pub bom_id: u64,
 }
 
@@ -16,7 +15,6 @@ impl From<ExplodeBomArgs> for super::Reducer {
     fn from(args: ExplodeBomArgs) -> Self {
         Self::ExplodeBom {
             organization_id: args.organization_id,
-            company_id: args.company_id,
             bom_id: args.bom_id,
         }
     }
@@ -37,8 +35,8 @@ pub trait explode_bom {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`explode_bom:explode_bom_then`] to run a callback after the reducer completes.
-    fn explode_bom(&self, organization_id: u64, company_id: u64, bom_id: u64) -> __sdk::Result<()> {
-        self.explode_bom_then(organization_id, company_id, bom_id, |_, _| {})
+    fn explode_bom(&self, organization_id: u64, bom_id: u64) -> __sdk::Result<()> {
+        self.explode_bom_then(organization_id, bom_id, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `explode_bom` to run as soon as possible,
@@ -50,7 +48,6 @@ pub trait explode_bom {
     fn explode_bom_then(
         &self,
         organization_id: u64,
-        company_id: u64,
         bom_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -63,7 +60,6 @@ impl explode_bom for super::RemoteReducers {
     fn explode_bom_then(
         &self,
         organization_id: u64,
-        company_id: u64,
         bom_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -73,7 +69,6 @@ impl explode_bom for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             ExplodeBomArgs {
                 organization_id,
-                company_id,
                 bom_id,
             },
             callback,

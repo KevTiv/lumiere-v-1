@@ -4,6 +4,8 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::crm_activity_target_type::CrmActivityTarget;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateActivityParams {
@@ -18,8 +20,7 @@ pub struct CreateActivityParams {
     pub date_deadline: Option<__sdk::Timestamp>,
     pub date_done: Option<__sdk::Timestamp>,
     pub assigned_to: Option<__sdk::Identity>,
-    pub res_model: Option<String>,
-    pub res_id: Option<u64>,
+    pub target: Option<CrmActivityTarget>,
     pub duration: Option<i32>,
     pub location: Option<String>,
     pub video_url: Option<String>,

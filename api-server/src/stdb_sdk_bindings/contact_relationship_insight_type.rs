@@ -19,6 +19,8 @@ pub struct ContactRelationshipInsight {
     pub computed_at: __sdk::Timestamp,
     pub computed_by: __sdk::Identity,
     pub metadata: Option<String>,
+    pub is_stale: bool,
+    pub stale_since: Option<__sdk::Timestamp>,
 }
 
 impl __sdk::InModule for ContactRelationshipInsight {
@@ -41,6 +43,9 @@ pub struct ContactRelationshipInsightCols {
     pub computed_at: __sdk::__query_builder::Col<ContactRelationshipInsight, __sdk::Timestamp>,
     pub computed_by: __sdk::__query_builder::Col<ContactRelationshipInsight, __sdk::Identity>,
     pub metadata: __sdk::__query_builder::Col<ContactRelationshipInsight, Option<String>>,
+    pub is_stale: __sdk::__query_builder::Col<ContactRelationshipInsight, bool>,
+    pub stale_since:
+        __sdk::__query_builder::Col<ContactRelationshipInsight, Option<__sdk::Timestamp>>,
 }
 
 impl __sdk::__query_builder::HasCols for ContactRelationshipInsight {
@@ -65,6 +70,8 @@ impl __sdk::__query_builder::HasCols for ContactRelationshipInsight {
             computed_at: __sdk::__query_builder::Col::new(table_name, "computed_at"),
             computed_by: __sdk::__query_builder::Col::new(table_name, "computed_by"),
             metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
+            is_stale: __sdk::__query_builder::Col::new(table_name, "is_stale"),
+            stale_since: __sdk::__query_builder::Col::new(table_name, "stale_since"),
         }
     }
 }

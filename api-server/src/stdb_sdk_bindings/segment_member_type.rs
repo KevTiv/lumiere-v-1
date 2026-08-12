@@ -59,6 +59,7 @@ impl __sdk::__query_builder::HasCols for SegmentMember {
 /// Provides typed access to indexed columns for query building.
 pub struct SegmentMemberIxCols {
     pub id: __sdk::__query_builder::IxCol<SegmentMember, u64>,
+    pub segment_id: __sdk::__query_builder::IxCol<SegmentMember, u64>,
 }
 
 impl __sdk::__query_builder::HasIxCols for SegmentMember {
@@ -66,6 +67,7 @@ impl __sdk::__query_builder::HasIxCols for SegmentMember {
     fn ix_cols(table_name: &'static str) -> Self::IxCols {
         SegmentMemberIxCols {
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            segment_id: __sdk::__query_builder::IxCol::new(table_name, "segment_id"),
         }
     }
 }

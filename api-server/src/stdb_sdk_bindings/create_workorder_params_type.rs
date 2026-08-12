@@ -4,8 +4,6 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
-use super::workorder_state_type::WorkorderState;
-
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateWorkorderParams {
@@ -14,20 +12,12 @@ pub struct CreateWorkorderParams {
     pub duration_expected: f64,
     pub name: String,
     pub sequence: u32,
-    pub state: WorkorderState,
-    pub production_availability: String,
-    pub is_user_working: bool,
-    pub is_produced: bool,
-    pub is_last_unfinished_wo: bool,
-    pub quality_check_todo: bool,
-    pub quality_check_fail: bool,
     pub capacity: Option<f64>,
     pub worksheet: Option<String>,
     pub worksheet_url: Option<String>,
     pub operation_note: Option<String>,
     pub operation_id: Option<u64>,
     pub blocked_by_workorder_id: Option<u64>,
-    pub quality_state: Option<String>,
     pub metadata: Option<String>,
 }
 

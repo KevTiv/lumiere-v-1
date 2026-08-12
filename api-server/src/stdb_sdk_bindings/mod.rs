@@ -81,6 +81,7 @@ pub mod activity_type_type;
 pub mod add_account_move_line_params_type;
 pub mod add_account_move_line_reducer;
 pub mod add_article_member_reducer;
+pub mod add_contact_categories_reducer;
 pub mod add_contact_to_segment_reducer;
 pub mod add_document_version_params_type;
 pub mod add_document_version_reducer;
@@ -226,6 +227,7 @@ pub mod approve_proposal_reducer;
 pub mod approve_purchase_requisition_reducer;
 pub mod approve_supplier_intake_reducer;
 pub mod archive_ai_chat_session_reducer;
+pub mod archive_contact_category_reducer;
 pub mod archive_contact_identity_reducer;
 pub mod archive_employee_params_type;
 pub mod archive_employee_reducer;
@@ -255,6 +257,7 @@ pub mod assignment_rule_table;
 pub mod assignment_rule_type;
 pub mod audit_log_table;
 pub mod audit_log_type;
+pub mod audit_manufacturing_data_reducer;
 pub mod audit_rule_table;
 pub mod audit_rule_type;
 pub mod award_purchase_rfq_bid_reducer;
@@ -348,10 +351,18 @@ pub mod claim_queue_job_reducer;
 pub mod claim_workflow_human_task_params_type;
 pub mod claim_workflow_human_task_reducer;
 pub mod cleanup_stale_proposal_presence_reducer;
+pub mod clear_contact_categories_reducer;
 pub mod clear_document_presence_reducer;
+pub mod clear_inventory_audit_violations_reducer;
 pub mod clear_knowledge_article_presence_reducer;
+pub mod clear_landed_cost_field_reducer;
 pub mod clear_opportunity_presence_reducer;
+pub mod clear_partner_bank_field_reducer;
 pub mod clear_proposal_presence_reducer;
+pub mod clear_purchase_order_field_reducer;
+pub mod clear_purchase_order_line_field_reducer;
+pub mod clear_supplier_intake_field_reducer;
+pub mod clear_vendor_risk_reason_reducer;
 pub mod clone_workflow_version_to_draft_reducer;
 pub mod close_account_asset_reducer;
 pub mod close_account_period_reducer;
@@ -579,6 +590,8 @@ pub mod create_consolidation_account_params_type;
 pub mod create_consolidation_account_reducer;
 pub mod create_consolidation_journal_params_type;
 pub mod create_consolidation_journal_reducer;
+pub mod create_contact_category_params_type;
+pub mod create_contact_category_reducer;
 pub mod create_contact_identity_params_type;
 pub mod create_contact_identity_reducer;
 pub mod create_contact_params_type;
@@ -729,6 +742,8 @@ pub mod create_leave_request_params_type;
 pub mod create_leave_request_reducer;
 pub mod create_leave_type_params_type;
 pub mod create_leave_type_reducer;
+pub mod create_loss_category_params_type;
+pub mod create_loss_category_reducer;
 pub mod create_loyalty_card_reducer;
 pub mod create_loyalty_program_params_type;
 pub mod create_loyalty_program_reducer;
@@ -833,6 +848,7 @@ pub mod create_proposal_template_params_type;
 pub mod create_proposal_template_reducer;
 pub mod create_public_holiday_params_type;
 pub mod create_public_holiday_reducer;
+pub mod create_purchase_blanket_order_line_params_type;
 pub mod create_purchase_blanket_order_params_type;
 pub mod create_purchase_blanket_order_reducer;
 pub mod create_purchase_contract_params_type;
@@ -1000,6 +1016,7 @@ pub mod create_working_calendar_params_type;
 pub mod create_working_calendar_reducer;
 pub mod create_workorder_params_type;
 pub mod create_workorder_reducer;
+pub mod crm_activity_target_type;
 pub mod crm_conversation_message_table;
 pub mod crm_conversation_message_type;
 pub mod crm_conversation_table;
@@ -1439,6 +1456,10 @@ pub mod invalidate_workflow_human_task_params_type;
 pub mod invalidate_workflow_human_task_reducer;
 pub mod inventory_adjustment_table;
 pub mod inventory_adjustment_type;
+pub mod inventory_audit_run_table;
+pub mod inventory_audit_run_type;
+pub mod inventory_audit_violation_table;
+pub mod inventory_audit_violation_type;
 pub mod inventory_close_line_table;
 pub mod inventory_close_line_type;
 pub mod inventory_close_table;
@@ -1545,6 +1566,8 @@ pub mod mrp_bom_line_table;
 pub mod mrp_bom_line_type;
 pub mod mrp_bom_table;
 pub mod mrp_bom_type;
+pub mod mrp_loss_category_table;
+pub mod mrp_loss_category_type;
 pub mod mrp_production_table;
 pub mod mrp_production_type;
 pub mod mrp_routing_workcenter_table;
@@ -1571,6 +1594,7 @@ pub mod opportunity_line_type;
 pub mod opportunity_presence_table;
 pub mod opportunity_presence_type;
 pub mod opportunity_stage_type;
+pub mod opportunity_state_type;
 pub mod opportunity_table;
 pub mod opportunity_type;
 pub mod org_permission_table;
@@ -1765,8 +1789,12 @@ pub mod publish_form_configuration_reducer;
 pub mod publish_workflow_version_reducer;
 pub mod purchase_approval_delegate_table;
 pub mod purchase_approval_delegate_type;
+pub mod purchase_blanket_order_line_table;
+pub mod purchase_blanket_order_line_type;
 pub mod purchase_blanket_order_table;
 pub mod purchase_blanket_order_type;
+pub mod purchase_blanket_release_table;
+pub mod purchase_blanket_release_type;
 pub mod purchase_contract_table;
 pub mod purchase_contract_type;
 pub mod purchase_order_line_table;
@@ -1789,6 +1817,7 @@ pub mod purchase_rfq_table;
 pub mod purchase_rfq_type;
 pub mod purchasing_integration_intent_table;
 pub mod purchasing_integration_intent_type;
+pub mod purchasing_integrity_inventory_reducer;
 pub mod purge_expired_documents_reducer;
 pub mod quality_alert_reason_table;
 pub mod quality_alert_reason_type;
@@ -1817,6 +1846,7 @@ pub mod rate_subscription_usage_events_params_type;
 pub mod rate_subscription_usage_events_reducer;
 pub mod rebase_deferred_schedules_for_subscription_reducer;
 pub mod rebase_deferred_schedules_params_type;
+pub mod rebuild_manufacturing_associations_reducer;
 pub mod receive_consignment_stock_params_type;
 pub mod receive_consignment_stock_reducer;
 pub mod receive_crm_provider_message_params_type;
@@ -1916,12 +1946,14 @@ pub mod reject_expense_policy_exception_reducer;
 pub mod reject_supplier_intake_reducer;
 pub mod reject_timesheets_params_type;
 pub mod reject_timesheets_reducer;
+pub mod release_blanket_line_params_type;
 pub mod release_blanket_to_po_params_type;
 pub mod release_blanket_to_po_reducer;
 pub mod release_document_legal_hold_params_type;
 pub mod release_document_legal_hold_reducer;
 pub mod release_picking_wave_reducer;
 pub mod remove_article_member_reducer;
+pub mod remove_contact_categories_reducer;
 pub mod remove_landed_cost_line_reducer;
 pub mod remove_member_from_quality_team_reducer;
 pub mod remove_purchase_order_line_reducer;
@@ -1936,6 +1968,7 @@ pub mod reopen_ticket_reducer;
 pub mod reopen_timesheets_params_type;
 pub mod reopen_timesheets_reducer;
 pub mod reorder_proposal_line_items_reducer;
+pub mod replace_contact_categories_reducer;
 pub mod replenishment_rule_table;
 pub mod replenishment_rule_type;
 pub mod report_state_type;
@@ -1953,6 +1986,7 @@ pub mod res_partner_bank_type;
 pub mod reserve_serial_reducer;
 pub mod reserve_stock_quant_reducer;
 pub mod reset_leave_to_draft_reducer;
+pub mod resolve_inventory_audit_violation_reducer;
 pub mod resolve_inventory_exception_reducer;
 pub mod resolve_iot_alert_reducer;
 pub mod resolve_proposal_comment_reducer;
@@ -2017,6 +2051,7 @@ pub mod run_all_expenses_tests_reducer;
 pub mod run_all_fleet_tests_reducer;
 pub mod run_all_hr_tests_reducer;
 pub mod run_all_inventory_tests_reducer;
+pub mod run_all_manufacturing_tests_reducer;
 pub mod run_all_platform_tests_reducer;
 pub mod run_all_projects_tests_reducer;
 pub mod run_all_proposals_tests_reducer;
@@ -2060,12 +2095,17 @@ pub mod run_helpdesk_ticket_test_reducer;
 pub mod run_hr_leave_type_test_reducer;
 pub mod run_hr_wave_a_test_reducer;
 pub mod run_inventory_3_pl_asn_test_reducer;
+pub mod run_inventory_adjustment_company_derived_test_reducer;
+pub mod run_inventory_adjustment_process_idempotency_test_reducer;
+pub mod run_inventory_adjustment_requires_valid_reason_test_reducer;
 pub mod run_inventory_adjustment_test_reducer;
 pub mod run_inventory_atp_fail_closed_test_reducer;
 pub mod run_inventory_cartonization_test_reducer;
 pub mod run_inventory_close_lock_test_reducer;
+pub mod run_inventory_close_no_gl_on_create_test_reducer;
 pub mod run_inventory_close_params_type;
 pub mod run_inventory_close_reducer;
+pub mod run_inventory_close_reopen_blocked_gl_test_reducer;
 pub mod run_inventory_close_valuation_test_reducer;
 pub mod run_inventory_company_isolation_test_reducer;
 pub mod run_inventory_consignment_atp_test_reducer;
@@ -2075,10 +2115,12 @@ pub mod run_inventory_directed_putaway_test_reducer;
 pub mod run_inventory_exception_queues_test_reducer;
 pub mod run_inventory_expired_lot_test_reducer;
 pub mod run_inventory_fefo_test_reducer;
+pub mod run_inventory_integration_applied_guard_test_reducer;
 pub mod run_inventory_lot_reserve_test_reducer;
 pub mod run_inventory_lot_validate_test_reducer;
 pub mod run_inventory_multi_wh_promise_atp_test_reducer;
 pub mod run_inventory_packing_workflow_test_reducer;
+pub mod run_inventory_preflight_audit_reducer;
 pub mod run_inventory_product_category_test_reducer;
 pub mod run_inventory_product_update_test_reducer;
 pub mod run_inventory_qc_quarantine_test_reducer;
@@ -2086,13 +2128,19 @@ pub mod run_inventory_receipt_average_costing_test_reducer;
 pub mod run_inventory_receipt_fifo_layers_test_reducer;
 pub mod run_inventory_receipt_quant_test_reducer;
 pub mod run_inventory_replenishment_demand_test_reducer;
+pub mod run_inventory_replenishment_rule_not_found_test_reducer;
 pub mod run_inventory_serial_id_validate_test_reducer;
 pub mod run_inventory_serial_reserve_test_reducer;
+pub mod run_inventory_server_owns_state_test_reducer;
 pub mod run_inventory_stock_inventory_test_reducer;
 pub mod run_inventory_stock_quant_test_reducer;
 pub mod run_inventory_uom_conversion_test_reducer;
 pub mod run_inventory_warehouse_sync_test_reducer;
 pub mod run_inventory_wave_release_test_reducer;
+pub mod run_manufacturing_loss_category_create_test_reducer;
+pub mod run_manufacturing_loss_category_invalid_category_test_reducer;
+pub mod run_manufacturing_workcenter_create_test_reducer;
+pub mod run_manufacturing_workcenter_cross_org_test_reducer;
 pub mod run_manufacturing_workcenter_test_reducer;
 pub mod run_owner_report_schedule_reducer;
 pub mod run_projects_wave_a_test_reducer;
@@ -2106,6 +2154,13 @@ pub mod run_purchasing_bill_balanced_test_reducer;
 pub mod run_purchasing_company_isolation_test_reducer;
 pub mod run_purchasing_incoming_picking_test_reducer;
 pub mod run_purchasing_lot_receive_test_reducer;
+pub mod run_purchasing_phase_0_containment_test_reducer;
+pub mod run_purchasing_phase_0_fixture_test_reducer;
+pub mod run_purchasing_phase_1_landed_costs_test_reducer;
+pub mod run_purchasing_phase_1_purchase_orders_test_reducer;
+pub mod run_purchasing_phase_1_relational_integrity_test_reducer;
+pub mod run_purchasing_phase_1_returns_advanced_test_reducer;
+pub mod run_purchasing_phase_2_blanket_release_test_reducer;
 pub mod run_purchasing_wave_c_smoke_test_reducer;
 pub mod run_purchasing_wave_e_test_reducer;
 pub mod run_queue_foundation_tests_reducer;
@@ -2290,6 +2345,10 @@ pub mod stock_inventory_line_table;
 pub mod stock_inventory_line_type;
 pub mod stock_inventory_table;
 pub mod stock_inventory_type;
+pub mod stock_landed_cost_allocation_table;
+pub mod stock_landed_cost_allocation_type;
+pub mod stock_landed_cost_application_table;
+pub mod stock_landed_cost_application_type;
 pub mod stock_landed_cost_lines_table;
 pub mod stock_landed_cost_lines_type;
 pub mod stock_landed_cost_table;
@@ -2488,6 +2547,8 @@ pub mod update_contact_address_params_type;
 pub mod update_contact_address_reducer;
 pub mod update_contact_business_params_type;
 pub mod update_contact_business_reducer;
+pub mod update_contact_category_params_type;
+pub mod update_contact_category_reducer;
 pub mod update_contact_core_params_type;
 pub mod update_contact_details_params_type;
 pub mod update_contact_details_reducer;
@@ -2969,6 +3030,7 @@ pub use activity_type_type::ActivityType;
 pub use add_account_move_line_params_type::AddAccountMoveLineParams;
 pub use add_account_move_line_reducer::add_account_move_line;
 pub use add_article_member_reducer::add_article_member;
+pub use add_contact_categories_reducer::add_contact_categories;
 pub use add_contact_to_segment_reducer::add_contact_to_segment;
 pub use add_document_version_params_type::AddDocumentVersionParams;
 pub use add_document_version_reducer::add_document_version;
@@ -3114,6 +3176,7 @@ pub use approve_proposal_reducer::approve_proposal;
 pub use approve_purchase_requisition_reducer::approve_purchase_requisition;
 pub use approve_supplier_intake_reducer::approve_supplier_intake;
 pub use archive_ai_chat_session_reducer::archive_ai_chat_session;
+pub use archive_contact_category_reducer::archive_contact_category;
 pub use archive_contact_identity_reducer::archive_contact_identity;
 pub use archive_employee_params_type::ArchiveEmployeeParams;
 pub use archive_employee_reducer::archive_employee;
@@ -3143,6 +3206,7 @@ pub use assignment_rule_table::*;
 pub use assignment_rule_type::AssignmentRule;
 pub use audit_log_table::*;
 pub use audit_log_type::AuditLog;
+pub use audit_manufacturing_data_reducer::audit_manufacturing_data;
 pub use audit_rule_table::*;
 pub use audit_rule_type::AuditRule;
 pub use award_purchase_rfq_bid_reducer::award_purchase_rfq_bid;
@@ -3236,10 +3300,18 @@ pub use claim_queue_job_reducer::claim_queue_job;
 pub use claim_workflow_human_task_params_type::ClaimWorkflowHumanTaskParams;
 pub use claim_workflow_human_task_reducer::claim_workflow_human_task;
 pub use cleanup_stale_proposal_presence_reducer::cleanup_stale_proposal_presence;
+pub use clear_contact_categories_reducer::clear_contact_categories;
 pub use clear_document_presence_reducer::clear_document_presence;
+pub use clear_inventory_audit_violations_reducer::clear_inventory_audit_violations;
 pub use clear_knowledge_article_presence_reducer::clear_knowledge_article_presence;
+pub use clear_landed_cost_field_reducer::clear_landed_cost_field;
 pub use clear_opportunity_presence_reducer::clear_opportunity_presence;
+pub use clear_partner_bank_field_reducer::clear_partner_bank_field;
 pub use clear_proposal_presence_reducer::clear_proposal_presence;
+pub use clear_purchase_order_field_reducer::clear_purchase_order_field;
+pub use clear_purchase_order_line_field_reducer::clear_purchase_order_line_field;
+pub use clear_supplier_intake_field_reducer::clear_supplier_intake_field;
+pub use clear_vendor_risk_reason_reducer::clear_vendor_risk_reason;
 pub use clone_workflow_version_to_draft_reducer::clone_workflow_version_to_draft;
 pub use close_account_asset_reducer::close_account_asset;
 pub use close_account_period_reducer::close_account_period;
@@ -3467,6 +3539,8 @@ pub use create_consolidation_account_params_type::CreateConsolidationAccountPara
 pub use create_consolidation_account_reducer::create_consolidation_account;
 pub use create_consolidation_journal_params_type::CreateConsolidationJournalParams;
 pub use create_consolidation_journal_reducer::create_consolidation_journal;
+pub use create_contact_category_params_type::CreateContactCategoryParams;
+pub use create_contact_category_reducer::create_contact_category;
 pub use create_contact_identity_params_type::CreateContactIdentityParams;
 pub use create_contact_identity_reducer::create_contact_identity;
 pub use create_contact_params_type::CreateContactParams;
@@ -3617,6 +3691,8 @@ pub use create_leave_request_params_type::CreateLeaveRequestParams;
 pub use create_leave_request_reducer::create_leave_request;
 pub use create_leave_type_params_type::CreateLeaveTypeParams;
 pub use create_leave_type_reducer::create_leave_type;
+pub use create_loss_category_params_type::CreateLossCategoryParams;
+pub use create_loss_category_reducer::create_loss_category;
 pub use create_loyalty_card_reducer::create_loyalty_card;
 pub use create_loyalty_program_params_type::CreateLoyaltyProgramParams;
 pub use create_loyalty_program_reducer::create_loyalty_program;
@@ -3721,6 +3797,7 @@ pub use create_proposal_template_params_type::CreateProposalTemplateParams;
 pub use create_proposal_template_reducer::create_proposal_template;
 pub use create_public_holiday_params_type::CreatePublicHolidayParams;
 pub use create_public_holiday_reducer::create_public_holiday;
+pub use create_purchase_blanket_order_line_params_type::CreatePurchaseBlanketOrderLineParams;
 pub use create_purchase_blanket_order_params_type::CreatePurchaseBlanketOrderParams;
 pub use create_purchase_blanket_order_reducer::create_purchase_blanket_order;
 pub use create_purchase_contract_params_type::CreatePurchaseContractParams;
@@ -3888,6 +3965,7 @@ pub use create_working_calendar_params_type::CreateWorkingCalendarParams;
 pub use create_working_calendar_reducer::create_working_calendar;
 pub use create_workorder_params_type::CreateWorkorderParams;
 pub use create_workorder_reducer::create_workorder;
+pub use crm_activity_target_type::CrmActivityTarget;
 pub use crm_conversation_message_table::*;
 pub use crm_conversation_message_type::CrmConversationMessage;
 pub use crm_conversation_table::*;
@@ -4327,6 +4405,10 @@ pub use invalidate_workflow_human_task_params_type::InvalidateWorkflowHumanTaskP
 pub use invalidate_workflow_human_task_reducer::invalidate_workflow_human_task;
 pub use inventory_adjustment_table::*;
 pub use inventory_adjustment_type::InventoryAdjustment;
+pub use inventory_audit_run_table::*;
+pub use inventory_audit_run_type::InventoryAuditRun;
+pub use inventory_audit_violation_table::*;
+pub use inventory_audit_violation_type::InventoryAuditViolation;
 pub use inventory_close_line_table::*;
 pub use inventory_close_line_type::InventoryCloseLine;
 pub use inventory_close_table::*;
@@ -4433,6 +4515,8 @@ pub use mrp_bom_line_table::*;
 pub use mrp_bom_line_type::MrpBomLine;
 pub use mrp_bom_table::*;
 pub use mrp_bom_type::MrpBom;
+pub use mrp_loss_category_table::*;
+pub use mrp_loss_category_type::MrpLossCategory;
 pub use mrp_production_table::*;
 pub use mrp_production_type::MrpProduction;
 pub use mrp_routing_workcenter_table::*;
@@ -4459,6 +4543,7 @@ pub use opportunity_line_type::OpportunityLine;
 pub use opportunity_presence_table::*;
 pub use opportunity_presence_type::OpportunityPresence;
 pub use opportunity_stage_type::OpportunityStage;
+pub use opportunity_state_type::OpportunityState;
 pub use opportunity_table::*;
 pub use opportunity_type::Opportunity;
 pub use org_permission_table::*;
@@ -4653,8 +4738,12 @@ pub use publish_form_configuration_reducer::publish_form_configuration;
 pub use publish_workflow_version_reducer::publish_workflow_version;
 pub use purchase_approval_delegate_table::*;
 pub use purchase_approval_delegate_type::PurchaseApprovalDelegate;
+pub use purchase_blanket_order_line_table::*;
+pub use purchase_blanket_order_line_type::PurchaseBlanketOrderLine;
 pub use purchase_blanket_order_table::*;
 pub use purchase_blanket_order_type::PurchaseBlanketOrder;
+pub use purchase_blanket_release_table::*;
+pub use purchase_blanket_release_type::PurchaseBlanketRelease;
 pub use purchase_contract_table::*;
 pub use purchase_contract_type::PurchaseContract;
 pub use purchase_order_line_table::*;
@@ -4677,6 +4766,7 @@ pub use purchase_rfq_table::*;
 pub use purchase_rfq_type::PurchaseRfq;
 pub use purchasing_integration_intent_table::*;
 pub use purchasing_integration_intent_type::PurchasingIntegrationIntent;
+pub use purchasing_integrity_inventory_reducer::purchasing_integrity_inventory;
 pub use purge_expired_documents_reducer::purge_expired_documents;
 pub use quality_alert_reason_table::*;
 pub use quality_alert_reason_type::QualityAlertReason;
@@ -4705,6 +4795,7 @@ pub use rate_subscription_usage_events_params_type::RateSubscriptionUsageEventsP
 pub use rate_subscription_usage_events_reducer::rate_subscription_usage_events;
 pub use rebase_deferred_schedules_for_subscription_reducer::rebase_deferred_schedules_for_subscription;
 pub use rebase_deferred_schedules_params_type::RebaseDeferredSchedulesParams;
+pub use rebuild_manufacturing_associations_reducer::rebuild_manufacturing_associations;
 pub use receive_consignment_stock_params_type::ReceiveConsignmentStockParams;
 pub use receive_consignment_stock_reducer::receive_consignment_stock;
 pub use receive_crm_provider_message_params_type::ReceiveCrmProviderMessageParams;
@@ -4804,12 +4895,14 @@ pub use reject_expense_policy_exception_reducer::reject_expense_policy_exception
 pub use reject_supplier_intake_reducer::reject_supplier_intake;
 pub use reject_timesheets_params_type::RejectTimesheetsParams;
 pub use reject_timesheets_reducer::reject_timesheets;
+pub use release_blanket_line_params_type::ReleaseBlanketLineParams;
 pub use release_blanket_to_po_params_type::ReleaseBlanketToPoParams;
 pub use release_blanket_to_po_reducer::release_blanket_to_po;
 pub use release_document_legal_hold_params_type::ReleaseDocumentLegalHoldParams;
 pub use release_document_legal_hold_reducer::release_document_legal_hold;
 pub use release_picking_wave_reducer::release_picking_wave;
 pub use remove_article_member_reducer::remove_article_member;
+pub use remove_contact_categories_reducer::remove_contact_categories;
 pub use remove_landed_cost_line_reducer::remove_landed_cost_line;
 pub use remove_member_from_quality_team_reducer::remove_member_from_quality_team;
 pub use remove_purchase_order_line_reducer::remove_purchase_order_line;
@@ -4824,6 +4917,7 @@ pub use reopen_ticket_reducer::reopen_ticket;
 pub use reopen_timesheets_params_type::ReopenTimesheetsParams;
 pub use reopen_timesheets_reducer::reopen_timesheets;
 pub use reorder_proposal_line_items_reducer::reorder_proposal_line_items;
+pub use replace_contact_categories_reducer::replace_contact_categories;
 pub use replenishment_rule_table::*;
 pub use replenishment_rule_type::ReplenishmentRule;
 pub use report_state_type::ReportState;
@@ -4841,6 +4935,7 @@ pub use res_partner_bank_type::ResPartnerBank;
 pub use reserve_serial_reducer::reserve_serial;
 pub use reserve_stock_quant_reducer::reserve_stock_quant;
 pub use reset_leave_to_draft_reducer::reset_leave_to_draft;
+pub use resolve_inventory_audit_violation_reducer::resolve_inventory_audit_violation;
 pub use resolve_inventory_exception_reducer::resolve_inventory_exception;
 pub use resolve_iot_alert_reducer::resolve_iot_alert;
 pub use resolve_proposal_comment_reducer::resolve_proposal_comment;
@@ -4905,6 +5000,7 @@ pub use run_all_expenses_tests_reducer::run_all_expenses_tests;
 pub use run_all_fleet_tests_reducer::run_all_fleet_tests;
 pub use run_all_hr_tests_reducer::run_all_hr_tests;
 pub use run_all_inventory_tests_reducer::run_all_inventory_tests;
+pub use run_all_manufacturing_tests_reducer::run_all_manufacturing_tests;
 pub use run_all_platform_tests_reducer::run_all_platform_tests;
 pub use run_all_projects_tests_reducer::run_all_projects_tests;
 pub use run_all_proposals_tests_reducer::run_all_proposals_tests;
@@ -4948,12 +5044,17 @@ pub use run_helpdesk_ticket_test_reducer::run_helpdesk_ticket_test;
 pub use run_hr_leave_type_test_reducer::run_hr_leave_type_test;
 pub use run_hr_wave_a_test_reducer::run_hr_wave_a_test;
 pub use run_inventory_3_pl_asn_test_reducer::run_inventory_3_pl_asn_test;
+pub use run_inventory_adjustment_company_derived_test_reducer::run_inventory_adjustment_company_derived_test;
+pub use run_inventory_adjustment_process_idempotency_test_reducer::run_inventory_adjustment_process_idempotency_test;
+pub use run_inventory_adjustment_requires_valid_reason_test_reducer::run_inventory_adjustment_requires_valid_reason_test;
 pub use run_inventory_adjustment_test_reducer::run_inventory_adjustment_test;
 pub use run_inventory_atp_fail_closed_test_reducer::run_inventory_atp_fail_closed_test;
 pub use run_inventory_cartonization_test_reducer::run_inventory_cartonization_test;
 pub use run_inventory_close_lock_test_reducer::run_inventory_close_lock_test;
+pub use run_inventory_close_no_gl_on_create_test_reducer::run_inventory_close_no_gl_on_create_test;
 pub use run_inventory_close_params_type::RunInventoryCloseParams;
 pub use run_inventory_close_reducer::run_inventory_close;
+pub use run_inventory_close_reopen_blocked_gl_test_reducer::run_inventory_close_reopen_blocked_gl_test;
 pub use run_inventory_close_valuation_test_reducer::run_inventory_close_valuation_test;
 pub use run_inventory_company_isolation_test_reducer::run_inventory_company_isolation_test;
 pub use run_inventory_consignment_atp_test_reducer::run_inventory_consignment_atp_test;
@@ -4963,10 +5064,12 @@ pub use run_inventory_directed_putaway_test_reducer::run_inventory_directed_puta
 pub use run_inventory_exception_queues_test_reducer::run_inventory_exception_queues_test;
 pub use run_inventory_expired_lot_test_reducer::run_inventory_expired_lot_test;
 pub use run_inventory_fefo_test_reducer::run_inventory_fefo_test;
+pub use run_inventory_integration_applied_guard_test_reducer::run_inventory_integration_applied_guard_test;
 pub use run_inventory_lot_reserve_test_reducer::run_inventory_lot_reserve_test;
 pub use run_inventory_lot_validate_test_reducer::run_inventory_lot_validate_test;
 pub use run_inventory_multi_wh_promise_atp_test_reducer::run_inventory_multi_wh_promise_atp_test;
 pub use run_inventory_packing_workflow_test_reducer::run_inventory_packing_workflow_test;
+pub use run_inventory_preflight_audit_reducer::run_inventory_preflight_audit;
 pub use run_inventory_product_category_test_reducer::run_inventory_product_category_test;
 pub use run_inventory_product_update_test_reducer::run_inventory_product_update_test;
 pub use run_inventory_qc_quarantine_test_reducer::run_inventory_qc_quarantine_test;
@@ -4974,13 +5077,19 @@ pub use run_inventory_receipt_average_costing_test_reducer::run_inventory_receip
 pub use run_inventory_receipt_fifo_layers_test_reducer::run_inventory_receipt_fifo_layers_test;
 pub use run_inventory_receipt_quant_test_reducer::run_inventory_receipt_quant_test;
 pub use run_inventory_replenishment_demand_test_reducer::run_inventory_replenishment_demand_test;
+pub use run_inventory_replenishment_rule_not_found_test_reducer::run_inventory_replenishment_rule_not_found_test;
 pub use run_inventory_serial_id_validate_test_reducer::run_inventory_serial_id_validate_test;
 pub use run_inventory_serial_reserve_test_reducer::run_inventory_serial_reserve_test;
+pub use run_inventory_server_owns_state_test_reducer::run_inventory_server_owns_state_test;
 pub use run_inventory_stock_inventory_test_reducer::run_inventory_stock_inventory_test;
 pub use run_inventory_stock_quant_test_reducer::run_inventory_stock_quant_test;
 pub use run_inventory_uom_conversion_test_reducer::run_inventory_uom_conversion_test;
 pub use run_inventory_warehouse_sync_test_reducer::run_inventory_warehouse_sync_test;
 pub use run_inventory_wave_release_test_reducer::run_inventory_wave_release_test;
+pub use run_manufacturing_loss_category_create_test_reducer::run_manufacturing_loss_category_create_test;
+pub use run_manufacturing_loss_category_invalid_category_test_reducer::run_manufacturing_loss_category_invalid_category_test;
+pub use run_manufacturing_workcenter_create_test_reducer::run_manufacturing_workcenter_create_test;
+pub use run_manufacturing_workcenter_cross_org_test_reducer::run_manufacturing_workcenter_cross_org_test;
 pub use run_manufacturing_workcenter_test_reducer::run_manufacturing_workcenter_test;
 pub use run_owner_report_schedule_reducer::run_owner_report_schedule;
 pub use run_projects_wave_a_test_reducer::run_projects_wave_a_test;
@@ -4994,6 +5103,13 @@ pub use run_purchasing_bill_balanced_test_reducer::run_purchasing_bill_balanced_
 pub use run_purchasing_company_isolation_test_reducer::run_purchasing_company_isolation_test;
 pub use run_purchasing_incoming_picking_test_reducer::run_purchasing_incoming_picking_test;
 pub use run_purchasing_lot_receive_test_reducer::run_purchasing_lot_receive_test;
+pub use run_purchasing_phase_0_containment_test_reducer::run_purchasing_phase_0_containment_test;
+pub use run_purchasing_phase_0_fixture_test_reducer::run_purchasing_phase_0_fixture_test;
+pub use run_purchasing_phase_1_landed_costs_test_reducer::run_purchasing_phase_1_landed_costs_test;
+pub use run_purchasing_phase_1_purchase_orders_test_reducer::run_purchasing_phase_1_purchase_orders_test;
+pub use run_purchasing_phase_1_relational_integrity_test_reducer::run_purchasing_phase_1_relational_integrity_test;
+pub use run_purchasing_phase_1_returns_advanced_test_reducer::run_purchasing_phase_1_returns_advanced_test;
+pub use run_purchasing_phase_2_blanket_release_test_reducer::run_purchasing_phase_2_blanket_release_test;
 pub use run_purchasing_wave_c_smoke_test_reducer::run_purchasing_wave_c_smoke_test;
 pub use run_purchasing_wave_e_test_reducer::run_purchasing_wave_e_test;
 pub use run_queue_foundation_tests_reducer::run_queue_foundation_tests;
@@ -5178,6 +5294,10 @@ pub use stock_inventory_line_table::*;
 pub use stock_inventory_line_type::StockInventoryLine;
 pub use stock_inventory_table::*;
 pub use stock_inventory_type::StockInventory;
+pub use stock_landed_cost_allocation_table::*;
+pub use stock_landed_cost_allocation_type::StockLandedCostAllocation;
+pub use stock_landed_cost_application_table::*;
+pub use stock_landed_cost_application_type::StockLandedCostApplication;
 pub use stock_landed_cost_lines_table::*;
 pub use stock_landed_cost_lines_type::StockLandedCostLines;
 pub use stock_landed_cost_table::*;
@@ -5376,6 +5496,8 @@ pub use update_contact_address_params_type::UpdateContactAddressParams;
 pub use update_contact_address_reducer::update_contact_address;
 pub use update_contact_business_params_type::UpdateContactBusinessParams;
 pub use update_contact_business_reducer::update_contact_business;
+pub use update_contact_category_params_type::UpdateContactCategoryParams;
+pub use update_contact_category_reducer::update_contact_category;
 pub use update_contact_core_params_type::UpdateContactCoreParams;
 pub use update_contact_details_params_type::UpdateContactDetailsParams;
 pub use update_contact_details_reducer::update_contact_details;
@@ -5845,6 +5967,11 @@ pub enum Reducer {
         article_id: u64,
         member: __sdk::Identity,
     },
+    AddContactCategories {
+        organization_id: u64,
+        contact_id: u64,
+        category_ids: Vec<u64>,
+    },
     AddContactToSegment {
         organization_id: u64,
         segment_id: u64,
@@ -6157,6 +6284,10 @@ pub enum Reducer {
         session_key: String,
         archived: bool,
     },
+    ArchiveContactCategory {
+        organization_id: u64,
+        category_id: u64,
+    },
     ArchiveContactIdentity {
         organization_id: u64,
         identity_id: u64,
@@ -6237,6 +6368,9 @@ pub enum Reducer {
         organization_id: u64,
         picking_id: u64,
         params: AssignUserToPickingParams,
+    },
+    AuditManufacturingData {
+        organization_id: u64,
     },
     AwardPurchaseRfqBid {
         organization_id: u64,
@@ -6424,19 +6558,58 @@ pub enum Reducer {
         organization_id: u64,
         max_age_micros: u64,
     },
+    ClearContactCategories {
+        organization_id: u64,
+        contact_id: u64,
+    },
     ClearDocumentPresence {
         document_id: u64,
+    },
+    ClearInventoryAuditViolations {
+        organization_id: u64,
+        run_id: Option<u64>,
     },
     ClearKnowledgeArticlePresence {
         article_id: u64,
     },
+    ClearLandedCostField {
+        organization_id: u64,
+        landed_cost_id: u64,
+        field: String,
+    },
     ClearOpportunityPresence {
         opportunity_id: u64,
+    },
+    ClearPartnerBankField {
+        organization_id: u64,
+        bank_id: u64,
+        field: String,
     },
     ClearProposalPresence {
         organization_id: u64,
         company_id: u64,
         proposal_id: u64,
+    },
+    ClearPurchaseOrderField {
+        organization_id: u64,
+        company_id: u64,
+        order_id: u64,
+        field: String,
+    },
+    ClearPurchaseOrderLineField {
+        organization_id: u64,
+        line_id: u64,
+        field: String,
+    },
+    ClearSupplierIntakeField {
+        organization_id: u64,
+        intake_id: u64,
+        field: String,
+    },
+    ClearVendorRiskReason {
+        organization_id: u64,
+        company_id: u64,
+        partner_id: u64,
     },
     CloneWorkflowVersionToDraft {
         organization_id: u64,
@@ -6536,7 +6709,6 @@ pub enum Reducer {
     },
     CompleteProductivityLog {
         organization_id: u64,
-        company_id: u64,
         log_id: u64,
     },
     CompleteProposalIntegrationIntent {
@@ -6562,7 +6734,6 @@ pub enum Reducer {
     },
     ComputeBomCost {
         organization_id: u64,
-        company_id: u64,
         bom_id: u64,
     },
     ComputeDepreciationBoard {
@@ -6896,6 +7067,10 @@ pub enum Reducer {
     CreateContact {
         organization_id: u64,
         params: CreateContactParams,
+    },
+    CreateContactCategory {
+        organization_id: u64,
+        params: CreateContactCategoryParams,
     },
     CreateContactIdentity {
         organization_id: u64,
@@ -7255,6 +7430,10 @@ pub enum Reducer {
         company_id: u64,
         params: CreateLeaveTypeParams,
     },
+    CreateLossCategory {
+        organization_id: u64,
+        params: CreateLossCategoryParams,
+    },
     CreateLoyaltyCard {
         organization_id: u64,
         partner_id: Option<u64>,
@@ -7584,7 +7763,6 @@ pub enum Reducer {
     },
     CreateRoutingWorkcenter {
         organization_id: u64,
-        company_id: u64,
         params: CreateRoutingWorkcenterParams,
     },
     CreateSalaryRule {
@@ -7935,7 +8113,6 @@ pub enum Reducer {
     },
     DeleteBom {
         organization_id: u64,
-        company_id: u64,
         bom_id: u64,
     },
     DeleteBudgetLine {
@@ -8259,6 +8436,7 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         rule_id: u64,
+        idempotency_key: String,
     },
     ExecuteRetentionPurge {
         organization_id: u64,
@@ -8274,7 +8452,6 @@ pub enum Reducer {
     },
     ExplodeBom {
         organization_id: u64,
-        company_id: u64,
         bom_id: u64,
     },
     ExportFinancialReport {
@@ -8760,7 +8937,6 @@ pub enum Reducer {
     },
     LogWorkcenterProductivity {
         organization_id: u64,
-        company_id: u64,
         workcenter_id: u64,
         params: CreateWorkcenterProductivityParams,
     },
@@ -8985,6 +9161,7 @@ pub enum Reducer {
         workflow_version_id: u64,
         expected_revision: u64,
     },
+    PurchasingIntegrityInventory,
     PurgeExpiredDocuments {
         organization_id: u64,
     },
@@ -9004,6 +9181,9 @@ pub enum Reducer {
         company_id: u64,
         subscription_id: u64,
         params: RebaseDeferredSchedulesParams,
+    },
+    RebuildManufacturingAssociations {
+        organization_id: u64,
     },
     ReceiveConsignmentStock {
         organization_id: u64,
@@ -9318,6 +9498,11 @@ pub enum Reducer {
         article_id: u64,
         member: __sdk::Identity,
     },
+    RemoveContactCategories {
+        organization_id: u64,
+        contact_id: u64,
+        category_ids: Vec<u64>,
+    },
     RemoveLandedCostLine {
         organization_id: u64,
         line_id: u64,
@@ -9370,6 +9555,11 @@ pub enum Reducer {
         proposal_id: u64,
         ordered_ids: Vec<u64>,
     },
+    ReplaceContactCategories {
+        organization_id: u64,
+        contact_id: u64,
+        category_ids: Vec<u64>,
+    },
     RequestAiSkillCertification {
         organization_id: u64,
         params: RequestAiSkillCertificationParams,
@@ -9399,6 +9589,9 @@ pub enum Reducer {
         organization_id: u64,
         company_id: u64,
         leave_id: u64,
+    },
+    ResolveInventoryAuditViolation {
+        violation_id: u64,
     },
     ResolveInventoryException {
         organization_id: u64,
@@ -9536,6 +9729,7 @@ pub enum Reducer {
     RunAllFleetTests,
     RunAllHrTests,
     RunAllInventoryTests,
+    RunAllManufacturingTests,
     RunAllPlatformTests,
     RunAllProjectsTests,
     RunAllProposalsTests,
@@ -9590,6 +9784,9 @@ pub enum Reducer {
     RunHrLeaveTypeTest,
     RunHrWaveATest,
     RunInventory3PlAsnTest,
+    RunInventoryAdjustmentCompanyDerivedTest,
+    RunInventoryAdjustmentProcessIdempotencyTest,
+    RunInventoryAdjustmentRequiresValidReasonTest,
     RunInventoryAdjustmentTest,
     RunInventoryAtpFailClosedTest,
     RunInventoryCartonizationTest,
@@ -9600,6 +9797,8 @@ pub enum Reducer {
         params: RunInventoryCloseParams,
     },
     RunInventoryCloseLockTest,
+    RunInventoryCloseNoGlOnCreateTest,
+    RunInventoryCloseReopenBlockedGlTest,
     RunInventoryCloseValuationTest,
     RunInventoryCompanyIsolationTest,
     RunInventoryConsignmentAtpTest,
@@ -9609,10 +9808,15 @@ pub enum Reducer {
     RunInventoryExceptionQueuesTest,
     RunInventoryExpiredLotTest,
     RunInventoryFefoTest,
+    RunInventoryIntegrationAppliedGuardTest,
     RunInventoryLotReserveTest,
     RunInventoryLotValidateTest,
     RunInventoryMultiWhPromiseAtpTest,
     RunInventoryPackingWorkflowTest,
+    RunInventoryPreflightAudit {
+        organization_id: u64,
+        company_id: Option<u64>,
+    },
     RunInventoryProductCategoryTest,
     RunInventoryProductUpdateTest,
     RunInventoryQcQuarantineTest,
@@ -9620,13 +9824,19 @@ pub enum Reducer {
     RunInventoryReceiptFifoLayersTest,
     RunInventoryReceiptQuantTest,
     RunInventoryReplenishmentDemandTest,
+    RunInventoryReplenishmentRuleNotFoundTest,
     RunInventorySerialIdValidateTest,
     RunInventorySerialReserveTest,
+    RunInventoryServerOwnsStateTest,
     RunInventoryStockInventoryTest,
     RunInventoryStockQuantTest,
     RunInventoryUomConversionTest,
     RunInventoryWarehouseSyncTest,
     RunInventoryWaveReleaseTest,
+    RunManufacturingLossCategoryCreateTest,
+    RunManufacturingLossCategoryInvalidCategoryTest,
+    RunManufacturingWorkcenterCreateTest,
+    RunManufacturingWorkcenterCrossOrgTest,
     RunManufacturingWorkcenterTest,
     RunOwnerReportSchedule {
         organization_id: u64,
@@ -9643,6 +9853,13 @@ pub enum Reducer {
     RunPurchasingCompanyIsolationTest,
     RunPurchasingIncomingPickingTest,
     RunPurchasingLotReceiveTest,
+    RunPurchasingPhase0ContainmentTest,
+    RunPurchasingPhase0FixtureTest,
+    RunPurchasingPhase1LandedCostsTest,
+    RunPurchasingPhase1PurchaseOrdersTest,
+    RunPurchasingPhase1RelationalIntegrityTest,
+    RunPurchasingPhase1ReturnsAdvancedTest,
+    RunPurchasingPhase2BlanketReleaseTest,
     RunPurchasingWaveCSmokeTest,
     RunPurchasingWaveETest,
     RunQueueFoundationTests,
@@ -10232,7 +10449,6 @@ pub enum Reducer {
     },
     UpdateBom {
         organization_id: u64,
-        company_id: u64,
         bom_id: u64,
         params: UpdateBomParams,
     },
@@ -10291,6 +10507,11 @@ pub enum Reducer {
         organization_id: u64,
         contact_id: u64,
         params: UpdateContactBusinessParams,
+    },
+    UpdateContactCategory {
+        organization_id: u64,
+        category_id: u64,
+        params: UpdateContactCategoryParams,
     },
     UpdateContactDetails {
         organization_id: u64,
@@ -10534,7 +10755,6 @@ pub enum Reducer {
     UpdateOpportunityPresence {
         organization_id: u64,
         opportunity_id: u64,
-        user_name: String,
     },
     UpdateOpportunityStage {
         organization_id: u64,
@@ -11116,6 +11336,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ActivateSubscriptionPlan { .. } => "activate_subscription_plan",
             Reducer::AddAccountMoveLine { .. } => "add_account_move_line",
             Reducer::AddArticleMember { .. } => "add_article_member",
+            Reducer::AddContactCategories { .. } => "add_contact_categories",
             Reducer::AddContactToSegment { .. } => "add_contact_to_segment",
             Reducer::AddDocumentVersion { .. } => "add_document_version",
             Reducer::AddFormField { .. } => "add_form_field",
@@ -11185,6 +11406,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ApprovePurchaseRequisition { .. } => "approve_purchase_requisition",
             Reducer::ApproveSupplierIntake { .. } => "approve_supplier_intake",
             Reducer::ArchiveAiChatSession { .. } => "archive_ai_chat_session",
+            Reducer::ArchiveContactCategory { .. } => "archive_contact_category",
             Reducer::ArchiveContactIdentity { .. } => "archive_contact_identity",
             Reducer::ArchiveEmployee { .. } => "archive_employee",
             Reducer::ArchiveFinancialReport { .. } => "archive_financial_report",
@@ -11201,6 +11423,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AssignTeamMemberSkill { .. } => "assign_team_member_skill",
             Reducer::AssignTicket { .. } => "assign_ticket",
             Reducer::AssignUserToPicking { .. } => "assign_user_to_picking",
+            Reducer::AuditManufacturingData { .. } => "audit_manufacturing_data",
             Reducer::AwardPurchaseRfqBid { .. } => "award_purchase_rfq_bid",
             Reducer::BackfillConsolidationOrganizationOwnership => {
                 "backfill_consolidation_organization_ownership"
@@ -11252,10 +11475,18 @@ impl __sdk::Reducer for Reducer {
             Reducer::ClaimQueueJob { .. } => "claim_queue_job",
             Reducer::ClaimWorkflowHumanTask { .. } => "claim_workflow_human_task",
             Reducer::CleanupStaleProposalPresence { .. } => "cleanup_stale_proposal_presence",
+            Reducer::ClearContactCategories { .. } => "clear_contact_categories",
             Reducer::ClearDocumentPresence { .. } => "clear_document_presence",
+            Reducer::ClearInventoryAuditViolations { .. } => "clear_inventory_audit_violations",
             Reducer::ClearKnowledgeArticlePresence { .. } => "clear_knowledge_article_presence",
+            Reducer::ClearLandedCostField { .. } => "clear_landed_cost_field",
             Reducer::ClearOpportunityPresence { .. } => "clear_opportunity_presence",
+            Reducer::ClearPartnerBankField { .. } => "clear_partner_bank_field",
             Reducer::ClearProposalPresence { .. } => "clear_proposal_presence",
+            Reducer::ClearPurchaseOrderField { .. } => "clear_purchase_order_field",
+            Reducer::ClearPurchaseOrderLineField { .. } => "clear_purchase_order_line_field",
+            Reducer::ClearSupplierIntakeField { .. } => "clear_supplier_intake_field",
+            Reducer::ClearVendorRiskReason { .. } => "clear_vendor_risk_reason",
             Reducer::CloneWorkflowVersionToDraft { .. } => "clone_workflow_version_to_draft",
             Reducer::CloseAccountAsset { .. } => "close_account_asset",
             Reducer::CloseAccountPeriod { .. } => "close_account_period",
@@ -11366,6 +11597,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateConsolidationAccount { .. } => "create_consolidation_account",
             Reducer::CreateConsolidationJournal { .. } => "create_consolidation_journal",
             Reducer::CreateContact { .. } => "create_contact",
+            Reducer::CreateContactCategory { .. } => "create_contact_category",
             Reducer::CreateContactIdentity { .. } => "create_contact_identity",
             Reducer::CreateContactRelationship { .. } => "create_contact_relationship",
             Reducer::CreateContactSegment { .. } => "create_contact_segment",
@@ -11447,6 +11679,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateLeadSource { .. } => "create_lead_source",
             Reducer::CreateLeaveRequest { .. } => "create_leave_request",
             Reducer::CreateLeaveType { .. } => "create_leave_type",
+            Reducer::CreateLossCategory { .. } => "create_loss_category",
             Reducer::CreateLoyaltyCard { .. } => "create_loyalty_card",
             Reducer::CreateLoyaltyProgram { .. } => "create_loyalty_program",
             Reducer::CreateMailTemplate { .. } => "create_mail_template",
@@ -11836,11 +12069,15 @@ impl __sdk::Reducer for Reducer {
             Reducer::PromoteAiSkillVersion { .. } => "promote_ai_skill_version",
             Reducer::PublishFormConfiguration { .. } => "publish_form_configuration",
             Reducer::PublishWorkflowVersion { .. } => "publish_workflow_version",
+            Reducer::PurchasingIntegrityInventory => "purchasing_integrity_inventory",
             Reducer::PurgeExpiredDocuments { .. } => "purge_expired_documents",
             Reducer::QueueMailFromTemplate { .. } => "queue_mail_from_template",
             Reducer::RateSubscriptionUsageEvents { .. } => "rate_subscription_usage_events",
             Reducer::RebaseDeferredSchedulesForSubscription { .. } => {
                 "rebase_deferred_schedules_for_subscription"
+            }
+            Reducer::RebuildManufacturingAssociations { .. } => {
+                "rebuild_manufacturing_associations"
             }
             Reducer::ReceiveConsignmentStock { .. } => "receive_consignment_stock",
             Reducer::ReceiveCrmProviderMessage { .. } => "receive_crm_provider_message",
@@ -11921,6 +12158,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReleaseDocumentLegalHold { .. } => "release_document_legal_hold",
             Reducer::ReleasePickingWave { .. } => "release_picking_wave",
             Reducer::RemoveArticleMember { .. } => "remove_article_member",
+            Reducer::RemoveContactCategories { .. } => "remove_contact_categories",
             Reducer::RemoveLandedCostLine { .. } => "remove_landed_cost_line",
             Reducer::RemoveMemberFromQualityTeam { .. } => "remove_member_from_quality_team",
             Reducer::RemovePurchaseOrderLine { .. } => "remove_purchase_order_line",
@@ -11932,12 +12170,14 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReopenTicket { .. } => "reopen_ticket",
             Reducer::ReopenTimesheets { .. } => "reopen_timesheets",
             Reducer::ReorderProposalLineItems { .. } => "reorder_proposal_line_items",
+            Reducer::ReplaceContactCategories { .. } => "replace_contact_categories",
             Reducer::RequestAiSkillCertification { .. } => "request_ai_skill_certification",
             Reducer::RequestEmbeddingJob { .. } => "request_embedding_job",
             Reducer::RequestExpensePolicyException { .. } => "request_expense_policy_exception",
             Reducer::ReserveSerial { .. } => "reserve_serial",
             Reducer::ReserveStockQuant { .. } => "reserve_stock_quant",
             Reducer::ResetLeaveToDraft { .. } => "reset_leave_to_draft",
+            Reducer::ResolveInventoryAuditViolation { .. } => "resolve_inventory_audit_violation",
             Reducer::ResolveInventoryException { .. } => "resolve_inventory_exception",
             Reducer::ResolveIotAlert { .. } => "resolve_iot_alert",
             Reducer::ResolveProposalComment { .. } => "resolve_proposal_comment",
@@ -11991,6 +12231,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunAllFleetTests => "run_all_fleet_tests",
             Reducer::RunAllHrTests => "run_all_hr_tests",
             Reducer::RunAllInventoryTests => "run_all_inventory_tests",
+            Reducer::RunAllManufacturingTests => "run_all_manufacturing_tests",
             Reducer::RunAllPlatformTests => "run_all_platform_tests",
             Reducer::RunAllProjectsTests => "run_all_projects_tests",
             Reducer::RunAllProposalsTests => "run_all_proposals_tests",
@@ -12033,11 +12274,26 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunHrLeaveTypeTest => "run_hr_leave_type_test",
             Reducer::RunHrWaveATest => "run_hr_wave_a_test",
             Reducer::RunInventory3PlAsnTest => "run_inventory_3_pl_asn_test",
+            Reducer::RunInventoryAdjustmentCompanyDerivedTest => {
+                "run_inventory_adjustment_company_derived_test"
+            }
+            Reducer::RunInventoryAdjustmentProcessIdempotencyTest => {
+                "run_inventory_adjustment_process_idempotency_test"
+            }
+            Reducer::RunInventoryAdjustmentRequiresValidReasonTest => {
+                "run_inventory_adjustment_requires_valid_reason_test"
+            }
             Reducer::RunInventoryAdjustmentTest => "run_inventory_adjustment_test",
             Reducer::RunInventoryAtpFailClosedTest => "run_inventory_atp_fail_closed_test",
             Reducer::RunInventoryCartonizationTest => "run_inventory_cartonization_test",
             Reducer::RunInventoryClose { .. } => "run_inventory_close",
             Reducer::RunInventoryCloseLockTest => "run_inventory_close_lock_test",
+            Reducer::RunInventoryCloseNoGlOnCreateTest => {
+                "run_inventory_close_no_gl_on_create_test"
+            }
+            Reducer::RunInventoryCloseReopenBlockedGlTest => {
+                "run_inventory_close_reopen_blocked_gl_test"
+            }
             Reducer::RunInventoryCloseValuationTest => "run_inventory_close_valuation_test",
             Reducer::RunInventoryCompanyIsolationTest => "run_inventory_company_isolation_test",
             Reducer::RunInventoryConsignmentAtpTest => "run_inventory_consignment_atp_test",
@@ -12047,10 +12303,14 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunInventoryExceptionQueuesTest => "run_inventory_exception_queues_test",
             Reducer::RunInventoryExpiredLotTest => "run_inventory_expired_lot_test",
             Reducer::RunInventoryFefoTest => "run_inventory_fefo_test",
+            Reducer::RunInventoryIntegrationAppliedGuardTest => {
+                "run_inventory_integration_applied_guard_test"
+            }
             Reducer::RunInventoryLotReserveTest => "run_inventory_lot_reserve_test",
             Reducer::RunInventoryLotValidateTest => "run_inventory_lot_validate_test",
             Reducer::RunInventoryMultiWhPromiseAtpTest => "run_inventory_multi_wh_promise_atp_test",
             Reducer::RunInventoryPackingWorkflowTest => "run_inventory_packing_workflow_test",
+            Reducer::RunInventoryPreflightAudit { .. } => "run_inventory_preflight_audit",
             Reducer::RunInventoryProductCategoryTest => "run_inventory_product_category_test",
             Reducer::RunInventoryProductUpdateTest => "run_inventory_product_update_test",
             Reducer::RunInventoryQcQuarantineTest => "run_inventory_qc_quarantine_test",
@@ -12062,13 +12322,29 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunInventoryReplenishmentDemandTest => {
                 "run_inventory_replenishment_demand_test"
             }
+            Reducer::RunInventoryReplenishmentRuleNotFoundTest => {
+                "run_inventory_replenishment_rule_not_found_test"
+            }
             Reducer::RunInventorySerialIdValidateTest => "run_inventory_serial_id_validate_test",
             Reducer::RunInventorySerialReserveTest => "run_inventory_serial_reserve_test",
+            Reducer::RunInventoryServerOwnsStateTest => "run_inventory_server_owns_state_test",
             Reducer::RunInventoryStockInventoryTest => "run_inventory_stock_inventory_test",
             Reducer::RunInventoryStockQuantTest => "run_inventory_stock_quant_test",
             Reducer::RunInventoryUomConversionTest => "run_inventory_uom_conversion_test",
             Reducer::RunInventoryWarehouseSyncTest => "run_inventory_warehouse_sync_test",
             Reducer::RunInventoryWaveReleaseTest => "run_inventory_wave_release_test",
+            Reducer::RunManufacturingLossCategoryCreateTest => {
+                "run_manufacturing_loss_category_create_test"
+            }
+            Reducer::RunManufacturingLossCategoryInvalidCategoryTest => {
+                "run_manufacturing_loss_category_invalid_category_test"
+            }
+            Reducer::RunManufacturingWorkcenterCreateTest => {
+                "run_manufacturing_workcenter_create_test"
+            }
+            Reducer::RunManufacturingWorkcenterCrossOrgTest => {
+                "run_manufacturing_workcenter_cross_org_test"
+            }
             Reducer::RunManufacturingWorkcenterTest => "run_manufacturing_workcenter_test",
             Reducer::RunOwnerReportSchedule { .. } => "run_owner_report_schedule",
             Reducer::RunProjectsWaveATest => "run_projects_wave_a_test",
@@ -12082,6 +12358,25 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunPurchasingCompanyIsolationTest => "run_purchasing_company_isolation_test",
             Reducer::RunPurchasingIncomingPickingTest => "run_purchasing_incoming_picking_test",
             Reducer::RunPurchasingLotReceiveTest => "run_purchasing_lot_receive_test",
+            Reducer::RunPurchasingPhase0ContainmentTest => {
+                "run_purchasing_phase_0_containment_test"
+            }
+            Reducer::RunPurchasingPhase0FixtureTest => "run_purchasing_phase_0_fixture_test",
+            Reducer::RunPurchasingPhase1LandedCostsTest => {
+                "run_purchasing_phase_1_landed_costs_test"
+            }
+            Reducer::RunPurchasingPhase1PurchaseOrdersTest => {
+                "run_purchasing_phase_1_purchase_orders_test"
+            }
+            Reducer::RunPurchasingPhase1RelationalIntegrityTest => {
+                "run_purchasing_phase_1_relational_integrity_test"
+            }
+            Reducer::RunPurchasingPhase1ReturnsAdvancedTest => {
+                "run_purchasing_phase_1_returns_advanced_test"
+            }
+            Reducer::RunPurchasingPhase2BlanketReleaseTest => {
+                "run_purchasing_phase_2_blanket_release_test"
+            }
             Reducer::RunPurchasingWaveCSmokeTest => "run_purchasing_wave_c_smoke_test",
             Reducer::RunPurchasingWaveETest => "run_purchasing_wave_e_test",
             Reducer::RunQueueFoundationTests => "run_queue_foundation_tests",
@@ -12264,6 +12559,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpdateContact { .. } => "update_contact",
             Reducer::UpdateContactAddress { .. } => "update_contact_address",
             Reducer::UpdateContactBusiness { .. } => "update_contact_business",
+            Reducer::UpdateContactCategory { .. } => "update_contact_category",
             Reducer::UpdateContactDetails { .. } => "update_contact_details",
             Reducer::UpdateContactIdentity { .. } => "update_contact_identity",
             Reducer::UpdateContactParent { .. } => "update_contact_parent",
@@ -12522,6 +12818,15 @@ impl __sdk::Reducer for Reducer {
                 organization_id: organization_id.clone(),
                 article_id: article_id.clone(),
                 member: member.clone(),
+}),
+            Reducer::AddContactCategories{
+                organization_id,
+                contact_id,
+                category_ids,
+}             => __sats::bsatn::to_vec(&add_contact_categories_reducer::AddContactCategoriesArgs {
+                organization_id: organization_id.clone(),
+                contact_id: contact_id.clone(),
+                category_ids: category_ids.clone(),
 }),
             Reducer::AddContactToSegment{
                 organization_id,
@@ -13087,6 +13392,13 @@ Reducer::ApplyHrIntegrationIntent{
                 session_key: session_key.clone(),
                 archived: archived.clone(),
 }),
+            Reducer::ArchiveContactCategory{
+                organization_id,
+                category_id,
+}             => __sats::bsatn::to_vec(&archive_contact_category_reducer::ArchiveContactCategoryArgs {
+                organization_id: organization_id.clone(),
+                category_id: category_id.clone(),
+}),
             Reducer::ArchiveContactIdentity{
                 organization_id,
                 identity_id,
@@ -13232,6 +13544,11 @@ Reducer::ApplyHrIntegrationIntent{
                 organization_id: organization_id.clone(),
                 picking_id: picking_id.clone(),
                 params: params.clone(),
+}),
+            Reducer::AuditManufacturingData{
+                organization_id,
+}             => __sats::bsatn::to_vec(&audit_manufacturing_data_reducer::AuditManufacturingDataArgs {
+                organization_id: organization_id.clone(),
 }),
             Reducer::AwardPurchaseRfqBid{
                 organization_id,
@@ -13567,20 +13884,52 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 max_age_micros: max_age_micros.clone(),
 }),
+            Reducer::ClearContactCategories{
+                organization_id,
+                contact_id,
+}             => __sats::bsatn::to_vec(&clear_contact_categories_reducer::ClearContactCategoriesArgs {
+                organization_id: organization_id.clone(),
+                contact_id: contact_id.clone(),
+}),
             Reducer::ClearDocumentPresence{
                 document_id,
 }             => __sats::bsatn::to_vec(&clear_document_presence_reducer::ClearDocumentPresenceArgs {
                 document_id: document_id.clone(),
+}),
+            Reducer::ClearInventoryAuditViolations{
+                organization_id,
+                run_id,
+}             => __sats::bsatn::to_vec(&clear_inventory_audit_violations_reducer::ClearInventoryAuditViolationsArgs {
+                organization_id: organization_id.clone(),
+                run_id: run_id.clone(),
 }),
             Reducer::ClearKnowledgeArticlePresence{
                 article_id,
 }             => __sats::bsatn::to_vec(&clear_knowledge_article_presence_reducer::ClearKnowledgeArticlePresenceArgs {
                 article_id: article_id.clone(),
 }),
+            Reducer::ClearLandedCostField{
+                organization_id,
+                landed_cost_id,
+                field,
+}             => __sats::bsatn::to_vec(&clear_landed_cost_field_reducer::ClearLandedCostFieldArgs {
+                organization_id: organization_id.clone(),
+                landed_cost_id: landed_cost_id.clone(),
+                field: field.clone(),
+}),
             Reducer::ClearOpportunityPresence{
                 opportunity_id,
 }             => __sats::bsatn::to_vec(&clear_opportunity_presence_reducer::ClearOpportunityPresenceArgs {
                 opportunity_id: opportunity_id.clone(),
+}),
+            Reducer::ClearPartnerBankField{
+                organization_id,
+                bank_id,
+                field,
+}             => __sats::bsatn::to_vec(&clear_partner_bank_field_reducer::ClearPartnerBankFieldArgs {
+                organization_id: organization_id.clone(),
+                bank_id: bank_id.clone(),
+                field: field.clone(),
 }),
             Reducer::ClearProposalPresence{
                 organization_id,
@@ -13590,6 +13939,44 @@ Reducer::BillProjectMilestone{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 proposal_id: proposal_id.clone(),
+}),
+            Reducer::ClearPurchaseOrderField{
+                organization_id,
+                company_id,
+                order_id,
+                field,
+}             => __sats::bsatn::to_vec(&clear_purchase_order_field_reducer::ClearPurchaseOrderFieldArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                order_id: order_id.clone(),
+                field: field.clone(),
+}),
+            Reducer::ClearPurchaseOrderLineField{
+                organization_id,
+                line_id,
+                field,
+}             => __sats::bsatn::to_vec(&clear_purchase_order_line_field_reducer::ClearPurchaseOrderLineFieldArgs {
+                organization_id: organization_id.clone(),
+                line_id: line_id.clone(),
+                field: field.clone(),
+}),
+            Reducer::ClearSupplierIntakeField{
+                organization_id,
+                intake_id,
+                field,
+}             => __sats::bsatn::to_vec(&clear_supplier_intake_field_reducer::ClearSupplierIntakeFieldArgs {
+                organization_id: organization_id.clone(),
+                intake_id: intake_id.clone(),
+                field: field.clone(),
+}),
+            Reducer::ClearVendorRiskReason{
+                organization_id,
+                company_id,
+                partner_id,
+}             => __sats::bsatn::to_vec(&clear_vendor_risk_reason_reducer::ClearVendorRiskReasonArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+                partner_id: partner_id.clone(),
 }),
             Reducer::CloneWorkflowVersionToDraft{
                 organization_id,
@@ -13766,11 +14153,9 @@ Reducer::BillProjectMilestone{
 }),
             Reducer::CompleteProductivityLog{
                 organization_id,
-                company_id,
                 log_id,
 }             => __sats::bsatn::to_vec(&complete_productivity_log_reducer::CompleteProductivityLogArgs {
                 organization_id: organization_id.clone(),
-                company_id: company_id.clone(),
                 log_id: log_id.clone(),
 }),
             Reducer::CompleteProposalIntegrationIntent{
@@ -13813,11 +14198,9 @@ Reducer::BillProjectMilestone{
 }),
             Reducer::ComputeBomCost{
                 organization_id,
-                company_id,
                 bom_id,
 }             => __sats::bsatn::to_vec(&compute_bom_cost_reducer::ComputeBomCostArgs {
                 organization_id: organization_id.clone(),
-                company_id: company_id.clone(),
                 bom_id: bom_id.clone(),
 }),
             Reducer::ComputeDepreciationBoard{
@@ -14408,6 +14791,13 @@ Reducer::BillProjectMilestone{
                 organization_id,
                 params,
 }             => __sats::bsatn::to_vec(&create_contact_reducer::CreateContactArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::CreateContactCategory{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_contact_category_reducer::CreateContactCategoryArgs {
                 organization_id: organization_id.clone(),
                 params: params.clone(),
 }),
@@ -15052,6 +15442,13 @@ Reducer::BillProjectMilestone{
                 company_id: company_id.clone(),
                 params: params.clone(),
 }),
+            Reducer::CreateLossCategory{
+                organization_id,
+                params,
+}             => __sats::bsatn::to_vec(&create_loss_category_reducer::CreateLossCategoryArgs {
+                organization_id: organization_id.clone(),
+                params: params.clone(),
+}),
             Reducer::CreateLoyaltyCard{
                 organization_id,
                 partner_id,
@@ -15638,11 +16035,9 @@ Reducer::BillProjectMilestone{
 }),
             Reducer::CreateRoutingWorkcenter{
                 organization_id,
-                company_id,
                 params,
 }             => __sats::bsatn::to_vec(&create_routing_workcenter_reducer::CreateRoutingWorkcenterArgs {
                 organization_id: organization_id.clone(),
-                company_id: company_id.clone(),
                 params: params.clone(),
 }),
             Reducer::CreateSalaryRule{
@@ -16264,11 +16659,9 @@ Reducer::DeactivatePosConfig{
 }),
             Reducer::DeleteBom{
                 organization_id,
-                company_id,
                 bom_id,
 }             => __sats::bsatn::to_vec(&delete_bom_reducer::DeleteBomArgs {
                 organization_id: organization_id.clone(),
-                company_id: company_id.clone(),
                 bom_id: bom_id.clone(),
 }),
             Reducer::DeleteBudgetLine{
@@ -16839,10 +17232,12 @@ Reducer::ErrorIntercompanyTransaction{
                 organization_id,
                 company_id,
                 rule_id,
+                idempotency_key,
 }             => __sats::bsatn::to_vec(&execute_replenishment_rule_reducer::ExecuteReplenishmentRuleArgs {
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 rule_id: rule_id.clone(),
+                idempotency_key: idempotency_key.clone(),
 }),
             Reducer::ExecuteRetentionPurge{
                 organization_id,
@@ -16867,11 +17262,9 @@ Reducer::ErrorIntercompanyTransaction{
 }),
             Reducer::ExplodeBom{
                 organization_id,
-                company_id,
                 bom_id,
 }             => __sats::bsatn::to_vec(&explode_bom_reducer::ExplodeBomArgs {
                 organization_id: organization_id.clone(),
-                company_id: company_id.clone(),
                 bom_id: bom_id.clone(),
 }),
             Reducer::ExportFinancialReport{
@@ -17734,12 +18127,10 @@ Reducer::ImportAccountCsv{
 }),
             Reducer::LogWorkcenterProductivity{
                 organization_id,
-                company_id,
                 workcenter_id,
                 params,
 }             => __sats::bsatn::to_vec(&log_workcenter_productivity_reducer::LogWorkcenterProductivityArgs {
                 organization_id: organization_id.clone(),
-                company_id: company_id.clone(),
                 workcenter_id: workcenter_id.clone(),
                 params: params.clone(),
 }),
@@ -18141,7 +18532,9 @@ Reducer::MigrateWorkflowInstance{
                 workflow_version_id: workflow_version_id.clone(),
                 expected_revision: expected_revision.clone(),
 }),
-            Reducer::PurgeExpiredDocuments{
+            Reducer::PurchasingIntegrityInventory => __sats::bsatn::to_vec(&purchasing_integrity_inventory_reducer::PurchasingIntegrityInventoryArgs {
+                }),
+Reducer::PurgeExpiredDocuments{
                 organization_id,
 }             => __sats::bsatn::to_vec(&purge_expired_documents_reducer::PurgeExpiredDocumentsArgs {
                 organization_id: organization_id.clone(),
@@ -18176,6 +18569,11 @@ Reducer::MigrateWorkflowInstance{
                 company_id: company_id.clone(),
                 subscription_id: subscription_id.clone(),
                 params: params.clone(),
+}),
+            Reducer::RebuildManufacturingAssociations{
+                organization_id,
+}             => __sats::bsatn::to_vec(&rebuild_manufacturing_associations_reducer::RebuildManufacturingAssociationsArgs {
+                organization_id: organization_id.clone(),
 }),
             Reducer::ReceiveConsignmentStock{
                 organization_id,
@@ -18740,6 +19138,15 @@ Reducer::MigrateWorkflowInstance{
                 article_id: article_id.clone(),
                 member: member.clone(),
 }),
+            Reducer::RemoveContactCategories{
+                organization_id,
+                contact_id,
+                category_ids,
+}             => __sats::bsatn::to_vec(&remove_contact_categories_reducer::RemoveContactCategoriesArgs {
+                organization_id: organization_id.clone(),
+                contact_id: contact_id.clone(),
+                category_ids: category_ids.clone(),
+}),
             Reducer::RemoveLandedCostLine{
                 organization_id,
                 line_id,
@@ -18833,6 +19240,15 @@ Reducer::MigrateWorkflowInstance{
                 proposal_id: proposal_id.clone(),
                 ordered_ids: ordered_ids.clone(),
 }),
+            Reducer::ReplaceContactCategories{
+                organization_id,
+                contact_id,
+                category_ids,
+}             => __sats::bsatn::to_vec(&replace_contact_categories_reducer::ReplaceContactCategoriesArgs {
+                organization_id: organization_id.clone(),
+                contact_id: contact_id.clone(),
+                category_ids: category_ids.clone(),
+}),
             Reducer::RequestAiSkillCertification{
                 organization_id,
                 params,
@@ -18886,6 +19302,11 @@ Reducer::MigrateWorkflowInstance{
                 organization_id: organization_id.clone(),
                 company_id: company_id.clone(),
                 leave_id: leave_id.clone(),
+}),
+            Reducer::ResolveInventoryAuditViolation{
+                violation_id,
+}             => __sats::bsatn::to_vec(&resolve_inventory_audit_violation_reducer::ResolveInventoryAuditViolationArgs {
+                violation_id: violation_id.clone(),
 }),
             Reducer::ResolveInventoryException{
                 organization_id,
@@ -19135,6 +19556,8 @@ Reducer::RunAllHrTests => __sats::bsatn::to_vec(&run_all_hr_tests_reducer::RunAl
                 }),
 Reducer::RunAllInventoryTests => __sats::bsatn::to_vec(&run_all_inventory_tests_reducer::RunAllInventoryTestsArgs {
                 }),
+Reducer::RunAllManufacturingTests => __sats::bsatn::to_vec(&run_all_manufacturing_tests_reducer::RunAllManufacturingTestsArgs {
+                }),
 Reducer::RunAllPlatformTests => __sats::bsatn::to_vec(&run_all_platform_tests_reducer::RunAllPlatformTestsArgs {
                 }),
 Reducer::RunAllProjectsTests => __sats::bsatn::to_vec(&run_all_projects_tests_reducer::RunAllProjectsTestsArgs {
@@ -19239,6 +19662,12 @@ Reducer::RunHrWaveATest => __sats::bsatn::to_vec(&run_hr_wave_a_test_reducer::Ru
                 }),
 Reducer::RunInventory3PlAsnTest => __sats::bsatn::to_vec(&run_inventory_3_pl_asn_test_reducer::RunInventory3PlAsnTestArgs {
                 }),
+Reducer::RunInventoryAdjustmentCompanyDerivedTest => __sats::bsatn::to_vec(&run_inventory_adjustment_company_derived_test_reducer::RunInventoryAdjustmentCompanyDerivedTestArgs {
+                }),
+Reducer::RunInventoryAdjustmentProcessIdempotencyTest => __sats::bsatn::to_vec(&run_inventory_adjustment_process_idempotency_test_reducer::RunInventoryAdjustmentProcessIdempotencyTestArgs {
+                }),
+Reducer::RunInventoryAdjustmentRequiresValidReasonTest => __sats::bsatn::to_vec(&run_inventory_adjustment_requires_valid_reason_test_reducer::RunInventoryAdjustmentRequiresValidReasonTestArgs {
+                }),
 Reducer::RunInventoryAdjustmentTest => __sats::bsatn::to_vec(&run_inventory_adjustment_test_reducer::RunInventoryAdjustmentTestArgs {
                 }),
 Reducer::RunInventoryAtpFailClosedTest => __sats::bsatn::to_vec(&run_inventory_atp_fail_closed_test_reducer::RunInventoryAtpFailClosedTestArgs {
@@ -19258,6 +19687,10 @@ Reducer::RunInventoryClose{
 }),
             Reducer::RunInventoryCloseLockTest => __sats::bsatn::to_vec(&run_inventory_close_lock_test_reducer::RunInventoryCloseLockTestArgs {
                 }),
+Reducer::RunInventoryCloseNoGlOnCreateTest => __sats::bsatn::to_vec(&run_inventory_close_no_gl_on_create_test_reducer::RunInventoryCloseNoGlOnCreateTestArgs {
+                }),
+Reducer::RunInventoryCloseReopenBlockedGlTest => __sats::bsatn::to_vec(&run_inventory_close_reopen_blocked_gl_test_reducer::RunInventoryCloseReopenBlockedGlTestArgs {
+                }),
 Reducer::RunInventoryCloseValuationTest => __sats::bsatn::to_vec(&run_inventory_close_valuation_test_reducer::RunInventoryCloseValuationTestArgs {
                 }),
 Reducer::RunInventoryCompanyIsolationTest => __sats::bsatn::to_vec(&run_inventory_company_isolation_test_reducer::RunInventoryCompanyIsolationTestArgs {
@@ -19276,6 +19709,8 @@ Reducer::RunInventoryExpiredLotTest => __sats::bsatn::to_vec(&run_inventory_expi
                 }),
 Reducer::RunInventoryFefoTest => __sats::bsatn::to_vec(&run_inventory_fefo_test_reducer::RunInventoryFefoTestArgs {
                 }),
+Reducer::RunInventoryIntegrationAppliedGuardTest => __sats::bsatn::to_vec(&run_inventory_integration_applied_guard_test_reducer::RunInventoryIntegrationAppliedGuardTestArgs {
+                }),
 Reducer::RunInventoryLotReserveTest => __sats::bsatn::to_vec(&run_inventory_lot_reserve_test_reducer::RunInventoryLotReserveTestArgs {
                 }),
 Reducer::RunInventoryLotValidateTest => __sats::bsatn::to_vec(&run_inventory_lot_validate_test_reducer::RunInventoryLotValidateTestArgs {
@@ -19284,7 +19719,14 @@ Reducer::RunInventoryMultiWhPromiseAtpTest => __sats::bsatn::to_vec(&run_invento
                 }),
 Reducer::RunInventoryPackingWorkflowTest => __sats::bsatn::to_vec(&run_inventory_packing_workflow_test_reducer::RunInventoryPackingWorkflowTestArgs {
                 }),
-Reducer::RunInventoryProductCategoryTest => __sats::bsatn::to_vec(&run_inventory_product_category_test_reducer::RunInventoryProductCategoryTestArgs {
+Reducer::RunInventoryPreflightAudit{
+                organization_id,
+                company_id,
+}             => __sats::bsatn::to_vec(&run_inventory_preflight_audit_reducer::RunInventoryPreflightAuditArgs {
+                organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
+}),
+            Reducer::RunInventoryProductCategoryTest => __sats::bsatn::to_vec(&run_inventory_product_category_test_reducer::RunInventoryProductCategoryTestArgs {
                 }),
 Reducer::RunInventoryProductUpdateTest => __sats::bsatn::to_vec(&run_inventory_product_update_test_reducer::RunInventoryProductUpdateTestArgs {
                 }),
@@ -19298,9 +19740,13 @@ Reducer::RunInventoryReceiptQuantTest => __sats::bsatn::to_vec(&run_inventory_re
                 }),
 Reducer::RunInventoryReplenishmentDemandTest => __sats::bsatn::to_vec(&run_inventory_replenishment_demand_test_reducer::RunInventoryReplenishmentDemandTestArgs {
                 }),
+Reducer::RunInventoryReplenishmentRuleNotFoundTest => __sats::bsatn::to_vec(&run_inventory_replenishment_rule_not_found_test_reducer::RunInventoryReplenishmentRuleNotFoundTestArgs {
+                }),
 Reducer::RunInventorySerialIdValidateTest => __sats::bsatn::to_vec(&run_inventory_serial_id_validate_test_reducer::RunInventorySerialIdValidateTestArgs {
                 }),
 Reducer::RunInventorySerialReserveTest => __sats::bsatn::to_vec(&run_inventory_serial_reserve_test_reducer::RunInventorySerialReserveTestArgs {
+                }),
+Reducer::RunInventoryServerOwnsStateTest => __sats::bsatn::to_vec(&run_inventory_server_owns_state_test_reducer::RunInventoryServerOwnsStateTestArgs {
                 }),
 Reducer::RunInventoryStockInventoryTest => __sats::bsatn::to_vec(&run_inventory_stock_inventory_test_reducer::RunInventoryStockInventoryTestArgs {
                 }),
@@ -19311,6 +19757,14 @@ Reducer::RunInventoryUomConversionTest => __sats::bsatn::to_vec(&run_inventory_u
 Reducer::RunInventoryWarehouseSyncTest => __sats::bsatn::to_vec(&run_inventory_warehouse_sync_test_reducer::RunInventoryWarehouseSyncTestArgs {
                 }),
 Reducer::RunInventoryWaveReleaseTest => __sats::bsatn::to_vec(&run_inventory_wave_release_test_reducer::RunInventoryWaveReleaseTestArgs {
+                }),
+Reducer::RunManufacturingLossCategoryCreateTest => __sats::bsatn::to_vec(&run_manufacturing_loss_category_create_test_reducer::RunManufacturingLossCategoryCreateTestArgs {
+                }),
+Reducer::RunManufacturingLossCategoryInvalidCategoryTest => __sats::bsatn::to_vec(&run_manufacturing_loss_category_invalid_category_test_reducer::RunManufacturingLossCategoryInvalidCategoryTestArgs {
+                }),
+Reducer::RunManufacturingWorkcenterCreateTest => __sats::bsatn::to_vec(&run_manufacturing_workcenter_create_test_reducer::RunManufacturingWorkcenterCreateTestArgs {
+                }),
+Reducer::RunManufacturingWorkcenterCrossOrgTest => __sats::bsatn::to_vec(&run_manufacturing_workcenter_cross_org_test_reducer::RunManufacturingWorkcenterCrossOrgTestArgs {
                 }),
 Reducer::RunManufacturingWorkcenterTest => __sats::bsatn::to_vec(&run_manufacturing_workcenter_test_reducer::RunManufacturingWorkcenterTestArgs {
                 }),
@@ -19342,6 +19796,20 @@ Reducer::RunPurchasingCompanyIsolationTest => __sats::bsatn::to_vec(&run_purchas
 Reducer::RunPurchasingIncomingPickingTest => __sats::bsatn::to_vec(&run_purchasing_incoming_picking_test_reducer::RunPurchasingIncomingPickingTestArgs {
                 }),
 Reducer::RunPurchasingLotReceiveTest => __sats::bsatn::to_vec(&run_purchasing_lot_receive_test_reducer::RunPurchasingLotReceiveTestArgs {
+                }),
+Reducer::RunPurchasingPhase0ContainmentTest => __sats::bsatn::to_vec(&run_purchasing_phase_0_containment_test_reducer::RunPurchasingPhase0ContainmentTestArgs {
+                }),
+Reducer::RunPurchasingPhase0FixtureTest => __sats::bsatn::to_vec(&run_purchasing_phase_0_fixture_test_reducer::RunPurchasingPhase0FixtureTestArgs {
+                }),
+Reducer::RunPurchasingPhase1LandedCostsTest => __sats::bsatn::to_vec(&run_purchasing_phase_1_landed_costs_test_reducer::RunPurchasingPhase1LandedCostsTestArgs {
+                }),
+Reducer::RunPurchasingPhase1PurchaseOrdersTest => __sats::bsatn::to_vec(&run_purchasing_phase_1_purchase_orders_test_reducer::RunPurchasingPhase1PurchaseOrdersTestArgs {
+                }),
+Reducer::RunPurchasingPhase1RelationalIntegrityTest => __sats::bsatn::to_vec(&run_purchasing_phase_1_relational_integrity_test_reducer::RunPurchasingPhase1RelationalIntegrityTestArgs {
+                }),
+Reducer::RunPurchasingPhase1ReturnsAdvancedTest => __sats::bsatn::to_vec(&run_purchasing_phase_1_returns_advanced_test_reducer::RunPurchasingPhase1ReturnsAdvancedTestArgs {
+                }),
+Reducer::RunPurchasingPhase2BlanketReleaseTest => __sats::bsatn::to_vec(&run_purchasing_phase_2_blanket_release_test_reducer::RunPurchasingPhase2BlanketReleaseTestArgs {
                 }),
 Reducer::RunPurchasingWaveCSmokeTest => __sats::bsatn::to_vec(&run_purchasing_wave_c_smoke_test_reducer::RunPurchasingWaveCSmokeTestArgs {
                 }),
@@ -20409,12 +20877,10 @@ Reducer::ToggleProjectFavorite{
 }),
             Reducer::UpdateBom{
                 organization_id,
-                company_id,
                 bom_id,
                 params,
 }             => __sats::bsatn::to_vec(&update_bom_reducer::UpdateBomArgs {
                 organization_id: organization_id.clone(),
-                company_id: company_id.clone(),
                 bom_id: bom_id.clone(),
                 params: params.clone(),
 }),
@@ -20516,6 +20982,15 @@ Reducer::ToggleProjectFavorite{
 }             => __sats::bsatn::to_vec(&update_contact_business_reducer::UpdateContactBusinessArgs {
                 organization_id: organization_id.clone(),
                 contact_id: contact_id.clone(),
+                params: params.clone(),
+}),
+            Reducer::UpdateContactCategory{
+                organization_id,
+                category_id,
+                params,
+}             => __sats::bsatn::to_vec(&update_contact_category_reducer::UpdateContactCategoryArgs {
+                organization_id: organization_id.clone(),
+                category_id: category_id.clone(),
                 params: params.clone(),
 }),
             Reducer::UpdateContactDetails{
@@ -20957,11 +21432,9 @@ Reducer::ToggleProjectFavorite{
             Reducer::UpdateOpportunityPresence{
                 organization_id,
                 opportunity_id,
-                user_name,
 }             => __sats::bsatn::to_vec(&update_opportunity_presence_reducer::UpdateOpportunityPresenceArgs {
                 organization_id: organization_id.clone(),
                 opportunity_id: opportunity_id.clone(),
-                user_name: user_name.clone(),
 }),
             Reducer::UpdateOpportunityStage{
                 organization_id,
@@ -22183,6 +22656,8 @@ pub struct DbUpdate {
     intercompany_rule: __sdk::TableUpdate<IntercompanyRule>,
     intercompany_transaction: __sdk::TableUpdate<IntercompanyTransaction>,
     inventory_adjustment: __sdk::TableUpdate<InventoryAdjustment>,
+    inventory_audit_run: __sdk::TableUpdate<InventoryAuditRun>,
+    inventory_audit_violation: __sdk::TableUpdate<InventoryAuditViolation>,
     inventory_close: __sdk::TableUpdate<InventoryClose>,
     inventory_close_line: __sdk::TableUpdate<InventoryCloseLine>,
     inventory_exception: __sdk::TableUpdate<InventoryException>,
@@ -22210,6 +22685,7 @@ pub struct DbUpdate {
     message_template: __sdk::TableUpdate<MessageTemplate>,
     mrp_bom: __sdk::TableUpdate<MrpBom>,
     mrp_bom_line: __sdk::TableUpdate<MrpBomLine>,
+    mrp_loss_category: __sdk::TableUpdate<MrpLossCategory>,
     mrp_production: __sdk::TableUpdate<MrpProduction>,
     mrp_routing_workcenter: __sdk::TableUpdate<MrpRoutingWorkcenter>,
     mrp_workcenter: __sdk::TableUpdate<MrpWorkcenter>,
@@ -22288,6 +22764,8 @@ pub struct DbUpdate {
     public_holiday: __sdk::TableUpdate<PublicHoliday>,
     purchase_approval_delegate: __sdk::TableUpdate<PurchaseApprovalDelegate>,
     purchase_blanket_order: __sdk::TableUpdate<PurchaseBlanketOrder>,
+    purchase_blanket_order_line: __sdk::TableUpdate<PurchaseBlanketOrderLine>,
+    purchase_blanket_release: __sdk::TableUpdate<PurchaseBlanketRelease>,
     purchase_contract: __sdk::TableUpdate<PurchaseContract>,
     purchase_order: __sdk::TableUpdate<PurchaseOrder>,
     purchase_order_line: __sdk::TableUpdate<PurchaseOrderLine>,
@@ -22344,6 +22822,8 @@ pub struct DbUpdate {
     stock_inventory: __sdk::TableUpdate<StockInventory>,
     stock_inventory_line: __sdk::TableUpdate<StockInventoryLine>,
     stock_landed_cost: __sdk::TableUpdate<StockLandedCost>,
+    stock_landed_cost_allocation: __sdk::TableUpdate<StockLandedCostAllocation>,
+    stock_landed_cost_application: __sdk::TableUpdate<StockLandedCostApplication>,
     stock_landed_cost_lines: __sdk::TableUpdate<StockLandedCostLines>,
     stock_location: __sdk::TableUpdate<StockLocation>,
     stock_move: __sdk::TableUpdate<StockMove>,
@@ -23066,6 +23546,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "inventory_adjustment" => db_update.inventory_adjustment.append(
                     inventory_adjustment_table::parse_table_update(table_update)?,
                 ),
+                "inventory_audit_run" => db_update
+                    .inventory_audit_run
+                    .append(inventory_audit_run_table::parse_table_update(table_update)?),
+                "inventory_audit_violation" => db_update.inventory_audit_violation.append(
+                    inventory_audit_violation_table::parse_table_update(table_update)?,
+                ),
                 "inventory_close" => db_update
                     .inventory_close
                     .append(inventory_close_table::parse_table_update(table_update)?),
@@ -23147,6 +23633,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "mrp_bom_line" => db_update
                     .mrp_bom_line
                     .append(mrp_bom_line_table::parse_table_update(table_update)?),
+                "mrp_loss_category" => db_update
+                    .mrp_loss_category
+                    .append(mrp_loss_category_table::parse_table_update(table_update)?),
                 "mrp_production" => db_update
                     .mrp_production
                     .append(mrp_production_table::parse_table_update(table_update)?),
@@ -23383,6 +23872,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "purchase_blanket_order" => db_update.purchase_blanket_order.append(
                     purchase_blanket_order_table::parse_table_update(table_update)?,
                 ),
+                "purchase_blanket_order_line" => db_update.purchase_blanket_order_line.append(
+                    purchase_blanket_order_line_table::parse_table_update(table_update)?,
+                ),
+                "purchase_blanket_release" => db_update.purchase_blanket_release.append(
+                    purchase_blanket_release_table::parse_table_update(table_update)?,
+                ),
                 "purchase_contract" => db_update
                     .purchase_contract
                     .append(purchase_contract_table::parse_table_update(table_update)?),
@@ -23551,6 +24046,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "stock_landed_cost" => db_update
                     .stock_landed_cost
                     .append(stock_landed_cost_table::parse_table_update(table_update)?),
+                "stock_landed_cost_allocation" => db_update.stock_landed_cost_allocation.append(
+                    stock_landed_cost_allocation_table::parse_table_update(table_update)?,
+                ),
+                "stock_landed_cost_application" => db_update.stock_landed_cost_application.append(
+                    stock_landed_cost_application_table::parse_table_update(table_update)?,
+                ),
                 "stock_landed_cost_lines" => db_update.stock_landed_cost_lines.append(
                     stock_landed_cost_lines_table::parse_table_update(table_update)?,
                 ),
@@ -24735,6 +25236,18 @@ impl __sdk::DbUpdate for DbUpdate {
                 &self.inventory_adjustment,
             )
             .with_updates_by_pk(|row| &row.id);
+        diff.inventory_audit_run = cache
+            .apply_diff_to_table::<InventoryAuditRun>(
+                "inventory_audit_run",
+                &self.inventory_audit_run,
+            )
+            .with_updates_by_pk(|row| &row.id);
+        diff.inventory_audit_violation = cache
+            .apply_diff_to_table::<InventoryAuditViolation>(
+                "inventory_audit_violation",
+                &self.inventory_audit_violation,
+            )
+            .with_updates_by_pk(|row| &row.id);
         diff.inventory_close = cache
             .apply_diff_to_table::<InventoryClose>("inventory_close", &self.inventory_close)
             .with_updates_by_pk(|row| &row.id);
@@ -24830,6 +25343,9 @@ impl __sdk::DbUpdate for DbUpdate {
             .with_updates_by_pk(|row| &row.id);
         diff.mrp_bom_line = cache
             .apply_diff_to_table::<MrpBomLine>("mrp_bom_line", &self.mrp_bom_line)
+            .with_updates_by_pk(|row| &row.id);
+        diff.mrp_loss_category = cache
+            .apply_diff_to_table::<MrpLossCategory>("mrp_loss_category", &self.mrp_loss_category)
             .with_updates_by_pk(|row| &row.id);
         diff.mrp_production = cache
             .apply_diff_to_table::<MrpProduction>("mrp_production", &self.mrp_production)
@@ -25164,6 +25680,18 @@ impl __sdk::DbUpdate for DbUpdate {
                 &self.purchase_blanket_order,
             )
             .with_updates_by_pk(|row| &row.id);
+        diff.purchase_blanket_order_line = cache
+            .apply_diff_to_table::<PurchaseBlanketOrderLine>(
+                "purchase_blanket_order_line",
+                &self.purchase_blanket_order_line,
+            )
+            .with_updates_by_pk(|row| &row.id);
+        diff.purchase_blanket_release = cache
+            .apply_diff_to_table::<PurchaseBlanketRelease>(
+                "purchase_blanket_release",
+                &self.purchase_blanket_release,
+            )
+            .with_updates_by_pk(|row| &row.id);
         diff.purchase_contract = cache
             .apply_diff_to_table::<PurchaseContract>("purchase_contract", &self.purchase_contract)
             .with_updates_by_pk(|row| &row.id);
@@ -25394,6 +25922,18 @@ impl __sdk::DbUpdate for DbUpdate {
             .with_updates_by_pk(|row| &row.id);
         diff.stock_landed_cost = cache
             .apply_diff_to_table::<StockLandedCost>("stock_landed_cost", &self.stock_landed_cost)
+            .with_updates_by_pk(|row| &row.id);
+        diff.stock_landed_cost_allocation = cache
+            .apply_diff_to_table::<StockLandedCostAllocation>(
+                "stock_landed_cost_allocation",
+                &self.stock_landed_cost_allocation,
+            )
+            .with_updates_by_pk(|row| &row.id);
+        diff.stock_landed_cost_application = cache
+            .apply_diff_to_table::<StockLandedCostApplication>(
+                "stock_landed_cost_application",
+                &self.stock_landed_cost_application,
+            )
             .with_updates_by_pk(|row| &row.id);
         diff.stock_landed_cost_lines = cache
             .apply_diff_to_table::<StockLandedCostLines>(
@@ -26383,6 +26923,12 @@ impl __sdk::DbUpdate for DbUpdate {
                 "inventory_adjustment" => db_update
                     .inventory_adjustment
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "inventory_audit_run" => db_update
+                    .inventory_audit_run
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "inventory_audit_violation" => db_update
+                    .inventory_audit_violation
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "inventory_close" => db_update
                     .inventory_close
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -26463,6 +27009,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "mrp_bom_line" => db_update
                     .mrp_bom_line
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "mrp_loss_category" => db_update
+                    .mrp_loss_category
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "mrp_production" => db_update
                     .mrp_production
@@ -26698,6 +27247,12 @@ impl __sdk::DbUpdate for DbUpdate {
                 "purchase_blanket_order" => db_update
                     .purchase_blanket_order
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "purchase_blanket_order_line" => db_update
+                    .purchase_blanket_order_line
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "purchase_blanket_release" => db_update
+                    .purchase_blanket_release
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "purchase_contract" => db_update
                     .purchase_contract
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -26865,6 +27420,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "stock_landed_cost" => db_update
                     .stock_landed_cost
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_landed_cost_allocation" => db_update
+                    .stock_landed_cost_allocation
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "stock_landed_cost_application" => db_update
+                    .stock_landed_cost_application
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "stock_landed_cost_lines" => db_update
                     .stock_landed_cost_lines
@@ -27731,6 +28292,12 @@ impl __sdk::DbUpdate for DbUpdate {
                 "inventory_adjustment" => db_update
                     .inventory_adjustment
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "inventory_audit_run" => db_update
+                    .inventory_audit_run
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "inventory_audit_violation" => db_update
+                    .inventory_audit_violation
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "inventory_close" => db_update
                     .inventory_close
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -27811,6 +28378,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "mrp_bom_line" => db_update
                     .mrp_bom_line
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "mrp_loss_category" => db_update
+                    .mrp_loss_category
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "mrp_production" => db_update
                     .mrp_production
@@ -28046,6 +28616,12 @@ impl __sdk::DbUpdate for DbUpdate {
                 "purchase_blanket_order" => db_update
                     .purchase_blanket_order
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "purchase_blanket_order_line" => db_update
+                    .purchase_blanket_order_line
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "purchase_blanket_release" => db_update
+                    .purchase_blanket_release
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "purchase_contract" => db_update
                     .purchase_contract
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -28213,6 +28789,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "stock_landed_cost" => db_update
                     .stock_landed_cost
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_landed_cost_allocation" => db_update
+                    .stock_landed_cost_allocation
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "stock_landed_cost_application" => db_update
+                    .stock_landed_cost_application
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "stock_landed_cost_lines" => db_update
                     .stock_landed_cost_lines
@@ -28693,6 +29275,8 @@ pub struct AppliedDiff<'r> {
     intercompany_rule: __sdk::TableAppliedDiff<'r, IntercompanyRule>,
     intercompany_transaction: __sdk::TableAppliedDiff<'r, IntercompanyTransaction>,
     inventory_adjustment: __sdk::TableAppliedDiff<'r, InventoryAdjustment>,
+    inventory_audit_run: __sdk::TableAppliedDiff<'r, InventoryAuditRun>,
+    inventory_audit_violation: __sdk::TableAppliedDiff<'r, InventoryAuditViolation>,
     inventory_close: __sdk::TableAppliedDiff<'r, InventoryClose>,
     inventory_close_line: __sdk::TableAppliedDiff<'r, InventoryCloseLine>,
     inventory_exception: __sdk::TableAppliedDiff<'r, InventoryException>,
@@ -28720,6 +29304,7 @@ pub struct AppliedDiff<'r> {
     message_template: __sdk::TableAppliedDiff<'r, MessageTemplate>,
     mrp_bom: __sdk::TableAppliedDiff<'r, MrpBom>,
     mrp_bom_line: __sdk::TableAppliedDiff<'r, MrpBomLine>,
+    mrp_loss_category: __sdk::TableAppliedDiff<'r, MrpLossCategory>,
     mrp_production: __sdk::TableAppliedDiff<'r, MrpProduction>,
     mrp_routing_workcenter: __sdk::TableAppliedDiff<'r, MrpRoutingWorkcenter>,
     mrp_workcenter: __sdk::TableAppliedDiff<'r, MrpWorkcenter>,
@@ -28798,6 +29383,8 @@ pub struct AppliedDiff<'r> {
     public_holiday: __sdk::TableAppliedDiff<'r, PublicHoliday>,
     purchase_approval_delegate: __sdk::TableAppliedDiff<'r, PurchaseApprovalDelegate>,
     purchase_blanket_order: __sdk::TableAppliedDiff<'r, PurchaseBlanketOrder>,
+    purchase_blanket_order_line: __sdk::TableAppliedDiff<'r, PurchaseBlanketOrderLine>,
+    purchase_blanket_release: __sdk::TableAppliedDiff<'r, PurchaseBlanketRelease>,
     purchase_contract: __sdk::TableAppliedDiff<'r, PurchaseContract>,
     purchase_order: __sdk::TableAppliedDiff<'r, PurchaseOrder>,
     purchase_order_line: __sdk::TableAppliedDiff<'r, PurchaseOrderLine>,
@@ -28854,6 +29441,8 @@ pub struct AppliedDiff<'r> {
     stock_inventory: __sdk::TableAppliedDiff<'r, StockInventory>,
     stock_inventory_line: __sdk::TableAppliedDiff<'r, StockInventoryLine>,
     stock_landed_cost: __sdk::TableAppliedDiff<'r, StockLandedCost>,
+    stock_landed_cost_allocation: __sdk::TableAppliedDiff<'r, StockLandedCostAllocation>,
+    stock_landed_cost_application: __sdk::TableAppliedDiff<'r, StockLandedCostApplication>,
     stock_landed_cost_lines: __sdk::TableAppliedDiff<'r, StockLandedCostLines>,
     stock_location: __sdk::TableAppliedDiff<'r, StockLocation>,
     stock_move: __sdk::TableAppliedDiff<'r, StockMove>,
@@ -29844,6 +30433,16 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.inventory_adjustment,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<InventoryAuditRun>(
+            "inventory_audit_run",
+            &self.inventory_audit_run,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<InventoryAuditViolation>(
+            "inventory_audit_violation",
+            &self.inventory_audit_violation,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<InventoryClose>(
             "inventory_close",
             &self.inventory_close,
@@ -29945,6 +30544,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<MrpBomLine>(
             "mrp_bom_line",
             &self.mrp_bom_line,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<MrpLossCategory>(
+            "mrp_loss_category",
+            &self.mrp_loss_category,
             event,
         );
         callbacks.invoke_table_row_callbacks::<MrpProduction>(
@@ -30309,6 +30913,16 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.purchase_blanket_order,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<PurchaseBlanketOrderLine>(
+            "purchase_blanket_order_line",
+            &self.purchase_blanket_order_line,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<PurchaseBlanketRelease>(
+            "purchase_blanket_release",
+            &self.purchase_blanket_release,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<PurchaseContract>(
             "purchase_contract",
             &self.purchase_contract,
@@ -30575,6 +31189,16 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<StockLandedCost>(
             "stock_landed_cost",
             &self.stock_landed_cost,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<StockLandedCostAllocation>(
+            "stock_landed_cost_allocation",
+            &self.stock_landed_cost_allocation,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<StockLandedCostApplication>(
+            "stock_landed_cost_application",
+            &self.stock_landed_cost_application,
             event,
         );
         callbacks.invoke_table_row_callbacks::<StockLandedCostLines>(
@@ -31809,6 +32433,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         intercompany_rule_table::register_table(client_cache);
         intercompany_transaction_table::register_table(client_cache);
         inventory_adjustment_table::register_table(client_cache);
+        inventory_audit_run_table::register_table(client_cache);
+        inventory_audit_violation_table::register_table(client_cache);
         inventory_close_table::register_table(client_cache);
         inventory_close_line_table::register_table(client_cache);
         inventory_exception_table::register_table(client_cache);
@@ -31836,6 +32462,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         message_template_table::register_table(client_cache);
         mrp_bom_table::register_table(client_cache);
         mrp_bom_line_table::register_table(client_cache);
+        mrp_loss_category_table::register_table(client_cache);
         mrp_production_table::register_table(client_cache);
         mrp_routing_workcenter_table::register_table(client_cache);
         mrp_workcenter_table::register_table(client_cache);
@@ -31914,6 +32541,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         public_holiday_table::register_table(client_cache);
         purchase_approval_delegate_table::register_table(client_cache);
         purchase_blanket_order_table::register_table(client_cache);
+        purchase_blanket_order_line_table::register_table(client_cache);
+        purchase_blanket_release_table::register_table(client_cache);
         purchase_contract_table::register_table(client_cache);
         purchase_order_table::register_table(client_cache);
         purchase_order_line_table::register_table(client_cache);
@@ -31970,6 +32599,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         stock_inventory_table::register_table(client_cache);
         stock_inventory_line_table::register_table(client_cache);
         stock_landed_cost_table::register_table(client_cache);
+        stock_landed_cost_allocation_table::register_table(client_cache);
+        stock_landed_cost_application_table::register_table(client_cache);
         stock_landed_cost_lines_table::register_table(client_cache);
         stock_location_table::register_table(client_cache);
         stock_move_table::register_table(client_cache);
@@ -32256,6 +32887,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "intercompany_rule",
         "intercompany_transaction",
         "inventory_adjustment",
+        "inventory_audit_run",
+        "inventory_audit_violation",
         "inventory_close",
         "inventory_close_line",
         "inventory_exception",
@@ -32283,6 +32916,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "message_template",
         "mrp_bom",
         "mrp_bom_line",
+        "mrp_loss_category",
         "mrp_production",
         "mrp_routing_workcenter",
         "mrp_workcenter",
@@ -32361,6 +32995,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "public_holiday",
         "purchase_approval_delegate",
         "purchase_blanket_order",
+        "purchase_blanket_order_line",
+        "purchase_blanket_release",
         "purchase_contract",
         "purchase_order",
         "purchase_order_line",
@@ -32417,6 +33053,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "stock_inventory",
         "stock_inventory_line",
         "stock_landed_cost",
+        "stock_landed_cost_allocation",
+        "stock_landed_cost_application",
         "stock_landed_cost_lines",
         "stock_location",
         "stock_move",

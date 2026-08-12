@@ -8,7 +8,6 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub(super) struct ComputeBomCostArgs {
     pub organization_id: u64,
-    pub company_id: u64,
     pub bom_id: u64,
 }
 
@@ -16,7 +15,6 @@ impl From<ComputeBomCostArgs> for super::Reducer {
     fn from(args: ComputeBomCostArgs) -> Self {
         Self::ComputeBomCost {
             organization_id: args.organization_id,
-            company_id: args.company_id,
             bom_id: args.bom_id,
         }
     }
@@ -37,13 +35,8 @@ pub trait compute_bom_cost {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`compute_bom_cost:compute_bom_cost_then`] to run a callback after the reducer completes.
-    fn compute_bom_cost(
-        &self,
-        organization_id: u64,
-        company_id: u64,
-        bom_id: u64,
-    ) -> __sdk::Result<()> {
-        self.compute_bom_cost_then(organization_id, company_id, bom_id, |_, _| {})
+    fn compute_bom_cost(&self, organization_id: u64, bom_id: u64) -> __sdk::Result<()> {
+        self.compute_bom_cost_then(organization_id, bom_id, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `compute_bom_cost` to run as soon as possible,
@@ -55,7 +48,6 @@ pub trait compute_bom_cost {
     fn compute_bom_cost_then(
         &self,
         organization_id: u64,
-        company_id: u64,
         bom_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -68,7 +60,6 @@ impl compute_bom_cost for super::RemoteReducers {
     fn compute_bom_cost_then(
         &self,
         organization_id: u64,
-        company_id: u64,
         bom_id: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -78,7 +69,6 @@ impl compute_bom_cost for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             ComputeBomCostArgs {
                 organization_id,
-                company_id,
                 bom_id,
             },
             callback,

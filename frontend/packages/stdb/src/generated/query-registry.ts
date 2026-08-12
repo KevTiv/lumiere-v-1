@@ -740,7 +740,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   "contacts": {
     table: "contact",
     aliases: ["contacts", "contact"],
-    defaultRestricted: ["name", "email", "phone", "parent_id", "company_id"],
+    defaultRestricted: ["name", "email", "phone", "parent_id", "company_id", "is_vendor", "supplier_rank"],
     mandatory: ["id", "organization_id", "company_id", "deleted_at", "merge_target_id"],
   },
   "contracts": {
@@ -1532,7 +1532,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   "products": {
     table: "product",
     aliases: ["products", "product"],
-    defaultRestricted: ["name", "display_name", "code", "default_code", "active", "categ_id", "list_price", "public_price", "type", "barcode"],
+    defaultRestricted: ["name", "display_name", "code", "default_code", "active", "categ_id", "list_price", "public_price", "type", "barcode", "purchase_ok"],
     mandatory: ["id", "organization_id", "uom_id", "uom_po_id"],
   },
   "project-baselines": {
@@ -2222,7 +2222,7 @@ export const RESOURCE_REGISTRY: Record<QueryResourceKey, ResourceEntry> = {
   "uoms": {
     table: "uom",
     aliases: ["uoms", "uom"],
-    defaultRestricted: ["name", "category_id", "symbol"],
+    defaultRestricted: ["name", "category_id", "symbol", "is_active"],
     mandatory: ["id", "organization_id"],
   },
   "user-custom-fields": {

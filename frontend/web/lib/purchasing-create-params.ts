@@ -132,8 +132,12 @@ export function toCreatePurchaseOrderParams(
 
   const datePlannedRaw = formData.datePlanned
   const hasDatePlanned = datePlannedRaw != null && String(datePlannedRaw).trim() !== ""
-  const datePlanned = hasDatePlanned ? requiredTimestampFromForm(datePlannedRaw) : undefined
-  if (hasDatePlanned && datePlanned == null) return null
+  let datePlanned: Timestamp | undefined
+  if (hasDatePlanned) {
+    const parsedDatePlanned = requiredTimestampFromForm(datePlannedRaw)
+    if (parsedDatePlanned == null) return null
+    datePlanned = parsedDatePlanned
+  }
 
   return {
     companyId: undefined,
