@@ -507,3 +507,51 @@ pub fn full_client_subscription_resources_vec() -> Vec<String> {
     serde_json::from_str(FULL_CLIENT_SUBSCRIPTION_RESOURCES_JSON)
         .expect("full-client-subscription-resources.json")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn subscription_queries_fail_closed_without_organization_context() {
+        let context = SubscriptionQueryContext::default();
+
+        for row in ERP_ORG_ROWS
+            .iter()
+            .filter(|row| row.resource_key.starts_with("subscription"))
+        {
+            let queries = subscription_queries_for_resource(&row.resource_key, &context)
+                .expect("subscription SQL generation should not fail");
+            assert!(
+                queries.is_none(),
+                "{} emitted SQL without authenticated organization context",
+                row.resource_key
+            );
+        }
+    }
+
+    #[test]
+    fn subscription_queries_inject_authenticated_organization() {
+        let context = SubscriptionQueryContext {
+            organization_id: Some(42),
+            ..SubscriptionQueryContext::default()
+        };
+
+        for row in ERP_ORG_ROWS
+            .iter()
+            .filter(|row| row.resource_key.starts_with("subscription"))
+        {
+            let queries = subscription_queries_for_resource(&row.resource_key, &context)
+                .expect("subscription SQL generation should not fail")
+                .unwrap_or_else(|| panic!("{} should resolve", row.resource_key));
+            assert!(!queries.is_empty(), "{} emitted no SQL", row.resource_key);
+            assert!(
+                queries
+                    .iter()
+                    .all(|query| query.contains("organization_id = 42")),
+                "{} was not scoped to the authenticated organization: {queries:?}",
+                row.resource_key
+            );
+        }
+    }
+}

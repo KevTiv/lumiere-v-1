@@ -114,7 +114,7 @@ fn resolve_activity_target(
 /// Scope: `organization_id` is a flat reducer param (not in this struct).
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateActivityParams {
-    pub activity_type: String,
+    pub activity_type_id: u64,
     pub summary: String,
     pub priority: String,
     pub state: String,
@@ -201,6 +201,8 @@ pub struct Activity {
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64,
+    pub activity_type_id: u64,
+    /// Server-derived display snapshot of the referenced activity type name.
     pub activity_type: String,
     pub summary: String,
     pub note: Option<String>,
@@ -300,12 +302,26 @@ pub fn create_activity(
         return Err("Activity summary cannot be empty".to_string());
     }
 
+    let activity_type = ctx
+        .db
+        .activity_type()
+        .id()
+        .find(&params.activity_type_id)
+        .ok_or("Activity type not found")?;
+    if activity_type.organization_id != organization_id {
+        return Err("Activity type does not belong to this organization".to_string());
+    }
+    if !activity_type.is_active {
+        return Err("Activity type is inactive".to_string());
+    }
+
     let (res_model, res_id) = resolve_activity_target(ctx, organization_id, &params.target)?;
 
     let activity = ctx.db.activity().insert(Activity {
         id: 0,
         organization_id,
-        activity_type: params.activity_type,
+        activity_type_id: activity_type.id,
+        activity_type: activity_type.name,
         summary: params.summary,
         note: params.note,
         date_deadline: params.date_deadline,

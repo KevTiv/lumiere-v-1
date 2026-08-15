@@ -1,4 +1,6 @@
 //! HR domain test suite — invoke via `run_all_hr_tests` reducer.
+pub mod department_relations_test;
+pub mod job_relationships_test;
 pub mod wave_a_test;
 
 use spacetimedb::ReducerContext;
@@ -27,6 +29,12 @@ pub fn run_hr_wave_a_test(ctx: &ReducerContext) -> Result<(), String> {
 #[spacetimedb::reducer]
 pub fn run_all_hr_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_hr_wave_a_test(ctx)?;
+    department_relations_test::test_department_create_relationships(ctx)
+        .map_err(|e| format!("department_create_relationships: {e}"))?;
+    department_relations_test::test_department_update_relationships(ctx)
+        .map_err(|e| format!("department_update_relationships: {e}"))?;
+    job_relationships_test::test_employee_job_relationships(ctx)
+        .map_err(|e| format!("employee_job_relationships: {e}"))?;
     log::info!("✅ run_all_hr_tests complete");
     Ok(())
 }

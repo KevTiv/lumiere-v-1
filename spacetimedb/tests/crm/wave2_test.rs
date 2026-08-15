@@ -3,6 +3,7 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::country_pack::{set_company_country_pack, SetCompanyCountryPackParams};
+use crate::core::users::{user_profile, UserProfile};
 use crate::crm::contacts::{create_contact, CreateContactParams};
 use crate::crm::forecast::{
     create_forecast_snapshot, crm_forecast_snapshot, CreateCrmForecastSnapshotParams,
@@ -60,6 +61,17 @@ fn base_contact_params(name: &str, company_id: u64, tax_id: Option<String>) -> C
 
 pub fn test_opportunity_presence_upsert_and_clear(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
+    let caller_profile = ctx
+        .db
+        .user_profile()
+        .identity()
+        .find(ctx.sender())
+        .ok_or("Harness caller profile not found")?;
+    ctx.db.user_profile().identity().update(UserProfile {
+        name: "Harness Tester".to_string(),
+        updated_at: ctx.timestamp,
+        ..caller_profile
+    });
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
@@ -142,6 +154,17 @@ pub fn test_opportunity_presence_upsert_and_clear(ctx: &ReducerContext) -> Resul
     }
 
     // Upsert: calling again for the same user+opportunity must update in place, not duplicate.
+    let caller_profile = ctx
+        .db
+        .user_profile()
+        .identity()
+        .find(ctx.sender())
+        .ok_or("Harness caller profile not found before rename")?;
+    ctx.db.user_profile().identity().update(UserProfile {
+        name: "Harness Viewer Renamed".to_string(),
+        updated_at: ctx.timestamp,
+        ..caller_profile
+    });
     update_opportunity_presence(ctx, org_id, opp.id)?;
 
     let presence_rows_after_upsert: Vec<_> = ctx

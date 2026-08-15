@@ -13,6 +13,7 @@ import {
 export default __t.row({
   id: __t.u64().primaryKey(),
   organizationId: __t.u64().name("organization_id"),
+  activityTypeId: __t.u64().name("activity_type_id"),
   activityType: __t.string().name("activity_type"),
   summary: __t.string(),
   note: __t.option(__t.string()),

@@ -42,6 +42,8 @@ fn domain_test_reducers_are_wasm_linked() {
     let _ = stringify!(run_all_manufacturing_tests);
     let _ = stringify!(run_manufacturing_workcenter_create_test);
     let _ = stringify!(run_manufacturing_loss_category_create_test);
+    let _ = stringify!(run_manufacturing_workorder_workcenter_integrity_test);
+    let _ = stringify!(run_manufacturing_productivity_relational_integrity_test);
 }
 
 fn run_all_domain_tests() {}
@@ -79,3 +81,5 @@ fn run_all_fleet_tests() {}
 fn run_all_manufacturing_tests() {}
 fn run_manufacturing_workcenter_create_test() {}
 fn run_manufacturing_loss_category_create_test() {}
+fn run_manufacturing_workorder_workcenter_integrity_test() {}
+fn run_manufacturing_productivity_relational_integrity_test() {}

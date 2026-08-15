@@ -16,6 +16,7 @@ import {
 
 export default {
   organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
   metricId: __t.u64(),
   get params() {
     return UpdateMetricValuesParams;

@@ -25,7 +25,7 @@ Executable tracker for the full backlog (Pilot → Competitive → Differentiati
 - [x] Live KPIs from real invoices / deferred remaining (not client-trusted header MRR alone)
 - [x] Period-open gate on AR invoice create/post (same as recognize)
 - [x] CSV: plans + draft headers only; no silent Posted AR via import
-- [ ] Publish + `spacetime call … run_subscriptions_wave_b_test` / `run_all_subscriptions_tests` on live DB
+- [x] Publish + `run_all_subscriptions_tests` on Maincloud (`lumiere-v1-j1uo0`, 2026-08-15)
 - [ ] Playwright smoke for tax invoice + pay path (optional follow-up)
 
 ## Wave C — Amendments & proration
@@ -37,7 +37,7 @@ Executable tracker for the full backlog (Pilot → Competitive → Differentiati
 - [x] Cancel → OutRefund or credit memo + entitlement revoke hook point
 - [x] Plan update/deactivate reducers (unused `UpdateSubscriptionPlanParams` today)
 - [x] Amendment audit (before/after commercial terms)
-- [ ] Publish + `spacetime call … run_subscriptions_wave_c_test` / `run_all_subscriptions_tests`
+- [x] Publish + `run_all_subscriptions_tests` on Maincloud (`lumiere-v1-j1uo0`, 2026-08-15)
 
 ## Wave D — Usage, tiers, commitments
 
@@ -48,7 +48,7 @@ Executable tracker for the full backlog (Pilot → Competitive → Differentiati
 - [x] Minimum commitment true-up
 - [x] Structured bundles / add-ons (replace metadata-JSON-only)
 - [x] Rating-backlog bounded SQL + Ops surface
-- [ ] Publish + `spacetime call … run_subscriptions_wave_d_test` / `run_all_subscriptions_tests`
+- [x] Publish + `run_all_subscriptions_tests` on Maincloud (`lumiere-v1-j1uo0`, 2026-08-15)
 
 ## Wave E — Collections, entitlements, regional rails
 
@@ -61,7 +61,7 @@ Executable tracker for the full backlog (Pilot → Competitive → Differentiati
 - [x] Bounded exception SQL: due-to-bill, past-due, rating-backlog, amend-pending
 - [x] Contract mod ↔ rev-rec schedule rebase
 - [x] Domain suite wave E + Playwright collections/entitlement smoke (phase-6 tabs)
-- [ ] Publish + `spacetime call … run_subscriptions_wave_e_test` / `run_all_subscriptions_tests`
+- [x] Publish + `run_all_subscriptions_tests` on Maincloud (`lumiere-v1-j1uo0`, 2026-08-15)
 
 ## Ops checklist (after each wave that touches schema)
 

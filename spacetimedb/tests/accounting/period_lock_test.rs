@@ -5,12 +5,13 @@ use crate::accounting::fiscal_periods::{
     backfill_fiscal_period_organization_ownership, close_account_period, update_fiscal_year,
     AccountFiscalYear, UpdateFiscalYearParams,
 };
-use crate::accounting::journal_entries::post_invoice;
+use crate::accounting::journal_entries::{account_move, account_move_line, post_invoice};
 use crate::accounting::payments::{
     account_payment, create_payment, post_payment, CreatePaymentParams,
 };
+use crate::core::organization::company;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
-use crate::types::{PartnerType, PaymentState, PaymentType};
+use crate::types::{AccountMoveState, PartnerType, PaymentState, PaymentType};
 
 use super::helpers::{create_balanced_customer_invoice, seed_bank_journal};
 
@@ -150,6 +151,21 @@ pub fn test_post_blocked_in_closed_period(ctx: &ReducerContext) -> Result<(), St
         .chart_account_ids
         .get(crate::test_harness::chart_keys::REVENUE)
         .ok_or("Harness missing revenue account")?;
+    let move_before = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&move_id)
+        .ok_or("Invoice move not found before post")?;
+    if move_before.state != AccountMoveState::Draft {
+        return Err("Expected draft invoice before post".to_string());
+    }
+    let line_count_before = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_id)
+        .count();
 
     let result = post_invoice(
         ctx,
@@ -160,10 +176,32 @@ pub fn test_post_blocked_in_closed_period(ctx: &ReducerContext) -> Result<(), St
     );
 
     match result {
-        Ok(()) => Err("Expected post to fail in closed accounting period".to_string()),
-        Err(msg) if msg.contains("closed") => Ok(()),
-        Err(msg) => Err(format!("Unexpected error: {msg}")),
+        Ok(()) => return Err("Expected post to fail in closed accounting period".to_string()),
+        Err(msg) if msg.contains("closed") => {}
+        Err(msg) => return Err(format!("Unexpected error: {msg}")),
     }
+
+    let move_after = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&move_id)
+        .ok_or("Invoice move disappeared after rejected post")?;
+    let line_count_after = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_id)
+        .count();
+    if move_after.state != move_before.state
+        || move_after.posted_before != move_before.posted_before
+        || move_after.secure_sequence_number != move_before.secure_sequence_number
+        || line_count_after != line_count_before
+    {
+        return Err("Rejected invoice post changed persisted accounting state".to_string());
+    }
+
+    Ok(())
 }
 
 pub fn test_post_payment_blocked_in_closed_period(ctx: &ReducerContext) -> Result<(), String> {
@@ -173,6 +211,13 @@ pub fn test_post_payment_blocked_in_closed_period(ctx: &ReducerContext) -> Resul
     seed_closed_period(ctx, &fixture)?;
 
     let (bank_journal_id, _bank_account_id) = seed_bank_journal(ctx, &fixture)?;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&fixture.company_id)
+        .ok_or("Fixture company not found")?
+        .currency_id;
 
     create_payment(
         ctx,
@@ -184,7 +229,7 @@ pub fn test_post_payment_blocked_in_closed_period(ctx: &ReducerContext) -> Resul
             partner_type: PartnerType::Customer,
             partner_id: fixture.partner_id,
             amount: 25.0,
-            currency_id: 1,
+            currency_id,
             date: Some(ctx.timestamp),
             journal_id: bank_journal_id,
             ref_: Some("Period lock payment test".to_string()),
@@ -212,12 +257,33 @@ pub fn test_post_payment_blocked_in_closed_period(ctx: &ReducerContext) -> Resul
     if payment.state != PaymentState::NotPaid {
         return Err("Expected draft payment before post".to_string());
     }
+    let payment_move_count_before = ctx.db.account_move().iter().count();
+    let move_id_before = payment.move_id;
+    let name_before = payment.name;
 
     let result = post_payment(ctx, fixture.organization_id, payment_id);
 
     match result {
-        Ok(()) => Err("Expected post_payment to fail in closed accounting period".to_string()),
-        Err(msg) if msg.contains("closed") => Ok(()),
-        Err(msg) => Err(format!("Unexpected error: {msg}")),
+        Ok(()) => {
+            return Err("Expected post_payment to fail in closed accounting period".to_string())
+        }
+        Err(msg) if msg.contains("closed") => {}
+        Err(msg) => return Err(format!("Unexpected error: {msg}")),
     }
+
+    let payment_after = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("Payment disappeared after rejected post")?;
+    if payment_after.state != PaymentState::NotPaid
+        || payment_after.move_id != move_id_before
+        || payment_after.name != name_before
+        || ctx.db.account_move().iter().count() != payment_move_count_before
+    {
+        return Err("Rejected payment post changed persisted accounting state".to_string());
+    }
+
+    Ok(())
 }

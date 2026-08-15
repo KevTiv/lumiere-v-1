@@ -117,6 +117,7 @@ pub fn test_lead_score_explainable_factors(ctx: &ReducerContext) -> Result<(), S
             referred_by: None,
             description: None,
             user_id: None,
+            stage_id: None,
             team_id: None,
             partner_id: None,
             date_deadline: None,
@@ -370,12 +371,15 @@ pub fn test_crm_whatsapp_inbox(ctx: &ReducerContext) -> Result<(), String> {
             kind: ContactIdentityKind::WhatsApp,
             normalized_e164: "+61412345678".to_string(),
             display_masked: "+614****678".to_string(),
-            verification_state: ContactVerificationState::Verified,
+            // Inbox routing only requires a non-opted-out identity. Keep this
+            // fixture unverified so the persisted domain-test dataset does not
+            // bypass the provider-proof contract enforced for verified rows.
+            verification_state: ContactVerificationState::Unverified,
             is_preferred: true,
             created_by: ctx.sender(),
             created_at: ctx.timestamp,
             updated_at: ctx.timestamp,
-            verified_at: Some(ctx.timestamp),
+            verified_at: None,
             archived_at: None,
             metadata: Some(r#"{"test":"inbox-identity"}"#.to_string()),
         });

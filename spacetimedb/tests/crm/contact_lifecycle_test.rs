@@ -180,6 +180,7 @@ pub fn test_lead_delete(ctx: &ReducerContext) -> Result<(), String> {
             referred_by: None,
             description: None,
             user_id: None,
+            stage_id: None,
             team_id: None,
             partner_id: None,
             date_deadline: None,

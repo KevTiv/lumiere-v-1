@@ -16,6 +16,7 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
+  organizationId: __t.u64().name("organization_id"),
   documentType: __t.string().name("document_type"),
   jobType: __t.string().name("job_type"),
   get status() {

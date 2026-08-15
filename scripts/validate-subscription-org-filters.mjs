@@ -19,7 +19,16 @@ const subscriptionKeysPath = path.join(
 );
 
 const registry = JSON.parse(readFileSync(registryPath, "utf8"));
-const subscriptionKeys = JSON.parse(readFileSync(subscriptionKeysPath, "utf8"));
+const configuredKeys = JSON.parse(readFileSync(subscriptionKeysPath, "utf8"));
+// The configured list is intentionally curated for client boot. Query resources added by
+// later subscription waves still require the same tenant guard even when they are loaded
+// lazily, so derive those keys from the canonical registry as well.
+const subscriptionKeys = [
+  ...new Set([
+    ...configuredKeys,
+    ...Object.keys(registry).filter((key) => key.startsWith("subscription")),
+  ]),
+];
 
 const companyScopedOnly = new Set([
   "intercompany-rules",

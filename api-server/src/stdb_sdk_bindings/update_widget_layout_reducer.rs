@@ -10,6 +10,7 @@ use super::update_widget_layout_params_type::UpdateWidgetLayoutParams;
 #[sats(crate = __lib)]
 pub(super) struct UpdateWidgetLayoutArgs {
     pub organization_id: u64,
+    pub company_id: Option<u64>,
     pub widget_id: u64,
     pub params: UpdateWidgetLayoutParams,
 }
@@ -18,6 +19,7 @@ impl From<UpdateWidgetLayoutArgs> for super::Reducer {
     fn from(args: UpdateWidgetLayoutArgs) -> Self {
         Self::UpdateWidgetLayout {
             organization_id: args.organization_id,
+            company_id: args.company_id,
             widget_id: args.widget_id,
             params: args.params,
         }
@@ -42,10 +44,11 @@ pub trait update_widget_layout {
     fn update_widget_layout(
         &self,
         organization_id: u64,
+        company_id: Option<u64>,
         widget_id: u64,
         params: UpdateWidgetLayoutParams,
     ) -> __sdk::Result<()> {
-        self.update_widget_layout_then(organization_id, widget_id, params, |_, _| {})
+        self.update_widget_layout_then(organization_id, company_id, widget_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `update_widget_layout` to run as soon as possible,
@@ -57,6 +60,7 @@ pub trait update_widget_layout {
     fn update_widget_layout_then(
         &self,
         organization_id: u64,
+        company_id: Option<u64>,
         widget_id: u64,
         params: UpdateWidgetLayoutParams,
 
@@ -70,6 +74,7 @@ impl update_widget_layout for super::RemoteReducers {
     fn update_widget_layout_then(
         &self,
         organization_id: u64,
+        company_id: Option<u64>,
         widget_id: u64,
         params: UpdateWidgetLayoutParams,
 
@@ -80,6 +85,7 @@ impl update_widget_layout for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             UpdateWidgetLayoutArgs {
                 organization_id,
+                company_id,
                 widget_id,
                 params,
             },

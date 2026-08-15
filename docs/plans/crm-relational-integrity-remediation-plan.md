@@ -459,7 +459,7 @@ running against persisted SpacetimeDB data.
 - Add telemetry for rejected/invalid relation attempts.
 - Run the integrity inventory and preserve its results.
 
-**Status: Implemented, unverified against real data (2026-07-31).**
+**Status: Verified on Maincloud persisted data (2026-08-15).**
 
 Completion evidence:
 - Implementation:
@@ -499,9 +499,30 @@ Completion evidence:
   cargo check/test only.
 - Completed on: 2026-07-31
 
-**Outstanding before Phase 0 can be marked Verified:** run `crm_integrity_inventory` against a
-real (non-sandboxed) database with publish access, record results in
-`docs/integrity/crm-integrity-inventory-baseline.md`, and get reviewer sign-off.
+**2026-08-15 Maincloud completion evidence:**
+
+- Added fail-closed reducer `run_crm_persisted_integrity_smoke_test`, backed by
+  the same nine read-only finding collectors as `crm_integrity_inventory`.
+- Published and reset Maincloud database `lumiere-v1-j1uo0` with explicit
+  authorization to discard synthetic data.
+- `run_all_crm_tests` passed against a persisted dataset containing 46 contacts,
+  10 opportunities, and 5 opportunity lines.
+- The assertive smoke reducer then passed with `count=0` for all nine categories:
+  zero/missing IDs, dangling relations, cross-org/company references,
+  deleted/merged targets, contradictory opportunity state, duplicate SOs,
+  hierarchy cycles, duplicate/stale associations, and forged verification.
+- Clean-database runtime execution exposed and fixed fixture-only assumptions
+  for magic UoM/currency IDs, authenticated presence display names, and the
+  required multi-company feature flag, plus a WhatsApp fixture that claimed
+  verification without provider proof. Production validation was not weakened.
+- After the final authorized reset, the smoke reducer passed again with all nine
+  categories at zero. The populated pre-reset proof is preserved in
+  `docs/integrity/crm-integrity-inventory-baseline.md`.
+- Local verification: rustfmt checks, `cargo check`, `cargo test`, and
+  `git diff --check` passed; only unrelated existing warnings remain.
+
+Phase 0 is closed. The Phase 1–3 UI, large-population, and specialized semantic
+gates documented below remain separate P1/P2 work.
 
 ### Phase 1 — Write safety
 

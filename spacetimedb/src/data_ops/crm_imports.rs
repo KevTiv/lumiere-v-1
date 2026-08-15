@@ -13,7 +13,7 @@ use crate::core::organization::company_id_from_scope;
 use crate::core::reference::currency;
 use crate::core::utm::{utm_campaign, utm_medium};
 use crate::crm::contacts::{contact, Contact};
-use crate::crm::leads::{lead, lead_source, Lead};
+use crate::crm::leads::{crm_team, lead, lead_source, Lead};
 use crate::crm::opportunities::{opp_stage, opportunity, Opportunity};
 use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{
@@ -86,6 +86,24 @@ fn check_lead_ref(ctx: &ReducerContext, organization_id: u64, id: u64) -> Result
     }
     if l.deleted_at.is_some() {
         return Err(format!("lead {id} is deleted"));
+    }
+    Ok(())
+}
+
+fn check_crm_team_ref(ctx: &ReducerContext, organization_id: u64, id: u64) -> Result<(), String> {
+    let team = ctx
+        .db
+        .crm_team()
+        .id()
+        .find(&id)
+        .ok_or_else(|| format!("CRM team {id} not found"))?;
+    if team.organization_id != organization_id {
+        return Err(format!(
+            "CRM team {id} not found or not in this organization"
+        ));
+    }
+    if !team.is_active {
+        return Err(format!("CRM team {id} is inactive"));
     }
     Ok(())
 }
@@ -463,10 +481,38 @@ pub fn import_lead_csv(
             }
         };
 
-        // team_id: no CRM team table exists in this schema yet to validate
-        // against, so we can only reject missing/malformed/zero cells here;
-        // a valid-looking id is stored as-is (see CRM-RI-002 for the broader
-        // relation matrix once a team table lands).
+        let stage_id_cell = col(&headers, row, "stage_id");
+        let stage_id = match parse_relation_id(stage_id_cell) {
+            RelationId::Missing => None,
+            RelationId::Malformed => {
+                record_import_error(
+                    ctx,
+                    job.id,
+                    row_num,
+                    Some("stage_id"),
+                    Some(stage_id_cell),
+                    "stage_id: malformed or zero id, expected a positive integer",
+                );
+                errors += 1;
+                continue;
+            }
+            RelationId::Valid(id) => {
+                if let Err(reason) = check_opp_stage_ref(ctx, organization_id, id) {
+                    record_import_error(
+                        ctx,
+                        job.id,
+                        row_num,
+                        Some("stage_id"),
+                        Some(stage_id_cell),
+                        &format!("stage_id: {reason}"),
+                    );
+                    errors += 1;
+                    continue;
+                }
+                Some(id)
+            }
+        };
+
         let team_id_cell = col(&headers, row, "team_id");
         let team_id = match parse_relation_id(team_id_cell) {
             RelationId::Missing => None,
@@ -482,7 +528,21 @@ pub fn import_lead_csv(
                 errors += 1;
                 continue;
             }
-            RelationId::Valid(id) => Some(id),
+            RelationId::Valid(id) => {
+                if let Err(reason) = check_crm_team_ref(ctx, organization_id, id) {
+                    record_import_error(
+                        ctx,
+                        job.id,
+                        row_num,
+                        Some("team_id"),
+                        Some(team_id_cell),
+                        &format!("team_id: {reason}"),
+                    );
+                    errors += 1;
+                    continue;
+                }
+                Some(id)
+            }
         };
 
         let partner_id_cell = col(&headers, row, "partner_id");
@@ -555,6 +615,7 @@ pub fn import_lead_csv(
             date_conversion: None,
             date_last_stage_update: None,
             user_id: None,
+            stage_id,
             team_id,
             partner_id,
             day_open: None,

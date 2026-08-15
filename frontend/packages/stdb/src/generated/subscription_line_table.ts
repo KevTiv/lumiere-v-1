@@ -46,6 +46,7 @@ export default __t.row({
   lineIsGift: __t.bool().name("line_is_gift"),
   lineIsUpgrade: __t.bool().name("line_is_upgrade"),
   lineIsDowngrade: __t.bool().name("line_is_downgrade"),
+  saleOrderLineId: __t.option(__t.u64()).name("sale_order_line_id"),
   createdAt: __t.timestamp().name("created_at"),
   updatedAt: __t.timestamp().name("updated_at"),
   metadata: __t.string(),

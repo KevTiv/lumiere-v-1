@@ -16,6 +16,7 @@ use crate::inventory::stock::{
     require_warehouse_in_org_and_company, stock_picking, stock_quant, CreateStockMoveParams,
     CreateStockPickingParams,
 };
+use crate::inventory::warehouse::stock_route;
 use crate::purchasing::purchase_orders::{
     add_purchase_order_line, create_purchase_order, purchase_order, AddPurchaseOrderLineParams,
     CreatePurchaseOrderParams,
@@ -124,6 +125,40 @@ fn available_qty_at_location(
         })
         .map(|q| (q.quantity - q.reserved_quantity).max(0.0))
         .sum()
+}
+
+/// Load and validate an optional route before it is persisted on a replenishment rule.
+/// Organization-global routes have no company; company-specific routes must match the rule.
+fn require_replenishment_route(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    route_id: u64,
+) -> Result<(), String> {
+    let route = ctx
+        .db
+        .stock_route()
+        .id()
+        .find(&route_id)
+        .ok_or_else(|| format!("stock route {} not found", route_id))?;
+    if route.organization_id != organization_id {
+        return Err("stock route does not belong to this organization".to_string());
+    }
+    if let Some(route_company_id) = route.company_id {
+        if route_company_id != company_id {
+            return Err("stock route does not belong to this company".to_string());
+        }
+    }
+    if !route.active || !route.is_active {
+        return Err(format!("stock route {} is inactive", route_id));
+    }
+    if !route.product_selectable {
+        return Err(format!(
+            "stock route {} cannot be assigned to products",
+            route_id
+        ));
+    }
+    Ok(())
 }
 
 fn round_up_multiple(qty: f64, multiple: f64) -> f64 {
@@ -491,9 +526,27 @@ pub fn create_replenishment_rule(
     require_company_in_organization(ctx, organization_id, company_id)?;
 
     require_product_in_org(ctx, organization_id, params.product_id)?;
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&params.product_id)
+        .ok_or_else(|| format!("product {} not found", params.product_id))?;
+    if product.type_ == "service" {
+        return Err("service products cannot be replenished".to_string());
+    }
+    if params.uom_id != product.uom_id {
+        return Err(format!(
+            "replenishment UOM {} does not match product {} stock UOM {}",
+            params.uom_id, params.product_id, product.uom_id
+        ));
+    }
     require_location_in_org(ctx, organization_id, params.location_id)?;
     if let Some(wid) = params.warehouse_id {
         require_warehouse_in_org_and_company(ctx, organization_id, company_id, wid)?;
+    }
+    if let Some(route_id) = params.route_id {
+        require_replenishment_route(ctx, organization_id, company_id, route_id)?;
     }
 
     // qty_to_order derived from min/max quantities

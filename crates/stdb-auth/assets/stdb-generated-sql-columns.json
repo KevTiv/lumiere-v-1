@@ -649,6 +649,7 @@
   "Activity": [
     "id",
     "organization_id",
+    "activity_type_id",
     "activity_type",
     "summary",
     "note",
@@ -994,6 +995,7 @@
   ],
   "AiDocumentProcessingJob": [
     "id",
+    "organization_id",
     "document_type",
     "job_type",
     "status",
@@ -1021,6 +1023,7 @@
   ],
   "AiInsight": [
     "id",
+    "organization_id",
     "severity",
     "title",
     "description",
@@ -2582,7 +2585,7 @@
     "triggered_by"
   ],
   "CreateActivityParams": [
-    "activity_type",
+    "activity_type_id",
     "summary",
     "priority",
     "state",
@@ -3798,6 +3801,7 @@
     "referred_by",
     "description",
     "user_id",
+    "stage_id",
     "team_id",
     "partner_id",
     "date_deadline",
@@ -5841,6 +5845,13 @@
     "registered_by",
     "registered_at",
     "retired_at"
+  ],
+  "CrmTeam": [
+    "id",
+    "organization_id",
+    "name",
+    "is_active",
+    "metadata"
   ],
   "CrossoveredBudget": [
     "id",
@@ -8055,6 +8066,7 @@
     "date_conversion",
     "date_last_stage_update",
     "user_id",
+    "stage_id",
     "team_id",
     "partner_id",
     "day_open",
@@ -11612,6 +11624,7 @@
   ],
   "SearchEmbedding": [
     "id",
+    "organization_id",
     "content_type",
     "content_id",
     "text",
@@ -12722,6 +12735,7 @@
     "line_is_gift",
     "line_is_upgrade",
     "line_is_downgrade",
+    "sale_order_line_id",
     "created_at",
     "updated_at",
     "metadata"
@@ -13731,7 +13745,9 @@
     "zip",
     "country_code",
     "expected_revenue",
-    "probability"
+    "probability",
+    "stage_id",
+    "team_id"
   ],
   "UpdateLeadRevenueParams": [
     "expected_revenue",

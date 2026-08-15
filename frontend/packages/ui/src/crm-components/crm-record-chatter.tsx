@@ -43,8 +43,6 @@ import {
 
 const FOLLOW_SUBTYPES = ["comment", "note"] as const
 
-const ACTIVITY_TYPES = ["call", "email", "meeting", "todo"] as const
-
 function identityHex(v: unknown): string {
   if (v == null) return ""
   if (typeof v === "string") return v.toLowerCase()
@@ -120,7 +118,8 @@ export function CrmRecordChatter({
   const [noteBody, setNoteBody] = useState("")
   const [attachmentIdsRaw, setAttachmentIdsRaw] = useState("")
   const [activitySummary, setActivitySummary] = useState("")
-  const [activityType, setActivityType] = useState<(typeof ACTIVITY_TYPES)[number]>("todo")
+  const [activityTypes, setActivityTypes] = useState<Array<{ id: bigint; name: string }>>([])
+  const [activityTypeId, setActivityTypeId] = useState("")
   const [activityDeadline, setActivityDeadline] = useState("")
   const [activityNote, setActivityNote] = useState("")
   const [busy, setBusy] = useState(false)
@@ -221,6 +220,37 @@ export function CrmRecordChatter({
     })()
   }, [organizationId, resModel, resId])
 
+  const reloadActivityTypes = useCallback(() => {
+    if (!organizationId) {
+      setActivityTypes([])
+      setActivityTypeId("")
+      return
+    }
+    ;(async () => {
+      try {
+        const list = await stdbBrowserQuery("activity-types")
+        const options = list
+          .filter((value) => {
+            const row = value as { organizationId: unknown; isActive: unknown }
+            return Number(row.organizationId) === organizationId && Boolean(row.isActive)
+          })
+          .map((value) => {
+            const row = value as { id: unknown; name: string }
+            return { id: BigInt(String(row.id)), name: row.name }
+          })
+        setActivityTypes(options)
+        setActivityTypeId((current) =>
+          options.some((option) => option.id.toString() === current)
+            ? current
+            : (options[0]?.id.toString() ?? ""),
+        )
+      } catch {
+        setActivityTypes([])
+        setActivityTypeId("")
+      }
+    })()
+  }, [organizationId])
+
   const reloadFollower = useCallback(() => {
     if (!identity || !organizationId || !resModel) {
       setFollowing(false)
@@ -254,8 +284,9 @@ export function CrmRecordChatter({
   useEffect(() => {
     reloadMessages()
     reloadActivities()
+    reloadActivityTypes()
     reloadFollower()
-  }, [reloadMessages, reloadActivities, reloadFollower])
+  }, [reloadMessages, reloadActivities, reloadActivityTypes, reloadFollower])
 
   const timeline = useMemo(
     () => mergeRecordTimeline(messages, activities),
@@ -296,13 +327,13 @@ export function CrmRecordChatter({
 
   const logActivity = async () => {
     const summary = activitySummary.trim()
-    if (!summary || !activityDeadline) return
+    if (!summary || !activityDeadline || !activityTypeId) return
     const d = new Date(activityDeadline)
     if (Number.isNaN(d.getTime())) return
     try {
       setBusy(true)
       const params = finalizeCreateActivityParams({
-        activityType,
+        activityTypeId: BigInt(activityTypeId),
         summary,
         note: activityNote.trim() || undefined,
         dateDeadline: stbTimestampFromDate(d),
@@ -316,7 +347,6 @@ export function CrmRecordChatter({
       setActivitySummary("")
       setActivityNote("")
       setActivityDeadline("")
-      setActivityType("todo")
       reloadActivities()
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
@@ -426,14 +456,14 @@ export function CrmRecordChatter({
           </div>
           <div className="space-y-1">
             <Label>{t("crm.chatter.activityType")}</Label>
-            <Select value={activityType} onValueChange={(v) => setActivityType(v as typeof activityType)}>
+            <Select value={activityTypeId} onValueChange={setActivityTypeId}>
               <SelectTrigger data-testid="record-chatter-activity-type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ACTIVITY_TYPES.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {t(`crm.chatter.activityTypes.${type}`)}
+                {activityTypes.map((type) => (
+                  <SelectItem key={type.id.toString()} value={type.id.toString()}>
+                    {type.name}
                   </SelectItem>
                 ))}
               </SelectContent>

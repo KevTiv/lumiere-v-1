@@ -1,5 +1,5 @@
 //! Work-center and loss-category tests for the manufacturing domain.
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::ReducerContext;
 
 use crate::manufacturing::work_centers::{
     create_loss_category, create_workcenter, mrp_loss_category, mrp_workcenter,

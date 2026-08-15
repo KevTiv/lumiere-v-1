@@ -73,6 +73,29 @@ impl Finding {
     }
 }
 
+fn collect_findings(ctx: &ReducerContext) -> [Finding; 9] {
+    [
+        check_zero_and_missing_ids(ctx),
+        check_dangling_relations(ctx),
+        check_cross_org_company(ctx),
+        check_deleted_or_merged_contact_targets(ctx),
+        check_contradictory_opportunity_state(ctx),
+        check_duplicate_sales_orders_per_opportunity(ctx),
+        check_contact_hierarchy_cycles(ctx),
+        check_duplicate_associations_and_stale_counts(ctx),
+        check_forged_identity_verification(ctx),
+    ]
+}
+
+fn log_findings(findings: &[Finding]) -> usize {
+    let mut total_violations = 0usize;
+    for finding in findings {
+        finding.log();
+        total_violations += finding.count;
+    }
+    total_violations
+}
+
 /// Zero-like sentinel or missing-required-ID checks across CRM relation fields.
 fn check_zero_and_missing_ids(ctx: &ReducerContext) -> Finding {
     let mut ids = Vec::new();
@@ -632,23 +655,8 @@ fn check_forged_identity_verification(ctx: &ReducerContext) -> Finding {
 pub fn crm_integrity_inventory(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("[crm-integrity] === CRM relational-integrity inventory: start ===");
 
-    let findings = [
-        check_zero_and_missing_ids(ctx),
-        check_dangling_relations(ctx),
-        check_cross_org_company(ctx),
-        check_deleted_or_merged_contact_targets(ctx),
-        check_contradictory_opportunity_state(ctx),
-        check_duplicate_sales_orders_per_opportunity(ctx),
-        check_contact_hierarchy_cycles(ctx),
-        check_duplicate_associations_and_stale_counts(ctx),
-        check_forged_identity_verification(ctx),
-    ];
-
-    let mut total_violations = 0usize;
-    for finding in &findings {
-        finding.log();
-        total_violations += finding.count;
-    }
+    let findings = collect_findings(ctx);
+    let total_violations = log_findings(&findings);
 
     log::info!(
         "[crm-integrity] === CRM relational-integrity inventory: done -- categories={} total_violations={} ===",
@@ -656,5 +664,36 @@ pub fn crm_integrity_inventory(ctx: &ReducerContext) -> Result<(), String> {
         total_violations
     );
 
+    Ok(())
+}
+
+/// Assert that persisted CRM data contains no relational-integrity violations.
+///
+/// This is the pass/fail counterpart to [`crm_integrity_inventory`]. It uses
+/// the same read-only checks and returns an error when any finding is present,
+/// making it suitable for deployment smoke tests and release gates.
+#[spacetimedb::reducer]
+pub fn run_crm_persisted_integrity_smoke_test(ctx: &ReducerContext) -> Result<(), String> {
+    log::info!("[crm-integrity-smoke] === persisted CRM integrity smoke: start ===");
+
+    let findings = collect_findings(ctx);
+    let total_violations = log_findings(&findings);
+
+    if total_violations != 0 {
+        let failing_categories = findings
+            .iter()
+            .filter(|finding| finding.count != 0)
+            .map(|finding| format!("{}={}", finding.category, finding.count))
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(format!(
+            "persisted CRM integrity smoke failed: total_violations={total_violations}; {failing_categories}"
+        ));
+    }
+
+    log::info!(
+        "[crm-integrity-smoke] === persisted CRM integrity smoke: passed -- categories={} total_violations=0 ===",
+        findings.len()
+    );
     Ok(())
 }

@@ -4,6 +4,7 @@
 /// (mirrors `seed.rs`) so `convert_opportunity_to_sale_order` can find a won stage.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::reference::currency;
 use crate::crm::opportunities::{
     convert_opportunity_to_sale_order, create_opportunity, create_opportunity_line, opp_stage,
     opportunity, opportunity_line, update_opportunity, ConvertOpportunityParams,
@@ -16,7 +17,14 @@ use crate::sales::sales_core::{sale_order, sale_order_line};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::DiscountPolicy;
 
-const R2_DISTINCT_CURRENCY: u64 = 42;
+fn persisted_currency_id(ctx: &ReducerContext, code: &str) -> Result<u64, String> {
+    ctx.db
+        .currency()
+        .code()
+        .find(&code.to_string())
+        .map(|currency| currency.id)
+        .ok_or_else(|| format!("{code} currency not found"))
+}
 
 pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
@@ -111,6 +119,13 @@ pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<()
         .iter()
         .find(|o| o.organization_id == org_id && o.name == "Harness Enterprise Deal")
         .ok_or("Opportunity not found after create")?;
+    let product_uom_id = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("Harness product not found after create")?
+        .uom_id;
 
     create_opportunity_line(
         ctx,
@@ -121,7 +136,7 @@ pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<()
             product_id: fixture.product_id,
             name: Some("Harness line".to_string()),
             quantity: 1.0,
-            uom_id: 1,
+            uom_id: product_uom_id,
             price_unit: 100.0,
             discount: 0.0,
             tax_ids: vec![],
@@ -182,6 +197,7 @@ pub fn test_convert_opp_missing_currency_fail_closed(ctx: &ReducerContext) -> Re
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let distinct_currency_id = persisted_currency_id(ctx, "EUR")?;
 
     let _stage_qualify = ctx.db.opp_stage().insert(OpportunityStage {
         id: 0,
@@ -215,7 +231,7 @@ pub fn test_convert_opp_missing_currency_fail_closed(ctx: &ReducerContext) -> Re
         org_id,
         CreatePricelistParams {
             name: "R2 Currency PL".to_string(),
-            currency_id: R2_DISTINCT_CURRENCY,
+            currency_id: distinct_currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -352,6 +368,7 @@ pub fn test_convert_opp_missing_uom_fail_closed(ctx: &ReducerContext) -> Result<
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let distinct_currency_id = persisted_currency_id(ctx, "EUR")?;
 
     let stage_qualify = ctx.db.opp_stage().insert(OpportunityStage {
         id: 0,
@@ -385,7 +402,7 @@ pub fn test_convert_opp_missing_uom_fail_closed(ctx: &ReducerContext) -> Result<
         org_id,
         CreatePricelistParams {
             name: "R2 UoM PL".to_string(),
-            currency_id: R2_DISTINCT_CURRENCY,
+            currency_id: distinct_currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -418,7 +435,7 @@ pub fn test_convert_opp_missing_uom_fail_closed(ctx: &ReducerContext) -> Result<
             user_id: None,
             team_id: None,
             company_id: Some(company_id),
-            company_currency_id: Some(R2_DISTINCT_CURRENCY),
+            company_currency_id: Some(distinct_currency_id),
             lost_reason_id: None,
             date_open: Some(ctx.timestamp),
             date_closed: None,
@@ -524,6 +541,7 @@ pub fn test_convert_opp_distinctive_currency_uom(ctx: &ReducerContext) -> Result
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let distinct_currency_id = persisted_currency_id(ctx, "EUR")?;
 
     let product = ctx
         .db
@@ -568,7 +586,7 @@ pub fn test_convert_opp_distinctive_currency_uom(ctx: &ReducerContext) -> Result
         org_id,
         CreatePricelistParams {
             name: "R2 Distinct PL".to_string(),
-            currency_id: R2_DISTINCT_CURRENCY,
+            currency_id: distinct_currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -601,7 +619,7 @@ pub fn test_convert_opp_distinctive_currency_uom(ctx: &ReducerContext) -> Result
             user_id: None,
             team_id: None,
             company_id: Some(company_id),
-            company_currency_id: Some(R2_DISTINCT_CURRENCY),
+            company_currency_id: Some(distinct_currency_id),
             lost_reason_id: None,
             date_open: Some(ctx.timestamp),
             date_closed: None,
@@ -659,9 +677,9 @@ pub fn test_convert_opp_distinctive_currency_uom(ctx: &ReducerContext) -> Result
         .find(|so| so.organization_id == org_id && so.opportunity_id == Some(opp.id))
         .ok_or("SO missing after convert")?;
 
-    if so.currency_id != R2_DISTINCT_CURRENCY {
+    if so.currency_id != distinct_currency_id {
         return Err(format!(
-            "Expected currency_id={R2_DISTINCT_CURRENCY}, got {}",
+            "Expected currency_id={distinct_currency_id}, got {}",
             so.currency_id
         ));
     }
@@ -749,6 +767,13 @@ pub fn test_create_opportunity_line_on_unscoped_opportunity(
             deleted_at: None,
             metadata: Some(r#"{"test":"unscoped_opp_line"}"#.to_string()),
         });
+    let product_uom_id = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("Harness product not found after create")?
+        .uom_id;
 
     create_opportunity_line(
         ctx,
@@ -759,7 +784,7 @@ pub fn test_create_opportunity_line_on_unscoped_opportunity(
             product_id: fixture.product_id,
             name: Some("Unscoped opp line".to_string()),
             quantity: 2.0,
-            uom_id: 1,
+            uom_id: product_uom_id,
             price_unit: 50.0,
             discount: 0.0,
             tax_ids: vec![],

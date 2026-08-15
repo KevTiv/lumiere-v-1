@@ -46,6 +46,7 @@ pub mod fx_revaluation;
 pub(crate) mod idempotency;
 pub mod intercompany;
 pub mod journal_entries;
+pub mod ownership_backfill;
 pub mod payment_management;
 pub mod payment_terms;
 pub mod payments;

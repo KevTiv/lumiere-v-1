@@ -51,6 +51,7 @@ pub struct CreateLeadParams {
     pub description: Option<String>,
     // Assignment fields
     pub user_id: Option<Identity>,
+    pub stage_id: Option<u64>,
     pub team_id: Option<u64>,
     pub partner_id: Option<u64>,
     pub date_deadline: Option<Timestamp>,
@@ -112,6 +113,8 @@ pub struct UpdateLeadParams {
     pub country_code: Option<Option<String>>,
     pub expected_revenue: Option<f64>,
     pub probability: Option<f64>,
+    pub stage_id: Option<Option<u64>>,
+    pub team_id: Option<Option<u64>>,
 }
 
 /// Params for converting a lead to a contact/opportunity.
@@ -217,6 +220,7 @@ pub struct Lead {
     pub date_conversion: Option<Timestamp>,
     pub date_last_stage_update: Option<Timestamp>,
     pub user_id: Option<Identity>,
+    pub stage_id: Option<u64>,
     pub team_id: Option<u64>,
     pub partner_id: Option<u64>,
     pub day_open: Option<i32>,
@@ -227,6 +231,21 @@ pub struct Lead {
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
     pub deleted_at: Option<Timestamp>,
+    pub metadata: Option<String>,
+}
+
+/// Organization-scoped sales team used for lead assignment.
+#[spacetimedb::table(
+    accessor = crm_team,
+    index(accessor = crm_team_by_org, btree(columns = [organization_id]))
+)]
+pub struct CrmTeam {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub name: String,
+    pub is_active: bool,
     pub metadata: Option<String>,
 }
 
@@ -398,6 +417,29 @@ fn validate_lead_opportunity_stage(
     if stage.organization_id != organization_id {
         return Err("Stage does not belong to this organization".to_string());
     }
+    if !stage.is_active {
+        return Err("Stage is inactive".to_string());
+    }
+    Ok(())
+}
+
+fn validate_lead_team(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    team_id: u64,
+) -> Result<(), String> {
+    let team = ctx
+        .db
+        .crm_team()
+        .id()
+        .find(&team_id)
+        .ok_or("CRM team not found")?;
+    if team.organization_id != organization_id {
+        return Err("CRM team does not belong to this organization".to_string());
+    }
+    if !team.is_active {
+        return Err("CRM team is inactive".to_string());
+    }
     Ok(())
 }
 
@@ -433,9 +475,12 @@ pub fn create_lead(
     if let Some(partner_id) = params.partner_id {
         validate_lead_partner(ctx, organization_id, partner_id)?;
     }
-    // `team_id` has no backing scoped team table in this module today; there is
-    // nothing to validate against without inventing a table, so it is stored
-    // as-is (tracked as a known gap, not a validated relation).
+    if let Some(stage_id) = params.stage_id {
+        validate_lead_opportunity_stage(ctx, organization_id, stage_id)?;
+    }
+    if let Some(team_id) = params.team_id {
+        validate_lead_team(ctx, organization_id, team_id)?;
+    }
     validate_lead_tags(ctx, organization_id, &params.tag_ids)?;
 
     let lead = ctx.db.lead().insert(Lead {
@@ -473,6 +518,7 @@ pub fn create_lead(
         lost_reason_id: None,
         date_deadline: params.date_deadline,
         user_id: params.user_id,
+        stage_id: params.stage_id,
         team_id: params.team_id,
         partner_id: params.partner_id,
         tag_ids: params.tag_ids,
@@ -521,10 +567,12 @@ pub fn update_lead(
     }
     check_permission(ctx, organization_id, "lead", "write")?;
 
-    // None of the patchable fields (contact_name, title, website, industry,
-    // referred_by, description, street, city, zip, country_code,
-    // expected_revenue, probability) reference another table, so there is no
-    // CRM-RI-002 relation validation to run here.
+    if let Some(Some(stage_id)) = params.stage_id {
+        validate_lead_opportunity_stage(ctx, organization_id, stage_id)?;
+    }
+    if let Some(Some(team_id)) = params.team_id {
+        validate_lead_team(ctx, organization_id, team_id)?;
+    }
 
     let mut changed_fields = Vec::new();
     if params.contact_name.is_some() {
@@ -563,6 +611,12 @@ pub fn update_lead(
     if params.probability.is_some() {
         changed_fields.push("probability".to_string());
     }
+    if params.stage_id.is_some() {
+        changed_fields.push("stage_id".to_string());
+    }
+    if params.team_id.is_some() {
+        changed_fields.push("team_id".to_string());
+    }
 
     ctx.db.lead().id().update(Lead {
         contact_name: params
@@ -585,6 +639,8 @@ pub fn update_lead(
             .unwrap_or_else(|| lead.country_code.clone()),
         expected_revenue: params.expected_revenue.unwrap_or(lead.expected_revenue),
         probability: params.probability.unwrap_or(lead.probability),
+        stage_id: params.stage_id.unwrap_or(lead.stage_id),
+        team_id: params.team_id.unwrap_or(lead.team_id),
         updated_at: ctx.timestamp,
         ..lead
     });

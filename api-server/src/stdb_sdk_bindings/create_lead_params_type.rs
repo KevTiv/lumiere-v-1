@@ -31,6 +31,7 @@ pub struct CreateLeadParams {
     pub referred_by: Option<String>,
     pub description: Option<String>,
     pub user_id: Option<__sdk::Identity>,
+    pub stage_id: Option<u64>,
     pub team_id: Option<u64>,
     pub partner_id: Option<u64>,
     pub date_deadline: Option<__sdk::Timestamp>,

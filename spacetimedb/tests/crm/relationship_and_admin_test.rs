@@ -2,7 +2,9 @@
 /// in-module test helpers (mirrors `contact_identity_test.rs` harness patterns).
 use spacetimedb::{ReducerContext, Table};
 
-use crate::core::organization::{company, create_company, CreateCompanyParams};
+use crate::core::organization::{
+    company, create_company, organization_settings, CreateCompanyParams, OrganizationSettings,
+};
 use crate::crm::contacts::{
     contact, contact_relationship, create_contact, create_contact_relationship,
     end_contact_relationship, update_contact_parent, CreateContactParams,
@@ -20,7 +22,45 @@ use crate::crm::segments::{
     assignment_rule, create_assignment_rule, update_assignment_rule, CreateAssignmentRuleParams,
     UpdateAssignmentRuleParams,
 };
+use crate::crm::CRM_MULTI_COMPANY_FLAG;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
+
+fn enable_multi_company_crm(ctx: &ReducerContext, organization_id: u64) {
+    match ctx
+        .db
+        .organization_settings()
+        .organization_id()
+        .find(&organization_id)
+    {
+        Some(settings) => {
+            let mut feature_flags = settings.feature_flags.clone();
+            if !feature_flags
+                .iter()
+                .any(|flag| flag == CRM_MULTI_COMPANY_FLAG)
+            {
+                feature_flags.push(CRM_MULTI_COMPANY_FLAG.to_string());
+            }
+            ctx.db
+                .organization_settings()
+                .organization_id()
+                .update(OrganizationSettings {
+                    feature_flags,
+                    updated_at: ctx.timestamp,
+                    ..settings
+                });
+        }
+        None => {
+            ctx.db.organization_settings().insert(OrganizationSettings {
+                organization_id,
+                module_config: None,
+                feature_flags: vec![CRM_MULTI_COMPANY_FLAG.to_string()],
+                integration_keys: None,
+                updated_at: ctx.timestamp,
+                metadata: Some(r#"{"harness":"crm-relationship"}"#.to_string()),
+            });
+        }
+    }
+}
 
 fn create_test_contact(
     ctx: &ReducerContext,
@@ -110,6 +150,7 @@ pub fn test_contact_relationship_lifecycle(ctx: &ReducerContext) -> Result<(), S
             metadata: None,
         },
     )?;
+    enable_multi_company_crm(ctx, org_id);
     let sibling_company_id = ctx
         .db
         .company()

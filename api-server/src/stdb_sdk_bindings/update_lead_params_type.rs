@@ -19,6 +19,8 @@ pub struct UpdateLeadParams {
     pub country_code: Option<Option<String>>,
     pub expected_revenue: Option<f64>,
     pub probability: Option<f64>,
+    pub stage_id: Option<Option<u64>>,
+    pub team_id: Option<Option<u64>>,
 }
 
 impl __sdk::InModule for UpdateLeadParams {

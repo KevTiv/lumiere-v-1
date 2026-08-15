@@ -3,6 +3,7 @@ pub mod contact_identity_test;
 pub mod contact_lifecycle_test;
 pub mod deferred_test;
 pub mod opportunity_lifecycle_test;
+pub mod relational_fk_test;
 pub mod relationship_and_admin_test;
 pub mod wave2_test;
 
@@ -17,9 +18,18 @@ pub fn run_all_crm_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_crm_contact_identity_test(ctx)?;
     run_crm_wave2_test(ctx)?;
     run_crm_relationship_admin_test(ctx)?;
+    run_crm_relational_fk_test(ctx)?;
     run_crm_deferred_test(ctx)?;
     log::info!("✅ run_all_crm_tests complete");
     Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn run_crm_relational_fk_test(ctx: &ReducerContext) -> Result<(), String> {
+    relational_fk_test::test_lead_stage_and_team_relations(ctx)
+        .map_err(|e| format!("lead_stage_and_team_relations: {e}"))?;
+    relational_fk_test::test_activity_type_and_contact_relations(ctx)
+        .map_err(|e| format!("activity_type_and_contact_relations: {e}"))
 }
 
 #[spacetimedb::reducer]

@@ -45,6 +45,7 @@ export function finalizeCreateLeadParams(
     referredBy: partial.referredBy,
     description: partial.description,
     userId: partial.userId,
+    stageId: partial.stageId,
     teamId: partial.teamId,
     partnerId: partial.partnerId,
     dateDeadline: partial.dateDeadline,
@@ -138,8 +139,11 @@ export function finalizeCreateContactParams(
 export function finalizeCreateActivityParams(
   partial: Partial<CreateActivityParams>,
 ): CreateActivityParams {
+  if (partial.activityTypeId == null || partial.activityTypeId === 0n) {
+    throw new Error("activityTypeId is required to create an activity")
+  }
   return {
-    activityType: partial.activityType ?? "todo",
+    activityTypeId: partial.activityTypeId,
     summary: partial.summary ?? "",
     priority: partial.priority ?? "normal",
     state: partial.state ?? "planned",

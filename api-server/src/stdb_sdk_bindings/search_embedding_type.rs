@@ -8,6 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub struct SearchEmbedding {
     pub id: u64,
+    pub organization_id: u64,
     pub content_type: String,
     pub content_id: u64,
     pub text: String,
@@ -36,6 +37,7 @@ impl __sdk::InModule for SearchEmbedding {
 /// Provides typed access to columns for query building.
 pub struct SearchEmbeddingCols {
     pub id: __sdk::__query_builder::Col<SearchEmbedding, u64>,
+    pub organization_id: __sdk::__query_builder::Col<SearchEmbedding, u64>,
     pub content_type: __sdk::__query_builder::Col<SearchEmbedding, String>,
     pub content_id: __sdk::__query_builder::Col<SearchEmbedding, u64>,
     pub text: __sdk::__query_builder::Col<SearchEmbedding, String>,
@@ -60,6 +62,7 @@ impl __sdk::__query_builder::HasCols for SearchEmbedding {
     fn cols(table_name: &'static str) -> Self::Cols {
         SearchEmbeddingCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
             content_type: __sdk::__query_builder::Col::new(table_name, "content_type"),
             content_id: __sdk::__query_builder::Col::new(table_name, "content_id"),
             text: __sdk::__query_builder::Col::new(table_name, "text"),
@@ -88,6 +91,7 @@ pub struct SearchEmbeddingIxCols {
     pub company_id: __sdk::__query_builder::IxCol<SearchEmbedding, Option<u64>>,
     pub content_type: __sdk::__query_builder::IxCol<SearchEmbedding, String>,
     pub id: __sdk::__query_builder::IxCol<SearchEmbedding, u64>,
+    pub organization_id: __sdk::__query_builder::IxCol<SearchEmbedding, u64>,
     pub sync_status: __sdk::__query_builder::IxCol<SearchEmbedding, String>,
 }
 
@@ -98,6 +102,7 @@ impl __sdk::__query_builder::HasIxCols for SearchEmbedding {
             company_id: __sdk::__query_builder::IxCol::new(table_name, "company_id"),
             content_type: __sdk::__query_builder::IxCol::new(table_name, "content_type"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             sync_status: __sdk::__query_builder::IxCol::new(table_name, "sync_status"),
         }
     }

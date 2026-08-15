@@ -3,6 +3,7 @@ pub mod gap_fixes_test;
 pub mod inventory_adjustments_tests;
 pub mod product_category_tests;
 pub mod product_update_test;
+pub mod relational_integrity_test;
 pub mod stock_picking_quant_test;
 pub mod stock_test;
 
@@ -52,6 +53,8 @@ pub fn run_all_inventory_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_inventory_integration_applied_guard_test(ctx)?;
     run_inventory_close_no_gl_on_create_test(ctx)?;
     run_inventory_adjustment_requires_valid_reason_test(ctx)?;
+    run_inventory_replenishment_relation_negative_matrix_test(ctx)?;
+    run_inventory_adjustment_reason_negative_matrix_test(ctx)?;
     log::info!("✅ run_all_inventory_tests complete");
     Ok(())
 }
@@ -289,4 +292,20 @@ pub fn run_inventory_adjustment_requires_valid_reason_test(
 ) -> Result<(), String> {
     gap_fixes_test::test_adjustment_requires_valid_reason_id(ctx)
         .map_err(|e| format!("adjustment_requires_valid_reason: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_replenishment_relation_negative_matrix_test(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    relational_integrity_test::test_replenishment_relation_negative_matrix(ctx)
+        .map_err(|e| format!("replenishment_relation_negative_matrix: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_adjustment_reason_negative_matrix_test(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    relational_integrity_test::test_adjustment_reason_negative_matrix(ctx)
+        .map_err(|e| format!("adjustment_reason_negative_matrix: {e}"))
 }

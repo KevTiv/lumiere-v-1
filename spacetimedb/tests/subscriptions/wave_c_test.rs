@@ -1,5 +1,5 @@
 //! Wave C — amendments, proration, pause/resume, renew, cancel, plan update.
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::{ReducerContext, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
@@ -306,6 +306,74 @@ pub fn test_amend_price_with_proration(ctx: &ReducerContext) -> Result<(), Strin
     let ar = *fixture.chart_account_ids.get(chart_keys::AR).ok_or("ar")?;
     let (sub_id, line_id) = seed_active_subscription(ctx, &fixture, journal_id, "AMEND", 100.0)?;
 
+    let subscription = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("subscription")?;
+    let before_line = ctx
+        .db
+        .subscription_line()
+        .id()
+        .find(&line_id)
+        .ok_or("line before rejected amendment")?;
+    let amendment_count_before = ctx
+        .db
+        .subscription_amendment()
+        .subscription_amendment_by_sub()
+        .filter(&sub_id)
+        .count();
+    let invalid_effective_date = Timestamp::from_micros_since_unix_epoch(
+        subscription
+            .date_start
+            .to_micros_since_unix_epoch()
+            .saturating_sub(1),
+    );
+    let rejected = amend_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        AmendSubscriptionParams {
+            amendment_type: "price".into(),
+            line_id,
+            effective_date: Some(invalid_effective_date),
+            new_product_id: None,
+            new_quantity: None,
+            new_price_unit: Some(125.0),
+            new_discount: None,
+            prorate: false,
+            journal_id: None,
+            income_account_id: None,
+            receivable_account_id: None,
+            notes: Some("invalid pre-start amendment".into()),
+        },
+    );
+    if rejected.is_ok() {
+        return Err("amendment before subscription start must be rejected".into());
+    }
+    let after_rejected_line = ctx
+        .db
+        .subscription_line()
+        .id()
+        .find(&line_id)
+        .ok_or("line after rejected amendment")?;
+    if after_rejected_line.price_unit != before_line.price_unit
+        || after_rejected_line.price_subtotal != before_line.price_subtotal
+    {
+        return Err("rejected pre-start amendment must not mutate the line".into());
+    }
+    let amendment_count_after = ctx
+        .db
+        .subscription_amendment()
+        .subscription_amendment_by_sub()
+        .filter(&sub_id)
+        .count();
+    if amendment_count_after != amendment_count_before {
+        return Err("rejected pre-start amendment must not persist an amendment row".into());
+    }
+
     amend_subscription(
         ctx,
         org_id,
@@ -611,7 +679,7 @@ pub fn test_plan_update_and_deactivate(ctx: &ReducerContext) -> Result<(), Strin
             currency_id: None,
             journal_id: None,
             product_id: None,
-            billing_period: Some("year".into()),
+            billing_period: Some("  ANNUALLY ".into()),
             billing_period_unit: None,
             recurring_invoice_day: None,
             trial_period: None,
@@ -643,6 +711,93 @@ pub fn test_plan_update_and_deactivate(ctx: &ReducerContext) -> Result<(), Strin
     }
     if plan.payment_mode != "automated_payment" {
         return Err(format!("payment_mode={}", plan.payment_mode));
+    }
+
+    for invalid_day in [0, 29] {
+        let rejected = update_subscription_plan(
+            ctx,
+            org_id,
+            company_id,
+            plan_id,
+            UpdateSubscriptionPlanParams {
+                name: None,
+                description: None,
+                code: None,
+                currency_id: None,
+                journal_id: None,
+                product_id: None,
+                billing_period: None,
+                billing_period_unit: None,
+                recurring_invoice_day: Some(invalid_day),
+                trial_period: None,
+                trial_duration: None,
+                trial_unit: None,
+                auto_close_limit: None,
+                payment_mode: None,
+                template_id: None,
+                invoice_mail_template_id: None,
+                website_url: None,
+                is_published: None,
+                is_default: None,
+                color: None,
+                image_1920_url: None,
+                metadata: None,
+            },
+        );
+        if rejected.is_ok() {
+            return Err(format!(
+                "recurring_invoice_day={invalid_day} must be rejected"
+            ));
+        }
+        let persisted = ctx
+            .db
+            .subscription_plan()
+            .id()
+            .find(&plan_id)
+            .ok_or("plan after rejected invoice day")?;
+        if persisted.recurring_invoice_day != 1 {
+            return Err("rejected invoice day must not mutate the plan".into());
+        }
+    }
+
+    update_subscription_plan(
+        ctx,
+        org_id,
+        company_id,
+        plan_id,
+        UpdateSubscriptionPlanParams {
+            name: None,
+            description: None,
+            code: None,
+            currency_id: None,
+            journal_id: None,
+            product_id: None,
+            billing_period: None,
+            billing_period_unit: None,
+            recurring_invoice_day: Some(28),
+            trial_period: None,
+            trial_duration: None,
+            trial_unit: None,
+            auto_close_limit: None,
+            payment_mode: None,
+            template_id: None,
+            invoice_mail_template_id: None,
+            website_url: None,
+            is_published: None,
+            is_default: None,
+            color: None,
+            image_1920_url: None,
+            metadata: None,
+        },
+    )?;
+    let boundary = ctx
+        .db
+        .subscription_plan()
+        .id()
+        .find(&plan_id)
+        .ok_or("plan after valid invoice day")?;
+    if boundary.recurring_invoice_day != 28 {
+        return Err("recurring_invoice_day=28 must persist".into());
     }
 
     deactivate_subscription_plan(ctx, org_id, company_id, plan_id)?;

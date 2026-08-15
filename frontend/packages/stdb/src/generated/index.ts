@@ -847,6 +847,7 @@ import RunAccountingBudgetingTestReducer from "./run_accounting_budgeting_test_r
 import RunAccountingFixedAssetOwnershipTestReducer from "./run_accounting_fixed_asset_ownership_test_reducer";
 import RunAccountingFxRevaluationTestReducer from "./run_accounting_fx_revaluation_test_reducer";
 import RunAccountingIcConsolidationTestReducer from "./run_accounting_ic_consolidation_test_reducer";
+import RunAccountingOwnershipBackfillReducer from "./run_accounting_ownership_backfill_reducer";
 import RunAccountingPaymentCancelTestReducer from "./run_accounting_payment_cancel_test_reducer";
 import RunAccountingPaymentManagementTestReducer from "./run_accounting_payment_management_test_reducer";
 import RunAccountingPaymentMultiInvoiceResidualTestReducer from "./run_accounting_payment_multi_invoice_residual_test_reducer";
@@ -883,6 +884,8 @@ import RunCrmContactIdentityTestReducer from "./run_crm_contact_identity_test_re
 import RunCrmContactUpdateDeleteTestReducer from "./run_crm_contact_update_delete_test_reducer";
 import RunCrmDeferredTestReducer from "./run_crm_deferred_test_reducer";
 import RunCrmOpportunityConvertTestReducer from "./run_crm_opportunity_convert_test_reducer";
+import RunCrmPersistedIntegritySmokeTestReducer from "./run_crm_persisted_integrity_smoke_test_reducer";
+import RunCrmRelationalFkTestReducer from "./run_crm_relational_fk_test_reducer";
 import RunCrmRelationshipAdminTestReducer from "./run_crm_relationship_admin_test_reducer";
 import RunCrmWave2TestReducer from "./run_crm_wave_2_test_reducer";
 import RunDocumentRetentionPurgeReducer from "./run_document_retention_purge_reducer";
@@ -907,6 +910,7 @@ import RunHrWaveATestReducer from "./run_hr_wave_a_test_reducer";
 import RunInventory3PlAsnTestReducer from "./run_inventory_3_pl_asn_test_reducer";
 import RunInventoryAdjustmentCompanyDerivedTestReducer from "./run_inventory_adjustment_company_derived_test_reducer";
 import RunInventoryAdjustmentProcessIdempotencyTestReducer from "./run_inventory_adjustment_process_idempotency_test_reducer";
+import RunInventoryAdjustmentReasonNegativeMatrixTestReducer from "./run_inventory_adjustment_reason_negative_matrix_test_reducer";
 import RunInventoryAdjustmentRequiresValidReasonTestReducer from "./run_inventory_adjustment_requires_valid_reason_test_reducer";
 import RunInventoryAdjustmentTestReducer from "./run_inventory_adjustment_test_reducer";
 import RunInventoryAtpFailClosedTestReducer from "./run_inventory_atp_fail_closed_test_reducer";
@@ -937,6 +941,7 @@ import RunInventoryReceiptAverageCostingTestReducer from "./run_inventory_receip
 import RunInventoryReceiptFifoLayersTestReducer from "./run_inventory_receipt_fifo_layers_test_reducer";
 import RunInventoryReceiptQuantTestReducer from "./run_inventory_receipt_quant_test_reducer";
 import RunInventoryReplenishmentDemandTestReducer from "./run_inventory_replenishment_demand_test_reducer";
+import RunInventoryReplenishmentRelationNegativeMatrixTestReducer from "./run_inventory_replenishment_relation_negative_matrix_test_reducer";
 import RunInventoryReplenishmentRuleNotFoundTestReducer from "./run_inventory_replenishment_rule_not_found_test_reducer";
 import RunInventorySerialIdValidateTestReducer from "./run_inventory_serial_id_validate_test_reducer";
 import RunInventorySerialReserveTestReducer from "./run_inventory_serial_reserve_test_reducer";
@@ -948,9 +953,11 @@ import RunInventoryWarehouseSyncTestReducer from "./run_inventory_warehouse_sync
 import RunInventoryWaveReleaseTestReducer from "./run_inventory_wave_release_test_reducer";
 import RunManufacturingLossCategoryCreateTestReducer from "./run_manufacturing_loss_category_create_test_reducer";
 import RunManufacturingLossCategoryInvalidCategoryTestReducer from "./run_manufacturing_loss_category_invalid_category_test_reducer";
+import RunManufacturingProductivityRelationalIntegrityTestReducer from "./run_manufacturing_productivity_relational_integrity_test_reducer";
 import RunManufacturingWorkcenterCreateTestReducer from "./run_manufacturing_workcenter_create_test_reducer";
 import RunManufacturingWorkcenterCrossOrgTestReducer from "./run_manufacturing_workcenter_cross_org_test_reducer";
 import RunManufacturingWorkcenterTestReducer from "./run_manufacturing_workcenter_test_reducer";
+import RunManufacturingWorkorderWorkcenterIntegrityTestReducer from "./run_manufacturing_workorder_workcenter_integrity_test_reducer";
 import RunOwnerReportScheduleReducer from "./run_owner_report_schedule_reducer";
 import RunProjectsWaveATestReducer from "./run_projects_wave_a_test_reducer";
 import RunProjectsWaveCTestReducer from "./run_projects_wave_c_test_reducer";
@@ -1277,6 +1284,7 @@ import UpsertWarehouseGeoReducer from "./upsert_warehouse_geo_reducer";
 import UpsertWorkflowEdgeReducer from "./upsert_workflow_edge_reducer";
 import UpsertWorkflowNodeReducer from "./upsert_workflow_node_reducer";
 import UseSerialReducer from "./use_serial_reducer";
+import ValidateAccountingOwnershipBackfillReducer from "./validate_accounting_ownership_backfill_reducer";
 import ValidateBudgetReducer from "./validate_budget_reducer";
 import ValidateConsolidationReducer from "./validate_consolidation_reducer";
 import ValidateCycleCountReducer from "./validate_cycle_count_reducer";
@@ -1395,6 +1403,7 @@ import CrmConversationMessageRow from "./crm_conversation_message_table";
 import CrmForecastSnapshotRow from "./crm_forecast_snapshot_table";
 import CrmProviderEventReceiptRow from "./crm_provider_event_receipt_table";
 import CrmProviderPrincipalRow from "./crm_provider_principal_table";
+import CrmTeamRow from "./crm_team_table";
 import CrossoveredBudgetRow from "./crossovered_budget_table";
 import CrossoveredBudgetLinesRow from "./crossovered_budget_lines_table";
 import CurrencyRow from "./currency_table";
@@ -2518,6 +2527,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'doc_job_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'doc_job_by_status', algorithm: 'btree', columns: [
         'status',
       ] },
@@ -2534,6 +2546,9 @@ const tablesSchema = __schema({
       ] },
       { name: 'id', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { name: 'insight_by_org', algorithm: 'btree', columns: [
+        'organizationId',
       ] },
       { name: 'insight_by_model', algorithm: 'btree', columns: [
         'relatedModel',
@@ -3676,6 +3691,20 @@ const tablesSchema = __schema({
       { name: 'crm_provider_principal_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, CrmProviderPrincipalRow),
+  crm_team: __table({
+    name: 'crm_team',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'crm_team_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'crm_team_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, CrmTeamRow),
   crossovered_budget: __table({
     name: 'crossovered_budget',
     indexes: [
@@ -8141,6 +8170,9 @@ const tablesSchema = __schema({
       { name: 'id', algorithm: 'btree', columns: [
         'id',
       ] },
+      { name: 'embedding_by_org', algorithm: 'btree', columns: [
+        'organizationId',
+      ] },
       { name: 'embedding_by_sync_status', algorithm: 'btree', columns: [
         'syncStatus',
       ] },
@@ -10820,6 +10852,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_accounting_fixed_asset_ownership_test", RunAccountingFixedAssetOwnershipTestReducer),
   __reducerSchema("run_accounting_fx_revaluation_test", RunAccountingFxRevaluationTestReducer),
   __reducerSchema("run_accounting_ic_consolidation_test", RunAccountingIcConsolidationTestReducer),
+  __reducerSchema("run_accounting_ownership_backfill", RunAccountingOwnershipBackfillReducer),
   __reducerSchema("run_accounting_payment_cancel_test", RunAccountingPaymentCancelTestReducer),
   __reducerSchema("run_accounting_payment_management_test", RunAccountingPaymentManagementTestReducer),
   __reducerSchema("run_accounting_payment_multi_invoice_residual_test", RunAccountingPaymentMultiInvoiceResidualTestReducer),
@@ -10856,6 +10889,8 @@ const reducersSchema = __reducers(
   __reducerSchema("run_crm_contact_update_delete_test", RunCrmContactUpdateDeleteTestReducer),
   __reducerSchema("run_crm_deferred_test", RunCrmDeferredTestReducer),
   __reducerSchema("run_crm_opportunity_convert_test", RunCrmOpportunityConvertTestReducer),
+  __reducerSchema("run_crm_persisted_integrity_smoke_test", RunCrmPersistedIntegritySmokeTestReducer),
+  __reducerSchema("run_crm_relational_fk_test", RunCrmRelationalFkTestReducer),
   __reducerSchema("run_crm_relationship_admin_test", RunCrmRelationshipAdminTestReducer),
   __reducerSchema("run_crm_wave_2_test", RunCrmWave2TestReducer),
   __reducerSchema("run_document_retention_purge", RunDocumentRetentionPurgeReducer),
@@ -10880,6 +10915,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_inventory_3_pl_asn_test", RunInventory3PlAsnTestReducer),
   __reducerSchema("run_inventory_adjustment_company_derived_test", RunInventoryAdjustmentCompanyDerivedTestReducer),
   __reducerSchema("run_inventory_adjustment_process_idempotency_test", RunInventoryAdjustmentProcessIdempotencyTestReducer),
+  __reducerSchema("run_inventory_adjustment_reason_negative_matrix_test", RunInventoryAdjustmentReasonNegativeMatrixTestReducer),
   __reducerSchema("run_inventory_adjustment_requires_valid_reason_test", RunInventoryAdjustmentRequiresValidReasonTestReducer),
   __reducerSchema("run_inventory_adjustment_test", RunInventoryAdjustmentTestReducer),
   __reducerSchema("run_inventory_atp_fail_closed_test", RunInventoryAtpFailClosedTestReducer),
@@ -10910,6 +10946,7 @@ const reducersSchema = __reducers(
   __reducerSchema("run_inventory_receipt_fifo_layers_test", RunInventoryReceiptFifoLayersTestReducer),
   __reducerSchema("run_inventory_receipt_quant_test", RunInventoryReceiptQuantTestReducer),
   __reducerSchema("run_inventory_replenishment_demand_test", RunInventoryReplenishmentDemandTestReducer),
+  __reducerSchema("run_inventory_replenishment_relation_negative_matrix_test", RunInventoryReplenishmentRelationNegativeMatrixTestReducer),
   __reducerSchema("run_inventory_replenishment_rule_not_found_test", RunInventoryReplenishmentRuleNotFoundTestReducer),
   __reducerSchema("run_inventory_serial_id_validate_test", RunInventorySerialIdValidateTestReducer),
   __reducerSchema("run_inventory_serial_reserve_test", RunInventorySerialReserveTestReducer),
@@ -10921,9 +10958,11 @@ const reducersSchema = __reducers(
   __reducerSchema("run_inventory_wave_release_test", RunInventoryWaveReleaseTestReducer),
   __reducerSchema("run_manufacturing_loss_category_create_test", RunManufacturingLossCategoryCreateTestReducer),
   __reducerSchema("run_manufacturing_loss_category_invalid_category_test", RunManufacturingLossCategoryInvalidCategoryTestReducer),
+  __reducerSchema("run_manufacturing_productivity_relational_integrity_test", RunManufacturingProductivityRelationalIntegrityTestReducer),
   __reducerSchema("run_manufacturing_workcenter_create_test", RunManufacturingWorkcenterCreateTestReducer),
   __reducerSchema("run_manufacturing_workcenter_cross_org_test", RunManufacturingWorkcenterCrossOrgTestReducer),
   __reducerSchema("run_manufacturing_workcenter_test", RunManufacturingWorkcenterTestReducer),
+  __reducerSchema("run_manufacturing_workorder_workcenter_integrity_test", RunManufacturingWorkorderWorkcenterIntegrityTestReducer),
   __reducerSchema("run_owner_report_schedule", RunOwnerReportScheduleReducer),
   __reducerSchema("run_projects_wave_a_test", RunProjectsWaveATestReducer),
   __reducerSchema("run_projects_wave_c_test", RunProjectsWaveCTestReducer),
@@ -11250,6 +11289,7 @@ const reducersSchema = __reducers(
   __reducerSchema("upsert_workflow_edge", UpsertWorkflowEdgeReducer),
   __reducerSchema("upsert_workflow_node", UpsertWorkflowNodeReducer),
   __reducerSchema("use_serial", UseSerialReducer),
+  __reducerSchema("validate_accounting_ownership_backfill", ValidateAccountingOwnershipBackfillReducer),
   __reducerSchema("validate_budget", ValidateBudgetReducer),
   __reducerSchema("validate_consolidation", ValidateConsolidationReducer),
   __reducerSchema("validate_cycle_count", ValidateCycleCountReducer),

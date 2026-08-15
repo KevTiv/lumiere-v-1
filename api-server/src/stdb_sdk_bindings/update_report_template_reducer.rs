@@ -10,6 +10,7 @@ use super::update_report_template_params_type::UpdateReportTemplateParams;
 #[sats(crate = __lib)]
 pub(super) struct UpdateReportTemplateArgs {
     pub organization_id: u64,
+    pub company_id: Option<u64>,
     pub template_id: u64,
     pub params: UpdateReportTemplateParams,
 }
@@ -18,6 +19,7 @@ impl From<UpdateReportTemplateArgs> for super::Reducer {
     fn from(args: UpdateReportTemplateArgs) -> Self {
         Self::UpdateReportTemplate {
             organization_id: args.organization_id,
+            company_id: args.company_id,
             template_id: args.template_id,
             params: args.params,
         }
@@ -42,10 +44,17 @@ pub trait update_report_template {
     fn update_report_template(
         &self,
         organization_id: u64,
+        company_id: Option<u64>,
         template_id: u64,
         params: UpdateReportTemplateParams,
     ) -> __sdk::Result<()> {
-        self.update_report_template_then(organization_id, template_id, params, |_, _| {})
+        self.update_report_template_then(
+            organization_id,
+            company_id,
+            template_id,
+            params,
+            |_, _| {},
+        )
     }
 
     /// Request that the remote module invoke the reducer `update_report_template` to run as soon as possible,
@@ -57,6 +66,7 @@ pub trait update_report_template {
     fn update_report_template_then(
         &self,
         organization_id: u64,
+        company_id: Option<u64>,
         template_id: u64,
         params: UpdateReportTemplateParams,
 
@@ -70,6 +80,7 @@ impl update_report_template for super::RemoteReducers {
     fn update_report_template_then(
         &self,
         organization_id: u64,
+        company_id: Option<u64>,
         template_id: u64,
         params: UpdateReportTemplateParams,
 
@@ -80,6 +91,7 @@ impl update_report_template for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             UpdateReportTemplateArgs {
                 organization_id,
+                company_id,
                 template_id,
                 params,
             },

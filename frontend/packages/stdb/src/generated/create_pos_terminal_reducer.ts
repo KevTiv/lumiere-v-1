@@ -12,6 +12,7 @@ import {
 
 export default {
   organizationId: __t.u64(),
+  companyId: __t.option(__t.u64()),
   name: __t.string(),
   locationLabel: __t.option(__t.string()),
   latitude: __t.option(__t.f64()),

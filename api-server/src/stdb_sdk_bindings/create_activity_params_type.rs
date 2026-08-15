@@ -9,7 +9,7 @@ use super::crm_activity_target_type::CrmActivityTarget;
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateActivityParams {
-    pub activity_type: String,
+    pub activity_type_id: u64,
     pub summary: String,
     pub priority: String,
     pub state: String,

@@ -1,6 +1,8 @@
 /// HR Employees — HrResource, HrDepartment, HrJobPosition, HrEmployee
 ///
 /// Core HR entity tables. Based on the Supabase/Odoo HR schema.
+use std::collections::HashSet;
+
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
@@ -8,34 +10,83 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ── HR-003/004 helpers ────────────────────────────────────────────────────────
 
-/// HR-003: Validate that setting `new_parent_id` for `dept_id` would not create
-/// a cycle in the department hierarchy. Walks the parent chain (BFS) up to 100
-/// hops — anything deeper is treated as a cycle to prevent infinite loops.
-fn validate_department_no_cycle(
+fn validate_department_parent(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     dept_id: u64,
     new_parent_id: u64,
 ) -> Result<(), String> {
-    if new_parent_id == dept_id {
-        return Err("A department cannot be its own parent".to_string());
-    }
     let mut current = new_parent_id;
-    for _ in 0..100 {
-        let parent = match ctx.db.hr_department().id().find(&current) {
-            Some(d) => d,
-            None => break, // dangling parent → chain ends, no cycle
-        };
+    let mut visited = HashSet::new();
+
+    loop {
+        if current == dept_id || !visited.insert(current) {
+            return Err("setting this parent would create a department hierarchy cycle".into());
+        }
+        let parent = ctx
+            .db
+            .hr_department()
+            .id()
+            .find(&current)
+            .ok_or("parent department not found")?;
         if parent.organization_id != organization_id {
-            return Err("Parent department belongs to a different organization".to_string());
+            return Err("parent department belongs to a different organization".into());
+        }
+        if parent.company_id != company_id {
+            return Err("parent department belongs to a different company".into());
         }
         match parent.parent_id {
-            None => break,
-            Some(grand) if grand == dept_id => {
-                return Err("Setting this parent would create a department hierarchy cycle".to_string());
-            }
+            None => return Ok(()),
             Some(grand) => current = grand,
         }
+    }
+}
+
+fn validate_department_manager(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    manager_id: u64,
+) -> Result<(), String> {
+    let manager = ctx
+        .db
+        .hr_employee()
+        .id()
+        .find(&manager_id)
+        .ok_or("manager employee not found")?;
+    if manager.organization_id != organization_id {
+        return Err("manager does not belong to this organization".into());
+    }
+    if manager.company_id != company_id {
+        return Err("manager does not belong to this company".into());
+    }
+    if !manager.is_active || manager.deleted_at.is_some() {
+        return Err("manager employee is not active".into());
+    }
+    Ok(())
+}
+
+fn validate_employee_job(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    job_id: u64,
+) -> Result<(), String> {
+    let job = ctx
+        .db
+        .hr_job_position()
+        .id()
+        .find(&job_id)
+        .ok_or("job position not found")?;
+    if job.organization_id != organization_id {
+        return Err("job position belongs to a different organization".into());
+    }
+    if job.company_id != company_id {
+        return Err("job position belongs to a different company".into());
+    }
+    if !job.is_active {
+        return Err("job position is not active".into());
     }
     Ok(())
 }
@@ -265,22 +316,13 @@ pub fn create_department(
     if params.name.is_empty() {
         return Err("Department name cannot be empty".to_string());
     }
-    // HR-004: Validate manager_id FK.
     if let Some(mid) = params.manager_id {
-        let mgr = ctx.db.hr_employee().id().find(&mid)
-            .ok_or("Manager employee not found")?;
-        if mgr.organization_id != organization_id {
-            return Err("Manager does not belong to this organization".to_string());
-        }
+        validate_department_manager(ctx, organization_id, company_id, mid)?;
     }
-    // HR-003: Validate parent_id FK (cycle detection deferred — new dept has no id yet,
-    // so only validate existence and org match on create; cycles impossible for new rows).
     if let Some(pid) = params.parent_id {
-        let parent = ctx.db.hr_department().id().find(&pid)
-            .ok_or("Parent department not found")?;
-        if parent.organization_id != organization_id {
-            return Err("Parent department belongs to a different organization".to_string());
-        }
+        // A new department cannot be referenced by an existing row yet, but walking the
+        // complete chain also rejects dangling or already-corrupt parent hierarchies.
+        validate_department_parent(ctx, organization_id, company_id, 0, pid)?;
     }
     let dept = ctx.db.hr_department().insert(HrDepartment {
         id: 0,
@@ -333,17 +375,11 @@ pub fn update_department(
     if dept.company_id != company_id {
         return Err("Department does not belong to this company".to_string());
     }
-    // HR-004: Validate manager_id FK on update.
     if let Some(mid) = params.manager_id {
-        let mgr = ctx.db.hr_employee().id().find(&mid)
-            .ok_or("Manager employee not found")?;
-        if mgr.organization_id != organization_id {
-            return Err("Manager does not belong to this organization".to_string());
-        }
+        validate_department_manager(ctx, organization_id, company_id, mid)?;
     }
-    // HR-003: Validate parent_id FK + cycle detection on update.
     if let Some(pid) = params.parent_id {
-        validate_department_no_cycle(ctx, organization_id, department_id, pid)?;
+        validate_department_parent(ctx, organization_id, company_id, department_id, pid)?;
     }
     ctx.db.hr_department().id().update(HrDepartment {
         name: params.name.unwrap_or(dept.name),
@@ -475,6 +511,11 @@ pub fn create_employee(
     if params.name.is_empty() {
         return Err("Employee name cannot be empty".to_string());
     }
+    if let Some(job_id) = params.job_id {
+        // Validate before creating the scheduling resource so a rejected employee
+        // cannot leave an orphan when this reducer is called from another reducer.
+        validate_employee_job(ctx, organization_id, company_id, job_id)?;
+    }
     // Create a resource for scheduling
     let resource = ctx.db.hr_resource().insert(HrResource {
         id: 0,
@@ -564,6 +605,9 @@ pub fn update_employee(
     }
     if emp.company_id != company_id {
         return Err("Employee does not belong to this company".to_string());
+    }
+    if let Some(job_id) = params.job_id {
+        validate_employee_job(ctx, organization_id, company_id, job_id)?;
     }
     let old_snapshot = employee_audit_json(&emp);
     let changed_fields: Vec<String> = [

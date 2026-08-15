@@ -10,6 +10,7 @@ use super::insight_severity_type::InsightSeverity;
 #[sats(crate = __lib)]
 pub struct AiInsight {
     pub id: u64,
+    pub organization_id: u64,
     pub severity: InsightSeverity,
     pub title: String,
     pub description: String,
@@ -46,6 +47,7 @@ impl __sdk::InModule for AiInsight {
 /// Provides typed access to columns for query building.
 pub struct AiInsightCols {
     pub id: __sdk::__query_builder::Col<AiInsight, u64>,
+    pub organization_id: __sdk::__query_builder::Col<AiInsight, u64>,
     pub severity: __sdk::__query_builder::Col<AiInsight, InsightSeverity>,
     pub title: __sdk::__query_builder::Col<AiInsight, String>,
     pub description: __sdk::__query_builder::Col<AiInsight, String>,
@@ -78,6 +80,7 @@ impl __sdk::__query_builder::HasCols for AiInsight {
     fn cols(table_name: &'static str) -> Self::Cols {
         AiInsightCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
             severity: __sdk::__query_builder::Col::new(table_name, "severity"),
             title: __sdk::__query_builder::Col::new(table_name, "title"),
             description: __sdk::__query_builder::Col::new(table_name, "description"),
@@ -113,6 +116,7 @@ impl __sdk::__query_builder::HasCols for AiInsight {
 pub struct AiInsightIxCols {
     pub company_id: __sdk::__query_builder::IxCol<AiInsight, Option<u64>>,
     pub id: __sdk::__query_builder::IxCol<AiInsight, u64>,
+    pub organization_id: __sdk::__query_builder::IxCol<AiInsight, u64>,
     pub related_model: __sdk::__query_builder::IxCol<AiInsight, String>,
 }
 
@@ -122,6 +126,7 @@ impl __sdk::__query_builder::HasIxCols for AiInsight {
         AiInsightIxCols {
             company_id: __sdk::__query_builder::IxCol::new(table_name, "company_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             related_model: __sdk::__query_builder::IxCol::new(table_name, "related_model"),
         }
     }

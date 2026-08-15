@@ -368,11 +368,12 @@ pub fn create_manufacturing_order(
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
-    // Validate consumption mode (default to "use_created" if not provided)
+    // Validate consumption mode. The optional API field must default to a value
+    // accepted by `ConsumptionMode`; `use_created` is not a supported mode.
     let consumption_str = params
         .consumption
         .clone()
-        .unwrap_or_else(|| "use_created".to_string());
+        .unwrap_or_else(|| "flexible".to_string());
     ConsumptionMode::from_str(&consumption_str)?;
 
     validate_positive_qty(params.product_qty, "product_qty")?;

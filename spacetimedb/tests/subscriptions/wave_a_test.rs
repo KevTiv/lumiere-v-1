@@ -17,6 +17,7 @@ use crate::subscriptions::reducers::{
     CreateSubscriptionFromSaleOrderParams, CreateSubscriptionPlanParams,
     GenerateSubscriptionInvoiceParams,
 };
+use crate::subscriptions::subscription_wave_e::subscription_entitlement;
 use crate::subscriptions::tables::{
     subscription, subscription_billing_run, subscription_line, subscription_plan,
 };
@@ -489,5 +490,55 @@ pub fn test_close_requires_no_charge_without_invoices(ctx: &ReducerContext) -> R
             no_charge: true,
         },
     )?;
+
+    let closed = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("subscription after close")?;
+    if closed.state != "closed" || closed.is_active {
+        return Err("close must persist a closed, inactive subscription".into());
+    }
+    let entitlements: Vec<_> = ctx
+        .db
+        .subscription_entitlement()
+        .subscription_entitlement_by_sub()
+        .filter(&sub_id)
+        .collect();
+    if entitlements.is_empty() || entitlements.iter().any(|row| row.status != "revoked") {
+        return Err("close must atomically revoke every subscription entitlement".into());
+    }
+    if entitlements.iter().any(|row| row.revoked_at.is_none()) {
+        return Err("revoked entitlements must persist revoked_at".into());
+    }
+
+    let retry = close_subscription(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        sub_id,
+        CloseSubscriptionParams {
+            close_reason_id: None,
+            notes: Some("retry".into()),
+            no_charge: true,
+        },
+    );
+    if retry.is_ok() {
+        return Err("retrying an already closed subscription must be rejected".into());
+    }
+    let persisted_entitlements: Vec<_> = ctx
+        .db
+        .subscription_entitlement()
+        .subscription_entitlement_by_sub()
+        .filter(&sub_id)
+        .collect();
+    if persisted_entitlements.len() != entitlements.len()
+        || persisted_entitlements
+            .iter()
+            .any(|row| row.status != "revoked" || row.revoked_at.is_none())
+    {
+        return Err("rejected close retry must not change persisted entitlements".into());
+    }
     Ok(())
 }

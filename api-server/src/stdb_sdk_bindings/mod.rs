@@ -1028,6 +1028,8 @@ pub mod crm_provider_event_receipt_table;
 pub mod crm_provider_event_receipt_type;
 pub mod crm_provider_principal_table;
 pub mod crm_provider_principal_type;
+pub mod crm_team_table;
+pub mod crm_team_type;
 pub mod crossovered_budget_lines_table;
 pub mod crossovered_budget_lines_type;
 pub mod crossovered_budget_table;
@@ -2034,6 +2036,7 @@ pub mod run_accounting_budgeting_test_reducer;
 pub mod run_accounting_fixed_asset_ownership_test_reducer;
 pub mod run_accounting_fx_revaluation_test_reducer;
 pub mod run_accounting_ic_consolidation_test_reducer;
+pub mod run_accounting_ownership_backfill_reducer;
 pub mod run_accounting_payment_cancel_test_reducer;
 pub mod run_accounting_payment_management_test_reducer;
 pub mod run_accounting_payment_multi_invoice_residual_test_reducer;
@@ -2071,6 +2074,8 @@ pub mod run_crm_contact_identity_test_reducer;
 pub mod run_crm_contact_update_delete_test_reducer;
 pub mod run_crm_deferred_test_reducer;
 pub mod run_crm_opportunity_convert_test_reducer;
+pub mod run_crm_persisted_integrity_smoke_test_reducer;
+pub mod run_crm_relational_fk_test_reducer;
 pub mod run_crm_relationship_admin_test_reducer;
 pub mod run_crm_wave_2_test_reducer;
 pub mod run_document_retention_purge_reducer;
@@ -2097,6 +2102,7 @@ pub mod run_hr_wave_a_test_reducer;
 pub mod run_inventory_3_pl_asn_test_reducer;
 pub mod run_inventory_adjustment_company_derived_test_reducer;
 pub mod run_inventory_adjustment_process_idempotency_test_reducer;
+pub mod run_inventory_adjustment_reason_negative_matrix_test_reducer;
 pub mod run_inventory_adjustment_requires_valid_reason_test_reducer;
 pub mod run_inventory_adjustment_test_reducer;
 pub mod run_inventory_atp_fail_closed_test_reducer;
@@ -2128,6 +2134,7 @@ pub mod run_inventory_receipt_average_costing_test_reducer;
 pub mod run_inventory_receipt_fifo_layers_test_reducer;
 pub mod run_inventory_receipt_quant_test_reducer;
 pub mod run_inventory_replenishment_demand_test_reducer;
+pub mod run_inventory_replenishment_relation_negative_matrix_test_reducer;
 pub mod run_inventory_replenishment_rule_not_found_test_reducer;
 pub mod run_inventory_serial_id_validate_test_reducer;
 pub mod run_inventory_serial_reserve_test_reducer;
@@ -2139,9 +2146,11 @@ pub mod run_inventory_warehouse_sync_test_reducer;
 pub mod run_inventory_wave_release_test_reducer;
 pub mod run_manufacturing_loss_category_create_test_reducer;
 pub mod run_manufacturing_loss_category_invalid_category_test_reducer;
+pub mod run_manufacturing_productivity_relational_integrity_test_reducer;
 pub mod run_manufacturing_workcenter_create_test_reducer;
 pub mod run_manufacturing_workcenter_cross_org_test_reducer;
 pub mod run_manufacturing_workcenter_test_reducer;
+pub mod run_manufacturing_workorder_workcenter_integrity_test_reducer;
 pub mod run_owner_report_schedule_reducer;
 pub mod run_projects_wave_a_test_reducer;
 pub mod run_projects_wave_c_test_reducer;
@@ -2825,6 +2834,7 @@ pub mod utm_medium_table;
 pub mod utm_medium_type;
 pub mod utm_source_table;
 pub mod utm_source_type;
+pub mod validate_accounting_ownership_backfill_reducer;
 pub mod validate_budget_reducer;
 pub mod validate_consolidation_reducer;
 pub mod validate_cycle_count_reducer;
@@ -3977,6 +3987,8 @@ pub use crm_provider_event_receipt_table::*;
 pub use crm_provider_event_receipt_type::CrmProviderEventReceipt;
 pub use crm_provider_principal_table::*;
 pub use crm_provider_principal_type::CrmProviderPrincipal;
+pub use crm_team_table::*;
+pub use crm_team_type::CrmTeam;
 pub use crossovered_budget_lines_table::*;
 pub use crossovered_budget_lines_type::CrossoveredBudgetLines;
 pub use crossovered_budget_table::*;
@@ -4983,6 +4995,7 @@ pub use run_accounting_budgeting_test_reducer::run_accounting_budgeting_test;
 pub use run_accounting_fixed_asset_ownership_test_reducer::run_accounting_fixed_asset_ownership_test;
 pub use run_accounting_fx_revaluation_test_reducer::run_accounting_fx_revaluation_test;
 pub use run_accounting_ic_consolidation_test_reducer::run_accounting_ic_consolidation_test;
+pub use run_accounting_ownership_backfill_reducer::run_accounting_ownership_backfill;
 pub use run_accounting_payment_cancel_test_reducer::run_accounting_payment_cancel_test;
 pub use run_accounting_payment_management_test_reducer::run_accounting_payment_management_test;
 pub use run_accounting_payment_multi_invoice_residual_test_reducer::run_accounting_payment_multi_invoice_residual_test;
@@ -5020,6 +5033,8 @@ pub use run_crm_contact_identity_test_reducer::run_crm_contact_identity_test;
 pub use run_crm_contact_update_delete_test_reducer::run_crm_contact_update_delete_test;
 pub use run_crm_deferred_test_reducer::run_crm_deferred_test;
 pub use run_crm_opportunity_convert_test_reducer::run_crm_opportunity_convert_test;
+pub use run_crm_persisted_integrity_smoke_test_reducer::run_crm_persisted_integrity_smoke_test;
+pub use run_crm_relational_fk_test_reducer::run_crm_relational_fk_test;
 pub use run_crm_relationship_admin_test_reducer::run_crm_relationship_admin_test;
 pub use run_crm_wave_2_test_reducer::run_crm_wave_2_test;
 pub use run_document_retention_purge_reducer::run_document_retention_purge;
@@ -5046,6 +5061,7 @@ pub use run_hr_wave_a_test_reducer::run_hr_wave_a_test;
 pub use run_inventory_3_pl_asn_test_reducer::run_inventory_3_pl_asn_test;
 pub use run_inventory_adjustment_company_derived_test_reducer::run_inventory_adjustment_company_derived_test;
 pub use run_inventory_adjustment_process_idempotency_test_reducer::run_inventory_adjustment_process_idempotency_test;
+pub use run_inventory_adjustment_reason_negative_matrix_test_reducer::run_inventory_adjustment_reason_negative_matrix_test;
 pub use run_inventory_adjustment_requires_valid_reason_test_reducer::run_inventory_adjustment_requires_valid_reason_test;
 pub use run_inventory_adjustment_test_reducer::run_inventory_adjustment_test;
 pub use run_inventory_atp_fail_closed_test_reducer::run_inventory_atp_fail_closed_test;
@@ -5077,6 +5093,7 @@ pub use run_inventory_receipt_average_costing_test_reducer::run_inventory_receip
 pub use run_inventory_receipt_fifo_layers_test_reducer::run_inventory_receipt_fifo_layers_test;
 pub use run_inventory_receipt_quant_test_reducer::run_inventory_receipt_quant_test;
 pub use run_inventory_replenishment_demand_test_reducer::run_inventory_replenishment_demand_test;
+pub use run_inventory_replenishment_relation_negative_matrix_test_reducer::run_inventory_replenishment_relation_negative_matrix_test;
 pub use run_inventory_replenishment_rule_not_found_test_reducer::run_inventory_replenishment_rule_not_found_test;
 pub use run_inventory_serial_id_validate_test_reducer::run_inventory_serial_id_validate_test;
 pub use run_inventory_serial_reserve_test_reducer::run_inventory_serial_reserve_test;
@@ -5088,9 +5105,11 @@ pub use run_inventory_warehouse_sync_test_reducer::run_inventory_warehouse_sync_
 pub use run_inventory_wave_release_test_reducer::run_inventory_wave_release_test;
 pub use run_manufacturing_loss_category_create_test_reducer::run_manufacturing_loss_category_create_test;
 pub use run_manufacturing_loss_category_invalid_category_test_reducer::run_manufacturing_loss_category_invalid_category_test;
+pub use run_manufacturing_productivity_relational_integrity_test_reducer::run_manufacturing_productivity_relational_integrity_test;
 pub use run_manufacturing_workcenter_create_test_reducer::run_manufacturing_workcenter_create_test;
 pub use run_manufacturing_workcenter_cross_org_test_reducer::run_manufacturing_workcenter_cross_org_test;
 pub use run_manufacturing_workcenter_test_reducer::run_manufacturing_workcenter_test;
+pub use run_manufacturing_workorder_workcenter_integrity_test_reducer::run_manufacturing_workorder_workcenter_integrity_test;
 pub use run_owner_report_schedule_reducer::run_owner_report_schedule;
 pub use run_projects_wave_a_test_reducer::run_projects_wave_a_test;
 pub use run_projects_wave_c_test_reducer::run_projects_wave_c_test;
@@ -5774,6 +5793,7 @@ pub use utm_medium_table::*;
 pub use utm_medium_type::UtmMedium;
 pub use utm_source_table::*;
 pub use utm_source_type::UtmSource;
+pub use validate_accounting_ownership_backfill_reducer::validate_accounting_ownership_backfill;
 pub use validate_budget_reducer::validate_budget;
 pub use validate_consolidation_reducer::validate_consolidation;
 pub use validate_cycle_count_reducer::validate_cycle_count;
@@ -7570,6 +7590,7 @@ pub enum Reducer {
     },
     CreatePosTerminal {
         organization_id: u64,
+        company_id: Option<u64>,
         name: String,
         location_label: Option<String>,
         latitude: Option<f64>,
@@ -9712,6 +9733,7 @@ pub enum Reducer {
     RunAccountingFixedAssetOwnershipTest,
     RunAccountingFxRevaluationTest,
     RunAccountingIcConsolidationTest,
+    RunAccountingOwnershipBackfill,
     RunAccountingPaymentCancelTest,
     RunAccountingPaymentManagementTest,
     RunAccountingPaymentMultiInvoiceResidualTest,
@@ -9752,6 +9774,8 @@ pub enum Reducer {
     RunCrmContactUpdateDeleteTest,
     RunCrmDeferredTest,
     RunCrmOpportunityConvertTest,
+    RunCrmPersistedIntegritySmokeTest,
+    RunCrmRelationalFkTest,
     RunCrmRelationshipAdminTest,
     RunCrmWave2Test,
     RunDocumentRetentionPurge {
@@ -9786,6 +9810,7 @@ pub enum Reducer {
     RunInventory3PlAsnTest,
     RunInventoryAdjustmentCompanyDerivedTest,
     RunInventoryAdjustmentProcessIdempotencyTest,
+    RunInventoryAdjustmentReasonNegativeMatrixTest,
     RunInventoryAdjustmentRequiresValidReasonTest,
     RunInventoryAdjustmentTest,
     RunInventoryAtpFailClosedTest,
@@ -9824,6 +9849,7 @@ pub enum Reducer {
     RunInventoryReceiptFifoLayersTest,
     RunInventoryReceiptQuantTest,
     RunInventoryReplenishmentDemandTest,
+    RunInventoryReplenishmentRelationNegativeMatrixTest,
     RunInventoryReplenishmentRuleNotFoundTest,
     RunInventorySerialIdValidateTest,
     RunInventorySerialReserveTest,
@@ -9835,9 +9861,11 @@ pub enum Reducer {
     RunInventoryWaveReleaseTest,
     RunManufacturingLossCategoryCreateTest,
     RunManufacturingLossCategoryInvalidCategoryTest,
+    RunManufacturingProductivityRelationalIntegrityTest,
     RunManufacturingWorkcenterCreateTest,
     RunManufacturingWorkcenterCrossOrgTest,
     RunManufacturingWorkcenterTest,
+    RunManufacturingWorkorderWorkcenterIntegrityTest,
     RunOwnerReportSchedule {
         organization_id: u64,
         report_id: u64,
@@ -10743,6 +10771,7 @@ pub enum Reducer {
     },
     UpdateMetricValues {
         organization_id: u64,
+        company_id: Option<u64>,
         metric_id: u64,
         params: UpdateMetricValuesParams,
     },
@@ -10956,6 +10985,7 @@ pub enum Reducer {
     },
     UpdateReportTemplate {
         organization_id: u64,
+        company_id: Option<u64>,
         template_id: u64,
         params: UpdateReportTemplateParams,
     },
@@ -11159,6 +11189,7 @@ pub enum Reducer {
     },
     UpdateWidgetLayout {
         organization_id: u64,
+        company_id: Option<u64>,
         widget_id: u64,
         params: UpdateWidgetLayoutParams,
     },
@@ -11272,6 +11303,7 @@ pub enum Reducer {
         organization_id: u64,
         serial_id: u64,
     },
+    ValidateAccountingOwnershipBackfill,
     ValidateBudget {
         organization_id: u64,
         budget_id: u64,
@@ -12208,6 +12240,7 @@ impl __sdk::Reducer for Reducer {
             }
             Reducer::RunAccountingFxRevaluationTest => "run_accounting_fx_revaluation_test",
             Reducer::RunAccountingIcConsolidationTest => "run_accounting_ic_consolidation_test",
+            Reducer::RunAccountingOwnershipBackfill => "run_accounting_ownership_backfill",
             Reducer::RunAccountingPaymentCancelTest => "run_accounting_payment_cancel_test",
             Reducer::RunAccountingPaymentManagementTest => "run_accounting_payment_management_test",
             Reducer::RunAccountingPaymentMultiInvoiceResidualTest => {
@@ -12252,6 +12285,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunCrmContactUpdateDeleteTest => "run_crm_contact_update_delete_test",
             Reducer::RunCrmDeferredTest => "run_crm_deferred_test",
             Reducer::RunCrmOpportunityConvertTest => "run_crm_opportunity_convert_test",
+            Reducer::RunCrmPersistedIntegritySmokeTest => "run_crm_persisted_integrity_smoke_test",
+            Reducer::RunCrmRelationalFkTest => "run_crm_relational_fk_test",
             Reducer::RunCrmRelationshipAdminTest => "run_crm_relationship_admin_test",
             Reducer::RunCrmWave2Test => "run_crm_wave_2_test",
             Reducer::RunDocumentRetentionPurge { .. } => "run_document_retention_purge",
@@ -12279,6 +12314,9 @@ impl __sdk::Reducer for Reducer {
             }
             Reducer::RunInventoryAdjustmentProcessIdempotencyTest => {
                 "run_inventory_adjustment_process_idempotency_test"
+            }
+            Reducer::RunInventoryAdjustmentReasonNegativeMatrixTest => {
+                "run_inventory_adjustment_reason_negative_matrix_test"
             }
             Reducer::RunInventoryAdjustmentRequiresValidReasonTest => {
                 "run_inventory_adjustment_requires_valid_reason_test"
@@ -12322,6 +12360,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunInventoryReplenishmentDemandTest => {
                 "run_inventory_replenishment_demand_test"
             }
+            Reducer::RunInventoryReplenishmentRelationNegativeMatrixTest => {
+                "run_inventory_replenishment_relation_negative_matrix_test"
+            }
             Reducer::RunInventoryReplenishmentRuleNotFoundTest => {
                 "run_inventory_replenishment_rule_not_found_test"
             }
@@ -12339,6 +12380,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::RunManufacturingLossCategoryInvalidCategoryTest => {
                 "run_manufacturing_loss_category_invalid_category_test"
             }
+            Reducer::RunManufacturingProductivityRelationalIntegrityTest => {
+                "run_manufacturing_productivity_relational_integrity_test"
+            }
             Reducer::RunManufacturingWorkcenterCreateTest => {
                 "run_manufacturing_workcenter_create_test"
             }
@@ -12346,6 +12390,9 @@ impl __sdk::Reducer for Reducer {
                 "run_manufacturing_workcenter_cross_org_test"
             }
             Reducer::RunManufacturingWorkcenterTest => "run_manufacturing_workcenter_test",
+            Reducer::RunManufacturingWorkorderWorkcenterIntegrityTest => {
+                "run_manufacturing_workorder_workcenter_integrity_test"
+            }
             Reducer::RunOwnerReportSchedule { .. } => "run_owner_report_schedule",
             Reducer::RunProjectsWaveATest => "run_projects_wave_a_test",
             Reducer::RunProjectsWaveCTest => "run_projects_wave_c_test",
@@ -12704,6 +12751,9 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpsertWorkflowEdge { .. } => "upsert_workflow_edge",
             Reducer::UpsertWorkflowNode { .. } => "upsert_workflow_node",
             Reducer::UseSerial { .. } => "use_serial",
+            Reducer::ValidateAccountingOwnershipBackfill => {
+                "validate_accounting_ownership_backfill"
+            }
             Reducer::ValidateBudget { .. } => "validate_budget",
             Reducer::ValidateConsolidation { .. } => "validate_consolidation",
             Reducer::ValidateCycleCount { .. } => "validate_cycle_count",
@@ -15689,12 +15739,14 @@ Reducer::BillProjectMilestone{
 }),
             Reducer::CreatePosTerminal{
                 organization_id,
+                company_id,
                 name,
                 location_label,
                 latitude,
                 longitude,
 }             => __sats::bsatn::to_vec(&create_pos_terminal_reducer::CreatePosTerminalArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 name: name.clone(),
                 location_label: location_label.clone(),
                 latitude: latitude.clone(),
@@ -19522,6 +19574,8 @@ Reducer::RunAccountingFxRevaluationTest => __sats::bsatn::to_vec(&run_accounting
                 }),
 Reducer::RunAccountingIcConsolidationTest => __sats::bsatn::to_vec(&run_accounting_ic_consolidation_test_reducer::RunAccountingIcConsolidationTestArgs {
                 }),
+Reducer::RunAccountingOwnershipBackfill => __sats::bsatn::to_vec(&run_accounting_ownership_backfill_reducer::RunAccountingOwnershipBackfillArgs {
+                }),
 Reducer::RunAccountingPaymentCancelTest => __sats::bsatn::to_vec(&run_accounting_payment_cancel_test_reducer::RunAccountingPaymentCancelTestArgs {
                 }),
 Reducer::RunAccountingPaymentManagementTest => __sats::bsatn::to_vec(&run_accounting_payment_management_test_reducer::RunAccountingPaymentManagementTestArgs {
@@ -19601,6 +19655,10 @@ Reducer::RunCrmDeferredTest => __sats::bsatn::to_vec(&run_crm_deferred_test_redu
                 }),
 Reducer::RunCrmOpportunityConvertTest => __sats::bsatn::to_vec(&run_crm_opportunity_convert_test_reducer::RunCrmOpportunityConvertTestArgs {
                 }),
+Reducer::RunCrmPersistedIntegritySmokeTest => __sats::bsatn::to_vec(&run_crm_persisted_integrity_smoke_test_reducer::RunCrmPersistedIntegritySmokeTestArgs {
+                }),
+Reducer::RunCrmRelationalFkTest => __sats::bsatn::to_vec(&run_crm_relational_fk_test_reducer::RunCrmRelationalFkTestArgs {
+                }),
 Reducer::RunCrmRelationshipAdminTest => __sats::bsatn::to_vec(&run_crm_relationship_admin_test_reducer::RunCrmRelationshipAdminTestArgs {
                 }),
 Reducer::RunCrmWave2Test => __sats::bsatn::to_vec(&run_crm_wave_2_test_reducer::RunCrmWave2TestArgs {
@@ -19665,6 +19723,8 @@ Reducer::RunInventory3PlAsnTest => __sats::bsatn::to_vec(&run_inventory_3_pl_asn
 Reducer::RunInventoryAdjustmentCompanyDerivedTest => __sats::bsatn::to_vec(&run_inventory_adjustment_company_derived_test_reducer::RunInventoryAdjustmentCompanyDerivedTestArgs {
                 }),
 Reducer::RunInventoryAdjustmentProcessIdempotencyTest => __sats::bsatn::to_vec(&run_inventory_adjustment_process_idempotency_test_reducer::RunInventoryAdjustmentProcessIdempotencyTestArgs {
+                }),
+Reducer::RunInventoryAdjustmentReasonNegativeMatrixTest => __sats::bsatn::to_vec(&run_inventory_adjustment_reason_negative_matrix_test_reducer::RunInventoryAdjustmentReasonNegativeMatrixTestArgs {
                 }),
 Reducer::RunInventoryAdjustmentRequiresValidReasonTest => __sats::bsatn::to_vec(&run_inventory_adjustment_requires_valid_reason_test_reducer::RunInventoryAdjustmentRequiresValidReasonTestArgs {
                 }),
@@ -19740,6 +19800,8 @@ Reducer::RunInventoryReceiptQuantTest => __sats::bsatn::to_vec(&run_inventory_re
                 }),
 Reducer::RunInventoryReplenishmentDemandTest => __sats::bsatn::to_vec(&run_inventory_replenishment_demand_test_reducer::RunInventoryReplenishmentDemandTestArgs {
                 }),
+Reducer::RunInventoryReplenishmentRelationNegativeMatrixTest => __sats::bsatn::to_vec(&run_inventory_replenishment_relation_negative_matrix_test_reducer::RunInventoryReplenishmentRelationNegativeMatrixTestArgs {
+                }),
 Reducer::RunInventoryReplenishmentRuleNotFoundTest => __sats::bsatn::to_vec(&run_inventory_replenishment_rule_not_found_test_reducer::RunInventoryReplenishmentRuleNotFoundTestArgs {
                 }),
 Reducer::RunInventorySerialIdValidateTest => __sats::bsatn::to_vec(&run_inventory_serial_id_validate_test_reducer::RunInventorySerialIdValidateTestArgs {
@@ -19762,11 +19824,15 @@ Reducer::RunManufacturingLossCategoryCreateTest => __sats::bsatn::to_vec(&run_ma
                 }),
 Reducer::RunManufacturingLossCategoryInvalidCategoryTest => __sats::bsatn::to_vec(&run_manufacturing_loss_category_invalid_category_test_reducer::RunManufacturingLossCategoryInvalidCategoryTestArgs {
                 }),
+Reducer::RunManufacturingProductivityRelationalIntegrityTest => __sats::bsatn::to_vec(&run_manufacturing_productivity_relational_integrity_test_reducer::RunManufacturingProductivityRelationalIntegrityTestArgs {
+                }),
 Reducer::RunManufacturingWorkcenterCreateTest => __sats::bsatn::to_vec(&run_manufacturing_workcenter_create_test_reducer::RunManufacturingWorkcenterCreateTestArgs {
                 }),
 Reducer::RunManufacturingWorkcenterCrossOrgTest => __sats::bsatn::to_vec(&run_manufacturing_workcenter_cross_org_test_reducer::RunManufacturingWorkcenterCrossOrgTestArgs {
                 }),
 Reducer::RunManufacturingWorkcenterTest => __sats::bsatn::to_vec(&run_manufacturing_workcenter_test_reducer::RunManufacturingWorkcenterTestArgs {
+                }),
+Reducer::RunManufacturingWorkorderWorkcenterIntegrityTest => __sats::bsatn::to_vec(&run_manufacturing_workorder_workcenter_integrity_test_reducer::RunManufacturingWorkorderWorkcenterIntegrityTestArgs {
                 }),
 Reducer::RunOwnerReportSchedule{
                 organization_id,
@@ -21411,10 +21477,12 @@ Reducer::ToggleProjectFavorite{
 }),
             Reducer::UpdateMetricValues{
                 organization_id,
+                company_id,
                 metric_id,
                 params,
 }             => __sats::bsatn::to_vec(&update_metric_values_reducer::UpdateMetricValuesArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 metric_id: metric_id.clone(),
                 params: params.clone(),
 }),
@@ -21798,10 +21866,12 @@ Reducer::ToggleProjectFavorite{
 }),
             Reducer::UpdateReportTemplate{
                 organization_id,
+                company_id,
                 template_id,
                 params,
 }             => __sats::bsatn::to_vec(&update_report_template_reducer::UpdateReportTemplateArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 template_id: template_id.clone(),
                 params: params.clone(),
 }),
@@ -22164,10 +22234,12 @@ Reducer::ToggleProjectFavorite{
 }),
             Reducer::UpdateWidgetLayout{
                 organization_id,
+                company_id,
                 widget_id,
                 params,
 }             => __sats::bsatn::to_vec(&update_widget_layout_reducer::UpdateWidgetLayoutArgs {
                 organization_id: organization_id.clone(),
+                company_id: company_id.clone(),
                 widget_id: widget_id.clone(),
                 params: params.clone(),
 }),
@@ -22371,7 +22443,9 @@ Reducer::ToggleProjectFavorite{
                 organization_id: organization_id.clone(),
                 serial_id: serial_id.clone(),
 }),
-            Reducer::ValidateBudget{
+            Reducer::ValidateAccountingOwnershipBackfill => __sats::bsatn::to_vec(&validate_accounting_ownership_backfill_reducer::ValidateAccountingOwnershipBackfillArgs {
+                }),
+Reducer::ValidateBudget{
                 organization_id,
                 budget_id,
 }             => __sats::bsatn::to_vec(&validate_budget_reducer::ValidateBudgetArgs {
@@ -22563,6 +22637,7 @@ pub struct DbUpdate {
     crm_forecast_snapshot: __sdk::TableUpdate<CrmForecastSnapshot>,
     crm_provider_event_receipt: __sdk::TableUpdate<CrmProviderEventReceipt>,
     crm_provider_principal: __sdk::TableUpdate<CrmProviderPrincipal>,
+    crm_team: __sdk::TableUpdate<CrmTeam>,
     crossovered_budget: __sdk::TableUpdate<CrossoveredBudget>,
     crossovered_budget_lines: __sdk::TableUpdate<CrossoveredBudgetLines>,
     currency: __sdk::TableUpdate<Currency>,
@@ -23265,6 +23340,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "crm_provider_principal" => db_update.crm_provider_principal.append(
                     crm_provider_principal_table::parse_table_update(table_update)?,
                 ),
+                "crm_team" => db_update
+                    .crm_team
+                    .append(crm_team_table::parse_table_update(table_update)?),
                 "crossovered_budget" => db_update
                     .crossovered_budget
                     .append(crossovered_budget_table::parse_table_update(table_update)?),
@@ -24827,6 +24905,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "crm_provider_principal",
                 &self.crm_provider_principal,
             )
+            .with_updates_by_pk(|row| &row.id);
+        diff.crm_team = cache
+            .apply_diff_to_table::<CrmTeam>("crm_team", &self.crm_team)
             .with_updates_by_pk(|row| &row.id);
         diff.crossovered_budget = cache
             .apply_diff_to_table::<CrossoveredBudget>(
@@ -26644,6 +26725,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "crm_provider_principal" => db_update
                     .crm_provider_principal
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "crm_team" => db_update
+                    .crm_team
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "crossovered_budget" => db_update
                     .crossovered_budget
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -28013,6 +28097,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "crm_provider_principal" => db_update
                     .crm_provider_principal
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "crm_team" => db_update
+                    .crm_team
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "crossovered_budget" => db_update
                     .crossovered_budget
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -29182,6 +29269,7 @@ pub struct AppliedDiff<'r> {
     crm_forecast_snapshot: __sdk::TableAppliedDiff<'r, CrmForecastSnapshot>,
     crm_provider_event_receipt: __sdk::TableAppliedDiff<'r, CrmProviderEventReceipt>,
     crm_provider_principal: __sdk::TableAppliedDiff<'r, CrmProviderPrincipal>,
+    crm_team: __sdk::TableAppliedDiff<'r, CrmTeam>,
     crossovered_budget: __sdk::TableAppliedDiff<'r, CrossoveredBudget>,
     crossovered_budget_lines: __sdk::TableAppliedDiff<'r, CrossoveredBudgetLines>,
     currency: __sdk::TableAppliedDiff<'r, Currency>,
@@ -30016,6 +30104,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.crm_provider_principal,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<CrmTeam>("crm_team", &self.crm_team, event);
         callbacks.invoke_table_row_callbacks::<CrossoveredBudget>(
             "crossovered_budget",
             &self.crossovered_budget,
@@ -32340,6 +32429,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         crm_forecast_snapshot_table::register_table(client_cache);
         crm_provider_event_receipt_table::register_table(client_cache);
         crm_provider_principal_table::register_table(client_cache);
+        crm_team_table::register_table(client_cache);
         crossovered_budget_table::register_table(client_cache);
         crossovered_budget_lines_table::register_table(client_cache);
         currency_table::register_table(client_cache);
@@ -32794,6 +32884,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "crm_forecast_snapshot",
         "crm_provider_event_receipt",
         "crm_provider_principal",
+        "crm_team",
         "crossovered_budget",
         "crossovered_budget_lines",
         "currency",

@@ -7,7 +7,7 @@ Module: Purchasing
 Audit report: 2026-07-26 purchasing relational-integrity audit
 Owner: Unassigned
 Target release: Before the next Purchasing pilot
-Current readiness: Unsafe for real ERP data
+Current readiness: Pilot ready with restrictions
 Allowed pilot restrictions: No real ERP data until all P0 items are Verified
 ```
 
@@ -41,12 +41,12 @@ persisted-data and negative proof specified below.
 | PUR-RI-014 | P0 | Advanced procurement reducers trust caller company and most vendor/product/warehouse/PO identities | `spacetimedb/src/purchasing/procurement_advanced.rs`; advanced hooks/Ops UI | Validate company in organization for every command; load and validate vendors, products, warehouses, POs, principals, delegates, and lifecycle/type compatibility | System-owned context; scoped relation loader | Audit advanced tables for company and relation mismatches | No advanced row can be created with company `0`, a foreign company, or an invalid related record | Per-table persisted relation tests across two organizations/companies | Implemented, unverified |
 | PUR-RI-015 | P0 | Purchasing integration intents accept an unchecked PO relation and idempotency uniqueness is organization-wide rather than explicitly scoped to provider/type/company | `spacetimedb/src/purchasing/procurement_advanced.rs`; integration worker/API contracts | Validate PO scope; define an immutable idempotency tuple; restrict result recording to the authorized worker/service identity and explicit state transitions | Typed source reference; atomic idempotent operation | Detect duplicate keys and intents linked to foreign POs; quarantine before unique enforcement | Duplicate logical requests return the original result; foreign PO and illegal result transitions fail | Persisted intent query, concurrency/retry test, worker-authorization tests | Implemented, unverified |
 | PUR-RI-016 | P1 | Update contracts cannot consistently distinguish unchanged, clear, and replace | PO, PO-line, landed-cost, partner-bank, intake and advanced update params; generated TypeScript; mappers/forms | Use explicit patch semantics for nullable scalars and explicit collection operations for arrays | Explicit patch; explicit association update | No data migration unless a new association table is introduced | Omission preserves; explicit clear clears; replacement validates before mutation; invalid values fail | Positive omission/clear/replace persisted tests for every changed contract | Not started |
-| PUR-RI-017 | P1 | Purchasing HTTP/WS reads are organization-scoped but do not enforce the session's allowed company set | `frontend/packages/stdb/src/queries/erp-subscriptions.ts`; `api-server/src/query_exec.rs`; session company context | Add allowed-company filters to headers and children, deriving child visibility through stored company or validated parent | Relation-aware query | None; access-policy change requires rollout review | A user authorized only for Company A1 cannot read Company A2 Purchasing rows over HTTP or WebSocket | HTTP and WS tests with two companies and field/role contexts | Not started |
+| PUR-RI-017 | P1 | Purchasing HTTP/WS reads are organization-scoped but do not enforce the session's allowed company set | `frontend/packages/stdb/src/queries/erp-subscriptions.ts`; `api-server/src/query_exec.rs`; session company context | Add allowed-company filters to headers and children, deriving child visibility through stored company or validated parent | Relation-aware query | None; access-policy change requires rollout review | A user authorized only for Company A1 cannot read Company A2 Purchasing rows over HTTP or WebSocket | HTTP and WS tests with two companies and field/role contexts | Implemented, unverified |
 | PUR-RI-018 | P1 | Missing company context falls back to `0n`; RFQ and bid currency use hard-coded `1n`; landed-cost dates silently become current time | `frontend/web/app/(modules)/purchasing/purchasing-client.tsx`; `frontend/web/lib/purchasing-create-params.ts`; Ops SoD | Block actions until real company/configuration is loaded; source currency from selected RFQ/company; require or deliberately server-default business dates | Active company context; related-record lookup; domain default only when documented | None | No business mutation sends company/currency `0/1` as a compiler fallback or invents a date | Mapper tests and captured mutation payloads using distinctive non-default IDs/dates | Not started |
-| PUR-RI-019 | P1 | Blanket release creates an empty PO and increments release state without contractual lines/remaining commitment | `spacetimedb/src/purchasing/procurement_advanced.rs`; blanket schema/UI | Add blanket lines and remaining-quantity/value semantics, or disable release until required PO lines are supplied and validated | Parent-child wiring; atomic idempotent command | Add/backfill blanket-line table only where source evidence exists; mark header-only blankets non-releasable | Release creates a usable PO with exact lines and cannot exceed the remaining commitment or duplicate on retry | Persisted blanket → release → PO → line proof and limit/retry tests | Not started |
+| PUR-RI-019 | P1 | Blanket release creates an empty PO and increments release state without contractual lines/remaining commitment | `spacetimedb/src/purchasing/procurement_advanced.rs`; blanket schema/UI | Add blanket lines and remaining-quantity/value semantics, or disable release until required PO lines are supplied and validated | Parent-child wiring; atomic idempotent command | Add/backfill blanket-line table only where source evidence exists; mark header-only blankets non-releasable | Release creates a usable PO with exact lines and cannot exceed the remaining commitment or duplicate on retry | Persisted blanket → release → PO → line proof and limit/retry tests | Implemented, unverified |
 | PUR-RI-020 | P2 | Reverse ID vectors duplicate authoritative parent-child relations and can drift | PO, requisition, RFQ, return and landed-cost headers/children | Prefer indexed child queries; otherwise centralize atomic maintenance, uniqueness, delete behavior, and consistency checks | Relation-aware query; explicit association update | Rebuild vectors from child tables and report discrepancies before removing fields | Parent details resolve complete children after refresh; no duplicate/orphan IDs remain | Consistency query and migration report | Not started |
-| PUR-RI-021 | P2 | Advanced tables have callable mutations but no complete query resources, selectors, labels, navigation, or refresh invalidation | Purchasing workspace/query registry/read models/hooks/UI | Register company-filtered resources; return stable IDs plus useful labels; add scoped selectors and invalidate affected resources | Relation-aware read | None | Created/updated rows appear after refresh with related labels and can be filtered/navigated | HTTP/WS/UI refresh tests | Not started |
-| PUR-RI-022 | P3 | Public commands contain compiler-only reverse vectors and broad record-shaped fields; UI uses raw-ID prompts and unsafe enum casts | Purchasing params, generated contracts, mappers, prompt-driven Ops UI | Remove non-intent fields; replace raw prompts with typed scoped selectors; replace casts with validated enum mapping | Intent-shaped command; typed context | Coordinate generated-client rollout; no stored-data migration unless fields are removed | Frontend cannot submit arbitrary raw IDs for supported workflows; generated contracts expose only business intent | Generated diff, mapper tests, UI tests, typecheck | Not started |
+| PUR-RI-021 | P2 | Advanced tables have callable mutations but no complete query resources, selectors, labels, navigation, or refresh invalidation | Purchasing workspace/query registry/read models/hooks/UI | Register company-filtered resources; return stable IDs plus useful labels; add scoped selectors and invalidate affected resources | Relation-aware read | None | Created/updated rows appear after refresh with related labels and can be filtered/navigated | HTTP/WS/UI refresh tests | In progress |
+| PUR-RI-022 | P3 | Public commands contain compiler-only reverse vectors and broad record-shaped fields; UI uses raw-ID prompts and unsafe enum casts | Purchasing params, generated contracts, mappers, prompt-driven Ops UI | Remove non-intent fields; replace raw prompts with typed scoped selectors; replace casts with validated enum mapping | Intent-shaped command; typed context | Coordinate generated-client rollout; no stored-data migration unless fields are removed | Frontend cannot submit arbitrary raw IDs for supported workflows; generated contracts expose only business intent | Generated diff, mapper tests, UI tests, typecheck | In progress |
 
 ## Relationship and Contract Changes
 
@@ -95,18 +95,18 @@ Implementation status (2026-08-08):
 
 | Work item | Status | Evidence | Remaining proof |
 |---|---|---|---|
-| Contain unsafe mutations | Implemented, unverified | `purchasing_ri_phase0_unsafe_actions` fails closed for landed-cost application and advanced procurement reducers; `run_purchasing_phase0_containment_test` exercises the opt-in boundary | Execute the reducer test in a published isolated database and preserve its logs |
+| Contain unsafe mutations | Verified | `purchasing_ri_phase0_unsafe_actions` fails closed; `run_purchasing_phase_0_containment_test` passed on Maincloud 2026-08-14 | None for this work item |
 | Measure suspect relationships | Implemented, unverified | `purchasing_integrity_inventory` reports zero IDs, dangling targets, cross-scope links, duplicate/stale collections, business mismatches, and duplicate integration intents; runbook: `docs/integrity/purchasing-integrity-inventory-baseline.md` | Run against every populated tenant, attach counts and samples, and record a quarantine/backfill decision for every nonzero category |
-| Capture distinctive fixtures | Implemented, unverified | `PurchasingIntegrityFixture` persists primary, same-organization/cross-company, and foreign-organization scopes; `run_purchasing_phase0_fixture_test` is the isolated evidence reducer | Execute against a clean isolated database and preserve distinctive persisted IDs/query output |
+| Capture distinctive fixtures | Verified | `PurchasingIntegrityFixture` persists primary, same-organization/cross-company, and foreign-organization scopes; `run_purchasing_phase_0_fixture_test` passed on Maincloud 2026-08-14 | None for this work item |
 
 Exit gate: the suspected data population is measured and every affected tenant
 has a quarantine/backfill decision.
 
-The exit gate is **not yet met**. Native compilation and an unexecuted inventory
-do not establish clean persisted data or tenant decisions. Phase 1 remediation
-may be implemented behind the containment gate, but no P0 row can become
-`Verified` until the runtime artifacts are attached. Purchasing remains unsafe
-for real ERP data.
+The full exit gate is **not yet met** because the integrity inventory and tenant
+quarantine/backfill decisions remain outstanding. The containment and
+distinctive-fixture reducers passed on Maincloud. With no pre-existing business
+data, this supports an internal pilot only; populated tenants still require the
+inventory decision before rollout.
 
 ### Phase 1 — Tenant and accounting safety
 
@@ -118,25 +118,32 @@ Implementation status (2026-08-08):
 
 | Work item | Status | Evidence | Remaining proof |
 |---|---|---|---|
-| Landed-cost safety (PUR-RI-001–003) | Implemented, unverified | Scoped lifecycle/relation validation, durable application marker and per-quant allocations; `run_purchasing_phase1_landed_costs_test` | Regenerate clients and execute persisted apply/retry/concurrency/failure-injection proof with done moves and quants |
-| Supplier intake and partner bank (PUR-RI-004–005, 013) | Implemented, unverified | Tenant-safe intake transitions, authenticated internal submission, scoped bank/payment relations; `run_purchasing_phase1_relational_integrity_test` | Execute member/non-member and persisted relation matrix; introduce an authoritative bank catalog before accepting `bank_id` |
-| Requisitions and purchase orders (PUR-RI-006–009) | Implemented, unverified | Parent-scoped lifecycle loaders, server-derived actor/reverse relations, validated PO and line relations; `run_purchasing_phase1_purchase_orders_test` | Execute published persisted chain and negative matrix; regenerate narrowed contracts in Phase 2 |
-| Sourcing (PUR-RI-010) | Implemented, unverified | Scoped company/currency/product/UoM/vendor validation and approved-requisition requirement; `run_purchasing_phase1_relational_integrity_test` | Execute persisted RFQ-to-PO chain and relation-negative suite |
-| Returns and credits (PUR-RI-011–012) | Implemented, unverified | Source-derived return lines and eligible quantity; scoped accounting-role validation and retry-safe credit linkage; `run_purchasing_phase1_returns_advanced_test` | Execute persisted picking/move/account proof plus cross-company rollback and failure injection |
-| Advanced procurement and integrations (PUR-RI-014–015) | Implemented, unverified | Scoped advanced relations, immutable integration tuple, worker permission and explicit transitions; `run_purchasing_phase1_returns_advanced_test` | Provision worker permission and execute every-table, authorization, retry and concurrency matrix |
+| Landed-cost safety (PUR-RI-001–003) | Implemented, unverified | Scoped lifecycle/relation validation, durable application marker and per-quant allocations; `run_purchasing_phase_1_landed_costs_test` passed on Maincloud 2026-08-14 | Execute concurrency/failure-injection proof with done moves and quants |
+| Supplier intake and partner bank (PUR-RI-004–005, 013) | Implemented, unverified | Tenant-safe intake transitions, authenticated internal submission, scoped bank/payment relations; `run_purchasing_phase_1_relational_integrity_test` passed on Maincloud 2026-08-14 | Execute member/non-member authorization matrix; introduce an authoritative bank catalog before accepting `bank_id` |
+| Requisitions and purchase orders (PUR-RI-006–009) | Implemented, unverified | Parent-scoped lifecycle loaders, server-derived actor/reverse relations, validated PO and line relations; `run_purchasing_phase_1_purchase_orders_test` passed on Maincloud 2026-08-14 | Regenerate narrowed contracts in Phase 2 |
+| Sourcing (PUR-RI-010) | Implemented, unverified | Scoped company/currency/product/UoM/vendor validation and approved-requisition requirement; `run_purchasing_phase_1_relational_integrity_test` passed on Maincloud 2026-08-14 | Complete the remaining authorization matrix |
+| Returns and credits (PUR-RI-011–012) | Implemented, unverified | Source-derived return lines and eligible quantity; scoped accounting-role validation and retry-safe credit linkage; `run_purchasing_phase_1_returns_advanced_test` passed on Maincloud 2026-08-14 | Execute failure-injection proof |
+| Advanced procurement and integrations (PUR-RI-014–015) | Implemented, unverified | Scoped advanced relations, immutable integration tuple, worker permission and explicit transitions; `run_purchasing_phase_1_returns_advanced_test` passed on Maincloud 2026-08-14 | Provision worker permission and execute every-table authorization/concurrency matrix |
 
 Exit gate: all P0 tests pass against persisted data, retries are safe, and no P0
 item remains below `Verified`.
 
-The Phase 1 exit gate is **not yet met**. The reducers and focused evidence
-reducers are implemented, but published-database execution, concurrency and
-failure-injection evidence, generated-client verification, and Phase 0 tenant
-inventory decisions remain outstanding.
+The Phase 1 focused reducers and aggregate Purchasing suite passed on
+Maincloud. The complete exit gate is **not yet met** because concurrency,
+failure-injection, generated-client, and Phase 0 tenant-inventory evidence
+remain outstanding.
 
 ### Phase 2 — Contract and read cohesion
 
 Implement PUR-RI-016 through PUR-RI-019, regenerate Rust/TypeScript bindings,
 update mappers/hooks/forms, and apply company-aware read policies.
+
+Implementation status (2026-08-11):
+
+| Work item | Status | Evidence | Remaining proof |
+|---|---|---|---|
+| Company-aware Purchasing reads (PUR-RI-017) | Implemented, unverified | HTTP/WS query paths fail closed without one allowed company; advanced Purchasing subscription and cache-projection tests cover exact organization/company scope | Execute HTTP and WebSocket reads as a Company A1-only user against persisted A1/A2/B1 records |
+| Blanket contract and UI (PUR-RI-019; partial PUR-RI-021/022) | Implemented, unverified | Line-bearing create/release contracts, full-request idempotency and effective-window checks passed via `run_purchasing_phase_2_blanket_release_test` on Maincloud 2026-08-14; subscription-aware reads, scoped selectors, Ops-inline forms, detail/history tab, generated Rust SDK | Preserve UI refresh and cross-company read evidence; migrate the remaining Wave C/D raw-ID actions separately |
 
 Exit gate: create/update/clear semantics are explicit and fresh HTTP/WS/UI reads
 show the same scoped relationships.
@@ -262,14 +269,28 @@ Frontend:
 
 Runtime:
 - publish the candidate module to an isolated test database
-- run `run_purchasing_phase0_containment_test`
-- run `run_purchasing_phase0_fixture_test`
+- run `run_purchasing_phase_0_containment_test`
+- run `run_purchasing_phase_0_fixture_test`
 - run `purchasing_integrity_inventory` and capture the structured log lines
 - run all Purchasing domain reducers
 - run the new relational-integrity negative suite
 - execute persisted parent/relation/accounting/inventory queries
 - attach retry and rollback results
 ```
+
+Maincloud runtime evidence (2026-08-14):
+
+- Published non-destructively to `lumiere-v1-j1uo0`; no clear or migration
+  backfill was performed.
+- `run_purchasing_phase_0_containment_test` passed.
+- `run_purchasing_phase_0_fixture_test` passed.
+- All Phase 1 focused reducers passed, including returns/credits/integrations.
+- `run_purchasing_phase_2_blanket_release_test` passed.
+- `run_all_purchasing_tests` passed after the aggregate suite was expanded to
+  invoke the complete Phase 0–2 reducer set.
+- Runtime failures found and fixed during verification: duplicate settings
+  insertion, invalid fixture currency codes, arithmetic supplier-location
+  fallback, and unscoped persisted-test lookups.
 
 For each tracker item, attach:
 
@@ -294,8 +315,12 @@ For each tracker item, attach:
 
 ## Final Readiness Decision
 
-Current decisive evidence includes cross-organization mutation paths,
-unvalidated accounting and operational relations, and retry-unsafe landed-cost
-valuation. No runtime persisted-data proof closes those gates.
+Maincloud persisted-data execution closes the focused Phase 0–2 reducer gate
+and confirms the supplier-location, vendor, accounting, blanket-release,
+cross-scope, and retry checks exercised by that suite. Remaining gaps include
+tenant-wide integrity inventory, concurrency/failure injection, complete
+HTTP/WS/UI read evidence, generated-client verification, and Playwright E2E.
+Restrict rollout to an internal pilot without real financial data until those
+gates pass.
 
-Unsafe for real ERP data
+Pilot ready with restrictions

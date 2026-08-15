@@ -8,6 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub(super) struct CreatePosTerminalArgs {
     pub organization_id: u64,
+    pub company_id: Option<u64>,
     pub name: String,
     pub location_label: Option<String>,
     pub latitude: Option<f64>,
@@ -18,6 +19,7 @@ impl From<CreatePosTerminalArgs> for super::Reducer {
     fn from(args: CreatePosTerminalArgs) -> Self {
         Self::CreatePosTerminal {
             organization_id: args.organization_id,
+            company_id: args.company_id,
             name: args.name,
             location_label: args.location_label,
             latitude: args.latitude,
@@ -44,6 +46,7 @@ pub trait create_pos_terminal {
     fn create_pos_terminal(
         &self,
         organization_id: u64,
+        company_id: Option<u64>,
         name: String,
         location_label: Option<String>,
         latitude: Option<f64>,
@@ -51,6 +54,7 @@ pub trait create_pos_terminal {
     ) -> __sdk::Result<()> {
         self.create_pos_terminal_then(
             organization_id,
+            company_id,
             name,
             location_label,
             latitude,
@@ -68,6 +72,7 @@ pub trait create_pos_terminal {
     fn create_pos_terminal_then(
         &self,
         organization_id: u64,
+        company_id: Option<u64>,
         name: String,
         location_label: Option<String>,
         latitude: Option<f64>,
@@ -83,6 +88,7 @@ impl create_pos_terminal for super::RemoteReducers {
     fn create_pos_terminal_then(
         &self,
         organization_id: u64,
+        company_id: Option<u64>,
         name: String,
         location_label: Option<String>,
         latitude: Option<f64>,
@@ -95,6 +101,7 @@ impl create_pos_terminal for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             CreatePosTerminalArgs {
                 organization_id,
+                company_id,
                 name,
                 location_label,
                 latitude,

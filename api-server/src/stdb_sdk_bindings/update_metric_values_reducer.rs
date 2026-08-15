@@ -10,6 +10,7 @@ use super::update_metric_values_params_type::UpdateMetricValuesParams;
 #[sats(crate = __lib)]
 pub(super) struct UpdateMetricValuesArgs {
     pub organization_id: u64,
+    pub company_id: Option<u64>,
     pub metric_id: u64,
     pub params: UpdateMetricValuesParams,
 }
@@ -18,6 +19,7 @@ impl From<UpdateMetricValuesArgs> for super::Reducer {
     fn from(args: UpdateMetricValuesArgs) -> Self {
         Self::UpdateMetricValues {
             organization_id: args.organization_id,
+            company_id: args.company_id,
             metric_id: args.metric_id,
             params: args.params,
         }
@@ -42,10 +44,11 @@ pub trait update_metric_values {
     fn update_metric_values(
         &self,
         organization_id: u64,
+        company_id: Option<u64>,
         metric_id: u64,
         params: UpdateMetricValuesParams,
     ) -> __sdk::Result<()> {
-        self.update_metric_values_then(organization_id, metric_id, params, |_, _| {})
+        self.update_metric_values_then(organization_id, company_id, metric_id, params, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `update_metric_values` to run as soon as possible,
@@ -57,6 +60,7 @@ pub trait update_metric_values {
     fn update_metric_values_then(
         &self,
         organization_id: u64,
+        company_id: Option<u64>,
         metric_id: u64,
         params: UpdateMetricValuesParams,
 
@@ -70,6 +74,7 @@ impl update_metric_values for super::RemoteReducers {
     fn update_metric_values_then(
         &self,
         organization_id: u64,
+        company_id: Option<u64>,
         metric_id: u64,
         params: UpdateMetricValuesParams,
 
@@ -80,6 +85,7 @@ impl update_metric_values for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             UpdateMetricValuesArgs {
                 organization_id,
+                company_id,
                 metric_id,
                 params,
             },

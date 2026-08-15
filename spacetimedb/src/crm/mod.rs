@@ -105,7 +105,8 @@ pub fn require_single_company_crm_scope(
 // Re-export key types for convenience
 pub use activities::{
     complete_activity, create_activity, create_calendar_event, delete_calendar_event,
-    update_calendar_event, Activity, ActivityType, CalendarEvent, UpdateCalendarEventParams,
+    update_calendar_event, Activity, ActivityType, CalendarEvent, CreateActivityParams,
+    CrmActivityTarget, UpdateCalendarEventParams,
 };
 pub use contact_identities::{
     archive_contact_identity, configure_contact_identity_verification_authority,
@@ -147,7 +148,7 @@ pub use leads::{
     convert_lead_to_customer, create_lead, create_lead_lost_reason, create_lead_source,
     update_lead, update_lead_address, update_lead_details, update_lead_lost_reason,
     update_lead_revenue, update_lead_source, CreateLeadLostReasonParams, CreateLeadSourceParams,
-    Lead, LeadLostReason, LeadSource, UpdateLeadLostReasonParams, UpdateLeadParams,
+    CrmTeam, Lead, LeadLostReason, LeadSource, UpdateLeadLostReasonParams, UpdateLeadParams,
     UpdateLeadSourceParams,
 };
 pub use opportunities::{

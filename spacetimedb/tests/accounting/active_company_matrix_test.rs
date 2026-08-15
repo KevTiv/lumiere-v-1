@@ -28,7 +28,9 @@ use crate::accounting::tax_management::{
     account_tax, account_tax_group, create_account_tax, create_account_tax_group,
     CreateAccountTaxGroupParams, CreateAccountTaxParams,
 };
+use crate::core::organization::{organization_settings, OrganizationSettings};
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
+use crate::crm::CRM_MULTI_COMPANY_FLAG;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{
     AccountInternalGroup, AccountTypeInternal, AssetType, DepreciationMethod, JournalType,
@@ -36,6 +38,43 @@ use crate::types::{
 };
 
 use super::helpers::seed_sibling_company;
+
+fn enable_multi_company_crm(ctx: &ReducerContext, organization_id: u64) {
+    match ctx
+        .db
+        .organization_settings()
+        .organization_id()
+        .find(&organization_id)
+    {
+        Some(settings) => {
+            let mut feature_flags = settings.feature_flags.clone();
+            if !feature_flags
+                .iter()
+                .any(|flag| flag == CRM_MULTI_COMPANY_FLAG)
+            {
+                feature_flags.push(CRM_MULTI_COMPANY_FLAG.to_string());
+            }
+            ctx.db
+                .organization_settings()
+                .organization_id()
+                .update(OrganizationSettings {
+                    feature_flags,
+                    updated_at: ctx.timestamp,
+                    ..settings
+                });
+        }
+        None => {
+            ctx.db.organization_settings().insert(OrganizationSettings {
+                organization_id,
+                module_config: None,
+                feature_flags: vec![CRM_MULTI_COMPANY_FLAG.to_string()],
+                integration_keys: None,
+                updated_at: ctx.timestamp,
+                metadata: Some(r#"{"harness":"accounting-a2"}"#.to_string()),
+            });
+        }
+    }
+}
 
 fn assert_company(label: &str, expected: u64, actual: u64) -> Result<(), String> {
     if actual != expected {
@@ -55,6 +94,7 @@ pub fn test_active_company_a2_create_persist_matrix(ctx: &ReducerContext) -> Res
     if company_a2 == company_a1 {
         return Err("A2 must differ from A1".to_string());
     }
+    enable_multi_company_crm(ctx, org_id);
 
     let suffix = company_a2;
     create_account_account_type(

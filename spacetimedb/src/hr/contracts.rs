@@ -87,6 +87,9 @@ fn assert_job_in_company(
     if job.company_id != company_id {
         return Err("Job position does not belong to this company".to_string());
     }
+    if !job.is_active {
+        return Err("Job position is not active".to_string());
+    }
     Ok(())
 }
 

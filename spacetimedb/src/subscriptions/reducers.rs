@@ -794,6 +794,15 @@ pub fn close_subscription(
 
     let old_state = subscription.state.clone();
 
+    // Revoke access in the same reducer transaction as the contract close. SpacetimeDB
+    // rolls back every write if this reducer returns an error, so callers can never
+    // observe a closed subscription with active customer entitlements.
+    let revoked_entitlements = crate::subscriptions::subscription_wave_e::revoke_all_entitlements(
+        ctx,
+        organization_id,
+        subscription_id,
+    );
+
     ctx.db.subscription().id().update(Subscription {
         state: "closed".to_string(),
         is_active: false,
@@ -824,6 +833,7 @@ pub fn close_subscription(
                 serde_json::json!({
                     "notes": params.notes,
                     "no_charge": params.no_charge,
+                    "entitlements_revoked": revoked_entitlements,
                 })
                 .to_string(),
             ),

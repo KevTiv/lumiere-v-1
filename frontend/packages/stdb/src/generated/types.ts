@@ -791,6 +791,7 @@ export type AccrueSaleCommissionParams = __Infer<typeof AccrueSaleCommissionPara
 export const Activity = __t.object("Activity", {
   id: __t.u64(),
   organizationId: __t.u64(),
+  activityTypeId: __t.u64(),
   activityType: __t.string(),
   summary: __t.string(),
   note: __t.option(__t.string()),
@@ -1186,6 +1187,7 @@ export type AiChatSession = __Infer<typeof AiChatSession>;
 
 export const AiDocumentProcessingJob = __t.object("AiDocumentProcessingJob", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   documentType: __t.string(),
   jobType: __t.string(),
   get status() {
@@ -1217,6 +1219,7 @@ export type AiDocumentProcessingJob = __Infer<typeof AiDocumentProcessingJob>;
 
 export const AiInsight = __t.object("AiInsight", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   get severity() {
     return InsightSeverity;
   },
@@ -3313,7 +3316,7 @@ export const CreateActionParams = __t.object("CreateActionParams", {
 export type CreateActionParams = __Infer<typeof CreateActionParams>;
 
 export const CreateActivityParams = __t.object("CreateActivityParams", {
-  activityType: __t.string(),
+  activityTypeId: __t.u64(),
   summary: __t.string(),
   priority: __t.string(),
   state: __t.string(),
@@ -4793,6 +4796,7 @@ export const CreateLeadParams = __t.object("CreateLeadParams", {
   referredBy: __t.option(__t.string()),
   description: __t.option(__t.string()),
   userId: __t.option(__t.identity()),
+  stageId: __t.option(__t.u64()),
   teamId: __t.option(__t.u64()),
   partnerId: __t.option(__t.u64()),
   dateDeadline: __t.option(__t.timestamp()),
@@ -7224,6 +7228,15 @@ export const CrmProviderPrincipal = __t.object("CrmProviderPrincipal", {
   retiredAt: __t.option(__t.timestamp()),
 });
 export type CrmProviderPrincipal = __Infer<typeof CrmProviderPrincipal>;
+
+export const CrmTeam = __t.object("CrmTeam", {
+  id: __t.u64(),
+  organizationId: __t.u64(),
+  name: __t.string(),
+  isActive: __t.bool(),
+  metadata: __t.option(__t.string()),
+});
+export type CrmTeam = __Infer<typeof CrmTeam>;
 
 export const CrossoveredBudget = __t.object("CrossoveredBudget", {
   id: __t.u64(),
@@ -9938,6 +9951,7 @@ export const Lead = __t.object("Lead", {
   dateConversion: __t.option(__t.timestamp()),
   dateLastStageUpdate: __t.option(__t.timestamp()),
   userId: __t.option(__t.identity()),
+  stageId: __t.option(__t.u64()),
   teamId: __t.option(__t.u64()),
   partnerId: __t.option(__t.u64()),
   dayOpen: __t.option(__t.i32()),
@@ -14384,6 +14398,7 @@ export type SchemaMigration = __Infer<typeof SchemaMigration>;
 
 export const SearchEmbedding = __t.object("SearchEmbedding", {
   id: __t.u64(),
+  organizationId: __t.u64(),
   contentType: __t.string(),
   contentId: __t.u64(),
   text: __t.string(),
@@ -15703,6 +15718,7 @@ export const SubscriptionLine = __t.object("SubscriptionLine", {
   lineIsGift: __t.bool(),
   lineIsUpgrade: __t.bool(),
   lineIsDowngrade: __t.bool(),
+  saleOrderLineId: __t.option(__t.u64()),
   createdAt: __t.timestamp(),
   updatedAt: __t.timestamp(),
   metadata: __t.string(),
@@ -16979,6 +16995,8 @@ export const UpdateLeadParams = __t.object("UpdateLeadParams", {
   countryCode: __t.option(__t.option(__t.string())),
   expectedRevenue: __t.option(__t.f64()),
   probability: __t.option(__t.f64()),
+  stageId: __t.option(__t.option(__t.u64())),
+  teamId: __t.option(__t.option(__t.u64())),
 });
 export type UpdateLeadParams = __Infer<typeof UpdateLeadParams>;
 

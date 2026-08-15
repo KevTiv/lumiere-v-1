@@ -9,6 +9,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct Activity {
     pub id: u64,
     pub organization_id: u64,
+    pub activity_type_id: u64,
     pub activity_type: String,
     pub summary: String,
     pub note: Option<String>,
@@ -43,6 +44,7 @@ impl __sdk::InModule for Activity {
 pub struct ActivityCols {
     pub id: __sdk::__query_builder::Col<Activity, u64>,
     pub organization_id: __sdk::__query_builder::Col<Activity, u64>,
+    pub activity_type_id: __sdk::__query_builder::Col<Activity, u64>,
     pub activity_type: __sdk::__query_builder::Col<Activity, String>,
     pub summary: __sdk::__query_builder::Col<Activity, String>,
     pub note: __sdk::__query_builder::Col<Activity, Option<String>>,
@@ -73,6 +75,7 @@ impl __sdk::__query_builder::HasCols for Activity {
         ActivityCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            activity_type_id: __sdk::__query_builder::Col::new(table_name, "activity_type_id"),
             activity_type: __sdk::__query_builder::Col::new(table_name, "activity_type"),
             summary: __sdk::__query_builder::Col::new(table_name, "summary"),
             note: __sdk::__query_builder::Col::new(table_name, "note"),

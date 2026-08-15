@@ -62,6 +62,8 @@ export function toCreateLeadParams(formData: Record<string, unknown>): Partial<C
   const partnerName = optionalTrimmedString(formData.partnerName)
 
   const stateRaw = optionalTrimmedString(formData.state)
+  const stageId = parseU64Field(formData.stageId)
+  const teamId = parseU64Field(formData.teamId)
 
   return {
     name: contactName,
@@ -73,6 +75,8 @@ export function toCreateLeadParams(formData: Record<string, unknown>): Partial<C
     companyName: partnerName,
     contactName,
     description: optionalTrimmedString(formData.description),
+    stageId: stageId != null && stageId > 0n ? stageId : undefined,
+    teamId: teamId != null && teamId > 0n ? teamId : undefined,
     metadata: optionalTrimmedString(formData.metadata),
   }
 }
@@ -125,26 +129,14 @@ export function toCreateContactParams(formData: Record<string, unknown>): Partia
   }
 }
 
-/** Defaults (activityType, priority, state, flags) merged in `useCreateActivity`. */
-const ACTIVITY_TYPE_VALUES = new Set(["call", "email", "meeting", "todo"])
-
-function resolveActivityType(formData: Record<string, unknown>): string | null {
-  const raw = formData.activityType ?? formData.activityTypeId
-  const s = String(raw ?? "").trim().toLowerCase()
-  if (ACTIVITY_TYPE_VALUES.has(s)) return s
-  const n = Number(raw)
-  if (Number.isFinite(n) && n > 0) return "todo"
-  return null
-}
-
 export function toCreateActivityParams(
   formData: Record<string, unknown>,
 ): Partial<CreateActivityParams> | null {
   const summary = optionalTrimmedString(formData.summary)
   if (!summary) return null
 
-  const activityType = resolveActivityType(formData)
-  if (!activityType) return null
+  const activityTypeId = parseU64Field(formData.activityTypeId)
+  if (activityTypeId == null || activityTypeId === 0n) return null
 
   const rawDeadline = formData.dateDeadline
   if (rawDeadline == null || String(rawDeadline).trim() === "") return null
@@ -178,7 +170,7 @@ export function toCreateActivityParams(
       : undefined
 
   return {
-    activityType,
+    activityTypeId,
     summary,
     note: optionalTrimmedString(formData.note),
     dateDeadline: stbTimestampFromDate(d),

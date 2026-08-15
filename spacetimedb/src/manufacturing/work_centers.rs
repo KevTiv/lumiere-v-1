@@ -103,8 +103,7 @@ pub struct MrpWorkcenterProductivity {
     pub workcenter_id: u64,
     pub workorder_id: u64,
     pub description: Option<String>,
-    /// Loss category ID. None until an authoritative MrpLossCategory table is
-    /// introduced (MFG-009). Required once the domain table exists.
+    /// Optional authoritative [`MrpLossCategory`] reference.
     pub loss_id: Option<u64>,
     pub date_start: Timestamp,
     pub date_end: Option<Timestamp>,
@@ -518,18 +517,24 @@ pub fn log_workcenter_productivity(
     if wc.organization_id != organization_id {
         return Err("Work center does not belong to this organization".to_string());
     }
+    if !wc.active {
+        return Err("Work center is inactive".to_string());
+    }
 
     // Derive company from the workcenter — never trust a parallel caller argument.
     let company_id = wc.company_id;
 
     // Validate workorder belongs to the same company as the workcenter.
-    require_workorder_in_company(
+    let workorder = require_workorder_in_company(
         ctx,
         organization_id,
         company_id,
         params.workorder_id,
         "productivity workorder",
     )?;
+    if workorder.workcenter_id != workcenter_id {
+        return Err("productivity workorder does not belong to this work center".to_string());
+    }
 
     // Validate loss_id against the authoritative loss category table (MFG-009).
     if let Some(lid) = params.loss_id {

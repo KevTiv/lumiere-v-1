@@ -41,6 +41,7 @@ export default __t.row({
   dateConversion: __t.option(__t.timestamp()).name("date_conversion"),
   dateLastStageUpdate: __t.option(__t.timestamp()).name("date_last_stage_update"),
   userId: __t.option(__t.identity()).name("user_id"),
+  stageId: __t.option(__t.u64()).name("stage_id"),
   teamId: __t.option(__t.u64()).name("team_id"),
   partnerId: __t.option(__t.u64()).name("partner_id"),
   dayOpen: __t.option(__t.i32()).name("day_open"),

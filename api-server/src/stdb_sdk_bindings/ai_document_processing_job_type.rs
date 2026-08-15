@@ -10,6 +10,7 @@ use super::job_status_type::JobStatus;
 #[sats(crate = __lib)]
 pub struct AiDocumentProcessingJob {
     pub id: u64,
+    pub organization_id: u64,
     pub document_type: String,
     pub job_type: String,
     pub status: JobStatus,
@@ -45,6 +46,7 @@ impl __sdk::InModule for AiDocumentProcessingJob {
 /// Provides typed access to columns for query building.
 pub struct AiDocumentProcessingJobCols {
     pub id: __sdk::__query_builder::Col<AiDocumentProcessingJob, u64>,
+    pub organization_id: __sdk::__query_builder::Col<AiDocumentProcessingJob, u64>,
     pub document_type: __sdk::__query_builder::Col<AiDocumentProcessingJob, String>,
     pub job_type: __sdk::__query_builder::Col<AiDocumentProcessingJob, String>,
     pub status: __sdk::__query_builder::Col<AiDocumentProcessingJob, JobStatus>,
@@ -78,6 +80,7 @@ impl __sdk::__query_builder::HasCols for AiDocumentProcessingJob {
     fn cols(table_name: &'static str) -> Self::Cols {
         AiDocumentProcessingJobCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
             document_type: __sdk::__query_builder::Col::new(table_name, "document_type"),
             job_type: __sdk::__query_builder::Col::new(table_name, "job_type"),
             status: __sdk::__query_builder::Col::new(table_name, "status"),
@@ -121,6 +124,7 @@ impl __sdk::__query_builder::HasCols for AiDocumentProcessingJob {
 pub struct AiDocumentProcessingJobIxCols {
     pub company_id: __sdk::__query_builder::IxCol<AiDocumentProcessingJob, Option<u64>>,
     pub id: __sdk::__query_builder::IxCol<AiDocumentProcessingJob, u64>,
+    pub organization_id: __sdk::__query_builder::IxCol<AiDocumentProcessingJob, u64>,
     pub status: __sdk::__query_builder::IxCol<AiDocumentProcessingJob, JobStatus>,
 }
 
@@ -130,6 +134,7 @@ impl __sdk::__query_builder::HasIxCols for AiDocumentProcessingJob {
         AiDocumentProcessingJobIxCols {
             company_id: __sdk::__query_builder::IxCol::new(table_name, "company_id"),
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             status: __sdk::__query_builder::IxCol::new(table_name, "status"),
         }
     }

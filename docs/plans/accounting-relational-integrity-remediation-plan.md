@@ -304,7 +304,7 @@ Retry tests must assert:
 
 ### ACC-RI-001 — Add organization provenance to legacy accounting tables
 
-**Status:** In progress — isolated backfill/quarantine proof passes; target snapshot pending
+**Status:** Verified on Maincloud target (2026-08-15)
 
 **Affected tables**
 
@@ -366,9 +366,10 @@ Completion evidence:
   `spacetimedb/src/seed.rs`,
   `frontend/packages/stdb/src/queries/erp-subscriptions.ts`, and regenerated
   SpacetimeDB TypeScript/SQL metadata.
-- Persisted-data test: behavioral reducer added at
-  `spacetimedb/tests/accounting/period_lock_test.rs`; published-module execution
-  remains pending.
+- Persisted-data test: `spacetimedb/tests/accounting/period_lock_test.rs` passed
+  through `run_all_accounting_tests` on Maincloud on 2026-08-15. Closed-period
+  invoice and payment posts reject while the draft move/payment, line count,
+  generated move link, and document name remain unchanged.
 - Isolation test: cross-organization update, conflicting ownership quarantine,
   and quarantined-row mutation rejection added to
   `test_fiscal_ownership_is_derived_and_tenant_scoped`.
@@ -379,8 +380,8 @@ Completion evidence:
   `cargo test --no-run` pass. Shared frontend packages pass typecheck; the web
   typecheck remains blocked by pre-existing CRM/HR/projects/sales optional
   company errors.
-- Reviewer: pending.
-- Completed on: pending.
+- Reviewer: Maincloud aggregate accounting suite.
+- Completed on: 2026-08-15.
 
 **Phase 2 progress — fixed assets and depreciation lines (2026-07-27)**
 
@@ -462,14 +463,33 @@ Completion evidence:
 - Reviewer: pending.
 - Completed on: pending.
 
-**Remaining ACC-RI-001 release gate**
+**ACC-RI-001 Maincloud completion evidence — 2026-08-15**
 
-- Publish the candidate module against a representative database.
-- Execute all four ownership backfills.
-- Resolve or explicitly quarantine every reported legacy conflict.
-- Record a final run with zero unresolved production rows.
-- Execute `run_all_accounting_tests` against the published module and capture
-  persisted query evidence plus UI reload verification.
+- Implementation: added `spacetimedb/src/accounting/ownership_backfill.rs`, which
+  orchestrates all four authoritative backfills and exposes a separate
+  fail-closed `validate_accounting_ownership_backfill` reducer. Added
+  `scripts/run-accounting-ownership-backfill.sh` for repeatable execution and
+  SQL evidence capture.
+- Published proof: reset and published the combined candidate to Maincloud
+  database `lumiere-v1-j1uo0` (identity
+  `c200e2229c0146f2a36c688327f03995e9a6a1c93138012645cd9786cde39ae8`).
+- Positive/negative proof: `run_all_accounting_tests` passed. Its intentional
+  legacy fixtures proved real backfills (`fiscal_periods=1`, `fixed_assets=2`,
+  `consolidation=3`, `intercompany=1`) and six fail-closed quarantine cases.
+- Final target proof: the authorized disposable target was reset after the
+  adversarial suite. `run_accounting_ownership_backfill` and
+  `validate_accounting_ownership_backfill` then passed. All four persisted run
+  summaries reported `unresolved_rows=0`; the issue-table count was zero; the
+  validator confirmed zero nullable ownership rows across all ten legacy tables.
+- Idempotency/provenance: each scope derives ownership only from validated
+  company/parent relations, replaces its scoped issue rows, retains auditable
+  run history, and never assigns guessed or first-record ownership.
+- Checks: changed Rust files are rustfmt-clean; `cargo check`, `cargo test
+  --no-run`, shell syntax, and `git diff --check` passed. Eight unrelated
+  repository warnings remain.
+- Remaining accounting release work is tracked separately under UI/read-path,
+  Playwright, full frontend typecheck, and clean-tree codegen/format gates; it
+  no longer blocks ACC-RI-001 ownership-backfill closure.
 
 ### ACC-RI-002 — Close globally addressed move mutation paths
 
@@ -1960,9 +1980,9 @@ Document ref:      IC-7719
 
 ### Gate A — Schema and ownership
 
-- [ ] Every accounting row is directly organization-scoped or safely scoped
+- [x] Every accounting row is directly organization-scoped or safely scoped
       through a validated immutable parent.
-- [ ] No unresolved ownership remains after backfill.
+- [x] No unresolved ownership remains after backfill.
 - [ ] Every global-ID reducer checks row organization before mutation.
 
 ### Gate B — Mutation provenance
@@ -2028,8 +2048,8 @@ Document ref:      IC-7719
 - Applied the numeric reference map through the remediation reducer and
   verified persisted USD `1`, EUR `2`, and distinctive test SEK `42`.
 - The full frontend typecheck, accounting Playwright run, clean-tree
-  `check-codegen`, repository-wide format baseline, and real-target ownership
-  backfill remain open exactly as recorded above.
+  `check-codegen`, and repository-wide format baseline remain open exactly as
+  recorded above. The real-target ownership backfill closed on 2026-08-15.
 
 ### Final release decision
 
@@ -2050,12 +2070,11 @@ required-relation fallback issue remains `Unsafe for real ERP data`.
 
 **Current decision (2026-07-30): `Partially relational`.**
 
-All code-level P0 adversarial findings are closed and the isolated accounting,
-tenant-isolation, currency-remediation, and focused subscription gates pass.
-Promotion remains blocked on applying/reviewing the ownership backfill against
-the real target snapshot (the test suite deliberately creates six quarantined
-conflict rows), the accounting Playwright run, the repository-wide frontend
-typecheck baseline, and clean-tree `check-codegen`/format evidence.
+All code-level P0 adversarial findings are closed; the Maincloud ownership
+backfill, accounting suite, tenant-isolation, currency-remediation, and focused
+subscription gates pass. Unrestricted promotion remains blocked by the
+accounting Playwright run, repository-wide frontend typecheck baseline, and
+clean-tree `check-codegen`/format evidence.
 
 ---
 
@@ -2063,7 +2082,7 @@ typecheck baseline, and clean-tree `check-codegen`/format evidence.
 
 | Order | ID | Priority | Status | Dependency |
 |---:|---|---|---|---|
-| 1 | ACC-RI-001 | P0 | Isolated proof passes; target snapshot pending | None |
+| 1 | ACC-RI-001 | P0 | Verified on Maincloud target (2026-08-15) | None |
 | 2 | ACC-RI-002 | P0 | Verified on isolated published candidate | ACC-RI-001/scoped loaders |
 | 3 | ACC-RI-003 | P0 | Verified | Scoped loaders |
 | 4 | ACC-RI-004 | P0 | Verified on isolated published candidate | ACC-RI-002, ACC-RI-006 |
