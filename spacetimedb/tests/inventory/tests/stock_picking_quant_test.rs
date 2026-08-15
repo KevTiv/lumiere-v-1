@@ -259,6 +259,7 @@ pub fn test_delivery_decreases_reserved_or_moves_quant(ctx: &ReducerContext) -> 
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: "Quant Delivery Pricelist".to_string(),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,

@@ -18,6 +18,7 @@ pub fn run_all_platform_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_workflow_definition_test(ctx)?;
     run_subscription_plan_test(ctx)?;
     run_forms_custom_field_test(ctx)?;
+    run_forms_custom_field_record_existence_test(ctx)?;
     run_tenant_isolation_tests(ctx)?;
     run_country_pack_test(ctx)?;
     log::info!("✅ run_all_platform_tests complete");
@@ -92,6 +93,12 @@ pub fn run_subscription_plan_test(ctx: &ReducerContext) -> Result<(), String> {
 #[spacetimedb::reducer]
 pub fn run_forms_custom_field_test(ctx: &ReducerContext) -> Result<(), String> {
     platform_smoke::test_forms_custom_field_eav(ctx).map_err(|e| format!("forms: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_forms_custom_field_record_existence_test(ctx: &ReducerContext) -> Result<(), String> {
+    platform_smoke::test_forms_custom_field_record_existence(ctx)
+        .map_err(|e| format!("forms_record_existence: {e}"))
 }
 
 #[spacetimedb::reducer]

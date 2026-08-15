@@ -48,6 +48,7 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: "Harness Pricelist".to_string(),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,
@@ -413,6 +414,7 @@ pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> 
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: "Harness Delivery Pricelist".to_string(),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,
@@ -517,8 +519,11 @@ pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> 
         ));
     }
 
-    // Soft ATP reservation must be held after confirm.
-    let reserved_qty: f64 = ctx
+    // Primary-warehouse fulfillment defers ATP reservation to assign_stock_picking
+    // (only off-primary/network fulfillment holds a promise reservation at confirm
+    // time — see create_outgoing_pickings_for_confirmed_order); confirm alone must
+    // not reserve, or assign would double-reserve on top of it.
+    let reserved_after_confirm: f64 = ctx
         .db
         .stock_quant()
         .quant_by_product()
@@ -526,9 +531,9 @@ pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> 
         .filter(|q| q.organization_id == org_id && q.company_id == company_id)
         .map(|q| q.reserved_quantity)
         .sum();
-    if (reserved_qty - 2.0).abs() > 1e-6 {
+    if reserved_after_confirm.abs() > 1e-6 {
         return Err(format!(
-            "Expected reserved_quantity 2.0 after confirm, got {reserved_qty}"
+            "Expected reserved_quantity 0 after confirm (primary-warehouse fulfillment), got {reserved_after_confirm}"
         ));
     }
 
@@ -562,6 +567,21 @@ pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> 
 
     confirm_stock_picking(ctx, org_id, picking.id, scope.clone())?;
     assign_stock_picking(ctx, org_id, picking.id, scope.clone())?;
+
+    let reserved_after_assign: f64 = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&fixture.product_id)
+        .filter(|q| q.organization_id == org_id && q.company_id == company_id)
+        .map(|q| q.reserved_quantity)
+        .sum();
+    if (reserved_after_assign - 2.0).abs() > 1e-6 {
+        return Err(format!(
+            "Expected reserved_quantity 2.0 after assign, got {reserved_after_assign}"
+        ));
+    }
+
     validate_stock_picking(ctx, org_id, picking.id, scope)?;
 
     let done_picking = ctx
@@ -663,6 +683,7 @@ pub fn test_order_confirm_cancel_releases_reservation(ctx: &ReducerContext) -> R
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: "Harness Cancel Pricelist".to_string(),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,
@@ -891,6 +912,7 @@ pub fn test_confirm_fails_on_atp_shortfall(ctx: &ReducerContext) -> Result<(), S
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: "ATP Fail Pricelist".to_string(),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,
@@ -964,6 +986,7 @@ pub fn test_confirm_blocked_by_partner_credit_hold(ctx: &ReducerContext) -> Resu
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: "Credit Hold Pricelist".to_string(),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,
@@ -1024,6 +1047,7 @@ pub fn test_pricelist_applied_on_line_create(ctx: &ReducerContext) -> Result<(),
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: "Fixed Price Pricelist".to_string(),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,
@@ -1115,6 +1139,7 @@ pub fn test_send_quotation_then_confirm(ctx: &ReducerContext) -> Result<(), Stri
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: "Send Quote Pricelist".to_string(),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,
@@ -1198,6 +1223,7 @@ pub fn test_partial_validate_creates_backorder(ctx: &ReducerContext) -> Result<(
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: "Backorder Pricelist".to_string(),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,

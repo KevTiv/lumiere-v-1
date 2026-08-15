@@ -143,6 +143,14 @@ pub mod core_tests;
 #[path = "../tests/manufacturing/mod.rs"]
 pub mod manufacturing_tests;
 
+/// AI domain tests — call `run_all_ai_tests` reducer to execute.
+#[path = "../tests/ai/mod.rs"]
+pub mod ai_tests;
+
+/// Analytics domain tests — call `run_all_analytics_tests` reducer to execute.
+#[path = "../tests/analytics/mod.rs"]
+pub mod analytics_tests;
+
 use crate::core::migrations::apply_pending_global_migrations;
 use crate::core::reference::{currency, Currency};
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
@@ -176,6 +184,8 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("workflow deterministic core: {e}"))?;
     workflow_tests::run_all_workflow_human_effect_tests(ctx)
         .map_err(|e| format!("workflow human effects: {e}"))?;
+    ai_tests::run_all_ai_tests(ctx).map_err(|e| format!("ai: {e}"))?;
+    analytics_tests::run_all_analytics_tests(ctx).map_err(|e| format!("analytics: {e}"))?;
     log::info!("✅ run_all_domain_tests complete");
     Ok(())
 }

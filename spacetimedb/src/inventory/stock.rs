@@ -554,6 +554,31 @@ pub(crate) fn resolve_supplier_stock_location(
         })
 }
 
+/// Customer virtual location for outbound delivery legs.
+/// Fail-closed: never invent IDs via arithmetic on stock locations.
+pub(crate) fn resolve_customer_stock_location(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+) -> Result<u64, String> {
+    ctx.db
+        .stock_location()
+        .iter()
+        .find(|loc| {
+            loc.organization_id == organization_id
+                && loc.active
+                && loc.usage == "customer"
+                && (loc.company_id.is_none() || loc.company_id == Some(company_id))
+        })
+        .map(|loc| loc.id)
+        .ok_or_else(|| {
+            format!(
+                "No customer stock location found for organization {} company {}",
+                organization_id, company_id
+            )
+        })
+}
+
 /// Storable / consumable products need ATP; services do not.
 pub(crate) fn product_requires_stock(ctx: &ReducerContext, product_id: u64) -> bool {
     ctx.db

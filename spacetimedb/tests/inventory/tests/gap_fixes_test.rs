@@ -66,6 +66,7 @@ use crate::inventory::stock::{
 use crate::inventory::tracking::{
     create_stock_production_lot, create_stock_production_serial, stock_production_lot,
     stock_production_serial, CreateStockProductionLotParams, CreateStockProductionSerialParams,
+    StockProductionLot,
 };
 use crate::inventory::warehouse::{
     create_stock_location, stock_location, update_warehouse, warehouse, CreateStockLocationParams,
@@ -99,7 +100,7 @@ fn create_quant_for_fixture(
         fixture.organization_id,
         fixture.company_id,
         fixture.product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         quantity,
         None,
     )
@@ -364,7 +365,7 @@ pub fn test_lot_required_on_reserve(ctx: &ReducerContext) -> Result<(), String> 
         org_id,
         company_id,
         product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         5.0,
         None,
     )?;
@@ -398,7 +399,7 @@ pub fn test_lot_required_on_reserve(ctx: &ReducerContext) -> Result<(), String> 
             removal_date: None,
             alert_date: None,
             product_qty: 5.0,
-            location_id: Some(fixture.warehouse_id),
+            location_id: Some(fixture.location_id),
             package_id: None,
             owner_id: None,
             is_scrap: false,
@@ -419,7 +420,7 @@ pub fn test_lot_required_on_reserve(ctx: &ReducerContext) -> Result<(), String> 
         org_id,
         company_id,
         product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         5.0,
         Some(lot_id),
     )?;
@@ -450,7 +451,7 @@ pub fn test_serial_required_on_reserve(ctx: &ReducerContext) -> Result<(), Strin
         org_id,
         company_id,
         product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         2.0,
         None,
     )?;
@@ -485,7 +486,7 @@ pub fn test_serial_required_on_reserve(ctx: &ReducerContext) -> Result<(), Strin
             removal_date: None,
             alert_date: None,
             product_qty: 1.0,
-            location_id: Some(fixture.warehouse_id),
+            location_id: Some(fixture.location_id),
             package_id: None,
             owner_id: None,
             state: "free".to_string(),
@@ -555,7 +556,7 @@ pub fn test_lot_required_on_validate(ctx: &ReducerContext) -> Result<(), String>
             removal_date: None,
             alert_date: None,
             product_qty: 1.0,
-            location_id: Some(fixture.warehouse_id),
+            location_id: Some(fixture.location_id),
             package_id: None,
             owner_id: None,
             is_scrap: false,
@@ -578,7 +579,7 @@ pub fn test_lot_required_on_validate(ctx: &ReducerContext) -> Result<(), String>
         org_id,
         company_id,
         product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         1.0,
         Some(lot_id),
     )?;
@@ -590,8 +591,8 @@ pub fn test_lot_required_on_validate(ctx: &ReducerContext) -> Result<(), String>
             company_id: Some(company_id),
             name: "OUT-LOT-VAL".to_string(),
             picking_type_id: 0,
-            location_id: fixture.warehouse_id,
-            location_dest_id: fixture.warehouse_id,
+            location_id: fixture.location_id,
+            location_dest_id: fixture.location_id,
             move_type: "direct".to_string(),
             priority: "1".to_string(),
             partner_id: Some(fixture.partner_id),
@@ -665,8 +666,8 @@ pub fn test_lot_required_on_validate(ctx: &ReducerContext) -> Result<(), String>
             product_tmpl_id: product_id,
             product_uom: product.uom_id,
             product_uom_qty: 1.0,
-            location_id: fixture.warehouse_id,
-            location_dest_id: fixture.partner_id, // customer/partner loc placeholder
+            location_id: fixture.location_id,
+            location_dest_id: fixture.customer_location_id, // customer/partner loc placeholder
             date_expected: ctx.timestamp,
             move_type: "outgoing".to_string(),
             priority: "1".to_string(),
@@ -719,25 +720,9 @@ pub fn test_lot_required_on_validate(ctx: &ReducerContext) -> Result<(), String>
         company_id: Some(company_id),
     };
     confirm_stock_picking(ctx, org_id, picking_id, scope.clone())?;
-    // Soft-reserve ATP for the move product before assign/validate.
-    let quant_id = ctx
-        .db
-        .stock_quant()
-        .iter()
-        .find(|q| {
-            q.organization_id == org_id && q.product_id == product_id && q.lot_id == Some(lot_id)
-        })
-        .map(|q| q.id)
-        .ok_or("lot quant missing")?;
-    reserve_stock_quant(
-        ctx,
-        org_id,
-        quant_id,
-        StockQuantReserveParams {
-            company_id: Some(company_id),
-            reserve_qty: 1.0,
-        },
-    )?;
+    // assign_stock_picking reserves ATP for the move internally (via the lot
+    // quant created above); a manual pre-reservation here would double-reserve
+    // and exhaust availability before assign runs.
     assign_stock_picking(ctx, org_id, picking_id, scope.clone())?;
 
     match validate_stock_picking(ctx, org_id, picking_id, scope) {
@@ -770,7 +755,7 @@ pub fn test_inbound_validate_stamps_lot_id(ctx: &ReducerContext) -> Result<(), S
             removal_date: None,
             alert_date: None,
             product_qty: 5.0,
-            location_id: Some(fixture.warehouse_id),
+            location_id: Some(fixture.location_id),
             package_id: None,
             owner_id: None,
             is_scrap: false,
@@ -828,7 +813,7 @@ pub fn test_inbound_validate_stamps_lot_id(ctx: &ReducerContext) -> Result<(), S
         company_id,
         product_id,
         src_loc,
-        fixture.warehouse_id,
+        fixture.location_id,
         5.0,
         true,
         10.0,
@@ -843,7 +828,7 @@ pub fn test_inbound_validate_stamps_lot_id(ctx: &ReducerContext) -> Result<(), S
         .find(|q| {
             q.organization_id == org_id
                 && q.company_id == company_id
-                && q.location_id == fixture.warehouse_id
+                && q.location_id == fixture.location_id
                 && q.lot_id == Some(lot_id)
         })
         .ok_or("inbound quant missing lot_id stamp")?;
@@ -876,7 +861,7 @@ pub fn test_outbound_transfer_keeps_lot_id(ctx: &ReducerContext) -> Result<(), S
             removal_date: None,
             alert_date: None,
             product_qty: 8.0,
-            location_id: Some(fixture.warehouse_id),
+            location_id: Some(fixture.location_id),
             package_id: None,
             owner_id: None,
             is_scrap: false,
@@ -900,7 +885,7 @@ pub fn test_outbound_transfer_keeps_lot_id(ctx: &ReducerContext) -> Result<(), S
         org_id,
         company_id,
         product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         20.0,
         None,
     )?;
@@ -909,7 +894,7 @@ pub fn test_outbound_transfer_keeps_lot_id(ctx: &ReducerContext) -> Result<(), S
         org_id,
         company_id,
         product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         8.0,
         Some(lot_id),
     )?;
@@ -955,7 +940,7 @@ pub fn test_outbound_transfer_keeps_lot_id(ctx: &ReducerContext) -> Result<(), S
         org_id,
         company_id,
         product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         dest_loc,
         3.0,
         false,
@@ -987,7 +972,7 @@ pub fn test_outbound_transfer_keeps_lot_id(ctx: &ReducerContext) -> Result<(), S
         .find(|q| {
             q.organization_id == org_id
                 && q.company_id == company_id
-                && q.location_id == fixture.warehouse_id
+                && q.location_id == fixture.location_id
                 && q.lot_id == Some(lot_id)
         })
         .ok_or("lot-matched source quant missing after consume")?;
@@ -1006,7 +991,7 @@ pub fn test_outbound_transfer_keeps_lot_id(ctx: &ReducerContext) -> Result<(), S
         .find(|q| {
             q.organization_id == org_id
                 && q.company_id == company_id
-                && q.location_id == fixture.warehouse_id
+                && q.location_id == fixture.location_id
                 && q.lot_id.is_none()
         })
         .ok_or("untracked source quant should be untouched")?;
@@ -1040,6 +1025,9 @@ pub fn test_expired_lot_blocked_on_reserve(ctx: &ReducerContext) -> Result<(), S
     let company_id = fixture.company_id;
     let product_id = create_tracked_product(ctx, &fixture, "lot", "LOT-EXP")?;
 
+    // Lot starts non-expired: create_stock_quant validates lot expiry at
+    // creation time too, so an already-expired lot would never reach a quant.
+    // Expire it after the quant exists to isolate the reserve-time check.
     create_stock_production_lot(
         ctx,
         org_id,
@@ -1050,12 +1038,12 @@ pub fn test_expired_lot_blocked_on_reserve(ctx: &ReducerContext) -> Result<(), S
             product_variant_id: None,
             ref_: None,
             note: None,
-            expiration_date: Some(past_timestamp(ctx)),
+            expiration_date: Some(future_timestamp(ctx, 1)),
             use_date: None,
             removal_date: None,
             alert_date: None,
             product_qty: 2.0,
-            location_id: Some(fixture.warehouse_id),
+            location_id: Some(fixture.location_id),
             package_id: None,
             owner_id: None,
             is_scrap: false,
@@ -1063,23 +1051,28 @@ pub fn test_expired_lot_blocked_on_reserve(ctx: &ReducerContext) -> Result<(), S
             metadata: None,
         },
     )?;
-    let lot_id = ctx
+    let lot = ctx
         .db
         .stock_production_lot()
         .iter()
         .find(|l| l.organization_id == org_id && l.name == "LOT-EXPIRED")
-        .map(|l| l.id)
         .ok_or("expired lot missing")?;
+    let lot_id = lot.id;
 
     let quant_id = create_quant(
         ctx,
         org_id,
         company_id,
         product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         2.0,
         Some(lot_id),
     )?;
+
+    ctx.db.stock_production_lot().id().update(StockProductionLot {
+        expiration_date: Some(past_timestamp(ctx)),
+        ..lot
+    });
 
     match reserve_stock_quant(
         ctx,
@@ -1119,7 +1112,7 @@ pub fn test_fefo_prefers_earlier_expiry(ctx: &ReducerContext) -> Result<(), Stri
             removal_date: None,
             alert_date: None,
             product_qty: 5.0,
-            location_id: Some(fixture.warehouse_id),
+            location_id: Some(fixture.location_id),
             package_id: None,
             owner_id: None,
             is_scrap: false,
@@ -1142,7 +1135,7 @@ pub fn test_fefo_prefers_earlier_expiry(ctx: &ReducerContext) -> Result<(), Stri
             removal_date: None,
             alert_date: None,
             product_qty: 5.0,
-            location_id: Some(fixture.warehouse_id),
+            location_id: Some(fixture.location_id),
             package_id: None,
             owner_id: None,
             is_scrap: false,
@@ -1172,7 +1165,7 @@ pub fn test_fefo_prefers_earlier_expiry(ctx: &ReducerContext) -> Result<(), Stri
         org_id,
         company_id,
         product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         5.0,
         Some(late_id),
     )?;
@@ -1181,7 +1174,7 @@ pub fn test_fefo_prefers_earlier_expiry(ctx: &ReducerContext) -> Result<(), Stri
         org_id,
         company_id,
         product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         5.0,
         Some(early_id),
     )?;
@@ -1191,7 +1184,7 @@ pub fn test_fefo_prefers_earlier_expiry(ctx: &ReducerContext) -> Result<(), Stri
         org_id,
         company_id,
         product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         1.0,
     )?;
 
@@ -1242,7 +1235,7 @@ pub fn test_serial_id_on_validate(ctx: &ReducerContext) -> Result<(), String> {
         org_id,
         company_id,
         product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         1.0,
         None,
     )?;
@@ -1263,7 +1256,7 @@ pub fn test_serial_id_on_validate(ctx: &ReducerContext) -> Result<(), String> {
             removal_date: None,
             alert_date: None,
             product_qty: 1.0,
-            location_id: Some(fixture.warehouse_id),
+            location_id: Some(fixture.location_id),
             package_id: None,
             owner_id: None,
             state: "free".to_string(),
@@ -1292,8 +1285,8 @@ pub fn test_serial_id_on_validate(ctx: &ReducerContext) -> Result<(), String> {
             company_id: Some(company_id),
             name: "OUT-SER-MOVE".to_string(),
             picking_type_id: 0,
-            location_id: fixture.warehouse_id,
-            location_dest_id: fixture.partner_id,
+            location_id: fixture.location_id,
+            location_dest_id: fixture.customer_location_id,
             move_type: "direct".to_string(),
             priority: "1".to_string(),
             partner_id: Some(fixture.partner_id),
@@ -1366,8 +1359,8 @@ pub fn test_serial_id_on_validate(ctx: &ReducerContext) -> Result<(), String> {
             product_tmpl_id: product_id,
             product_uom: product.uom_id,
             product_uom_qty: 1.0,
-            location_id: fixture.warehouse_id,
-            location_dest_id: fixture.partner_id,
+            location_id: fixture.location_id,
+            location_dest_id: fixture.customer_location_id,
             date_expected: ctx.timestamp,
             move_type: "outgoing".to_string(),
             priority: "1".to_string(),
@@ -1420,14 +1413,8 @@ pub fn test_serial_id_on_validate(ctx: &ReducerContext) -> Result<(), String> {
         company_id: Some(company_id),
     };
     confirm_stock_picking(ctx, org_id, picking_id, scope.clone())?;
-    reserve_quantity_at_location(
-        ctx,
-        org_id,
-        company_id,
-        product_id,
-        fixture.warehouse_id,
-        1.0,
-    )?;
+    // assign_stock_picking reserves ATP for the move internally; a manual
+    // pre-reservation here would double-reserve and exhaust availability.
     assign_stock_picking(ctx, org_id, picking_id, scope.clone())?;
     validate_stock_picking(ctx, org_id, picking_id, scope)?;
 
@@ -1530,14 +1517,52 @@ pub fn test_replenishment_creates_draft_po(ctx: &ReducerContext) -> Result<(), S
         },
     )?;
 
-    // Destination location has no stock → below min.
+    // Destination location has no stock → below min. `fixture.location_id`
+    // already carries the 100-unit seed quant from OrgFixture, so use a
+    // freshly created, empty location instead.
+    create_stock_location(
+        ctx,
+        org_id,
+        CreateStockLocationParams {
+            name: "Replen Empty Dest".to_string(),
+            usage: "internal".to_string(),
+            location_category: "internal".to_string(),
+            parent_path: "/".to_string(),
+            child_left: 0,
+            child_right: 0,
+            scrap_location: false,
+            return_location: false,
+            active: true,
+            posx: 0.0,
+            posy: 0.0,
+            posz: 0.0,
+            cyclic_inventory_frequency: 0,
+            location_id: None,
+            complete_name: Some("Replen Empty Dest".to_string()),
+            valuation_in_account_id: None,
+            valuation_out_account_id: None,
+            comment: None,
+            barcode: None,
+            last_inventory_date: None,
+            next_inventory_date: None,
+            metadata: Some(r#"{"test":"replen-empty-dest"}"#.to_string()),
+        },
+    )?;
+    let empty_dest_location_id = ctx
+        .db
+        .stock_location()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "Replen Empty Dest")
+        .map(|l| l.id)
+        .ok_or("empty dest location missing")?;
+
     create_replenishment_rule(
         ctx,
         org_id,
         company_id,
         CreateReplenishmentRuleParams {
             product_id: fixture.product_id,
-            location_id: fixture.warehouse_id,
+            location_id: empty_dest_location_id,
             warehouse_id: Some(fixture.warehouse_id),
             uom_id: product.uom_id,
             product_min_qty: 10.0,
@@ -1603,6 +1628,18 @@ pub fn test_quality_fail_quarantines_from_atp(ctx: &ReducerContext) -> Result<()
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
     let product_id = fixture.product_id;
+
+    // resolve_quality_source_location has no picking to disambiguate and picks
+    // the first matching on-hand quant for the product; remove the harness
+    // seed quant so only the quant this test creates below is a candidate.
+    if let Some(seed_quant) = ctx.db.stock_quant().iter().find(|q| {
+        q.organization_id == org_id
+            && q.product_id == product_id
+            && q.location_id == fixture.location_id
+            && q.metadata.as_deref() == Some(r#"{"harness":"minimal"}"#)
+    }) {
+        ctx.db.stock_quant().id().delete(&seed_quant.id);
+    }
 
     create_quant_for_fixture(ctx, &fixture, 10.0)?;
 
@@ -1690,7 +1727,7 @@ pub fn test_quality_fail_quarantines_from_atp(ctx: &ReducerContext) -> Result<()
         .find(|q| {
             q.organization_id == org_id
                 && q.product_id == product_id
-                && q.location_id == fixture.warehouse_id
+                && q.location_id == fixture.location_id
         })
         .ok_or("source quant after quarantine")?;
     if (src.quantity - 6.0).abs() > 0.001 {
@@ -1750,8 +1787,8 @@ pub fn test_wave_release_orchestrates_tasks(ctx: &ReducerContext) -> Result<(), 
             company_id: Some(company_id),
             name: "OUT-WAVE-1".to_string(),
             picking_type_id: 0,
-            location_id: fixture.warehouse_id,
-            location_dest_id: fixture.partner_id,
+            location_id: fixture.location_id,
+            location_dest_id: fixture.customer_location_id,
             move_type: "direct".to_string(),
             priority: "1".to_string(),
             partner_id: Some(fixture.partner_id),
@@ -1824,8 +1861,8 @@ pub fn test_wave_release_orchestrates_tasks(ctx: &ReducerContext) -> Result<(), 
             product_tmpl_id: product_id,
             product_uom: product.uom_id,
             product_uom_qty: 2.0,
-            location_id: fixture.warehouse_id,
-            location_dest_id: fixture.partner_id,
+            location_id: fixture.location_id,
+            location_dest_id: fixture.customer_location_id,
             date_expected: ctx.timestamp,
             move_type: "outgoing".to_string(),
             priority: "1".to_string(),
@@ -1963,7 +2000,7 @@ pub fn test_wave_release_orchestrates_tasks(ctx: &ReducerContext) -> Result<(), 
         org_id,
         company_id,
         product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         2.0,
     )?;
     validate_stock_picking(ctx, org_id, picking_id, scope)?;
@@ -2050,7 +2087,7 @@ pub fn test_uom_conversion_on_move_and_reserve(ctx: &ReducerContext) -> Result<(
         org_id,
         company_id,
         fixture.product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         stock_qty,
     )?;
 
@@ -2064,8 +2101,8 @@ pub fn test_uom_conversion_on_move_and_reserve(ctx: &ReducerContext) -> Result<(
             product_tmpl_id: fixture.product_id,
             product_uom: box_uom,
             product_uom_qty: 1.0,
-            location_id: fixture.warehouse_id,
-            location_dest_id: fixture.partner_id,
+            location_id: fixture.location_id,
+            location_dest_id: fixture.customer_location_id,
             date_expected: ctx.timestamp,
             move_type: "outgoing".to_string(),
             priority: "1".to_string(),
@@ -2175,7 +2212,7 @@ pub fn test_inventory_close_locks_stock(ctx: &ReducerContext) -> Result<(), Stri
         org_id,
         company_id,
         fixture.product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         1.0,
     ) {
         Err(msg) if msg.to_lowercase().contains("locked") => {}
@@ -2189,7 +2226,7 @@ pub fn test_inventory_close_locks_stock(ctx: &ReducerContext) -> Result<(), Stri
         org_id,
         company_id,
         fixture.product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         1.0,
     )?;
     Ok(())
@@ -2201,6 +2238,18 @@ pub fn test_3pl_asn_inbound_posts_stock(ctx: &ReducerContext) -> Result<(), Stri
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+
+    // The ASN result increases the existing quant at this product+location;
+    // remove the harness seed quant so the post-ASN assertion below checks
+    // the ASN's own delta instead of seed(100) + ASN(7).
+    if let Some(seed_quant) = ctx.db.stock_quant().iter().find(|q| {
+        q.organization_id == org_id
+            && q.product_id == fixture.product_id
+            && q.location_id == fixture.location_id
+            && q.metadata.as_deref() == Some(r#"{"harness":"minimal"}"#)
+    }) {
+        ctx.db.stock_quant().id().delete(&seed_quant.id);
+    }
 
     create_inventory_integration_intent(
         ctx,
@@ -2237,7 +2286,7 @@ pub fn test_3pl_asn_inbound_posts_stock(ctx: &ReducerContext) -> Result<(), Stri
             external_reference: Some("EXT-ASN-1".to_string()),
             last_error: None,
             product_id: Some(fixture.product_id),
-            location_id: Some(fixture.warehouse_id),
+            location_id: Some(fixture.location_id),
             quantity: Some(7.0),
             cost: Some(3.5),
             metadata: None,
@@ -2251,12 +2300,122 @@ pub fn test_3pl_asn_inbound_posts_stock(ctx: &ReducerContext) -> Result<(), Stri
         .find(|q| {
             q.organization_id == org_id
                 && q.product_id == fixture.product_id
-                && q.location_id == fixture.warehouse_id
+                && q.location_id == fixture.location_id
         })
         .ok_or("quant after ASN")?;
     if (quant.quantity - 7.0).abs() > 0.001 {
         return Err(format!("expected qty 7 after ASN, got {}", quant.quantity));
     }
+    Ok(())
+}
+
+/// INT-001/INT-002: a succeeded asn_inbound result with a missing or cross-org
+/// product_id/location_id must reject without posting stock.
+pub fn test_integration_result_fk_relations(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let local = OrgFixture::seed_minimal(ctx)?;
+    let foreign = OrgFixture::seed_minimal(ctx)?;
+
+    let missing_product_id = ctx.db.product().iter().map(|p| p.id).max().unwrap_or(0) + 1000;
+    let missing_location_id = ctx
+        .db
+        .stock_location()
+        .iter()
+        .map(|l| l.id)
+        .max()
+        .unwrap_or(0)
+        + 1000;
+
+    for (case, product_id, location_id, expected) in [
+        (
+            "missing product",
+            missing_product_id,
+            local.location_id,
+            "product",
+        ),
+        (
+            "cross-org product",
+            foreign.product_id,
+            local.location_id,
+            "product",
+        ),
+        (
+            "missing location",
+            local.product_id,
+            missing_location_id,
+            "location",
+        ),
+        (
+            "cross-org location",
+            local.product_id,
+            foreign.location_id,
+            "location",
+        ),
+    ] {
+        create_inventory_integration_intent(
+            ctx,
+            local.organization_id,
+            local.company_id,
+            CreateInventoryIntegrationIntentParams {
+                provider: "demo-3pl".to_string(),
+                intent_type: "asn_inbound".to_string(),
+                warehouse_id: Some(local.warehouse_id),
+                picking_id: None,
+                idempotency_key: format!("int-fk-{case}"),
+                request_payload: Some(r#"{"asn":"FK"}"#.to_string()),
+                metadata: None,
+            },
+        )?;
+        let intent_id = ctx
+            .db
+            .inventory_integration_intent()
+            .iter()
+            .find(|i| {
+                i.organization_id == local.organization_id
+                    && i.idempotency_key == format!("int-fk-{case}")
+            })
+            .map(|i| i.id)
+            .ok_or_else(|| format!("{case}: intent missing"))?;
+
+        let quant_count_before = ctx.db.stock_quant().iter().count();
+        let result = record_inventory_integration_result(
+            ctx,
+            local.organization_id,
+            local.company_id,
+            intent_id,
+            RecordInventoryIntegrationResultParams {
+                status: "succeeded".to_string(),
+                external_reference: Some(format!("EXT-{case}")),
+                last_error: None,
+                product_id: Some(product_id),
+                location_id: Some(location_id),
+                quantity: Some(5.0),
+                cost: Some(1.0),
+                metadata: None,
+            },
+        );
+        match result {
+            Err(ref e) if e.contains(expected) => {}
+            other => {
+                return Err(format!(
+                    "{case}: expected {expected:?} error, got {other:?}"
+                ))
+            }
+        }
+        if ctx.db.stock_quant().iter().count() != quant_count_before {
+            return Err(format!("{case}: rejected result posted a stock quant"));
+        }
+        let intent = ctx
+            .db
+            .inventory_integration_intent()
+            .id()
+            .find(&intent_id)
+            .ok_or_else(|| format!("{case}: intent disappeared"))?;
+        if intent.applied {
+            return Err(format!("{case}: rejected result marked intent applied"));
+        }
+    }
+
     Ok(())
 }
 
@@ -2301,8 +2460,8 @@ pub fn test_cartonization_packs_moves(ctx: &ReducerContext) -> Result<(), String
             company_id: Some(company_id),
             name: "OUT-CARTON".to_string(),
             picking_type_id: 0,
-            location_id: fixture.warehouse_id,
-            location_dest_id: fixture.partner_id,
+            location_id: fixture.location_id,
+            location_dest_id: fixture.customer_location_id,
             move_type: "direct".to_string(),
             priority: "1".to_string(),
             partner_id: Some(fixture.partner_id),
@@ -2375,8 +2534,8 @@ pub fn test_cartonization_packs_moves(ctx: &ReducerContext) -> Result<(), String
             product_tmpl_id: fixture.product_id,
             product_uom: product.uom_id,
             product_uom_qty: 2.0,
-            location_id: fixture.warehouse_id,
-            location_dest_id: fixture.partner_id,
+            location_id: fixture.location_id,
+            location_dest_id: fixture.customer_location_id,
             date_expected: ctx.timestamp,
             move_type: "outgoing".to_string(),
             priority: "1".to_string(),
@@ -2613,7 +2772,7 @@ pub fn test_cross_dock_creates_outbound(ctx: &ReducerContext) -> Result<(), Stri
         org_id,
         company_id,
         fixture.product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         8.0,
         None,
     )?;
@@ -2625,8 +2784,8 @@ pub fn test_cross_dock_creates_outbound(ctx: &ReducerContext) -> Result<(), Stri
             company_id: Some(company_id),
             name: "IN-XDOCK".to_string(),
             picking_type_id: 0,
-            location_id: fixture.partner_id,
-            location_dest_id: fixture.warehouse_id,
+            location_id: fixture.supplier_location_id,
+            location_dest_id: fixture.location_id,
             move_type: "direct".to_string(),
             priority: "1".to_string(),
             partner_id: Some(fixture.partner_id),
@@ -2704,7 +2863,7 @@ pub fn test_cross_dock_creates_outbound(ctx: &ReducerContext) -> Result<(), Stri
             product_id: fixture.product_id,
             quantity: 3.0,
             partner_id: fixture.partner_id,
-            location_dest_id: Some(fixture.partner_id),
+            location_dest_id: Some(fixture.customer_location_id),
             metadata: None,
         },
     )?;
@@ -2715,7 +2874,7 @@ pub fn test_cross_dock_creates_outbound(ctx: &ReducerContext) -> Result<(), Stri
         .iter()
         .find(|p| p.organization_id == org_id && p.name == format!("XD-{inbound_id}"))
         .ok_or("cross-dock outbound missing")?;
-    if outbound.location_id != fixture.warehouse_id {
+    if outbound.location_id != fixture.location_id {
         return Err(format!(
             "expected outbound source at inbound dest, got {}",
             outbound.location_id
@@ -3142,8 +3301,8 @@ pub fn test_packing_workflow(ctx: &ReducerContext) -> Result<(), String> {
             company_id: Some(company_id),
             name: "OUT-PACK".to_string(),
             picking_type_id: 0,
-            location_id: fixture.warehouse_id,
-            location_dest_id: fixture.partner_id,
+            location_id: fixture.location_id,
+            location_dest_id: fixture.customer_location_id,
             move_type: "direct".to_string(),
             priority: "1".to_string(),
             partner_id: Some(fixture.partner_id),
@@ -3216,8 +3375,8 @@ pub fn test_packing_workflow(ctx: &ReducerContext) -> Result<(), String> {
             product_tmpl_id: fixture.product_id,
             product_uom: product.uom_id,
             product_uom_qty: 3.0,
-            location_id: fixture.warehouse_id,
-            location_dest_id: fixture.partner_id,
+            location_id: fixture.location_id,
+            location_dest_id: fixture.customer_location_id,
             date_expected: ctx.timestamp,
             move_type: "outgoing".to_string(),
             priority: "1".to_string(),
@@ -3326,7 +3485,7 @@ pub fn test_inventory_exception_queues(ctx: &ReducerContext) -> Result<(), Strin
         org_id,
         company_id,
         fixture.product_id,
-        fixture.warehouse_id,
+        fixture.location_id,
         4.0,
         None,
     )?;
@@ -3340,13 +3499,14 @@ pub fn test_inventory_exception_queues(ctx: &ReducerContext) -> Result<(), Strin
         },
     )?;
 
+    let lot_tracked_product_id = create_tracked_product(ctx, &fixture, "lot", "EXC-LOT")?;
     create_stock_production_lot(
         ctx,
         org_id,
         CreateStockProductionLotParams {
             company_id: Some(company_id),
             name: format!("LOT-EXP-{company_id}"),
-            product_id: fixture.product_id,
+            product_id: lot_tracked_product_id,
             product_variant_id: None,
             ref_: None,
             note: None,
@@ -3355,7 +3515,7 @@ pub fn test_inventory_exception_queues(ctx: &ReducerContext) -> Result<(), Strin
             removal_date: Some(past_timestamp(ctx)),
             alert_date: None,
             product_qty: 1.0,
-            location_id: Some(fixture.warehouse_id),
+            location_id: Some(fixture.location_id),
             package_id: None,
             owner_id: None,
             is_scrap: false,
@@ -3780,7 +3940,7 @@ pub fn test_warehouse_sync_intent(ctx: &ReducerContext) -> Result<(), String> {
             payload: serde_json::json!({
                 "cycle_count_id": 999999u64,
                 "product_id": fixture.product_id,
-                "location_id": fixture.warehouse_id,
+                "location_id": fixture.location_id,
                 "qty_counted": 1.0,
                 "uom_id": 1u64,
             })
@@ -3961,6 +4121,7 @@ pub fn test_multi_wh_promise_atp(ctx: &ReducerContext) -> Result<(), String> {
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: "MultiWH PL".to_string(),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,
@@ -4186,7 +4347,7 @@ pub fn test_adjustment_company_derived(ctx: &ReducerContext) -> Result<(), Strin
         CreateInventoryAdjustmentParams {
             name: "CompanyDerived-001".to_string(),
             product_id: fixture.product_id,
-            location_id: fixture.warehouse_id,
+            location_id: fixture.location_id,
             quantity_after: 5.0,
             reason_id: reason.id,
             adjustment_type: "inventory".to_string(),
@@ -4249,7 +4410,7 @@ pub fn test_adjustment_process_idempotency(ctx: &ReducerContext) -> Result<(), S
         CreateInventoryAdjustmentParams {
             name: "Idem-Adj-001".to_string(),
             product_id: fixture.product_id,
-            location_id: fixture.warehouse_id,
+            location_id: fixture.location_id,
             quantity_after: 8.0,
             reason_id: reason.id,
             adjustment_type: "inventory".to_string(),
@@ -4280,7 +4441,7 @@ pub fn test_adjustment_process_idempotency(ctx: &ReducerContext) -> Result<(), S
         .filter(|q| {
             q.organization_id == org_id
                 && q.product_id == fixture.product_id
-                && q.location_id == fixture.warehouse_id
+                && q.location_id == fixture.location_id
         })
         .map(|q| q.quantity)
         .sum();
@@ -4295,7 +4456,7 @@ pub fn test_adjustment_process_idempotency(ctx: &ReducerContext) -> Result<(), S
         .filter(|q| {
             q.organization_id == org_id
                 && q.product_id == fixture.product_id
-                && q.location_id == fixture.warehouse_id
+                && q.location_id == fixture.location_id
         })
         .map(|q| q.quantity)
         .sum();
@@ -4523,7 +4684,7 @@ pub fn test_adjustment_requires_valid_reason_id(ctx: &ReducerContext) -> Result<
         CreateInventoryAdjustmentParams {
             name: "BadReason-Adj-001".to_string(),
             product_id: fixture.product_id,
-            location_id: fixture.warehouse_id,
+            location_id: fixture.location_id,
             quantity_after: 3.0,
             reason_id: 9_999_999u64, // non-existent
             adjustment_type: "inventory".to_string(),

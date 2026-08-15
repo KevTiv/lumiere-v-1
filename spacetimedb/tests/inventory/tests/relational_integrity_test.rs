@@ -257,8 +257,6 @@ pub fn test_replenishment_relation_negative_matrix(ctx: &ReducerContext) -> Resu
     )?;
     assert_rule_count_unchanged(ctx, before, "incompatible product UOM")?;
 
-    let missing_route_id =
-        next_unused_id(ctx.db.stock_route().iter().map(|row| row.id), "stock route")?;
     let foreign_route_id = insert_route(
         ctx,
         foreign.organization_id,
@@ -335,6 +333,11 @@ pub fn test_replenishment_relation_negative_matrix(ctx: &ReducerContext) -> Resu
         true,
         true,
     );
+
+    // Compute after all routes above are inserted so this id cannot collide
+    // with an auto-inc id assigned to one of them.
+    let missing_route_id =
+        next_unused_id(ctx.db.stock_route().iter().map(|row| row.id), "stock route")?;
 
     for (case, route_id, expected) in [
         ("missing route", missing_route_id, "not found"),

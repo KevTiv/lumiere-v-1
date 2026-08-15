@@ -1530,6 +1530,10 @@ pub fn add_proposal_line_item(
     if prod.organization_id != organization_id {
         return Err("Product does not belong to this organization".to_string());
     }
+    // PRO-005: an archived product cannot be added to a proposal line.
+    if !prod.active {
+        return Err(format!("Product {} is archived", params.product_id));
+    }
 
     let subtotal = line_subtotal(params.quantity, params.price_unit, params.discount);
     let sequence = ctx
@@ -1973,6 +1977,13 @@ pub fn convert_proposal_to_sale_order(
             if product.organization_id != organization_id {
                 return Err(format!(
                     "Proposal line product {} does not belong to this organization",
+                    l.product_id
+                ));
+            }
+            // PRO-005: an archived product cannot convert to a sale order line.
+            if !product.active {
+                return Err(format!(
+                    "Proposal line product {} is archived",
                     l.product_id
                 ));
             }

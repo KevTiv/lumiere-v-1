@@ -145,6 +145,7 @@ fn seed_active_subscription(
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: pl_name.clone(),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,

@@ -4,6 +4,7 @@
 /// POSConfig, POSTransaction, SubscriptionTemplate, and IntercompanyRule.
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::types::{ComputePrice, DiscountPolicy, PricelistAppliedOn};
@@ -21,6 +22,8 @@ pub struct ProductPricelist {
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64,
+    /// `None` means the pricelist is shared across every company in the org.
+    pub company_id: Option<u64>,
     pub name: String,
     pub currency_id: u64,
     pub discount_policy: DiscountPolicy, // WithDiscount | WithoutDiscount
@@ -64,6 +67,7 @@ pub struct ProductPricelistItem {
 
 #[derive(SpacetimeType)]
 pub struct CreatePricelistParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub currency_id: u64,
     pub discount_policy: DiscountPolicy,
@@ -172,9 +176,13 @@ pub fn create_pricelist(
     if params.name.is_empty() {
         return Err("Pricelist name cannot be empty".to_string());
     }
+    if let Some(company_id) = params.company_id {
+        require_company_in_organization(ctx, organization_id, company_id)?;
+    }
     let pl = ctx.db.product_pricelist().insert(ProductPricelist {
         id: 0,
         organization_id,
+        company_id: params.company_id,
         name: params.name,
         currency_id: params.currency_id,
         discount_policy: params.discount_policy,

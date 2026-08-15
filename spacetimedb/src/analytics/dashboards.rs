@@ -15,6 +15,7 @@
 /// | **Dashboard** | Named collection of widgets |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::WidgetType;
 
@@ -279,6 +280,11 @@ pub fn create_dashboard(
     params: CreateDashboardParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "dashboard", "create")?;
+
+    // ANL-004: validate company_id belongs to this organization when provided
+    if let Some(cid) = company_id {
+        require_company_in_organization(ctx, organization_id, cid)?;
+    }
 
     // is_shared is derived from share_with / share_with_groups
     let is_shared = !params.share_with.is_empty() || !params.share_with_groups.is_empty();

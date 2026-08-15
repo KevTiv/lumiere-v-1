@@ -30,6 +30,7 @@ pub fn run_all_sales_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_sales_fx_fail_closed_test(ctx)?;
     run_sales_dropship_confirm_test(ctx)?;
     run_sales_company_isolation_test(ctx)?;
+    run_sales_pricelist_company_scope_test(ctx)?;
     run_sales_exchange_from_return_test(ctx)?;
     run_sales_ghost_product_fail_closed_test(ctx)?;
     log::info!("✅ run_all_sales_tests complete");
@@ -146,6 +147,12 @@ pub fn run_sales_dropship_confirm_test(ctx: &ReducerContext) -> Result<(), Strin
 pub fn run_sales_company_isolation_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_company_isolation_on_confirm(ctx)
         .map_err(|e| format!("company_isolation: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_sales_pricelist_company_scope_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_pricelist_company_scope(ctx)
+        .map_err(|e| format!("pricelist_company_scope: {e}"))
 }
 
 #[spacetimedb::reducer]

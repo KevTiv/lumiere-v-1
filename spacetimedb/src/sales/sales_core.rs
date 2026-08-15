@@ -631,6 +631,13 @@ pub fn create_sale_order(
     if pl.organization_id != organization_id {
         return Err("Pricelist belongs to a different organization".to_string());
     }
+    // SAL-002: a pricelist scoped to a specific company cannot be used by another
+    // company's orders; `company_id = None` means the pricelist is org-wide.
+    if let Some(pl_company_id) = pl.company_id {
+        if pl_company_id != company_id {
+            return Err("Pricelist does not belong to this company".to_string());
+        }
+    }
 
     let wh = ctx
         .db
@@ -862,8 +869,9 @@ fn create_outgoing_pickings_for_confirmed_order(
 ) -> Result<(), String> {
     use crate::inventory::stock::{
         create_stock_move, create_stock_picking, product_requires_stock,
-        reserve_quantity_at_location, resolve_warehouse_stock_location, stock_picking,
-        to_product_stock_qty, CreateStockMoveParams, CreateStockPickingParams,
+        reserve_quantity_at_location, resolve_customer_stock_location,
+        resolve_warehouse_stock_location, stock_picking, to_product_stock_qty,
+        CreateStockMoveParams, CreateStockPickingParams,
     };
 
     let order = ctx
@@ -948,15 +956,21 @@ fn create_outgoing_pickings_for_confirmed_order(
         fulfillment_warehouse_id = fulfill_wh;
         let fulfill_loc = resolve_warehouse_stock_location(ctx, fulfill_wh);
         for (product_id, stock_qty) in &line_needs {
-            reserve_quantity_at_location(
-                ctx,
-                organization_id,
-                company_id,
-                *product_id,
-                fulfill_loc,
-                *stock_qty,
-            )?;
             if fulfill_wh != warehouse_id {
+                // Off-primary fulfillment: hold this ATP promise now so a second
+                // order cannot claim the same network stock before this order's
+                // own delivery picking gets assigned. Primary-warehouse orders
+                // skip this — their delivery picking's own `assign_stock_picking`
+                // call is the single, authoritative reservation step; reserving
+                // here too would double-count against the same quant.
+                reserve_quantity_at_location(
+                    ctx,
+                    organization_id,
+                    company_id,
+                    *product_id,
+                    fulfill_loc,
+                    *stock_qty,
+                )?;
                 let _ = create_network_transfer_demand(
                     ctx,
                     organization_id,
@@ -971,7 +985,7 @@ fn create_outgoing_pickings_for_confirmed_order(
         }
     }
     let src_location = resolve_warehouse_stock_location(ctx, fulfillment_warehouse_id);
-    let dest_location = src_location.saturating_add(1);
+    let dest_location = resolve_customer_stock_location(ctx, organization_id, company_id)?;
 
     // Split fulfilment MVP: one OUT picking per distinct line route_id (0 = default route).
     let mut route_groups: Vec<(u64, Vec<&SaleOrderLine>)> = Vec::new();

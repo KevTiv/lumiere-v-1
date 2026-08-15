@@ -140,6 +140,7 @@ fn validate_return_lines_against_sale_order(
     ctx: &ReducerContext,
     sale_order_id: u64,
     lines: &[CreateReturnOrderLineParams],
+    exclude_return_order_id: Option<u64>,
 ) -> Result<(), String> {
     for line in lines {
         if line.product_uom_qty <= 0.0 {
@@ -155,11 +156,17 @@ fn validate_return_lines_against_sale_order(
             if sol.order_id != sale_order_id {
                 return Err("Sale order line does not belong to the source sale order".to_string());
             }
+            // Exclude this same return order's own lines — re-validating on
+            // confirm must not count the order's own already-inserted lines
+            // as "already returned" against itself.
             let already_returned: f64 = ctx
                 .db
                 .return_order_line()
                 .iter()
-                .filter(|r| r.sale_order_line_id == Some(sol_id))
+                .filter(|r| {
+                    r.sale_order_line_id == Some(sol_id)
+                        && Some(r.return_order_id) != exclude_return_order_id
+                })
                 .map(|r| r.product_uom_qty)
                 .sum();
             let residual = (sol.qty_delivered - already_returned).max(0.0);
@@ -199,7 +206,8 @@ fn create_return_picking_for_order(
 
     let stock_location =
         crate::inventory::stock::resolve_warehouse_stock_location(ctx, warehouse_id);
-    let customer_location = stock_location.saturating_add(1);
+    let customer_location =
+        crate::inventory::stock::resolve_customer_stock_location(ctx, organization_id, company_id)?;
     let order_label = return_order.name.clone();
 
     create_stock_picking(
@@ -388,7 +396,7 @@ pub fn create_return_order(
         if order.partner_id != params.partner_id {
             return Err("Partner does not match the source sale order".to_string());
         }
-        validate_return_lines_against_sale_order(ctx, so_id, &params.lines)?;
+        validate_return_lines_against_sale_order(ctx, so_id, &params.lines, None)?;
     }
 
     let name = next_doc_number(ctx, "RMA");
@@ -506,7 +514,12 @@ pub fn confirm_return_order(
                 lot_id: l.lot_id,
             })
             .collect();
-        validate_return_lines_against_sale_order(ctx, so_id, &line_params)?;
+        validate_return_lines_against_sale_order(
+            ctx,
+            so_id,
+            &line_params,
+            Some(return_order_id),
+        )?;
     }
 
     let picking_id =

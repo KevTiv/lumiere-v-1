@@ -39,6 +39,7 @@ fn seed_so(
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: pricelist_name.to_string(),
             currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
@@ -397,6 +398,182 @@ pub fn test_company_isolation_on_confirm(ctx: &ReducerContext) -> Result<(), Str
         Err(msg) => Err(format!("Expected company isolation error, got: {msg}")),
         Ok(()) => Err("Cross-company confirm must fail".to_string()),
     }
+}
+
+/// SAL-002: a company-scoped pricelist cannot be used by another company's order.
+pub fn test_pricelist_company_scope(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_a = fixture.company_id;
+    create_company(
+        ctx,
+        org_id,
+        CreateCompanyParams {
+            name: "Sales Pricelist Company B".to_string(),
+            code: format!("SO-PL-CB-{}", company_a),
+            currency_id: 1,
+            fiscal_year_end_month: 12,
+            fiscal_year_end_day: 31,
+            is_parent: false,
+            parent_id: None,
+            tax_id: None,
+            company_registry: None,
+            address_street: None,
+            address_city: None,
+            address_zip: None,
+            address_country_code: None,
+            metadata: Some(r#"{"harness":"sales-pricelist-company-b"}"#.to_string()),
+        },
+    )?;
+    let company_b = ctx
+        .db
+        .company()
+        .company_by_org()
+        .filter(&org_id)
+        .map(|c| c.id)
+        .filter(|id| *id != company_a)
+        .max()
+        .ok_or("company B missing")?;
+
+    let product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("Harness product not found")?;
+
+    create_pricelist(
+        ctx,
+        org_id,
+        CreatePricelistParams {
+            company_id: Some(company_b),
+            name: "Company B Pricelist".to_string(),
+            currency_id: 1,
+            discount_policy: DiscountPolicy::WithDiscount,
+        },
+    )?;
+    let company_b_pricelist_id = ctx
+        .db
+        .product_pricelist()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "Company B Pricelist")
+        .map(|p| p.id)
+        .ok_or("Company B pricelist not found")?;
+
+    let so_params = |pricelist_id: u64, client_order_ref: &str| CreateSaleOrderParams {
+        company_id: Some(company_a),
+        partner_id: fixture.partner_id,
+        partner_invoice_id: fixture.partner_id,
+        partner_shipping_id: fixture.partner_id,
+        pricelist_id,
+        currency_id: 1,
+        warehouse_id: fixture.warehouse_id,
+        order_lines: vec![CreateSaleOrderLineParams {
+            product_id: fixture.product_id,
+            quantity: 1.0,
+            uom_id: product.uom_id,
+            price_unit: Some(10.0),
+            discount: 0.0,
+            tax_ids: vec![],
+            name: None,
+            sequence: 1,
+            is_downpayment: false,
+            display_type: None,
+            product_variant_id: None,
+            packaging_id: None,
+            route_id: None,
+            analytic_tag_ids: vec![],
+            customer_lead: None,
+            metadata: None,
+        }],
+        origin: Some(client_order_ref.to_string()),
+        client_order_ref: Some(client_order_ref.to_string()),
+        payment_term_id: None,
+        fiscal_position_id: None,
+        team_id: None,
+        opportunity_id: None,
+        proposal_id: None,
+        note: None,
+        terms_and_conditions: None,
+        validity_days: None,
+        shipping_policy: None,
+        picking_policy: None,
+        campaign_id: None,
+        medium_id: None,
+        source_id: None,
+        commitment_date: None,
+        expected_date: None,
+        incoterm_id: None,
+        incoterm: None,
+        incoterm_location: None,
+        carrier_id: None,
+        customer_lead: None,
+        analytic_account_id: None,
+        user_id: None,
+        is_printed: None,
+        is_locked: None,
+        is_dropship: None,
+        invoice_policy: None,
+        message_follower_ids: None,
+        message_partner_ids: None,
+        message_channel_ids: None,
+        activity_ids: None,
+        metadata: None,
+    };
+
+    let rejected = create_sale_order(
+        ctx,
+        org_id,
+        so_params(company_b_pricelist_id, "SAL-002 Rejected"),
+    );
+    match rejected {
+        Err(msg) if msg.to_lowercase().contains("company") => {}
+        Err(msg) => return Err(format!("Expected company-scope error, got: {msg}")),
+        Ok(()) => return Err("Cross-company pricelist create must fail".to_string()),
+    }
+    if ctx
+        .db
+        .sale_order()
+        .iter()
+        .any(|o| o.client_order_ref.as_deref() == Some("SAL-002 Rejected"))
+    {
+        return Err("rejected cross-company pricelist order was persisted".to_string());
+    }
+
+    create_pricelist(
+        ctx,
+        org_id,
+        CreatePricelistParams {
+            company_id: Some(company_a),
+            name: "Company A Pricelist".to_string(),
+            currency_id: 1,
+            discount_policy: DiscountPolicy::WithDiscount,
+        },
+    )?;
+    let company_a_pricelist_id = ctx
+        .db
+        .product_pricelist()
+        .iter()
+        .find(|p| p.organization_id == org_id && p.name == "Company A Pricelist")
+        .map(|p| p.id)
+        .ok_or("Company A pricelist not found")?;
+
+    create_sale_order(
+        ctx,
+        org_id,
+        so_params(company_a_pricelist_id, "SAL-002 Valid"),
+    )?;
+    if !ctx
+        .db
+        .sale_order()
+        .iter()
+        .any(|o| o.client_order_ref.as_deref() == Some("SAL-002 Valid"))
+    {
+        return Err("same-company pricelist order was not persisted".to_string());
+    }
+
+    Ok(())
 }
 
 pub fn test_exchange_order_from_return(ctx: &ReducerContext) -> Result<(), String> {

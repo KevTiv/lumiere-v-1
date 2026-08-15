@@ -79,6 +79,19 @@ pub struct OrgFixture {
     pub partner_id: u64,
     pub product_id: u64,
     pub warehouse_id: u64,
+    /// Real `stock_location` row (internal, org-scoped) backing `warehouse_id`'s
+    /// `lot_stock_id`. Use this — never `warehouse_id` — wherever a reducer
+    /// expects a `location_id`/`location_dest_id`: the two tables have
+    /// independently incrementing primary keys, so `warehouse_id` is only a
+    /// valid `stock_location` id by coincidence on the very first fixture call.
+    pub location_id: u64,
+    /// Real `stock_location` row with `usage = "customer"`. Use this — never
+    /// `partner_id` — wherever a reducer expects an outbound `location_dest_id`:
+    /// a Contact id is not a StockLocation id.
+    pub customer_location_id: u64,
+    /// Real `stock_location` row with `usage = "supplier"`. Use this — never
+    /// `partner_id` — wherever a reducer expects an inbound source `location_id`.
+    pub supplier_location_id: u64,
     pub chart_account_ids: HashMap<&'static str, u64>,
 }
 
@@ -566,12 +579,20 @@ impl OrgFixture {
             updated_at: ctx.timestamp,
             metadata: None,
         });
-        ctx.db.stock_location().insert(StockLocation {
+        let loc_supplier = ctx.db.stock_location().insert(StockLocation {
             id: 0,
             name: format!("Harness Supplier {suffix}"),
             complete_name: Some(format!("WH{suffix}/Supplier")),
             usage: "supplier".to_string(),
             location_category: "supplier".to_string(),
+            ..loc_stock.clone()
+        });
+        let loc_customer = ctx.db.stock_location().insert(StockLocation {
+            id: 0,
+            name: format!("Harness Customer {suffix}"),
+            complete_name: Some(format!("WH{suffix}/Customer")),
+            usage: "customer".to_string(),
+            location_category: "customer".to_string(),
             ..loc_stock.clone()
         });
 
@@ -616,6 +637,9 @@ impl OrgFixture {
             partner_id,
             product_id,
             warehouse_id: wh.id,
+            location_id: loc_stock.id,
+            customer_location_id: loc_customer.id,
+            supplier_location_id: loc_supplier.id,
             chart_account_ids,
         })
     }
@@ -1595,6 +1619,9 @@ mod smoke {
             partner_id: 4,
             product_id: 5,
             warehouse_id: 6,
+            location_id: 7,
+            customer_location_id: 8,
+            supplier_location_id: 9,
             chart_account_ids,
         };
 

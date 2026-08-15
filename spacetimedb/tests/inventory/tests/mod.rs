@@ -55,6 +55,7 @@ pub fn run_all_inventory_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_inventory_adjustment_requires_valid_reason_test(ctx)?;
     run_inventory_replenishment_relation_negative_matrix_test(ctx)?;
     run_inventory_adjustment_reason_negative_matrix_test(ctx)?;
+    run_inventory_integration_result_fk_relations_test(ctx)?;
     log::info!("✅ run_all_inventory_tests complete");
     Ok(())
 }
@@ -308,4 +309,12 @@ pub fn run_inventory_adjustment_reason_negative_matrix_test(
 ) -> Result<(), String> {
     relational_integrity_test::test_adjustment_reason_negative_matrix(ctx)
         .map_err(|e| format!("adjustment_reason_negative_matrix: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_inventory_integration_result_fk_relations_test(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    gap_fixes_test::test_integration_result_fk_relations(ctx)
+        .map_err(|e| format!("integration_result_fk_relations: {e}"))
 }

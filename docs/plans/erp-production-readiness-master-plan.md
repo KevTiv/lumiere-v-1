@@ -10,24 +10,24 @@
 
 | # | Module | Verdict | P0 Open | P1 Open | P2 Open | Deploy Gate |
 |---|--------|---------|---------|---------|---------|-------------|
-| 1 | **Sales** | ✅ Compliant | 0 | 2 | 2 | Ready for GA |
+| 1 | **Sales** | ✅ Compliant | 0 | 0 | 2 | Ready for GA |
 | 2 | **Purchasing** | 🟢 Pilot w/ restrictions | 0 | 0 | 1 | E2E + tenant inventory for GA |
-| 3 | **Inventory** | 🟢 Pilot w/ restrictions | 0 | 4 | 3 | P1 hardening |
+| 3 | **Inventory** | 🟢 Pilot w/ restrictions | 0 | 0 | 2 | GA: Playwright E2E + adjustment product org-match |
 | 4 | **Manufacturing** | 🟢 Pilot w/ restrictions | 0 | 0 | 2 | E2E + BOM component validation |
 | 5 | **Accounting** | 🟢 Pilot w/ restrictions | 0 | 2 | 1 | Company-switch UI + GA hardening |
-| 6 | **HR** | 🟢 Pilot w/ restrictions | 0 | 1 | 2 | job_id FK + E2E |
-| 7 | **CRM** | 🟢 Pilot w/ restrictions | 0 | 3 | 2 | P1 hardening + E2E |
+| 6 | **HR** | 🟢 Pilot w/ restrictions | 0 | 0 | 2 | GA: payslip E2E + Playwright E2E |
+| 7 | **CRM** | 🟢 Pilot w/ restrictions | 0 | 0 | 1 | GA: Playwright E2E |
 | 8 | **Expenses** | 🟢 Pilot w/ restrictions | 0 | 5 | 2 | P1 hardening |
 | 9 | **Projects** | 🟢 Pilot w/ restrictions | 0 | 3 | 2 | P1 hardening (analytic_account, stage_id FK) |
-| 10 | **AI** | 🟢 Pilot w/ restrictions | 0 | 2 | 2 | P1 hardening |
+| 10 | **AI** | 🟢 Pilot w/ restrictions | 0 | 0 | 2 | GA: multi-org isolation test + Playwright E2E |
 | 11 | **Documents** | 🟢 Pilot w/ restrictions | 0 | 3 | 2 | Add test suite |
-| 12 | **Fleet** | 🟢 Pilot w/ restrictions | 0 | 2 | 2 | P1 hardening (driver FK, service type) |
-| 13 | **Forms** | ✅ Compliant | 0 | 2 | 1 | P1 hardening (record existence, atomicity) |
+| 12 | **Fleet** | 🟢 Pilot w/ restrictions | 0 | 0 | 2 | GA: company isolation + negative tests |
+| 13 | **Forms** | ✅ Compliant | 0 | 0 | 1 | GA: negative test for invalid model value |
 | 14 | **Helpdesk** | 🟢 Pilot w/ restrictions | 0 | 3 | 2 | P1 hardening (CSV FKs, cross-team guard) |
-| 15 | **Integrations** | 🟢 Pilot w/ restrictions | 0 | 2 | 2 | product_id/location_id FKs |
+| 15 | **Integrations** | 🟢 Pilot w/ restrictions | 0 | 0 | 3 | GA: WhatsApp/GDrive company_id + configurable conflict policy |
 | 16 | **IoT** | 🟢 Pilot w/ restrictions | 0 | 4 | 2 | P1 hardening |
-| 17 | **Proposals** | ✅ Compliant | 0 | 2 | 1 | P1 hardening (convert SO validation, tests) |
-| 18 | **Analytics** | 🟢 Pilot w/ restrictions | 0 | 2 | 1 | P1 hardening (org_id validate, negative tests) |
+| 17 | **Proposals** | ✅ Compliant | 0 | 0 | 1 | GA: Playwright E2E |
+| 18 | **Analytics** | 🟢 Pilot w/ restrictions | 0 | 0 | 1 | GA: Playwright E2E |
 | 19 | **Workflow** | 🟢 Pilot w/ restrictions | 0 | 3 | 2 | P1 hardening |
 | 20 | **Subscriptions** | ✅ Compliant | 0 | 0 | 3 | P2 lifecycle hardening + E2E |
 
@@ -73,18 +73,25 @@ P0-P      XL       Expenses            All 14 items (nothing started)
 
 ### MODULE 1 — SALES ✅ Compliant
 
-**Verdict:** Production-ready for GA with minor hardening.
+**Verdict:** Production-ready for GA. All P1 relation hardening closed and verified on Maincloud; three genuine production bugs were found and fixed while proving the suite end-to-end on a clean database (see evidence below).
 
 **Strengths:** 25+ domain tests; strong FK validation; scope enforcement consistent.
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
-| SAL-001 | P1 | Validate currency_id FK on SO create | `spacetimedb/src/sales/` | Open | currency_id found in table |
-| SAL-002 | P1 | Validate pricelist_id belongs to company | `spacetimedb/src/sales/` | Open | pricelist.company_id == order.company_id |
+| SAL-001 | P1 | Validate currency_id FK on SO create | `spacetimedb/src/sales/sales_core.rs` | ✅ Verified on Maincloud | Already implemented (`require_active_currency_by_id` + pricelist-currency cross-check); confirmed via `run_all_sales_tests` |
+| SAL-002 | P1 | Validate pricelist_id belongs to company | `spacetimedb/src/sales/pricelists.rs`, `spacetimedb/src/sales/sales_core.rs` | ✅ Done + Verified on Maincloud | Added `company_id: Option<u64>` to `ProductPricelist` (`None` = org-wide, matching the existing `StockLocation`/`PosTerminal` scoping convention); `create_sale_order` now rejects a pricelist whose `company_id` doesn't match the order's company. Persisted SQL shows a company-scoped pricelist create an order for its own company and reject a cross-company order |
 | SAL-003 | P2 | Add negative test matrix for SO cancellation | `spacetimedb/tests/sales/` | Open | Tests reject invalid transitions |
 | SAL-004 | P2 | Playwright E2E for SO → Invoice workflow | `frontend/e2e/` | Open | Full flow passes in browser |
+| SAL-005 | P0 | Stop inventing the outbound customer `location_dest_id` via `src_location + 1` | `spacetimedb/src/sales/sales_core.rs`, `spacetimedb/src/sales/return_orders.rs` | ✅ Done (found + fixed 2026-08-15) | New `resolve_customer_stock_location()` in `stock.rs` resolves the org/company's real `usage = "customer"` location; used by outgoing-delivery picking creation and by RMA return-picking creation instead of arithmetic on a resolved warehouse location id |
+| SAL-006 | P0 | Stop double-reserving ATP for primary-warehouse SO fulfillment | `spacetimedb/src/sales/sales_core.rs` | ✅ Done (found + fixed 2026-08-15) | `create_outgoing_pickings_for_confirmed_order`'s ATP-promise reservation now only fires for off-primary (network-transfer) fulfillment; primary-warehouse orders defer reservation to `assign_stock_picking` as the single authoritative step. Previously every SO confirm reserved stock, then `assign_stock_picking` reserved the same residual again, leaving stale `reserved_quantity` after delivery |
+| SAL-007 | P0 | Stop self-counting a return order's own lines as "already returned" on confirm | `spacetimedb/src/sales/return_orders.rs` | ✅ Done (found + fixed 2026-08-15) | `confirm_return_order` re-validates against `sale_order_line.qty_delivered`, but summed *all* `return_order_line` rows for that line — including the very rows it had just inserted via `create_return_order` — so any full-quantity return always self-rejected on confirm. `validate_return_lines_against_sale_order` now takes an `exclude_return_order_id` and excludes the order's own lines |
 
 **Gate:** No P0 gaps. Proceed to GA after P1 fixes.
+
+**2026-08-15 discovery (SAL-005):** While proving Inventory's `run_all_inventory_tests` end-to-end on a clean Maincloud database, `confirm_sales_order` failed with `location 111 not found`. Root cause: `create_outgoing_pickings_for_confirmed_order` derived the delivery's `location_dest_id` as `src_location.saturating_add(1)` — the exact "invent IDs via arithmetic on stock locations" anti-pattern already called out and fixed elsewhere in this codebase for Purchasing (see MODULE 2 evidence). `return_orders.rs` had the identical pattern for RMA return pickings. Both now resolve the real customer-usage `stock_location` row via a new `resolve_customer_stock_location()` helper (mirrors the existing `resolve_supplier_stock_location()`). This is a genuine production correctness fix, not a test-fixture change — it was previously masked because the arithmetic result happened to collide with a real location often enough in existing seed/test data.
+
+**2026-08-15 Maincloud evidence (SAL-001/002/006/007):** `run_all_sales_tests` had never completed end-to-end on a clean database before this pass — each fix unmasked the next never-before-reached test. Fixing SAL-005 exposed SAL-006 (`order_to_delivery_state` failed asserting `reserved_quantity` post-validate); fixing SAL-006 exposed SAL-007 (`exchange_from_return` failed on `confirm_return_order`). All three are genuine production defects, not fixture issues. After all fixes, `run_all_sales_tests` passed cleanly end-to-end (all 21 tests, including the new `test_pricelist_company_scope` for SAL-002). Persisted SQL confirms: a company-scoped `product_pricelist` row used by a same-company `sale_order` (persisted), with the cross-company attempt correctly absent from the table.
 
 ---
 
@@ -118,9 +125,9 @@ and repeatable. No database clear was performed.
 
 ---
 
-### MODULE 3 — INVENTORY 🟡 Pilot w/ restrictions
+### MODULE 3 — INVENTORY 🟢 Pilot w/ restrictions
 
-**Verdict:** All 7 P0 items resolved. INV-001/002 (location FK in stock.rs, pre-existing), INV-003 (require_company_in_organization in create_inventory_close), INV-004 (require_active_journal, pre-existing), INV-005 (idempotency key+guard in integration.rs, pre-existing), INV-006 (company_id_from_scope, pre-existing), INV-007 (ensure_accounting_period_open_for_date in reopen_inventory_close).
+**Verdict:** All 7 P0 items resolved. INV-001/002 (location FK in stock.rs, pre-existing), INV-003 (require_company_in_organization in create_inventory_close), INV-004 (require_active_journal, pre-existing), INV-005 (idempotency key+guard in integration.rs, pre-existing), INV-006 (company_id_from_scope, pre-existing), INV-007 (ensure_accounting_period_open_for_date in reopen_inventory_close). All 4 P1 items closed 2026-08-15: replenishment rule product_id/route_id/UOM relations validated (`require_replenishment_route` in `replenishment.rs`, pre-existing but now proven on a reset Maincloud target), adjustment reason_id validated (`test_adjustment_reason_negative_matrix`), and the negative test matrix runs as part of `run_all_inventory_tests`.
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
@@ -131,14 +138,16 @@ and repeatable. No database clear was performed.
 | INV-005 | P0 | Implement integration idempotency guard | `spacetimedb/src/inventory/integration.rs` | ✅ Done (pre-existing) | Duplicate sync requests are no-ops via idempotency key |
 | INV-006 | P0 | Add company_id to StockInventory on create | `spacetimedb/src/inventory/stock.rs` | ✅ Done (pre-existing) | company_id_from_scope used |
 | INV-007 | P0 | Reject reopen of GL-locked inventory | `spacetimedb/src/inventory/inventory_close.rs` | ✅ Done | ensure_accounting_period_open_for_date added to reopen_inventory_close |
-| INV-008 | P1 | Replenishment rule: validate product_id | `spacetimedb/src/inventory/` | Not started | product_id found in product table |
-| INV-009 | P1 | Replenishment rule: validate route_id | `spacetimedb/src/inventory/` | Not started | route_id found in routing table |
-| INV-010 | P1 | Validate reason_id on inventory adjustments | `spacetimedb/src/inventory/` | Partial | reason exists in reason table |
-| INV-011 | P1 | Add negative test matrix | `spacetimedb/tests/inventory/` | Open | Happy-path-only → add cross-org, bad FK tests |
+| INV-008 | P1 | Replenishment rule: validate product_id | `spacetimedb/src/inventory/replenishment.rs` | ✅ Verified on Maincloud | `require_replenishment_route`/product checks reject missing, cross-org, inactive, and service-type products; persisted rule shows a valid relation |
+| INV-009 | P1 | Replenishment rule: validate route_id | `spacetimedb/src/inventory/replenishment.rs` | ✅ Verified on Maincloud | Missing, cross-org, cross-company, inactive, and non-product routes reject without persisting a rule; valid route persists active |
+| INV-010 | P1 | Validate reason_id on inventory adjustments | `spacetimedb/src/inventory/inventory_adjustments.rs` | ✅ Verified on Maincloud | Missing, cross-org, and inactive reasons reject without persisting an adjustment (`test_adjustment_reason_negative_matrix`) |
+| INV-011 | P1 | Add negative test matrix | `spacetimedb/tests/inventory/tests/relational_integrity_test.rs` | ✅ Verified on Maincloud | `run_inventory_replenishment_relation_negative_matrix_test` + `run_inventory_adjustment_reason_negative_matrix_test` pass in `run_all_inventory_tests` |
 | INV-012 | P2 | Playwright E2E for adjustment → close → reopen | `frontend/e2e/` | Open | Full flow passes in browser |
 | INV-013 | P2 | Validate product_id org-match on adjustment | `spacetimedb/src/inventory/` | Open | product.organization_id == adjustment.organization_id |
 
-**Gate:** All 7 P0 items (INV-001 through INV-007) must be complete and tested.
+**Gate:** All 7 P0 items (INV-001 through INV-007) complete. P1 relation gates (INV-008/009/010/011) passed on Maincloud on 2026-08-15. Inventory is pilot-ready with restrictions; INV-012/013 remain before GA.
+
+**2026-08-15 Maincloud evidence:** Published (dev reducers enabled) to a reset `lumiere-v1-j1uo0`. `run_all_inventory_tests` passed end-to-end, including the replenishment and adjustment-reason negative matrices. Persisted SQL confirms a valid `replenishment_rule` row (product/route relation, `active=true`) and a resulting draft `purchase_order` (`partner_ref = 'RPL-1'`) created by `execute_replenishment_rule` when stock at an empty destination location fell below the reorder minimum. Clean-database execution surfaced and fixed several fixture-only defects (see §7a) without weakening production validation; one genuine production bug was also found and fixed (see MODULE 1 SAL-005).
 
 ---
 
@@ -167,13 +176,13 @@ and repeatable. No database clear was performed.
 
 ### MODULE 5 — ACCOUNTING 🟢 Pilot w/ restrictions
 
-**Verdict:** All P0 items closed. The four-scope ownership backfill and fail-closed validator passed on the reset Maincloud target. Locked-period invoice/payment rejection coverage is now green. Pending: company-switch UI and Playwright E2E.
+**Verdict:** All P0 items closed. The four-scope ownership backfill and fail-closed validator passed on the reset Maincloud target. Locked-period invoice/payment rejection coverage is now green. ACC-003's E2E spec is written but not yet run; ACC-002 is blocked on missing UI.
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
 | ACC-001 | P0 | Backfill existing records with real FK targets | Production DB migration | ✅ Verified on Maincloud | Four scopes completed; zero unresolved issues and zero nullable ownership rows |
-| ACC-002 | P1 | Company-switch UI regression test | `frontend/e2e/` | Not started | Switching company reloads correct journals/accounts |
-| ACC-003 | P1 | Playwright E2E for journal entry → post → reconcile | `frontend/e2e/` | Open | Full flow passes in browser |
+| ACC-002 | P1 | Company-switch UI regression test | `frontend/e2e/` | ⛔ Blocked — no UI | Switching company reloads correct journals/accounts |
+| ACC-003 | P1 | Playwright E2E for journal entry → post → reconcile | `frontend/web/tests/e2e/accounting-post-reconcile.spec.ts` | Written, not yet executed | Full flow passes in browser |
 | ACC-004 | P2 | Validate tax_id on invoice lines | `spacetimedb/src/accounting/` | Open | tax_id found in account_tax table |
 | ACC-005 | P1 | Add negative test for locked period write | `spacetimedb/tests/accounting/` | ✅ Verified on Maincloud | Invoice/payment writes reject and persisted draft state remains unchanged |
 
@@ -181,11 +190,13 @@ and repeatable. No database clear was performed.
 
 **2026-08-15 Maincloud evidence:** Published to and reset `lumiere-v1-j1uo0` with no data-preservation requirement. `run_all_accounting_tests` passed, including valid legacy-null backfills and six intentional quarantine cases. The target was reset afterward; `run_accounting_ownership_backfill` and `validate_accounting_ownership_backfill` then passed with all four scope summaries persisted, `unresolved_rows = 0`, no issue rows, and no nullable ownership rows.
 
+**2026-08-15 update (PM):** ACC-002 investigated and found blocked — the frontend has no company-switcher UI to regression-test against; skipped per explicit user decision rather than silently marked done. ACC-003 implemented as `accounting-post-reconcile.spec.ts`: creates a posted invoice and a draft plain journal entry via the reducer BFF (setup only), then drives the UI to post the entry (`post_account_move`) and reconcile it against the invoice (`entity-action-pay-reconcile-moves` → `reconcile_payment_with_invoice`), asserting the invoice's AR line reaches `residual=0, matching=true` via persisted query. Verified via `npx tsc --noEmit` with zero errors attributable to the new file (99 pre-existing errors elsewhere, none in this file). Not executed locally: running it requires a locally-issued SpacetimeDB login token, and obtaining one via `spacetime login --server-issued-login local` logs out the active Maincloud CLI session first — per explicit user decision, this was skipped rather than disrupting the session used for all other module publishes in this pass. `pnpm run lint` also could not be exercised — the repo has no `eslint.config.(js|mjs|cjs)` at any level, so ESLint 9's flat-config resolution fails before parsing any file, including pre-existing ones; this is pre-existing tooling drift, not specific to this file. Remaining before GA: run this spec against a live stack (`make e2e-single E2E_SPEC=tests/e2e/accounting-post-reconcile.spec.ts`) and build a company-switcher UI to unblock ACC-002.
+
 ---
 
-### MODULE 6 — HR 🟡 Partially relational
+### MODULE 6 — HR 🟢 Pilot w/ restrictions
 
-**Verdict:** ✅ P0 items resolved. Payslip FKs and department hierarchy/manager relations are validated. Employee `job_id` remains P1.
+**Verdict:** ✅ P0 and P1 items resolved. Payslip FKs, department hierarchy/manager relations, and employee `job_id` are all validated and proven on Maincloud.
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
@@ -193,33 +204,33 @@ and repeatable. No database clear was performed.
 | HR-002 | P0 | Validate payslip struct_id (salary structure) FK | `spacetimedb/src/hr/` | ✅ Done | struct_id found in hr_salary_structure |
 | HR-003 | P1 | Validate department parent_id (no cycles) | `spacetimedb/src/hr/` | ✅ Verified on Maincloud | Parent exists, matches organization/company, and hierarchy is acyclic |
 | HR-004 | P1 | Validate department manager_id = existing employee | `spacetimedb/src/hr/` | ✅ Verified on Maincloud | Manager exists, is active/not archived, and matches organization/company |
-| HR-005 | P1 | Validate employee job_id FK | `spacetimedb/src/hr/` | Open | job_id found in hr_job table |
+| HR-005 | P1 | Validate employee job_id FK | `spacetimedb/src/hr/employees.rs` | ✅ Verified on Maincloud | Missing, cross-organization, cross-company, and inactive job_id reject on both create and update without persisted side effects (`test_employee_job_relationships`) |
 | HR-006 | P2 | Add payslip generation E2E test | `spacetimedb/tests/hr/` | Open | Payslip created with correct contract ref |
 | HR-007 | P2 | Add department hierarchy negative test | `spacetimedb/tests/hr/` | ✅ Verified on Maincloud | Self/descendant/corrupt-chain cycles reject without persisted changes |
 | HR-008 | P2 | Playwright E2E for employee → contract → payslip | `frontend/e2e/` | Open | Full flow passes in browser |
 
-**Gate:** HR-001 through HR-004 passed on Maincloud on 2026-08-15. HR-005/006/008 remain for GA.
+**Gate:** HR-001 through HR-005 passed on Maincloud on 2026-08-15. HR-006/008 (Playwright/E2E depth) remain for GA.
 
-**2026-08-15 Maincloud evidence:** `run_all_hr_tests` passed on the reset target. Persisted rows prove a valid parent/child hierarchy and manager replacement; missing, inactive, archived, cross-organization, cross-company, self, descendant, and pre-existing-cycle inputs reject without writes.
+**2026-08-15 Maincloud evidence:** `run_all_hr_tests` passed on the reset target. Persisted rows prove a valid parent/child hierarchy and manager replacement; missing, inactive, archived, cross-organization, cross-company, self, descendant, and pre-existing-cycle inputs reject without writes. Persisted SQL additionally confirms an `hr_employee` row updated from its primary `job_id` to a replacement `job_id` that resolves to a real `hr_job_position` row in the same org/company, with missing/cross-org/cross-company/inactive job assignments rejected on both create and update.
 
 ---
 
 ### MODULE 7 — CRM 🟢 Pilot w/ restrictions
 
-**Verdict:** All phases 0–3 code-complete and persisted-data validation is green on Maincloud. P1 relation hardening and E2E remain.
+**Verdict:** All phases 0–3 code-complete; persisted-data validation and all P1 relation hardening are green on Maincloud. Only Playwright E2E depth remains for GA.
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
 | CRM-001 | P0 | Run persisted-data validation smoke test | Live DB query | ✅ Verified on Maincloud | Nine inventory categories returned zero violations after the full CRM suite |
-| CRM-002 | P1 | Validate lead stage_id FK on create/update | `spacetimedb/src/crm/` | Open | stage_id found in crm_stage; org matches |
-| CRM-003 | P1 | Validate team_id FK on lead assign | `spacetimedb/src/crm/` | Open | team_id found in crm_team; org matches |
-| CRM-004 | P1 | Validate activity type_id FK | `spacetimedb/src/crm/` | Open | type_id found in mail_activity_type |
-| CRM-005 | P2 | Add cross-org contact rejection test | `spacetimedb/tests/crm/` | Open | Cross-org FK attempt rejected |
+| CRM-002 | P1 | Validate lead stage_id FK on create/update | `spacetimedb/src/crm/leads.rs` | ✅ Verified on Maincloud | Cross-org and inactive `stage_id` reject on create and update without persisted changes; valid stage persists and is replaceable |
+| CRM-003 | P1 | Validate team_id FK on lead assign | `spacetimedb/src/crm/leads.rs` | ✅ Verified on Maincloud | Cross-org and inactive `team_id` reject on create and update without persisted changes; valid team persists and is replaceable |
+| CRM-004 | P1 | Validate activity type_id FK | `spacetimedb/src/crm/activities.rs` | ✅ Verified on Maincloud | Cross-org and inactive `activity_type_id` rejected; valid type persists with derived `activity_type` name |
+| CRM-005 | P2 | Add cross-org contact rejection test | `spacetimedb/tests/crm/relational_fk_test.rs` | ✅ Verified on Maincloud | `test_activity_type_and_contact_relations` rejects an activity targeting a cross-org contact without persisting a row |
 | CRM-006 | P2 | Playwright E2E for lead → opportunity → won | `frontend/e2e/` | Open | Full conversion flow passes |
 
-**Gate:** CRM-001 passed on Maincloud on 2026-08-15. CRM is pilot-ready with restrictions; CRM-002/003/004 and E2E remain before GA.
+**Gate:** CRM-001 through CRM-005 passed on Maincloud on 2026-08-15. CRM-006 (Playwright E2E) remains before GA.
 
-**2026-08-15 Maincloud evidence:** `run_all_crm_tests` passed against persisted fixture data (46 contacts, 10 opportunities, 5 opportunity lines). `run_crm_persisted_integrity_smoke_test` then returned success with zero findings in all nine categories. Clean-database execution exposed and fixed fixture-only assumptions for UoM IDs, currency IDs, authenticated presence names, and multi-company feature flags without weakening production guards.
+**2026-08-15 Maincloud evidence:** `run_all_crm_tests` passed against persisted fixture data (46 contacts, 10 opportunities, 5 opportunity lines), followed by `run_crm_relational_fk_test` and `run_crm_persisted_integrity_smoke_test`, both green with zero findings. Persisted SQL confirms a `lead` row's `stage_id`/`team_id` were replaced end-to-end (create → update) and resolve to real `opp_stage`/`crm_team` rows in the same org, and an `activity` row's `activity_type_id` resolves to a real `activity_type` row with the type name correctly denormalized onto the activity. Clean-database execution exposed and fixed fixture-only assumptions for UoM IDs, currency IDs, authenticated presence names, and multi-company feature flags without weakening production guards.
 
 ---
 
@@ -266,9 +277,9 @@ and repeatable. No database clear was performed.
 
 ---
 
-### MODULE 10 — AI 🟡 Partially relational
+### MODULE 10 — AI 🟢 Pilot w/ restrictions
 
-**Verdict:** ✅ P0 items resolved. AI tables now have direct organization_id isolation; exec guard and test-run self-attest confirmed as already implemented.
+**Verdict:** ✅ P0 and P1 items resolved. AI tables have direct organization_id isolation; every mutation reducer already required org membership via `check_permission` plus `ensure_*_in_org` row checks. AI-006/007 were already correctly implemented in production code — this pass added the module's first-ever test suite to prove it persisted, since none existed before.
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
@@ -277,12 +288,14 @@ and repeatable. No database clear was performed.
 | AI-003 | P0 | Add organization_id to SearchEmbedding table | `spacetimedb/src/ai/` | ✅ Done | All embedding rows scoped to org |
 | AI-004 | P0 | Validate cross-org FK in execute_whitelisted_draft | `spacetimedb/src/ai/` | ✅ Done | draft.organization_id == ctx.sender org (load_mutable_draft) |
 | AI-005 | P0 | External validator for AiSkillTestRun (not self-attesting) | `spacetimedb/src/ai/` | ✅ Done | No reducer writes AiSkillTestRun directly |
-| AI-006 | P1 | Add org scope filter to all AI query reducers | `spacetimedb/src/ai/` | Open | All reads require org_id from ctx.sender scope |
-| AI-007 | P1 | Validate document_id FK on processing job | `spacetimedb/src/ai/` | Open | document_id found in documents table; org matches |
+| AI-006 | P1 | Add org scope filter to all AI query reducers | `spacetimedb/src/ai/intelligence.rs` | ✅ Verified on Maincloud | Every mutation reducer already required `check_permission(ctx, organization_id, ...)` plus row-level `ensure_*_in_org` checks; no unscoped reducer found. `test_insight_org_scope` proves `dismiss_insight` rejects a cross-org insight id without mutating it |
+| AI-007 | P1 | Validate document_id FK on processing job | `spacetimedb/src/ai/intelligence.rs` | ✅ Verified on Maincloud | `create_document_processing_job` already validated `document_id`/`document_version_id` existence + org match. `test_document_processing_job_document_relation` proves missing and cross-org document_id reject; a valid same-org document persists |
 | AI-008 | P2 | Add multi-org isolation test for embeddings | `spacetimedb/tests/ai/` | Open | Org A cannot read Org B embeddings |
 | AI-009 | P2 | Playwright E2E for AI insight creation | `frontend/e2e/` | Open | Full flow passes in browser |
 
-**Gate:** AI-001 through AI-005 all required.
+**Gate:** AI-001 through AI-007 passed on Maincloud on 2026-08-15. AI-008/009 remain for GA.
+
+**2026-08-15 Maincloud evidence:** No `spacetimedb/tests/ai/` suite existed before this pass (AI was the only domain module with zero test coverage and no `run_all_ai_tests` reducer). Added `tests/ai/relational_integrity_test.rs`, wired into `run_all_ai_tests` and `run_all_domain_tests`. `run_all_ai_tests` passed on Maincloud: persisted SQL shows a foreign-org insight staying `dismissed=false` after a rejected cross-org dismiss attempt, a local-org insight correctly `dismissed=true`, and exactly one `ai_document_processing_job` row (the valid same-org case) with the missing/cross-org document_id attempts producing no rows.
 
 ---
 
@@ -308,33 +321,37 @@ and repeatable. No database clear was performed.
 
 ### MODULE 12 — FLEET 🟢 Pilot w/ restrictions
 
-**Verdict:** P0 items resolved. `create_pos_terminal` now accepts and validates `company_id`; `upsert_warehouse_geo` validates `warehouse_id` FK against `Warehouse` table with org scope. P1 hardening items remain.
+**Verdict:** All P0 and P1 items resolved. `create_pos_terminal` validates `company_id`; `upsert_warehouse_geo` validates `warehouse_id`; `driver_id` and `service_type_id` are now real, validated FKs (previously neither was settable at all).
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
 | FLT-001 | P0 | Set PosTerminal company_id from ctx.sender scope | `spacetimedb/src/fleet/fleet.rs` | ✅ Done | `create_pos_terminal` accepts `company_id: Option<u64>`; validates via `require_company_in_organization` |
 | FLT-002 | P0 | Validate WarehouseGeo warehouse_id FK | `spacetimedb/src/fleet/fleet.rs` | ✅ Done | `upsert_warehouse_geo` looks up `Warehouse` by id; rejects if not found or org mismatch |
-| FLT-003 | P1 | Set FleetVehicle driver_id from employee lookup | `spacetimedb/src/fleet/fleet.rs` | Not started | driver_id found in hr_employee if provided |
-| FLT-004 | P1 | Validate vehicle service_type_id FK | `spacetimedb/src/fleet/fleet.rs` | Open | service_type_id found if provided |
+| FLT-003 | P1 | Set FleetVehicle driver_id from employee lookup | `spacetimedb/src/fleet/fleet.rs` | ✅ Done + Verified on Maincloud | `driver_id` was previously `Option<Identity>` with no reducer able to set it (hardcoded `None` on create, no update reducer existed at all). Retyped to `Option<u64>` (FK → `hr_employee.id`); added to `CreateFleetVehicleParams` and a new `update_fleet_vehicle` reducer, both validated via `require_fleet_driver_in_org_and_company` (missing/cross-org/cross-company/inactive employee rejected) |
+| FLT-004 | P1 | Validate vehicle service_type_id FK | `spacetimedb/src/fleet/fleet.rs` | ✅ Done + Verified on Maincloud | `service_type_id` did not exist anywhere in the codebase. Added `FleetVehicleServiceType` table (company-scoped, `company_id = None` = org-wide) + `create_fleet_vehicle_service_type` reducer; `service_type_id` validated on create and update via `require_fleet_service_type_in_org_and_company` |
 | FLT-005 | P2 | Add company isolation test for PosTerminal | `spacetimedb/tests/fleet/` | Open | Org A terminal not visible to Org B |
 | FLT-006 | P2 | Add WarehouseGeo negative test (invalid warehouse) | `spacetimedb/tests/fleet/` | Open | Invalid warehouse_id rejected |
 
-**Gate:** FLT-001 + FLT-002 must be complete.
+**Gate:** FLT-001 through FLT-004 passed on Maincloud on 2026-08-15. FLT-005/006 remain for GA.
+
+**2026-08-15 Maincloud evidence:** `run_all_fleet_tests` passed, including new `test_driver_id_relations`/`test_service_type_id_relations`. Persisted SQL confirms: a vehicle updated to a valid `driver_id` persists it; missing/cross-org/inactive driver create-and-update attempts leave `driver_id = None`; a vehicle created with a valid company-scoped `service_type_id` persists it. This required a data-model change (not just added validation) since neither FK was previously settable — flagged and confirmed with the requester before implementation.
 
 ---
 
 ### MODULE 13 — FORMS ✅ Compliant
 
-**Verdict:** P0 gate cleared. `ALLOWED_CUSTOM_FIELD_MODELS` whitelist (23 entries) enforced in both `set_record_custom_field_values` and `delete_record_custom_field_values` — any unrecognised model string is rejected. P1 hardening items remain.
+**Verdict:** All P0 and P1 items resolved. `ALLOWED_CUSTOM_FIELD_MODELS` whitelist (22 entries — the "23" in the prior verdict was a miscount) enforced in both `set_record_custom_field_values` and `delete_record_custom_field_values`; `res_id` existence is now checked against the real table for every whitelisted model, not just `account_move`.
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
 | FRM-001 | P0 | Add model whitelist to RecordCustomFieldValue | `spacetimedb/src/forms/mod.rs` | ✅ Done | `ALLOWED_CUSTOM_FIELD_MODELS` constant; checked in set + delete reducers |
-| FRM-002 | P1 | Validate record existence for all model types beyond account_move | `spacetimedb/src/forms/mod.rs` | Not started | res_id exists in the referenced model's table |
-| FRM-003 | P1 | Make batch upsert atomic (single reducer transaction) | `spacetimedb/src/forms/mod.rs` | Not started | All lines succeed or all fail |
+| FRM-002 | P1 | Validate record existence for all model types beyond account_move | `spacetimedb/src/forms/mod.rs` | ✅ Done + Verified on Maincloud | `ensure_record_allows_custom_field_writes` was a no-op for 21 of the 22 whitelisted models. Rewrote it as a per-model dispatch: each model now resolves its real table and checks existence + organization (and company, where the table carries one) before allowing a custom-field write. `product_template` resolves to the same `product` table (templates are rows in that table, not a separate one) |
+| FRM-003 | P1 | Make batch upsert atomic (single reducer transaction) | `spacetimedb/src/forms/mod.rs` | ✅ Verified — already satisfied | SpacetimeDB reducers are single-transaction by default, and `set_record_custom_field_values`/`delete_record_custom_field_values` validate every entry with `?` (no swallowed errors, no partial-continue loop) — a failure on any entry already rolls back the whole call. No code change needed |
 | FRM-004 | P2 | Add negative test for invalid model value | `spacetimedb/tests/forms/` | Open | Non-whitelisted model rejected |
 
-**Gate:** FRM-001 must be complete before GA. Pilot OK today with manual model validation.
+**Gate:** FRM-001 through FRM-003 passed on Maincloud on 2026-08-15. FRM-004 remains for GA.
+
+**2026-08-15 Maincloud evidence:** Fixing FRM-002 also exposed a stale pre-existing test (`test_forms_custom_field_eav`) that used `model: "lead"` (not in the whitelist — should be `"crm_lead"`) and a hardcoded, non-existent `record_id: 42`; both would have failed FRM-002's new existence check. Fixed to create a real lead and use its id. Added `test_forms_custom_field_record_existence` (new) proving a missing and a cross-org `contact` record_id reject without writing an EAV row, and a valid same-org contact persists one. Both `run_forms_custom_field_test` and `run_forms_custom_field_record_existence_test` passed on Maincloud.
 
 ---
 
@@ -360,17 +377,19 @@ and repeatable. No database clear was performed.
 
 ### MODULE 15 — INTEGRATIONS 🟢 Pilot w/ restrictions
 
-**Verdict:** Core functionality sound. P1: product_id/location_id unvalidated in integration result recording. P2: WhatsApp/GDrive missing company_id.
+**Verdict:** All P1 items resolved. `record_inventory_integration_result` (the reducer INT-001/002 actually describe — it lives in `spacetimedb/src/inventory/integration.rs`, not `spacetimedb/src/integrations/`, which only holds generic connection-status management) now validates both FKs before posting stock. P2 items remain (unrelated connector-config gaps).
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
-| INT-001 | P1 | Validate product_id FK on integration result record | `spacetimedb/src/integrations/` | Not started | product_id found in product; org matches |
-| INT-002 | P1 | Validate location_id FK on integration result record | `spacetimedb/src/integrations/` | Not started | location_id found in stock_location; org matches |
+| INT-001 | P1 | Validate product_id FK on integration result record | `spacetimedb/src/inventory/integration.rs` | ✅ Done + Verified on Maincloud | `record_inventory_integration_result` now calls `require_product_in_org` before posting a succeeded `asn_inbound` result; missing/cross-org product_id rejected without posting stock or marking the intent applied |
+| INT-002 | P1 | Validate location_id FK on integration result record | `spacetimedb/src/inventory/integration.rs` | ✅ Done + Verified on Maincloud | Same reducer now calls `require_location_in_org` before posting; missing/cross-org location_id rejected the same way |
 | INT-003 | P2 | Add company_id to WhatsApp integration record | `spacetimedb/src/integrations/` | Not started | company_id populated and validated |
 | INT-004 | P2 | Add company_id to GDrive integration record | `spacetimedb/src/integrations/` | Not started | company_id populated and validated |
 | INT-005 | P2 | Make conflict_policy configurable per integration | `spacetimedb/src/integrations/` | Not started | conflict_policy settable at connector level |
 
-**Gate:** No blocking P0s. Pilot OK today. INT-001/002 for GA.
+**Gate:** INT-001/002 passed on Maincloud on 2026-08-15. INT-003/004/005 remain for GA (unrelated to this pass's scope).
+
+**2026-08-15 Maincloud evidence:** No dedicated `spacetimedb/tests/integrations/` suite exists; added `test_integration_result_fk_relations` alongside the existing 3PL/ASN coverage in `spacetimedb/tests/inventory/tests/gap_fixes_test.rs`, wired into `run_all_inventory_tests`. Passed on Maincloud: missing product, cross-org product, missing location, and cross-org location all reject with no stock quant created and the intent left `applied = false`.
 
 ---
 
@@ -399,7 +418,7 @@ and repeatable. No database clear was performed.
 
 ### MODULE 17 — PROPOSALS ✅ Compliant
 
-**Verdict:** All 4 P0 FK gaps resolved. `add_proposal_comment` validates `section_id` proposal-scope and `parent_id` comment-scope. `add_proposal_line_item` validates optional `section_id` proposal-scope and `product_id` org-scope via `product` table.
+**Verdict:** All P0 and P1 items resolved. `add_proposal_comment` validates `section_id` proposal-scope and `parent_id` comment-scope. `add_proposal_line_item` and `convert_proposal_to_sale_order` both validate `product_id` existence, org-scope, and (newly) active status.
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
@@ -407,28 +426,32 @@ and repeatable. No database clear was performed.
 | PRO-002 | P0 | Validate ProposalLineItem.section_id FK | `spacetimedb/src/proposals/proposals.rs` | ✅ Done | optional `section_id` validated against `proposal_section` when provided |
 | PRO-003 | P0 | Validate ProposalLineItem.product_id FK at line creation | `spacetimedb/src/proposals/proposals.rs` | ✅ Done | `product` FK lookup with org match in `add_proposal_line_item` |
 | PRO-004 | P0 | Validate section parent_id FK (no cycles) | `spacetimedb/src/proposals/proposals.rs` | ✅ Done | `ProposalComment.parent_id` validated; parent must exist and belong to same proposal |
-| PRO-005 | P1 | Validate convert_proposal SO validity | `spacetimedb/src/proposals/proposals.rs` | Open | All line products exist at conversion time |
-| PRO-006 | P1 | Add negative test for orphan section comment | `spacetimedb/tests/proposals/` | Open | Comment on deleted section rejected |
+| PRO-005 | P1 | Validate convert_proposal SO validity | `spacetimedb/src/proposals/proposals.rs` | ✅ Done + Verified on Maincloud | Existence + org-match were already implemented and already had passing tests (`test_convert_proposal_missing_product_fail_closed`). The one real gap — archived products weren't rejected — is now checked in both `add_proposal_line_item` and `convert_proposal_to_sale_order` |
+| PRO-006 | P1 | Add negative test for orphan section comment | `spacetimedb/tests/proposals/convert_integrity_test.rs` | ✅ Done + Verified on Maincloud | The PRO-001 FK check already correctly rejects a comment on a deleted section (hard-delete means `find()` returns `None`, indistinguishable from never-existing) — `add_proposal_comment` had zero test coverage before this pass. Added `test_add_proposal_comment_orphan_section_rejected` |
 | PRO-007 | P2 | Playwright E2E for proposal → publish → convert | `frontend/e2e/` | Open | Full flow passes in browser |
 
-**Gate:** PRO-001 through PRO-004 for GA. Pilot OK with manual section/product validation.
+**Gate:** PRO-001 through PRO-006 passed on Maincloud on 2026-08-15. PRO-007 remains for GA.
+
+**2026-08-15 Maincloud evidence:** `run_all_proposals_tests` passed, including two new tests. `test_convert_proposal_archived_product_fail_closed` proves an archived product is rejected both on `add_proposal_line_item` and — independently, via a line inserted directly to bypass that check — on `convert_proposal_to_sale_order`, with `proposal.sale_order_id` staying unset either way. `test_add_proposal_comment_orphan_section_rejected` proves a comment on a section deleted after a valid comment was already added is rejected without persisting, while the live-section comment count is unchanged.
 
 ---
 
 ### MODULE 18 — ANALYTICS 🟢 Pilot w/ restrictions
 
-**Verdict:** All P0 company scope gaps resolved. `add_widget_to_dashboard` rejects cross-company widget placement; `create_scheduled_report` validates template company match; `update_widget_layout`, `update_report_template`, and `update_metric_values` now require the caller to present matching `company_id` for company-scoped records.
+**Verdict:** All P0 and P1 company-scope gaps resolved. `add_widget_to_dashboard` rejects cross-company widget placement; `create_scheduled_report` validates template company match; `update_widget_layout`, `update_report_template`, `update_metric_values`, and now `create_dashboard` all validate `company_id` against the organization.
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
 | ANL-001 | P0 | Validate company match on add_widget_to_dashboard | `spacetimedb/src/analytics/dashboards.rs` | ✅ Done | Cross-company widget placement rejected when both sides have `company_id` |
 | ANL-002 | P0 | Validate company match on ScheduledReport template | `spacetimedb/src/analytics/reports.rs` | ✅ Done | `validate_schedule_configuration` checks `template.company_id == report.company_id` |
 | ANL-003 | P0 | Add company scope guard to update operations | `spacetimedb/src/analytics/` | ✅ Done | `update_widget_layout`, `update_report_template`, `update_metric_values` each take `company_id: Option<u64>` and enforce match against the record's company scope |
-| ANL-004 | P1 | Validate dashboard organization_id on create | `spacetimedb/src/analytics/` | Open | org validated via require_company_in_organization |
-| ANL-005 | P1 | Add negative test: cross-company widget add | `spacetimedb/tests/analytics/` | Open | Cross-company widget add rejected |
+| ANL-004 | P1 | Validate dashboard organization_id on create | `spacetimedb/src/analytics/dashboards.rs` | ✅ Done + Verified on Maincloud | `create_dashboard` did not call `require_company_in_organization` at all (the prior verdict describing it as already covered was inaccurate). Added the same guard used elsewhere in this file |
+| ANL-005 | P1 | Add negative test: cross-company widget add | `spacetimedb/tests/analytics/relational_integrity_test.rs` | ✅ Done + Verified on Maincloud | No `tests/analytics/` suite existed and Analytics wasn't wired into `run_all_domain_tests` at all. Added the module's first test suite, including `test_cross_company_widget_add_rejected` |
 | ANL-006 | P2 | Playwright E2E for dashboard create → widget → schedule | `frontend/e2e/` | Open | Full flow passes in browser |
 
-**Gate:** ANL-001 through ANL-003 all required.
+**Gate:** ANL-001 through ANL-005 passed on Maincloud on 2026-08-15. ANL-006 remains for GA.
+
+**2026-08-15 Maincloud evidence:** Added `spacetimedb/tests/analytics/` (new), wired into `run_all_analytics_tests` and `run_all_domain_tests`. Passed on Maincloud: persisted SQL shows a cross-org `create_dashboard` attempt correctly absent while a same-org dashboard persists; a cross-company widget-add attempt leaves the dashboard's `widget_ids` unchanged while a same-company widget is added successfully.
 
 ---
 
@@ -514,11 +537,11 @@ Analytics (ANL)
 
 ### Gate 1: Internal Pilot (small team, no real financial data)
 **Modules safe to use:** Sales, Forms, Integrations, Proposals (with restrictions)
-**Additional modules with runtime gates passed:** Purchasing, CRM, Accounting, HR, Manufacturing, Subscriptions
+**Additional modules with runtime gates passed:** Purchasing, CRM, Accounting, HR, Manufacturing, Subscriptions, Inventory
 
 ### Gate 2: Restricted Production Pilot (real data, limited customer base)
 **Prerequisite fixes:** All P0 items per module
-**Modules that qualify:** Sales, Purchasing, Forms, Integrations, CRM, Accounting, HR, Manufacturing, Subscriptions
+**Modules that qualify:** Sales, Purchasing, Forms, Integrations, CRM, Accounting, HR, Manufacturing, Subscriptions, Inventory
 **Open item-level P0 blockers:** 0
 
 ### Gate 3: General Availability (all modules, full customer base)
@@ -533,9 +556,13 @@ Analytics (ANL)
 | Severity | Total Open Items | Blocking GA |
 |----------|-----------------|-------------|
 | P0 | 0 | N/A — all item-level P0 gates are closed |
-| P1 | 44 | Yes (before GA) |
-| P2 | 35 | No by priority, though tracked Playwright gates are required by Gate 3 |
-| **Total** | **79** | — |
+| P1 | 22 | Yes (before GA) |
+| P2 | 34 | No by priority, though tracked Playwright gates are required by Gate 3 |
+| **Total** | **56** | — |
+
+**2026-08-15 update (AM):** Inventory P1 (INV-008/009/010/011), CRM P1 (CRM-002/003/004) + P2 (CRM-005), and HR P1 (HR-005) closed and verified on Maincloud, reducing open P1 by 8 and open P2 by 1 (79 → 70). See MODULE 3, 6, 7 evidence above.
+
+**2026-08-15 update (PM):** Sales P1 (SAL-001/002), AI P1 (AI-006/007), Fleet P1 (FLT-003/004), Forms P1 (FRM-002/003), Proposals P1 (PRO-005/006), Analytics P1 (ANL-004/005), and Integrations P1 (INT-001/002) closed and verified on Maincloud — 14 P1 items — reducing open P1 by 14 (36 → 22, 70 → 56 total). Three genuine production bugs (not fixture/test issues) were found and fixed along the way: Sales ATP double-reservation and return-order self-counting (both blocking `run_all_sales_tests` from ever completing), plus the SAL-005 arithmetic-location bug from the morning pass. See MODULE 1, 10, 12, 13, 15, 17, 18 evidence above.
 
 ### P0 Items by Module
 
@@ -603,6 +630,24 @@ Analytics (ANL)
 - ✅ MFG-006/007/008: Workcenter/loss-category guards and cross-tenant no-side-effect coverage
 - ✅ SUB-007/008/009/010/011: Normalization, bounds, atomic close, and authenticated query scoping
 - ✅ ACC-005: Locked-period invoice/payment rejection with persisted no-side-effect assertions
+
+### Sprint 7a — Inventory/CRM/HR P1 Hardening + Sales Fix ✅ Complete (2026-08-15)
+- ✅ INV-008/009/010/011: Replenishment product/route and adjustment-reason negative matrices green on a reset Maincloud target
+- ✅ CRM-002/003/004/005: Lead stage_id/team_id and activity type_id/contact relation guards, plus cross-org contact rejection, all verified persisted
+- ✅ HR-005: Employee job_id FK guard verified persisted (create + update, all rejection cases)
+- ✅ SAL-005: Fixed a genuine production bug found during this pass — outbound/RMA picking destination location was invented via `src_location + 1` instead of resolving the org's real customer-usage `stock_location`
+- Fixed 8 clean-database-only test fixture defects surfaced along the way (see `spacetimedb/tests/harness/mod.rs` and `spacetimedb/tests/inventory/tests/*` diffs): `OrgFixture` gained real `location_id`/`customer_location_id`/`supplier_location_id` fields (previously several tests misused `warehouse_id` or `partner_id` as if they were `stock_location` ids); double-reservation before `assign_stock_picking`; an already-expired lot that could never pass quant-creation validation; a replenishment destination that collided with the harness's own 100-unit seed quant; an ambiguous quality-quarantine quant match; and a `next_unused_id` computed before, instead of after, the rows it needed to avoid colliding with
+
+### Sprint 7b — Sales/AI/Fleet/Forms/Proposals/Analytics/Integrations P1 Hardening ✅ Complete (2026-08-15)
+- ✅ SAL-001/002: currency_id FK (already implemented) and pricelist company-scope (new `company_id: Option<u64>` on `ProductPricelist`) verified persisted
+- ✅ AI-006/007: org-scope and document_id FK were already correctly implemented; added the module's first-ever test suite (`spacetimedb/tests/ai/`, previously nonexistent) to prove it
+- ✅ FLT-003/004: `driver_id` (was `Option<Identity>`, unsettable) retyped to a real `hr_employee` FK with a new `update_fleet_vehicle` reducer; `service_type_id` and its backing `FleetVehicleServiceType` table designed and added from scratch — both flagged to and approved by the requester as net-new schema work, not simple hardening
+- ✅ FRM-002/003: per-model `res_id` existence dispatch replacing the account_move-only check (21 previously-unchecked models); FRM-003 confirmed already satisfied by SpacetimeDB's transactional reducer semantics
+- ✅ PRO-005/006: archived-product rejection added to `add_proposal_line_item` and `convert_proposal_to_sale_order`; orphan-section-comment rejection was already correct, now has its first test
+- ✅ ANL-004/005: `create_dashboard` company-scope guard added (was missing entirely, contrary to the prior verdict); Analytics' first-ever test suite added and wired into `run_all_domain_tests`
+- ✅ INT-001/002: `record_inventory_integration_result` (the actual location of this reducer — `spacetimedb/src/inventory/integration.rs`, not `spacetimedb/src/integrations/`) now validates product_id/location_id before posting stock
+- ✅ SAL-006/007 (found during this pass, not pre-planned): fixed two genuine production bugs that had silently prevented `run_all_sales_tests` from ever completing on a clean database — ATP double-reservation between `confirm_sales_order` and `assign_stock_picking` for primary-warehouse orders, and `confirm_return_order` self-counting its own just-inserted return lines as "already returned," which made any full-quantity return always self-reject on confirm
+- Research for all 7 modules was parallelized via background Explore agents before implementation; several tracker items turned out already-implemented (SAL-001, AI-006/007, FRM-003, PRO-005's core check, PRO-006's rejection behavior) and needed only persisted test evidence, not code changes
 
 ### Sprint 8 — E2E Tests + GA Hardening
 - All remaining P1 items across modules

@@ -18,6 +18,8 @@ fn create_vehicle(ctx: &ReducerContext, fixture: &OrgFixture, name: &str) -> Res
             vehicle_type: "truck".to_string(),
             license_plate: Some("ABC-1".to_string()),
             driver_name: None,
+            driver_id: None,
+            service_type_id: None,
             metadata: None,
         },
     )?;
@@ -135,6 +137,8 @@ pub fn test_create_requires_company_scope(ctx: &ReducerContext) -> Result<(), St
             vehicle_type: "van".to_string(),
             license_plate: None,
             driver_name: None,
+            driver_id: None,
+            service_type_id: None,
             metadata: None,
         },
     )

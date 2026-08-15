@@ -19,7 +19,7 @@ pub fn test_stock_inventory_create(ctx: &ReducerContext) -> Result<(), String> {
         CreateStockInventoryParams {
             company_id: Some(fixture.company_id),
             name: "Harness Cycle Count".to_string(),
-            location_ids: vec![fixture.warehouse_id],
+            location_ids: vec![fixture.location_id],
             product_ids: vec![fixture.product_id],
             lot_ids: vec![],
             owner_ids: vec![],
@@ -57,8 +57,7 @@ pub fn test_inventory_adjustment_create(ctx: &ReducerContext) -> Result<(), Stri
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
 
-    // Use warehouse id as location stub (harness warehouse row; full location graph is Phase 2)
-    let location_id = fixture.warehouse_id;
+    let location_id = fixture.location_id;
 
     let product = ctx
         .db

@@ -213,6 +213,7 @@ fn seed_plan_and_sub_with_tax(
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: format!("PL-B-{org_id}"),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,
@@ -538,6 +539,7 @@ pub fn test_pay_subscription_invoice_clears_residual(ctx: &ReducerContext) -> Re
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: format!("PL-PAY-{org_id}"),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,
@@ -794,6 +796,7 @@ pub fn test_csv_import_draft_only(ctx: &ReducerContext) -> Result<(), String> {
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: format!("CSV-PL-{org_id}"),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,

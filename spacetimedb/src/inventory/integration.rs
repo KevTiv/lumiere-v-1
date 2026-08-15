@@ -6,7 +6,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
-use crate::inventory::stock::increase_quant_at_location;
+use crate::inventory::stock::{increase_quant_at_location, require_location_in_org, require_product_in_org};
 use serde_json;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -198,6 +198,10 @@ pub fn record_inventory_integration_result(
         assert_inventory_writable(ctx, organization_id, company_id)?;
         let product_id = params.product_id.unwrap();
         let location_id = params.location_id.unwrap();
+        // INT-001/INT-002: product_id and location_id must resolve to real,
+        // active, same-org rows before posting stock from an integration result.
+        require_product_in_org(ctx, organization_id, product_id)?;
+        require_location_in_org(ctx, organization_id, location_id)?;
         let qty = params.quantity.unwrap();
         let cost = params.cost.unwrap_or(0.0);
         increase_quant_at_location(

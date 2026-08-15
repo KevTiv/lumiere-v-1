@@ -43,6 +43,10 @@ pub fn run_proposals_convert_integrity_test(ctx: &ReducerContext) -> Result<(), 
         .map_err(|e| format!("r5_derive_uom: {e}"))?;
     convert_integrity_test::test_convert_proposal_zero_product_uom_fail_closed(ctx)
         .map_err(|e| format!("r5_zero_uom: {e}"))?;
+    convert_integrity_test::test_convert_proposal_archived_product_fail_closed(ctx)
+        .map_err(|e| format!("pro_005_archived_product: {e}"))?;
+    convert_integrity_test::test_add_proposal_comment_orphan_section_rejected(ctx)
+        .map_err(|e| format!("pro_006_orphan_section_comment: {e}"))?;
     Ok(())
 }
 

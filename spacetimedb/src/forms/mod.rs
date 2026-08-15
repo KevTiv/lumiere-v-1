@@ -18,9 +18,25 @@
 
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::journal_entries::account_move;
+use crate::accounting::journal_entries::{account_move, account_move_line};
 use crate::core::organization::require_company_in_organization;
+use crate::crm::contacts::contact;
+use crate::crm::leads::lead;
+use crate::expenses::expenses::{expense_sheet, hr_expense};
+use crate::fleet::fleet::fleet_vehicle;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpdesk::tickets::helpdesk_ticket;
+use crate::hr::contracts::hr_contract;
+use crate::hr::employees::hr_employee;
+use crate::hr::payroll::hr_payslip;
+use crate::inventory::product::product;
+use crate::manufacturing::manufacturing_orders::mrp_production;
+use crate::projects::projects::project_project;
+use crate::projects::tasks::project_task;
+use crate::proposals::proposals::proposal;
+use crate::purchasing::purchase_orders::{purchase_order, purchase_order_line};
+use crate::sales::sales_core::{sale_order, sale_order_line};
+use crate::subscriptions::tables::subscription;
 use crate::types::AccountMoveState;
 
 pub mod migrations;
@@ -535,6 +551,9 @@ fn validate_custom_field_value(
     Ok(())
 }
 
+/// FRM-002: `res_id` must resolve to a real, same-org (and same-company when the
+/// model carries one) row before custom fields can be attached. `product_template`
+/// shares the `product` table (templates are rows in that same table).
 fn ensure_record_allows_custom_field_writes(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -542,24 +561,75 @@ fn ensure_record_allows_custom_field_writes(
     model: &str,
     record_id: u64,
 ) -> Result<(), String> {
-    if model != "account_move" {
-        return Ok(());
+    macro_rules! require_org_and_company {
+        ($table:expr, $label:expr) => {{
+            let row = $table
+                .id()
+                .find(&record_id)
+                .ok_or_else(|| format!("{} {} not found", $label, record_id))?;
+            if row.organization_id != organization_id {
+                return Err("Record does not belong to this organization".to_string());
+            }
+            if row.company_id != company_id {
+                return Err("Record does not belong to this company".to_string());
+            }
+        }};
+    }
+    macro_rules! require_org_only {
+        ($table:expr, $label:expr) => {{
+            let row = $table
+                .id()
+                .find(&record_id)
+                .ok_or_else(|| format!("{} {} not found", $label, record_id))?;
+            if row.organization_id != organization_id {
+                return Err("Record does not belong to this organization".to_string());
+            }
+        }};
     }
 
-    let mv = ctx
-        .db
-        .account_move()
-        .id()
-        .find(&record_id)
-        .ok_or_else(|| format!("account_move {record_id} not found"))?;
-    if mv.organization_id != organization_id {
-        return Err("Record does not belong to this organization".to_string());
-    }
-    if mv.company_id != company_id {
-        return Err("Record does not belong to this company".to_string());
-    }
-    if mv.state == AccountMoveState::Posted || mv.posted_before {
-        return Err("cannot change custom fields on a posted accounting document".to_string());
+    match model {
+        "account_move" => {
+            let mv = ctx
+                .db
+                .account_move()
+                .id()
+                .find(&record_id)
+                .ok_or_else(|| format!("account_move {record_id} not found"))?;
+            if mv.organization_id != organization_id {
+                return Err("Record does not belong to this organization".to_string());
+            }
+            if mv.company_id != company_id {
+                return Err("Record does not belong to this company".to_string());
+            }
+            if mv.state == AccountMoveState::Posted || mv.posted_before {
+                return Err(
+                    "cannot change custom fields on a posted accounting document".to_string(),
+                );
+            }
+        }
+        "account_move_line" => require_org_only!(ctx.db.account_move_line(), "account_move_line"),
+        "sale_order" => require_org_and_company!(ctx.db.sale_order(), "sale_order"),
+        "sale_order_line" => require_org_and_company!(ctx.db.sale_order_line(), "sale_order_line"),
+        "purchase_order" => require_org_and_company!(ctx.db.purchase_order(), "purchase_order"),
+        "purchase_order_line" => {
+            require_org_and_company!(ctx.db.purchase_order_line(), "purchase_order_line")
+        }
+        "hr_employee" => require_org_and_company!(ctx.db.hr_employee(), "hr_employee"),
+        "hr_contract" => require_org_and_company!(ctx.db.hr_contract(), "hr_contract"),
+        "hr_expense" => require_org_and_company!(ctx.db.hr_expense(), "hr_expense"),
+        "expense_sheet" => require_org_and_company!(ctx.db.expense_sheet(), "expense_sheet"),
+        "contact" => require_org_only!(ctx.db.contact(), "contact"),
+        "product" | "product_template" => require_org_only!(ctx.db.product(), "product"),
+        "project_project" => require_org_and_company!(ctx.db.project_project(), "project_project"),
+        "project_task" => require_org_and_company!(ctx.db.project_task(), "project_task"),
+        "helpdesk_ticket" => require_org_only!(ctx.db.helpdesk_ticket(), "helpdesk_ticket"),
+        "mrp_production" => require_org_and_company!(ctx.db.mrp_production(), "mrp_production"),
+        "subscription" => require_org_and_company!(ctx.db.subscription(), "subscription"),
+        "proposal" => require_org_and_company!(ctx.db.proposal(), "proposal"),
+        "hr_payslip" => require_org_and_company!(ctx.db.hr_payslip(), "hr_payslip"),
+        "fleet_vehicle" => require_org_and_company!(ctx.db.fleet_vehicle(), "fleet_vehicle"),
+        "crm_lead" => require_org_only!(ctx.db.lead(), "crm_lead"),
+        _ => {}
     }
     Ok(())
 }

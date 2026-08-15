@@ -1,4 +1,5 @@
 //! Fleet domain test suite — invoke via `run_all_fleet_tests` reducer.
+pub mod relational_integrity_test;
 pub mod wave_a_test;
 
 use spacetimedb::ReducerContext;
@@ -13,7 +14,17 @@ pub fn run_fleet_wave_a_test(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 #[spacetimedb::reducer]
+pub fn run_fleet_relational_integrity_test(ctx: &ReducerContext) -> Result<(), String> {
+    relational_integrity_test::test_driver_id_relations(ctx)
+        .map_err(|e| format!("driver_id_relations: {e}"))?;
+    relational_integrity_test::test_service_type_id_relations(ctx)
+        .map_err(|e| format!("service_type_id_relations: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_fleet_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_fleet_wave_a_test(ctx)?;
+    run_fleet_relational_integrity_test(ctx)?;
     Ok(())
 }

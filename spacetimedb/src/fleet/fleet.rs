@@ -10,6 +10,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::hr::employees::hr_employee;
 use crate::inventory::warehouse::warehouse;
 
 // ============================================================================
@@ -85,7 +86,8 @@ pub struct FleetVehicle {
     pub name: String, // e.g. "Truck #101"
     pub license_plate: Option<String>,
     pub driver_name: Option<String>,
-    pub driver_id: Option<Identity>,
+    pub driver_id: Option<u64>, // FK -> HrEmployee.id
+    pub service_type_id: Option<u64>, // FK -> FleetVehicleServiceType.id
     pub status: VehicleStatus,
     pub latitude: Option<f64>,
     pub longitude: Option<f64>,
@@ -159,6 +161,29 @@ pub struct WarehouseGeo {
     pub write_date: Timestamp,
 }
 
+/// FleetVehicleServiceType — reference list of vehicle service/maintenance types.
+/// `company_id = None` means the type is shared across every company in the org.
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = fleet_vehicle_service_type,
+    public,
+    index(accessor = fleet_vehicle_service_type_by_org, btree(columns = [organization_id]))
+)]
+pub struct FleetVehicleServiceType {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+
+    pub organization_id: u64,
+    pub company_id: Option<u64>,
+    pub name: String,
+    pub is_active: bool,
+    pub create_uid: Identity,
+    pub create_date: Timestamp,
+    pub write_uid: Identity,
+    pub write_date: Timestamp,
+}
+
 // ── Input Params ─────────────────────────────────────────────────────────────
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -167,7 +192,23 @@ pub struct CreateFleetVehicleParams {
     pub vehicle_type: String,
     pub license_plate: Option<String>,
     pub driver_name: Option<String>,
+    pub driver_id: Option<u64>,
+    pub service_type_id: Option<u64>,
     pub metadata: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateFleetVehicleServiceTypeParams {
+    pub name: String,
+    pub company_id: Option<u64>,
+}
+
+/// Patch semantics: outer `None` = leave unchanged; `Some(None)` = clear the FK;
+/// `Some(Some(id))` = set/validate the FK.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UpdateFleetVehicleParams {
+    pub driver_id: Option<Option<u64>>,
+    pub service_type_id: Option<Option<u64>>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -197,6 +238,59 @@ fn require_fleet_vehicle_company(
     Ok(())
 }
 
+/// FLT-003: driver_id must resolve to an active hr_employee in this org/company.
+fn require_fleet_driver_in_org_and_company(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    driver_id: u64,
+) -> Result<(), String> {
+    let employee = ctx
+        .db
+        .hr_employee()
+        .id()
+        .find(&driver_id)
+        .ok_or_else(|| format!("Driver employee {} not found", driver_id))?;
+    if employee.organization_id != organization_id {
+        return Err("Driver does not belong to this organization".to_string());
+    }
+    if employee.company_id != company_id {
+        return Err("Driver does not belong to this company".to_string());
+    }
+    if !employee.is_active || employee.deleted_at.is_some() {
+        return Err("Driver employee is not active".to_string());
+    }
+    Ok(())
+}
+
+/// FLT-004: service_type_id must resolve to an active FleetVehicleServiceType in
+/// this org; when the type carries a company_id, it must match the vehicle's.
+fn require_fleet_service_type_in_org_and_company(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    service_type_id: u64,
+) -> Result<(), String> {
+    let service_type = ctx
+        .db
+        .fleet_vehicle_service_type()
+        .id()
+        .find(&service_type_id)
+        .ok_or_else(|| format!("Service type {} not found", service_type_id))?;
+    if service_type.organization_id != organization_id {
+        return Err("Service type does not belong to this organization".to_string());
+    }
+    if let Some(st_company_id) = service_type.company_id {
+        if st_company_id != company_id {
+            return Err("Service type does not belong to this company".to_string());
+        }
+    }
+    if !service_type.is_active {
+        return Err(format!("Service type {} is not active", service_type_id));
+    }
+    Ok(())
+}
+
 /// Create or register a fleet vehicle
 #[reducer]
 pub fn create_fleet_vehicle(
@@ -214,6 +308,17 @@ pub fn create_fleet_vehicle(
     if params.vehicle_type.trim().is_empty() {
         return Err("Vehicle type cannot be empty".to_string());
     }
+    if let Some(driver_id) = params.driver_id {
+        require_fleet_driver_in_org_and_company(ctx, organization_id, company_id, driver_id)?;
+    }
+    if let Some(service_type_id) = params.service_type_id {
+        require_fleet_service_type_in_org_and_company(
+            ctx,
+            organization_id,
+            company_id,
+            service_type_id,
+        )?;
+    }
 
     let row = ctx.db.fleet_vehicle().insert(FleetVehicle {
         id: 0,
@@ -222,7 +327,8 @@ pub fn create_fleet_vehicle(
         name: params.name.trim().to_string(),
         license_plate: params.license_plate,
         driver_name: params.driver_name,
-        driver_id: None,
+        driver_id: params.driver_id,
+        service_type_id: params.service_type_id,
         status: VehicleStatus::Idle,
         latitude: None,
         longitude: None,
@@ -261,6 +367,130 @@ pub fn create_fleet_vehicle(
                 "vehicle_type".to_string(),
                 "company_id".to_string(),
             ],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+/// Create a fleet vehicle service/maintenance type.
+#[reducer]
+pub fn create_fleet_vehicle_service_type(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateFleetVehicleServiceTypeParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "fleet_vehicle_service_type", "create")?;
+
+    if params.name.trim().is_empty() {
+        return Err("Service type name cannot be empty".to_string());
+    }
+    if let Some(company_id) = params.company_id {
+        require_company_in_organization(ctx, organization_id, company_id)?;
+    }
+
+    let row = ctx
+        .db
+        .fleet_vehicle_service_type()
+        .insert(FleetVehicleServiceType {
+            id: 0,
+            organization_id,
+            company_id: params.company_id,
+            name: params.name.trim().to_string(),
+            is_active: true,
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            write_uid: ctx.sender(),
+            write_date: ctx.timestamp,
+        });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: params.company_id,
+            table_name: "fleet_vehicle_service_type",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "name": row.name }).to_string()),
+            changed_fields: vec!["name".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
+/// Update a fleet vehicle's driver_id and/or service_type_id (FLT-003/FLT-004).
+#[reducer]
+pub fn update_fleet_vehicle(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    vehicle_id: u64,
+    params: UpdateFleetVehicleParams,
+) -> Result<(), String> {
+    require_company_in_organization(ctx, organization_id, company_id)?;
+
+    let vehicle = ctx
+        .db
+        .fleet_vehicle()
+        .id()
+        .find(&vehicle_id)
+        .ok_or_else(|| format!("Vehicle {} not found", vehicle_id))?;
+
+    require_fleet_vehicle_company(&vehicle, organization_id, company_id)?;
+    check_permission(ctx, organization_id, "fleet_vehicle", "write")?;
+
+    let next_driver_id = match params.driver_id {
+        Some(Some(driver_id)) => {
+            require_fleet_driver_in_org_and_company(ctx, organization_id, company_id, driver_id)?;
+            Some(driver_id)
+        }
+        Some(None) => None,
+        None => vehicle.driver_id,
+    };
+    let next_service_type_id = match params.service_type_id {
+        Some(Some(service_type_id)) => {
+            require_fleet_service_type_in_org_and_company(
+                ctx,
+                organization_id,
+                company_id,
+                service_type_id,
+            )?;
+            Some(service_type_id)
+        }
+        Some(None) => None,
+        None => vehicle.service_type_id,
+    };
+
+    ctx.db.fleet_vehicle().id().update(FleetVehicle {
+        driver_id: next_driver_id,
+        service_type_id: next_service_type_id,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..vehicle
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "fleet_vehicle",
+            record_id: vehicle_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "driver_id": next_driver_id,
+                    "service_type_id": next_service_type_id
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["driver_id".to_string(), "service_type_id".to_string()],
             metadata: None,
         },
     );

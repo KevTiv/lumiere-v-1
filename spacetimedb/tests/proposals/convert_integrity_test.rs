@@ -2,11 +2,13 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::reference::{create_uom, uom, CreateUomParams};
-use crate::inventory::product::product;
+use crate::inventory::product::{product, Product};
 use crate::proposals::proposals::{
-    add_proposal_line_item, convert_proposal_to_sale_order, create_proposal, proposal,
-    proposal_line_item, AddProposalLineItemParams, ConvertProposalToSaleOrderParams,
-    CreateProposalParams, Proposal, ProposalLineItem, ProposalStatus,
+    add_proposal_comment, add_proposal_line_item, convert_proposal_to_sale_order, create_proposal,
+    delete_proposal_section, proposal, proposal_comment, proposal_line_item,
+    proposal_section, upsert_proposal_section, AddProposalLineItemParams,
+    ConvertProposalToSaleOrderParams, CreateProposalParams, Proposal, ProposalLineItem,
+    ProposalStatus, UpsertProposalSectionParams,
 };
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
 use crate::sales::sales_core::{sale_order, sale_order_line};
@@ -62,6 +64,7 @@ fn seed_pricelist(ctx: &ReducerContext, fixture: &OrgFixture, name: &str) -> Res
         ctx,
         fixture.organization_id,
         CreatePricelistParams {
+            company_id: None,
             name: name.to_string(),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,
@@ -366,6 +369,184 @@ pub fn test_convert_proposal_zero_product_uom_fail_closed(
     });
     if magic_uom {
         return Err("Magic product_uom=1 line persisted".into());
+    }
+
+    Ok(())
+}
+
+/// PRO-005: an archived product is rejected both when added to a proposal line
+/// and (if it slips onto one directly) at conversion time.
+pub fn test_convert_proposal_archived_product_fail_closed(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    let base_product = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("harness product missing")?;
+    ctx.db.product().id().update(Product {
+        active: false,
+        ..base_product
+    });
+
+    let proposal_id = create_awarded_proposal(ctx, &fixture, "R5 Archived Product")?;
+
+    let add_err = add_proposal_line_item(
+        ctx,
+        org_id,
+        company_id,
+        proposal_id,
+        AddProposalLineItemParams {
+            section_id: None,
+            product_id: fixture.product_id,
+            product_name: "Archived Product".to_string(),
+            product_variant_id: None,
+            description: None,
+            quantity: 1.0,
+            price_unit: 10.0,
+            discount: 0.0,
+            notes: None,
+        },
+    )
+    .expect_err("archived product line add must fail closed");
+    if !add_err.contains("archived") {
+        return Err(format!("Expected archived-product error, got: {add_err}"));
+    }
+    if ctx
+        .db
+        .proposal_line_item()
+        .line_item_by_proposal()
+        .filter(&proposal_id)
+        .any(|l| l.product_id == fixture.product_id)
+    {
+        return Err("rejected archived-product line was persisted".into());
+    }
+
+    // Insert the line directly (bypassing add_proposal_line_item) to prove
+    // convert_proposal_to_sale_order independently fails closed too.
+    ctx.db.proposal_line_item().insert(ProposalLineItem {
+        id: 0,
+        organization_id: org_id,
+        proposal_id,
+        section_id: None,
+        product_id: fixture.product_id,
+        product_name: "Archived Product".to_string(),
+        product_variant_id: None,
+        description: None,
+        quantity: 1.0,
+        price_unit: 10.0,
+        subtotal: 10.0,
+        discount: 0.0,
+        sequence: 10,
+        notes: None,
+        create_uid: ctx.sender(),
+        create_date: ctx.timestamp,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+    });
+    let pricelist_id = seed_pricelist(ctx, &fixture, "R5 Archived Product PL")?;
+    let convert_err = convert_proposal_to_sale_order(
+        ctx,
+        org_id,
+        company_id,
+        proposal_id,
+        ConvertProposalToSaleOrderParams {
+            warehouse_id: fixture.warehouse_id,
+            pricelist_id,
+        },
+    )
+    .expect_err("archived product convert must fail closed");
+    if !convert_err.contains("archived") {
+        return Err(format!(
+            "Expected archived-product convert error, got: {convert_err}"
+        ));
+    }
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&proposal_id)
+        .ok_or("proposal after archived-product convert fail")?;
+    if proposal.sale_order_id.is_some() {
+        return Err("proposal.sale_order_id must stay unset on failed convert".into());
+    }
+
+    Ok(())
+}
+
+/// PRO-006: a comment on a since-deleted section is rejected without persisting.
+pub fn test_add_proposal_comment_orphan_section_rejected(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+
+    let proposal_id = create_awarded_proposal(ctx, &fixture, "PRO-006 Proposal")?;
+
+    upsert_proposal_section(
+        ctx,
+        org_id,
+        company_id,
+        proposal_id,
+        0,
+        0,
+        UpsertProposalSectionParams {
+            title: "PRO-006 Section".to_string(),
+            content: "content".to_string(),
+            status: "draft".to_string(),
+            sequence: 1,
+            ai_suggestion: None,
+        },
+    )?;
+    let section_id = ctx
+        .db
+        .proposal_section()
+        .iter()
+        .find(|s| s.proposal_id == proposal_id && s.title == "PRO-006 Section")
+        .map(|s| s.id)
+        .ok_or("section missing after create")?;
+
+    // Baseline: a comment on the live section succeeds.
+    add_proposal_comment(
+        ctx,
+        org_id,
+        company_id,
+        proposal_id,
+        section_id,
+        "live comment".to_string(),
+        None,
+        "Tester".to_string(),
+    )?;
+    let comment_count_before = ctx.db.proposal_comment().iter().count();
+
+    delete_proposal_section(ctx, org_id, company_id, section_id)?;
+
+    let err = add_proposal_comment(
+        ctx,
+        org_id,
+        company_id,
+        proposal_id,
+        section_id,
+        "orphan comment".to_string(),
+        None,
+        "Tester".to_string(),
+    )
+    .expect_err("comment on deleted section must be rejected");
+    if !err.contains("not found") {
+        return Err(format!(
+            "Expected section-not-found error, got: {err}"
+        ));
+    }
+    if ctx.db.proposal_comment().iter().count() != comment_count_before {
+        return Err("rejected orphan-section comment was persisted".into());
     }
 
     Ok(())

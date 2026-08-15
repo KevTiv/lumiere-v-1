@@ -64,6 +64,7 @@ pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<()
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: "Harness CRM Pricelist".to_string(),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,
@@ -230,6 +231,7 @@ pub fn test_convert_opp_missing_currency_fail_closed(ctx: &ReducerContext) -> Re
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: "R2 Currency PL".to_string(),
             currency_id: distinct_currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
@@ -401,6 +403,7 @@ pub fn test_convert_opp_missing_uom_fail_closed(ctx: &ReducerContext) -> Result<
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: "R2 UoM PL".to_string(),
             currency_id: distinct_currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
@@ -585,6 +588,7 @@ pub fn test_convert_opp_distinctive_currency_uom(ctx: &ReducerContext) -> Result
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: "R2 Distinct PL".to_string(),
             currency_id: distinct_currency_id,
             discount_policy: DiscountPolicy::WithDiscount,

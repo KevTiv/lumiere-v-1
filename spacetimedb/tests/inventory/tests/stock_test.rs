@@ -16,8 +16,7 @@ pub fn test_stock_quant_create(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
 
-    // Harness warehouse row doubles as location stub (see inventory_adjustments_tests).
-    let location_id = fixture.warehouse_id;
+    let location_id = fixture.location_id;
     let initial_qty = 5.0;
 
     create_stock_quant(

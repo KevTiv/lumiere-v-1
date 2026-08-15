@@ -24,6 +24,7 @@ fn seed_pricelist(ctx: &ReducerContext, org_id: u64, name: &str) -> Result<u64, 
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: name.to_string(),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,

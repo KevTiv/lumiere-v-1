@@ -1637,6 +1637,7 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
 
 /// Forms platform: publish config, bind EAV values to defs, reject unknown keys.
 pub fn test_forms_custom_field_eav(ctx: &ReducerContext) -> Result<(), String> {
+    use crate::crm::leads::{create_lead, lead, CreateLeadParams};
     use crate::forms::{
         add_form_field, form_config, publish_form_configuration, record_custom_field_value,
         set_record_custom_field_values, CreateFormFieldParams, FieldType, FieldValidation,
@@ -1679,6 +1680,7 @@ pub fn test_forms_custom_field_eav(ctx: &ReducerContext) -> Result<(), String> {
         ctx: &ReducerContext,
         org_id: u64,
         company_id: u64,
+        lead_id: u64,
         field_key: &str,
         value_json: &str,
     ) -> Result<(), String> {
@@ -1687,8 +1689,8 @@ pub fn test_forms_custom_field_eav(ctx: &ReducerContext) -> Result<(), String> {
             org_id,
             company_id,
             SetRecordCustomFieldValuesParams {
-                model: "lead".to_string(),
-                record_id: 42,
+                model: "crm_lead".to_string(),
+                record_id: lead_id,
                 entries: vec![RecordCustomFieldEntry {
                     field_key: field_key.to_string(),
                     value_json: value_json.to_string(),
@@ -1701,6 +1703,49 @@ pub fn test_forms_custom_field_eav(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+
+    create_lead(
+        ctx,
+        org_id,
+        CreateLeadParams {
+            name: "EAV Test Lead".to_string(),
+            priority: "normal".to_string(),
+            state: "new".to_string(),
+            expected_revenue: 0.0,
+            probability: 0.0,
+            tag_ids: vec![],
+            email: None,
+            phone: None,
+            mobile: None,
+            company_name: None,
+            contact_name: None,
+            title: None,
+            street: None,
+            city: None,
+            zip: None,
+            country_code: None,
+            website: None,
+            industry: None,
+            source_id: None,
+            campaign_id: None,
+            medium_id: None,
+            referred_by: None,
+            description: None,
+            user_id: None,
+            stage_id: None,
+            team_id: None,
+            partner_id: None,
+            date_deadline: None,
+            metadata: None,
+        },
+    )?;
+    let lead_id = ctx
+        .db
+        .lead()
+        .iter()
+        .find(|l| l.organization_id == org_id && l.name == "EAV Test Lead")
+        .map(|l| l.id)
+        .ok_or("EAV test lead missing after create")?;
 
     publish_form_configuration(
         ctx,
@@ -1755,14 +1800,14 @@ pub fn test_forms_custom_field_eav(ctx: &ReducerContext) -> Result<(), String> {
         ),
     )?;
 
-    if set_eav(ctx, org_id, company_id, "custom:unknown", "\"x\"").is_ok() {
+    if set_eav(ctx, org_id, company_id, lead_id, "custom:unknown", "\"x\"").is_ok() {
         return Err("unknown custom field should be rejected".to_string());
     }
-    if set_eav(ctx, org_id, company_id, "custom:region_code", "\"\"").is_ok() {
+    if set_eav(ctx, org_id, company_id, lead_id, "custom:region_code", "\"\"").is_ok() {
         return Err("required custom field empty value should be rejected".to_string());
     }
 
-    set_eav(ctx, org_id, company_id, "custom:region_code", "\"APAC\"")?;
+    set_eav(ctx, org_id, company_id, lead_id, "custom:region_code", "\"APAC\"")?;
 
     let row = ctx
         .db
@@ -1771,13 +1816,177 @@ pub fn test_forms_custom_field_eav(ctx: &ReducerContext) -> Result<(), String> {
         .find(|r| {
             r.organization_id == org_id
                 && r.company_id == company_id
-                && r.model == "lead"
-                && r.record_id == 42
+                && r.model == "crm_lead"
+                && r.record_id == lead_id
                 && r.field_key == "custom:region_code"
         })
         .ok_or("EAV row missing after upsert")?;
     if row.value_json != "\"APAC\"" {
         return Err(format!("unexpected value_json {}", row.value_json));
+    }
+
+    Ok(())
+}
+
+/// FRM-002: res_id existence/org checks now apply beyond account_move — proven
+/// here against the "contact" model (missing and cross-org record_id rejected;
+/// a real, same-org record succeeds).
+pub fn test_forms_custom_field_record_existence(ctx: &ReducerContext) -> Result<(), String> {
+    use crate::crm::contacts::{contact, create_contact, CreateContactParams};
+    use crate::forms::{
+        add_form_field, form_config, publish_form_configuration, record_custom_field_value,
+        set_record_custom_field_values, CreateFormFieldParams, FieldType, FieldValidation,
+        FieldWidth, PublishFormConfigurationParams, RecordCustomFieldEntry,
+        SetRecordCustomFieldValuesParams,
+    };
+
+    fn set_eav(
+        ctx: &ReducerContext,
+        org_id: u64,
+        company_id: u64,
+        record_id: u64,
+    ) -> Result<(), String> {
+        set_record_custom_field_values(
+            ctx,
+            org_id,
+            company_id,
+            SetRecordCustomFieldValuesParams {
+                model: "contact".to_string(),
+                record_id,
+                entries: vec![RecordCustomFieldEntry {
+                    field_key: "custom:anything".to_string(),
+                    value_json: "\"x\"".to_string(),
+                }],
+            },
+        )
+    }
+
+    ensure_test_superuser(ctx)?;
+    let local = OrgFixture::seed_minimal(ctx)?;
+    let foreign = OrgFixture::seed_minimal(ctx)?;
+
+    publish_form_configuration(
+        ctx,
+        local.organization_id,
+        PublishFormConfigurationParams {
+            module_id: "crm".to_string(),
+            form_id: "new-contact".to_string(),
+            name: "New Contact".to_string(),
+            description: None,
+            is_system_default: false,
+            fields: vec![],
+            role_configs: vec![],
+            expected_updated_at_micros: None,
+            replace_missing_fields: false,
+        },
+    )?;
+    let config = ctx
+        .db
+        .form_config()
+        .iter()
+        .find(|c| {
+            c.organization_id == local.organization_id
+                && c.module_id == "crm"
+                && c.form_id == "new-contact"
+        })
+        .ok_or("published form_config missing")?;
+    add_form_field(
+        ctx,
+        local.organization_id,
+        config.id,
+        CreateFormFieldParams {
+            field_id: "custom:anything".to_string(),
+            name: "custom:anything".to_string(),
+            label: "Anything".to_string(),
+            field_type: FieldType::Text,
+            description: None,
+            placeholder: None,
+            default_value: None,
+            options: vec![],
+            validation: FieldValidation::default(),
+            ai_suggestions: vec![],
+            order: 1,
+            is_system: false,
+            is_enabled: true,
+            category: None,
+            show_in_list: false,
+            width: FieldWidth::Full,
+            section_id: None,
+            visibility_json: None,
+        },
+    )?;
+
+    let make_contact = |ctx: &ReducerContext, fixture: &OrgFixture, name: &str| -> Result<u64, String> {
+        create_contact(
+            ctx,
+            fixture.organization_id,
+            CreateContactParams {
+                name: name.to_string(),
+                type_: "contact".to_string(),
+                email: None,
+                phone: None,
+                mobile: None,
+                company_id: Some(fixture.company_id),
+                is_customer: true,
+                is_vendor: false,
+                is_employee: false,
+                is_prospect: false,
+                is_partner: false,
+                customer_rank: 0,
+                supplier_rank: 0,
+                display_name: None,
+                first_name: None,
+                last_name: None,
+                title: None,
+                email_secondary: None,
+                fax: None,
+                website: None,
+                street: None,
+                street2: None,
+                city: None,
+                state_code: None,
+                zip: None,
+                country_code: None,
+                tax_id: None,
+                company_registry: None,
+                industry: None,
+                employees_count: None,
+                annual_revenue: None,
+                description: None,
+                salesperson_id: None,
+                assigned_user_id: None,
+                parent_id: None,
+                user_id: None,
+                color: None,
+                metadata: None,
+            },
+        )?;
+        ctx.db
+            .contact()
+            .iter()
+            .find(|c| c.organization_id == fixture.organization_id && c.name == name)
+            .map(|c| c.id)
+            .ok_or_else(|| format!("contact {name} missing after create"))
+    };
+
+    let foreign_contact_id = make_contact(ctx, &foreign, "FRM-002 Foreign Contact")?;
+    let missing_contact_id = ctx.db.contact().iter().map(|c| c.id).max().unwrap_or(0) + 1000;
+
+    if set_eav(ctx, local.organization_id, local.company_id, missing_contact_id).is_ok() {
+        return Err("missing contact record_id should be rejected".to_string());
+    }
+    if set_eav(ctx, local.organization_id, local.company_id, foreign_contact_id).is_ok() {
+        return Err("cross-org contact record_id should be rejected".to_string());
+    }
+
+    let local_contact_id = make_contact(ctx, &local, "FRM-002 Local Contact")?;
+    set_eav(ctx, local.organization_id, local.company_id, local_contact_id)?;
+    if !ctx.db.record_custom_field_value().iter().any(|r| {
+        r.organization_id == local.organization_id
+            && r.model == "contact"
+            && r.record_id == local_contact_id
+    }) {
+        return Err("valid contact EAV write was not persisted".to_string());
     }
 
     Ok(())

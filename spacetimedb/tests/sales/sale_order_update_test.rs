@@ -27,6 +27,7 @@ pub fn test_draft_sale_order_update(ctx: &ReducerContext) -> Result<(), String> 
         ctx,
         org_id,
         CreatePricelistParams {
+            company_id: None,
             name: "Harness Update Pricelist".to_string(),
             currency_id: 1,
             discount_policy: DiscountPolicy::WithDiscount,
