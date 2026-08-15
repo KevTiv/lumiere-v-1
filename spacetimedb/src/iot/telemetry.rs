@@ -125,7 +125,7 @@ pub fn record_telemetry(
 
         // Quality check measurement auto-fill (calipers / scales linked to a check)
         if let Some(check_id) = device.quality_check_id {
-            apply_measurement_to_quality_check(ctx, check_id, params.value);
+            apply_measurement_to_quality_check(ctx, device.organization_id, check_id, params.value);
         }
 
         // Footswitch → advance the active workorder step
@@ -133,7 +133,7 @@ pub fn record_telemetry(
             && params.sensor_type == "trigger"
             && device.workcenter_id.is_some()
         {
-            trigger_footswitch_workorder(ctx, device.workcenter_id.unwrap());
+            trigger_footswitch_workorder(ctx, device.organization_id, device.workcenter_id.unwrap());
         }
     }
 
@@ -309,8 +309,16 @@ fn check_thresholds(
 
 /// Auto-fill QualityCheck.measure with a device reading.
 /// Called inline from record_telemetry when device.quality_check_id is set.
-fn apply_measurement_to_quality_check(ctx: &ReducerContext, check_id: u64, value: f64) {
+fn apply_measurement_to_quality_check(ctx: &ReducerContext, device_org_id: u64, check_id: u64, value: f64) {
     if let Some(check) = ctx.db.quality_check().id().find(&check_id) {
+        // IOT-005: Reject cross-org measurement injection.
+        if check.organization_id != device_org_id {
+            log::warn!(
+                "Telemetry ignored: quality check {} org {} does not match device org {}",
+                check_id, check.organization_id, device_org_id
+            );
+            return;
+        }
         // Determine pass/fail against tolerance bounds
         let success = match (check.tolerance_min, check.tolerance_max) {
             (Some(min), Some(max)) => {
@@ -355,13 +363,13 @@ fn apply_measurement_to_quality_check(ctx: &ReducerContext, check_id: u64, value
 
 /// Advance the active workorder at a workcenter when a footswitch is triggered.
 /// Marks the currently in-progress workorder step as done.
-fn trigger_footswitch_workorder(ctx: &ReducerContext, workcenter_id: u64) {
-    // Find the first workorder in Progress at this workcenter
+fn trigger_footswitch_workorder(ctx: &ReducerContext, device_org_id: u64, workcenter_id: u64) {
+    // IOT-006: Find the first workorder in Progress at this workcenter, scoped to device org.
     let active = ctx
         .db
         .mrp_workorder()
         .iter()
-        .find(|wo| wo.workcenter_id == workcenter_id && wo.state == WorkorderState::Progress);
+        .find(|wo| wo.workcenter_id == workcenter_id && wo.state == WorkorderState::Progress && wo.organization_id == device_org_id);
 
     if let Some(wo) = active {
         ctx.db.mrp_workorder().id().update(MrpWorkorder {

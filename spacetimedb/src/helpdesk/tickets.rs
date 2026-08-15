@@ -8,6 +8,51 @@ use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{HelpdeskTicketState, TicketPriority};
 
+// ── FK helpers ────────────────────────────────────────────────────────────────
+
+/// HLP-001: Require a helpdesk team exists and belongs to the org.
+fn require_helpdesk_team(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    team_id: u64,
+) -> Result<(), String> {
+    let team = ctx
+        .db
+        .helpdesk_team()
+        .id()
+        .find(&team_id)
+        .ok_or_else(|| format!("Helpdesk team {} not found", team_id))?;
+    if team.organization_id != organization_id {
+        return Err("Helpdesk team does not belong to this organization".to_string());
+    }
+    Ok(())
+}
+
+/// HLP-002: Require a helpdesk stage exists and (when team-scoped) matches.
+fn require_helpdesk_stage(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    stage_id: u64,
+    team_id: Option<u64>,
+) -> Result<(), String> {
+    let stage = ctx
+        .db
+        .helpdesk_stage()
+        .id()
+        .find(&stage_id)
+        .ok_or_else(|| format!("Helpdesk stage {} not found", stage_id))?;
+    if stage.organization_id != organization_id {
+        return Err("Helpdesk stage does not belong to this organization".to_string());
+    }
+    // When stage is team-scoped, it must match the given team (shared stages have team_id = None)
+    if let (Some(tid), Some(stage_team)) = (team_id, stage.team_id) {
+        if stage_team != tid {
+            return Err("Helpdesk stage does not belong to this team".to_string());
+        }
+    }
+    Ok(())
+}
+
 // ── Tables ────────────────────────────────────────────────────────────────────
 
 /// Helpdesk Team — A support group that handles tickets (e.g. "Technical Support").
@@ -243,6 +288,10 @@ pub fn create_helpdesk_sla(
     if params.name.is_empty() {
         return Err("SLA name cannot be empty".to_string());
     }
+    // HLP-001: validate team FK
+    require_helpdesk_team(ctx, organization_id, params.team_id)?;
+    // HLP-002: validate stage FK (must belong to org; also must be compatible with the team)
+    require_helpdesk_stage(ctx, organization_id, params.stage_id, Some(params.team_id))?;
     let sla = ctx.db.helpdesk_sla().insert(HelpdeskSLA {
         id: 0,
         organization_id,
@@ -391,6 +440,10 @@ pub fn update_ticket(
     if ticket.organization_id != organization_id {
         return Err("Ticket belongs to a different organization".to_string());
     }
+    // HLP-004: validate stage FK when changing stage
+    if let Some(sid) = params.stage_id {
+        require_helpdesk_stage(ctx, organization_id, sid, Some(ticket.team_id))?;
+    }
     ctx.db.helpdesk_ticket().id().update(HelpdeskTicket {
         name: params.name.unwrap_or(ticket.name),
         description: params.description.or(ticket.description),
@@ -431,6 +484,15 @@ pub fn assign_ticket(
         .ok_or("Ticket not found")?;
     if ticket.organization_id != organization_id {
         return Err("Ticket belongs to a different organization".to_string());
+    }
+    // HLP-003: validate agent_id is a known contact (user_id) in this org
+    let agent_known = ctx
+        .db
+        .contact()
+        .iter()
+        .any(|c| c.organization_id == organization_id && c.user_id == Some(agent_id));
+    if !agent_known {
+        return Err("Agent identity not found in this organization".to_string());
     }
     ctx.db.helpdesk_ticket().id().update(HelpdeskTicket {
         user_id: Some(agent_id),

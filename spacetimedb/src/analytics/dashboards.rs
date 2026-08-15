@@ -216,6 +216,7 @@ pub fn create_dashboard_widget(
 pub fn update_widget_layout(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: Option<u64>,
     widget_id: u64,
     params: UpdateWidgetLayoutParams,
 ) -> Result<(), String> {
@@ -230,6 +231,14 @@ pub fn update_widget_layout(
 
     if widget.organization_id != organization_id {
         return Err("Widget does not belong to this organization".to_string());
+    }
+
+    // ANL-003: when a widget is company-scoped, the caller must present matching scope
+    if let Some(widget_company) = widget.company_id {
+        match company_id {
+            Some(cid) if cid == widget_company => {}
+            _ => return Err("Company scope mismatch — provide the widget's company_id to update it".to_string()),
+        }
     }
 
     ctx.db.dashboard_widget().id().update(DashboardWidget {
@@ -345,6 +354,15 @@ pub fn add_widget_to_dashboard(
 
     if widget.organization_id != organization_id {
         return Err("Widget does not belong to this organization".to_string());
+    }
+
+    // ANL-001: when both dashboard and widget carry a company scope, they must match
+    if let (Some(dash_company), Some(widget_company)) = (dash.company_id, widget.company_id) {
+        if dash_company != widget_company {
+            return Err(
+                "Widget company does not match dashboard company — cross-company widget placement is not allowed".to_string(),
+            );
+        }
     }
 
     if dash.widget_ids.contains(&widget_id) {

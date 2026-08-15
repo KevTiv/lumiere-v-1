@@ -9,8 +9,16 @@ use std::collections::BTreeSet;
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::journal_entries::account_move;
+use crate::accounting::payment_management::payment_transaction;
+use crate::accounting::payments::account_payment;
+use crate::ai::action_drafts::ai_action_draft;
 use crate::core::organization::require_company_in_organization;
+use crate::expenses::expenses::expense_sheet;
 use crate::helpers::check_permission;
+use crate::hr::leaves::hr_leave;
+use crate::purchasing::purchase_orders::purchase_order;
+use crate::sales::sales_core::sale_order;
 use crate::workflow::branches::{
     join_is_ready, paired_join_key, record_join_arrival, select_fork_edges, workflow_fork,
     workflow_join_arrival, WorkflowFork,
@@ -379,6 +387,14 @@ pub(crate) fn start_workflow_internal(
     if definition.model != params.subject_model {
         return Err("workflow model does not match subject model".to_string());
     }
+
+    // WRK-001: Validate subject_id exists in the ERP table for this org
+    validate_subject_id_fk(
+        ctx,
+        organization_id,
+        &params.subject_model,
+        params.subject_id,
+    )?;
 
     let version = ctx
         .db
@@ -1450,6 +1466,89 @@ fn validate_command_key(value: &str, field: &str) -> Result<(), String> {
     validate_required(value, field)?;
     if value.len() > MAX_KEY_LEN {
         return Err(format!("{field} exceeds {MAX_KEY_LEN} bytes"));
+    }
+    Ok(())
+}
+
+/// WRK-001: Validate that subject_id exists in the ERP table named by subject_model
+/// and belongs to the caller's organization.
+fn validate_subject_id_fk(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    subject_model: &str,
+    subject_id: u64,
+) -> Result<(), String> {
+    let belongs = match subject_model {
+        "purchase_order" => ctx
+            .db
+            .purchase_order()
+            .id()
+            .find(&subject_id)
+            .map(|r| r.organization_id == organization_id)
+            .unwrap_or(false),
+        "sale_order" => ctx
+            .db
+            .sale_order()
+            .id()
+            .find(&subject_id)
+            .map(|r| r.organization_id == organization_id)
+            .unwrap_or(false),
+        "account_move" => ctx
+            .db
+            .account_move()
+            .id()
+            .find(&subject_id)
+            .map(|r| r.organization_id == organization_id)
+            .unwrap_or(false),
+        "account_payment" => ctx
+            .db
+            .account_payment()
+            .id()
+            .find(&subject_id)
+            .map(|r| r.organization_id == organization_id)
+            .unwrap_or(false),
+        "hr_expense_sheet" => ctx
+            .db
+            .expense_sheet()
+            .id()
+            .find(&subject_id)
+            .map(|r| r.organization_id == organization_id)
+            .unwrap_or(false),
+        "ai_action_draft" => ctx
+            .db
+            .ai_action_draft()
+            .id()
+            .find(&subject_id)
+            .map(|r| r.organization_id == organization_id)
+            .unwrap_or(false),
+        "hr_leave" => ctx
+            .db
+            .hr_leave()
+            .id()
+            .find(&subject_id)
+            .map(|r| r.organization_id == organization_id)
+            .unwrap_or(false),
+        "payment_transaction" => ctx
+            .db
+            .payment_transaction()
+            .id()
+            .find(&subject_id)
+            .map(|r| r.organization_id == organization_id)
+            .unwrap_or(false),
+        // Unknown model — reject rather than silently accept
+        other => {
+            return Err(format!(
+                "subject_model '{}' is not a recognized ERP model for workflow subjects",
+                other
+            ))
+        }
+    };
+
+    if !belongs {
+        return Err(format!(
+            "subject_id {} not found in '{}' for this organization",
+            subject_id, subject_model
+        ));
     }
     Ok(())
 }

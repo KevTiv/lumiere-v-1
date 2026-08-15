@@ -771,6 +771,16 @@ pub fn create_expense(
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     require_active_currency_by_id(ctx, params.currency_id)?;
+    // EXP-002: Validate employee_id FK.
+    let _emp = ctx
+        .db
+        .hr_employee()
+        .id()
+        .find(&params.employee_id)
+        .ok_or("Employee not found")?;
+    if _emp.organization_id != organization_id || _emp.company_id != company_id {
+        return Err("Employee does not belong to this company".to_string());
+    }
 
     if let Some(ref req) = params.client_request_id {
         if !req.is_empty()
@@ -1439,6 +1449,16 @@ pub fn create_expense_sheet(
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     require_active_currency_by_id(ctx, params.currency_id)?;
+    // EXP-002: Validate employee_id FK.
+    let _emp = ctx
+        .db
+        .hr_employee()
+        .id()
+        .find(&params.employee_id)
+        .ok_or("Employee not found")?;
+    if _emp.organization_id != organization_id || _emp.company_id != company_id {
+        return Err("Employee does not belong to this company".to_string());
+    }
 
     if params.name.is_empty() {
         return Err("Expense sheet name cannot be empty".to_string());
@@ -1656,6 +1676,16 @@ pub fn approve_expense_sheet_impl(
         .ok_or("Expense sheet not found")?;
     if sheet.organization_id != organization_id {
         return Err("Expense sheet belongs to a different organization".to_string());
+    }
+    // EXP-007: Validate that the approver identity is an active hr_employee in this org.
+    let is_org_employee = ctx
+        .db
+        .hr_employee()
+        .employee_by_org()
+        .filter(&organization_id)
+        .any(|e| e.user_id == Some(ctx.sender()));
+    if !is_org_employee {
+        return Err("Approver must be an employee of this organization".to_string());
     }
     if sheet.state != ExpenseSheetState::Submitted {
         return Err("Only submitted sheets can be approved".to_string());

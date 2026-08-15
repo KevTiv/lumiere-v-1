@@ -242,6 +242,10 @@ pub struct SubscriptionLine {
     pub line_is_upgrade: bool,
     pub line_is_downgrade: bool,
 
+    /// Reference to the originating sale order line; used to re-validate
+    /// prices at invoice time (SUB-006).
+    pub sale_order_line_id: Option<u64>,
+
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
     pub metadata: String,

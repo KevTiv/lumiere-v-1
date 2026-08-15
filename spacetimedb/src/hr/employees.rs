@@ -5,6 +5,40 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+
+// ── HR-003/004 helpers ────────────────────────────────────────────────────────
+
+/// HR-003: Validate that setting `new_parent_id` for `dept_id` would not create
+/// a cycle in the department hierarchy. Walks the parent chain (BFS) up to 100
+/// hops — anything deeper is treated as a cycle to prevent infinite loops.
+fn validate_department_no_cycle(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    dept_id: u64,
+    new_parent_id: u64,
+) -> Result<(), String> {
+    if new_parent_id == dept_id {
+        return Err("A department cannot be its own parent".to_string());
+    }
+    let mut current = new_parent_id;
+    for _ in 0..100 {
+        let parent = match ctx.db.hr_department().id().find(&current) {
+            Some(d) => d,
+            None => break, // dangling parent → chain ends, no cycle
+        };
+        if parent.organization_id != organization_id {
+            return Err("Parent department belongs to a different organization".to_string());
+        }
+        match parent.parent_id {
+            None => break,
+            Some(grand) if grand == dept_id => {
+                return Err("Setting this parent would create a department hierarchy cycle".to_string());
+            }
+            Some(grand) => current = grand,
+        }
+    }
+    Ok(())
+}
 use crate::hr::offboarding::{assert_offboarding_ready_for_archive, ArchiveEmployeeParams};
 use crate::hr::pii::employee_audit_json;
 use crate::types::EmploymentType;
@@ -231,6 +265,23 @@ pub fn create_department(
     if params.name.is_empty() {
         return Err("Department name cannot be empty".to_string());
     }
+    // HR-004: Validate manager_id FK.
+    if let Some(mid) = params.manager_id {
+        let mgr = ctx.db.hr_employee().id().find(&mid)
+            .ok_or("Manager employee not found")?;
+        if mgr.organization_id != organization_id {
+            return Err("Manager does not belong to this organization".to_string());
+        }
+    }
+    // HR-003: Validate parent_id FK (cycle detection deferred — new dept has no id yet,
+    // so only validate existence and org match on create; cycles impossible for new rows).
+    if let Some(pid) = params.parent_id {
+        let parent = ctx.db.hr_department().id().find(&pid)
+            .ok_or("Parent department not found")?;
+        if parent.organization_id != organization_id {
+            return Err("Parent department belongs to a different organization".to_string());
+        }
+    }
     let dept = ctx.db.hr_department().insert(HrDepartment {
         id: 0,
         organization_id,
@@ -281,6 +332,18 @@ pub fn update_department(
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     if dept.company_id != company_id {
         return Err("Department does not belong to this company".to_string());
+    }
+    // HR-004: Validate manager_id FK on update.
+    if let Some(mid) = params.manager_id {
+        let mgr = ctx.db.hr_employee().id().find(&mid)
+            .ok_or("Manager employee not found")?;
+        if mgr.organization_id != organization_id {
+            return Err("Manager does not belong to this organization".to_string());
+        }
+    }
+    // HR-003: Validate parent_id FK + cycle detection on update.
+    if let Some(pid) = params.parent_id {
+        validate_department_no_cycle(ctx, organization_id, department_id, pid)?;
     }
     ctx.db.hr_department().id().update(HrDepartment {
         name: params.name.unwrap_or(dept.name),

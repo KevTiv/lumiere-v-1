@@ -187,6 +187,83 @@ pub struct UpdateTaskParams {
     pub metadata: Option<Option<String>>,
 }
 
+/// PRJ-001: Validate that dependency task IDs exist, belong to the same org/project,
+/// and (when updating an existing task) introduce no dependency cycle.
+///
+/// * `task_id` — `Some(id)` when updating an existing task; `None` on create (cycle impossible).
+/// * `project_id` — the project both the caller task and its deps must share (when set).
+fn validate_task_dependencies(
+    ctx: &ReducerContext,
+    task_id: Option<u64>,
+    project_id: Option<u64>,
+    organization_id: u64,
+    depend_on_ids: &[u64],
+) -> Result<(), String> {
+    for &dep_id in depend_on_ids {
+        // Self-dependency is always a cycle
+        if let Some(tid) = task_id {
+            if dep_id == tid {
+                return Err(format!("Task {} cannot depend on itself", tid));
+            }
+        }
+        let dep_task = ctx
+            .db
+            .project_task()
+            .id()
+            .find(&dep_id)
+            .ok_or_else(|| format!("Dependency task {} not found", dep_id))?;
+        if dep_task.organization_id != organization_id {
+            return Err(format!(
+                "Dependency task {} belongs to a different organization",
+                dep_id
+            ));
+        }
+        // Both tasks must share the same project when projects are set
+        if let (Some(task_proj), Some(dep_proj)) = (project_id, dep_task.project_id) {
+            if task_proj != dep_proj {
+                return Err(format!(
+                    "Dependency task {} belongs to a different project",
+                    dep_id
+                ));
+            }
+        }
+    }
+
+    // Cycle detection — only meaningful when updating an existing task.
+    // BFS from each dependency; if we reach `task_id`, there is a cycle.
+    if let Some(tid) = task_id {
+        let mut visited: std::collections::HashSet<u64> = std::collections::HashSet::new();
+        let mut queue: std::collections::VecDeque<u64> = depend_on_ids.iter().copied().collect();
+        let mut hops: u32 = 0;
+        while let Some(current) = queue.pop_front() {
+            hops += 1;
+            // Safety cap — dependency chains beyond 200 hops are treated as pathological
+            if hops > 200 {
+                break;
+            }
+            if current == tid {
+                return Err(
+                    "Circular dependency detected: this dependency would create a cycle"
+                        .to_string(),
+                );
+            }
+            if visited.contains(&current) {
+                continue;
+            }
+            visited.insert(current);
+            if let Some(dep) = ctx.db.project_task().id().find(&current) {
+                for &next in &dep.depend_on_ids {
+                    if !visited.contains(&next) {
+                        queue.push_back(next);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn timestamp_to_json(timestamp: Option<Timestamp>) -> Value {
     match timestamp {
         Some(ts) => Value::String(
@@ -442,6 +519,17 @@ pub fn create_task(
         params.project_id,
         params.milestone_id,
     )?;
+
+    // PRJ-001: validate dependency FKs (cycle detection not needed on create — no ID yet)
+    if !params.depend_on_ids.is_empty() {
+        validate_task_dependencies(
+            ctx,
+            None, // no existing id yet
+            params.project_id,
+            organization_id,
+            &params.depend_on_ids,
+        )?;
+    }
 
     let task = ctx.db.project_task().insert(ProjectTask {
         id: 0,
@@ -1026,6 +1114,14 @@ pub fn update_task(
     }
 
     if let Some(depend_on_ids) = params.depend_on_ids {
+        // PRJ-001: validate FK existence + project scope + no cycle
+        validate_task_dependencies(
+            ctx,
+            Some(task_id),
+            task.project_id,
+            organization_id,
+            &depend_on_ids,
+        )?;
         task.depend_on_ids = depend_on_ids;
         changed_fields.push("depend_on_ids".to_string());
     }

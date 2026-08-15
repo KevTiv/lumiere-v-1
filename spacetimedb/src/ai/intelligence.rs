@@ -15,35 +15,23 @@ use crate::documents::pack_locale::{document_search_language_for_company, trunca
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{InsightSeverity, JobStatus};
 
-fn ensure_insight_in_org(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    insight_company_id: Option<u64>,
-) -> Result<(), String> {
-    if let Some(cid) = insight_company_id {
-        require_company_in_organization(ctx, organization_id, cid)?;
+fn ensure_insight_in_org(organization_id: u64, insight_org_id: u64) -> Result<(), String> {
+    if insight_org_id != organization_id {
+        return Err("Insight does not belong to this organization".to_string());
     }
     Ok(())
 }
 
-fn ensure_doc_job_in_org(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    job_company_id: Option<u64>,
-) -> Result<(), String> {
-    if let Some(cid) = job_company_id {
-        require_company_in_organization(ctx, organization_id, cid)?;
+fn ensure_doc_job_in_org(organization_id: u64, job_org_id: u64) -> Result<(), String> {
+    if job_org_id != organization_id {
+        return Err("Processing job does not belong to this organization".to_string());
     }
     Ok(())
 }
 
-fn ensure_embedding_in_org(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    embedding_company_id: Option<u64>,
-) -> Result<(), String> {
-    if let Some(cid) = embedding_company_id {
-        require_company_in_organization(ctx, organization_id, cid)?;
+fn ensure_embedding_in_org(organization_id: u64, embedding_org_id: u64) -> Result<(), String> {
+    if embedding_org_id != organization_id {
+        return Err("Embedding does not belong to this organization".to_string());
     }
     Ok(())
 }
@@ -118,6 +106,7 @@ pub struct UpsertSearchEmbeddingParams {
 #[spacetimedb::table(
     accessor = ai_insight,
     public,
+    index(accessor = insight_by_org, btree(columns = [organization_id])),
     index(accessor = insight_by_model, btree(columns = [related_model])),
     index(accessor = insight_by_company, btree(columns = [company_id]))
 )]
@@ -126,6 +115,7 @@ pub struct AiInsight {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64, // AI-001: Tenant isolation
     pub severity: InsightSeverity,
     pub title: String,
     pub description: String,
@@ -159,6 +149,7 @@ pub struct AiInsight {
     accessor = ai_document_processing_job,
     public,
     index(name = "by_status", accessor = doc_job_by_status, btree(columns = [status])),
+    index(accessor = doc_job_by_org, btree(columns = [organization_id])),
     index(accessor = doc_job_by_company, btree(columns = [company_id]))
 )]
 pub struct AiDocumentProcessingJob {
@@ -166,6 +157,7 @@ pub struct AiDocumentProcessingJob {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64, // AI-002: Tenant isolation
     pub document_type: String, // Invoice, Receipt, Contract, etc.
     pub job_type: String,      // OCR, Extraction, Classification, Analysis
     pub status: JobStatus,
@@ -199,6 +191,7 @@ pub struct AiDocumentProcessingJob {
     accessor = search_embedding,
     public,
     index(name = "by_content", accessor = embedding_by_content, btree(columns = [content_type])),
+    index(accessor = embedding_by_org, btree(columns = [organization_id])),
     index(accessor = embedding_by_company, btree(columns = [company_id])),
     index(name = "by_sync_status", accessor = embedding_by_sync_status, btree(columns = [sync_status]))
 )]
@@ -207,6 +200,7 @@ pub struct SearchEmbedding {
     #[auto_inc]
     pub id: u64,
 
+    pub organization_id: u64, // AI-003: Tenant isolation
     pub content_type: String, // product, contact, document, article, etc.
     pub content_id: u64,
     pub text: String,                   // Original text that was embedded
@@ -251,6 +245,7 @@ pub fn create_ai_insight(
     let stored_company_id = Some(operating_company_id);
     let insight = ctx.db.ai_insight().insert(AiInsight {
         id: 0,
+        organization_id,
         severity: params.severity,
         title: params.title,
         description: params.description,
@@ -324,7 +319,7 @@ pub fn acknowledge_insight(
         .find(&insight_id)
         .ok_or("Insight not found")?;
 
-    ensure_insight_in_org(ctx, organization_id, insight.company_id)?;
+    ensure_insight_in_org(organization_id, insight.organization_id)?;
     if let (Some(scope_company_id), Some(row_company_id)) = (company_id, insight.company_id) {
         if scope_company_id != row_company_id {
             return Err("company_id does not match insight scope".to_string());
@@ -384,7 +379,7 @@ pub fn dismiss_insight(
         .find(&insight_id)
         .ok_or("Insight not found")?;
 
-    ensure_insight_in_org(ctx, organization_id, insight.company_id)?;
+    ensure_insight_in_org(organization_id, insight.organization_id)?;
     if let (Some(scope_company_id), Some(row_company_id)) = (company_id, insight.company_id) {
         if scope_company_id != row_company_id {
             return Err("company_id does not match insight scope".to_string());
@@ -463,6 +458,7 @@ pub fn create_document_processing_job(
         .ai_document_processing_job()
         .insert(AiDocumentProcessingJob {
             id: 0,
+            organization_id,
             document_type: params.document_type,
             job_type: params.job_type,
             // System-managed: new jobs always start as Pending
@@ -537,7 +533,7 @@ pub fn complete_document_processing_job(
         .find(&job_id)
         .ok_or("Processing job not found")?;
 
-    ensure_doc_job_in_org(ctx, organization_id, job.company_id)?;
+    ensure_doc_job_in_org(organization_id, job.organization_id)?;
     if let (Some(scope_company_id), Some(row_company_id)) = (company_id, job.company_id) {
         if scope_company_id != row_company_id {
             return Err("company_id does not match processing job scope".to_string());
@@ -607,7 +603,7 @@ pub fn approve_document_processing_job(
         .find(&job_id)
         .ok_or("Processing job not found")?;
 
-    ensure_doc_job_in_org(ctx, organization_id, job.company_id)?;
+    ensure_doc_job_in_org(organization_id, job.organization_id)?;
     if let (Some(scope_company_id), Some(row_company_id)) = (company_id, job.company_id) {
         if scope_company_id != row_company_id {
             return Err("company_id does not match processing job scope".to_string());
@@ -729,7 +725,7 @@ pub fn upsert_search_embedding(
         .find(|e| e.content_id == params.content_id && e.company_id == stored_company_id);
 
     if let Some(existing) = existing {
-        ensure_embedding_in_org(ctx, organization_id, existing.company_id)?;
+        ensure_embedding_in_org(organization_id, existing.organization_id)?;
         // Reset sync_status to "pending" so the gateway re-indexes the updated content
         ctx.db.search_embedding().id().update(SearchEmbedding {
             text: params.text,
@@ -750,6 +746,7 @@ pub fn upsert_search_embedding(
     } else {
         ctx.db.search_embedding().insert(SearchEmbedding {
             id: 0,
+            organization_id,
             content_type: params.content_type.clone(),
             content_id: params.content_id,
             text: params.text,
@@ -801,7 +798,7 @@ pub fn mark_embedding_synced(
         .find(&embedding_id)
         .ok_or("Embedding not found")?;
 
-    ensure_embedding_in_org(ctx, organization_id, existing.company_id)?;
+    ensure_embedding_in_org(organization_id, existing.organization_id)?;
     if let (Some(scope_company_id), Some(row_company_id)) = (company_id, existing.company_id) {
         if scope_company_id != row_company_id {
             return Err("company_id does not match embedding scope".to_string());
@@ -846,7 +843,7 @@ pub fn delete_search_embedding(
         .find(|e| e.content_id == content_id && e.company_id == stored_company_id)
         .ok_or("Embedding not found for this content")?;
 
-    ensure_embedding_in_org(ctx, organization_id, existing.company_id)?;
+    ensure_embedding_in_org(organization_id, existing.organization_id)?;
 
     ctx.db.search_embedding().id().update(SearchEmbedding {
         sync_status: "deleted".to_string(),

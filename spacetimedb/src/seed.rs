@@ -6614,6 +6614,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         line_is_gift: false,
         line_is_upgrade: false,
         line_is_downgrade: false,
+        sale_order_line_id: None, // seed data has no originating SO line
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         metadata: "{\"seed\":true}".to_string(),
@@ -8633,6 +8634,7 @@ Prioritize high-severity findings and cite related records."#,
 
     ctx.db.ai_insight().insert(AiInsight {
         id: 0,
+        organization_id: org_id,
         severity: InsightSeverity::Medium,
         title: "Proposal cycle time slipping".to_string(),
         description: "Recent proposal drafts are taking longer than target.".to_string(),
@@ -8663,6 +8665,7 @@ Prioritize high-severity findings and cite related records."#,
         .ai_document_processing_job()
         .insert(AiDocumentProcessingJob {
             id: 0,
+            organization_id: org_id,
             document_type: "contract".to_string(),
             job_type: "classification".to_string(),
             status: JobStatus::Completed,
@@ -8690,6 +8693,7 @@ Prioritize high-severity findings and cite related records."#,
         });
     ctx.db.search_embedding().insert(SearchEmbedding {
         id: 0,
+        organization_id: org_id,
         content_type: "document".to_string(),
         content_id: folder_contracts.id,
         text: "Master services agreement and pricing schedule".to_string(),

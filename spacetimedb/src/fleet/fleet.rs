@@ -10,6 +10,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::warehouse::warehouse;
 
 // ============================================================================
 // ENUMS
@@ -339,12 +340,18 @@ pub fn update_vehicle_position(
 pub fn create_pos_terminal(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: Option<u64>,
     name: String,
     location_label: Option<String>,
     latitude: Option<f64>,
     longitude: Option<f64>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "pos_terminal", "create")?;
+
+    // FLT-001: validate company belongs to this organization when provided
+    if let Some(cid) = company_id {
+        require_company_in_organization(ctx, organization_id, cid)?;
+    }
 
     let row = ctx.db.pos_terminal().insert(PosTerminal {
         id: 0,
@@ -357,7 +364,7 @@ pub fn create_pos_terminal(
         daily_revenue: 0.0,
         open_orders: 0,
         currency_id: None,
-        company_id: None,
+        company_id,
         create_uid: ctx.sender(),
         create_date: ctx.timestamp,
         write_uid: ctx.sender(),
@@ -369,13 +376,13 @@ pub fn create_pos_terminal(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id,
             table_name: "pos_terminal",
             record_id: row.id,
             action: "CREATE",
             old_values: None,
-            new_values: Some(serde_json::json!({ "name": row.name }).to_string()),
-            changed_fields: vec!["name".to_string()],
+            new_values: Some(serde_json::json!({ "name": row.name, "company_id": company_id }).to_string()),
+            changed_fields: vec!["name".to_string(), "company_id".to_string()],
             metadata: None,
         },
     );
@@ -444,6 +451,17 @@ pub fn upsert_warehouse_geo(
     manager_name: Option<String>,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "warehouse_geo", "write")?;
+
+    // FLT-002: validate warehouse exists and belongs to this organization
+    let wh = ctx
+        .db
+        .warehouse()
+        .id()
+        .find(&warehouse_id)
+        .ok_or_else(|| format!("Warehouse {} not found", warehouse_id))?;
+    if wh.organization_id != organization_id {
+        return Err("Warehouse does not belong to this organization".to_string());
+    }
 
     // Find existing geo record for this warehouse
     let existing = ctx

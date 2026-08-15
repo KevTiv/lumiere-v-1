@@ -106,5 +106,11 @@ pub fn run_all_purchasing_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_purchasing_wave_e_test(ctx)?;
     run_purchasing_lot_receive_test(ctx)?;
     run_purchasing_phase0_containment_test(ctx)?;
+    run_purchasing_phase0_fixture_test(ctx)?;
+    run_purchasing_phase1_landed_costs_test(ctx)?;
+    run_purchasing_phase1_relational_integrity_test(ctx)?;
+    run_purchasing_phase1_purchase_orders_test(ctx)?;
+    run_purchasing_phase1_returns_advanced_test(ctx)?;
+    run_purchasing_phase2_blanket_release_test(ctx)?;
     Ok(())
 }

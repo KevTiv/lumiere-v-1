@@ -1121,6 +1121,7 @@ pub fn apply_subscription_bundle(
                     line_is_gift: false,
                     line_is_upgrade: false,
                     line_is_downgrade: false,
+                    sale_order_line_id: None, // bundle-added lines have no SO origin
                     created_at: ctx.timestamp,
                     updated_at: ctx.timestamp,
                     metadata: serde_json::json!({

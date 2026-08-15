@@ -15,6 +15,7 @@ use crate::accounting::journal_entries::{
 use crate::core::country_pack::company_enabled_pack_keys;
 use crate::core::organization::{company, company_id_from_scope};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::hr::contracts::hr_contract;
 use crate::types::{AccountMoveState, MoveType, PaymentState, PayslipState};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
@@ -572,6 +573,34 @@ pub fn create_payslip(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_payroll", "create")?;
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+
+    // HR-001: validate contract_id FK when provided
+    if let Some(cid) = params.contract_id {
+        let contract = ctx
+            .db
+            .hr_contract()
+            .id()
+            .find(&cid)
+            .ok_or_else(|| format!("Contract {} not found", cid))?;
+        if contract.organization_id != organization_id {
+            return Err("Contract does not belong to this organization".to_string());
+        }
+        if contract.company_id != company_id {
+            return Err("Contract does not belong to this company".to_string());
+        }
+    }
+
+    // HR-002: validate payroll structure FK
+    let payroll_struct = ctx
+        .db
+        .hr_payroll_structure()
+        .id()
+        .find(&params.struct_id)
+        .ok_or_else(|| format!("Payroll structure {} not found", params.struct_id))?;
+    if payroll_struct.organization_id != organization_id {
+        return Err("Payroll structure does not belong to this organization".to_string());
+    }
+
     let payslip = ctx.db.hr_payslip().insert(HrPayslip {
         id: 0,
         organization_id,

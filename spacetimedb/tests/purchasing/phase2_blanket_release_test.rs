@@ -15,6 +15,43 @@ use crate::purchasing::purchase_orders::{purchase_order, purchase_order_line};
 use crate::purchasing::PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG;
 use crate::test_harness::{PurchasingIntegrityFixture, PurchasingIntegrityScope};
 
+fn enable_blanket_release(ctx: &ReducerContext, organization_id: u64, metadata: &str) {
+    match ctx
+        .db
+        .organization_settings()
+        .organization_id()
+        .find(&organization_id)
+    {
+        Some(settings) => {
+            let mut feature_flags = settings.feature_flags.clone();
+            if !feature_flags
+                .iter()
+                .any(|flag| flag == PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG)
+            {
+                feature_flags.push(PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG.to_string());
+            }
+            ctx.db
+                .organization_settings()
+                .organization_id()
+                .update(OrganizationSettings {
+                    feature_flags,
+                    updated_at: ctx.timestamp,
+                    ..settings
+                });
+        }
+        None => {
+            ctx.db.organization_settings().insert(OrganizationSettings {
+                organization_id,
+                module_config: None,
+                feature_flags: vec![PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG.to_string()],
+                integration_keys: None,
+                updated_at: ctx.timestamp,
+                metadata: Some(metadata.to_string()),
+            });
+        }
+    }
+}
+
 fn create_windowed_blanket(
     ctx: &ReducerContext,
     scope: &PurchasingIntegrityScope,
@@ -46,7 +83,11 @@ fn create_windowed_blanket(
         .db
         .purchase_blanket_order()
         .iter()
-        .find(|row| row.name == name)
+        .find(|row| {
+            row.organization_id == scope.organization_id
+                && row.company_id == scope.company_id
+                && row.name == name
+        })
         .ok_or("windowed blanket order was not persisted")?;
     let line = ctx
         .db
@@ -61,14 +102,11 @@ fn create_windowed_blanket(
 pub fn test_blanket_release_effective_window(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = PurchasingIntegrityFixture::seed(ctx)?;
     let scope = &fixture.primary;
-    ctx.db.organization_settings().insert(OrganizationSettings {
-        organization_id: scope.organization_id,
-        module_config: None,
-        feature_flags: vec![PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG.to_string()],
-        integration_keys: None,
-        updated_at: ctx.timestamp,
-        metadata: Some(r#"{"test":"purchasing-phase2-blanket-window"}"#.to_string()),
-    });
+    enable_blanket_release(
+        ctx,
+        scope.organization_id,
+        r#"{"test":"purchasing-phase2-blanket-window"}"#,
+    );
 
     let (inclusive_blanket_id, inclusive_line_id) = create_windowed_blanket(
         ctx,
@@ -154,14 +192,11 @@ pub fn test_blanket_release_effective_window(ctx: &ReducerContext) -> Result<(),
 pub fn test_blanket_release_lines_bounds_and_retry(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = PurchasingIntegrityFixture::seed(ctx)?;
     let scope = &fixture.primary;
-    ctx.db.organization_settings().insert(OrganizationSettings {
-        organization_id: scope.organization_id,
-        module_config: None,
-        feature_flags: vec![PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG.to_string()],
-        integration_keys: None,
-        updated_at: ctx.timestamp,
-        metadata: Some(r#"{"test":"purchasing-phase2-blanket"}"#.to_string()),
-    });
+    enable_blanket_release(
+        ctx,
+        scope.organization_id,
+        r#"{"test":"purchasing-phase2-blanket"}"#,
+    );
 
     create_purchase_blanket_order(
         ctx,
@@ -187,7 +222,11 @@ pub fn test_blanket_release_lines_bounds_and_retry(ctx: &ReducerContext) -> Resu
         .db
         .purchase_blanket_order()
         .iter()
-        .find(|row| row.name == "Distinctive cartons agreement")
+        .find(|row| {
+            row.organization_id == scope.organization_id
+                && row.company_id == scope.company_id
+                && row.name == "Distinctive cartons agreement"
+        })
         .ok_or("blanket order was not persisted")?;
     let line = ctx
         .db

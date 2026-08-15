@@ -6,7 +6,8 @@ use crate::accounting::journal_entries::{
     account_move, account_move_line, AccountMove, AccountMoveLine,
 };
 use crate::accounting::relations::{require_active_account, require_active_journal};
-use crate::core::organization::company;
+use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
+use crate::core::organization::{company, require_company_in_organization};
 use crate::core::reference::require_active_currency_by_id;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::inventory::stock::stock_quant;
@@ -421,6 +422,7 @@ pub fn create_inventory_close(
     params: CreateInventoryCloseParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "stock_quant", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
     if params.name.trim().is_empty() {
         return Err("Close name cannot be empty".to_string());
     }
@@ -637,6 +639,8 @@ pub fn reopen_inventory_close(
     if close.account_move_id.is_some() {
         return Err("Cannot reopen: GL valuation move exists — reverse it first through the accounting module".to_string());
     }
+    // INV-007: reject if the close period falls in a locked accounting period.
+    ensure_accounting_period_open_for_date(ctx, company_id, close.as_of)?;
 
     ctx.db.inventory_close().id().update(InventoryClose {
         locked: false,

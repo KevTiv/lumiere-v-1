@@ -7,9 +7,12 @@ use crate::accounting::journal_entries::{
     account_move, create_credit_note_from_invoice, insert_draft_account_move_line, AccountMove,
     CreateCreditNoteParams,
 };
+use crate::accounting::relations::{require_active_currency_id, require_active_journal};
 use crate::core::organization::company;
 use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::inventory::stock::require_product_in_org;
+use crate::subscriptions::reducers::validate_subscription_metadata;
 use crate::subscriptions::billing_helpers::{
     blank_line, calculate_next_date, normalize_payment_mode, normalize_plan_billing_period,
     normalize_rule_type, refresh_subscription_kpis, resolve_subscription_fx_rate,
@@ -440,6 +443,12 @@ pub fn amend_subscription(
 
     let new_subtotal = new_qty * new_price * (1.0 - new_discount / 100.0);
     let effective = params.effective_date.unwrap_or(ctx.timestamp);
+    // SUB-009: effective_date must not precede the subscription's start date.
+    if effective < subscription.date_start {
+        return Err(
+            "Amendment effective_date cannot be before the subscription start date".to_string(),
+        );
+    }
 
     let updated_line = SubscriptionLine {
         product_id: new_product,
@@ -1084,6 +1093,30 @@ pub fn update_subscription_plan(
     } else {
         None
     };
+
+    // SUB-008: Validate recurring_invoice_day ∈ [1, 28] when being updated.
+    if let Some(day) = params.recurring_invoice_day {
+        if day == 0 || day > 28 {
+            return Err(format!(
+                "recurring_invoice_day must be between 1 and 28 (got {})",
+                day
+            ));
+        }
+    }
+
+    // Validate FK fields when they are being updated
+    if let Some(currency_id) = params.currency_id {
+        require_active_currency_id(ctx, currency_id, "plan currency")?;
+    }
+    if let Some(journal_id) = params.journal_id {
+        require_active_journal(ctx, organization_id, company_id, journal_id, "plan journal")?;
+    }
+    if let Some(product_id) = params.product_id {
+        require_product_in_org(ctx, organization_id, product_id)?;
+    }
+    if let Some(ref meta) = params.metadata {
+        validate_subscription_metadata(meta)?;
+    }
 
     let old_name = plan.name.clone();
     ctx.db.subscription_plan().id().update(SubscriptionPlan {

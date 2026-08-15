@@ -17,8 +17,9 @@ use crate::inventory::stock::{
 use crate::manufacturing::bill_of_materials::mrp_bom_line;
 use crate::manufacturing::relations::{
     require_active_workcenter_in_company, require_bom_in_company,
-    require_product_for_manufacturing, require_routing_workcenter_in_company,
-    require_warehouse_for_manufacturing, validate_positive_duration, validate_positive_qty,
+    require_location_for_manufacturing, require_product_for_manufacturing,
+    require_routing_workcenter_in_company, require_warehouse_for_manufacturing,
+    validate_positive_duration, validate_positive_qty,
 };
 use crate::types::{ConsumptionMode, MoState, WorkorderState};
 use serde_json;
@@ -399,6 +400,31 @@ pub fn create_manufacturing_order(
         }
     }
 
+    // MFG-001: Validate location FKs
+    require_location_for_manufacturing(
+        ctx,
+        organization_id,
+        params.location_src_id,
+        "MO source location",
+    )?;
+    require_location_for_manufacturing(
+        ctx,
+        organization_id,
+        params.location_dest_id,
+        "MO destination location",
+    )?;
+
+    // MFG-003: Validate optional routing_id (MrpRoutingWorkcenter row)
+    if let Some(routing_id) = params.routing_id {
+        require_routing_workcenter_in_company(
+            ctx,
+            organization_id,
+            company_id,
+            routing_id,
+            "MO routing",
+        )?;
+    }
+
     let mo = ctx.db.mrp_production().insert(MrpProduction {
         id: 0,
         organization_id,
@@ -506,6 +532,26 @@ pub fn confirm_manufacturing_order(
 
     match mo.state {
         MoState::Draft => {
+            // MFG-005: Validate all workorder blocker FKs before confirming
+            let workorders: Vec<_> = ctx
+                .db
+                .mrp_workorder()
+                .mrp_workorder_by_production()
+                .filter(&mo_id)
+                .collect();
+            let wo_ids: std::collections::HashSet<u64> =
+                workorders.iter().map(|wo| wo.id).collect();
+            for wo in &workorders {
+                if let Some(blocker_id) = wo.blocked_by_workorder_id {
+                    if !wo_ids.contains(&blocker_id) {
+                        return Err(format!(
+                            "Workorder {} references blocker {} which does not belong to this MO",
+                            wo.id, blocker_id
+                        ));
+                    }
+                }
+            }
+
             ctx.db.mrp_production().id().update(MrpProduction {
                 state: MoState::Confirmed,
                 write_uid: ctx.sender(),
@@ -672,6 +718,12 @@ pub fn consume_mo_materials(
             "Manufacturing order must be in Progress or ToClose state to consume materials"
                 .to_string(),
         );
+    }
+
+    // MFG-004: Idempotency guard — if all raw moves already exist, this is a no-op
+    if !mo.move_raw_ids.is_empty() && mo.bom_id.is_some() {
+        // Already consumed — avoid creating duplicate stock moves
+        return Ok(());
     }
 
     let source_location_id = get_production_location(&mo);
@@ -1159,6 +1211,24 @@ pub fn create_workorder(
             op_id,
             "workorder operation",
         )?;
+    }
+
+    // MFG-005: Validate blocker workorder FK — blocker must exist in the same MO
+    if let Some(blocker_id) = params.blocked_by_workorder_id {
+        let blocker = ctx
+            .db
+            .mrp_workorder()
+            .id()
+            .find(&blocker_id)
+            .ok_or_else(|| format!("Blocker workorder {} not found", blocker_id))?;
+        if blocker.organization_id != organization_id {
+            return Err("Blocker workorder does not belong to this organization".to_string());
+        }
+        if blocker.production_id != params.production_id {
+            return Err(
+                "Blocker workorder does not belong to the same manufacturing order".to_string(),
+            );
+        }
     }
 
     // Resolve capacity: use supplied value, fall back to validated workcenter capacity.

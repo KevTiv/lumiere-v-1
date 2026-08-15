@@ -3,6 +3,7 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
+use crate::sales::sales_core::sale_order_line;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, add_account_move_line, create_account_move,
     insert_draft_account_move_line, post_invoice, AccountMove, AccountMoveLine,
@@ -625,6 +626,28 @@ pub fn create_subscription_ar_invoice(
     let mut all_tax_ids: Vec<u64> = Vec::new();
 
     for (seq, line) in lines.iter().enumerate() {
+        // SUB-006: Validate that the subscription line price has not drifted from
+        // the originating sale order line. Log a warning if drift is detected so
+        // finance teams can investigate; the invoice is not blocked (the subscription
+        // line price is the contract price, not the current SO list price).
+        if let Some(sol_id) = line.sale_order_line_id {
+            if let Some(sol) = ctx.db.sale_order_line().id().find(&sol_id) {
+                let drift = (line.price_unit - sol.price_unit).abs();
+                if drift > 0.01 {
+                    log::warn!(
+                        "SUB-006: subscription line {} (sub {}) price_unit {:.4} has drifted \
+                         from origin SO line {} price_unit {:.4} (delta {:.4})",
+                        line.id,
+                        line.subscription_id,
+                        line.price_unit,
+                        sol_id,
+                        sol.price_unit,
+                        drift
+                    );
+                }
+            }
+        }
+
         let qty = if line.product_uom_qty > 0.0 {
             line.product_uom_qty
         } else {

@@ -15,8 +15,12 @@ use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, AccountMove, AccountMoveLine,
 };
-use crate::core::organization::company_id_from_scope;
+use crate::accounting::relations::{
+    require_active_account, require_active_currency_id, require_active_journal,
+};
+use crate::core::organization::{company_id_from_scope, require_company_in_organization};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::inventory::stock::require_product_in_org;
 use crate::sales::sales_core::{sale_order, sale_order_line};
 use crate::subscriptions::billing_helpers::{
     apply_billing_run_to_subscription, apply_subscription_invoice_payment,
@@ -25,6 +29,47 @@ use crate::subscriptions::billing_helpers::{
 };
 use crate::subscriptions::tables::*;
 use crate::types::{AccountMoveState, PaymentState};
+
+// ============================================================================
+// METADATA VALIDATION
+// ============================================================================
+
+/// Reserved metadata keys written exclusively by the billing engine.
+/// User-provided metadata must not contain these keys to avoid overwriting
+/// system-computed values.
+const SUBSCRIPTION_RESERVED_METADATA_KEYS: &[&str] = &[
+    "billing_run_key",
+    "subscription_id",
+    "fx_rate",
+    "invoiced_untaxed_total",
+    "deferred_remaining",
+    "invoice_count",
+    "next_invoice_date",
+    "billing_period_start",
+    "billing_period_end",
+];
+
+/// Validate that user-provided metadata is valid JSON and does not contain
+/// system-reserved keys.
+pub(crate) fn validate_subscription_metadata(metadata: &str) -> Result<(), String> {
+    if metadata.is_empty() {
+        return Ok(());
+    }
+    let parsed: serde_json::Value = serde_json::from_str(metadata)
+        .map_err(|_| "metadata must be valid JSON".to_string())?;
+    let obj = parsed
+        .as_object()
+        .ok_or("metadata must be a JSON object".to_string())?;
+    for key in obj.keys() {
+        if SUBSCRIPTION_RESERVED_METADATA_KEYS.contains(&key.as_str()) {
+            return Err(format!(
+                "metadata key '{}' is reserved for system use",
+                key
+            ));
+        }
+    }
+    Ok(())
+}
 
 // ============================================================================
 // INPUT PARAMS
@@ -317,6 +362,25 @@ pub fn create_subscription_plan(
     let billing_period = normalize_plan_billing_period(&params.billing_period)?;
     let payment_mode = normalize_payment_mode(&params.payment_mode)?;
 
+    // SUB-008: Validate recurring_invoice_day ∈ [1, 28].
+    if params.recurring_invoice_day == 0 || params.recurring_invoice_day > 28 {
+        return Err(format!(
+            "recurring_invoice_day must be between 1 and 28 (got {})",
+            params.recurring_invoice_day
+        ));
+    }
+
+    // SUB-001: Validate currency FK
+    require_active_currency_id(ctx, params.currency_id, "plan currency")?;
+    // SUB-002: Validate journal FK
+    require_active_journal(ctx, organization_id, company_id, params.journal_id, "plan journal")?;
+    // SUB-003: Validate product FK
+    require_product_in_org(ctx, organization_id, params.product_id)?;
+    // SUB-005: Validate metadata schema
+    validate_subscription_metadata(
+        params.metadata.as_deref().unwrap_or_default(),
+    )?;
+
     let plan = SubscriptionPlan {
         id: 0,
         organization_id,
@@ -568,6 +632,7 @@ pub fn create_subscription_from_sale_order(
             line_is_gift: false,
             line_is_upgrade: false,
             line_is_downgrade: false,
+            sale_order_line_id: Some(so_line.id), // SUB-006: track origin for price re-validation
             created_at: ctx.timestamp,
             updated_at: ctx.timestamp,
             metadata: String::new(),
@@ -1506,6 +1571,34 @@ pub fn create_revenue_recognition_rule(
     params: CreateRevenueRecognitionRuleParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "revenue_recognition_rule", "create")?;
+
+    // Validate company belongs to org
+    require_company_in_organization(ctx, organization_id, company_id)?;
+
+    // SUB-004: Validate account FKs
+    require_active_account(
+        ctx,
+        organization_id,
+        company_id,
+        params.recognition_account_id,
+        "recognition account",
+    )?;
+    require_active_account(
+        ctx,
+        organization_id,
+        company_id,
+        params.deferred_account_id,
+        "deferred account",
+    )?;
+    if let Some(expense_account_id) = params.expense_account_id {
+        require_active_account(
+            ctx,
+            organization_id,
+            company_id,
+            expense_account_id,
+            "expense account",
+        )?;
+    }
 
     let rule = RevenueRecognitionRule {
         id: 0,

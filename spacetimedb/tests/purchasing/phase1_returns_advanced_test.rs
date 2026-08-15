@@ -23,14 +23,40 @@ use crate::purchasing::PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG;
 use crate::test_harness::{PurchasingIntegrityFixture, PurchasingIntegrityScope};
 
 fn enable_phase1_actions(ctx: &ReducerContext, scope: &PurchasingIntegrityScope) {
-    ctx.db.organization_settings().insert(OrganizationSettings {
-        organization_id: scope.organization_id,
-        module_config: None,
-        feature_flags: vec![PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG.to_string()],
-        integration_keys: None,
-        updated_at: ctx.timestamp,
-        metadata: Some(r#"{"test":"purchasing-phase1"}"#.to_string()),
-    });
+    match ctx
+        .db
+        .organization_settings()
+        .organization_id()
+        .find(&scope.organization_id)
+    {
+        Some(settings) => {
+            let mut feature_flags = settings.feature_flags.clone();
+            if !feature_flags
+                .iter()
+                .any(|flag| flag == PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG)
+            {
+                feature_flags.push(PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG.to_string());
+            }
+            ctx.db
+                .organization_settings()
+                .organization_id()
+                .update(OrganizationSettings {
+                    feature_flags,
+                    updated_at: ctx.timestamp,
+                    ..settings
+                });
+        }
+        None => {
+            ctx.db.organization_settings().insert(OrganizationSettings {
+                organization_id: scope.organization_id,
+                module_config: None,
+                feature_flags: vec![PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG.to_string()],
+                integration_keys: None,
+                updated_at: ctx.timestamp,
+                metadata: Some(r#"{"test":"purchasing-phase1"}"#.to_string()),
+            });
+        }
+    }
 }
 
 pub fn test_phase1_returns_credits_and_integrations(ctx: &ReducerContext) -> Result<(), String> {

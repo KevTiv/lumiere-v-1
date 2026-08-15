@@ -1506,6 +1506,31 @@ pub fn add_proposal_line_item(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "proposal", "write")?;
     let proposal = load_proposal_scoped(ctx, organization_id, company_id, proposal_id)?;
+
+    // PRO-002: when section_id is provided, validate it exists and belongs to this proposal
+    if let Some(sid) = params.section_id {
+        let section = ctx
+            .db
+            .proposal_section()
+            .id()
+            .find(&sid)
+            .ok_or_else(|| format!("Proposal section {} not found", sid))?;
+        if section.proposal_id != proposal_id {
+            return Err("Section does not belong to this proposal".to_string());
+        }
+    }
+
+    // PRO-003: validate product_id exists in the org
+    let prod = ctx
+        .db
+        .product()
+        .id()
+        .find(&params.product_id)
+        .ok_or_else(|| format!("Product {} not found", params.product_id))?;
+    if prod.organization_id != organization_id {
+        return Err("Product does not belong to this organization".to_string());
+    }
+
     let subtotal = line_subtotal(params.quantity, params.price_unit, params.discount);
     let sequence = ctx
         .db
@@ -1800,6 +1825,28 @@ pub fn add_proposal_comment(
     let _proposal = load_proposal_scoped(ctx, organization_id, company_id, proposal_id)?;
     if content.trim().is_empty() {
         return Err("Comment content cannot be empty".to_string());
+    }
+    // PRO-001: validate section_id exists and belongs to this proposal
+    let section = ctx
+        .db
+        .proposal_section()
+        .id()
+        .find(&section_id)
+        .ok_or_else(|| format!("Proposal section {} not found", section_id))?;
+    if section.proposal_id != proposal_id {
+        return Err("Section does not belong to this proposal".to_string());
+    }
+    // PRO-004: validate parent comment exists and belongs to this proposal
+    if let Some(pid) = parent_id {
+        let parent = ctx
+            .db
+            .proposal_comment()
+            .id()
+            .find(&pid)
+            .ok_or_else(|| format!("Parent comment {} not found", pid))?;
+        if parent.proposal_id != proposal_id {
+            return Err("Parent comment does not belong to this proposal".to_string());
+        }
     }
 
     let row = ctx.db.proposal_comment().insert(ProposalComment {

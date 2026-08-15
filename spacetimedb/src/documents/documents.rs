@@ -8,6 +8,17 @@
 /// | **DocumentVersion** | Version history for documents |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::journal_entries::account_move;
+use crate::core::organization::require_company_in_organization;
+use crate::crm::contacts::contact;
+use crate::expenses::expenses::{expense_sheet, hr_expense};
+use crate::helpdesk::tickets::helpdesk_ticket;
+use crate::hr::employees::hr_employee;
+use crate::inventory::product::product;
+use crate::projects::tasks::project_task;
+use crate::purchasing::purchase_orders::purchase_order;
+use crate::sales::sales_core::sale_order;
+use crate::subscriptions::tables::subscription;
 use crate::documents::pack_locale::{
     build_default_index_content, compute_purge_after, document_residency_region_for_company,
     document_search_language_for_company, truncate_index_content, validate_fiscal_archive,
@@ -359,6 +370,139 @@ fn ensure_folder_company_scope(
 }
 
 // ============================================================================
+// RELATIONAL INTEGRITY HELPERS (DOC-001 / DOC-002 / DOC-005)
+// ============================================================================
+
+/// Allowed ERP model names for `res_model` on documents.
+/// Each entry corresponds to a SpacetimeDB table accessor that can own a document.
+/// (DOC-001)
+const ALLOWED_RES_MODELS: &[&str] = &[
+    "sale_order",
+    "purchase_order",
+    "account_move",
+    "hr_employee",
+    "hr_contract",
+    "contact",
+    "product",
+    "project_project",
+    "project_task",
+    "helpdesk_ticket",
+    "mrp_production",
+    "hr_expense",
+    "expense_sheet",
+    "subscription",
+    "proposal",
+    "document_folder",
+    "hr_payslip",
+];
+
+/// Validate `res_model` against the whitelist and, when `res_id` is also
+/// provided, confirm the referenced record exists in the correct org.
+/// (DOC-001 + DOC-002)
+fn validate_res_model_and_id(
+    ctx: &ReducerContext,
+    res_model: Option<&str>,
+    res_id: Option<u64>,
+    organization_id: u64,
+) -> Result<(), String> {
+    let model = match res_model {
+        None => return Ok(()),
+        Some(m) => m,
+    };
+    if !ALLOWED_RES_MODELS.contains(&model) {
+        return Err(format!(
+            "res_model '{}' is not in the list of allowed ERP models",
+            model
+        ));
+    }
+    let id = match res_id {
+        None => return Ok(()), // model is valid; no FK to check
+        Some(id) => id,
+    };
+    // DOC-002: verify the referenced record exists and belongs to this org.
+    let exists = match model {
+        "sale_order" => ctx
+            .db
+            .sale_order()
+            .id()
+            .find(&id)
+            .is_some_and(|r| r.organization_id == organization_id),
+        "purchase_order" => ctx
+            .db
+            .purchase_order()
+            .id()
+            .find(&id)
+            .is_some_and(|r| r.organization_id == organization_id),
+        "account_move" => ctx
+            .db
+            .account_move()
+            .id()
+            .find(&id)
+            .is_some_and(|r| r.organization_id == organization_id),
+        "hr_employee" => ctx
+            .db
+            .hr_employee()
+            .id()
+            .find(&id)
+            .is_some_and(|r| r.organization_id == organization_id),
+        "contact" => ctx
+            .db
+            .contact()
+            .id()
+            .find(&id)
+            .is_some_and(|r| r.organization_id == organization_id),
+        "product" => ctx
+            .db
+            .product()
+            .id()
+            .find(&id)
+            .is_some_and(|r| r.organization_id == organization_id),
+        "project_task" => ctx
+            .db
+            .project_task()
+            .id()
+            .find(&id)
+            .is_some_and(|r| r.organization_id == organization_id),
+        "helpdesk_ticket" => ctx
+            .db
+            .helpdesk_ticket()
+            .id()
+            .find(&id)
+            .is_some_and(|r| r.organization_id == organization_id),
+        "hr_expense" => ctx
+            .db
+            .hr_expense()
+            .id()
+            .find(&id)
+            .is_some_and(|r| r.organization_id == organization_id),
+        "expense_sheet" => ctx
+            .db
+            .expense_sheet()
+            .id()
+            .find(&id)
+            .is_some_and(|r| r.organization_id == organization_id),
+        "subscription" => ctx
+            .db
+            .subscription()
+            .id()
+            .find(&id)
+            .is_some_and(|r| r.organization_id == organization_id),
+        // For models without a direct FK lookup (e.g., hr_contract, project_project,
+        // mrp_production, proposal, document_folder, hr_payslip), we accept the
+        // whitelisted model name as sufficient — FK existence can be tightened in
+        // a follow-up pass once those tables stabilize.
+        _ => true,
+    };
+    if !exists {
+        return Err(format!(
+            "res_id {} not found in model '{}' for this organization",
+            id, model
+        ));
+    }
+    Ok(())
+}
+
+// ============================================================================
 // REDUCERS
 // ============================================================================
 
@@ -452,6 +596,19 @@ pub fn create_document(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "document", "create")?;
     validate_blob_registration(&params.url, params.file_size, &params.checksum)?;
+
+    // DOC-005: Validate company belongs to org when provided
+    if let Some(cid) = company_id {
+        require_company_in_organization(ctx, organization_id, cid)?;
+    }
+
+    // DOC-001 + DOC-002: Validate res_model whitelist and res_id FK
+    validate_res_model_and_id(
+        ctx,
+        params.res_model.as_deref(),
+        params.res_id,
+        organization_id,
+    )?;
 
     if let Some(ref kind) = params.fiscal_kind {
         validate_fiscal_archive(ctx, organization_id, company_id, kind, &params.mimetype)?;
@@ -1044,6 +1201,13 @@ pub fn update_document(
             ensure_folder_company_scope(&folder, doc.company_id)?;
             folder_allows_write(&folder, ctx.sender())?;
         }
+    }
+
+    // DOC-001 + DOC-002: Validate res_model whitelist and res_id FK when being changed
+    let effective_res_model = params.res_model.as_deref().or(doc.res_model.as_deref());
+    let effective_res_id = params.res_id.or(doc.res_id);
+    if params.res_model.is_some() || params.res_id.is_some() {
+        validate_res_model_and_id(ctx, effective_res_model, effective_res_id, organization_id)?;
     }
 
     // Track changed fields

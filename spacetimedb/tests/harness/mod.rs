@@ -40,9 +40,10 @@ use crate::accounting::fiscal_periods::{
     open_account_period, open_fiscal_year, CreateAccountPeriodParams, CreateFiscalYearParams,
 };
 use crate::core::organization::{
-    company, create_company, insert_organization_with_owner, organization, CreateCompanyParams,
-    CreateOrganizationParams,
+    company, create_company, insert_organization_with_owner, organization, organization_settings,
+    CreateCompanyParams, CreateOrganizationParams, OrganizationSettings,
 };
+use crate::crm::CRM_MULTI_COMPANY_FLAG;
 use crate::core::reference::{
     create_currency, create_uom, create_uom_category, currency, uom, uom_cat, CreateCurrencyParams,
     CreateUomCategoryParams, CreateUomParams,
@@ -565,6 +566,14 @@ impl OrgFixture {
             updated_at: ctx.timestamp,
             metadata: None,
         });
+        ctx.db.stock_location().insert(StockLocation {
+            id: 0,
+            name: format!("Harness Supplier {suffix}"),
+            complete_name: Some(format!("WH{suffix}/Supplier")),
+            usage: "supplier".to_string(),
+            location_category: "supplier".to_string(),
+            ..loc_stock.clone()
+        });
 
         ctx.db.warehouse().id().update(Warehouse {
             lot_stock_id: loc_stock.id,
@@ -716,11 +725,40 @@ impl PurchasingIntegrityFixture {
 }
 
 fn seed_distinctive_currency(ctx: &ReducerContext, suffix: u64) -> Result<u64, String> {
+    const CURRENCY_CODE_SPACE: u64 = 26 * 26 * 26;
+
+    fn currency_code(index: u64) -> String {
+        let mut value = index % CURRENCY_CODE_SPACE;
+        let mut bytes = [b'A'; 3];
+        for byte in bytes.iter_mut().rev() {
+            *byte += (value % 26) as u8;
+            value /= 26;
+        }
+        bytes.into_iter().map(char::from).collect()
+    }
+
+    // Guarded workflow snapshots require three-letter uppercase currency codes.
+    // Select two currently unused codes so repeated persisted-data runs remain
+    // distinctive without colliding with canonical or earlier fixture currencies.
+    let mut codes = Vec::with_capacity(2);
+    for offset in 0..CURRENCY_CODE_SPACE {
+        let code = currency_code(suffix.wrapping_add(offset));
+        if ctx.db.currency().code().find(&code).is_none() {
+            codes.push(code);
+            if codes.len() == 2 {
+                break;
+            }
+        }
+    }
+    if codes.len() != 2 {
+        return Err("Harness: no unused three-letter currency codes remain".to_string());
+    }
+
     // A first catalog row guarantees the currency consumed by purchasing tests
     // is never the implicit first/global default in an otherwise empty runtime.
     for (code, name) in [
-        (format!("H{suffix}A"), "Harness control currency"),
-        (format!("H{suffix}B"), "Harness purchasing currency"),
+        (codes[0].clone(), "Harness control currency"),
+        (codes[1].clone(), "Harness purchasing currency"),
     ] {
         create_currency(
             ctx,
@@ -740,7 +778,7 @@ fn seed_distinctive_currency(ctx: &ReducerContext, suffix: u64) -> Result<u64, S
     ctx.db
         .currency()
         .code()
-        .find(&format!("H{suffix}B"))
+        .find(&codes[1])
         .map(|row| row.id)
         .ok_or("Harness: purchasing currency missing after create".into())
 }
@@ -1035,6 +1073,48 @@ fn seed_purchasing_integrity_scope(
         .map(|product| product.id)
         .ok_or("Harness: purchasing product missing after create")?;
 
+    // The fixture creates a second company in an org that already has one
+    // (from OrgFixture::seed_minimal), making it a multi-company org.  The
+    // CRM guard (CRM-RI-007) rejects contacts scoped to a non-default
+    // company unless the org has opted in via the crm_multi_company flag.
+    // Enable that flag here so the vendor contact can be company-scoped
+    // for cross-company boundary assertions without hitting the guard.
+    //
+    // Note: seed_minimal uses insert_organization_with_owner which does NOT
+    // create an OrganizationSettings row (only bootstrap_new_tenant does),
+    // so we must handle both the insert and update paths.
+    match ctx
+        .db
+        .organization_settings()
+        .organization_id()
+        .find(&organization_id)
+    {
+        Some(settings) => {
+            let mut flags = settings.feature_flags.clone();
+            if !flags.iter().any(|f| f == CRM_MULTI_COMPANY_FLAG) {
+                flags.push(CRM_MULTI_COMPANY_FLAG.to_string());
+            }
+            ctx.db
+                .organization_settings()
+                .organization_id()
+                .update(OrganizationSettings {
+                    feature_flags: flags,
+                    updated_at: ctx.timestamp,
+                    ..settings
+                });
+        }
+        None => {
+            ctx.db.organization_settings().insert(OrganizationSettings {
+                organization_id,
+                module_config: None,
+                feature_flags: vec![CRM_MULTI_COMPANY_FLAG.to_string()],
+                integration_keys: None,
+                updated_at: ctx.timestamp,
+                metadata: Some(r#"{"harness":"purchasing-integrity"}"#.to_string()),
+            });
+        }
+    }
+
     let vendor_email = format!("vendor-{marker}@harness.test");
     create_contact(
         ctx,
@@ -1269,6 +1349,14 @@ fn seed_integrity_warehouse(
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         metadata: Some(r#"{"harness":"purchasing-integrity"}"#.to_string()),
+    });
+    ctx.db.stock_location().insert(StockLocation {
+        id: 0,
+        name: format!("Integrity Supplier {marker}"),
+        complete_name: Some(format!("IW{marker}/Supplier")),
+        usage: "supplier".to_string(),
+        location_category: "supplier".to_string(),
+        ..location.clone()
     });
     ctx.db.warehouse().id().update(Warehouse {
         lot_stock_id: location.id,

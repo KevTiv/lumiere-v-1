@@ -7,7 +7,7 @@
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::permissions::user_role_assignment;
+use crate::core::permissions::{role, user_role_assignment};
 use crate::core::users::user_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
@@ -341,6 +341,23 @@ pub(crate) fn create_workflow_human_task_internal(
         .task_policy
         .ok_or("human task node has no task policy")?;
     validate_policy(&policy)?;
+
+    // WRK-003: Validate that each candidate_role_id exists in this organization
+    for &rid in &policy.candidate_role_ids {
+        let exists = ctx
+            .db
+            .role()
+            .role_by_org()
+            .filter(&organization_id)
+            .any(|r| r.id == rid);
+        if !exists {
+            return Err(format!(
+                "candidate role {} does not exist in this organization",
+                rid
+            ));
+        }
+    }
+
     match (&params.guarded_action, &params.subject_revision_hash) {
         (Some(_), None) => {
             return Err("guarded human task requires a material subject revision".to_string())

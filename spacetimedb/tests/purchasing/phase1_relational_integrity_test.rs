@@ -173,7 +173,12 @@ pub fn test_phase1_vendor_and_rfq_relations(ctx: &ReducerContext) -> Result<(), 
         .db
         .res_partner_bank()
         .iter()
-        .find(|row| row.sanitized_acc_number.as_deref() == Some("PH1outbound"))
+        .find(|row| {
+            row.organization_id == primary.organization_id
+                && row.company_id == Some(primary.company_id)
+                && row.partner_id == primary.vendor_id
+                && row.sanitized_acc_number.as_deref() == Some("PH1outbound")
+        })
         .ok_or("outbound partner bank was not persisted")?;
     if outbound_bank.organization_id != primary.organization_id
         || outbound_bank.company_id != Some(primary.company_id)

@@ -28,6 +28,33 @@ pub mod migrations;
 /// Max custom-field entries accepted in one EAV upsert (bounds WASM work).
 const MAX_CUSTOM_FIELD_ENTRIES: usize = 64;
 
+/// FRM-001: Allowed ERP model names that can carry custom fields.
+/// Any model string not in this list is rejected to prevent phantom/garbage data.
+const ALLOWED_CUSTOM_FIELD_MODELS: &[&str] = &[
+    "sale_order",
+    "sale_order_line",
+    "purchase_order",
+    "purchase_order_line",
+    "account_move",
+    "account_move_line",
+    "hr_employee",
+    "hr_contract",
+    "hr_expense",
+    "expense_sheet",
+    "contact",
+    "product",
+    "product_template",
+    "project_project",
+    "project_task",
+    "helpdesk_ticket",
+    "mrp_production",
+    "subscription",
+    "proposal",
+    "hr_payslip",
+    "fleet_vehicle",
+    "crm_lead",
+];
+
 // ═════════════════════════════════════════════════════════════════════════════
 // TYPES
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1222,6 +1249,13 @@ pub fn set_record_custom_field_values(
     if params.model.trim().is_empty() {
         return Err("model is required".to_string());
     }
+    // FRM-001: reject models not in the allowed ERP model set
+    if !ALLOWED_CUSTOM_FIELD_MODELS.contains(&params.model.as_str()) {
+        return Err(format!(
+            "model '{}' is not in the allowed ERP model set for custom fields",
+            params.model
+        ));
+    }
     if params.record_id == 0 {
         return Err("record_id is required".to_string());
     }
@@ -1367,6 +1401,13 @@ pub fn delete_record_custom_field_values(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, &model, "write")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
+    // FRM-001: reject models not in the allowed ERP model set
+    if !ALLOWED_CUSTOM_FIELD_MODELS.contains(&model.as_str()) {
+        return Err(format!(
+            "model '{}' is not in the allowed ERP model set for custom fields",
+            model
+        ));
+    }
     ensure_record_allows_custom_field_writes(ctx, organization_id, company_id, &model, record_id)?;
 
     let rows: Vec<_> = ctx

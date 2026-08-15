@@ -41,13 +41,16 @@ pub fn link_device_to_workcenter(
         return Err("Device does not belong to this organization".to_string());
     }
 
-    // Verify workcenter exists
-    let _ = ctx
+    // IOT-001: Verify workcenter exists and belongs to the same org as the device.
+    let workcenter = ctx
         .db
         .mrp_workcenter()
         .id()
         .find(&workcenter_id)
         .ok_or("Work center not found")?;
+    if workcenter.organization_id != device.organization_id {
+        return Err("Work center does not belong to the same organization as the device".to_string());
+    }
 
     ctx.db
         .iot_device()
@@ -101,13 +104,16 @@ pub fn link_device_to_location(
         return Err("Device does not belong to this organization".to_string());
     }
 
-    // Verify location exists
-    let _ = ctx
+    // IOT-002: Verify location exists and belongs to the same org as the device.
+    let location = ctx
         .db
         .stock_location()
         .id()
         .find(&location_id)
         .ok_or("Stock location not found")?;
+    if location.organization_id != device.organization_id {
+        return Err("Stock location does not belong to the same organization as the device".to_string());
+    }
 
     ctx.db
         .iot_device()
@@ -161,13 +167,16 @@ pub fn link_device_to_pos(
         return Err("Device does not belong to this organization".to_string());
     }
 
-    // Verify POS config exists
-    let _ = ctx
+    // IOT-003: Verify POS config exists and belongs to the same company as the device.
+    let pos = ctx
         .db
         .pos_config()
         .id()
         .find(&pos_config_id)
         .ok_or("POS configuration not found")?;
+    if pos.company_id != device.company_id {
+        return Err("POS configuration does not belong to the same company as the device".to_string());
+    }
 
     ctx.db
         .iot_device()
@@ -221,12 +230,16 @@ pub fn link_device_to_quality_check(
         return Err("Device does not belong to this organization".to_string());
     }
 
-    let _ = ctx
+    // IOT-004: Verify quality check exists and belongs to the same org as the device.
+    let qc = ctx
         .db
         .quality_check()
         .id()
         .find(&check_id)
         .ok_or("Quality check not found")?;
+    if qc.organization_id != device.organization_id {
+        return Err("Quality check does not belong to the same organization as the device".to_string());
+    }
 
     ctx.db
         .iot_device()

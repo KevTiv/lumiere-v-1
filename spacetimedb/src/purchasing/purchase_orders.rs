@@ -1126,8 +1126,8 @@ fn create_incoming_pickings_for_confirmed_order(
 ) -> Result<(), String> {
     use crate::inventory::stock::{
         create_stock_move, create_stock_picking, product_requires_stock,
-        resolve_warehouse_stock_location, stock_picking, CreateStockMoveParams,
-        CreateStockPickingParams,
+        resolve_supplier_stock_location, resolve_warehouse_stock_location, stock_picking,
+        CreateStockMoveParams, CreateStockPickingParams,
     };
     use crate::inventory::warehouse::warehouse;
 
@@ -1182,8 +1182,7 @@ fn create_incoming_pickings_for_confirmed_order(
         })?;
 
     let dest_location = resolve_warehouse_stock_location(ctx, warehouse_id);
-    // MVP vendor location stub (mirrors sales customer = stock+1).
-    let src_location = dest_location.saturating_add(1);
+    let src_location = resolve_supplier_stock_location(ctx, organization_id, company_id)?;
     let order_label = order
         .name
         .as_deref()

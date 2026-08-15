@@ -360,6 +360,14 @@ fn validate_schedule_configuration(
             if template.organization_id != organization_id {
                 return Err("Report template does not belong to this organization".to_string());
             }
+            // ANL-002: when both the schedule and template carry a company scope, they must match
+            if let (Some(report_company), Some(tmpl_company)) = (company_id, template.company_id) {
+                if report_company != tmpl_company {
+                    return Err(
+                        "Report template does not belong to this company".to_string(),
+                    );
+                }
+            }
             if params.recipients.is_empty() {
                 return Err("At least one recipient is required".to_string());
             }
@@ -861,6 +869,7 @@ pub fn create_report_template(
 pub fn update_report_template(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: Option<u64>,
     template_id: u64,
     params: UpdateReportTemplateParams,
 ) -> Result<(), String> {
@@ -875,6 +884,14 @@ pub fn update_report_template(
 
     if tmpl.organization_id != organization_id {
         return Err("Report template does not belong to this organization".to_string());
+    }
+
+    // ANL-003: when the template is company-scoped, the caller must present matching scope
+    if let Some(tmpl_company) = tmpl.company_id {
+        match company_id {
+            Some(cid) if cid == tmpl_company => {}
+            _ => return Err("Company scope mismatch — provide the template's company_id to update it".to_string()),
+        }
     }
 
     ctx.db.report_template().id().update(ReportTemplate {
@@ -1280,6 +1297,7 @@ pub fn create_analytics_metric(
 pub fn update_metric_values(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: Option<u64>,
     metric_id: u64,
     params: UpdateMetricValuesParams,
 ) -> Result<(), String> {
@@ -1294,6 +1312,14 @@ pub fn update_metric_values(
 
     if metric.organization_id != organization_id {
         return Err("Metric does not belong to this organization".to_string());
+    }
+
+    // ANL-003: when the metric is company-scoped, the caller must present matching scope
+    if let Some(metric_company) = metric.company_id {
+        match company_id {
+            Some(cid) if cid == metric_company => {}
+            _ => return Err("Company scope mismatch — provide the metric's company_id to update it".to_string()),
+        }
     }
 
     // change_amount, change_percentage, trend_direction are computed from inputs
