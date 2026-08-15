@@ -324,6 +324,46 @@ pub async fn resolve_purchasing_company_id(
     Ok(allowed)
 }
 
+/// Resolve the only Accounting company visible to the authenticated membership.
+///
+/// Company-bound memberships are restricted to that company. Organization-level
+/// memberships fall back to the default company. A requested browser company
+/// must equal the server-derived scope. Mirrors `resolve_purchasing_company_id`;
+/// every accounting table this covers carries a required (non-nullable)
+/// `company_id`, so there is no org-shared row concept here to fall back to.
+pub async fn resolve_accounting_company_id(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+    requested_company_id: Option<u64>,
+) -> Result<u64, ApiError> {
+    let identity = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+    let sql = format!(
+        "SELECT id, organization_id, company_id, is_active FROM user_organization WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
+    );
+    let memberships = client
+        .query_sql(&sql)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let membership = memberships
+        .first()
+        .ok_or_else(|| ApiError::Forbidden("No active organization membership".into()))?;
+    let membership_company =
+        row_u64(membership, "companyId", "company_id").map_err(ApiError::Internal)?;
+    let allowed = match membership_company {
+        Some(company_id) if company_id > 0 => company_id,
+        _ => default_company_id(client, organization_id)
+            .await?
+            .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
+    };
+    if requested_company_id.is_some_and(|requested| requested != allowed) {
+        return Err(ApiError::Forbidden(
+            "Cannot query another company's accounting data".into(),
+        ));
+    }
+    Ok(allowed)
+}
+
 pub(crate) fn crm_resource(resource: &str) -> bool {
     matches!(
         resource,
@@ -422,6 +462,30 @@ pub(crate) fn purchasing_resource(resource: &str) -> bool {
             | "purchase-approval-delegates"
             | "commodity-price-indexes"
             | "purchasing-integration-intents"
+    )
+}
+
+/// Accounting resources backed by a table with a required (non-nullable)
+/// `company_id`. `account-account-types`, `account-payment-terms`, and
+/// `account-payment-term-lines` are deliberately excluded — those tables have
+/// no `company_id` column at all and are org-wide by design.
+pub(crate) fn accounting_resource(resource: &str) -> bool {
+    matches!(
+        resource,
+        "account-accounts"
+            | "account-assets"
+            | "account-groups"
+            | "account-journals"
+            | "account-move-lines"
+            | "account-moves"
+            | "account-payments"
+            | "account-periods"
+            | "account-reconciliation-widgets"
+            | "account-taxes"
+            | "budgets"
+            | "budget-lines"
+            | "budget-posts"
+            | "fiscal-years"
     )
 }
 
@@ -595,6 +659,19 @@ pub async fn execute_resource_query_for_company(
     let purchasing_company_id = if purchasing_resource(resource) {
         Some(
             resolve_purchasing_company_id(
+                client,
+                organization_id,
+                identity_hex,
+                requested_company_id,
+            )
+            .await?,
+        )
+    } else {
+        None
+    };
+    let accounting_company_id = if accounting_resource(resource) {
+        Some(
+            resolve_accounting_company_id(
                 client,
                 organization_id,
                 identity_hex,
@@ -1613,6 +1690,9 @@ pub async fn execute_resource_query_for_company(
     } else if let Some(cid) = purchasing_company_id {
         extra_where_owned = format!("{extra_where_raw} AND company_id = {cid}");
         extra_where_owned.as_str()
+    } else if let Some(cid) = accounting_company_id {
+        extra_where_owned = format!("{extra_where_raw} AND company_id = {cid}");
+        extra_where_owned.as_str()
     } else {
         extra_where_raw
     };
@@ -1645,6 +1725,9 @@ pub async fn execute_resource_query_for_company(
         filter_inventory_company_rows(resource, company_id, &mut rows);
     }
     if let Some(company_id) = purchasing_company_id {
+        rows.retain(|row| row_company_matches(row, company_id, false));
+    }
+    if let Some(company_id) = accounting_company_id {
         rows.retain(|row| row_company_matches(row, company_id, false));
     }
 
@@ -1993,5 +2076,83 @@ mod tests {
         assert!(inventory_resource("picking-batches"));
         assert!(!inventory_resource("account-moves"));
         assert!(!inventory_resource("contacts"));
+    }
+
+    #[test]
+    fn accounting_resource_classification_covers_company_scoped_tables() {
+        for resource in [
+            "account-accounts",
+            "account-assets",
+            "account-groups",
+            "account-journals",
+            "account-move-lines",
+            "account-moves",
+            "account-payments",
+            "account-periods",
+            "account-reconciliation-widgets",
+            "account-taxes",
+            "budgets",
+            "budget-lines",
+            "budget-posts",
+            "fiscal-years",
+        ] {
+            assert!(
+                accounting_resource(resource),
+                "{resource} backs a required company_id column and must be scoped"
+            );
+        }
+    }
+
+    #[test]
+    fn accounting_resource_excludes_org_wide_tables_and_other_domains() {
+        // These accounting tables carry no company_id column at all — org-wide by design.
+        assert!(!accounting_resource("account-account-types"));
+        assert!(!accounting_resource("account-payment-terms"));
+        assert!(!accounting_resource("account-payment-term-lines"));
+        // Sanity: not misclassified as another domain's resource.
+        assert!(!accounting_resource("contacts"));
+        assert!(!accounting_resource("stock-quants"));
+        assert!(!crm_resource("account-accounts"));
+        assert!(!inventory_resource("account-journals"));
+        assert!(!purchasing_resource("account-moves"));
+    }
+
+    #[test]
+    fn accounting_resources_project_company_id_for_row_filtering() {
+        for resource in [
+            "account-accounts",
+            "account-assets",
+            "account-groups",
+            "account-journals",
+            "account-move-lines",
+            "account-moves",
+            "account-payments",
+            "account-periods",
+            "account-reconciliation-widgets",
+            "account-taxes",
+            "budgets",
+            "budget-lines",
+            "budget-posts",
+            "fiscal-years",
+        ] {
+            let entry = registry_get(resource).expect("accounting resource must be registered");
+            let projects_company_id = entry.mandatory.iter().any(|f| f == "company_id")
+                || entry.default_restricted.iter().any(|f| f == "company_id");
+            assert!(
+                projects_company_id,
+                "{resource} must project company_id by default for row_company_matches to work"
+            );
+        }
+    }
+
+    #[test]
+    fn accounting_company_scoped_rows_filtered_strictly_no_shared_fallback() {
+        let mut rows = vec![
+            json!({ "id": 1, "companyId": 7 }),
+            json!({ "id": 2, "companyId": null }),
+            json!({ "id": 3, "companyId": 8 }),
+        ];
+        rows.retain(|row| row_company_matches(row, 7, false));
+        assert_eq!(rows, vec![json!({ "id": 1, "companyId": 7 })]);
     }
 }
