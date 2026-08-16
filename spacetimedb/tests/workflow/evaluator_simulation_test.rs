@@ -182,7 +182,7 @@ fn test_simulation_writes_only_simulation_tables(ctx: &ReducerContext) -> Result
         Some(fixture.company_id),
         CreateWorkflowParams {
             workflow_key: format!("wf.simulation.{}", fixture.organization_id),
-            model: "purchase.order".to_string(),
+            model: "purchase_order".to_string(),
             name: "Simulation safety".to_string(),
             description: None,
             trigger: WorkflowTrigger::Manual,
@@ -251,7 +251,7 @@ fn test_simulation_writes_only_simulation_tables(ctx: &ReducerContext) -> Result
             simulation_key: format!("simulation:{}", version.id),
             signal_key: None,
             snapshot: ConditionSnapshot {
-                subject_model: "purchase.order".to_string(),
+                subject_model: "purchase_order".to_string(),
                 subject_id: fixture.partner_id,
                 subject_revision_hash: "sha256:test-subject-revision".to_string(),
                 fields: Vec::new(),
@@ -318,7 +318,7 @@ fn field(
 
 fn snapshot(fields: Vec<ConditionSnapshotField>) -> ConditionSnapshot {
     ConditionSnapshot {
-        subject_model: "purchase.order".to_string(),
+        subject_model: "purchase_order".to_string(),
         subject_id: 42,
         subject_revision_hash: "sha256:subject-revision".to_string(),
         fields,
@@ -347,7 +347,7 @@ fn pure_definition(
         organization_id: 1,
         company_id: Some(1),
         workflow_key: "wf.pure.simulation".to_string(),
-        model: "purchase.order".to_string(),
+        model: "purchase_order".to_string(),
         create_uid: identity,
         create_date: timestamp,
     };

@@ -268,6 +268,7 @@ fn seed_employee(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, Stri
 pub fn test_card_feed_and_liability_post(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    super::wave_a_test::seed_caller_manager(ctx, &fixture)?;
     let accounts = seed_accounts(ctx, &fixture)?;
     let employee_id = seed_employee(ctx, &fixture)?;
 
@@ -495,6 +496,7 @@ pub fn test_duplicate_fraud_hold_blocks_submit(ctx: &ReducerContext) -> Result<(
 pub fn test_advance_and_delayed_sync(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    super::wave_a_test::seed_caller_manager(ctx, &fixture)?;
     let accounts = seed_accounts(ctx, &fixture)?;
     let employee_id = seed_employee(ctx, &fixture)?;
 

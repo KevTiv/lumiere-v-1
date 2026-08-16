@@ -21,6 +21,7 @@ pub mod project_accounting;
 pub mod projects;
 pub mod psa_advanced;
 pub mod rate_cards;
+pub mod task_stages;
 pub mod tasks;
 pub mod timesheets;
 
@@ -30,5 +31,6 @@ pub use project_accounting::*;
 pub use projects::*;
 pub use psa_advanced::*;
 pub use rate_cards::*;
+pub use task_stages::*;
 pub use tasks::*;
 pub use timesheets::*;

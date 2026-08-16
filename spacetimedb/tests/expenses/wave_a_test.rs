@@ -10,7 +10,7 @@ use crate::accounting::journal_entries::account_move;
 use crate::expenses::expenses::{
     approve_expense_sheet, approve_expense_sheet_impl, create_expense,
     create_expense_reimbursement_payment, create_expense_sheet, expense_sheet, hr_expense,
-    post_expense_sheet, refuse_expense_sheet, submit_expense, submit_expense_sheet,
+    post_expense_sheet, refuse_expense_sheet_impl, submit_expense, submit_expense_sheet,
     CreateExpenseParams, CreateExpenseReimbursementParams, CreateExpenseSheetParams,
     PostExpenseSheetParams, RefuseExpenseSheetParams,
 };
@@ -21,14 +21,17 @@ use crate::types::{
     ExpenseSheetState, ExpenseState, JournalType,
 };
 
-struct ExpenseAccounts {
-    journal_id: u64,
-    expense_id: u64,
-    payable_id: u64,
-    liquidity_id: u64,
+pub(super) struct ExpenseAccounts {
+    pub(super) journal_id: u64,
+    pub(super) expense_id: u64,
+    pub(super) payable_id: u64,
+    pub(super) liquidity_id: u64,
 }
 
-fn seed_accounts(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<ExpenseAccounts, String> {
+pub(super) fn seed_accounts(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+) -> Result<ExpenseAccounts, String> {
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
     let payable_id = *fixture
@@ -204,6 +207,39 @@ fn seed_accounts(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<ExpenseAc
     })
 }
 
+/// approve_expense_sheet_impl/refuse_expense_sheet_impl (EXP-007/EXP-011) require
+/// the caller to be a registered hr_employee in the org — create_employee never
+/// sets user_id itself, so this links a fresh employee to the test caller's own
+/// identity via update_employee. Every reducer call in a test reducer shares the
+/// same ctx.sender(), so this is the only way to satisfy that check here; the
+/// SoD guards (submitted_by == ctx.sender()) are still meaningfully exercised
+/// since submitted_by is independently set to ctx.sender() at submit time.
+pub(super) fn seed_caller_manager(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, String> {
+    let name = format!("Caller Manager {}", fixture.organization_id);
+    let manager_id = seed_employee(ctx, fixture, &name)?;
+    crate::hr::employees::update_employee(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        manager_id,
+        crate::hr::employees::UpdateEmployeeParams {
+            name: None,
+            job_title: None,
+            job_id: None,
+            department_id: None,
+            parent_id: None,
+            work_email: None,
+            work_phone: None,
+            mobile_phone: None,
+            work_location: None,
+            work_contact_partner_id: None,
+            employment_type: None,
+            user_id: Some(ctx.sender()),
+        },
+    )?;
+    Ok(manager_id)
+}
+
 fn seed_employee(ctx: &ReducerContext, fixture: &OrgFixture, name: &str) -> Result<u64, String> {
     create_employee(
         ctx,
@@ -333,6 +369,7 @@ fn create_draft_sheet(
 pub fn test_expense_lifecycle_posts_move(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    seed_caller_manager(ctx, &fixture)?;
     let accounts = seed_accounts(ctx, &fixture)?;
     let employee_id = seed_employee(ctx, &fixture, "Traveler A")?;
     let sheet_id = create_draft_sheet(ctx, &fixture, employee_id, "Trip A")?;
@@ -437,32 +474,38 @@ pub fn test_expense_lifecycle_posts_move(ctx: &ReducerContext) -> Result<(), Str
 pub fn test_refuse_only_from_submitted(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    seed_caller_manager(ctx, &fixture)?;
     let employee_id = seed_employee(ctx, &fixture, "Traveler B")?;
     let sheet_id = create_draft_sheet(ctx, &fixture, employee_id, "Trip B")?;
     let line_id = create_line_with_receipt(ctx, &fixture, employee_id, "Hotel B", 80.0)?;
     submit_expense(ctx, fixture.organization_id, line_id, sheet_id)?;
 
     // Refuse while Draft must fail.
-    let early = refuse_expense_sheet(
+    let early = refuse_expense_sheet_impl(
         ctx,
         fixture.organization_id,
         sheet_id,
         RefuseExpenseSheetParams {
             reason: Some("too early".into()),
         },
+        true,
     );
     if early.is_ok() {
         return Err("refuse on Draft should fail".into());
     }
 
     submit_expense_sheet(ctx, fixture.organization_id, sheet_id)?;
-    refuse_expense_sheet(
+    // skip_approval_check=true: this test's single identity both submits and
+    // refuses, which the public reducer's SoD guard (EXP-011) would otherwise
+    // reject — that guard has its own dedicated test below.
+    refuse_expense_sheet_impl(
         ctx,
         fixture.organization_id,
         sheet_id,
         RefuseExpenseSheetParams {
             reason: Some("policy".into()),
         },
+        true,
     )?;
     let sheet = ctx
         .db
@@ -502,11 +545,12 @@ pub fn test_refuse_only_from_submitted(ctx: &ReducerContext) -> Result<(), Strin
             client_request_id: None,
         },
     )?;
-    let refuse_posted = refuse_expense_sheet(
+    let refuse_posted = refuse_expense_sheet_impl(
         ctx,
         fixture.organization_id,
         sheet2,
         RefuseExpenseSheetParams { reason: None },
+        true,
     );
     if refuse_posted.is_ok() {
         return Err("refuse on Posted should fail".into());
@@ -518,6 +562,7 @@ pub fn test_company_isolation_on_post(ctx: &ReducerContext) -> Result<(), String
     ensure_test_superuser(ctx)?;
     let fixture_a = OrgFixture::seed_minimal(ctx)?;
     let fixture_b = OrgFixture::seed_minimal(ctx)?;
+    seed_caller_manager(ctx, &fixture_a)?;
     let accounts_a = seed_accounts(ctx, &fixture_a)?;
     let employee_a = seed_employee(ctx, &fixture_a, "Iso Emp A")?;
     let sheet_a = create_draft_sheet(ctx, &fixture_a, employee_a, "Iso Sheet A")?;

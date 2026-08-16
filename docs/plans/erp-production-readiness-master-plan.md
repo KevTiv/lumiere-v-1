@@ -14,21 +14,21 @@
 | 2 | **Purchasing** | 🟢 Pilot w/ restrictions | 0 | 0 | 1 | E2E + tenant inventory for GA |
 | 3 | **Inventory** | 🟢 Pilot w/ restrictions | 0 | 0 | 2 | GA: Playwright E2E + adjustment product org-match |
 | 4 | **Manufacturing** | 🟢 Pilot w/ restrictions | 0 | 0 | 2 | E2E + BOM component validation |
-| 5 | **Accounting** | 🟢 Pilot w/ restrictions | 0 | 2 | 1 | Company-switch UI + GA hardening |
+| 5 | **Accounting** | 🟢 Pilot w/ restrictions | 0 | 0 | 1 | GA: ACC-004 tax_id validation |
 | 6 | **HR** | 🟢 Pilot w/ restrictions | 0 | 0 | 2 | GA: payslip E2E + Playwright E2E |
 | 7 | **CRM** | 🟢 Pilot w/ restrictions | 0 | 0 | 1 | GA: Playwright E2E |
-| 8 | **Expenses** | 🟢 Pilot w/ restrictions | 0 | 5 | 2 | P1 hardening |
-| 9 | **Projects** | 🟢 Pilot w/ restrictions | 0 | 3 | 2 | P1 hardening (analytic_account, stage_id FK) |
+| 8 | **Expenses** | 🟢 Pilot w/ restrictions | 0 | 0 | 2 | GA: Playwright E2E + analytic_account_id FK |
+| 9 | **Projects** | 🟢 Pilot w/ restrictions | 0 | 0 | 2 | GA: Playwright E2E + milestone_id FK |
 | 10 | **AI** | 🟢 Pilot w/ restrictions | 0 | 0 | 2 | GA: multi-org isolation test + Playwright E2E |
-| 11 | **Documents** | 🟢 Pilot w/ restrictions | 0 | 3 | 2 | Add test suite |
+| 11 | **Documents** | 🟢 Pilot w/ restrictions | 0 | 0 | 1 | GA: Playwright E2E |
 | 12 | **Fleet** | 🟢 Pilot w/ restrictions | 0 | 0 | 2 | GA: company isolation + negative tests |
 | 13 | **Forms** | ✅ Compliant | 0 | 0 | 1 | GA: negative test for invalid model value |
-| 14 | **Helpdesk** | 🟢 Pilot w/ restrictions | 0 | 3 | 2 | P1 hardening (CSV FKs, cross-team guard) |
+| 14 | **Helpdesk** | ✅ Compliant | 0 | 0 | 2 | GA: negative test for cross-org ticket + Playwright E2E |
 | 15 | **Integrations** | 🟢 Pilot w/ restrictions | 0 | 0 | 3 | GA: WhatsApp/GDrive company_id + configurable conflict policy |
-| 16 | **IoT** | 🟢 Pilot w/ restrictions | 0 | 4 | 2 | P1 hardening |
+| 16 | **IoT** | 🟢 Pilot w/ restrictions | 0 | 0 | 2 | GA: cross-org link test + Playwright E2E |
 | 17 | **Proposals** | ✅ Compliant | 0 | 0 | 1 | GA: Playwright E2E |
 | 18 | **Analytics** | 🟢 Pilot w/ restrictions | 0 | 0 | 1 | GA: Playwright E2E |
-| 19 | **Workflow** | 🟢 Pilot w/ restrictions | 0 | 3 | 2 | P1 hardening |
+| 19 | **Workflow** | ✅ Compliant | 0 | 0 | 1 | GA: Playwright E2E |
 | 20 | **Subscriptions** | ✅ Compliant | 0 | 0 | 3 | P2 lifecycle hardening + E2E |
 
 ### Legend
@@ -42,7 +42,7 @@
 
 ## 2. Priority Action Matrix — Maximum Unblocking Order
 
-Execute fixes in this order to convert the most modules to "Pilot ready" fastest:
+**Superseded 2026-08-16:** every module now shows `P0 Open: 0` in §1 — all P0 gaps listed below were resolved across this plan's sprints (7, 7a, 7b) and verified on Maincloud. The matrix is kept for historical context only; it no longer reflects open work. **Every module's P1 backlog is now closed** (Expenses, IoT, Projects, Documents, Workflow, and Helpdesk P1s closed in Sprints 7c–7h; see §6 for the running count). Remaining open work is entirely P2 (mostly Playwright E2E depth) — see §6 for the full breakdown.
 
 ```
 Priority  Effort   Modules Unblocked   Action
@@ -50,19 +50,19 @@ Priority  Effort   Modules Unblocked   Action
 P0-A      XS       Purchasing          ✅ Runtime suite green on Maincloud (2026-08-14)
 P0-B      S        CRM                 ✅ Persisted-data validation green on Maincloud (2026-08-15)
 P0-C      S        Accounting          ✅ Backfill + zero-unresolved validation green on Maincloud (2026-08-15)
-P0-D      M        HR                  Payslip contract_id/struct_id FK + dept hierarchy
-P0-E      M        Analytics           Add company scope guard to widget/template updates
-P0-F      M        Fleet               PosTerminal company_id + WarehouseGeo FK
-P0-G      M        Projects            Complete Wave B open items
-P0-H      L        Workflow            subject FK + guarded action + parent token + queue
-P0-I      L        Helpdesk            SLA/assign/stage FK + CSV validation (4 gaps)
-P0-J      L        AI                  org_id on AiInsight/Job/Embedding + exec guard
-P0-K      L        Subscriptions       5 FK validations + atomicity fixes
-P0-L      XL       Manufacturing       5 P0 gaps (location/routing/stock idempotency)
-P0-M      XL       Documents           FK validation + legal hold + company scope (5 gaps)
-P0-N      XL       IoT                 Org validation for link_device + auto-invoke (2 clusters)
-P0-O      XL       Inventory           7 P0 items (location FK, close accounting, idempotency)
-P0-P      XL       Expenses            All 14 items (nothing started)
+P0-D      M        HR                  ✅ Done
+P0-E      M        Analytics           ✅ Done
+P0-F      M        Fleet               ✅ Done
+P0-G      M        Projects            ✅ Done
+P0-H      L        Workflow            ✅ Done
+P0-I      L        Helpdesk            ✅ Done
+P0-J      L        AI                  ✅ Done
+P0-K      L        Subscriptions       ✅ Done
+P0-L      XL       Manufacturing       ✅ Done
+P0-M      XL       Documents           ✅ Done
+P0-N      XL       IoT                 ✅ Done
+P0-O      XL       Inventory           ✅ Done
+P0-P      XL       Expenses            ✅ Done
 ```
 
 ---
@@ -249,9 +249,9 @@ None of these were fixed by weakening the test; each is either a genuine bug in 
 
 ---
 
-### MODULE 8 — EXPENSES 🟡 Pilot w/ restrictions
+### MODULE 8 — EXPENSES 🟢 Pilot w/ restrictions
 
-**Verdict:** All P0 items resolved. EXP-001 (org-scoped indexes + company_id_from_scope throughout), EXP-002 (employee FK in create_expense + create_expense_sheet), EXP-003 (product FK via enforce_expense_product_policy), EXP-004/005/006 (pre-existing), EXP-007 (approver employee check in approve_expense_sheet_impl), EXP-008 (state machine pre-existing).
+**Verdict:** All P0 and P1 items resolved. EXP-001 (org-scoped indexes + company_id_from_scope throughout), EXP-002 (employee FK in create_expense + create_expense_sheet), EXP-003 (product FK via enforce_expense_product_policy), EXP-004/005/006 (pre-existing), EXP-007 (approver employee check in approve_expense_sheet_impl), EXP-008 (state machine pre-existing). EXP-009/EXP-010 were already correctly implemented — verified via new tests. EXP-011 needed a real fix (refuse lacked approve's manager/SoD guards). EXP-012's "10+ tests" bar was already exceeded by the existing 25-test wave suite before this pass.
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
@@ -263,32 +263,36 @@ None of these were fixed by weakening the test; each is either a genuine bug in 
 | EXP-006 | P0 | Validate journal_id FK on expense post | `spacetimedb/src/expenses/expenses.rs` | ✅ Done (pre-existing) | Journal lookup + company match in post_expense_sheet |
 | EXP-007 | P0 | Validate approver_id = existing employee | `spacetimedb/src/expenses/expenses.rs` | ✅ Done | approve_expense_sheet_impl checks approver identity is an hr_employee in this org |
 | EXP-008 | P0 | Enforce state machine (draft → submitted → approved → posted) | `spacetimedb/src/expenses/expenses.rs` | ✅ Done (pre-existing) | All state transitions guarded with explicit state checks |
-| EXP-009 | P1 | Validate expense_sheet company scope on submit | `spacetimedb/src/expenses/` | Not started | All sheet lines in same company |
-| EXP-010 | P1 | Idempotency on expense post (accounting entry) | `spacetimedb/src/expenses/` | Not started | Duplicate post is no-op |
-| EXP-011 | P1 | Add refusal workflow validation | `spacetimedb/src/expenses/` | Not started | Only manager can refuse; state enforced |
-| EXP-012 | P1 | Add full domain test suite | `spacetimedb/tests/expenses/` | Not started | 10+ tests covering all state transitions |
+| EXP-009 | P1 | Validate expense_sheet company scope on submit | `spacetimedb/src/expenses/expenses.rs` | ✅ Verified on Maincloud | `submit_expense` already rejects attaching a different-company line to a sheet (company_id and employee_id both checked) before the line can ever reach the sheet; `submit_expense_sheet` has the same check again as defense-in-depth. `test_submit_expense_rejects_cross_company_attach` proves the rejection and that a same-company attach still succeeds |
+| EXP-010 | P1 | Idempotency on expense post (accounting entry) | `spacetimedb/src/expenses/expenses.rs` | ✅ Verified on Maincloud | `post_expense_sheet` already no-ops on a repeated `client_request_id` and rejects a different request id against an already-posted sheet. `test_post_expense_sheet_is_idempotent` proves the second post call doesn't change `account_move_id` and the move stays posted |
+| EXP-011 | P1 | Add refusal workflow validation | `spacetimedb/src/expenses/expenses.rs` | ✅ Done + Verified on Maincloud | `refuse_expense_sheet` only had the state-machine check; unlike `approve_expense_sheet_impl` it was missing the org-employee and SoD (submitter-cannot-act-on-own-sheet) guards. Split into `refuse_expense_sheet`/`refuse_expense_sheet_impl(skip_approval_check)`, mirroring approve exactly, and added both missing checks to the public reducer. `test_refuse_expense_sheet_rejects_self_refusal` proves a self-refuse attempt is rejected with a SoD-specific error and the sheet stays Submitted |
+| EXP-012 | P1 | Add full domain test suite | `spacetimedb/tests/expenses/` | ✅ Verified — already satisfied | 6 pre-existing wave files (a–f) already covered 25 tests, well past the 10+ bar; a 7th wave (g, 3 tests) was added for EXP-009/010/011 |
 | EXP-013 | P2 | Playwright E2E for expense → approve → post | `frontend/e2e/` | Open | Full flow passes in browser |
 | EXP-014 | P2 | Validate analytic_account_id FK | `spacetimedb/src/expenses/` | Not started | account found if provided |
 
-**Gate:** EXP-001 through EXP-008 all required before any production data.
+**Gate:** EXP-001 through EXP-011 passed on Maincloud on 2026-08-16. Expenses is pilot-ready with restrictions; EXP-013/014 remain for GA.
+
+**2026-08-16 Maincloud evidence:** Published (dev reducers enabled) to a reset `lumiere-v1-j1uo0`. First `run_all_expenses_tests` call failed on a genuinely fresh database with `"Approver must be an employee of this organization"` inside the very first wave-A test — a previously-undiscovered gap, not something this pass introduced: `create_employee` never sets `user_id`, so no test fixture across all 6 pre-existing wave files (15 call sites) had ever actually linked the test-superuser identity to an `hr_employee` row, and `approve_expense_sheet_impl`'s EXP-007 employee check is unconditional (runs even with `skip_approval_check=true`, which only bypasses the SoD/guarded-action step). This had simply never been exercised on a clean database before. Fixed by adding a `seed_caller_manager` harness helper (creates an employee, links it to the caller via `update_employee`) and calling it in every affected test across waves a–g. After republishing, `run_all_expenses_tests` passed cleanly end-to-end — all 28 tests (25 pre-existing + 3 new). Persisted SQL confirms: `expense_sheet` rows named "Wave G Sheet A" (draft, no `account_move_id` — the cross-company attach was never assembled), "Wave G Idem Sheet" (posted, a single `account_move_id` per test run — the duplicate post call did not create a second move), and "Wave G SoD Sheet" (state `Submitted`, not `Refused` — the self-refuse attempt was rejected before any state change).
 
 ---
 
 ### MODULE 9 — PROJECTS 🟢 Pilot w/ restrictions
 
-**Verdict:** All P0 items resolved. `create_task`/`update_task` now validate `depend_on_ids` FKs with BFS cycle detection (PRJ-001). Timesheet–task project consistency was already enforced in `log_timesheet` and `start_timesheet_timer` (PRJ-002 confirmed pre-existing).
+**Verdict:** All P0 and P1 items resolved. `create_task`/`update_task` now validate `depend_on_ids` FKs with BFS cycle detection (PRJ-001). Timesheet–task project consistency was already enforced in `log_timesheet` and `start_timesheet_timer` (PRJ-002 confirmed pre-existing). PRJ-004 required net-new schema (a `ProjectTaskStage` table) — flagged to and approved by the requester before implementation, comparable to Fleet's FLT-003/004 earlier in this plan.
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
 | PRJ-001 | P0 | Validate task dependency_ids FK (no cycles) | `spacetimedb/src/projects/tasks.rs` | ✅ Done | `validate_task_dependencies`: each dep exists in org/project; BFS cycle check capped at 200 hops |
 | PRJ-002 | P0 | Validate timesheet project_id matches task project_id | `spacetimedb/src/projects/timesheets.rs` | ✅ Done (pre-existing) | `task.project_id != Some(params.project_id)` guard in `log_timesheet` + `start_timesheet_timer` |
-| PRJ-003 | P1 | Validate analytic_account_id FK on project | `spacetimedb/src/projects/` | Open | account_id found if provided |
-| PRJ-004 | P1 | Validate stage_id FK on task create/update | `spacetimedb/src/projects/` | Open | stage_id found in project_task_type; project matches |
-| PRJ-005 | P1 | Add negative test: cross-project timesheet | `spacetimedb/tests/projects/` | Open | Cross-project timesheet rejected |
+| PRJ-003 | P1 | Validate analytic_account_id FK on project | `spacetimedb/src/projects/projects.rs` | ✅ Done + Verified on Maincloud | `analytic_account_id` was stored but never validated in `create_project`/`update_project`. Added `require_project_analytic_account` (mirrors the equivalent helper in `purchasing/purchase_orders.rs`), checking org/company match and `active` |
+| PRJ-004 | P1 | Validate stage_id FK on task create/update | `spacetimedb/src/projects/tasks.rs`, `spacetimedb/src/projects/task_stages.rs` (new) | ✅ Done + Verified on Maincloud | `ProjectTask.stage_id` had no backing table at all. Added `ProjectTaskStage` (org/company/project-scoped, mirroring `ProjectMilestone`'s convention exactly) with a `create_project_task_stage` reducer, and `require_task_stage` wired into both `create_task` and `update_task` — a stage from a sibling project is rejected even when org/company match |
+| PRJ-005 | P1 | Add negative test: cross-project timesheet | `spacetimedb/tests/projects/wave_f_test.rs` | ✅ Verified on Maincloud | `log_timesheet`'s existing `task.project_id != Some(params.project_id)` guard (PRJ-002) already covered this; added `test_log_timesheet_rejects_cross_project_task` to prove it |
 | PRJ-006 | P2 | Playwright E2E for project → task → timesheet | `frontend/e2e/` | Open | Full flow passes in browser |
 | PRJ-007 | P2 | Validate milestone_id FK on task | `spacetimedb/src/projects/` | Open | milestone_id found in project_milestone; project matches |
 
-**Gate:** PRJ-001 + PRJ-002 must be complete.
+**Gate:** PRJ-001 through PRJ-005 passed on Maincloud on 2026-08-16. Projects is pilot-ready with restrictions; PRJ-006/007 remain for GA.
+
+**2026-08-16 Maincloud evidence:** Added `spacetimedb/tests/projects/wave_f_test.rs` (3 tests), wired into `run_projects_wave_f_test` and `run_all_projects_tests`. First run of the full suite on a genuinely fresh database also surfaced a previously-undiscovered, unrelated fixture bug in the pre-existing `test_period_lock_rejects_bill` (wave A): it created a new accounting period spanning "today", which now genuinely overlaps the period `OrgFixture::seed_minimal` itself opens (`[now-180d, now+180d]`) — a real, correct overlap rejection the test hadn't accounted for. Fixed by closing the harness's own already-open period directly instead of creating a redundant, colliding one; this is a fixture-only fix; `create_account_period`'s overlap validation itself is correct production behavior and was not touched. After the fix, `run_all_projects_tests` passed cleanly, and `run_all_domain_tests` progressed through Projects (position 9 of the module sequence) without incident before failing later at the already-known, previously-flagged, out-of-scope Documents-module bug (`run_documents_wave_a_tests`, unrelated to this pass). Persisted SQL confirms: exactly one `project_task_stage` row (the same-project attempt), and a `project_project` row with a persisted `analytic_account_id` for the valid case, with the missing/cross-org attempts correctly absent.
 
 ---
 
@@ -314,9 +318,9 @@ None of these were fixed by weakening the test; each is either a genuine bug in 
 
 ---
 
-### MODULE 11 — DOCUMENTS 🟡 Partially relational
+### MODULE 11 — DOCUMENTS 🟢 Pilot w/ restrictions
 
-**Verdict:** DOC-001/002/003/004/005 implemented. DOC-003 (legal hold block on delete) was already present. DOC-004 (company_id validation via `require_company_in_organization`) added. DOC-001/002 (res_model whitelist + res_id FK lookup) added in `create_document`/`update_document`. DOC-005 (company scope guard on create) added. Remaining: test suite, E2E.
+**Verdict:** All P0 and P1 items resolved. DOC-003 (legal hold block on delete) was already present. DOC-004 (company_id validation via `require_company_in_organization`) added. DOC-001/002 (res_model whitelist + res_id FK lookup) added in `create_document`/`update_document`. DOC-005 (company scope guard on create) added. DOC-006 was already fully implemented in both `create_document` and `update_document`. DOC-007's "5+ tests" bar was already exceeded by 8 pre-existing test functions across 5 waves before this pass. DOC-008 (mimetype/size limits) was a genuine gap, now closed.
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
@@ -325,12 +329,14 @@ None of these were fixed by weakening the test; each is either a genuine bug in 
 | DOC-003 | P0 | Enforce legal hold: block delete on held documents | `spacetimedb/src/documents/documents.rs` | ✅ Done (pre-existing) | `document_has_active_legal_hold()` check in `delete_document` |
 | DOC-004 | P0 | Add company_id org validation on document create | `spacetimedb/src/documents/documents.rs` | ✅ Done | `require_company_in_organization()` called when company_id provided |
 | DOC-005 | P0 | Add company scope filter to document queries | `spacetimedb/src/documents/documents.rs` | ✅ Done | company_id validated via `require_company_in_organization` on create |
-| DOC-006 | P1 | Validate folder_id FK on document | `spacetimedb/src/documents/` | Not started | folder_id found in documents_folder; org matches |
-| DOC-007 | P1 | Add full domain test suite | `spacetimedb/tests/documents/` | Not started | 5+ tests covering CRUD and legal hold |
-| DOC-008 | P1 | Validate mimetype/size limits on upload | `spacetimedb/src/documents/` | Open | Reject oversized or disallowed types |
+| DOC-006 | P1 | Validate folder_id FK on document | `spacetimedb/src/documents/documents.rs` | ✅ Verified on Maincloud | Already fully implemented in both `create_document` and `update_document` (existence, org match, company scope, write permission); `test_documents_folder_fk_rejects_cross_org` added since no existing test covered the cross-org case specifically |
+| DOC-007 | P1 | Add full domain test suite | `spacetimedb/tests/platform/platform_smoke.rs` | ✅ Verified — already satisfied | 8 test functions already existed across 5 waves (folder, a–d) before this pass, well past the "5+" bar; added wave E (2 tests) for DOC-006/008 |
+| DOC-008 | P1 | Validate mimetype/size limits on upload | `spacetimedb/src/documents/documents.rs` | ✅ Done + Verified on Maincloud | Neither existed at all. Added a 50 MiB cap (`MAX_DOCUMENT_UPLOAD_BYTES`, mirroring `api-server/src/document_blobs.rs`'s existing `MAX_UPLOAD_BYTES` as defense in depth) and an `ALLOWED_DOCUMENT_MIMETYPES` whitelist to `validate_blob_registration`, called from both `create_document` and `add_document_version` |
 | DOC-009 | P2 | Playwright E2E for document upload → attach → hold | `frontend/e2e/` | Open | Full flow passes in browser |
 
-**Gate:** All P0 items complete. Proceed to pilot after P1 test suite.
+**Gate:** DOC-001 through DOC-008 passed on Maincloud on 2026-08-16. Documents is pilot-ready with restrictions; DOC-009 remains for GA.
+
+**2026-08-16 Maincloud evidence:** Fixing this module also resolved the long-standing, previously-flagged `run_all_domain_tests`/`make e2e-smoke-setup` blocker mentioned repeatedly earlier in this plan (see the ACC-003 evidence note, MODULE 5): `test_documents_create_and_lock` hardcoded `res_model: "sale_order", res_id: 42` — a stale fixture value that predates DOC-002's FK-existence check and was never updated once that check landed, so it had rejected on every run since. Fixed by switching to `res_model: "contact"` with the fixture's own real `partner_id`, mirroring the identical fix already applied to Forms' EAV test in Phase 2 (same root cause, same "hardcoded id 42" pattern, likely the same original author/template). A second, purely cosmetic test bug was found immediately after: `test_documents_company_isolation` asserted the rejection error `.contains("company")` (lowercase) against a message that actually reads "Company does not belong to this organization" (capital C) — a case-sensitivity mismatch in the test only, not the production code. Fixed with `.to_lowercase().contains(...)`. After both fixes, `run_all_platform_tests` (helpdesk, HR, manufacturing, documents ×5 waves, workflow definition, subscriptions, forms, tenant isolation, country pack) passed cleanly end-to-end for what — per this plan's own repeated notes — may be the first time on a genuinely fresh Maincloud database. `run_all_domain_tests` now progresses through every module up to and including Platform before failing at a separate, already-known, out-of-scope Workflow bug (`subject_model 'purchase.order' is not a recognized ERP model for workflow subjects`) — not touched here. Persisted SQL confirms a valid document (`mimetype`/`file_size` within limits) persisted while the oversized, disallowed-mimetype, missing-folder, and cross-org-folder attempts are all correctly absent from the table.
 
 ---
 
@@ -370,9 +376,9 @@ None of these were fixed by weakening the test; each is either a genuine bug in 
 
 ---
 
-### MODULE 14 — HELPDESK 🟢 Pilot w/ restrictions
+### MODULE 14 — HELPDESK ✅ Compliant (P0 + P1 items resolved)
 
-**Verdict:** All 4 P0 FK gaps resolved. `require_helpdesk_team` and `require_helpdesk_stage` helpers added; wired into SLA creation, ticket assignment, and ticket update. Agent validated via `contact.user_id` lookup in org.
+**Verdict:** All 4 P0 FK gaps and all 3 P1 items resolved. `require_helpdesk_team` and `require_helpdesk_stage` helpers (now `pub(crate)`) wired into SLA creation, stage creation, ticket assignment, ticket update, and all four CSV import reducers. Agent validated via `contact.user_id` lookup in org. Cross-team assignment now blocked by a new `HelpdeskTeamMember` roster. SLA breach (`sla_reached`) is now exclusively system-set via a scheduled job.
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
@@ -380,13 +386,15 @@ None of these were fixed by weakening the test; each is either a genuine bug in 
 | HLP-002 | P0 | Validate SLA stage_id FK | `spacetimedb/src/helpdesk/tickets.rs` | ✅ Done | `require_helpdesk_stage` checks org + team-scope |
 | HLP-003 | P0 | Validate assign_ticket agent_id FK | `spacetimedb/src/helpdesk/tickets.rs` | ✅ Done | Agent `Identity` matched against `contact.user_id` in org |
 | HLP-004 | P0 | Validate update_ticket stage_id FK | `spacetimedb/src/helpdesk/tickets.rs` | ✅ Done | `require_helpdesk_stage` called with ticket's `team_id` |
-| HLP-005 | P1 | Validate CSV import team_id/stage_id FKs | `spacetimedb/src/helpdesk/tickets.rs` | Not started | All FK fields validated before batch insert |
-| HLP-006 | P1 | Reject cross-team ticket assignment | `spacetimedb/src/helpdesk/tickets.rs` | Open | agent must belong to ticket's team |
-| HLP-007 | P1 | Add SLA breach event validation | `spacetimedb/src/helpdesk/` | Open | SLA breach only set by system; not user input |
+| HLP-005 | P1 | Validate CSV import team_id/stage_id FKs | `spacetimedb/src/data_ops/helpdesk_imports.rs` | ✅ Done | `require_helpdesk_team`/`require_helpdesk_stage` (plus new sla_id/partner_id checks) reject bad rows per-row in all 4 import reducers |
+| HLP-006 | P1 | Reject cross-team ticket assignment | `spacetimedb/src/helpdesk/tickets.rs` | ✅ Done | New `HelpdeskTeamMember` roster (`add_helpdesk_team_member`/`remove_helpdesk_team_member`); `assign_ticket` calls `require_team_member` |
+| HLP-007 | P1 | Add SLA breach event validation | `spacetimedb/src/helpdesk/tickets.rs` | ✅ Done | `sla_reached` is never client-settable (CSV import forces `false`); new scheduled `HelpdeskSlaCheckJob`/`run_helpdesk_sla_check` is the only code path that sets it `true`, and only past a real deadline on a still-open ticket |
 | HLP-008 | P2 | Add negative test: cross-org ticket | `spacetimedb/tests/helpdesk/` | Open | Cross-org ticket creation rejected |
 | HLP-009 | P2 | Playwright E2E for ticket → assign → close | `frontend/e2e/` | Open | Full flow passes in browser |
 
-**Gate:** HLP-001 through HLP-004 all required.
+**Gate:** HLP-001 through HLP-007 all satisfied. HLP-008/009 (P2) remain for GA depth.
+
+**2026-08-16 evidence:** Added the module's first-ever test suite (`spacetimedb/tests/helpdesk/`, previously nonexistent, matching AI/IoT's prior state) with 3 tests covering HLP-005/006/007. `run_all_helpdesk_tests` and `run_all_domain_tests` both passed (EXIT=0) on a reset Maincloud database. SQL: `helpdesk_team_member` 4 rows, `helpdesk_ticket` 7 rows, `helpdesk_sla_check_job` 2 rows still pending (their deadlines are in the future — expected), `import_job` shows 6 `helpdesk_ticket` import runs including the rejected-row cases.
 
 ---
 
@@ -408,9 +416,9 @@ None of these were fixed by weakening the test; each is either a genuine bug in 
 
 ---
 
-### MODULE 16 — IoT 🟡 Pilot w/ restrictions
+### MODULE 16 — IoT 🟢 Pilot w/ restrictions
 
-**Verdict:** All P0 items resolved. IOT-001/002/004 validate org match between device and linked entity in link_device_to_* reducers; IOT-003 validates company match for PosConfig (which lacks organization_id); IOT-005 adds org guard in apply_measurement_to_quality_check; IOT-006 scopes workorder lookup to device.organization_id in trigger_footswitch_workorder.
+**Verdict:** All P0 and P1 items resolved. IOT-001/002/004 validate org match between device and linked entity in link_device_to_* reducers; IOT-003 validates company match for PosConfig (which lacks organization_id); IOT-005 adds org guard in apply_measurement_to_quality_check; IOT-006 scopes workorder lookup to device.organization_id in trigger_footswitch_workorder. IOT-007 through 010 added `company_id` (denormalized from the owning device, matching the codebase's existing denormalization convention) to all four tables that had never carried it.
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
@@ -420,14 +428,16 @@ None of these were fixed by weakening the test; each is either a genuine bug in 
 | IOT-004 | P0 | Validate org match in link_device_to_quality_check | `spacetimedb/src/iot/integrations.rs` | ✅ Done | quality_check.organization_id == device.organization_id checked |
 | IOT-005 | P0 | Validate org in auto-invoke telemetry → quality check | `spacetimedb/src/iot/telemetry.rs` | ✅ Done | apply_measurement_to_quality_check guards check.organization_id == device_org_id |
 | IOT-006 | P0 | Validate org in footswitch → workorder auto-invoke | `spacetimedb/src/iot/telemetry.rs` | ✅ Done | trigger_footswitch_workorder scopes workorder iter to device_org_id |
-| IOT-007 | P1 | Add company_id to IoTTelemetry table | `spacetimedb/src/iot/` | Not started | company_id populated on insert |
-| IOT-008 | P1 | Add company_id to IoTThreshold table | `spacetimedb/src/iot/` | Not started | company_id populated on insert |
-| IOT-009 | P1 | Add company_id to IoTAlert table | `spacetimedb/src/iot/` | Not started | company_id populated on insert |
-| IOT-010 | P1 | Add company_id to IoTAction table | `spacetimedb/src/iot/` | Not started | company_id populated on insert |
+| IOT-007 | P1 | Add company_id to IoTTelemetry table | `spacetimedb/src/iot/telemetry.rs` | ✅ Done + Verified on Maincloud | Both `record_telemetry` and `record_telemetry_batch` set `company_id: device.company_id` on every insert |
+| IOT-008 | P1 | Add company_id to IoTThreshold table | `spacetimedb/src/iot/telemetry.rs` | ✅ Done + Verified on Maincloud | `set_iot_threshold`'s insert branch sets `company_id: device.company_id` (the update branch preserves it via `..existing`) |
+| IOT-009 | P1 | Add company_id to IoTAlert table | `spacetimedb/src/iot/alerts.rs` | ✅ Done + Verified on Maincloud | `create_alert_internal` (auto-created on threshold breach) and `create_iot_alert` (manual) both now take/set `company_id` |
+| IOT-010 | P1 | Add company_id to IoTAction table | `spacetimedb/src/iot/actions.rs` | ✅ Done + Verified on Maincloud | `create_iot_action`, `test_iot_device`, and the shared `queue_action_internal` helper (used by 3 POS-transaction IoT hooks in `spacetimedb/src/sales/pos_transactions.rs`) all now set `company_id` |
 | IOT-011 | P2 | Add cross-org device link rejection test | `spacetimedb/tests/iot/` | Open | Cross-org link rejected |
 | IOT-012 | P2 | Playwright E2E for device → telemetry → alert | `frontend/e2e/` | Open | Full flow passes in browser |
 
-**Gate:** IOT-001 through IOT-006 all required before any production data.
+**Gate:** IOT-001 through IOT-010 passed on Maincloud on 2026-08-16. IoT is pilot-ready with restrictions; IOT-011/012 remain for GA.
+
+**2026-08-16 Maincloud evidence:** No `spacetimedb/tests/iot/` suite existed before this pass (IoT had zero test coverage and no `run_all_iot_tests` reducer, matching AI's state before its own first suite). Added `tests/iot/relational_integrity_test.rs`, wired into `run_all_iot_tests` and `run_all_domain_tests`. All four fields required threading a `company_id: u64` parameter through internal helper functions (`check_thresholds`, `create_alert_internal`, `queue_action_internal`) since the device row carrying it wasn't otherwise in scope at every insert site — 3 call sites in `spacetimedb/src/sales/pos_transactions.rs`'s POS→IoT hooks (customer display, payment terminal, receipt printer) needed updating too. `run_all_iot_tests` and `run_all_sales_tests` (to confirm the `pos_transactions.rs` change didn't regress) both passed on Maincloud. Persisted SQL confirms real, non-zero `company_id` values matching each row's owning device on `iot_telemetry`, `iot_threshold`, `iot_alert` (created via an actual threshold breach, not inserted directly), and `iot_action`.
 
 ---
 
@@ -470,9 +480,9 @@ None of these were fixed by weakening the test; each is either a genuine bug in 
 
 ---
 
-### MODULE 19 — WORKFLOW 🟡 Partially relational
+### MODULE 19 — WORKFLOW 🟢 Compliant (P0 + P1 items resolved)
 
-**Verdict:** ✅ P0 items resolved. subject_id FK validated at start; revision hash re-validated on signal; candidate role FK validated at task creation; parent token Active guard + queue job FK guard already existed in codebase.
+**Verdict:** ✅ All P0 and P1 items resolved or re-scoped to match the actual architecture. subject_id FK validated at start (and doubles as the subject_model whitelist); revision hash re-validated on signal; candidate role FK validated at task creation; parent token Active guard + queue job FK guard already existed in codebase. WRK-006 re-scoped (no `assignee_id` field exists — authorization runs on candidate-role/group/unit membership instead); WRK-008 re-scoped (no "Expired" token state exists to test against — the intent is already covered by WRK-004).
 
 | ID | Priority | Item | File / Location | Status | Acceptance Criteria |
 |----|----------|------|-----------------|--------|---------------------|
@@ -481,12 +491,14 @@ None of these were fixed by weakening the test; each is either a genuine bug in 
 | WRK-003 | P0 | Validate guarded action at task creation time | `spacetimedb/src/workflow/approvals.rs` | ✅ Done | Required approver roles exist in org (role table FK) |
 | WRK-004 | P0 | Check parent token state before child task create | `spacetimedb/src/workflow/approvals.rs` | ✅ Done | Parent token is active (not cancelled/expired) |
 | WRK-005 | P0 | Enforce queue job FK (job table exists) | `spacetimedb/src/workflow/delivery.rs` | ✅ Done | queue job references valid workflow queue entry |
-| WRK-006 | P1 | Validate assignee_id FK on task assign | `spacetimedb/src/workflow/runtime.rs` | Open | assignee_id found in users; org matches |
-| WRK-007 | P1 | Add subject_model whitelist | `spacetimedb/src/workflow/runtime.rs` | Open | subject_model in allowed ERP model set |
-| WRK-008 | P1 | Add negative test: expired parent token | `spacetimedb/tests/workflow/` | Open | Creating child of expired token rejected |
+| WRK-006 | P1 | Validate assignee_id FK on task assign | `spacetimedb/src/workflow/runtime.rs` | ✅ Re-scoped, covered | No `assignee_id` field exists; `authorize_task_actor` validates candidate-role/group/unit membership on every claim/decision instead |
+| WRK-007 | P1 | Add subject_model whitelist | `spacetimedb/src/workflow/runtime.rs` | ✅ Done | `validate_subject_id_fk`'s closed `match subject_model {...}` (already shipped with WRK-001) rejects any unlisted model |
+| WRK-008 | P1 | Add negative test: expired parent token | `spacetimedb/tests/workflow/` | ⚪ Re-scoped, not applicable | `WorkflowTokenState` has no "Expired" variant (`Active/Consumed/Cancelled/Completed/Failed`); intent already covered by WRK-004's cancelled-token test |
 | WRK-009 | P2 | Playwright E2E for workflow create → approve → complete | `frontend/e2e/` | Open | Full flow passes in browser |
 
-**Gate:** WRK-001 through WRK-005 all required.
+**Gate:** WRK-001 through WRK-008 all satisfied (WRK-006/008 re-scoped with reasoning above, no code gap remains). WRK-009 (P2 Playwright) remains for GA depth.
+
+**2026-08-16 evidence:** After fixing a long chain of clean-database-only fixture bugs (model-name mismatches, hardcoded subject_id/role_id/journal_id placeholders — see Sprint 7g), `run_all_workflow_foundation_tests`, `run_all_workflow_deterministic_core_tests`, `run_all_workflow_human_effect_tests`, `run_workflow_authorization_tests`, and `run_workflow_migration_tests` all passed on a reset Maincloud database, and `run_all_domain_tests` passed end-to-end (EXIT=0) — the first fully-green run of the whole domain-test gate this session. SQL on the resulting database: `workflow_instance` 20 rows, `workflow_human_task` 6 rows, `guarded_action_receipt` 11 rows, `workflow_outbox` 4 rows.
 
 ---
 
@@ -561,8 +573,8 @@ Analytics (ANL)
 
 ### Gate 3: General Availability (all modules, full customer base)
 **Prerequisite:** All P0 + P1 items complete; all domain tests green; Playwright E2E for each module
-**Modules with most work remaining:** Expenses (14 items), Inventory (13 items), Documents (9 items), IoT (12 items)
-**Item-level open work:** 44 P1 + 35 P2 items; Playwright/domain release evidence remains
+**P1 backlog (2026-08-16): 0 across every module** — see §6 for the full P2 breakdown by module
+**Item-level open work:** 0 P1 + 33 P2 items; Playwright/domain release evidence remains. `run_all_domain_tests` passes end-to-end on a reset Maincloud database
 
 ---
 
@@ -571,13 +583,19 @@ Analytics (ANL)
 | Severity | Total Open Items | Blocking GA |
 |----------|-----------------|-------------|
 | P0 | 0 | N/A — all item-level P0 gates are closed |
-| P1 | 22 | Yes (before GA) |
-| P2 | 34 | No by priority, though tracked Playwright gates are required by Gate 3 |
-| **Total** | **56** | — |
+| P1 | 0 | N/A — all item-level P1 gates are closed |
+| P2 | 33 | No by priority, though tracked Playwright gates are required by Gate 3 |
+| **Total** | **33** | — |
 
 **2026-08-15 update (AM):** Inventory P1 (INV-008/009/010/011), CRM P1 (CRM-002/003/004) + P2 (CRM-005), and HR P1 (HR-005) closed and verified on Maincloud, reducing open P1 by 8 and open P2 by 1 (79 → 70). See MODULE 3, 6, 7 evidence above.
 
 **2026-08-15 update (PM):** Sales P1 (SAL-001/002), AI P1 (AI-006/007), Fleet P1 (FLT-003/004), Forms P1 (FRM-002/003), Proposals P1 (PRO-005/006), Analytics P1 (ANL-004/005), and Integrations P1 (INT-001/002) closed and verified on Maincloud — 14 P1 items — reducing open P1 by 14 (36 → 22, 70 → 56 total). Three genuine production bugs (not fixture/test issues) were found and fixed along the way: Sales ATP double-reservation and return-order self-counting (both blocking `run_all_sales_tests` from ever completing), plus the SAL-005 arithmetic-location bug from the morning pass. See MODULE 1, 10, 12, 13, 15, 17, 18 evidence above.
+
+**2026-08-16 update:** Accounting P1 (ACC-002/003), Expenses P1 (EXP-009/010/011/012), IoT P1 (IOT-007/008/009/010), Projects P1 (PRJ-003/004/005), and Documents P1 (DOC-006/007/008) closed and verified — 16 P1 items — reducing open P1 by 16 (22 → 6, 56 → 39 total). Two genuine production bugs found along the way (not fixture-only): Accounting reads had zero company-scope enforcement for any resource outside CRM/Inventory/Purchasing (a real cross-company data leak, fixed in `api-server/src/query_exec.rs`), and Expenses' `refuse_expense_sheet` was missing the org-employee/SoD guards its sibling `approve_expense_sheet_impl` already had. Several more clean-database-only fixture bugs were found and fixed along the way (Expenses' employee-linking gap across 15 call sites, Projects' colliding-period test, and — significantly — Documents' long-standing `res_id 42` fixture bug that had blocked `run_all_domain_tests`/`make e2e-smoke-setup` since before this whole plan started) — see MODULE 5, 8, 9, 11, 16 evidence above.
+
+**2026-08-16 update (Workflow):** Workflow P1 (WRK-006/007/008) closed and verified — 3 P1 items — reducing open P1 by 3 (6 → 3, 39 → 36 total). No production code changes were needed: WRK-007 was already implemented as part of WRK-001's `validate_subject_id_fk` whitelist, and WRK-006/008 were re-scoped after confirming the fields/states they described (`assignee_id`, an "Expired" token state) don't exist in the actual implementation — the equivalent protections are already covered by `authorize_task_actor` and WRK-004 respectively. The bulk of the effort was fixture-only: a long, previously-undiscovered chain of clean-database bugs across 7 Workflow test files (Odoo-style model-name literals, hardcoded subject_id/role_id/journal_id placeholders) that had silently blocked the Workflow aggregate test reducers — and, transitively, `run_all_domain_tests` itself — from ever completing on a fresh database. After the fixes, **`run_all_domain_tests` passed end-to-end (EXIT=0) on a freshly reset Maincloud database for the first time this session** — see MODULE 19 and Sprint 7g evidence above.
+
+**2026-08-16 update (Helpdesk — P1 backlog now zero across every module):** Helpdesk P1 (HLP-005/006/007) closed and verified — the last 3 open P1 items in the entire plan — reducing open P1 by 3 (3 → 0, 36 → 33 total). All three were genuine gaps, unlike Workflow's re-scoped items: HLP-005's four CSV import reducers only checked `team_id != 0`, never actual FK existence/org/team scope (now use the existing `require_helpdesk_team`/`require_helpdesk_stage` helpers, made `pub(crate)`, plus new sla_id/partner_id checks); HLP-006 had no team-membership concept at all, so any org contact could be assigned to any ticket regardless of team — added a new `HelpdeskTeamMember` roster table and `require_team_member` guard; HLP-007's `sla_reached` breach flag could be set directly by CSV import (and there was no system that ever computed it otherwise — `create_ticket` always inserted `false` and nothing ever flipped it) — CSV import now forces `false` regardless of input, `create_ticket` derives `sla_deadline` from the SLA policy when not explicit, and a new scheduled `HelpdeskSlaCheckJob`/`run_helpdesk_sla_check` (mirroring Sales' existing `SalesSlaEscalationJob` pattern) is now the sole place the flag ever becomes true. Added the module's first-ever test suite (`spacetimedb/tests/helpdesk/`, previously nonexistent). `run_all_helpdesk_tests` and `run_all_domain_tests` both passed on a reset Maincloud database — see MODULE 14 and Sprint 7h evidence above.
 
 ### P0 Items by Module
 
@@ -637,7 +655,8 @@ Analytics (ANL)
 
 ### Sprint 6 — Greenfield (2–3 weeks)
 - ✅ EXP-001 through EXP-008: All Expenses P0 items resolved
-- EXP-009 through EXP-014: Expenses P1/P2 items (next hardening cycle)
+- ✅ EXP-009 through EXP-012: Expenses P1 items — see Sprint 7c
+- EXP-013/014: Expenses P2 items (GA hardening)
 
 ### Sprint 7 — Purchasing Tests + P1 Hardening ✅ Complete
 - ✅ PUR-001/002/003/004: Purchasing Maincloud suite green; runtime failures fixed
@@ -663,6 +682,42 @@ Analytics (ANL)
 - ✅ INT-001/002: `record_inventory_integration_result` (the actual location of this reducer — `spacetimedb/src/inventory/integration.rs`, not `spacetimedb/src/integrations/`) now validates product_id/location_id before posting stock
 - ✅ SAL-006/007 (found during this pass, not pre-planned): fixed two genuine production bugs that had silently prevented `run_all_sales_tests` from ever completing on a clean database — ATP double-reservation between `confirm_sales_order` and `assign_stock_picking` for primary-warehouse orders, and `confirm_return_order` self-counting its own just-inserted return lines as "already returned," which made any full-quantity return always self-reject on confirm
 - Research for all 7 modules was parallelized via background Explore agents before implementation; several tracker items turned out already-implemented (SAL-001, AI-006/007, FRM-003, PRO-005's core check, PRO-006's rejection behavior) and needed only persisted test evidence, not code changes
+
+### Sprint 7c — Expenses P1 Hardening ✅ Complete (2026-08-16)
+- ✅ EXP-009/010: Cross-company sheet-line attach rejection and idempotent post were both already correctly implemented (`submit_expense`'s existing company/employee match check and `post_expense_sheet`'s existing `client_request_id` no-op path) — proved with new tests, no code change needed
+- ✅ EXP-011 (found genuine gap): `refuse_expense_sheet` only enforced the state machine — unlike `approve_expense_sheet_impl` it was missing the org-employee and self-refusal (SoD) guards entirely. Split into `refuse_expense_sheet`/`refuse_expense_sheet_impl(skip_approval_check)` mirroring approve's own pattern, and added both checks
+- ✅ EXP-012: the "10+ tests" bar was already exceeded — 6 pre-existing wave files covered 25 tests before this pass; added wave G (3 tests) for the items above
+- Fixed a genuine, previously-undiscovered fixture gap affecting 15 call sites across all 6 pre-existing wave files: `create_employee` never sets `user_id`, so no expenses test had ever linked the test-superuser identity to an `hr_employee` row, and `approve_expense_sheet_impl`'s employee-membership check is unconditional (runs even when `skip_approval_check=true`). This had simply never been exercised on a truly fresh Maincloud database before — `run_all_expenses_tests` failed on its very first wave-A test on first attempt. Added a `seed_caller_manager` harness helper and wired it into every affected test
+
+### Sprint 7d — IoT P1 Hardening ✅ Complete (2026-08-16)
+- ✅ IOT-007/008/009/010: added `company_id` (denormalized from the owning `IoTDevice`) to `IoTTelemetry`, `IoTThreshold`, `IoTAlert`, and `IoTAction` — none of the four had ever carried it. Required threading a new `company_id` parameter through three internal helpers (`check_thresholds`, `create_alert_internal`, `queue_action_internal`) since the owning device wasn't otherwise in scope at every insert site, including 3 POS→IoT hook call sites in `spacetimedb/src/sales/pos_transactions.rs`
+- Added the module's first-ever test suite (`spacetimedb/tests/iot/`, previously nonexistent, matching AI's prior state) and wired it into `run_all_domain_tests`; `run_all_sales_tests` re-verified clean given the `pos_transactions.rs` change
+
+### Sprint 7e — Projects P1 Hardening ✅ Complete (2026-08-16)
+- ✅ PRJ-003: `analytic_account_id` was stored on `ProjectProject` but never validated — added `require_project_analytic_account` (mirrors the equivalent Purchasing helper) to both `create_project` and `update_project`
+- ✅ PRJ-004 (net-new schema, approved by the requester): `ProjectTask.stage_id` had no backing table at all. Added `ProjectTaskStage` (org/company/project-scoped, mirroring `ProjectMilestone`'s existing convention) with `create_project_task_stage`, and a `require_task_stage` validator wired into both `create_task` and `update_task`
+- ✅ PRJ-005: `log_timesheet`'s existing cross-project guard (PRJ-002) already covered this; added a dedicated negative test
+- Fixed a genuine, previously-undiscovered fixture bug in the pre-existing `test_period_lock_rejects_bill` (wave A): it created a new accounting period that now correctly collides with the period `OrgFixture::seed_minimal` itself opens — this had never been caught because Projects' full test suite had never run on a truly fresh Maincloud database before this pass
+
+### Sprint 7f — Documents P1 Hardening ✅ Complete (2026-08-16)
+- ✅ DOC-006: `folder_id` was already fully validated (existence, org, company scope, write permission) in both `create_document` and `update_document`; added a dedicated cross-org negative test since none existed
+- ✅ DOC-007: the "5+ tests" bar was already exceeded — 8 test functions existed across 5 waves before this pass; added wave E (2 tests) for DOC-006/008
+- ✅ DOC-008 (genuine gap): `create_document`/`add_document_version` had no size cap or mimetype whitelist at all. Added a 50 MiB cap mirroring `api-server/src/document_blobs.rs`'s existing HTTP-layer limit (defense in depth) and a general ERP-document mimetype whitelist
+- Fixed the long-standing `res_id 42` fixture bug in `test_documents_create_and_lock` that had blocked `run_all_domain_tests`/`make e2e-smoke-setup`'s domain gate since before this plan began — the same "hardcoded id 42, predates the FK-existence check" pattern already found and fixed in Forms during Phase 2. Also fixed a one-line case-sensitivity bug in `test_documents_company_isolation`'s error-message assertion. `run_all_domain_tests` now clears every module through Platform (Documents included) before stopping at an already-known, unrelated Workflow bug
+
+### Sprint 7g — Workflow P1 Hardening ✅ Complete (2026-08-16)
+- ✅ WRK-006 (re-scoped, matches actual architecture): there is no persisted `assignee_id: u64` field anywhere in the workflow module — human tasks are never assigned to a single user id. Authorization instead runs through `authorize_task_actor`, which checks the acting `Identity` against the task's `candidate_role_ids`/`candidate_group_ids`/`candidate_unit_ids` (or the `AllCandidates` projection) at claim/decision time — i.e. the FK-equivalent membership check already exists and is exercised by `human_tasks_test.rs`. Closed as already-covered; the item as originally written described a field that was never built
+- ✅ WRK-007: already implemented as part of WRK-001 — `validate_subject_id_fk` (`spacetimedb/src/workflow/runtime.rs`) is a closed `match subject_model { "purchase_order" => ..., "sale_order" => ..., ..., other => Err(...) }`, i.e. a genuine whitelist that also FK-checks existence, called from `start_workflow`
+- ⚪ WRK-008 (re-scoped, not applicable as written): `WorkflowTokenState` has exactly five variants (`Active, Consumed, Cancelled, Completed, Failed`) — there is no "Expired" state to write a negative test against. The functional intent (reject creating a child task/action from a non-Active parent token) is WRK-004, already ✅ Done and covered by `delivery_test.rs`'s existing cancelled-token test. Recommend removing WRK-008 as stated or rewriting it against a real state (e.g. `Failed`) in a future pass — not blocking, no code change made
+- Root-caused and fixed a long, previously-undiscovered chain of clean-database-only fixture bugs across 7 Workflow test files (`action_registry_test.rs`, `branches_test.rs`, `definitions_test.rs`, `delivery_test.rs`, `evaluator_simulation_test.rs`, `migration_test.rs`, `runtime_test.rs`) that had silently blocked `run_all_workflow_deterministic_core_tests`/`run_all_workflow_human_effect_tests`/`run_all_domain_tests` from ever completing on a fresh database: (1) 10 occurrences of Odoo-style `"purchase.order"` instead of this codebase's `"purchase_order"`, which `validate_subject_id_fk`'s whitelist rejects outright; (2) hardcoded/placeholder `subject_id` literals (101/102/201/301/42/random) that don't exist as real rows, now real `purchase_order` rows seeded via vendor-contact-then-PO helpers per file; (3) `candidate_role_ids: vec![1]` referencing a nonexistent role, now real seeded `Role` rows; (4) two hardcoded fake `journal_id` placeholders (`991_001`, `991_002`) in `action_registry_test.rs` failing `require_active_journal`/`load_active_journal_in_scope`, now real bank journals via the existing `accounting_tests::helpers::seed_bank_journal`. Also hardened `delivery_test.rs`'s `outbox_dispatch_is_linked_and_idempotent` duplicate-row assertion to scope by `organization_id`/`company_id` (matching the production dedup key in `create_workflow_outbox_internal`) instead of a bare `semantic_key` match, since the unscoped version could false-positive if the same literal semantic key were ever reused across orgs in one database session
+- **`run_all_domain_tests` now passes end-to-end (EXIT=0) on a freshly reset Maincloud database** — every module from Accounting through IoT, including all three Workflow aggregate reducers, in one call. This is the first time this session that the full domain-test gate has cleared completely
+
+### Sprint 7h — Helpdesk P1 Hardening ✅ Complete (2026-08-16) — P1 backlog now zero plan-wide
+- ✅ HLP-005 (genuine gap): all four `import_helpdesk_*_csv` reducers only checked `team_id != 0`, never real FK existence/org/team scope. Made `require_helpdesk_team`/`require_helpdesk_stage` `pub(crate)` and wired them into `import_helpdesk_stage_csv`, `import_helpdesk_sla_csv`, and `import_helpdesk_ticket_csv` (plus new sla_id org/team-match and partner_id org-match checks for tickets), all following the file's existing per-row soft-fail convention (`record_import_error` + `continue`, not a hard `Err` that aborts the whole batch)
+- ✅ HLP-006 (genuine gap, net-new schema): there was no team-membership concept anywhere — `assign_ticket` only checked the agent was a known org contact, not that they belonged to the ticket's team. Added `HelpdeskTeamMember` (org+team+identity roster) with `add_helpdesk_team_member`/`remove_helpdesk_team_member`, and a `require_team_member` guard wired into `assign_ticket`
+- ✅ HLP-007 (genuine gap): `sla_reached` had no system behind it at all — `create_ticket` always inserted `false` and nothing in production code ever flipped it to `true` except CSV import trusting a user-supplied column verbatim. CSV import now hardcodes `false` regardless of input; `create_ticket` derives `sla_deadline` from the linked SLA's `time_days`/`time_hours` when the caller doesn't pin one; added a scheduled `HelpdeskSlaCheckJob`/`run_helpdesk_sla_check` (mirroring Sales' existing `SalesSlaEscalationJob` pattern in `oms_advanced.rs`) as the sole system-side path that ever sets the flag, and only past a real deadline on a still-open ticket
+- Bonus fix in the same file/theme: `create_helpdesk_stage` accepted an optional `team_id` with zero FK validation (not one of the tracked items, but the same class of gap as HLP-005/001) — added the missing `require_helpdesk_team` check
+- Added the module's first-ever test suite (`spacetimedb/tests/helpdesk/`, previously nonexistent, matching AI/IoT/Workflow-adjacent modules' prior state) and wired it into `run_all_domain_tests`; both it and the full domain suite passed clean on a reset Maincloud database on the first attempt — no clean-database fixture bugs were found in this module (unlike most others this session)
 
 ### Sprint 8 — E2E Tests + GA Hardening
 - All remaining P1 items across modules

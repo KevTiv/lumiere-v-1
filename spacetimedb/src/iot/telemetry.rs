@@ -25,6 +25,8 @@ pub struct IoTTelemetry {
     pub id: u64,
     pub device_id: u64,
     pub organization_id: u64,
+    /// IOT-007: denormalized from device.company_id at write time.
+    pub company_id: u64,
     /// Sensor type: "weight", "temperature", "humidity", "barcode", "rfid", "count", etc.
     pub sensor_type: String,
     /// Numeric reading (for barcodes/RFID this is 0.0 — use raw_value)
@@ -50,6 +52,8 @@ pub struct IoTThreshold {
     pub id: u64,
     pub device_id: u64,
     pub organization_id: u64,
+    /// IOT-008: denormalized from device.company_id at write time.
+    pub company_id: u64,
     pub sensor_type: String,
     pub min_value: Option<f64>,
     pub max_value: Option<f64>,
@@ -105,6 +109,7 @@ pub fn record_telemetry(
         id: 0,
         device_id,
         organization_id,
+        company_id: device.company_id,
         sensor_type: params.sensor_type.clone(),
         value: params.value,
         raw_value: params.raw_value.clone(),
@@ -118,6 +123,7 @@ pub fn record_telemetry(
         check_thresholds(
             ctx,
             organization_id,
+            device.company_id,
             device_id,
             &params.sensor_type,
             params.value,
@@ -171,6 +177,7 @@ pub fn record_telemetry_batch(
             id: 0,
             device_id,
             organization_id,
+            company_id: device.company_id,
             sensor_type: params.sensor_type.clone(),
             value: params.value,
             raw_value: params.raw_value.clone(),
@@ -183,6 +190,7 @@ pub fn record_telemetry_batch(
             check_thresholds(
                 ctx,
                 organization_id,
+                device.company_id,
                 device_id,
                 &params.sensor_type,
                 params.value,
@@ -243,6 +251,7 @@ pub fn set_iot_threshold(
             id: 0,
             device_id,
             organization_id,
+            company_id: device.company_id,
             sensor_type,
             min_value,
             max_value,
@@ -259,6 +268,7 @@ pub fn set_iot_threshold(
 fn check_thresholds(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     device_id: u64,
     sensor_type: &str,
     value: f64,
@@ -280,6 +290,7 @@ fn check_thresholds(
                 ctx,
                 device_id,
                 organization_id,
+                company_id,
                 "threshold_low",
                 &threshold.severity,
                 &format!(
@@ -294,6 +305,7 @@ fn check_thresholds(
                 ctx,
                 device_id,
                 organization_id,
+                company_id,
                 "threshold_high",
                 &threshold.severity,
                 &format!(

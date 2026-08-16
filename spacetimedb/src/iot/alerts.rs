@@ -23,6 +23,8 @@ pub struct IoTAlert {
     pub id: u64,
     pub device_id: u64,
     pub organization_id: u64,
+    /// IOT-009: denormalized from device.company_id at write time.
+    pub company_id: u64,
     pub alert_type: String,
     pub severity: String, // IoTAlertSeverity: "Info" | "Warning" | "Critical"
     pub message: String,
@@ -40,6 +42,7 @@ pub fn create_alert_internal(
     ctx: &ReducerContext,
     device_id: u64,
     organization_id: u64,
+    company_id: u64,
     alert_type: &str,
     severity: &str,
     message: &str,
@@ -48,6 +51,7 @@ pub fn create_alert_internal(
         id: 0,
         device_id,
         organization_id,
+        company_id,
         alert_type: alert_type.to_string(),
         severity: severity.to_string(),
         message: message.to_string(),
@@ -150,6 +154,7 @@ pub fn create_iot_alert(
         id: 0,
         device_id,
         organization_id,
+        company_id: device.company_id,
         alert_type: alert_type.clone(),
         severity: severity.clone(),
         message: message.clone(),

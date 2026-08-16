@@ -15,6 +15,7 @@ pub fn run_all_platform_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_documents_wave_b_tests(ctx)?;
     run_documents_wave_c_tests(ctx)?;
     run_documents_wave_d_tests(ctx)?;
+    run_documents_wave_e_tests(ctx)?;
     run_workflow_definition_test(ctx)?;
     run_subscription_plan_test(ctx)?;
     run_forms_custom_field_test(ctx)?;
@@ -78,6 +79,15 @@ pub fn run_documents_wave_c_tests(ctx: &ReducerContext) -> Result<(), String> {
 pub fn run_documents_wave_d_tests(ctx: &ReducerContext) -> Result<(), String> {
     platform_smoke::test_documents_wave_d_hold_ocr_drive_esign_presence(ctx)
         .map_err(|e| format!("documents wave d: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_documents_wave_e_tests(ctx: &ReducerContext) -> Result<(), String> {
+    platform_smoke::test_documents_folder_fk_rejects_cross_org(ctx)
+        .map_err(|e| format!("documents folder fk cross-org: {e}"))?;
+    platform_smoke::test_documents_upload_rejects_oversized_and_disallowed_mimetype(ctx)
+        .map_err(|e| format!("documents upload limits: {e}"))?;
+    Ok(())
 }
 
 #[spacetimedb::reducer]

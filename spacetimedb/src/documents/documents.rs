@@ -269,7 +269,41 @@ pub struct UpdateDocumentFolderParams {
 // HELPERS
 // ============================================================================
 
-fn validate_blob_registration(url: &str, file_size: u64, checksum: &str) -> Result<(), String> {
+/// DOC-008: mirrors `api-server/src/document_blobs.rs`'s `MAX_UPLOAD_BYTES` —
+/// the HTTP blob-upload endpoint already enforces this before storage, but
+/// `create_document`/`update_document` only register metadata and could be
+/// called directly, so the reducer layer checks it again as defense in depth.
+const MAX_DOCUMENT_UPLOAD_BYTES: u64 = 50 * 1024 * 1024;
+
+/// DOC-008: general-purpose ERP document types. Fiscal-archive mimetypes are
+/// validated separately (and more narrowly) by `validate_fiscal_archive`.
+const ALLOWED_DOCUMENT_MIMETYPES: &[&str] = &[
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "image/svg+xml",
+    "text/plain",
+    "text/csv",
+    "application/json",
+    "application/xml",
+    "text/xml",
+    "application/zip",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+];
+
+fn validate_blob_registration(
+    url: &str,
+    file_size: u64,
+    checksum: &str,
+    mimetype: &str,
+) -> Result<(), String> {
     if url.trim().is_empty() {
         return Err(
             "url is required — upload the file to object storage before registering".to_string(),
@@ -277,6 +311,15 @@ fn validate_blob_registration(url: &str, file_size: u64, checksum: &str) -> Resu
     }
     if file_size == 0 {
         return Err("file_size must be greater than zero".to_string());
+    }
+    if file_size > MAX_DOCUMENT_UPLOAD_BYTES {
+        return Err(format!(
+            "file_size {file_size} exceeds max allowed {MAX_DOCUMENT_UPLOAD_BYTES} bytes"
+        ));
+    }
+    let mt = mimetype.trim().to_ascii_lowercase();
+    if !ALLOWED_DOCUMENT_MIMETYPES.contains(&mt.as_str()) {
+        return Err(format!("mimetype '{mimetype}' is not an allowed document type"));
     }
     let checksum = checksum.trim();
     if checksum.is_empty() {
@@ -595,7 +638,12 @@ pub fn create_document(
     params: CreateDocumentParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "document", "create")?;
-    validate_blob_registration(&params.url, params.file_size, &params.checksum)?;
+    validate_blob_registration(
+        &params.url,
+        params.file_size,
+        &params.checksum,
+        &params.mimetype,
+    )?;
 
     // DOC-005: Validate company belongs to org when provided
     if let Some(cid) = company_id {
@@ -754,7 +802,12 @@ pub fn add_document_version(
     params: AddDocumentVersionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "document", "write")?;
-    validate_blob_registration(&params.url, params.file_size, &params.checksum)?;
+    validate_blob_registration(
+        &params.url,
+        params.file_size,
+        &params.checksum,
+        &params.mimetype,
+    )?;
 
     let doc = ctx
         .db

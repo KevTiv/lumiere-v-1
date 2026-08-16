@@ -5,6 +5,7 @@ pub mod wave_c_test;
 pub mod wave_d_test;
 pub mod wave_e_test;
 pub mod wave_f_test;
+pub mod wave_g_test;
 
 use spacetimedb::{ReducerContext, Table};
 
@@ -124,6 +125,17 @@ pub fn run_expenses_wave_f_test(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 #[spacetimedb::reducer]
+pub fn run_expenses_wave_g_test(ctx: &ReducerContext) -> Result<(), String> {
+    wave_g_test::test_submit_expense_rejects_cross_company_attach(ctx)
+        .map_err(|e| format!("submit_expense_rejects_cross_company_attach: {e}"))?;
+    wave_g_test::test_post_expense_sheet_is_idempotent(ctx)
+        .map_err(|e| format!("post_expense_sheet_is_idempotent: {e}"))?;
+    wave_g_test::test_refuse_expense_sheet_rejects_self_refusal(ctx)
+        .map_err(|e| format!("refuse_expense_sheet_rejects_self_refusal: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_expenses_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_expenses_wave_a_test(ctx)?;
     run_expenses_wave_b_test(ctx)?;
@@ -131,5 +143,6 @@ pub fn run_all_expenses_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_expenses_wave_d_test(ctx)?;
     run_expenses_wave_e_test(ctx)?;
     run_expenses_wave_f_test(ctx)?;
+    run_expenses_wave_g_test(ctx)?;
     Ok(())
 }

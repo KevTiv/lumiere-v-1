@@ -3,6 +3,7 @@ pub mod wave_a_test;
 pub mod wave_c_test;
 pub mod wave_d_test;
 pub mod wave_e_test;
+pub mod wave_f_test;
 
 use spacetimedb::ReducerContext;
 
@@ -52,10 +53,22 @@ pub fn run_projects_wave_e_test(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 #[spacetimedb::reducer]
+pub fn run_projects_wave_f_test(ctx: &ReducerContext) -> Result<(), String> {
+    wave_f_test::test_project_analytic_account_fk(ctx)
+        .map_err(|e| format!("project_analytic_account_fk: {e}"))?;
+    wave_f_test::test_task_stage_fk_project_scoped(ctx)
+        .map_err(|e| format!("task_stage_fk_project_scoped: {e}"))?;
+    wave_f_test::test_log_timesheet_rejects_cross_project_task(ctx)
+        .map_err(|e| format!("log_timesheet_rejects_cross_project_task: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_projects_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_projects_wave_a_test(ctx)?;
     run_projects_wave_c_test(ctx)?;
     run_projects_wave_d_test(ctx)?;
     run_projects_wave_e_test(ctx)?;
+    run_projects_wave_f_test(ctx)?;
     Ok(())
 }

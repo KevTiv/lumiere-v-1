@@ -1,11 +1,12 @@
 /// Helpdesk CSV Imports — HelpdeskTeam, HelpdeskStage, HelpdeskSLA, HelpdeskTicket
 use spacetimedb::{ReducerContext, Table};
 
+use crate::crm::contacts::contact;
 use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
 use crate::helpdesk::tickets::{
-    helpdesk_sla, helpdesk_stage, helpdesk_team, helpdesk_ticket, HelpdeskSLA, HelpdeskStage,
-    HelpdeskTeam, HelpdeskTicket,
+    helpdesk_sla, helpdesk_stage, helpdesk_team, helpdesk_ticket, require_helpdesk_stage,
+    require_helpdesk_team, HelpdeskSLA, HelpdeskStage, HelpdeskTeam, HelpdeskTicket,
 };
 use crate::helpers::check_permission;
 use crate::types::{HelpdeskTicketState, TicketPriority};
@@ -90,12 +91,21 @@ pub fn import_helpdesk_stage_csv(
             continue;
         }
 
+        let team_id = opt_u64(col(&headers, row, "team_id"));
+        if let Some(tid) = team_id {
+            if let Err(e) = require_helpdesk_team(ctx, organization_id, tid) {
+                record_import_error(ctx, job.id, row_num, Some("team_id"), None, &e);
+                errors += 1;
+                continue;
+            }
+        }
+
         ctx.db.helpdesk_stage().insert(HelpdeskStage {
             id: 0,
             organization_id,
             name,
             description: opt_str(col(&headers, row, "description")),
-            team_id: opt_u64(col(&headers, row, "team_id")),
+            team_id,
             sequence: parse_u32(col(&headers, row, "sequence")),
             is_closed: parse_bool(col(&headers, row, "is_closed")),
             template: opt_str(col(&headers, row, "template")),
@@ -156,6 +166,18 @@ pub fn import_helpdesk_sla_csv(
             errors += 1;
             continue;
         }
+        if let Err(e) = require_helpdesk_team(ctx, organization_id, team_id) {
+            record_import_error(ctx, job.id, row_num, Some("team_id"), None, &e);
+            errors += 1;
+            continue;
+        }
+
+        let stage_id = parse_u64(col(&headers, row, "stage_id"));
+        if let Err(e) = require_helpdesk_stage(ctx, organization_id, stage_id, Some(team_id)) {
+            record_import_error(ctx, job.id, row_num, Some("stage_id"), None, &e);
+            errors += 1;
+            continue;
+        }
 
         let priority = match col(&headers, row, "priority") {
             "high" => TicketPriority::High,
@@ -169,7 +191,7 @@ pub fn import_helpdesk_sla_csv(
             organization_id,
             name,
             team_id,
-            stage_id: parse_u64(col(&headers, row, "stage_id")),
+            stage_id,
             priority,
             time_days: parse_u32(col(&headers, row, "time_days")),
             time_hours: parse_u32(col(&headers, row, "time_hours")),
@@ -231,6 +253,80 @@ pub fn import_helpdesk_ticket_csv(
             errors += 1;
             continue;
         }
+        if let Err(e) = require_helpdesk_team(ctx, organization_id, team_id) {
+            record_import_error(ctx, job.id, row_num, Some("team_id"), None, &e);
+            errors += 1;
+            continue;
+        }
+
+        let stage_id = parse_u64(col(&headers, row, "stage_id"));
+        if let Err(e) = require_helpdesk_stage(ctx, organization_id, stage_id, Some(team_id)) {
+            record_import_error(ctx, job.id, row_num, Some("stage_id"), None, &e);
+            errors += 1;
+            continue;
+        }
+
+        let sla_id = opt_u64(col(&headers, row, "sla_id"));
+        if let Some(sid) = sla_id {
+            match ctx.db.helpdesk_sla().id().find(&sid) {
+                Some(sla) if sla.organization_id == organization_id && sla.team_id == team_id => {}
+                Some(_) => {
+                    record_import_error(
+                        ctx,
+                        job.id,
+                        row_num,
+                        Some("sla_id"),
+                        None,
+                        "Helpdesk SLA does not belong to this organization/team",
+                    );
+                    errors += 1;
+                    continue;
+                }
+                None => {
+                    record_import_error(
+                        ctx,
+                        job.id,
+                        row_num,
+                        Some("sla_id"),
+                        None,
+                        &format!("Helpdesk SLA {} not found", sid),
+                    );
+                    errors += 1;
+                    continue;
+                }
+            }
+        }
+
+        let partner_id = opt_u64(col(&headers, row, "partner_id"));
+        if let Some(pid) = partner_id {
+            match ctx.db.contact().id().find(&pid) {
+                Some(partner) if partner.organization_id == organization_id => {}
+                Some(_) => {
+                    record_import_error(
+                        ctx,
+                        job.id,
+                        row_num,
+                        Some("partner_id"),
+                        None,
+                        "Partner does not belong to this organization",
+                    );
+                    errors += 1;
+                    continue;
+                }
+                None => {
+                    record_import_error(
+                        ctx,
+                        job.id,
+                        row_num,
+                        Some("partner_id"),
+                        None,
+                        &format!("Partner {} not found", pid),
+                    );
+                    errors += 1;
+                    continue;
+                }
+            }
+        }
 
         let priority = match col(&headers, row, "priority") {
             "high" => TicketPriority::High,
@@ -252,17 +348,19 @@ pub fn import_helpdesk_ticket_csv(
             organization_id,
             name,
             description: opt_str(col(&headers, row, "description")),
-            partner_id: opt_u64(col(&headers, row, "partner_id")),
+            partner_id,
             partner_name: opt_str(col(&headers, row, "partner_name")),
             partner_email: opt_str(col(&headers, row, "partner_email")),
             team_id,
-            stage_id: parse_u64(col(&headers, row, "stage_id")),
+            stage_id,
             user_id: None,
             priority,
             state,
-            sla_id: opt_u64(col(&headers, row, "sla_id")),
+            sla_id,
             sla_deadline: opt_timestamp(col(&headers, row, "sla_deadline")),
-            sla_reached: parse_bool(col(&headers, row, "sla_reached")),
+            // HLP-007: the breach flag is system-only — CSV import never sets it,
+            // regardless of what a "sla_reached" column might contain.
+            sla_reached: false,
             closed_at: opt_timestamp(col(&headers, row, "closed_at")),
             created_at: ctx.timestamp,
             deleted_at: None,

@@ -1,3 +1,6 @@
 pub mod tickets;
 
-pub use tickets::{HelpdeskSLA, HelpdeskStage, HelpdeskTeam, HelpdeskTicket};
+pub use tickets::{
+    HelpdeskSLA, HelpdeskSlaCheckJob, HelpdeskStage, HelpdeskTeam, HelpdeskTeamMember,
+    HelpdeskTicket,
+};

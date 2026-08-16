@@ -317,6 +317,7 @@ pub fn test_mileage_line_from_rate(ctx: &ReducerContext) -> Result<(), String> {
 pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    super::wave_a_test::seed_caller_manager(ctx, &fixture)?;
     let accounts = seed_accounts(ctx, &fixture)?;
     let employee_id = seed_employee(ctx, &fixture, "Alloc Emp")?;
 
@@ -809,6 +810,7 @@ pub fn test_mileage_rate_effective_dates(ctx: &ReducerContext) -> Result<(), Str
 pub fn test_allocation_tax_split_on_post(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    super::wave_a_test::seed_caller_manager(ctx, &fixture)?;
     let accounts = seed_accounts(ctx, &fixture)?;
     let employee_id = seed_employee(ctx, &fixture, "TaxAlloc Emp")?;
 

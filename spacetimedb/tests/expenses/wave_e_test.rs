@@ -346,6 +346,7 @@ pub fn test_pack_tax_evidence_required(ctx: &ReducerContext) -> Result<(), Strin
 pub fn test_card_statement_match_and_fx_fee(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    super::wave_a_test::seed_caller_manager(ctx, &fixture)?;
     let accounts = seed_accounts(ctx, &fixture)?;
     let employee_id = seed_employee(ctx, &fixture)?;
 

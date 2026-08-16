@@ -469,8 +469,11 @@ pub fn test_documents_create_and_lock(ctx: &ReducerContext) -> Result<(), String
             url: "/api/documents/blobs/object/1/default/deadbeef".to_string(),
             checksum: checksum.clone(),
             folder_id: Some(folder.id),
-            res_model: Some("sale_order".to_string()),
-            res_id: Some(42),
+            // DOC-002 validates res_id against the real table for res_model — a
+            // hardcoded id 42 predates that check and no longer exists. contact
+            // is the simplest whitelisted model with a fixture-provided real row.
+            res_model: Some("contact".to_string()),
+            res_id: Some(fixture.partner_id),
             partner_id: None,
             tag_ids: vec![],
             is_favorite: false,
@@ -492,7 +495,7 @@ pub fn test_documents_create_and_lock(ctx: &ReducerContext) -> Result<(), String
     if doc.checksum.as_deref() != Some(checksum.as_str()) {
         return Err("checksum not stored".to_string());
     }
-    if doc.res_model.as_deref() != Some("sale_order") || doc.res_id != Some(42) {
+    if doc.res_model.as_deref() != Some("contact") || doc.res_id != Some(fixture.partner_id) {
         return Err("res link not stored".to_string());
     }
     let version = ctx
@@ -652,7 +655,7 @@ pub fn test_documents_company_isolation(ctx: &ReducerContext) -> Result<(), Stri
     )
     .err()
     .ok_or("expected company mismatch to fail")?;
-    if !company_mismatch.contains("company") {
+    if !company_mismatch.to_lowercase().contains("company") {
         return Err(format!(
             "expected company isolation, got: {company_mismatch}"
         ));
@@ -1989,5 +1992,179 @@ pub fn test_forms_custom_field_record_existence(ctx: &ReducerContext) -> Result<
         return Err("valid contact EAV write was not persisted".to_string());
     }
 
+    Ok(())
+}
+
+/// DOC-006: create_document already validates folder_id FK existence, org
+/// match, and company scope — this proves the cross-org rejection path
+/// specifically (no existing test covered it).
+pub fn test_documents_folder_fk_rejects_cross_org(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let local = OrgFixture::seed_minimal(ctx)?;
+    let foreign = OrgFixture::seed_minimal(ctx)?;
+
+    create_document_folder(
+        ctx,
+        foreign.organization_id,
+        Some(foreign.company_id),
+        CreateDocumentFolderParams {
+            name: "DOC-006 Foreign Folder".to_string(),
+            description: None,
+            parent_id: None,
+            is_access_restricted: false,
+            is_hidden: false,
+            is_readonly: false,
+            is_favorite: false,
+            sequence: 1,
+            storage_id: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )?;
+    let foreign_folder_id = ctx
+        .db
+        .doc_folder()
+        .iter()
+        .find(|f| f.organization_id == foreign.organization_id && f.name == "DOC-006 Foreign Folder")
+        .map(|f| f.id)
+        .ok_or("foreign folder missing")?;
+
+    let checksum = "b".repeat(64);
+    let missing = create_document(
+        ctx,
+        local.organization_id,
+        Some(local.company_id),
+        CreateDocumentParams {
+            name: "DOC-006 Missing Folder Doc".to_string(),
+            description: None,
+            file_name: "doc.pdf".to_string(),
+            file_size: 128,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/2/default/deadbeef".to_string(),
+            checksum: checksum.clone(),
+            folder_id: Some(999_999_999),
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            tag_ids: vec![],
+            is_favorite: false,
+            index_content: None,
+            classification_id: None,
+            retention_days: None,
+            fiscal_kind: None,
+            residency_region: None,
+            metadata: None,
+        },
+    );
+    if missing.is_ok() {
+        return Err("missing folder_id should reject".to_string());
+    }
+
+    let cross_org = create_document(
+        ctx,
+        local.organization_id,
+        Some(local.company_id),
+        CreateDocumentParams {
+            name: "DOC-006 Cross Org Doc".to_string(),
+            description: None,
+            file_name: "doc.pdf".to_string(),
+            file_size: 128,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/3/default/deadbeef".to_string(),
+            checksum,
+            folder_id: Some(foreign_folder_id),
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            tag_ids: vec![],
+            is_favorite: false,
+            index_content: None,
+            classification_id: None,
+            retention_days: None,
+            fiscal_kind: None,
+            residency_region: None,
+            metadata: None,
+        },
+    );
+    if cross_org.is_ok() {
+        return Err("cross-org folder_id should reject".to_string());
+    }
+    Ok(())
+}
+
+/// DOC-008: create_document rejects an oversized file and a disallowed
+/// mimetype, and accepts a valid combination.
+pub fn test_documents_upload_rejects_oversized_and_disallowed_mimetype(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+
+    let base = |name: &str, file_size: u64, mimetype: &str, checksum: String| CreateDocumentParams {
+        name: name.to_string(),
+        description: None,
+        file_name: "doc.bin".to_string(),
+        file_size,
+        mimetype: mimetype.to_string(),
+        url: "/api/documents/blobs/object/4/default/deadbeef".to_string(),
+        checksum,
+        folder_id: None,
+        res_model: None,
+        res_id: None,
+        partner_id: None,
+        tag_ids: vec![],
+        is_favorite: false,
+        index_content: None,
+        classification_id: None,
+        retention_days: None,
+        fiscal_kind: None,
+        residency_region: None,
+        metadata: None,
+    };
+
+    let oversized = create_document(
+        ctx,
+        fixture.organization_id,
+        Some(fixture.company_id),
+        base(
+            "DOC-008 Oversized",
+            51 * 1024 * 1024,
+            "application/pdf",
+            "c".repeat(64),
+        ),
+    );
+    if oversized.is_ok() {
+        return Err("oversized file_size should reject".to_string());
+    }
+
+    let disallowed = create_document(
+        ctx,
+        fixture.organization_id,
+        Some(fixture.company_id),
+        base(
+            "DOC-008 Disallowed Mime",
+            128,
+            "application/x-msdownload",
+            "d".repeat(64),
+        ),
+    );
+    if disallowed.is_ok() {
+        return Err("disallowed mimetype should reject".to_string());
+    }
+
+    create_document(
+        ctx,
+        fixture.organization_id,
+        Some(fixture.company_id),
+        base("DOC-008 Valid", 1024, "application/pdf", "e".repeat(64)),
+    )?;
+    if !ctx
+        .db
+        .document()
+        .iter()
+        .any(|d| d.organization_id == fixture.organization_id && d.name == "DOC-008 Valid")
+    {
+        return Err("valid document was not persisted".to_string());
+    }
     Ok(())
 }

@@ -9,6 +9,10 @@ use crate::core::queue::{
     claim_queue_job, complete_queue_job, queue_effect_receipt, queue_job, queue_worker,
     register_queue_worker, ClaimQueueJobParams, CompleteQueueJobParams, RegisterQueueWorkerParams,
 };
+use crate::crm::contacts::{contact, create_contact, CreateContactParams};
+use crate::purchasing::purchase_orders::{
+    create_purchase_order, purchase_order, CreatePurchaseOrderParams,
+};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{QueueCompletionOutcome, QueueJobStatus};
 use crate::workflow::definitions::{
@@ -163,14 +167,22 @@ fn outbox_dispatch_is_linked_and_idempotent(ctx: &ReducerContext) -> Result<(), 
         .db
         .workflow_outbox()
         .iter()
-        .filter(|row| row.semantic_key == outbox.semantic_key)
+        .filter(|row| {
+            row.organization_id == outbox.organization_id
+                && row.company_id == outbox.company_id
+                && row.semantic_key == outbox.semantic_key
+        })
         .count()
         != 1
         || ctx
             .db
             .queue_job()
             .iter()
-            .filter(|row| row.semantic_key == outbox.semantic_key)
+            .filter(|row| {
+                row.organization_id == outbox.organization_id
+                    && row.company_id == Some(outbox.company_id)
+                    && row.semantic_key == outbox.semantic_key
+            })
             .count()
             != 1
     {
@@ -447,6 +459,97 @@ struct DeliveryFixture {
     edge_id: u64,
 }
 
+/// WRK-001: start_workflow validates subject_id against a real row in the
+/// table named by subject_model ("purchase_order" here).
+fn seed_purchase_order_subject(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    tag: &str,
+) -> Result<u64, String> {
+    create_contact(
+        ctx,
+        fixture.organization_id,
+        CreateContactParams {
+            name: format!("Vendor {tag}"),
+            type_: "contact".to_string(),
+            email: None,
+            phone: None,
+            mobile: None,
+            company_id: Some(fixture.company_id),
+            is_customer: false,
+            is_vendor: true,
+            is_employee: false,
+            is_prospect: false,
+            is_partner: false,
+            customer_rank: 0,
+            supplier_rank: 1,
+            display_name: Some(format!("Vendor {tag}")),
+            first_name: None,
+            last_name: None,
+            title: None,
+            email_secondary: None,
+            fax: None,
+            website: None,
+            street: None,
+            street2: None,
+            city: None,
+            state_code: None,
+            zip: None,
+            country_code: None,
+            tax_id: None,
+            company_registry: None,
+            industry: None,
+            employees_count: None,
+            annual_revenue: None,
+            description: None,
+            salesperson_id: None,
+            assigned_user_id: None,
+            parent_id: None,
+            user_id: None,
+            color: None,
+            metadata: None,
+        },
+    )?;
+    let vendor_id = ctx
+        .db
+        .contact()
+        .iter()
+        .find(|c| c.organization_id == fixture.organization_id && c.display_name == format!("Vendor {tag}"))
+        .map(|c| c.id)
+        .ok_or_else(|| format!("vendor contact {tag} missing"))?;
+    create_purchase_order(
+        ctx,
+        fixture.organization_id,
+        CreatePurchaseOrderParams {
+            company_id: Some(fixture.company_id),
+            partner_id: vendor_id,
+            currency_id: 1,
+            origin: Some(tag.to_string()),
+            partner_ref: None,
+            notes: None,
+            date_planned: None,
+            payment_term_id: None,
+            fiscal_position_id: None,
+            incoterm_id: None,
+            incoterm_location: None,
+            user_id: None,
+            invoice_ids: vec![],
+            picking_ids: vec![],
+            message_follower_ids: vec![],
+            message_ids: vec![],
+            activity_ids: vec![],
+            is_quantity_copy: None,
+            metadata: None,
+        },
+    )?;
+    ctx.db
+        .purchase_order()
+        .iter()
+        .find(|p| p.organization_id == fixture.organization_id && p.origin.as_deref() == Some(tag))
+        .map(|p| p.id)
+        .ok_or_else(|| format!("purchase order {tag} missing"))
+}
+
 fn seed_delivery_runtime(ctx: &ReducerContext, label: &str) -> Result<DeliveryFixture, String> {
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let workflow_key = format!("delivery.{label}.{}", ctx.rng().gen::<u64>());
@@ -456,7 +559,7 @@ fn seed_delivery_runtime(ctx: &ReducerContext, label: &str) -> Result<DeliveryFi
         Some(fixture.company_id),
         CreateWorkflowParams {
             workflow_key: workflow_key.clone(),
-            model: "purchase.order".to_string(),
+            model: "purchase_order".to_string(),
             name: format!("Delivery {label}"),
             description: None,
             trigger: WorkflowTrigger::Signal,
@@ -521,6 +624,7 @@ fn seed_delivery_runtime(ctx: &ReducerContext, label: &str) -> Result<DeliveryFi
         },
     )?;
     publish_workflow_version(ctx, fixture.organization_id, version.id, 4)?;
+    let subject_id = seed_purchase_order_subject(ctx, &fixture, &workflow_key)?;
     start_workflow(
         ctx,
         fixture.organization_id,
@@ -528,8 +632,8 @@ fn seed_delivery_runtime(ctx: &ReducerContext, label: &str) -> Result<DeliveryFi
             company_id: fixture.company_id,
             workflow_id: workflow.id,
             workflow_version_id: version.id,
-            subject_model: "purchase.order".to_string(),
-            subject_id: ctx.rng().gen::<u64>(),
+            subject_model: "purchase_order".to_string(),
+            subject_id,
             subject_revision_hash: SUBJECT_HASH.to_string(),
             singleton_trigger_key: None,
             idempotency_key: format!("delivery-start:{}", ctx.rng().gen::<u64>()),

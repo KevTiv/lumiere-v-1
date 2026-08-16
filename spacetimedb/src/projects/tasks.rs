@@ -520,6 +520,15 @@ pub fn create_task(
         params.milestone_id,
     )?;
 
+    // PRJ-004: validate stage_id FK, project-scoped when the task has a project.
+    crate::projects::task_stages::require_task_stage(
+        ctx,
+        organization_id,
+        company_id,
+        params.project_id,
+        params.stage_id,
+    )?;
+
     // PRJ-001: validate dependency FKs (cycle detection not needed on create — no ID yet)
     if !params.depend_on_ids.is_empty() {
         validate_task_dependencies(
@@ -924,6 +933,13 @@ pub fn update_task(
     }
 
     if let Some(stage_id) = params.stage_id {
+        crate::projects::task_stages::require_task_stage(
+            ctx,
+            organization_id,
+            company_id,
+            task.project_id,
+            stage_id,
+        )?;
         task.stage_id = stage_id;
         changed_fields.push("stage_id".to_string());
     }

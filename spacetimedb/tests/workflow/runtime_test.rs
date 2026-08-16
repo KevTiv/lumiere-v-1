@@ -2,6 +2,10 @@
 
 use spacetimedb::{ReducerContext, Table};
 
+use crate::crm::contacts::{contact, create_contact, CreateContactParams};
+use crate::purchasing::purchase_orders::{
+    create_purchase_order, purchase_order, CreatePurchaseOrderParams,
+};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::workflow::definitions::{
     create_workflow, publish_workflow_version, upsert_workflow_edge, upsert_workflow_node,
@@ -33,11 +37,12 @@ pub fn test_workflow_runtime(ctx: &ReducerContext) -> Result<(), String> {
 fn test_start_replay_mismatch_singleton_and_scope(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let (workflow_id, version_id) = seed_runtime_definition(ctx, &fixture, "runtime.start", true)?;
+    let subject_id = seed_purchase_order_subject(ctx, &fixture, "wf-runtime-start")?;
     let params = start_params(
         &fixture,
         workflow_id,
         version_id,
-        101,
+        subject_id,
         "start-101",
         Some("record-101"),
     );
@@ -120,13 +125,14 @@ fn test_signal_replay_stale_and_terminal(ctx: &ReducerContext) -> Result<(), Str
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let (workflow_id, version_id) =
         seed_runtime_definition(ctx, &fixture, "runtime.signal", false)?;
+    let subject_id = seed_purchase_order_subject(ctx, &fixture, "wf-runtime-signal")?;
     start_workflow(
         ctx,
         fixture.organization_id,
-        start_params(&fixture, workflow_id, version_id, 201, "start-201", None),
+        start_params(&fixture, workflow_id, version_id, subject_id, "start-201", None),
     )?;
     let instance = latest_instance(ctx, fixture.organization_id, workflow_id)?;
-    let next = signal_params(&fixture, instance.id, 201, 1, "next", "signal-next");
+    let next = signal_params(&fixture, instance.id, subject_id, 1, "next", "signal-next");
 
     signal_workflow(ctx, fixture.organization_id, next.clone())?;
     let after_next = require_instance(ctx, instance.id)?;
@@ -153,7 +159,7 @@ fn test_signal_replay_stale_and_terminal(ctx: &ReducerContext) -> Result<(), Str
         return Err(format!("signal key mismatch was not atomic: {error}"));
     }
 
-    let stale = signal_params(&fixture, instance.id, 201, 1, "finish", "signal-stale");
+    let stale = signal_params(&fixture, instance.id, subject_id, 1, "finish", "signal-stale");
     let error = signal_workflow(ctx, fixture.organization_id, stale)
         .err()
         .ok_or("stale signal revision advanced")?;
@@ -163,7 +169,7 @@ fn test_signal_replay_stale_and_terminal(ctx: &ReducerContext) -> Result<(), Str
         return Err(format!("stale signal was not atomic: {error}"));
     }
 
-    let finish = signal_params(&fixture, instance.id, 201, 2, "finish", "signal-finish");
+    let finish = signal_params(&fixture, instance.id, subject_id, 2, "finish", "signal-finish");
     signal_workflow(ctx, fixture.organization_id, finish)?;
     let completed = require_instance(ctx, instance.id)?;
     if completed.state != WorkflowInstanceState::Completed
@@ -185,7 +191,7 @@ fn test_signal_replay_stale_and_terminal(ctx: &ReducerContext) -> Result<(), Str
     }
 
     let completed_counts = runtime_counts(ctx, instance.id);
-    let terminal = signal_params(&fixture, instance.id, 201, 3, "finish", "signal-terminal");
+    let terminal = signal_params(&fixture, instance.id, subject_id, 3, "finish", "signal-terminal");
     let error = signal_workflow(ctx, fixture.organization_id, terminal)
         .err()
         .ok_or("terminal instance accepted a new signal")?;
@@ -199,10 +205,11 @@ fn test_cancel_replay_and_terminal_behavior(ctx: &ReducerContext) -> Result<(), 
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let (workflow_id, version_id) =
         seed_runtime_definition(ctx, &fixture, "runtime.cancel", false)?;
+    let subject_id = seed_purchase_order_subject(ctx, &fixture, "wf-runtime-cancel")?;
     start_workflow(
         ctx,
         fixture.organization_id,
-        start_params(&fixture, workflow_id, version_id, 301, "start-301", None),
+        start_params(&fixture, workflow_id, version_id, subject_id, "start-301", None),
     )?;
     let instance = latest_instance(ctx, fixture.organization_id, workflow_id)?;
     let cancel = CancelWorkflowParams {
@@ -249,6 +256,98 @@ fn test_cancel_replay_and_terminal_behavior(ctx: &ReducerContext) -> Result<(), 
     Ok(())
 }
 
+/// WRK-001: start_workflow validates subject_id against a real row in the
+/// table named by subject_model ("purchase_order" here) — a bare numeric
+/// placeholder is rejected, so tests need an actual purchase order.
+fn seed_purchase_order_subject(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    tag: &str,
+) -> Result<u64, String> {
+    create_contact(
+        ctx,
+        fixture.organization_id,
+        CreateContactParams {
+            name: format!("Vendor {tag}"),
+            type_: "contact".to_string(),
+            email: None,
+            phone: None,
+            mobile: None,
+            company_id: Some(fixture.company_id),
+            is_customer: false,
+            is_vendor: true,
+            is_employee: false,
+            is_prospect: false,
+            is_partner: false,
+            customer_rank: 0,
+            supplier_rank: 1,
+            display_name: Some(format!("Vendor {tag}")),
+            first_name: None,
+            last_name: None,
+            title: None,
+            email_secondary: None,
+            fax: None,
+            website: None,
+            street: None,
+            street2: None,
+            city: None,
+            state_code: None,
+            zip: None,
+            country_code: None,
+            tax_id: None,
+            company_registry: None,
+            industry: None,
+            employees_count: None,
+            annual_revenue: None,
+            description: None,
+            salesperson_id: None,
+            assigned_user_id: None,
+            parent_id: None,
+            user_id: None,
+            color: None,
+            metadata: None,
+        },
+    )?;
+    let vendor_id = ctx
+        .db
+        .contact()
+        .iter()
+        .find(|c| c.organization_id == fixture.organization_id && c.display_name == format!("Vendor {tag}"))
+        .map(|c| c.id)
+        .ok_or_else(|| format!("vendor contact {tag} missing"))?;
+    create_purchase_order(
+        ctx,
+        fixture.organization_id,
+        CreatePurchaseOrderParams {
+            company_id: Some(fixture.company_id),
+            partner_id: vendor_id,
+            currency_id: 1,
+            origin: Some(tag.to_string()),
+            partner_ref: None,
+            notes: None,
+            date_planned: None,
+            payment_term_id: None,
+            fiscal_position_id: None,
+            incoterm_id: None,
+            incoterm_location: None,
+            user_id: None,
+            invoice_ids: vec![],
+            picking_ids: vec![],
+            message_follower_ids: vec![],
+            message_ids: vec![],
+            activity_ids: vec![],
+            is_quantity_copy: None,
+            metadata: None,
+        },
+    )?;
+    ctx.db
+        .purchase_order()
+        .iter()
+        .find(|p| p.organization_id == fixture.organization_id && p.origin.as_deref() == Some(tag))
+        .map(|p| p.id)
+        .ok_or_else(|| format!("purchase order {tag} missing"))
+}
+
 fn seed_runtime_definition(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
@@ -261,7 +360,7 @@ fn seed_runtime_definition(
         Some(fixture.company_id),
         CreateWorkflowParams {
             workflow_key: workflow_key.to_string(),
-            model: "purchase.order".to_string(),
+            model: "purchase_order".to_string(),
             name: "Runtime test".to_string(),
             description: None,
             trigger: WorkflowTrigger::Signal,
@@ -362,7 +461,7 @@ fn start_params(
         company_id: fixture.company_id,
         workflow_id,
         workflow_version_id,
-        subject_model: "purchase.order".to_string(),
+        subject_model: "purchase_order".to_string(),
         subject_id,
         subject_revision_hash: snapshot.subject_revision_hash,
         singleton_trigger_key: singleton_trigger_key.map(ToOwned::to_owned),
@@ -394,7 +493,7 @@ fn signal_params(
 
 fn runtime_snapshot(subject_id: u64) -> ConditionSnapshot {
     let mut snapshot = ConditionSnapshot {
-        subject_model: "purchase.order".to_string(),
+        subject_model: "purchase_order".to_string(),
         subject_id,
         subject_revision_hash: String::new(),
         fields: vec![ConditionSnapshotField {

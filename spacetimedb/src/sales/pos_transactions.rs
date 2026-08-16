@@ -799,6 +799,7 @@ pub fn create_pos_order(
                 queue_action_internal(
                     ctx,
                     organization_id,
+                    device.company_id,
                     device.id,
                     "DisplayMessage",
                     &display_payload,
@@ -820,6 +821,7 @@ pub fn create_pos_order(
                     queue_action_internal(
                         ctx,
                         organization_id,
+                        device.company_id,
                         device.id,
                         "InitiatePayment",
                         &payment_payload,
@@ -833,6 +835,7 @@ pub fn create_pos_order(
                 queue_action_internal(
                     ctx,
                     organization_id,
+                    device.company_id,
                     device.id,
                     "PrintReceipt",
                     &receipt_payload,

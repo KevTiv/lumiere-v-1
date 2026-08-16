@@ -1747,6 +1747,16 @@ pub fn refuse_expense_sheet(
     sheet_id: u64,
     params: RefuseExpenseSheetParams,
 ) -> Result<(), String> {
+    refuse_expense_sheet_impl(ctx, organization_id, sheet_id, params, false)
+}
+
+pub fn refuse_expense_sheet_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    sheet_id: u64,
+    params: RefuseExpenseSheetParams,
+    skip_approval_check: bool,
+) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense_sheet", "approve")?;
     let sheet = ctx
         .db
@@ -1757,8 +1767,29 @@ pub fn refuse_expense_sheet(
     if sheet.organization_id != organization_id {
         return Err("Expense sheet belongs to a different organization".to_string());
     }
+    // EXP-011: Mirror approve_expense_sheet_impl's manager gate — refusal is the
+    // symmetric approval-workflow action, so it carries the same two guards. Like
+    // approve's employee check, this runs regardless of skip_approval_check —
+    // that flag only bypasses the SoD/guarded-action step, which needs a second
+    // identity tests can't simulate.
+    let is_org_employee = ctx
+        .db
+        .hr_employee()
+        .employee_by_org()
+        .filter(&organization_id)
+        .any(|e| e.user_id == Some(ctx.sender()));
+    if !is_org_employee {
+        return Err("Approver must be an employee of this organization".to_string());
+    }
     if sheet.state != ExpenseSheetState::Submitted {
         return Err("Only submitted sheets can be refused".to_string());
+    }
+    if !skip_approval_check {
+        if let Some(submitter) = sheet.submitted_by {
+            if submitter == ctx.sender() {
+                return Err("Submitter cannot refuse their own expense sheet (SoD)".to_string());
+            }
+        }
     }
     let company_id = sheet.company_id;
     let notes = match (params.reason, sheet.notes.clone()) {

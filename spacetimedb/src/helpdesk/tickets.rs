@@ -2,7 +2,7 @@
 ///
 /// Customer support ticketing system. Teams own stages and SLA policies;
 /// tickets are assigned to agents within teams.
-use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
+use spacetimedb::{reducer, Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, Timestamp};
 
 use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
@@ -11,7 +11,7 @@ use crate::types::{HelpdeskTicketState, TicketPriority};
 // ── FK helpers ────────────────────────────────────────────────────────────────
 
 /// HLP-001: Require a helpdesk team exists and belongs to the org.
-fn require_helpdesk_team(
+pub(crate) fn require_helpdesk_team(
     ctx: &ReducerContext,
     organization_id: u64,
     team_id: u64,
@@ -29,7 +29,7 @@ fn require_helpdesk_team(
 }
 
 /// HLP-002: Require a helpdesk stage exists and (when team-scoped) matches.
-fn require_helpdesk_stage(
+pub(crate) fn require_helpdesk_stage(
     ctx: &ReducerContext,
     organization_id: u64,
     stage_id: u64,
@@ -49,6 +49,25 @@ fn require_helpdesk_stage(
         if stage_team != tid {
             return Err("Helpdesk stage does not belong to this team".to_string());
         }
+    }
+    Ok(())
+}
+
+/// HLP-006: Require the identity is a member of the given helpdesk team.
+pub(crate) fn require_team_member(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    team_id: u64,
+    identity: Identity,
+) -> Result<(), String> {
+    let is_member = ctx
+        .db
+        .helpdesk_team_member()
+        .team_member_by_team()
+        .filter(&team_id)
+        .any(|m| m.organization_id == organization_id && m.identity == identity);
+    if !is_member {
+        return Err("Agent is not a member of this ticket's team".to_string());
     }
     Ok(())
 }
@@ -147,6 +166,35 @@ pub struct HelpdeskTicket {
     pub deleted_at: Option<Timestamp>,
 }
 
+/// Helpdesk Team Member — HLP-006: membership roster used to reject cross-team assignment.
+#[spacetimedb::table(
+    accessor = helpdesk_team_member,
+    public,
+    index(accessor = team_member_by_team, btree(columns = [team_id])),
+    index(accessor = team_member_by_org, btree(columns = [organization_id]))
+)]
+pub struct HelpdeskTeamMember {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub team_id: u64, // FK → HelpdeskTeam
+    pub identity: Identity,
+    pub created_at: Timestamp,
+}
+
+/// HLP-007: scheduled, system-only check that flips `sla_reached` once a ticket's
+/// deadline passes. `sla_reached` must never be set directly by user input.
+#[spacetimedb::table(accessor = helpdesk_sla_check_job, scheduled(run_helpdesk_sla_check))]
+pub struct HelpdeskSlaCheckJob {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    pub scheduled_at: ScheduleAt,
+    pub organization_id: u64,
+    pub ticket_id: u64,
+}
+
 // ── Input Params ──────────────────────────────────────────────────────────────
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -236,6 +284,93 @@ pub fn create_helpdesk_team(
     Ok(())
 }
 
+/// HLP-006: add an agent to a team's membership roster (idempotent).
+#[reducer]
+pub fn add_helpdesk_team_member(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    team_id: u64,
+    identity: Identity,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "helpdesk_team", "update")?;
+    require_helpdesk_team(ctx, organization_id, team_id)?;
+    let agent_known = ctx
+        .db
+        .contact()
+        .iter()
+        .any(|c| c.organization_id == organization_id && c.user_id == Some(identity));
+    if !agent_known {
+        return Err("Agent identity not found in this organization".to_string());
+    }
+    let already_member = ctx
+        .db
+        .helpdesk_team_member()
+        .team_member_by_team()
+        .filter(&team_id)
+        .any(|m| m.identity == identity);
+    if already_member {
+        return Ok(());
+    }
+    let member = ctx.db.helpdesk_team_member().insert(HelpdeskTeamMember {
+        id: 0,
+        organization_id,
+        team_id,
+        identity,
+        created_at: ctx.timestamp,
+    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "helpdesk_team_member",
+            record_id: member.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    );
+    Ok(())
+}
+
+/// HLP-006: remove an agent from a team's membership roster (idempotent).
+#[reducer]
+pub fn remove_helpdesk_team_member(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    team_id: u64,
+    identity: Identity,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "helpdesk_team", "update")?;
+    require_helpdesk_team(ctx, organization_id, team_id)?;
+    if let Some(member) = ctx
+        .db
+        .helpdesk_team_member()
+        .team_member_by_team()
+        .filter(&team_id)
+        .find(|m| m.organization_id == organization_id && m.identity == identity)
+    {
+        ctx.db.helpdesk_team_member().id().delete(&member.id);
+        write_audit_log_v2(
+            ctx,
+            organization_id,
+            AuditLogParams {
+                company_id: None,
+                table_name: "helpdesk_team_member",
+                record_id: member.id,
+                action: "DELETE",
+                old_values: None,
+                new_values: None,
+                changed_fields: vec![],
+                metadata: None,
+            },
+        );
+    }
+    Ok(())
+}
+
 // ── Reducers: Stages ──────────────────────────────────────────────────────────
 
 #[reducer]
@@ -247,6 +382,9 @@ pub fn create_helpdesk_stage(
     check_permission(ctx, organization_id, "helpdesk_stage", "create")?;
     if params.name.is_empty() {
         return Err("Stage name cannot be empty".to_string());
+    }
+    if let Some(team_id) = params.team_id {
+        require_helpdesk_team(ctx, organization_id, team_id)?;
     }
     let stage = ctx.db.helpdesk_stage().insert(HelpdeskStage {
         id: 0,
@@ -359,7 +497,10 @@ pub fn create_ticket(
         }
     }
 
-    if let Some(sla_id) = params.sla_id {
+    // HLP-007: the deadline is derived from the SLA policy when the caller doesn't
+    // pin one explicitly; the breach flag itself is never client-settable (see
+    // `run_helpdesk_sla_check`, the only place `sla_reached` ever flips to true).
+    let sla_deadline = if let Some(sla_id) = params.sla_id {
         let sla = ctx
             .db
             .helpdesk_sla()
@@ -372,7 +513,16 @@ pub fn create_ticket(
         if sla.team_id != params.team_id {
             return Err("Helpdesk SLA does not belong to this team".to_string());
         }
-    }
+        match params.sla_deadline {
+            Some(deadline) => Some(deadline),
+            None => {
+                let seconds = u64::from(sla.time_days) * 86_400 + u64::from(sla.time_hours) * 3_600;
+                Some(ctx.timestamp + std::time::Duration::from_secs(seconds))
+            }
+        }
+    } else {
+        params.sla_deadline
+    };
 
     if let Some(partner_id) = params.partner_id {
         let partner = ctx
@@ -400,7 +550,7 @@ pub fn create_ticket(
         priority: params.priority,
         state: HelpdeskTicketState::New,
         sla_id: params.sla_id,
-        sla_deadline: params.sla_deadline,
+        sla_deadline,
         sla_reached: false,
         closed_at: None,
         created_at: ctx.timestamp,
@@ -418,6 +568,58 @@ pub fn create_ticket(
             new_values: None,
             changed_fields: vec![],
             metadata: None,
+        },
+    );
+    if let Some(deadline) = sla_deadline {
+        ctx.db.helpdesk_sla_check_job().insert(HelpdeskSlaCheckJob {
+            scheduled_id: 0,
+            scheduled_at: ScheduleAt::Time(deadline),
+            organization_id,
+            ticket_id: ticket.id,
+        });
+    }
+    Ok(())
+}
+
+/// HLP-007: system-only breach detector. `sla_reached` is never accepted as
+/// direct user input (see `create_ticket`, `update_ticket`, and CSV import) —
+/// this scheduled reducer is the sole place that flips it to true.
+#[reducer]
+pub fn run_helpdesk_sla_check(ctx: &ReducerContext, job: HelpdeskSlaCheckJob) -> Result<(), String> {
+    let Some(ticket) = ctx.db.helpdesk_ticket().id().find(&job.ticket_id) else {
+        return Ok(());
+    };
+    if ticket.organization_id != job.organization_id || ticket.sla_reached {
+        return Ok(());
+    }
+    if matches!(
+        ticket.state,
+        HelpdeskTicketState::Closed | HelpdeskTicketState::Cancelled
+    ) {
+        return Ok(());
+    }
+    let Some(deadline) = ticket.sla_deadline else {
+        return Ok(());
+    };
+    if ctx.timestamp < deadline {
+        return Ok(());
+    }
+    ctx.db.helpdesk_ticket().id().update(HelpdeskTicket {
+        sla_reached: true,
+        ..ticket
+    });
+    write_audit_log_v2(
+        ctx,
+        job.organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "helpdesk_ticket",
+            record_id: job.ticket_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(serde_json::json!({ "sla_reached": true }).to_string()),
+            changed_fields: vec!["sla_reached".to_string()],
+            metadata: Some(r#"{"source":"system:sla_check"}"#.to_string()),
         },
     );
     Ok(())
@@ -494,6 +696,8 @@ pub fn assign_ticket(
     if !agent_known {
         return Err("Agent identity not found in this organization".to_string());
     }
+    // HLP-006: agent must be a member of the ticket's own team.
+    require_team_member(ctx, organization_id, ticket.team_id, agent_id)?;
     ctx.db.helpdesk_ticket().id().update(HelpdeskTicket {
         user_id: Some(agent_id),
         state: HelpdeskTicketState::InProgress,

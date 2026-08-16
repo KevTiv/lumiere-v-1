@@ -29,6 +29,8 @@ pub struct IoTAction {
     pub id: u64,
     pub device_id: u64,
     pub organization_id: u64,
+    /// IOT-010: denormalized from device.company_id at write time.
+    pub company_id: u64,
     /// "PrintLabel" | "PrintReceipt" | "OpenCashDrawer" | "DisplayMessage"
     /// "TriggerRelay" | "InitiatePayment" | "Custom"
     pub action_type: String,
@@ -61,6 +63,7 @@ pub struct CreateActionParams {
 pub fn queue_action_internal(
     ctx: &ReducerContext,
     organization_id: u64,
+    company_id: u64,
     device_id: u64,
     action_type: &str,
     payload: &str,
@@ -70,6 +73,7 @@ pub fn queue_action_internal(
         id: 0,
         device_id,
         organization_id,
+        company_id,
         action_type: action_type.to_string(),
         payload: payload.to_string(),
         status: "Pending".to_string(),
@@ -124,6 +128,7 @@ pub fn create_iot_action(
         id: 0,
         device_id,
         organization_id,
+        company_id: device.company_id,
         action_type: params.action_type.clone(),
         payload: params.payload.clone(),
         status: "Pending".to_string(),
@@ -196,6 +201,7 @@ pub fn test_iot_device(
         id: 0,
         device_id,
         organization_id,
+        company_id: device.company_id,
         action_type: action_type.to_string(),
         payload: payload.to_string(),
         status: "Pending".to_string(),

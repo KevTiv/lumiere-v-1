@@ -467,6 +467,7 @@ pub fn test_product_policy_and_line_cap(ctx: &ReducerContext) -> Result<(), Stri
 pub fn test_tax_recovery_and_partner_on_post(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    super::wave_a_test::seed_caller_manager(ctx, &fixture)?;
     let accounts = seed_accounts(ctx, &fixture)?;
     let employee_id = seed_employee(ctx, &fixture, "Tax Emp")?;
     update_employee(

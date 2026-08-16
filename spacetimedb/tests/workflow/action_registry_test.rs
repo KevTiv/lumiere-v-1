@@ -199,6 +199,8 @@ fn replays_all_seven_actions_and_rejects_changed_revision(
 
 fn executes_payment_and_order_once(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    let (bank_journal_id, _bank_account_id) =
+        crate::accounting_tests::helpers::seed_bank_journal(ctx, &fixture)?;
     let payment = ctx.db.account_payment().insert(AccountPayment {
         id: 0,
         organization_id: fixture.organization_id,
@@ -211,7 +213,7 @@ fn executes_payment_and_order_once(ctx: &ReducerContext) -> Result<(), String> {
         amount: 12.34,
         currency_id: 1,
         date: ctx.timestamp,
-        journal_id: 991_001,
+        journal_id: bank_journal_id,
         ref_: Some("workflow action test".to_string()),
         memo: None,
         reconciled_invoice_ids: vec![],
@@ -299,7 +301,9 @@ fn executes_payment_and_order_once(ctx: &ReducerContext) -> Result<(), String> {
 
 fn rejects_unbalanced_locked_and_cross_company_actions(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = OrgFixture::seed_minimal(ctx)?;
-    let unbalanced = insert_draft_move(ctx, &fixture, "WF-UNBALANCED");
+    let (journal_id, _bank_account_id) =
+        crate::accounting_tests::helpers::seed_bank_journal(ctx, &fixture)?;
+    let unbalanced = insert_draft_move(ctx, &fixture, journal_id, "WF-UNBALANCED");
     add_test_move_line(ctx, &fixture, unbalanced.id, 10.0, 0.0, 1)?;
     let action = GuardedActionKey::PostAccountMove;
     let input = GuardedActionInput::PostAccountMove {
@@ -353,7 +357,7 @@ fn rejects_unbalanced_locked_and_cross_company_actions(ctx: &ReducerContext) -> 
         return Err(format!("unexpected cross-company error: {cross_company}"));
     }
 
-    let locked = insert_draft_move(ctx, &fixture, "WF-LOCKED");
+    let locked = insert_draft_move(ctx, &fixture, journal_id, "WF-LOCKED");
     add_test_move_line(ctx, &fixture, locked.id, 10.0, 10.0, 1)?;
     let locked_input = GuardedActionInput::PostAccountMove { move_id: locked.id };
     let locked_snapshot = snapshot_guarded_action(
@@ -476,7 +480,12 @@ fn insert_draft_purchase_order(ctx: &ReducerContext, fixture: &OrgFixture) -> Pu
     })
 }
 
-fn insert_draft_move(ctx: &ReducerContext, fixture: &OrgFixture, name: &str) -> AccountMove {
+fn insert_draft_move(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    journal_id: u64,
+    name: &str,
+) -> AccountMove {
     ctx.db.account_move().insert(AccountMove {
         id: 0,
         organization_id: fixture.organization_id,
@@ -506,7 +515,7 @@ fn insert_draft_move(ctx: &ReducerContext, fixture: &OrgFixture, name: &str) -> 
         source_id: None,
         medium_id: None,
         company_id: fixture.company_id,
-        journal_id: 991_002,
+        journal_id,
         currency_id: 1,
         company_currency_id: 1,
         amount_untaxed: 0.0,

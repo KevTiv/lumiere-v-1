@@ -221,7 +221,7 @@ fn create_empty_draft(
         Some(fixture.company_id),
         CreateWorkflowParams {
             workflow_key: workflow_key.to_string(),
-            model: "purchase.order".to_string(),
+            model: "purchase_order".to_string(),
             name: "Definition test".to_string(),
             description: None,
             trigger: WorkflowTrigger::Manual,

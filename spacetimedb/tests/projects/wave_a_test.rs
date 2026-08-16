@@ -1,14 +1,10 @@
 //! Wave A projects/PSA lifecycle: isolation, SoD, freeze, bill sell-rate, period lock.
-use std::time::Duration;
-
 use spacetimedb::{Identity, ReducerContext, Table};
 
 use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
 };
-use crate::accounting::fiscal_periods::{
-    account_period, close_account_period, create_account_period, CreateAccountPeriodParams,
-};
+use crate::accounting::fiscal_periods::{account_period, close_account_period};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, bill_timesheets, BillTimesheetsParams,
 };
@@ -564,28 +560,18 @@ pub fn test_period_lock_rejects_bill(ctx: &ReducerContext) -> Result<(), String>
         .get(chart_keys::REVENUE)
         .ok_or("missing REVENUE")?;
 
-    create_account_period(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        CreateAccountPeriodParams {
-            name: "PSA Closed".to_string(),
-            code: "PSCL".to_string(),
-            date_from: ctx.timestamp,
-            date_to: ctx.timestamp + Duration::from_secs(86_400),
-            fiscal_year_id: fixture.fiscal_year_id,
-            is_adjustment: false,
-            notes: None,
-            metadata: None,
-        },
-    )?;
+    // OrgFixture::seed_minimal already opens a period spanning
+    // [now-180d, now+180d] for this fiscal year — creating another period
+    // covering "today" would overlap it and correctly reject. Close that
+    // existing period directly instead of creating a redundant, colliding one.
     let period_id = ctx
         .db
         .account_period()
-        .iter()
-        .find(|p| p.company_id == fixture.company_id && p.code == "PSCL")
+        .period_by_fiscal_year()
+        .filter(&fixture.fiscal_year_id)
+        .next()
         .map(|p| p.id)
-        .ok_or("period missing")?;
+        .ok_or("harness period missing")?;
     close_account_period(ctx, fixture.organization_id, fixture.company_id, period_id)?;
 
     let employee_id = seed_employee(ctx, &fixture, "Lock Emp")?;

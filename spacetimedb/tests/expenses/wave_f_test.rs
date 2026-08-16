@@ -393,6 +393,7 @@ fn spoof_submitter_as_other(ctx: &ReducerContext, sheet_id: u64) -> Result<(), S
 pub fn test_gate_enabled_sod_approve(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    super::wave_a_test::seed_caller_manager(ctx, &fixture)?;
     let employee_id = seed_employee(ctx, &fixture, "WF SoD Emp")?;
     let sheet_id = create_draft_sheet(ctx, &fixture, employee_id, "WF SoD Sheet")?;
     let line_id = create_line_with_receipt(ctx, &fixture, employee_id, "WF SoD Line", 90.0)?;
@@ -436,6 +437,7 @@ pub fn test_isolation_rebill_card_advance(ctx: &ReducerContext) -> Result<(), St
     ensure_test_superuser(ctx)?;
     let fixture_a = OrgFixture::seed_minimal(ctx)?;
     let fixture_b = OrgFixture::seed_minimal(ctx)?;
+    super::wave_a_test::seed_caller_manager(ctx, &fixture_a)?;
     let accounts_a = seed_accounts(ctx, &fixture_a)?;
     let emp_a = seed_employee(ctx, &fixture_a, "WF Iso Emp A")?;
     let emp_b = seed_employee(ctx, &fixture_b, "WF Iso Emp B")?;
@@ -620,6 +622,7 @@ pub fn test_isolation_rebill_card_advance(ctx: &ReducerContext) -> Result<(), St
 pub fn test_locked_period_rejects_post(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    super::wave_a_test::seed_caller_manager(ctx, &fixture)?;
     let accounts = seed_accounts(ctx, &fixture)?;
     let employee_id = seed_employee(ctx, &fixture, "WF Lock Emp")?;
     let sheet_id = create_draft_sheet(ctx, &fixture, employee_id, "WF Lock Sheet")?;

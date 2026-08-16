@@ -151,6 +151,14 @@ pub mod ai_tests;
 #[path = "../tests/analytics/mod.rs"]
 pub mod analytics_tests;
 
+/// IoT domain tests — call `run_all_iot_tests` reducer to execute.
+#[path = "../tests/iot/mod.rs"]
+pub mod iot_tests;
+
+/// Helpdesk domain tests — call `run_all_helpdesk_tests` reducer to execute.
+#[path = "../tests/helpdesk/mod.rs"]
+pub mod helpdesk_tests;
+
 use crate::core::migrations::apply_pending_global_migrations;
 use crate::core::reference::{currency, Currency};
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
@@ -186,6 +194,8 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("workflow human effects: {e}"))?;
     ai_tests::run_all_ai_tests(ctx).map_err(|e| format!("ai: {e}"))?;
     analytics_tests::run_all_analytics_tests(ctx).map_err(|e| format!("analytics: {e}"))?;
+    iot_tests::run_all_iot_tests(ctx).map_err(|e| format!("iot: {e}"))?;
+    helpdesk_tests::run_all_helpdesk_tests(ctx).map_err(|e| format!("helpdesk: {e}"))?;
     log::info!("✅ run_all_domain_tests complete");
     Ok(())
 }

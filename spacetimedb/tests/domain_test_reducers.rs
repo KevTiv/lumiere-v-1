@@ -46,6 +46,8 @@ fn domain_test_reducers_are_wasm_linked() {
     let _ = stringify!(run_manufacturing_productivity_relational_integrity_test);
     let _ = stringify!(run_all_ai_tests);
     let _ = stringify!(run_all_analytics_tests);
+    let _ = stringify!(run_all_iot_tests);
+    let _ = stringify!(run_all_helpdesk_tests);
 }
 
 fn run_all_domain_tests() {}
@@ -87,3 +89,5 @@ fn run_manufacturing_workorder_workcenter_integrity_test() {}
 fn run_manufacturing_productivity_relational_integrity_test() {}
 fn run_all_ai_tests() {}
 fn run_all_analytics_tests() {}
+fn run_all_iot_tests() {}
+fn run_all_helpdesk_tests() {}

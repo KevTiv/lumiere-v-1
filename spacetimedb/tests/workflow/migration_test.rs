@@ -1,7 +1,13 @@
 //! Active-version migration tests (WF-15).
 
-use spacetimedb::ReducerContext;
+use spacetimedb::rand::Rng;
+use spacetimedb::{ReducerContext, Table};
 
+use crate::core::permissions::{role, Role};
+use crate::crm::contacts::{contact, create_contact, CreateContactParams};
+use crate::purchasing::purchase_orders::{
+    create_purchase_order, purchase_order, CreatePurchaseOrderParams,
+};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::workflow::definitions::{
     clone_workflow_version_to_draft, create_workflow, publish_workflow_version,
@@ -331,7 +337,7 @@ fn test_human_task_kind_mismatch_rejected(ctx: &ReducerContext) -> Result<(), St
             task_policy: Some(WorkflowTaskPolicy {
                 kind: WorkflowHumanTaskKind::Complete,
                 assignment: WorkflowTaskAssignment::AnyCandidate,
-                candidate_role_ids: vec![1],
+                candidate_role_ids: vec![seed_role(ctx, fixture.organization_id)],
                 candidate_group_ids: vec![],
                 candidate_unit_ids: vec![],
                 require_comment_on_reject: false,
@@ -394,13 +400,125 @@ fn test_human_task_kind_mismatch_rejected(ctx: &ReducerContext) -> Result<(), St
 // FIXTURES
 // ============================================================================
 
+/// WRK-001: start_workflow validates subject_id against a real row in the
+/// table named by subject_model — "mig.subject" is not a recognized model.
+fn seed_purchase_order_subject(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    tag: &str,
+) -> Result<u64, String> {
+    create_contact(
+        ctx,
+        fixture.organization_id,
+        CreateContactParams {
+            name: format!("Vendor {tag}"),
+            type_: "contact".to_string(),
+            email: None,
+            phone: None,
+            mobile: None,
+            company_id: Some(fixture.company_id),
+            is_customer: false,
+            is_vendor: true,
+            is_employee: false,
+            is_prospect: false,
+            is_partner: false,
+            customer_rank: 0,
+            supplier_rank: 1,
+            display_name: Some(format!("Vendor {tag}")),
+            first_name: None,
+            last_name: None,
+            title: None,
+            email_secondary: None,
+            fax: None,
+            website: None,
+            street: None,
+            street2: None,
+            city: None,
+            state_code: None,
+            zip: None,
+            country_code: None,
+            tax_id: None,
+            company_registry: None,
+            industry: None,
+            employees_count: None,
+            annual_revenue: None,
+            description: None,
+            salesperson_id: None,
+            assigned_user_id: None,
+            parent_id: None,
+            user_id: None,
+            color: None,
+            metadata: None,
+        },
+    )?;
+    let vendor_id = ctx
+        .db
+        .contact()
+        .iter()
+        .find(|c| c.organization_id == fixture.organization_id && c.display_name == format!("Vendor {tag}"))
+        .map(|c| c.id)
+        .ok_or_else(|| format!("vendor contact {tag} missing"))?;
+    create_purchase_order(
+        ctx,
+        fixture.organization_id,
+        CreatePurchaseOrderParams {
+            company_id: Some(fixture.company_id),
+            partner_id: vendor_id,
+            currency_id: 1,
+            origin: Some(tag.to_string()),
+            partner_ref: None,
+            notes: None,
+            date_planned: None,
+            payment_term_id: None,
+            fiscal_position_id: None,
+            incoterm_id: None,
+            incoterm_location: None,
+            user_id: None,
+            invoice_ids: vec![],
+            picking_ids: vec![],
+            message_follower_ids: vec![],
+            message_ids: vec![],
+            activity_ids: vec![],
+            is_quantity_copy: None,
+            metadata: None,
+        },
+    )?;
+    ctx.db
+        .purchase_order()
+        .iter()
+        .find(|p| p.organization_id == fixture.organization_id && p.origin.as_deref() == Some(tag))
+        .map(|p| p.id)
+        .ok_or_else(|| format!("purchase order {tag} missing"))
+}
+
+/// WRK-003: candidate_role_ids must exist in this organization's role table.
+fn seed_role(ctx: &ReducerContext, organization_id: u64) -> u64 {
+    ctx.db
+        .role()
+        .insert(Role {
+            id: 0,
+            organization_id,
+            name: format!("migration-role-{}", ctx.rng().gen::<u64>()),
+            description: None,
+            parent_id: None,
+            permissions: vec!["workflow_task:write".to_string()],
+            is_system: false,
+            is_active: true,
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+            metadata: Some(r#"{"test":"migration"}"#.to_string()),
+        })
+        .id
+}
+
 fn seed_started_instance(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     workflow_key: &str,
 ) -> Result<(u64, u64, u64, u64), String> {
     let (workflow_id, version_id) = seed_linear_v1(ctx, fixture, workflow_key)?;
-    let snapshot = empty_snapshot(7)?;
+    let subject_id = seed_purchase_order_subject(ctx, fixture, workflow_key)?;
+    let snapshot = empty_snapshot(subject_id)?;
     start_workflow(
         ctx,
         fixture.organization_id,
@@ -408,8 +526,8 @@ fn seed_started_instance(
             company_id: fixture.company_id,
             workflow_id,
             workflow_version_id: version_id,
-            subject_model: "mig.subject".into(),
-            subject_id: 7,
+            subject_model: "purchase_order".into(),
+            subject_id,
             subject_revision_hash: snapshot.subject_revision_hash,
             singleton_trigger_key: None,
             idempotency_key: format!("start-{workflow_key}"),
@@ -438,7 +556,7 @@ fn seed_linear_v1(
         Some(fixture.company_id),
         CreateWorkflowParams {
             workflow_key: workflow_key.into(),
-            model: "mig.subject".into(),
+            model: "purchase_order".into(),
             name: "Migration linear".into(),
             description: None,
             trigger: WorkflowTrigger::Signal,
@@ -525,7 +643,7 @@ fn seed_human_task_v1(
         Some(fixture.company_id),
         CreateWorkflowParams {
             workflow_key: workflow_key.into(),
-            model: "mig.subject".into(),
+            model: "purchase_order".into(),
             name: "Migration human".into(),
             description: None,
             trigger: WorkflowTrigger::Signal,
@@ -548,6 +666,7 @@ fn seed_human_task_v1(
         .filter(&workflow.id)
         .find(|v| v.status == WorkflowVersionStatus::Draft)
         .ok_or("human migration draft missing")?;
+    let role_id = seed_role(ctx, fixture.organization_id);
     let mut rev = version.draft_revision;
     for (key, kind, seq, policy) in [
         ("start", WorkflowNodeKind::Start, 1, None),
@@ -558,7 +677,7 @@ fn seed_human_task_v1(
             Some(WorkflowTaskPolicy {
                 kind: WorkflowHumanTaskKind::ApproveReject,
                 assignment: WorkflowTaskAssignment::AnyCandidate,
-                candidate_role_ids: vec![1],
+                candidate_role_ids: vec![role_id],
                 candidate_group_ids: vec![],
                 candidate_unit_ids: vec![],
                 require_comment_on_reject: false,
@@ -625,7 +744,8 @@ fn seed_instance_on_human_task(
     use crate::workflow::runtime::SignalWorkflowParams;
 
     let (workflow_id, version_id) = seed_human_task_v1(ctx, fixture, workflow_key)?;
-    let snapshot = empty_snapshot(9)?;
+    let subject_id = seed_purchase_order_subject(ctx, fixture, workflow_key)?;
+    let snapshot = empty_snapshot(subject_id)?;
     start_workflow(
         ctx,
         fixture.organization_id,
@@ -633,8 +753,8 @@ fn seed_instance_on_human_task(
             company_id: fixture.company_id,
             workflow_id,
             workflow_version_id: version_id,
-            subject_model: "mig.subject".into(),
-            subject_id: 9,
+            subject_model: "purchase_order".into(),
+            subject_id,
             subject_revision_hash: snapshot.subject_revision_hash.clone(),
             singleton_trigger_key: None,
             idempotency_key: format!("start-{workflow_key}"),
@@ -775,7 +895,7 @@ fn assert_still_on_version(
 
 fn empty_snapshot(subject_id: u64) -> Result<ConditionSnapshot, String> {
     let mut snapshot = ConditionSnapshot {
-        subject_model: "mig.subject".into(),
+        subject_model: "purchase_order".into(),
         subject_id,
         subject_revision_hash: String::new(),
         fields: vec![],
