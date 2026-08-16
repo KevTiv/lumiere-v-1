@@ -201,7 +201,7 @@ export function GeneralLedgerView({
               ) : filtered.map((move) => {
                 const isPosted = String(move.state) === "Posted"
                 return (
-                  <TableRow key={String(move.id)} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedMove(move)}>
+                  <TableRow key={String(move.id)} data-testid={`entity-row-${move.id}`} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedMove(move)}>
                     <TableCell className="font-mono font-medium">{move.name}</TableCell>
                     <TableCell>{formatTimestamp(move.date)}</TableCell>
                     <TableCell>

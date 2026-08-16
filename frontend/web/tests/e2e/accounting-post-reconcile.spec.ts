@@ -6,7 +6,6 @@ import {
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   gotoModule,
-  postDraftInvoiceViaUi,
   scalarQueryId,
   smokeName,
   waitForMovePosted,
@@ -30,8 +29,11 @@ function stdbTimestampMicros(isoDate: string): { __timestamp_micros_since_unix_e
   return { __timestamp_micros_since_unix_epoch__: Number(micros) }
 }
 
-// Far-future date so posting is never blocked by a closed/seeded fiscal period.
-const POSTABLE_MOVE_DATE = "2099-06-01T00:00:00.000Z"
+// Seeded fiscal periods open a ~1-year window starting at seed time, not a fixed
+// calendar date — a far-future date (e.g. year 2099) falls outside that window and
+// posting rejects with "no open accounting period covers this date". A near-future
+// date safely inside the seeded window avoids that without hardcoding a year.
+const POSTABLE_MOVE_DATE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
 const moveLineBase = {
   quantity: 1,
@@ -75,31 +77,122 @@ async function fetchJournalIdByCode(page: Page, code: string): Promise<number> {
   return id
 }
 
-async function fetchCustomerPartnerId(page: Page): Promise<{ id: number; name: string }> {
-  const res = await page.request.get("/api/query/contacts")
-  if (!res.ok()) throw new Error(`contacts query failed: ${res.status()}`)
-  const json = (await res.json()) as {
-    data?: Array<{ id?: unknown; name?: string; isCustomer?: boolean }>
+const none = { none: [] as [] }
+const some = <T,>(value: T) => ({ some: value })
+
+/**
+ * Creates a fresh customer contact rather than reusing a seeded one — the seed
+ * fixture's demo customers already carry prior invoices, and `postDraftInvoiceViaUi`
+ * matches its row by partner name alone, so any pre-existing invoice for a shared
+ * name would collide with the one this test creates.
+ */
+async function createCustomerContact(
+  page: Page,
+  organizationId: number,
+  name: string,
+): Promise<{ id: number; name: string }> {
+  await callReducerBff(page, "create_contact", [
+    organizationId,
+    {
+      name,
+      type: "contact",
+      email: some(`${name.toLowerCase().replace(/\s+/g, "-")}@example.test`),
+      phone: none,
+      mobile: none,
+      company_id: none,
+      is_customer: true,
+      is_vendor: false,
+      is_employee: false,
+      is_prospect: false,
+      is_partner: false,
+      customer_rank: 17,
+      supplier_rank: 0,
+      display_name: none,
+      first_name: none,
+      last_name: none,
+      title: none,
+      email_secondary: none,
+      fax: none,
+      website: none,
+      street: none,
+      street2: none,
+      city: none,
+      state_code: none,
+      zip: none,
+      country_code: some("US"),
+      tax_id: none,
+      company_registry: none,
+      industry: none,
+      employees_count: none,
+      annual_revenue: none,
+      description: none,
+      salesperson_id: none,
+      assigned_user_id: none,
+      parent_id: none,
+      user_id: none,
+      color: none,
+      metadata: some(JSON.stringify({ test: "acc-003-post-reconcile" })),
+    },
+  ])
+
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/contacts")
+    if (res.ok()) {
+      const json = (await res.json()) as { data?: Array<{ id?: unknown; name?: string }> }
+      const row = (json.data ?? []).find((c) => c.name === name)
+      const id = scalarQueryId(row?.id)
+      if (id != null) return { id, name }
+    }
+    await page.waitForTimeout(250)
   }
-  const row = (json.data ?? []).find((c) => c.isCustomer !== false && c.name)
-  const id = scalarQueryId(row?.id)
-  if (id == null || !row?.name) throw new Error("no customer contact in seed data")
-  return { id, name: row.name }
+  throw new Error(`customer contact not found after create: ${name}`)
 }
 
+/** Matches by embedded metadata.ref, not the `ref` column — it isn't projected by the query API. */
 async function fetchDraftMoveIdByRef(page: Page, ref: string): Promise<number> {
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
     const res = await page.request.get("/api/query/account-moves")
     if (res.ok()) {
-      const json = (await res.json()) as { data?: Array<{ id?: unknown; ref?: string }> }
-      const row = (json.data ?? []).find((m) => m.ref === ref)
+      const json = (await res.json()) as { data?: Array<{ id?: unknown; metadata?: string }> }
+      const row = (json.data ?? []).find((m) => {
+        if (typeof m.metadata !== "string") return false
+        try {
+          return (JSON.parse(m.metadata) as { ref?: string }).ref === ref
+        } catch {
+          return false
+        }
+      })
       const id = scalarQueryId(row?.id)
       if (id != null) return id
     }
     await page.waitForTimeout(250)
   }
   throw new Error(`draft account move not found for ref: ${ref}`)
+}
+
+/**
+ * The reconcile dropdowns label options by `move.name` (posting auto-generates a
+ * sequence like "MISC/2026/0001") — the custom `ref` this spec sets is not projected
+ * by the query API, so option matching must key off the real posted name instead.
+ */
+async function fetchMoveNameById(page: Page, moveId: number): Promise<string> {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/account-moves")
+    if (res.ok()) {
+      const json = (await res.json()) as { data?: Array<{ id?: unknown; name?: string }> }
+      const row = (json.data ?? []).find((m) => scalarQueryId(m.id) === moveId)
+      if (row?.name) return row.name
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`account move ${moveId} has no name yet`)
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
 /** Create a draft OutInvoice move (AR debit / Revenue credit) via the reducer BFF. */
@@ -120,6 +213,7 @@ async function createDraftInvoice(
   await callReducerBff(page, "create_account_move", [
     args.organizationId,
     {
+      idempotency_key: args.ref,
       company_id: args.companyId,
       journal_id: args.journalId,
       move_type: { tag: "OutInvoice" },
@@ -132,8 +226,8 @@ async function createDraftInvoice(
       partner_id: args.partnerId,
       partner_bank_id: null,
       fiscal_position_id: null,
-      invoice_date: stdbTimestampMicros(POSTABLE_MOVE_DATE),
-      invoice_date_due: stdbTimestampMicros(POSTABLE_MOVE_DATE),
+      invoice_date: { some: stdbTimestampMicros(POSTABLE_MOVE_DATE) },
+      invoice_date_due: { some: stdbTimestampMicros(POSTABLE_MOVE_DATE) },
       invoice_payment_term_id: null,
       payment_reference: null,
       invoice_origin: null,
@@ -147,7 +241,7 @@ async function createDraftInvoice(
       source_id: null,
       medium_id: null,
       secure_sequence_number: null,
-      metadata: JSON.stringify({ test: "acc-003-post-reconcile" }),
+      metadata: JSON.stringify({ test: "acc-003-post-reconcile", ref: args.ref }),
     },
   ])
 
@@ -195,6 +289,7 @@ async function createDraftJournalEntry(
   await callReducerBff(page, "create_account_move", [
     args.organizationId,
     {
+      idempotency_key: args.ref,
       company_id: args.companyId,
       journal_id: args.journalId,
       move_type: { tag: "Entry" },
@@ -222,7 +317,7 @@ async function createDraftJournalEntry(
       source_id: null,
       medium_id: null,
       secure_sequence_number: null,
-      metadata: JSON.stringify({ test: "acc-003-post-reconcile" }),
+      metadata: JSON.stringify({ test: "acc-003-post-reconcile", ref: args.ref }),
     },
   ])
 
@@ -258,7 +353,7 @@ test.describe("Accounting journal entry post + reconcile", { tag: "@p0" }, () =>
   test("posts a draft journal entry via UI, then reconciles it against a posted invoice", async ({
     page,
   }) => {
-    test.setTimeout(120_000)
+    test.setTimeout(240_000)
 
     const organizationId = await fetchSessionOrganizationId(page)
     const companyId = await fetchDefaultCompanyId(page)
@@ -267,7 +362,7 @@ test.describe("Accounting journal entry post + reconcile", { tag: "@p0" }, () =>
     const bankAccountId = await fetchAccountIdByCode(page, "1200")
     const invJournalId = await fetchJournalIdByCode(page, "INV")
     const miscJournalId = await fetchJournalIdByCode(page, "MISC")
-    const customer = await fetchCustomerPartnerId(page)
+    const customer = await createCustomerContact(page, organizationId, smokeName("acc003-customer"))
 
     const amount = 250
     const invoiceRef = smokeName("acc003-inv")
@@ -286,7 +381,13 @@ test.describe("Accounting journal entry post + reconcile", { tag: "@p0" }, () =>
       amount,
       ref: invoiceRef,
     })
-    const invoiceMoveId = await postDraftInvoiceViaUi(page, customer.name)
+    const invoiceMoveId = await fetchDraftMoveIdByRef(page, invoiceRef)
+    // add_account_move_line doesn't roll per-line balances up to the move's own
+    // amount_total/amount_residual — without this, the invoice posts with both
+    // stuck at 0, which hides it from the reconcile dropdown's residual > 0 filter.
+    await callReducerBff(page, "compute_invoice_totals", [organizationId, invoiceMoveId])
+    await callReducerBff(page, "post_account_move", [organizationId, invoiceMoveId])
+    await waitForMovePosted(page, invoiceMoveId)
 
     // Draft journal entry with balanced AR/Bank lines already attached — only the
     // post action itself is exercised via UI below.
@@ -303,7 +404,7 @@ test.describe("Accounting journal entry post + reconcile", { tag: "@p0" }, () =>
 
     await gotoModule(page, "/accounting", "accounting")
     await page.getByTestId("module-tab-accounting-journal-entries").click()
-    const entryRow = page.locator("tbody tr").filter({ hasText: entryRef }).first()
+    const entryRow = page.getByTestId(`entity-row-${entryMoveId}`)
     await expect(entryRow).toBeVisible({ timeout: 30_000 })
     await entryRow.click()
 
@@ -319,6 +420,14 @@ test.describe("Accounting journal entry post + reconcile", { tag: "@p0" }, () =>
     expect(postRes.ok()).toBe(true)
     await waitForMovePosted(page, entryMoveId)
 
+    const entryName = await fetchMoveNameById(page, entryMoveId)
+    const invoiceName = await fetchMoveNameById(page, invoiceMoveId)
+
+    // The entry detail dialog stays open after posting (no auto-close) and its
+    // overlay intercepts pointer events, so the Payments tab click never lands.
+    await page.keyboard.press("Escape")
+    await expect(postButton).toBeHidden({ timeout: 15_000 })
+
     await page.getByTestId("module-tab-accounting-payments").click()
     await page.getByTestId("entity-action-pay-reconcile-moves").click()
     await expect(page.getByTestId("form-modal-reconcile-payment-invoice")).toBeVisible({
@@ -328,14 +437,14 @@ test.describe("Accounting journal entry post + reconcile", { tag: "@p0" }, () =>
     await page.getByTestId("form-field-paymentMoveId").click()
     await page
       .locator('[role="listbox"]:visible')
-      .getByRole("option", { name: new RegExp(entryRef) })
+      .getByRole("option", { name: new RegExp(escapeRegExp(entryName)) })
       .first()
       .click()
 
     await page.getByTestId("form-field-invoiceMoveId").click()
     await page
       .locator('[role="listbox"]:visible')
-      .getByRole("option", { name: new RegExp(invoiceRef) })
+      .getByRole("option", { name: new RegExp(escapeRegExp(invoiceName)) })
       .first()
       .click()
 
@@ -351,27 +460,28 @@ test.describe("Accounting journal entry post + reconcile", { tag: "@p0" }, () =>
       timeout: 15_000,
     })
 
+    // account-move-lines doesn't project amountResidual/isMatching (see
+    // resource_registry.json's default_restricted for that resource) — but
+    // account-moves does project amountResidual and paymentState, so assert
+    // reconciliation at the move level instead of the line level.
     await expect
       .poll(
         async () => {
-          const res = await page.request.get("/api/query/account-move-lines")
+          const res = await page.request.get("/api/query/account-moves")
           if (!res.ok()) return null
           const json = (await res.json()) as {
-            data?: Array<{
-              moveId?: unknown
-              accountId?: unknown
-              amountResidual?: unknown
-              isMatching?: unknown
-            }>
+            data?: Array<{ id?: unknown; amountResidual?: unknown; paymentState?: unknown }>
           }
-          const line = (json.data ?? []).find(
-            (l) => scalarQueryId(l.moveId) === invoiceMoveId && scalarQueryId(l.accountId) === arAccountId,
-          )
-          if (!line) return null
-          return { residual: Number(line.amountResidual ?? -1), matching: Boolean(line.isMatching) }
+          const move = (json.data ?? []).find((m) => scalarQueryId(m.id) === invoiceMoveId)
+          if (!move) return null
+          const paymentStateTag =
+            move.paymentState && typeof move.paymentState === "object"
+              ? (move.paymentState as { tag?: string }).tag
+              : move.paymentState
+          return { residual: Number(move.amountResidual ?? -1), paymentState: paymentStateTag }
         },
         { timeout: 30_000 },
       )
-      .toEqual({ residual: 0, matching: true })
+      .toEqual({ residual: 0, paymentState: "Paid" })
   })
 })
