@@ -132,6 +132,8 @@ pub fn run_expenses_wave_g_test(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("post_expense_sheet_is_idempotent: {e}"))?;
     wave_g_test::test_refuse_expense_sheet_rejects_self_refusal(ctx)
         .map_err(|e| format!("refuse_expense_sheet_rejects_self_refusal: {e}"))?;
+    wave_g_test::test_create_expense_analytic_account_fk(ctx)
+        .map_err(|e| format!("create_expense_analytic_account_fk: {e}"))?;
     Ok(())
 }
 

@@ -23,7 +23,9 @@ use crate::subscriptions::subscription_wave_c::{
     CancelSubscriptionParams, PauseSubscriptionParams, RenewSubscriptionParams,
     ResumeSubscriptionParams,
 };
-use crate::subscriptions::tables::{subscription, subscription_line, subscription_plan};
+use crate::subscriptions::tables::{
+    subscription, subscription_line, subscription_plan, SubscriptionLine,
+};
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{DiscountPolicy, JournalType, MoveType};
 
@@ -349,6 +351,7 @@ pub fn test_amend_price_with_proration(ctx: &ReducerContext) -> Result<(), Strin
             income_account_id: None,
             receivable_account_id: None,
             notes: Some("invalid pre-start amendment".into()),
+            parent_line_id: None,
         },
     );
     if rejected.is_ok() {
@@ -393,6 +396,7 @@ pub fn test_amend_price_with_proration(ctx: &ReducerContext) -> Result<(), Strin
             income_account_id: Some(income),
             receivable_account_id: Some(ar),
             notes: Some("price up".into()),
+            parent_line_id: None,
         },
     )?;
 
@@ -820,6 +824,115 @@ pub fn test_plan_update_and_deactivate(ctx: &ReducerContext) -> Result<(), Strin
         .ok_or("plan")?;
     if !active.active {
         return Err("expected reactivated plan".into());
+    }
+
+    Ok(())
+}
+
+fn base_amend_params(line_id: u64, notes: &str, parent_line_id: Option<u64>) -> AmendSubscriptionParams {
+    AmendSubscriptionParams {
+        amendment_type: "price".into(),
+        line_id,
+        effective_date: None,
+        new_product_id: None,
+        new_quantity: None,
+        new_price_unit: None,
+        new_discount: None,
+        prorate: false,
+        journal_id: None,
+        income_account_id: None,
+        receivable_account_id: None,
+        notes: Some(notes.into()),
+        parent_line_id,
+    }
+}
+
+/// SUB-013: amend_subscription rejects a nonexistent parent_line_id and a
+/// parent assignment that would create a cycle in the amendment parent/child
+/// chain (mirrors validate_contact_parent's cycle walk in crm/contacts.rs).
+pub fn test_amend_parent_line_fk_and_cycle(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let journal_id = seed_journal(ctx, &fixture)?;
+    let (sub_id, line_a) = seed_active_subscription(ctx, &fixture, journal_id, "PARENT", 100.0)?;
+
+    // Seed a second real line on the same subscription — no reducer adds
+    // lines after creation, so clone the real, already-validated line row.
+    let line_a_row = ctx
+        .db
+        .subscription_line()
+        .id()
+        .find(&line_a)
+        .ok_or("line_a missing")?;
+    let line_b_row = ctx.db.subscription_line().insert(SubscriptionLine {
+        id: 0,
+        name: "PARENT line B".into(),
+        ..line_a_row.clone()
+    });
+    let line_b = line_b_row.id;
+
+    // A nonexistent parent_line_id must be rejected.
+    let missing_parent_id = line_b + 1_000_000;
+    if ctx
+        .db
+        .subscription_line()
+        .id()
+        .find(&missing_parent_id)
+        .is_some()
+    {
+        return Err("expected missing_parent_id to not correspond to any real line".into());
+    }
+    let missing = amend_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        base_amend_params(line_a, "missing parent", Some(missing_parent_id)),
+    );
+    if missing.is_ok() {
+        return Err("nonexistent parent_line_id should be rejected".into());
+    }
+
+    // Link line_a's parent to line_b — both real lines on the same subscription.
+    amend_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        base_amend_params(line_a, "link parent", Some(line_b)),
+    )?;
+    let updated_a = ctx
+        .db
+        .subscription_line()
+        .id()
+        .find(&line_a)
+        .ok_or("line_a after link")?;
+    if updated_a.line_parent_id != Some(line_b) {
+        return Err("line_a.line_parent_id should be set to line_b".into());
+    }
+
+    // Now line_a -> line_b. Setting line_b's parent to line_a would close the
+    // loop (line_a -> line_b -> line_a) and must be rejected.
+    let cycle = amend_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        base_amend_params(line_b, "cycle attempt", Some(line_a)),
+    );
+    if cycle.is_ok() {
+        return Err("cycle-creating parent_line_id should be rejected".into());
+    }
+    let unchanged_b = ctx
+        .db
+        .subscription_line()
+        .id()
+        .find(&line_b)
+        .ok_or("line_b after rejected cycle")?;
+    if unchanged_b.line_parent_id.is_some() {
+        return Err("rejected cycle attempt must not mutate line_b".into());
     }
 
     Ok(())

@@ -1,5 +1,5 @@
 //! HLP-005/006/007: CSV import FK validation, cross-team assignment rejection,
-//! and the SLA breach flag being system-only.
+//! and the SLA breach flag being system-only. HLP-008: cross-org ticket rejection.
 use spacetimedb::rand::Rng;
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, Table};
 
@@ -409,6 +409,75 @@ pub fn test_sla_reached_is_system_only(ctx: &ReducerContext) -> Result<(), Strin
         .ok_or("ticket missing after breach check")?;
     if !breached.sla_reached {
         return Err("system check did not flip sla_reached past the deadline".to_string());
+    }
+    Ok(())
+}
+
+/// HLP-008: `create_ticket` must reject a team_id/stage_id belonging to a
+/// different organization than the caller's — proving the org checks already
+/// wired into `create_ticket` (alongside HLP-001/002) actually hold.
+pub fn test_cross_org_ticket_rejected(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let other_org = OrgFixture::seed_minimal(ctx)?;
+    let foreign_team = seed_team(ctx, &other_org, "HLP-008 Foreign Team")?;
+    let foreign_stage = seed_stage(ctx, &other_org, foreign_team, "HLP-008 Foreign Stage")?;
+
+    let cross_org_team_error = create_ticket(
+        ctx,
+        fixture.organization_id,
+        CreateTicketParams {
+            team_id: foreign_team,
+            stage_id: foreign_stage,
+            name: "Cross-org team ticket".to_string(),
+            description: None,
+            priority: TicketPriority::Normal,
+            partner_id: None,
+            partner_name: None,
+            partner_email: None,
+            sla_id: None,
+            sla_deadline: None,
+        },
+    )
+    .err()
+    .ok_or("cross-org team_id ticket creation unexpectedly succeeded")?;
+    if !cross_org_team_error.contains("does not belong to this organization") {
+        return Err(format!(
+            "unexpected cross-org team error: {cross_org_team_error}"
+        ));
+    }
+    if ctx
+        .db
+        .helpdesk_ticket()
+        .iter()
+        .any(|t| t.name == "Cross-org team ticket")
+    {
+        return Err("cross-org ticket was persisted despite rejection".to_string());
+    }
+
+    let own_team = seed_team(ctx, &fixture, "HLP-008 Own Team")?;
+    let cross_org_stage_error = create_ticket(
+        ctx,
+        fixture.organization_id,
+        CreateTicketParams {
+            team_id: own_team,
+            stage_id: foreign_stage,
+            name: "Cross-org stage ticket".to_string(),
+            description: None,
+            priority: TicketPriority::Normal,
+            partner_id: None,
+            partner_name: None,
+            partner_email: None,
+            sla_id: None,
+            sla_deadline: None,
+        },
+    )
+    .err()
+    .ok_or("cross-org stage_id ticket creation unexpectedly succeeded")?;
+    if !cross_org_stage_error.contains("does not belong to this organization") {
+        return Err(format!(
+            "unexpected cross-org stage error: {cross_org_stage_error}"
+        ));
     }
     Ok(())
 }

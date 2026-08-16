@@ -159,6 +159,10 @@ pub mod iot_tests;
 #[path = "../tests/helpdesk/mod.rs"]
 pub mod helpdesk_tests;
 
+/// Integrations domain tests — call `run_all_integrations_tests` reducer to execute.
+#[path = "../tests/integrations/mod.rs"]
+pub mod integrations_tests;
+
 use crate::core::migrations::apply_pending_global_migrations;
 use crate::core::reference::{currency, Currency};
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
@@ -196,6 +200,7 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
     analytics_tests::run_all_analytics_tests(ctx).map_err(|e| format!("analytics: {e}"))?;
     iot_tests::run_all_iot_tests(ctx).map_err(|e| format!("iot: {e}"))?;
     helpdesk_tests::run_all_helpdesk_tests(ctx).map_err(|e| format!("helpdesk: {e}"))?;
+    integrations_tests::run_all_integrations_tests(ctx).map_err(|e| format!("integrations: {e}"))?;
     log::info!("✅ run_all_domain_tests complete");
     Ok(())
 }

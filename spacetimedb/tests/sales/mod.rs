@@ -1,4 +1,5 @@
 //! Sales domain test suite — invoke via `run_all_sales_tests` reducer.
+pub mod cancellation_test;
 pub mod commission_settle_test;
 pub mod gap_fixes_test;
 pub mod oms_extensions_test;
@@ -33,6 +34,10 @@ pub fn run_all_sales_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_sales_pricelist_company_scope_test(ctx)?;
     run_sales_exchange_from_return_test(ctx)?;
     run_sales_ghost_product_fail_closed_test(ctx)?;
+    run_sales_cancel_done_rejected_test(ctx)?;
+    run_sales_cancel_invoiced_rejected_test(ctx)?;
+    run_sales_cancel_cross_org_rejected_test(ctx)?;
+    run_sales_cancel_nonexistent_rejected_test(ctx)?;
     log::info!("✅ run_all_sales_tests complete");
     Ok(())
 }
@@ -165,4 +170,29 @@ pub fn run_sales_exchange_from_return_test(ctx: &ReducerContext) -> Result<(), S
 pub fn run_sales_ghost_product_fail_closed_test(ctx: &ReducerContext) -> Result<(), String> {
     gap_fixes_test::test_unknown_product_so_line_fail_closed(ctx)
         .map_err(|e| format!("r1_ghost_product: {e}"))
+}
+
+/// SAL-003: negative test matrix for `cancel_sale_order` invalid state transitions.
+#[spacetimedb::reducer]
+pub fn run_sales_cancel_done_rejected_test(ctx: &ReducerContext) -> Result<(), String> {
+    cancellation_test::test_cancel_done_order_rejected(ctx)
+        .map_err(|e| format!("cancel_done_order_rejected: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_sales_cancel_invoiced_rejected_test(ctx: &ReducerContext) -> Result<(), String> {
+    cancellation_test::test_cancel_invoiced_order_rejected(ctx)
+        .map_err(|e| format!("cancel_invoiced_order_rejected: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_sales_cancel_cross_org_rejected_test(ctx: &ReducerContext) -> Result<(), String> {
+    cancellation_test::test_cancel_cross_org_rejected(ctx)
+        .map_err(|e| format!("cancel_cross_org_rejected: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_sales_cancel_nonexistent_rejected_test(ctx: &ReducerContext) -> Result<(), String> {
+    cancellation_test::test_cancel_nonexistent_order_rejected(ctx)
+        .map_err(|e| format!("cancel_nonexistent_order_rejected: {e}"))
 }

@@ -10,7 +10,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::inventory::stock::{increase_quant_at_location, stock_quant};
+use crate::inventory::stock::{increase_quant_at_location, require_product_in_org, stock_quant};
 use serde_json;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -346,6 +346,10 @@ pub fn create_inventory_adjustment(
         return Err("AdjustmentReason is inactive".to_string());
     }
     let reason_code = reason.code.clone();
+
+    // INV-013: Validate the referenced product exists, belongs to this
+    // organization, and is active before allowing the adjustment.
+    require_product_in_org(ctx, organization_id, params.product_id)?;
 
     // Derive quantity_before and unit_cost from the current on-hand stock quant (server-authoritative).
     let existing_quant = ctx

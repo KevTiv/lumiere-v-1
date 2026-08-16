@@ -1546,6 +1546,7 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
     create_google_drive_connection(
         ctx,
         org_id,
+        Some(fixture.company_id),
         "Wave D Drive".to_string(),
         "drive@example.com".to_string(),
         "gd-acc-1".to_string(),
@@ -1557,6 +1558,7 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
         None,
         None,
         SyncDirection::Bidirectional,
+        None,
         60,
         vec!["pdf".to_string()],
         25,
@@ -1990,6 +1992,115 @@ pub fn test_forms_custom_field_record_existence(ctx: &ReducerContext) -> Result<
             && r.record_id == local_contact_id
     }) {
         return Err("valid contact EAV write was not persisted".to_string());
+    }
+
+    Ok(())
+}
+
+/// FRM-004: the FRM-001 model whitelist rejects any model string outside
+/// `ALLOWED_CUSTOM_FIELD_MODELS` — proven against a made-up model name on both
+/// `set_record_custom_field_values` and `delete_record_custom_field_values`.
+pub fn test_forms_custom_field_rejects_invalid_model(ctx: &ReducerContext) -> Result<(), String> {
+    use crate::crm::contacts::{contact, create_contact, CreateContactParams};
+    use crate::forms::{
+        delete_record_custom_field_values, record_custom_field_value,
+        set_record_custom_field_values, RecordCustomFieldEntry, SetRecordCustomFieldValuesParams,
+    };
+
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+
+    create_contact(
+        ctx,
+        fixture.organization_id,
+        CreateContactParams {
+            name: "FRM-004 Contact".to_string(),
+            type_: "contact".to_string(),
+            email: None,
+            phone: None,
+            mobile: None,
+            company_id: Some(fixture.company_id),
+            is_customer: true,
+            is_vendor: false,
+            is_employee: false,
+            is_prospect: false,
+            is_partner: false,
+            customer_rank: 0,
+            supplier_rank: 0,
+            display_name: None,
+            first_name: None,
+            last_name: None,
+            title: None,
+            email_secondary: None,
+            fax: None,
+            website: None,
+            street: None,
+            street2: None,
+            city: None,
+            state_code: None,
+            zip: None,
+            country_code: None,
+            tax_id: None,
+            company_registry: None,
+            industry: None,
+            employees_count: None,
+            annual_revenue: None,
+            description: None,
+            salesperson_id: None,
+            assigned_user_id: None,
+            parent_id: None,
+            user_id: None,
+            color: None,
+            metadata: None,
+        },
+    )?;
+    let record_id = ctx
+        .db
+        .contact()
+        .iter()
+        .find(|c| c.organization_id == fixture.organization_id && c.name == "FRM-004 Contact")
+        .map(|c| c.id)
+        .ok_or("FRM-004 contact missing after create")?;
+
+    let bogus_model = "not_a_real_erp_model";
+
+    let set_err = set_record_custom_field_values(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        SetRecordCustomFieldValuesParams {
+            model: bogus_model.to_string(),
+            record_id,
+            entries: vec![RecordCustomFieldEntry {
+                field_key: "custom:anything".to_string(),
+                value_json: "\"x\"".to_string(),
+            }],
+        },
+    )
+    .expect_err("non-whitelisted model must be rejected by set_record_custom_field_values");
+    if !set_err.contains("not in the allowed ERP model set") {
+        return Err(format!("unexpected error for invalid model set: {set_err}"));
+    }
+
+    if ctx
+        .db
+        .record_custom_field_value()
+        .iter()
+        .any(|r| r.organization_id == fixture.organization_id && r.model == bogus_model)
+    {
+        return Err("invalid-model write should not have persisted a row".to_string());
+    }
+
+    let delete_err = delete_record_custom_field_values(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        bogus_model.to_string(),
+        record_id,
+    )
+    .expect_err("non-whitelisted model must be rejected by delete_record_custom_field_values");
+    if !delete_err.contains("not in the allowed ERP model set") {
+        return Err(format!("unexpected error for invalid model delete: {delete_err}"));
     }
 
     Ok(())

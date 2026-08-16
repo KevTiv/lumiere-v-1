@@ -19,6 +19,8 @@ pub fn run_hr_wave_a_test(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("leave_cross_company_type: {e}"))?;
     wave_a_test::test_payslip_done_requires_artifact(ctx)
         .map_err(|e| format!("payslip_artifact: {e}"))?;
+    wave_a_test::test_payslip_generation_references_contract(ctx)
+        .map_err(|e| format!("payslip_contract_reference: {e}"))?;
     wave_a_test::test_offboarding_gates_archive(ctx)
         .map_err(|e| format!("offboarding_gate: {e}"))?;
     wave_a_test::test_offboarding_override_audit(ctx)

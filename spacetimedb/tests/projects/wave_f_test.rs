@@ -5,6 +5,9 @@ use spacetimedb::{ReducerContext, Table};
 use crate::accounting::analytic_accounting::{
     account_analytic_account, create_analytic_account, CreateAnalyticAccountParams,
 };
+use crate::projects::milestones::{
+    create_project_milestone, project_milestone, CreateProjectMilestoneParams,
+};
 use crate::projects::projects::{create_project, project_project, CreateProjectParams};
 use crate::projects::task_stages::{
     create_project_task_stage, project_task_stage, CreateProjectTaskStageParams,
@@ -250,6 +253,113 @@ pub fn test_log_timesheet_rejects_cross_project_task(ctx: &ReducerContext) -> Re
     );
     if cross.is_ok() {
         return Err("timesheet against a task from a different project should reject".into());
+    }
+    Ok(())
+}
+
+fn seed_milestone(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    project_id: u64,
+    name: &str,
+) -> Result<u64, String> {
+    create_project_milestone(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        CreateProjectMilestoneParams {
+            project_id,
+            name: name.to_string(),
+            description: None,
+            deadline: None,
+            sequence: 1,
+            is_reached: false,
+            bill_amount: 0.0,
+            percent_complete: 0.0,
+            active: true,
+            metadata: None,
+        },
+    )?;
+    ctx.db
+        .project_milestone()
+        .iter()
+        .find(|m| m.organization_id == fixture.organization_id && m.name == name)
+        .map(|m| m.id)
+        .ok_or_else(|| format!("milestone {name} missing"))
+}
+
+/// PRJ-007: a task's milestone_id must belong to the task's own project and
+/// organization. `validate_milestone_fk` (src/projects/milestones.rs) is
+/// already wired into create_task/update_task — this proves a milestone from
+/// a sibling project (same org) and one from a different org entirely are
+/// both rejected, while a same-project milestone is accepted and persisted.
+pub fn test_task_milestone_fk_cross_project_and_org_rejected(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let other_org = OrgFixture::seed_minimal(ctx)?;
+
+    let project_a = seed_project(ctx, &fixture, "PRJ-007 Project A")?;
+    let project_b = seed_project(ctx, &fixture, "PRJ-007 Project B")?;
+
+    // Same org, sibling project's milestone must reject.
+    let milestone_b = seed_milestone(ctx, &fixture, project_b, "PRJ-007 Milestone B")?;
+    let cross_project = create_task(
+        ctx,
+        fixture.organization_id,
+        sample_task(
+            fixture.company_id,
+            project_a,
+            "PRJ-007 Task Cross Project",
+            Some(milestone_b),
+            "",
+        ),
+    );
+    if cross_project.is_ok() {
+        return Err("task milestone from a different project should reject".into());
+    }
+
+    // A milestone belonging to a completely different organization must reject too.
+    let foreign_project = seed_project(ctx, &other_org, "PRJ-007 Foreign Project")?;
+    let foreign_milestone =
+        seed_milestone(ctx, &other_org, foreign_project, "PRJ-007 Foreign Milestone")?;
+    let cross_org = create_task(
+        ctx,
+        fixture.organization_id,
+        sample_task(
+            fixture.company_id,
+            project_a,
+            "PRJ-007 Task Cross Org",
+            Some(foreign_milestone),
+            "",
+        ),
+    );
+    if cross_org.is_ok() {
+        return Err("task milestone from a different organization should reject".into());
+    }
+
+    // Sanity: a milestone belonging to the task's own project is accepted.
+    let milestone_a = seed_milestone(ctx, &fixture, project_a, "PRJ-007 Milestone A")?;
+    create_task(
+        ctx,
+        fixture.organization_id,
+        sample_task(
+            fixture.company_id,
+            project_a,
+            "PRJ-007 Task Valid",
+            Some(milestone_a),
+            "",
+        ),
+    )?;
+    let saved = ctx
+        .db
+        .project_task()
+        .iter()
+        .find(|t| t.organization_id == fixture.organization_id && t.name == "PRJ-007 Task Valid")
+        .ok_or("valid task missing")?;
+    if saved.milestone_id != Some(milestone_a) {
+        return Err("same-project milestone_id was not persisted".into());
     }
     Ok(())
 }

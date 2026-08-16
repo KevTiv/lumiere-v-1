@@ -6,8 +6,12 @@ use spacetimedb::ReducerContext;
 
 use crate::inventory::product::product;
 use crate::inventory::warehouse::warehouse;
+use crate::manufacturing::bill_of_materials::{
+    create_bom, mrp_bom, mrp_bom_line, BomLineInput, CreateBomParams, MrpBomLine,
+};
 use crate::manufacturing::manufacturing_orders::{
-    create_manufacturing_order, create_workorder, mrp_production, mrp_workorder,
+    confirm_manufacturing_order, consume_mo_materials, create_manufacturing_order,
+    create_workorder, mrp_production, mrp_workorder, start_manufacturing_order,
     CreateMrpProductionParams, CreateWorkorderParams, MrpProduction, MrpWorkorder,
 };
 use crate::manufacturing::work_centers::{
@@ -16,6 +20,7 @@ use crate::manufacturing::work_centers::{
     CreateWorkcenterProductivityParams, MrpLossCategory, MrpWorkcenter,
 };
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
+use crate::types::BomType;
 
 fn create_test_workcenter(
     ctx: &ReducerContext,
@@ -376,5 +381,148 @@ pub fn test_productivity_relational_integrity(ctx: &ReducerContext) -> Result<()
     }
 
     log::info!("test_productivity_relational_integrity passed");
+    Ok(())
+}
+
+/// MFG-010: MO material consumption re-validates that every BOM component
+/// product still exists and belongs to the manufacturing order's organization
+/// before exploding the BOM into consumption moves. `create_bom` already
+/// rejects a cross-org component at BOM-line creation time, so this test
+/// forces the stored line directly (simulating a stale/tampered row) to
+/// exercise the defense-in-depth guard in `consume_mo_materials`.
+pub fn test_consume_materials_rejects_cross_org_component(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture_a = OrgFixture::seed_minimal(ctx)?;
+    let fixture_b = OrgFixture::seed_minimal(ctx)?;
+
+    let product_a = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture_a.product_id)
+        .ok_or("fixture_a product missing")?;
+    let warehouse_a = ctx
+        .db
+        .warehouse()
+        .id()
+        .find(&fixture_a.warehouse_id)
+        .ok_or("fixture_a warehouse missing")?;
+
+    create_bom(
+        ctx,
+        fixture_a.organization_id,
+        CreateBomParams {
+            company_id: Some(fixture_a.company_id),
+            type_: BomType::Manufacture,
+            product_id: fixture_a.product_id,
+            product_qty: 1.0,
+            product_uom_id: product_a.uom_id,
+            ready_to_produce: "all_available".to_string(),
+            consumption: "flexible".to_string(),
+            sequence: 10,
+            lines: vec![BomLineInput {
+                product_id: fixture_a.product_id,
+                product_qty: 2.0,
+                product_uom_id: product_a.uom_id,
+                sequence: 10,
+                manual_consumption: false,
+                attachments_count: 0,
+                operation_id: None,
+                child_bom_id: None,
+                bom_product_template_attribute_value_ids: vec![],
+                possible_bom_product_template_attribute_value_ids: vec![],
+                metadata: None,
+            }],
+            picking_type_id: None,
+            location_src_id: None,
+            location_dest_id: None,
+            warehouse_id: None,
+            routing_id: None,
+            metadata: Some(r#"{"test":"manufacturing-relational-integrity"}"#.to_string()),
+        },
+    )?;
+
+    let bom = ctx
+        .db
+        .mrp_bom()
+        .mrp_bom_by_org()
+        .filter(&fixture_a.organization_id)
+        .next()
+        .ok_or("BOM missing after create")?;
+
+    let line = ctx
+        .db
+        .mrp_bom_line()
+        .mrp_bom_line_by_bom()
+        .filter(&bom.id)
+        .next()
+        .ok_or("BOM line missing after create")?;
+
+    // Force the stored line to reference fixture_b's (foreign-org) product,
+    // bypassing create_bom's own line validation to simulate a stale row.
+    ctx.db.mrp_bom_line().id().update(MrpBomLine {
+        product_id: fixture_b.product_id,
+        ..line
+    });
+
+    create_manufacturing_order(
+        ctx,
+        fixture_a.organization_id,
+        CreateMrpProductionParams {
+            company_id: Some(fixture_a.company_id),
+            product_id: fixture_a.product_id,
+            product_qty: 1.0,
+            product_uom_id: product_a.uom_id,
+            date_planned_start: ctx.timestamp,
+            date_planned_finished: ctx.timestamp + Duration::from_secs(3_600),
+            location_src_id: warehouse_a.lot_stock_id,
+            location_dest_id: warehouse_a.lot_stock_id,
+            warehouse_id: warehouse_a.id,
+            picking_type_id: warehouse_a.pick_type_id,
+            consumption: None,
+            bom_id: Some(bom.id),
+            routing_id: None,
+            proc_group_id: None,
+            procurement_group_id: None,
+            date_deadline: None,
+            origin: Some("MFG-BOM-CROSS-ORG-COMPONENT".to_string()),
+            responsible_user_id: None,
+            metadata: Some(r#"{"test":"manufacturing-relational-integrity"}"#.to_string()),
+        },
+    )?;
+
+    let mo = ctx
+        .db
+        .mrp_production()
+        .mrp_production_by_org()
+        .filter(&fixture_a.organization_id)
+        .find(|production| production.origin.as_deref() == Some("MFG-BOM-CROSS-ORG-COMPONENT"))
+        .ok_or("MO missing after create")?;
+
+    confirm_manufacturing_order(ctx, fixture_a.organization_id, fixture_a.company_id, mo.id)?;
+    start_manufacturing_order(ctx, fixture_a.organization_id, fixture_a.company_id, mo.id)?;
+
+    if consume_mo_materials(ctx, fixture_a.organization_id, fixture_a.company_id, mo.id).is_ok() {
+        return Err(
+            "consume_mo_materials accepted a BOM component from a foreign organization"
+                .to_string(),
+        );
+    }
+
+    let mo_after = ctx
+        .db
+        .mrp_production()
+        .id()
+        .find(&mo.id)
+        .ok_or("MO missing after rejected consumption")?;
+    if !mo_after.move_raw_ids.is_empty() {
+        return Err(
+            "rejected cross-org component consumption persisted a raw stock move".to_string(),
+        );
+    }
+
+    log::info!("test_consume_materials_rejects_cross_org_component passed");
     Ok(())
 }

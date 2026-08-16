@@ -14,6 +14,7 @@ pub fn run_all_manufacturing_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_manufacturing_loss_category_invalid_category_test(ctx)?;
     run_manufacturing_workorder_workcenter_integrity_test(ctx)?;
     run_manufacturing_productivity_relational_integrity_test(ctx)?;
+    run_manufacturing_consume_materials_cross_org_component_test(ctx)?;
     log::info!("✅ run_all_manufacturing_tests complete");
     Ok(())
 }
@@ -32,6 +33,14 @@ pub fn run_manufacturing_productivity_relational_integrity_test(
 ) -> Result<(), String> {
     relational_integrity_test::test_productivity_relational_integrity(ctx)
         .map_err(|e| format!("productivity_relational_integrity: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_manufacturing_consume_materials_cross_org_component_test(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    relational_integrity_test::test_consume_materials_rejects_cross_org_component(ctx)
+        .map_err(|e| format!("consume_materials_cross_org_component: {e}"))
 }
 
 #[spacetimedb::reducer]

@@ -75,6 +75,10 @@ pub struct AmendSubscriptionParams {
     pub income_account_id: Option<u64>,
     pub receivable_account_id: Option<u64>,
     pub notes: Option<String>,
+    /// SUB-013: optional link to the predecessor line in an upgrade/downgrade
+    /// chain (`SubscriptionLine.line_parent_id`). Validated to exist within
+    /// the same subscription/organization and to not create a cycle.
+    pub parent_line_id: Option<u64>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -112,6 +116,61 @@ pub struct CancelSubscriptionParams {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/// SUB-013: Validates that `parent_line_id` is an eligible parent for `line_id`
+/// within `subscription_id`/`organization_id`: the parent must exist, belong
+/// to the same subscription and organization, not be `line_id` itself, and
+/// not be a descendant of `line_id` (which would create a cycle in the
+/// amendment parent/child chain). Mirrors `validate_contact_parent` in
+/// crm/contacts.rs.
+fn require_subscription_line_parent(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    subscription_id: u64,
+    line_id: u64,
+    parent_line_id: u64,
+) -> Result<(), String> {
+    if parent_line_id == line_id {
+        return Err("An amendment line cannot be its own parent".to_string());
+    }
+
+    let parent = ctx
+        .db
+        .subscription_line()
+        .id()
+        .find(&parent_line_id)
+        .ok_or("Parent amendment line not found")?;
+
+    if parent.organization_id != organization_id {
+        return Err("Parent amendment line does not belong to this organization".to_string());
+    }
+    if parent.subscription_id != subscription_id {
+        return Err("Parent amendment line does not belong to this subscription".to_string());
+    }
+
+    // Walk the ancestor chain from the candidate parent; if `line_id` appears
+    // in it, setting this parent would create a cycle. Bounded to avoid
+    // looping forever on pre-existing corrupt/cyclic data.
+    const MAX_PARENT_CHAIN_DEPTH: usize = 1000;
+    let mut current = parent.line_parent_id;
+    for _ in 0..MAX_PARENT_CHAIN_DEPTH {
+        match current {
+            None => return Ok(()),
+            Some(id) if id == line_id => {
+                return Err("Setting this parent_line_id would create a cycle".to_string());
+            }
+            Some(id) => {
+                current = ctx
+                    .db
+                    .subscription_line()
+                    .id()
+                    .find(&id)
+                    .and_then(|l| l.line_parent_id);
+            }
+        }
+    }
+    Err("Amendment parent chain exceeds maximum depth".to_string())
+}
 
 fn next_contract_version(ctx: &ReducerContext, subscription_id: u64) -> u32 {
     ctx.db
@@ -417,6 +476,18 @@ pub fn amend_subscription(
     if !line.line_is_recurring {
         return Err("Only recurring lines can be amended".to_string());
     }
+    // SUB-013: parent_line_id must reference a real line in the same
+    // subscription/organization and must not create a cycle in the
+    // amendment parent/child chain.
+    if let Some(parent_line_id) = params.parent_line_id {
+        require_subscription_line_parent(
+            ctx,
+            organization_id,
+            subscription_id,
+            params.line_id,
+            parent_line_id,
+        )?;
+    }
 
     let before_total = line_period_total(&line);
     let before_json = serde_json::json!({
@@ -461,6 +532,7 @@ pub fn amend_subscription(
         line_is_upgrade: amendment_type == "upgrade" || line.line_is_upgrade,
         line_is_downgrade: amendment_type == "downgrade" || line.line_is_downgrade,
         line_is_prorated: params.prorate || line.line_is_prorated,
+        line_parent_id: params.parent_line_id.or(line.line_parent_id),
         updated_at: ctx.timestamp,
         ..line
     };

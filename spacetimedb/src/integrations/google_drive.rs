@@ -4,6 +4,7 @@
 /// Supports multiple Google Drive accounts per organization.
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
+use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{IntegrationStatus, SyncStatus};
 
@@ -21,6 +22,9 @@ pub struct GoogleDriveConnection {
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64,
+    /// Optional company scoping (INT-004). `None` means shared across every
+    /// company in the organization, matching the `PosTerminal` convention.
+    pub company_id: Option<u64>,
 
     // Display and identification
     pub name: String,
@@ -46,6 +50,9 @@ pub struct GoogleDriveConnection {
     // Sync settings
     pub sync_direction: SyncDirection, // Upload, Download, Bidirectional
     /// Bidirectional / inbound conflict policy (SharePoint workers reuse the same enum).
+    /// INT-005: settable at creation time via the `conflict_policy` param on
+    /// `create_google_drive_connection` below, and updatable afterwards via
+    /// `set_google_drive_conflict_policy` (spacetimedb/src/documents/drive_sync.rs).
     pub conflict_policy: DriveConflictPolicy,
     pub sync_frequency_minutes: u32,
     pub last_sync_at: Option<Timestamp>,
@@ -92,10 +99,13 @@ pub enum DriveConflictPolicy {
 ///
 /// Note: credentials_reference should point to an external secret store
 /// where actual OAuth tokens are securely stored.
+#[allow(clippy::too_many_arguments)]
 #[spacetimedb::reducer]
 pub fn create_google_drive_connection(
     ctx: &ReducerContext,
     organization_id: u64,
+    // INT-004: optional company scoping, validated against organization_id when set.
+    company_id: Option<u64>,
     name: String,
     account_email: String,
     account_id: String,
@@ -107,6 +117,9 @@ pub fn create_google_drive_connection(
     webhook_url: Option<String>,
     webhook_secret_reference: Option<String>,
     sync_direction: SyncDirection,
+    // INT-005: conflict policy is now settable at creation time; defaults to
+    // `PreferRemote` (previous hardcoded behavior) when not supplied.
+    conflict_policy: Option<DriveConflictPolicy>,
     sync_frequency_minutes: u32,
     allowed_file_types: Vec<String>,
     max_file_size_mb: u32,
@@ -125,12 +138,18 @@ pub fn create_google_drive_connection(
         return Err("Credentials reference cannot be empty".to_string());
     }
 
+    // INT-004: validate company belongs to this organization when provided.
+    if let Some(cid) = company_id {
+        require_company_in_organization(ctx, organization_id, cid)?;
+    }
+
     let row = ctx
         .db
         .google_drive_connection()
         .insert(GoogleDriveConnection {
             id: 0,
             organization_id,
+            company_id,
             name,
             account_email,
             account_id,
@@ -145,7 +164,7 @@ pub fn create_google_drive_connection(
             webhook_url,
             webhook_secret_reference,
             sync_direction,
-            conflict_policy: DriveConflictPolicy::PreferRemote,
+            conflict_policy: conflict_policy.unwrap_or(DriveConflictPolicy::PreferRemote),
             sync_frequency_minutes,
             last_sync_at: None,
             next_sync_at: None,
@@ -165,7 +184,7 @@ pub fn create_google_drive_connection(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id: row.company_id,
             table_name: "google_drive_connection",
             record_id: row.id,
             action: "CREATE",
@@ -181,6 +200,7 @@ pub fn create_google_drive_connection(
 
     Ok(())
 }
+#[allow(clippy::too_many_arguments)]
 #[spacetimedb::reducer]
 pub fn update_google_drive_connection(
     ctx: &ReducerContext,
@@ -215,6 +235,8 @@ pub fn update_google_drive_connection(
         return Err("Cannot update deleted connection".to_string());
     }
 
+    let conn_company_id = conn.company_id;
+
     ctx.db
         .google_drive_connection()
         .id()
@@ -238,7 +260,7 @@ pub fn update_google_drive_connection(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id: conn_company_id,
             table_name: "google_drive_connection",
             record_id: connection_id,
             action: "UPDATE",

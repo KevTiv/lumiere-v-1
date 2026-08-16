@@ -1,4 +1,5 @@
 //! Fleet domain test suite — invoke via `run_all_fleet_tests` reducer.
+pub mod gap_fixes_test;
 pub mod relational_integrity_test;
 pub mod wave_a_test;
 
@@ -23,8 +24,18 @@ pub fn run_fleet_relational_integrity_test(ctx: &ReducerContext) -> Result<(), S
 }
 
 #[spacetimedb::reducer]
+pub fn run_fleet_gap_fixes_test(ctx: &ReducerContext) -> Result<(), String> {
+    gap_fixes_test::test_pos_terminal_org_isolation(ctx)
+        .map_err(|e| format!("pos_terminal_org_isolation: {e}"))?;
+    gap_fixes_test::test_warehouse_geo_rejects_invalid_warehouse(ctx)
+        .map_err(|e| format!("warehouse_geo_rejects_invalid_warehouse: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_fleet_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_fleet_wave_a_test(ctx)?;
     run_fleet_relational_integrity_test(ctx)?;
+    run_fleet_gap_fixes_test(ctx)?;
     Ok(())
 }

@@ -12,7 +12,7 @@ use crate::accounting::budgeting::{
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::idempotency::{record_result, replayed_result};
-use crate::accounting::relations::require_explicit_company_id;
+use crate::accounting::relations::{require_active_tax, require_explicit_company_id};
 use crate::accounting::tax_management::account_tax;
 use crate::core::organization::{company, require_company_in_organization};
 use crate::crm::contacts::contact;
@@ -1238,6 +1238,16 @@ pub(crate) fn insert_draft_account_move_line(
     }
     if account.deprecated {
         return Err("account is deprecated".to_string());
+    }
+
+    for tax_id in &params.tax_ids {
+        require_active_tax(
+            ctx,
+            move_record.organization_id,
+            move_record.company_id,
+            *tax_id,
+            "line",
+        )?;
     }
 
     let balance = params.debit - params.credit;

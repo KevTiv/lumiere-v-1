@@ -629,6 +629,7 @@ pub fn test_crm_whatsapp_inbox(ctx: &ReducerContext) -> Result<(), String> {
         .insert(WhatsAppBusinessAccount {
             id: 0,
             organization_id: org_id,
+            company_id: Some(company_id),
             name: "Inbox Provider".to_string(),
             phone_number: "+61290000000".to_string(),
             phone_number_id: "wa-phone-inbox-provider".to_string(),

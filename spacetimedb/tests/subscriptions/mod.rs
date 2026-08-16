@@ -15,6 +15,10 @@ pub fn run_subscriptions_wave_a_test(ctx: &ReducerContext) -> Result<(), String>
         .map_err(|e| format!("company_isolation_on_activate: {e}"))?;
     wave_a_test::test_close_requires_no_charge_without_invoices(ctx)
         .map_err(|e| format!("close_requires_no_charge_without_invoices: {e}"))?;
+    wave_a_test::test_subscription_rejects_deleted_contact(ctx)
+        .map_err(|e| format!("subscription_rejects_deleted_contact: {e}"))?;
+    wave_a_test::test_subscription_rejects_cross_org_partner(ctx)
+        .map_err(|e| format!("subscription_rejects_cross_org_partner: {e}"))?;
     Ok(())
 }
 
@@ -39,6 +43,8 @@ pub fn run_subscriptions_wave_c_test(ctx: &ReducerContext) -> Result<(), String>
         .map_err(|e| format!("renew_and_cancel_with_credit: {e}"))?;
     wave_c_test::test_plan_update_and_deactivate(ctx)
         .map_err(|e| format!("plan_update_and_deactivate: {e}"))?;
+    wave_c_test::test_amend_parent_line_fk_and_cycle(ctx)
+        .map_err(|e| format!("amend_parent_line_fk_and_cycle: {e}"))?;
     Ok(())
 }
 

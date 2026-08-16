@@ -489,3 +489,110 @@ pub fn test_adjustment_reason_negative_matrix(ctx: &ReducerContext) -> Result<()
 
     Ok(())
 }
+
+fn adjustment_product_params(
+    product_id: u64,
+    reason_id: u64,
+    uom_id: u64,
+    location_id: u64,
+    name: &str,
+) -> CreateInventoryAdjustmentParams {
+    CreateInventoryAdjustmentParams {
+        name: name.to_string(),
+        product_id,
+        location_id,
+        quantity_after: 4.0,
+        reason_id,
+        adjustment_type: "inventory".to_string(),
+        inventory_id: None,
+        lot_id: None,
+        package_id: None,
+        uom_id,
+        reason_notes: None,
+        metadata: Some(r#"{"test":"inventory_relational_integrity"}"#.to_string()),
+    }
+}
+
+/// INV-013: adjustment product references enforce existence, tenant, and lifecycle atomically.
+pub fn test_adjustment_product_negative_matrix(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let local = OrgFixture::seed_minimal(ctx)?;
+    let foreign = OrgFixture::seed_minimal(ctx)?;
+    let uom_id = ctx
+        .db
+        .product()
+        .id()
+        .find(&local.product_id)
+        .map(|row| row.uom_id)
+        .ok_or("adjustment product matrix product missing")?;
+    let location_id = fixture_stock_location_id(ctx, &local)?;
+
+    let reason = ctx.db.adjustment_reason().insert(AdjustmentReason {
+        id: 0,
+        organization_id: local.organization_id,
+        code: "PRODUCT_MATRIX_REASON".to_string(),
+        description: None,
+        is_active: true,
+        is_system: false,
+        created_at: ctx.timestamp,
+        metadata: None,
+    });
+
+    let missing_product_id = next_unused_id(ctx.db.product().iter().map(|row| row.id), "product")?;
+
+    for (case, product_id, expected) in [
+        ("missing product", missing_product_id, "not found"),
+        (
+            "cross-organization product",
+            foreign.product_id,
+            "organization",
+        ),
+    ] {
+        let before = ctx.db.inventory_adjustment().iter().count();
+        expect_error(
+            create_inventory_adjustment(
+                ctx,
+                local.organization_id,
+                adjustment_product_params(product_id, reason.id, uom_id, location_id, case),
+            ),
+            expected,
+            case,
+        )?;
+        let after = ctx.db.inventory_adjustment().iter().count();
+        if after != before {
+            return Err(format!(
+                "{case}: rejected request persisted an adjustment ({before} -> {after})"
+            ));
+        }
+    }
+
+    // Archived (inactive) product must also be rejected.
+    if let Some(mut product) = ctx.db.product().id().find(&local.product_id) {
+        product.active = false;
+        ctx.db.product().id().update(product);
+    }
+    let before = ctx.db.inventory_adjustment().iter().count();
+    expect_error(
+        create_inventory_adjustment(
+            ctx,
+            local.organization_id,
+            adjustment_product_params(
+                local.product_id,
+                reason.id,
+                uom_id,
+                location_id,
+                "inactive product",
+            ),
+        ),
+        "archived",
+        "inactive product",
+    )?;
+    let after = ctx.db.inventory_adjustment().iter().count();
+    if after != before {
+        return Err(format!(
+            "inactive product: rejected request persisted an adjustment ({before} -> {after})"
+        ));
+    }
+
+    Ok(())
+}

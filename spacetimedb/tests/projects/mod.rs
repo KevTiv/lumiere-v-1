@@ -60,6 +60,8 @@ pub fn run_projects_wave_f_test(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("task_stage_fk_project_scoped: {e}"))?;
     wave_f_test::test_log_timesheet_rejects_cross_project_task(ctx)
         .map_err(|e| format!("log_timesheet_rejects_cross_project_task: {e}"))?;
+    wave_f_test::test_task_milestone_fk_cross_project_and_org_rejected(ctx)
+        .map_err(|e| format!("task_milestone_fk_cross_project_and_org_rejected: {e}"))?;
     Ok(())
 }
 

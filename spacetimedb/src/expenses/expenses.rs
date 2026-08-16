@@ -5,6 +5,7 @@
 /// (Dr expense / Cr employee payable) with optional reimbursement clearing.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::analytic_accounting::account_analytic_account;
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
@@ -283,6 +284,35 @@ pub struct UpsertExpensePolicyParams {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// EXP-014: analytic_account_id is stored on expense lines but was never
+/// validated against the org/company-scoped account_analytic_account table —
+/// mirrors require_project_analytic_account in projects/projects.rs (PRJ-003).
+fn require_expense_analytic_account(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    analytic_account_id: Option<u64>,
+) -> Result<(), String> {
+    let Some(analytic_account_id) = analytic_account_id else {
+        return Ok(());
+    };
+    let account = ctx
+        .db
+        .account_analytic_account()
+        .id()
+        .find(&analytic_account_id)
+        .ok_or("Analytic account not found")?;
+    if account.organization_id != organization_id || account.company_id != company_id {
+        return Err(
+            "Analytic account does not belong to this organization and company".to_string(),
+        );
+    }
+    if !account.active {
+        return Err("Analytic account is inactive".to_string());
+    }
+    Ok(())
+}
 
 /// Every attachment id must reference a real `hr_expense_receipt` for the same org/company/employee.
 /// Rejects `0`. Historically stubbed `1` is only accepted when that receipt row actually exists.
@@ -808,6 +838,10 @@ pub fn create_expense(
             return Err("Project does not belong to this company".to_string());
         }
     }
+
+    // EXP-014: analytic_account_id, when provided, must exist and belong to
+    // this organization/company.
+    require_expense_analytic_account(ctx, organization_id, company_id, params.analytic_account_id)?;
 
     let (
         line_kind,

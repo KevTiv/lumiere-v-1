@@ -741,12 +741,16 @@ pub fn consume_mo_materials(
 
         for (seq_idx, line) in bom_lines.into_iter().enumerate() {
             let required_qty = line.product_qty * mo.product_qty.max(1.0);
-            let component = ctx
-                .db
-                .product()
-                .id()
-                .find(&line.product_id)
-                .ok_or("BOM component product not found")?;
+            // MFG-010: Re-validate the BOM line's component product still exists,
+            // belongs to this organization, and is active before exploding the
+            // BOM into consumption moves (defense in depth against stale/edited
+            // rows since BOM line creation).
+            let component = require_product_for_manufacturing(
+                ctx,
+                organization_id,
+                line.product_id,
+                "BOM component",
+            )?;
             require_lot_when_tracked(
                 &component.tracking,
                 None,

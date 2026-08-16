@@ -5,6 +5,7 @@ use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
 };
 use crate::accounting::journal_entries::account_move;
+use crate::crm::contacts::{contact, Contact};
 use crate::inventory::product::product;
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
 use crate::sales::sales_core::{
@@ -542,4 +543,130 @@ pub fn test_close_requires_no_charge_without_invoices(ctx: &ReducerContext) -> R
         return Err("rejected close retry must not change persisted entitlements".into());
     }
     Ok(())
+}
+
+fn from_so_params(
+    ctx: &ReducerContext,
+    plan_id: u64,
+    sale_order_id: u64,
+    code: &str,
+) -> CreateSubscriptionFromSaleOrderParams {
+    CreateSubscriptionFromSaleOrderParams {
+        company_id: None,
+        sale_order_id,
+        code: Some(code.to_string()),
+        plan_id,
+        date_start: ctx.timestamp,
+        recurring_invoice_day: 1,
+        is_trial: false,
+        description: Some("SUB-012 test".into()),
+        recurring_rule_type: "monthly".into(),
+        recurring_interval: 1,
+        payment_mode: "manual".into(),
+        partner_id: 0,
+        vendor_id: None,
+        partner_invoice_id: 0,
+        partner_shipping_id: 0,
+        currency_id: 0,
+        pricelist_id: 0,
+        analytic_account_id: None,
+        team_id: None,
+        health: "healthy".into(),
+        stage_id: None,
+        state: "draft".into(),
+        is_active: false,
+        invoice_count: 0,
+        recurring_total: 0.0,
+        recurring_monthly: 0.0,
+        recurring_mrr: 0.0,
+        recurring_mrr_local: 0.0,
+        percentage_mrr: 0.0,
+        kpi_1month_mrr: 0.0,
+        kpi_3months_mrr: 0.0,
+        kpi_12months_mrr: 0.0,
+        rating_last_value: 0,
+        invoice_ids: vec![],
+        subscription_line_ids: vec![],
+        activity_ids: vec![],
+        message_follower_ids: vec![],
+        message_ids: vec![],
+        metadata: None,
+    }
+}
+
+/// SUB-012: create_subscription_from_sale_order rejects deriving a
+/// subscription from a sale order whose partner contact has since been
+/// soft-deleted (archived).
+pub fn test_subscription_rejects_deleted_contact(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let journal_id = seed_journal(ctx, &fixture)?;
+    let plan_id = seed_plan(ctx, &fixture, journal_id)?;
+    let so_id = seed_confirmed_so(ctx, &fixture, "SUB-012-DELETED-CONTACT")?;
+
+    let contact_row = ctx
+        .db
+        .contact()
+        .id()
+        .find(&fixture.partner_id)
+        .ok_or("fixture contact not found")?;
+    ctx.db.contact().id().update(Contact {
+        deleted_at: Some(ctx.timestamp),
+        ..contact_row
+    });
+
+    let params = from_so_params(ctx, plan_id, so_id, &format!("SUB-012-DEL-{so_id}"));
+    let result = create_subscription_from_sale_order(ctx, org_id, params);
+
+    match result {
+        Ok(()) => Err("subscription creation with a deleted contact must be rejected".into()),
+        Err(e) if e.contains("contact is inactive") => {
+            if ctx
+                .db
+                .subscription()
+                .iter()
+                .any(|s| s.sale_order_ids.contains(&so_id))
+            {
+                return Err("no subscription should be created when the contact is deleted".into());
+            }
+            Ok(())
+        }
+        Err(e) => Err(format!("unexpected error: {e}")),
+    }
+}
+
+/// SUB-012: create_subscription_from_sale_order rejects deriving a
+/// subscription for a caller organization that does not own the sale
+/// order's partner contact (cross-org).
+pub fn test_subscription_rejects_cross_org_partner(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture_a = OrgFixture::seed_minimal(ctx)?;
+    let fixture_b = OrgFixture::seed_minimal(ctx)?;
+
+    let journal_a = seed_journal(ctx, &fixture_a)?;
+    seed_plan(ctx, &fixture_a, journal_a)?;
+    let so_id = seed_confirmed_so(ctx, &fixture_a, "SUB-012-CROSS-ORG")?;
+
+    let journal_b = seed_journal(ctx, &fixture_b)?;
+    let plan_b = seed_plan(ctx, &fixture_b, journal_b)?;
+
+    let params = from_so_params(ctx, plan_b, so_id, &format!("SUB-012-XORG-{so_id}"));
+    let result = create_subscription_from_sale_order(ctx, fixture_b.organization_id, params);
+
+    match result {
+        Ok(()) => Err("cross-org subscription creation must be rejected".into()),
+        Err(e) if e.contains("does not belong to this organization") => {
+            if ctx
+                .db
+                .subscription()
+                .iter()
+                .any(|s| s.sale_order_ids.contains(&so_id))
+            {
+                return Err("no subscription should be created for a cross-org partner".into());
+            }
+            Ok(())
+        }
+        Err(e) => Err(format!("unexpected error: {e}")),
+    }
 }

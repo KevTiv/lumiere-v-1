@@ -2,6 +2,9 @@
 //! post), EXP-011 (only-manager-can-refuse SoD guard).
 use spacetimedb::{ReducerContext, Table};
 
+use crate::accounting::analytic_accounting::{
+    account_analytic_account, create_analytic_account, CreateAnalyticAccountParams,
+};
 use crate::accounting::journal_entries::account_move;
 use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::expenses::expenses::{
@@ -382,6 +385,150 @@ pub fn test_refuse_expense_sheet_rejects_self_refusal(ctx: &ReducerContext) -> R
             "sheet state should be unchanged (Submitted), got {:?}",
             sheet.state
         ));
+    }
+    Ok(())
+}
+
+fn seed_analytic_account(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    name: &str,
+) -> Result<u64, String> {
+    create_analytic_account(
+        ctx,
+        fixture.organization_id,
+        CreateAnalyticAccountParams {
+            company_id: Some(fixture.company_id),
+            name: name.to_string(),
+            code: None,
+            active: true,
+            currency_id: 1,
+            partner_id: None,
+            plan_id: None,
+            root_id: None,
+            group_id: None,
+            parent_id: None,
+            color: None,
+            is_required_in_move_lines: false,
+            is_required_in_distribution: false,
+            is_root_plan: false,
+            metadata: None,
+        },
+    )?;
+    ctx.db
+        .account_analytic_account()
+        .iter()
+        .find(|a| a.organization_id == fixture.organization_id && a.name == name)
+        .map(|a| a.id)
+        .ok_or_else(|| format!("analytic account {name} missing"))
+}
+
+fn expense_params(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    employee_id: u64,
+    receipt_id: u64,
+    name: &str,
+    analytic_account_id: Option<u64>,
+) -> CreateExpenseParams {
+    CreateExpenseParams {
+        company_id: Some(fixture.company_id),
+        employee_id,
+        name: name.to_string(),
+        date: ctx.timestamp,
+        unit_amount: 42.0,
+        quantity: 1.0,
+        currency_id: 1,
+        product_id: None,
+        description: None,
+        tax_ids: vec![],
+        account_id: None,
+        analytic_account_id,
+        project_id: None,
+        line_kind: ExpenseLineKind::Standard,
+        mileage_distance: None,
+        mileage_rate_id: None,
+        per_diem_days: None,
+        per_diem_rate_id: None,
+        attachment_ids: vec![receipt_id],
+        client_request_id: None,
+        payment_mode: ExpensePaymentMode::OutOfPocket,
+        merchant_key: None,
+        policy_exception_reason: None,
+    }
+}
+
+/// EXP-014: create_expense rejects a missing/cross-org analytic_account_id
+/// and accepts a valid same-org/company one.
+pub fn test_create_expense_analytic_account_fk(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let other_org = OrgFixture::seed_minimal(ctx)?;
+
+    let employee_id = seed_employee_in(ctx, &fixture, fixture.company_id, "EXP-014 Employee")?;
+    let receipt_id = super::test_receipt_id(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        employee_id,
+    )?;
+
+    let missing = create_expense(
+        ctx,
+        fixture.organization_id,
+        expense_params(
+            ctx,
+            &fixture,
+            employee_id,
+            receipt_id,
+            "EXP-014 Missing Account",
+            Some(999_999_999),
+        ),
+    );
+    if missing.is_ok() {
+        return Err("missing analytic_account_id should reject".into());
+    }
+
+    let foreign_account_id = seed_analytic_account(ctx, &other_org, "Foreign Analytic Exp")?;
+    let cross_org = create_expense(
+        ctx,
+        fixture.organization_id,
+        expense_params(
+            ctx,
+            &fixture,
+            employee_id,
+            receipt_id,
+            "EXP-014 Cross Org Account",
+            Some(foreign_account_id),
+        ),
+    );
+    if cross_org.is_ok() {
+        return Err("cross-org analytic_account_id should reject".into());
+    }
+
+    let valid_account_id = seed_analytic_account(ctx, &fixture, "Valid Analytic Exp")?;
+    create_expense(
+        ctx,
+        fixture.organization_id,
+        expense_params(
+            ctx,
+            &fixture,
+            employee_id,
+            receipt_id,
+            "EXP-014 Valid Account",
+            Some(valid_account_id),
+        ),
+    )?;
+    let saved = ctx
+        .db
+        .hr_expense()
+        .iter()
+        .find(|e| {
+            e.organization_id == fixture.organization_id && e.name == "EXP-014 Valid Account"
+        })
+        .ok_or("valid expense missing")?;
+    if saved.analytic_account_id != Some(valid_account_id) {
+        return Err("valid analytic_account_id was not persisted".into());
     }
     Ok(())
 }

@@ -17,6 +17,7 @@ use crate::accounting::journal_entries::{
 };
 use crate::accounting::relations::{
     require_active_account, require_active_currency_id, require_active_journal,
+    require_contact_in_scope,
 };
 use crate::core::organization::{company_id_from_scope, require_company_in_organization};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
@@ -476,6 +477,18 @@ pub fn create_subscription_from_sale_order(
         .id()
         .find(&params.sale_order_id)
         .ok_or("Sale order not found")?;
+
+    // SUB-012: the subscription's partner_id is derived from the sale order,
+    // but the referenced contact may since have been archived/soft-deleted or
+    // may belong to a different organization than the caller. Validate it
+    // exists, is in scope, and is active before deriving the subscription.
+    require_contact_in_scope(
+        ctx,
+        organization_id,
+        order.company_id,
+        order.partner_id,
+        "Subscription customer",
+    )?;
 
     if let Some(cid) = params.company_id {
         let resolved = company_id_from_scope(ctx, organization_id, Some(cid))?;

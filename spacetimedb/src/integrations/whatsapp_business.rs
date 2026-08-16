@@ -5,6 +5,7 @@
 /// Supports multiple WhatsApp Business numbers per organization.
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{IntegrationStatus, SyncStatus};
 
@@ -23,6 +24,9 @@ pub struct WhatsAppBusinessAccount {
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64,
+    /// Optional company scoping (INT-003). `None` means shared across every
+    /// company in the organization, matching the `PosTerminal` convention.
+    pub company_id: Option<u64>,
 
     // Display and identification
     pub name: String,                // Display name for this connection
@@ -105,6 +109,8 @@ pub enum VerificationLevel {
 /// Scope: `organization_id` is a flat reducer param.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateWhatsAppBusinessAccountParams {
+    /// Optional company scoping (INT-003). Validated against `organization_id` when set.
+    pub company_id: Option<u64>,
     pub name: String,
     pub phone_number: String,
     pub phone_number_id: String,
@@ -209,12 +215,18 @@ pub fn create_whatsapp_business_account(
         return Err("Webhook secret reference cannot be empty".to_string());
     }
 
+    // INT-003: validate company belongs to this organization when provided.
+    if let Some(cid) = params.company_id {
+        require_company_in_organization(ctx, organization_id, cid)?;
+    }
+
     let account = ctx
         .db
         .whatsapp_business_account()
         .insert(WhatsAppBusinessAccount {
             id: 0,
             organization_id,
+            company_id: params.company_id,
             name: params.name,
             phone_number: params.phone_number,
             phone_number_id: params.phone_number_id,
@@ -257,7 +269,7 @@ pub fn create_whatsapp_business_account(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id: account.company_id,
             table_name: "whatsapp_business_account",
             record_id: account.id,
             action: "CREATE",
@@ -387,7 +399,7 @@ pub fn update_whatsapp_business_account(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id: account.company_id,
             table_name: "whatsapp_business_account",
             record_id: account_id,
             action: "UPDATE",
@@ -431,6 +443,8 @@ pub fn update_whatsapp_credentials(
         return Err("Account does not belong to this organization".to_string());
     }
 
+    let account_company_id = account.company_id;
+
     ctx.db
         .whatsapp_business_account()
         .id()
@@ -445,7 +459,7 @@ pub fn update_whatsapp_credentials(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id: account_company_id,
             table_name: "whatsapp_business_account",
             record_id: account_id,
             action: "UPDATE",
@@ -492,6 +506,7 @@ pub fn update_whatsapp_verification_status(
 
     let old_verification = format!("{:?}", account.verification_status);
     let new_verification = format!("{:?}", params.verification_status);
+    let account_company_id = account.company_id;
 
     ctx.db
         .whatsapp_business_account()
@@ -508,7 +523,7 @@ pub fn update_whatsapp_verification_status(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id: account_company_id,
             table_name: "whatsapp_business_account",
             record_id: account_id,
             action: "UPDATE",
@@ -554,6 +569,7 @@ pub fn update_whatsapp_quality_score(
     }
 
     let old_score = account.quality_score.clone().unwrap_or_default();
+    let account_company_id = account.company_id;
 
     ctx.db
         .whatsapp_business_account()
@@ -569,7 +585,7 @@ pub fn update_whatsapp_quality_score(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id: account_company_id,
             table_name: "whatsapp_business_account",
             record_id: account_id,
             action: "UPDATE",
@@ -667,6 +683,7 @@ pub fn record_whatsapp_health_check(
 
     let old_status = format!("{:?}", account.sync_status);
     let new_status = format!("{:?}", new_sync_status);
+    let account_company_id = account.company_id;
 
     ctx.db
         .whatsapp_business_account()
@@ -683,7 +700,7 @@ pub fn record_whatsapp_health_check(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id: account_company_id,
             table_name: "whatsapp_business_account",
             record_id: account_id,
             action: "UPDATE",
@@ -742,6 +759,8 @@ pub fn set_whatsapp_primary_account(
         return Err("Account does not belong to this organization".to_string());
     }
 
+    let account_company_id = account.company_id;
+
     ctx.db
         .whatsapp_business_account()
         .id()
@@ -755,7 +774,7 @@ pub fn set_whatsapp_primary_account(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id: account_company_id,
             table_name: "whatsapp_business_account",
             record_id: account_id,
             action: "UPDATE",
@@ -794,6 +813,7 @@ pub fn delete_whatsapp_business_account(
     }
 
     let account_name = account.name.clone();
+    let account_company_id = account.company_id;
 
     ctx.db
         .whatsapp_business_account()
@@ -810,7 +830,7 @@ pub fn delete_whatsapp_business_account(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id: account_company_id,
             table_name: "whatsapp_business_account",
             record_id: account_id,
             action: "DELETE",

@@ -20,6 +20,7 @@ use spacetimedb::ReducerContext;
 use crate::accounting::chart_of_accounts::{
     account_account, account_journal, AccountAccount, AccountJournal,
 };
+use crate::accounting::tax_management::{account_tax, AccountTax};
 use crate::core::organization::require_company_in_organization;
 use crate::core::reference::{require_currency_by_id, Currency};
 use crate::crm::contacts::{contact, Contact};
@@ -82,6 +83,30 @@ pub(crate) fn require_active_journal(
         return Err(format!("{role} journal is inactive"));
     }
     Ok(journal)
+}
+
+pub(crate) fn require_active_tax(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    tax_id: u64,
+    role: &str,
+) -> Result<AccountTax, String> {
+    let tax = ctx
+        .db
+        .account_tax()
+        .id()
+        .find(&tax_id)
+        .ok_or_else(|| format!("{role} tax {tax_id} not found"))?;
+    if tax.organization_id != organization_id || tax.company_id != company_id {
+        return Err(format!(
+            "{role} tax {tax_id} does not belong to this organization and company"
+        ));
+    }
+    if !tax.active {
+        return Err(format!("{role} tax {tax_id} is inactive"));
+    }
+    Ok(tax)
 }
 
 pub(crate) fn require_active_currency_id(

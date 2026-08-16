@@ -4,6 +4,7 @@ use std::time::Duration;
 use spacetimedb::ReducerContext;
 
 use crate::core::organization::{company, create_company, CreateCompanyParams};
+use crate::hr::contracts::{create_contract, hr_contract, CreateContractParams};
 use crate::hr::employees::{archive_employee, create_employee, hr_employee, CreateEmployeeParams};
 use crate::hr::leaves::{
     approve_leave, create_leave_request, create_leave_type, hr_leave, hr_leave_allocation,
@@ -375,6 +376,113 @@ pub fn test_payslip_done_requires_artifact(ctx: &ReducerContext) -> Result<(), S
     if done.state != PayslipState::Done {
         return Err(format!("expected Done, got {:?}", done.state));
     }
+    Ok(())
+}
+
+/// HR-006: `create_payslip` (the payslip-generation reducer) must persist a
+/// payslip that correctly references the supplied contract, and the derived
+/// pay-period / wage figures must match what was requested against that
+/// contract.
+pub fn test_payslip_generation_references_contract(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let employee_id = seed_employee(ctx, &fixture, "Payslip Contract Emp")?;
+    let structure_id = seed_payroll_structure(ctx, &fixture)?;
+
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&fixture.company_id)
+        .ok_or("fixture company missing while seeding payslip contract test")?
+        .currency_id;
+
+    let contract_wage = 6200.0;
+    let contract_name = format!("Payslip Contract {}", fixture.company_id);
+    create_contract(
+        ctx,
+        fixture.organization_id,
+        CreateContractParams {
+            company_id: Some(fixture.company_id),
+            employee_id,
+            name: contract_name.clone(),
+            date_start: ctx.timestamp,
+            wage: contract_wage,
+            currency_id,
+            job_id: None,
+            department_id: None,
+            date_end: None,
+            notes: None,
+        },
+    )?;
+    let contract_id = ctx
+        .db
+        .hr_contract()
+        .contract_by_employee()
+        .filter(&employee_id)
+        .find(|c| {
+            c.organization_id == fixture.organization_id
+                && c.company_id == fixture.company_id
+                && c.name == contract_name
+        })
+        .map(|c| c.id)
+        .ok_or_else(|| "contract missing after create".to_string())?;
+
+    let date_from = ctx.timestamp;
+    let date_to = ctx.timestamp + Duration::from_secs(86400 * 30);
+    create_payslip(
+        ctx,
+        fixture.organization_id,
+        CreatePayslipParams {
+            company_id: Some(fixture.company_id),
+            employee_id,
+            struct_id: structure_id,
+            date_from,
+            date_to,
+            basic_wage: contract_wage,
+            contract_id: Some(contract_id),
+            notes: None,
+        },
+    )?;
+
+    let payslip_id = latest_payslip_for_employee(ctx, &fixture, employee_id)?;
+    let payslip = ctx
+        .db
+        .hr_payslip()
+        .id()
+        .find(&payslip_id)
+        .ok_or_else(|| "payslip missing after create".to_string())?;
+
+    if payslip.contract_id != Some(contract_id) {
+        return Err(format!(
+            "expected payslip.contract_id == Some({contract_id}), got {:?}",
+            payslip.contract_id
+        ));
+    }
+    if payslip.employee_id != employee_id {
+        return Err(format!(
+            "expected payslip.employee_id == {employee_id}, got {}",
+            payslip.employee_id
+        ));
+    }
+    if (payslip.basic_wage - contract_wage).abs() > f64::EPSILON {
+        return Err(format!(
+            "expected payslip.basic_wage {contract_wage} to match contract wage, got {}",
+            payslip.basic_wage
+        ));
+    }
+    if payslip.date_from != date_from || payslip.date_to != date_to {
+        return Err(
+            "payslip pay period does not match the requested date_from/date_to".to_string(),
+        );
+    }
+    if payslip.state != PayslipState::Draft {
+        return Err(format!(
+            "expected a freshly generated payslip to be Draft, got {:?}",
+            payslip.state
+        ));
+    }
+
     Ok(())
 }
 

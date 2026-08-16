@@ -13,6 +13,8 @@ pub fn run_helpdesk_relational_integrity_test(ctx: &ReducerContext) -> Result<()
         .map_err(|e| format!("cross_team_assignment_rejected: {e}"))?;
     relational_integrity_test::test_sla_reached_is_system_only(ctx)
         .map_err(|e| format!("sla_reached_is_system_only: {e}"))?;
+    relational_integrity_test::test_cross_org_ticket_rejected(ctx)
+        .map_err(|e| format!("cross_org_ticket_rejected: {e}"))?;
     Ok(())
 }
 

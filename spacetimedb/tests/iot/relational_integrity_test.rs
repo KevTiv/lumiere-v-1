@@ -4,6 +4,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::iot::actions::{create_iot_action, iot_action, CreateActionParams};
 use crate::iot::alerts::iot_alert;
+use crate::iot::integrations::link_device_to_location;
 use crate::iot::registry::{
     iot_device, iot_hub, register_iot_device, register_iot_hub, RegisterDeviceParams,
     RegisterHubParams,
@@ -181,6 +182,40 @@ pub fn test_alert_and_action_company_id(ctx: &ReducerContext) -> Result<(), Stri
             "action company_id {} != device company_id {}",
             action.company_id, fixture.company_id
         ));
+    }
+    Ok(())
+}
+
+/// IOT-011: `link_device_to_location` must reject a stock_location that
+/// belongs to a different organization than the device (the IOT-002 check
+/// already exists in `link_device_to_location` — this proves it).
+pub fn test_link_device_rejects_cross_org(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let other_org = OrgFixture::seed_minimal(ctx)?;
+    let device_id = seed_device(ctx, &fixture, "Iot Cross Org Device", "TemperatureSensor")?;
+
+    let location_error = link_device_to_location(
+        ctx,
+        fixture.organization_id,
+        device_id,
+        other_org.location_id,
+    )
+    .err()
+    .ok_or("cross-org location link unexpectedly succeeded")?;
+    if !location_error.contains("does not belong to the same organization") {
+        return Err(format!(
+            "unexpected cross-org location link error: {location_error}"
+        ));
+    }
+    let unlinked = ctx
+        .db
+        .iot_device()
+        .id()
+        .find(&device_id)
+        .ok_or("device missing after cross-org location attempt")?;
+    if unlinked.stock_location_id.is_some() {
+        return Err("cross-org location link was persisted despite rejection".to_string());
     }
     Ok(())
 }
