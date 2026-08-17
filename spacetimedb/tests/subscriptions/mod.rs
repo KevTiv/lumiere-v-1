@@ -54,6 +54,8 @@ pub fn run_subscriptions_wave_d_test(ctx: &ReducerContext) -> Result<(), String>
         .map_err(|e| format!("usage_ingest_rate_and_bill: {e}"))?;
     wave_d_test::test_commitment_true_up(ctx).map_err(|e| format!("commitment_true_up: {e}"))?;
     wave_d_test::test_bundle_apply(ctx).map_err(|e| format!("bundle_apply: {e}"))?;
+    wave_d_test::test_full_subscription_lifecycle(ctx)
+        .map_err(|e| format!("full_subscription_lifecycle: {e}"))?;
     Ok(())
 }
 

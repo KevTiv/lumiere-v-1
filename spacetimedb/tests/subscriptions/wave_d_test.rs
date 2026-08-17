@@ -1,4 +1,4 @@
-//! Wave D — usage ingest/rating, tiers, commitment true-up, bundles.
+//! Wave D — usage ingest/rating, tiers, commitment true-up, bundles, full lifecycle (SUB-014).
 use spacetimedb::{ReducerContext, Table};
 
 use crate::accounting::chart_of_accounts::{
@@ -12,9 +12,14 @@ use crate::sales::sales_core::{
     CreateSaleOrderParams,
 };
 use crate::subscriptions::reducers::{
-    activate_subscription, create_subscription_from_sale_order, create_subscription_plan,
-    generate_subscription_invoice, CreateSubscriptionFromSaleOrderParams,
-    CreateSubscriptionPlanParams, GenerateSubscriptionInvoiceParams,
+    activate_subscription, close_subscription, create_subscription_from_sale_order,
+    create_subscription_plan, generate_subscription_invoice, pay_subscription_invoice,
+    ApplySubscriptionInvoicePaymentParams, CloseSubscriptionParams,
+    CreateSubscriptionFromSaleOrderParams, CreateSubscriptionPlanParams,
+    GenerateSubscriptionInvoiceParams,
+};
+use crate::subscriptions::subscription_wave_c::{
+    amend_subscription, subscription_amendment, AmendSubscriptionParams,
 };
 use crate::subscriptions::subscription_wave_d::{
     add_subscription_bundle_item, apply_subscription_bundle, create_subscription_bundle,
@@ -25,9 +30,10 @@ use crate::subscriptions::subscription_wave_d::{
     CreateSubscriptionPriceTierParams, IngestSubscriptionUsageEventParams,
     RateSubscriptionUsageEventsParams, SetSubscriptionCommitmentParams,
 };
+use crate::subscriptions::subscription_wave_e::subscription_entitlement;
 use crate::subscriptions::tables::{subscription, subscription_line, subscription_plan};
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
-use crate::types::{DiscountPolicy, JournalType};
+use crate::types::{DiscountPolicy, JournalType, MoveType, PaymentState};
 
 fn seed_journal(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, String> {
     let org_id = fixture.organization_id;
@@ -593,5 +599,278 @@ pub fn test_bundle_apply(ctx: &ReducerContext) -> Result<(), String> {
     if (addon.price_unit - 12.0).abs() > 0.01 || (addon.product_uom_qty - 5.0).abs() > 0.01 {
         return Err("addon line qty/price mismatch".into());
     }
+    Ok(())
+}
+
+/// SUB-014: end-to-end subscription lifecycle — create → activate → amend → invoice → pay → close.
+///
+/// Verifies that each lifecycle state transition persists correctly and that
+/// the billing engine, amendment audit trail, payment settlement, and
+/// close/revoke path all operate atomically within a single module.
+pub fn test_full_subscription_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let journal_id = seed_journal(ctx, &fixture)?;
+    let income_id = *fixture
+        .chart_account_ids
+        .get(chart_keys::REVENUE)
+        .ok_or("revenue account")?;
+    let ar_id = *fixture.chart_account_ids.get(chart_keys::AR).ok_or("ar account")?;
+
+    // ── Step 1: Create a plan and a draft subscription from a confirmed SO ────
+
+    let (sub_id, _plan_id) =
+        seed_active_subscription(ctx, &fixture, journal_id, "lifecycle", 120.0)?;
+
+    // seed_active_subscription activates as a side-effect; verify draft/active transition
+    // by inspecting the already-activated subscription state.
+    let sub = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("subscription after activate")?;
+    if sub.state != "active" || !sub.is_active {
+        return Err(format!(
+            "expected active after activate, got state={} is_active={}",
+            sub.state, sub.is_active
+        ));
+    }
+    if (sub.recurring_mrr - 120.0).abs() > 0.01 {
+        return Err(format!(
+            "expected MRR 120 from SO line, got {}",
+            sub.recurring_mrr
+        ));
+    }
+
+    // ── Step 2: Amend — price increase on the recurring line ─────────────────
+
+    let line_id = ctx
+        .db
+        .subscription_line()
+        .subscription_line_by_subscription()
+        .filter(&sub_id)
+        .map(|l| l.id)
+        .next()
+        .ok_or("subscription line")?;
+
+    amend_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        AmendSubscriptionParams {
+            amendment_type: "price".into(),
+            line_id,
+            effective_date: None,
+            new_product_id: None,
+            new_quantity: None,
+            new_price_unit: Some(150.0),
+            new_discount: None,
+            prorate: false,
+            journal_id: None,
+            income_account_id: None,
+            receivable_account_id: None,
+            notes: Some("lifecycle price-up".into()),
+            parent_line_id: None,
+        },
+    )?;
+
+    let amended_line = ctx
+        .db
+        .subscription_line()
+        .id()
+        .find(&line_id)
+        .ok_or("line after amend")?;
+    if (amended_line.price_unit - 150.0).abs() > 0.01 {
+        return Err(format!(
+            "expected price_unit 150 after amend, got {}",
+            amended_line.price_unit
+        ));
+    }
+
+    let amendment_count = ctx
+        .db
+        .subscription_amendment()
+        .subscription_amendment_by_sub()
+        .filter(&sub_id)
+        .count();
+    if amendment_count != 1 {
+        return Err(format!(
+            "expected 1 amendment row after price amend, got {amendment_count}"
+        ));
+    }
+    let amendment = ctx
+        .db
+        .subscription_amendment()
+        .subscription_amendment_by_sub()
+        .filter(&sub_id)
+        .next()
+        .ok_or("amendment row")?;
+    if amendment.amendment_type != "price" {
+        return Err(format!(
+            "unexpected amendment_type: {}",
+            amendment.amendment_type
+        ));
+    }
+    if !amendment.before_json.contains("120") || !amendment.after_json.contains("150") {
+        return Err("amendment audit must capture before (120) and after (150) price".into());
+    }
+
+    // ── Step 3: Generate an invoice ──────────────────────────────────────────
+
+    generate_subscription_invoice(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        GenerateSubscriptionInvoiceParams {
+            invoice_date: ctx.timestamp,
+            billing_run_key: Some(format!("lifecycle-inv-{sub_id}")),
+            journal_id: Some(journal_id),
+            income_account_id: income_id,
+            receivable_account_id: ar_id,
+            tax_account_id: None,
+        },
+    )?;
+
+    let invoiced_sub = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("subscription after invoice")?;
+    if invoiced_sub.invoice_count != 1 {
+        return Err(format!(
+            "expected invoice_count 1, got {}",
+            invoiced_sub.invoice_count
+        ));
+    }
+    if invoiced_sub.invoice_ids.len() != 1 {
+        return Err("expected exactly one invoice_id".into());
+    }
+    let invoice_move_id = invoiced_sub.invoice_ids[0];
+    let invoice_move = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_move_id)
+        .ok_or("invoice account_move")?;
+    if invoice_move.move_type != MoveType::OutInvoice {
+        return Err(format!(
+            "expected OutInvoice, got {:?}",
+            invoice_move.move_type
+        ));
+    }
+    // Invoice amount should reflect the amended price (150), not the original (120).
+    if (invoice_move.amount_total - 150.0).abs() > 0.01 {
+        return Err(format!(
+            "expected invoice total 150 (amended price), got {}",
+            invoice_move.amount_total
+        ));
+    }
+
+    // ── Step 4: Pay the invoice ───────────────────────────────────────────────
+
+    let (bank_journal_id, bank_account_id) =
+        crate::accounting_tests::helpers::seed_bank_journal(ctx, &fixture)?;
+
+    pay_subscription_invoice(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        ApplySubscriptionInvoicePaymentParams {
+            invoice_move_id,
+            payment_journal_id: bank_journal_id,
+            bank_account_id,
+            receivable_account_id: ar_id,
+            amount: None,
+            payment_date: None,
+            cogs_account_id: income_id,
+            inventory_account_id: income_id,
+            ref_: Some(format!("lifecycle-pay-{sub_id}")),
+            memo: Some("SUB-014 lifecycle payment".into()),
+        },
+    )?;
+
+    let paid_move = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_move_id)
+        .ok_or("invoice after payment")?;
+    if paid_move.payment_state != PaymentState::Paid && paid_move.amount_residual.abs() > 0.01 {
+        return Err(format!(
+            "expected Paid / residual≈0 after pay, state={:?} residual={}",
+            paid_move.payment_state, paid_move.amount_residual
+        ));
+    }
+    if paid_move.amount_residual.abs() > 0.01 {
+        return Err(format!(
+            "invoice residual should be ~0 after pay, got {}",
+            paid_move.amount_residual
+        ));
+    }
+
+    // ── Step 5: Close the subscription ───────────────────────────────────────
+
+    close_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        CloseSubscriptionParams {
+            close_reason_id: None,
+            notes: Some("SUB-014 lifecycle complete".into()),
+            no_charge: false,
+        },
+    )?;
+
+    let closed_sub = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("subscription after close")?;
+    if closed_sub.state != "closed" || closed_sub.is_active {
+        return Err(format!(
+            "expected closed/inactive after close, got state={} is_active={}",
+            closed_sub.state, closed_sub.is_active
+        ));
+    }
+    if closed_sub.close_date.is_none() {
+        return Err("close must persist close_date".into());
+    }
+
+    // Entitlements granted on activate must be revoked atomically with the close.
+    let open_entitlements = ctx
+        .db
+        .subscription_entitlement()
+        .subscription_entitlement_by_sub()
+        .filter(&sub_id)
+        .any(|e| e.status == "active");
+    if open_entitlements {
+        return Err("close must revoke all active entitlements atomically".into());
+    }
+
+    // Re-closing an already-closed subscription must be rejected.
+    let retry = close_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        CloseSubscriptionParams {
+            close_reason_id: None,
+            notes: Some("retry close".into()),
+            no_charge: false,
+        },
+    );
+    if retry.is_ok() {
+        return Err("closing an already-closed subscription must be rejected".into());
+    }
+
     Ok(())
 }
