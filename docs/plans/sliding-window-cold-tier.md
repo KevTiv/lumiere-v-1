@@ -333,7 +333,7 @@ STDB business logic.
 
 ## 3. Eviction job
 
-### 3.1 Worker location
+### 3.1 Worker location and Postgres client dependency
 
 The eviction worker is a **standalone api-server binary** — `api-server/src/bin/cold-tier-worker.rs`
 → `run_cold_tier_worker()` — mirroring the five existing worker binaries
@@ -344,7 +344,7 @@ poll a SpacetimeDB queue/indicator, claim via lease, execute, verify, release.
 A new module `api-server/src/cold_tier/` containing:
 
 - `worker.rs` — the background poll loop (long-running `tokio::spawn` task).
-- `pg_client.rs` — Postgres connection pool (`sqlx` or `deadpool-postgres`).
+- `pg_client.rs` — Postgres connection pool (`tokio-postgres` + `deadpool-postgres`).
 - `schema.rs` — cold-tier table DDL + migration runner (generated — see §2.6).
 - `config.rs` — `ColdTierConfig` (window, batch size, poll interval, timeouts).
 - `hydrate.rs` — the re-hydration endpoint (`GET /v1/cold-tier/row/:table/:id`) called
@@ -352,6 +352,135 @@ A new module `api-server/src/cold_tier/` containing:
 
 The worker activates only when `COLD_TIER_ENABLED=true` and a Postgres `DATABASE_URL`
 is configured.
+
+#### Postgres client: `tokio-postgres` + `deadpool-postgres` (not `sqlx`)
+
+**Dependency choice:** `tokio-postgres` (async wire-protocol client) paired with
+`deadpool-postgres` (connection pooling). Not `sqlx`. Rationale:
+
+1. **No compile-time SQL checking needed.** The cold-tier schema and queries are
+   codegen artifacts (`pg_schema_emit.rs`, §2.6). If they drift, `make check-codegen`
+   catches it at CI time — `sqlx::query!` macro verification would be redundant and
+   would require a live database (or `sqlx-data.json`) during `cargo build`.
+2. **Minimal dependency surface.** `tokio-postgres` is a thin async wrapper over the
+   PostgreSQL wire protocol — no proc-macros, no schema.rs, no ORM overhead. The
+   cold-tier query patterns are simple (single-table SELECT by PK, batch INSERT with
+   ON CONFLICT). No query builder needed.
+3. **Matches the existing tokio stack.** The workspace already uses
+   `tokio = { version = "1", features = ["full"] }` and `reqwest`. `tokio-postgres`
+   integrates natively with the same runtime.
+4. **Faster compile times.** The workspace is large (624 reducers, 6 api-server
+   binaries). `sqlx` macros significantly increase compile times; `tokio-postgres`
+   adds negligible overhead.
+
+**Cargo.toml addition:**
+
+```toml
+# api-server/Cargo.toml
+[dependencies]
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"] }
+deadpool-postgres = "0.14"
+```
+
+Note: `tokio-postgres` uses `rustls` (not OpenSSL) when configured with the
+`rustls` feature, matching the workspace's existing `reqwest` TLS configuration.
+This avoids the `pkg-config` / `libssl-dev` build dependency that broke the
+sandbox `cargo check` during the readiness assessment.
+
+#### Connection pool setup (`pg_client.rs`)
+
+```rust
+use deadpool_postgres::{Config, Pool, Runtime};
+use tokio_postgres::NoTls;
+
+pub struct ColdTierPg {
+    pub pool: Pool,
+}
+
+impl ColdTierPg {
+    pub fn from_url(database_url: &str) -> anyhow::Result<Self> {
+        let mut cfg = Config::new();
+        cfg.url = Some(database_url);
+        let pool = cfg.create_pool(Some(Runtime::Tokio1), NoTls)?;
+        Ok(Self { pool })
+    }
+}
+```
+
+#### Merge-path query example (`query_exec.rs` integration)
+
+When `query_exec.rs` fans out to the cold tier for an archive-eligible resource,
+it runs a parameterized query against the PG pool:
+
+```rust
+use tokio_postgres::types::Type;
+
+pub async fn cold_tier_read(
+    pg: &ColdTierPg,
+    table: &str,          // e.g. "cold_pos_order"
+    org_id: i64,
+    window_days: i32,
+) -> Result<Vec<serde_json::Value>, ColdTierError> {
+    let client = pg.pool.get().await?;
+    let sql = format!(
+        "SELECT row_to_json(t) FROM {} t \
+         WHERE t.organization_id = $1 \
+           AND t.cold_eligible_at IS NOT NULL \
+           AND t.cold_eligible_at < now() - ($2 || ' days')::interval",
+        table  // table name is from the generated resource registry, not user input
+    );
+    let rows = client.query(&sql, &[&org_id, &window_days.to_string()])
+        .await
+        .map_err(|e| ColdTierError::Query(e))?;
+
+    Ok(rows.iter()
+        .map(|row| row.get::<_, serde_json::Value>(0))
+        .collect())
+}
+```
+
+The returned JSON values are merged with the SpacetimeDB hot rows in `query_exec.rs`,
+deduped by primary key (preferring the STDB row when both exist), and returned to the
+caller. The frontend sees a unified row set — no knowledge of the tier split.
+
+#### Eviction INSERT example (`worker.rs` integration)
+
+The eviction worker batch-inserts evicted rows into PG:
+
+```rust
+pub async fn cold_tier_insert_batch(
+    pg: &ColdTierPg,
+    table: &str,
+    rows: &[serde_json::Value],
+) -> Result<u64, ColdTierError> {
+    let client = pg.pool.get().await?;
+    let mut count = 0u64;
+    for row in rows {
+        // Each row is a JSONB blob matching the generated table's column set.
+        // ON CONFLICT DO NOTHING — idempotent re-runs after crash recovery.
+        let sql = format!(
+            "INSERT INTO {} (id, organization_id, cold_eligible_at, row_data, archived_at) \
+             VALUES ($1, $2, $3, $4, now()) \
+             ON CONFLICT (id) DO NOTHING",
+            table
+        );
+        let id: i64 = row["id"].as_i64().unwrap_or(0);
+        let org_id: i64 = row["organization_id"].as_i64().unwrap_or(0);
+        let cold_eligible_at: &str = row["cold_eligible_at"]
+            .as_str()
+            .unwrap_or("1970-01-01T00:00:00Z");
+        let row_data = serde_json::to_value(row).unwrap_or(serde_json::Value::Null);
+
+        let result = client.execute(&sql, &[&id, &org_id, &cold_eligible_at, &row_data]).await?;
+        count += result;
+    }
+    Ok(count)
+}
+```
+
+After the INSERT is verified (returned count matches batch size), the worker
+DELETEs the rows from SpacetimeDB. If the worker crashes before the DELETE, the
+next run re-fetches and re-inserts (idempotent `ON CONFLICT DO NOTHING`).
 
 ### 3.2 Eviction loop
 
@@ -440,7 +569,7 @@ existing stale-while-revalidate behavior — no new UX pattern.
 **Goal:** Postgres connection, generated schema, and the parallel-read merge in
 `query_exec.rs` for one resource (`audit-log`). No eviction; PG starts empty.
 
-- [ ] Add `sqlx` (or `deadpool-postgres`) to `api-server/Cargo.toml`.
+- [ ] Add `tokio-postgres` + `deadpool-postgres` to `api-server/Cargo.toml`.
 - [ ] `api-server/src/cold_tier/mod.rs`, `pg_client.rs`, `config.rs`.
 - [ ] `ColdTierConfig::from_env()`: `COLD_TIER_ENABLED`, `DATABASE_URL`,
       `COLD_TIER_WINDOW_DAYS`, `COLD_TIER_QUERY_TIMEOUT_SECS`.
@@ -592,20 +721,41 @@ recommendation and trigger conditions (when to revisit the architecture).
 
 ---
 
-## 8. Open questions (to resolve in Phase 1/4)
 
-1. **SpacetimeDB commit-log truncation:** does Standalone compact/truncate the WAL, or
-   does it grow forever? If it grows forever, eviction shrinks the in-memory working set
-   but not the on-disk log — replay time on restart may not improve. **Must measure
-   before Phase 2.** This is the gating unknown for the entire architecture.
+1. **SpacetimeDB commit-log truncation:** ~~does Standalone compact/truncate the WAL, or
+   does it grow forever?~~ **Resolved (2026-08-17):** SpacetimeDB has a native
+   `spacetimedb-snapshot` crate (v1.3.0, confirmed on docs.rs) that captures on-disk
+   snapshots of committed state at a transaction offset. On restart, the database loads
+   the most recent snapshot and replays only the commit-log suffix. This means eviction
+   (which shrinks the in-memory working set) combined with periodic snapshot capture
+   reduces replay time on restart. The commit-log itself is not truncated by snapshots,
+   but the replay path is shortened. The standalone `config.toml` now exposes
+   `[commitlog]` knobs (`max-segment-size`, `write-buffer-size`, `preallocate-segments`).
+   **Action:** enable periodic snapshot capture (see `backup-recovery-followup.md`) and
+   measure replay time before/after. No longer a blocker for Phase 2.
 2. **Per-org window configurability:** is 90 days right for POS-heavy tenants? A
    high-volume retailer may want 30 days hot; a low-volume B2B may want 365. Default +
    per-org override via `organization_settings.cold_tier_window_days`.
-3. **Re-hydration procedure feasibility:** SpacetimeDB 2.0 procedures are documented as
+3. **Re-hydration procedure feasibility:** ~~SpacetimeDB 2.0 procedures are documented as
    beta. Verify the procedure can make an HTTP call to the api-server re-hydration
-   endpoint and re-insert the row within the calling reducer's transaction. If
-   procedures can't do this cleanly, the fallback becomes an api-server-side
-   pre-reducer hook (less elegant but workable).
+   endpoint and re-insert the row within the calling reducer's transaction.~~
+   **Resolved (2026-08-17):** Confirmed feasible via official SpacetimeDB 2.0 docs
+   (spacetimedb.com/docs/1.12.0/functions/procedures/). Rust procedures use
+   `ProcedureContext` with two key capabilities:
+   - `ctx.http.get(url)` / `ctx.http.send(request)` — synchronous HTTP to external
+     services (the api-server re-hydration endpoint).
+   - `ctx.with_tx(|tx_ctx| { ... })` / `ctx.try_with_tx(|tx_ctx| { ... })` — opens a
+     database transaction with full read-write access (same as `ReducerContext`).
+   The re-hydration procedure can: (1) make an HTTP GET to
+   `/v1/cold-tier/row/:table/:id`, (2) parse the response, (3) call `ctx.with_tx` to
+   re-insert the row into STDB, all within a single procedure call. **Caveat:**
+   procedures cannot send HTTP requests while holding a transaction open — the HTTP
+   call must complete before `with_tx` is entered. This matches our design (fetch from
+   PG first, then open transaction to insert). **Requirement:** the `spacetimedb`
+   dependency in `spacetimedb/Cargo.toml` must add `features = ["unstable"]` (procedures
+   are behind the unstable feature gate in Rust modules). The project currently uses
+   `spacetimedb = { version = "2.0.1" }` without the feature — this is a Phase 3
+   prerequisite. See `backup-recovery-followup.md` §4 for the verified API.
 4. **Horizontal scaling path:** is the cold tier a stepping stone to per-org SpacetimeDB
    sharding, or a permanent second store? Phase 4 investigation answers this.
 
@@ -624,3 +774,6 @@ recommendation and trigger conditions (when to revisit the architecture).
 | 2026-08-17 | Postgres does not schedule or decide eviction | Eviction eligibility is business logic (period-closed, state-transition); only SpacetimeDB reducers decide; PG holds rows and manages its own internals only |
 | 2026-08-17 | Deterministic `cold_eligible_at` indicator on tables | Avoids N+1 cross-store business-logic re-derivation at eviction time; reducer stamps at terminal state, worker filters on one column |
 | 2026-08-17 | Helper-function fallback for late-mutated evicted rows | Evicted rows may need mutation (credit notes, returns, corrections); procedure re-hydrates from PG transparently; frontend-invisible |
+| 2026-08-17 | Re-hydration via SpacetimeDB procedure (confirmed feasible) | Official docs confirm `ctx.http.get()` + `ctx.with_tx()` in Rust procedures; requires `features = ["unstable"]` in Cargo.toml; HTTP must complete before transaction opens |
+| 2026-08-17 | Native snapshot capture for backup + replay optimization | `spacetimedb-snapshot` crate (v1.3.0) captures on-disk snapshots at tx offset; restart loads snapshot + replays suffix only; resolves commit-log growth concern |
+| 2026-08-17 | `tokio-postgres` + `deadpool-postgres` as PG client (not `sqlx`) | Codegen-driven schema/queries make compile-time SQL checking redundant; thin async client matches existing tokio stack; avoids proc-macro compile overhead; uses rustls not OpenSSL |
