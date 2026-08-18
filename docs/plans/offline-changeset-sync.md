@@ -4,7 +4,7 @@
 **Tracks:** `offline-first`, `desktop`, `changesets`, `production-readiness`
 **Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [audit-log-cold-by-default.md](./audit-log-cold-by-default.md) · [backup-recovery-followup.md](./backup-recovery-followup.md) · [ARCHITECTURE.md](../ARCHITECTURE.md)
 
-> The Postgres cold tier, shared `ResourceReadPlan`, stable Lumiere schema IR, and SQLite projection described here are not implemented. This document extends PR #3's architectural direction; it does not claim those components exist today.
+> The Postgres cold tier, shared `ResourceReadPlan`, stable Lumiere schema IR, and libSQL client projection described here are not implemented. This document extends PR #3's architectural direction; it does not claim those components exist today.
 
 ---
 
@@ -12,12 +12,12 @@
 
 Build desktop offline support around a generic, server-reconciled **Lumiere ChangeSet** system.
 
-A disconnected client stores an authorized local projection in SQLite and captures immutable **reducer intents**. Reconnection uploads those intents for server-side authorization, reconciliation, conflict classification, approval, and execution through canonical SpacetimeDB reducers.
+A disconnected client stores an authorized local projection in an embedded **libSQL** database and captures immutable **reducer intents**. Reconnection uploads those intents for server-side authorization, reconciliation, conflict classification, approval, and execution through canonical SpacetimeDB reducers.
 
 ```text
 offline user action
     ↓
-SQLite transaction:
+libSQL transaction:
   local presentation effect + immutable ChangeSet action
     ↓
 reconnect and refresh authority
@@ -37,6 +37,27 @@ api-server reconciliation and current-policy validation
 
 Offline is one ChangeSet producer. The same server-side model should later accept proposals from AI action drafts, imports, integrations, bulk operations, and automation without creating separate mutation architectures.
 
+### 1.1 libSQL is the storage engine; Lumiere owns the sync protocol
+
+This decision has two halves that must not be conflated.
+
+| Layer | Choice | Rationale |
+|---|---|---|
+| **Client storage engine** | **libSQL** (§5.0): embedded SQLite fork, SQLite dialect and file format, Rust and JS bindings, encryption at rest, WAL | Closes the previously open "which SQLite distribution" question with a production-proven engine that inherits SQLite's durability lineage |
+| **Synchronization protocol** | **Lumiere ChangeSet protocol, defined in §10** — *not* embedded replicas, engine sync, or offline writes for canonical business state | Engine replication moves *rows*; Lumiere must move *authorized reducer intents* reconciled against server policy. These are not substitutable. |
+
+> **Non-negotiable:** libSQL is adopted as an embedded database, not as a synchronization strategy. The engine choice answers no question about multi-device editing, multi-user conflicts, or accounting correctness. Those are answered by §10 and §12, and would be answered identically on any SQLite-dialect engine.
+
+Why engine-level replication cannot carry canonical ERP state:
+
+1. **Default conflict resolution is row-level last-write-wins.** §10.4 forbids whole-row last-write-wins for ERP data. Two cashiers editing one order, or two clerks adjusting one stock quant, must not be resolved by push arrival order.
+2. **Row replication bypasses reducers.** Replication pushes logical row mutations to a remote database. Lumiere's invariants (fiscal periods, stock ledgers, workflow transitions, approvals) live in SpacetimeDB reducers, not in table constraints. A row that arrives without executing its reducer is an unvalidated write.
+3. **The remote would be the wrong authority.** A replication remote is another SQL database. Lumiere's authority is SpacetimeDB. Making a replication primary authoritative for business rows creates a second source of truth — the exact failure this architecture exists to prevent.
+4. **Client-side mutation hooks are not authorization.** Pre-push transform hooks run on the device, under the user's control, with the user's stale permissions. Authorization must be re-resolved server-side at submission and merge (invariant 6).
+5. **Permissions are per-row and per-field, not per-database.** Field-level policy (`resolve_read_columns`) and company scope cannot be expressed as replication of a whole database or table.
+
+libSQL is therefore used strictly as a local engine: SQL execution, transactions, WAL, durability, encryption at rest, and file lifecycle. No hosted service is a runtime dependency, and no replication feature is enabled (§5.0).
+
 ### Key invariants
 
 > A disconnected Lumiere client may continue capturing authorized business activity, but only canonical server reducers may make those actions part of authoritative ERP state. Offline storage records authorized local projections and user intent; reconnection performs server-side reconciliation, policy evaluation and, where necessary, human review before canonical mutation.
@@ -47,11 +68,11 @@ Additional non-negotiable invariants:
 
 1. SpacetimeDB remains authoritative for business state, reducer transactions, and business validation.
 2. Postgres remains a generated cold projection only; it is not required for the first offline phase.
-3. SQLite is durable local storage, not an independent ERP business engine.
+3. libSQL is durable local storage, not an independent ERP business engine, and not a synchronization authority. Embedded-replica, engine-sync, and offline-write paths are disabled for all canonical business tables.
 4. Raw local table CRUD is never the canonical mutation representation. ChangeSet actions are reducer intents.
 5. No reconnect path blindly replays queued mutations.
 6. The api-server re-resolves identity, organization, company, permissions, field policy, reducer policy, versions, dependencies, and approvals before execution.
-7. Sensitive fields not included in the server-authorized projection are never materialized locally.
+7. Sensitive fields not included in the server-authorized projection are never materialized locally. No engine-level replication may introduce a column or row that the server's field policy did not authorize.
 8. React Query remains reactive query state; it is not the durable offline ledger.
 9. Every upload and merge boundary is idempotent.
 10. Physical events are reconciled as facts requiring acceptance, correction, compensation, or escalation—not presented as drafts that can simply be erased.
@@ -63,8 +84,10 @@ Additional non-negotiable invariants:
 ### Goals
 
 - Continue useful ERP workflows through multi-hour or multi-day WAN outages.
-- Use SQLite from the first desktop release for durable, queryable local state.
+- Use libSQL from the first desktop release for durable, queryable, encrypted local state.
 - Generate SQLite contracts from the same future Lumiere schema IR as Postgres and server metadata.
+- Define an explicit Lumiere sync protocol (pull, push, conflict classification, permission re-resolution) that is independent of any engine-provided replication.
+- Keep client schema evolution safe for devices that have been offline for weeks and are several application versions behind.
 - Preserve one canonical reducer mutation path and existing authorization system.
 - Provide explicit ChangeSet, conflict, dependency, review, and merge state machines.
 - Minimize frontend churn by placing online/offline selection behind repository/API abstractions.
@@ -74,13 +97,15 @@ Additional non-negotiable invariants:
 
 ### Non-goals
 
-- Implementing SQLite, desktop packaging, ChangeSet APIs, or Postgres in this PR.
+- Implementing libSQL storage, desktop packaging, ChangeSet APIs, or Postgres in this PR.
 - Running SpacetimeDB reducers locally.
-- Reproducing server business validation in TypeScript or SQLite.
+- Reproducing server business validation in TypeScript or the client database.
 - Making every resource and reducer offline-capable in the alpha.
 - Supporting arbitrary multi-reducer atomic transactions before a domain reducer explicitly provides that transaction boundary.
 - Peer-to-peer or multi-master synchronization.
 - Universal last-write-wins conflict resolution.
+- Using embedded replicas, engine-level sync, offline writes, or any replication feature as the transport for canonical business mutations.
+- Depending on any hosted database service as a runtime dependency for business correctness, or storing authoritative tenant business state in a replication primary.
 - Treating the React Query cache, browser `localStorage`, or opaque JSON snapshots as the durable offline database.
 
 ---
@@ -92,11 +117,11 @@ Additional non-negotiable invariants:
 | SpacetimeDB | Canonical business state; reducer transactions; business invariants; canonical permission checks; authoritative ChangeSet/review records where they affect business decisions; audit rows; synchronization/version facts. |
 | Postgres | Future generated historical projection only. The offline design must work before it exists and must not read PG directly from a desktop. |
 | Rust api-server | Session resolution; organization/company scope; field permissions; future `ResourceReadPlan`; hot/cold merge; sync projection endpoints; capability issuance; ChangeSet upload; policy resolution; reconciliation; conflict detection; reviewer authorization; hydration; canonical reducer invocation; idempotent merge orchestration. |
-| SQLite | Encrypted durable store for authorized projection rows, immutable local actions, ChangeSets, temporary IDs, dependencies, sync cursors, device state, capability grants, and attributable local approvals. |
-| React Query | Reactive view/query state over a repository. It may be seeded or invalidated from online API, realtime, or SQLite changes, but remains disposable. |
-| Desktop wrapper | Secure key storage, SQLite driver, filesystem lifecycle, device identity, network-state integration, update/migration startup. It must remain behind runtime ports. |
+| libSQL (embedded, on device) | Encrypted durable store for authorized projection rows, immutable local actions, ChangeSets, temporary IDs, dependencies, sync cursors, device state, capability grants, and attributable local approvals. Executes SQL and transactions. Holds no authority and performs no replication of its own. |
+| React Query | Reactive view/query state over a repository. It may be seeded or invalidated from online API, realtime, or local database changes, but remains disposable. |
+| Desktop wrapper | Secure key storage, libSQL driver, filesystem lifecycle, device identity, network-state integration, update/migration startup. It must remain behind runtime ports. |
 
-SQLite may evaluate generated structural constraints needed to capture an intent safely—required fields, codec validity, dependency presence, and capability/policy availability. It must not independently decide credit, fiscal, inventory, workflow, tax, accounting, or approval business rules.
+libSQL may evaluate generated structural constraints needed to capture an intent safely—required fields, codec validity, dependency presence, and capability/policy availability. It must not independently decide credit, fiscal, inventory, workflow, tax, accounting, or approval business rules.
 
 ---
 
@@ -120,9 +145,9 @@ The target architecture must begin from the repository as it exists, not from PR
 - `make generate-stdb-rust-sdk` already generates Rust client bindings into `api-server/src/stdb_sdk_bindings/` and then runs `scripts/fix-spacetimedb-rust-sdk-bindings.sh`.
 - Generated Rust bindings expose concrete table and reducer types. For example, `account_move_type.rs::AccountMove` preserves `u64`, `Option<u64>`, `Timestamp`, `Identity`, and enum types; `approve_ai_action_draft_reducer.rs::ApproveAiActionDraftArgs` preserves typed reducer arguments.
 - `lumiere-codegen/src/main.rs` does **not** consume those Rust bindings today. It emits frontend registry/invalidation assets and calls `sql_columns_emit::emit_sql_columns_json` using generated TypeScript.
-- `lumiere-codegen/src/sql_columns_emit.rs` explicitly parses `frontend/packages/stdb/src/generated/*_table.ts` and `types.ts`. This is current behavior, but it conflicts with PR #3's target Rust-bindings → stable schema-IR chain and must not be extended for SQLite.
+- `lumiere-codegen/src/sql_columns_emit.rs` explicitly parses `frontend/packages/stdb/src/generated/*_table.ts` and `types.ts`. This is current behavior, but it conflicts with PR #3's target Rust-bindings → stable schema-IR chain and must not be extended for libSQL generation.
 - `lumiere-codegen/reducer-stdb-invalidation.json` maps reducer names to affected query resources, but it does not describe reducer argument types, expected versions, offline eligibility, conflict fields, local presentation effects, idempotency, or approval policy.
-- `make check-codegen` currently checks query registry, invalidation, SQL-column, ERP subscription, and allowlist artifacts. It does not regenerate Rust bindings or check schema IR, Postgres, SQLite, reducer manifests, or offline manifests.
+- `make check-codegen` currently checks query registry, invalidation, SQL-column, ERP subscription, and allowlist artifacts. It does not regenerate Rust bindings or check schema IR, Postgres, libSQL, reducer manifests, or offline manifests.
 
 ### 4.3 Current authorization and session state
 
@@ -142,7 +167,7 @@ The target architecture must begin from the repository as it exists, not from PR
 - `frontend/packages/query-hooks/src/hooks/realtime.ts::useLumiereRealtime` reconnects a WebSocket and invalidates React Query resources on server change messages.
 - `frontend/packages/stdb/src/live/SubscriptionCacheBridge` and `cache-patch.ts` can seed React Query from the SpacetimeDB client subscription cache. That cache is live/disposable and is not suitable as the offline ledger.
 - `frontend/packages/erp-session/src/context.tsx::ErpSessionProvider` exposes identity, connected state, organization, allowed companies, and active company. The active company alone is persisted in browser `localStorage` by `active-company-storage.ts`; this is not an offline security boundary.
-- No Deno Desktop, Tauri, SQLite, `rusqlite`, or `libsql` runtime/package is present in the repository. The first wrapper choice remains open.
+- No Deno Desktop, Tauri, `libsql`, or `rusqlite` runtime/package is present in the repository. The database engine is decided (libSQL, §5.0); the desktop *wrapper* choice remains open and must stay behind the ports in §19.
 
 ### 4.5 Existing review and audit precedent
 
@@ -154,11 +179,74 @@ The target architecture must begin from the repository as it exists, not from PR
 
 ### Consequence
 
-Phase 0 must first establish the stable schema/reducer IR and server-side read/sync contracts. SQLite generation must not be bolted onto the current TypeScript parser, and ChangeSet reconciliation must not be placed in frontend hooks.
+Phase 0 must first establish the stable schema/reducer IR and server-side read/sync contracts. libSQL schema generation must not be bolted onto the current TypeScript parser, and ChangeSet reconciliation must not be placed in frontend hooks.
 
 ---
 
-## 5. Generated SQLite architecture
+## 5. Generated libSQL client-database architecture
+
+### 5.0 libSQL configuration and operational practice
+
+**Engine: libSQL**, embedded in the desktop process, opened as a purely local database. SQLite dialect and file format, so every generated artifact below is ordinary SQLite and stays portable if the engine is ever swapped.
+
+The engine is consumed through a deliberately thin surface: execute SQL, transactions, crash-safe durability, encryption at rest, WAL. Nothing else. That thinness is what keeps §19's adapter boundary credible and what makes the engine choice reversible.
+
+**Required open configuration**, asserted at startup and in CI:
+
+```text
+open mode           local file only — never a replica or synced-database builder
+encryption          EncryptionConfig { cipher: Aes256Cbc, key: <32 bytes from OS secure storage> }
+journal_mode        WAL
+synchronous         FULL          (ledger durability outweighs write throughput; see §21)
+foreign_keys        ON            (local structural integrity only, never business validation)
+busy_timeout        set explicitly — never rely on the default
+temp_store          MEMORY, with encrypted-profile temp dir when spilling
+```
+
+**Practices that follow from libSQL being SQLite underneath:**
+
+- **One writer.** Serialize writes through a single connection or an explicit write mutex; use a small read pool. SQLite's single-writer model is not a limitation here — the desktop has exactly one writer.
+- **Explicit transactions around every ledger append**, wrapping the immutable action, dependencies, hash state, and local presentation effect together (§21).
+- **Prepared statements** for all generated codecs; no string-built SQL in the repository layer.
+- **`PRAGMA integrity_check`** at startup, before migration (§22.2).
+- **Checkpoint deliberately.** WAL growth is a real disk-budget concern on POS hardware; checkpoint on a schedule and after large sync pages, and include WAL size in the §26 disk budget.
+- **Never expose engine handles above the port.** React and domain code see `OfflineRepository` (§19), never a connection.
+
+**Replication features are disabled, and startup must prove it:**
+
+```text
+embedded replica / synced-database open path   NOT USED
+remote primary or sync URL                     NOT CONFIGURED
+engine-level sync or offline-writes            DISABLED
+```
+
+> Startup must fail closed if any replication target is found configured on a database holding business tables. Such a path would both push unreconciled rows past the ChangeSet protocol and exfiltrate tenant rows outside the authorized projection. Treat it as a release blocker and cover it with the §22.2 integrity check.
+
+**Portability is the real insurance.** Lumiere depends on an embedded library over a SQLite-compatible file, not on any hosted service, so vendor strategy has limited reach into this system. Keeping every generated artifact to plain SQLite dialect is the load-bearing decision: it preserves a fallback to another SQLite-dialect engine without touching domain code. Revisit the engine only on evidence — a needed capability available nowhere else, or a meaningful slowdown in libSQL's release and security-fix cadence.
+
+### 5.0.1 Encryption at rest
+
+The libSQL Rust surface offers a single cipher, `Cipher::Aes256Cbc`, with the key supplied as raw bytes. Two consequences must be stated plainly rather than assumed away:
+
+| Property | Status |
+|---|---|
+| Confidentiality of the database file | Provided |
+| **Tamper-evidence / integrity** | **Not provided.** AES-256-CBC is unauthenticated; there is no per-page MAC in this configuration. An attacker with file access can flip ciphertext bits and cause controlled plaintext corruption. |
+
+Therefore the defence is layered, and the database cipher is deliberately *not* the primary control:
+
+1. **OS full-disk encryption is the primary control** — FileVault, BitLocker, or LUKS, verified at device enrolment and reported in §26 telemetry. It is the layer that satisfies recognised compliance controls and, critically, the only layer covering what database encryption structurally cannot: WAL and journal files, temp files, OS swap where plaintext pages land, crash dumps, and the encrypted backups written in §22.2.
+2. **libSQL `Aes256Cbc` with an OS-keychain key is the second layer**, defending the cases full-disk encryption misses: another OS user copying the file on a shared machine, or a device where full-disk encryption was never enabled. It does not carry the compliance claim alone.
+3. **Integrity comes from the application, not the cipher.** §15's hash chain gives the ledger tamper-evidence independent of storage. Projection and sync-metadata tables are not tamper-evident — acceptable because they are disposable caches of server truth (§22.1), where corruption causes a rebuild rather than a false business fact. **Never claim tamper-proofing from the fact that the database is encrypted.**
+4. **Prefer absence over encryption for sensitive data.** §16's `NeverLocal` is strictly stronger than field-level envelope encryption: a running app holds its own keys, so client-side field encryption buys little while costing queryability and codec complexity. Reserve it for a specific regulated field that must also be local — expected to be a very short list, possibly empty.
+
+The strongest lever here is not cryptographic. It is selective sync (§16): every field that never reaches disk is one that never has to be defended, audited, or explained in an incident.
+
+**Verification, enforced in CI** (extending the §25 sensitive-field test):
+
+- assert the database file header is **not** `SQLite format 3`, proving encryption is genuinely active and not silently misconfigured;
+- grep the raw database file *and the WAL* for known sensitive plaintext fixtures;
+- assert no replication target is configured.
 
 ### 5.1 One source-of-truth chain
 
@@ -178,9 +266,9 @@ Lumiere schema + reducer IR
         ├── ResourceReadPlan/hydration metadata       (future PR #3 work)
         ├── reducer argument/effect metadata
         ├── offline policy manifest
-        ├── SQLite projection DDL
-        ├── SQLite migrations
-        ├── SQLite codecs
+        ├── libSQL projection DDL
+        ├── libSQL migration graph
+        ├── libSQL codecs
         └── TypeScript repository/query contracts
 ```
 
@@ -189,12 +277,12 @@ Lumiere schema + reducer IR
 ```text
 rust_bindings_ir.rs     generated Rust bindings → stable IR
 postgres_emit.rs        IR → PG artifacts
-sqlite_emit.rs          IR + offline manifest → SQLite DDL/migrations/codecs
+libsql_emit.rs          IR + offline manifest → libSQL DDL/migrations/codecs
 reducer_manifest.rs     generated reducer args + reviewed annotations → reducer IR
 offline_manifest.rs     registry + reducer IR + policy annotations → offline contract
 ```
 
-Do not add SQLite output to `sql_columns_emit.rs`; that module currently recovers names from TypeScript and lacks sufficient type, key, enum, relation, and reducer information.
+Do not add libSQL output to `sql_columns_emit.rs`; that module currently recovers names from TypeScript and lacks sufficient type, key, enum, relation, and reducer information.
 
 ### 5.2 Projection table naming
 
@@ -251,9 +339,11 @@ offline_capability_grant(...)
 
 `local_state` belongs in `sync_row_state`, not every business table. Suggested values are `clean`, `optimistic`, `pending_review`, `conflicted`, `dependency_blocked`, and `tombstoned`.
 
+This metadata is Lumiere's own, written by Lumiere's protocol. It deliberately duplicates nothing from any engine-level replication bookkeeping, and must not be replaced by engine-managed sync state — the protocol in §10 has to remain inspectable, testable, and portable.
+
 ### 5.4 Explicit SQLite type mapping
 
-The schema IR owns type mappings and generated codecs.
+The schema IR owns type mappings and generated codecs. These are plain SQLite-dialect mappings.
 
 | Rust/STDB type | SQLite representation | Rule |
 |---|---|---|
@@ -269,7 +359,7 @@ The schema IR owns type mappings and generated codecs.
 | JSON/structured string | canonical JSON `TEXT`, `json_valid` where supported | Canonicalization is generated; JSON remains a field representation, not the primary database model. |
 | `Vec<T>` / custom struct | normalized child table when relation/query semantics require it; otherwise canonical typed JSON `TEXT` | The IR makes this decision once. |
 
-Relations, foreign-key targets, cardinality, ownership, and dependency direction live in generated relation metadata. SQLite foreign keys may protect local structural consistency, but they do not become business validation.
+Relations, foreign-key targets, cardinality, ownership, and dependency direction live in generated relation metadata. Foreign keys may protect local structural consistency, but they do not become business validation.
 
 ### 5.5 Generated indexes
 
@@ -287,7 +377,7 @@ Do not mirror every server index. `EXPLAIN QUERY PLAN` tests should justify addi
 
 ### 5.6 Authorized materialization
 
-SQLite stores the **resolved authorized API/sync projection**, not raw STDB rows and not a locally reconstructed STDB+PG merge.
+libSQL stores the **resolved authorized API/sync projection**, not raw STDB rows and not a locally reconstructed STDB+PG merge.
 
 The api-server must:
 
@@ -523,7 +613,7 @@ offline_changes:admin
 
 These augment—not replace—the target reducer's normal resource/action permissions.
 
-At capture time, SQLite verifies that the signed capability listed the reducer/mode/company and that the local user still has access to the unlocked profile. At submission and again immediately before merge, the api-server verifies:
+At capture time, the client verifies that the signed capability listed the reducer/mode/company and that the local user still has access to the unlocked profile. At submission and again immediately before merge, the api-server verifies:
 
 1. current identity and active organization membership;
 2. current company access;
@@ -541,13 +631,49 @@ An approval signs the exact reconciliation-plan hash. Any action edit, policy ch
 
 ---
 
-## 10. Synchronization revisions and conflict detection
+## 10. The Lumiere synchronization protocol
 
 ### 10.1 Current gap
 
 The repository has per-table IDs/timestamps and append-only audit rows, but no proven organization-wide synchronization revision that covers every canonical mutation. `audit_log.id` cannot be assumed complete enough to serve as a global base revision.
 
-### 10.2 Proposed revision model
+There is also no wire protocol. The storage engine does not supply one: as established in §1.1, engine-level replication moves rows with last-write-wins and bypasses reducers. This section defines the protocol Lumiere owns end to end.
+
+### 10.2 Shape of the protocol
+
+Two independent, separately versioned channels. They never share a transaction and may run at different cadences.
+
+```text
+PULL   server ──► device    authorized projection frames, server-ordered by revision
+PUSH   device ──► server    immutable ChangeSets of reducer intents
+```
+
+Asymmetry is deliberate and is the property that makes ERP correctness achievable:
+
+- **Pull carries rows.** They are already-authorized, already-validated server facts. The device applies them verbatim; it never merges them with local business logic.
+- **Push carries intents, never rows.** The device may not state what a table *should contain*; it may only state what the user *asked to do*. The server decides what that means against current state and current policy.
+
+A row-replication protocol collapses this asymmetry — which is why the engine's own sync cannot be used here.
+
+```text
+device                                   api-server                     SpacetimeDB
+  │                                          │                               │
+  │──(1) POST /sync/pull  cursor,policy_hash►│                               │
+  │◄─────── frames + next_cursor ────────────│◄── authorized read plan ──────│
+  │  apply frames + advance cursor           │                               │
+  │        (one libSQL transaction)          │                               │
+  │                                          │                               │
+  │──(2) POST /sync/push  sealed ChangeSet ─►│                               │
+  │◄─────── receipt (accepted, plan_hash) ───│                               │
+  │                                          │─ reconcile: versions, policy  │
+  │                                          │  ├─ clean  ──► reducer ──────►│
+  │                                          │  └─ conflict ──► review queue │
+  │──(3) POST /sync/outcomes  since=cursor ─►│                               │
+  │◄─────── per-action outcomes + temp IDs ──│                               │
+  │  apply outcomes, map temp IDs            │                               │
+```
+
+### 10.3 Revision model
 
 Introduce a canonical monotonic `SyncRevision` per organization and, where isolation requires it, company. Revision advancement must be committed with the canonical mutation or emitted from a guaranteed SpacetimeDB transaction event mechanism. The design must prove there is no successful offline-eligible mutation without a corresponding revision/event.
 
@@ -565,15 +691,60 @@ changed_field_set or semantic effect class
 transaction identity where available
 ```
 
-The api-server exposes snapshot + delta sync endpoints with deterministic cursors. Clients apply a page and advance `last_applied_revision` in one SQLite transaction.
+Retention is a protocol parameter, not an implementation detail: the server must keep the event stream long enough to serve the longest supported offline window (§22), and must be able to tell a device "your cursor is older than my retention — fall back to snapshot" rather than silently skipping revisions.
 
-### 10.3 Per-record expected versions
+### 10.4 Pull
 
-Every mutable offline-target record needs an explicit version or stable revision hash. The action records versions for all rows on which the intent materially depends—not only the row it appears to edit.
+**Request:** `(scope, resource_key, cursor, policy_hash, protocol_version, schema_version)`.
+
+**Server obligations, in order:**
+
+1. re-resolve session, organization, company, roles, and `FieldAccessContext` — the cursor confers no authority;
+2. build the `ResourceReadPlan` and intersect it with the offline/sync policy (§16);
+3. compare the client's `policy_hash` with the currently resolved one;
+4. emit frames, ordered by revision, each carrying only authorized columns;
+5. return `next_cursor` and the authoritative `policy_hash`.
+
+**Frame kinds:**
+
+| Frame | Meaning | Client action |
+|---|---|---|
+| `upsert` | row is authorized and current at revision R | replace projection row, set `sync_row_state` |
+| `delete` | row deleted canonically | tombstone |
+| `revoke` | row or column is **no longer authorized** — distinct from deletion | delete local material, invalidate cache; never render as a business deletion |
+| `resnapshot` | cursor unusable (retention lapse, policy change, schema change) | drop and rebuild the projection for that resource, preserving pending ChangeSets |
+| `policy_change` | `policy_hash` moved | re-evaluate authorized set before applying further frames |
+
+**Client obligations:** apply a page and advance `last_applied_revision` in **one libSQL transaction**. A partially applied page must be impossible (§21). Cursors advance only on full success.
+
+**Ordering:** frames are applied in server revision order per resource. Cross-resource ordering is not guaranteed and the client must not infer referential completeness from it — this is why local foreign keys are structural only and why dependency state lives in `sync_row_state`.
+
+### 10.5 Push
+
+Push uploads sealed, immutable ChangeSets (§6). The device never pushes table rows.
+
+**Stages:**
+
+| Stage | Server action | Failure mode |
+|---|---|---|
+| receipt | verify device, capability, hash chain, protocol/action schema versions; record `(organization, device, changeset_id, root_hash)` | tamper (same ID, different hash) → reject and alert |
+| authorize | re-resolve current identity, org, company, role, field policy, reducer policy | capability expired or permission reduced → reject or route to review; never execute on stale authority |
+| reconcile | load canonical current versions for every row the action depends on; classify per §10.7 | version drift → conflict |
+| plan | derive `plan_hash` from immutable actions + canonical versions + policy version | stale plan cannot merge |
+| execute | invoke canonical reducers in dependency order, idempotency key enforced in the same STDB transaction (§17) | partial application reported per action, never as a whole-set failure |
+| outcome | record per-action result, canonical IDs, temp-ID mappings | client fetches via stage (3) |
+
+Push is **never** implicit. There is no path where a local write reaches the server as a side effect of the database being open — an important property that engine-level offline writes would remove.
+
+### 10.6 Per-record expected versions
+
+Every mutable offline-target record needs an explicit version or stable revision hash. The action records versions for all rows on which the intent materially depends — not only the row it appears to edit.
 
 Generated schema IR identifies version fields and relations. Reducer/domain metadata identifies additional read dependencies and semantic conflict fields.
 
-### 10.4 Conflict classification
+This is what makes conflict detection possible at all. Last-Push-Wins needs no versions precisely because it discards the information that would have revealed the conflict.
+
+### 10.7 Conflict classification
 
 Do not use whole-row last-write-wins.
 
@@ -584,9 +755,45 @@ Do not use whole-row last-write-wins.
 - stock, accounting, workflow transitions, and approvals default to semantic review even when fields differ;
 - unknown or incomplete dependency metadata defaults to review/deny, not auto-merge.
 
-A “rebase” produces a new immutable reconciliation plan referencing original actions. It does not rewrite the uploaded ledger.
+A "rebase" produces a new immutable reconciliation plan referencing original actions. It does not rewrite the uploaded ledger.
 
-### 10.5 Cold-tier interaction
+Worked contrast, two devices offline editing one sales order:
+
+| | Engine row sync (Last-Push-Wins) | Lumiere protocol |
+|---|---|---|
+| Device A adds line, device B changes customer | later push overwrites the whole row; one edit vanishes silently | disjoint field sets; policy may auto-reconcile both |
+| Both change `credit_limit` | later push wins, no record that a decision was made | true conflict → review queue with both values and actors |
+| A confirms order, B cancels it | arrival order decides; stock and journal effects are whatever the last row said | semantic review; reducers decide legality; compensation if a physical effect already occurred |
+| B's role lost order-confirm permission while offline | row still replicates — permission was never consulted | re-authorized at push; rejected with evidence preserved |
+
+### 10.8 Permissions across the protocol
+
+Authority is re-resolved at **four** independent boundaries. None may be skipped, and none may be inferred from another.
+
+| Boundary | Resolved | Guarantee |
+|---|---|---|
+| capability issuance | what this device may capture offline, and for how long | bounds offline authority to the last server-authorized capability |
+| pull | rows and columns this session may *see* now | unauthorized material never reaches disk |
+| push authorize | whether this user may *request* these reducers now | capture-time permission grants nothing at merge |
+| approval | whether the reviewer may approve *this plan* now | stale approvals and self-approval blocked |
+
+The device is never a permission authority. It holds a capability describing what it was allowed to capture; that capability restrains local behavior but proves nothing to the server. Every merge decision is made with freshly resolved server-side policy.
+
+Field-level policy applies on both channels: pull intersects `resolve_read_columns`; push rejects actions that would write fields the user may not write, even when the local projection legitimately contained them for reading.
+
+### 10.9 Protocol versioning
+
+Three versions travel on every exchange and are negotiated independently:
+
+```text
+protocol_version       wire framing and endpoint semantics
+schema_version         client projection schema (§22)
+action_schema_version  per-reducer intent encoding
+```
+
+Rules: the server supports a documented window of each; a device outside the window receives an actionable upgrade instruction rather than a generic error; a device may always *upload* preserved ledger bytes for a supported `action_schema_version` even when its projection schema is too old to open normally (§22). Pull and push may be at different compatibility levels — a device may be allowed to pull (to repair itself) while being blocked from pushing.
+
+### 10.10 Cold-tier interaction
 
 If an entity was archived to future Postgres while a device was offline, the api-server follows PR #3's hydration policy before invoking the canonical reducer. The desktop neither knows nor cares which canonical store supplied the base row. A hydration failure blocks merge; it never causes local intent loss.
 
@@ -673,7 +880,7 @@ pub struct OfflineCapabilityGrant {
 }
 ```
 
-Use asymmetric signatures so the desktop contains verification keys, not an issuance secret. Store the grant and device private key through the desktop OS secure-storage adapter, not ordinary SQLite fields alone.
+Use asymmetric signatures so the desktop contains verification keys, not an issuance secret. Store the grant and device private key through the desktop OS secure-storage adapter, not ordinary database fields alone.
 
 ### Expiry and degraded operation
 
@@ -761,7 +968,7 @@ PR #3 coexistence rule:
 
 > The desktop synchronizes the api-server's resolved authorized projection. It never independently merges SpacetimeDB hot rows and Postgres cold rows.
 
-Before Postgres exists, that endpoint reads STDB only. After PR #3 is implemented, the same `ResourceReadPlan` and sync contract may source a bounded result from STDB + PG without changing SQLite or React consumers.
+Before Postgres exists, that endpoint reads STDB only. After PR #3 is implemented, the same `ResourceReadPlan` and sync contract may source a bounded result from STDB + PG without changing the libSQL projection or React consumers.
 
 ---
 
@@ -771,8 +978,8 @@ Before Postgres exists, that endpoint reads STDB only. After PR #3 is implemente
 stateDiagram-v2
     [*] --> OfflineReady: projection + capability valid
     OfflineReady --> Capturing: user action
-    Capturing --> OfflineReady: SQLite commit succeeds
-    Capturing --> LocalError: SQLite commit fails
+    Capturing --> OfflineReady: libSQL commit succeeds
+    Capturing --> LocalError: libSQL commit fails
     OfflineReady --> Reauthenticating: network restored
     Reauthenticating --> OfflineReady: network lost
     Reauthenticating --> Uploading: current session resolved
@@ -798,7 +1005,7 @@ Network boundaries and keys:
 | Boundary | Idempotency rule |
 |---|---|
 | capability issuance | request nonce + device ID; duplicate returns same active grant or explicit replacement |
-| sync page | revision range + deterministic cursor; page application and cursor advance in one SQLite transaction |
+| sync page | revision range + deterministic cursor; page application and cursor advance in one libSQL transaction |
 | ChangeSet upload | `(organization, device, changeset_id, root_hash)` unique; same ID/different hash is tampering |
 | action receipt | `(changeset_id, action_id, hash)` unique |
 | reconciliation | plan hash derived from immutable actions + canonical versions + policy version |
@@ -876,7 +1083,7 @@ A higher-level `LumiereDataGateway` chooses:
 
 ```text
 online query  → @lumiere/api-client canonical API
- offline query → OfflineRepository SQLite projection
+ offline query → OfflineRepository libSQL projection
 online action → current reducer API, unless policy requires ChangeSet
  offline action → append typed ChangeSet action + local presentation effect
 ```
@@ -886,25 +1093,29 @@ Minimal frontend evolution:
 1. extend `LumiereApiClient` or introduce a sibling data gateway rather than placing Deno/Tauri calls in hooks;
 2. make `useStdbQuery` call `gateway.query(resource, scope)` while keeping current React Query keys;
 3. make `useStdbCallMutation` call `gateway.mutate(reducer, args, context)`; offline mode returns a local pending result, not false server success;
-4. keep `STDB_REDUCER_INVALIDATION`, but generate richer reducer effects so a local transaction can refresh affected SQLite-backed queries;
-5. when online, `useLumiereRealtime` continues invalidating/refetching; when offline it pauses reconnect churn and SQLite change notifications invalidate the same keys;
+4. keep `STDB_REDUCER_INVALIDATION`, but generate richer reducer effects so a local transaction can refresh affected libSQL-backed queries;
+5. when online, `useLumiereRealtime` continues invalidating/refetching; when offline it pauses reconnect churn and local database change notifications invalidate the same keys;
 6. treat `SubscriptionCacheBridge` as an online optimization only; it does not write the durable ledger;
 7. extend `ErpSessionProvider` with explicit connectivity/capability/sync state from the gateway, while keeping organization/company selection; never trust `localStorage` as authority;
 8. keep `@lumiere/api-client` transport-neutral so web, Deno Desktop, Tauri, and mobile can share domain contracts.
 
-The initial implementation may use Deno Desktop + SQLite, but all runtime APIs must be confined to adapters. A later Tauri + SQLite adapter must not require rewriting React hooks or domain forms.
+The initial implementation may use Deno Desktop + libSQL, but all runtime APIs must be confined to adapters. A later Tauri + libSQL adapter must not require rewriting React hooks or domain forms. The engine sits behind the same port: swapping libSQL for another SQLite-dialect engine must be an adapter change, not a domain change.
 
 ---
 
 ## 20. Security
 
-### SQLite encryption and key storage
+### Database encryption and key storage
 
-- Require an encrypted SQLite build suitable for the selected wrapper (for example SQLCipher-compatible encryption), verified in CI/release artifacts. Plain SQLite is not acceptable for production tenant data.
+- Mandate **OS full-disk encryption** as the primary at-rest control, verified at device enrolment and reported in telemetry. It covers WAL, journals, temp files, swap, crash dumps, and backups — none of which database-level encryption protects.
+- Enable libSQL `Cipher::Aes256Cbc` as the second layer, key supplied as raw bytes from OS secure storage, verified in CI/release artifacts. An unencrypted client database is not acceptable for production tenant data.
+- **Claim confidentiality, not integrity.** The cipher is unauthenticated (§5.0.1); tamper-evidence for the ledger comes from the §15 hash chain, and the projection is disposable rather than trusted.
+- Prefer `NeverLocal` (§16) over client-side field encryption for sensitive data: absent beats encrypted, since a running application holds its own keys.
 - Generate a random per-installation/per-profile database key.
 - Wrap the key with OS secure storage (Keychain, Credential Manager, Secret Service/keystore) and bind access to the signed-in OS/application profile where available.
 - Never store the plaintext database key, refresh token, device private key, or capability-signing secret inside the same database unprotected.
-- Use restrictive filesystem permissions, secure temporary-file settings, encrypted WAL/journal support, and secure deletion appropriate to the selected SQLite distribution.
+- Use restrictive filesystem permissions, secure temporary-file settings, encrypted WAL/journal handling, and secure deletion appropriate to the engine build.
+- Verify at startup that no engine-level sync/replication target is configured (§5.0): a misconfigured remote would exfiltrate tenant rows outside the authorized protocol.
 
 ### Device and account lifecycle
 
@@ -928,9 +1139,9 @@ A cached record must not become readable to another OS/application user merely b
 
 | Failure | Required behavior |
 |---|---|
-| crash while capturing action | one SQLite transaction contains immutable action, dependencies, hash state, and safe local presentation effect; all commit or none commit |
+| crash while capturing action | one libSQL transaction contains immutable action, dependencies, hash state, and safe local presentation effect; all commit or none commit |
 | projection updated but action missing | prohibited by transaction boundary; startup integrity check detects any impossible state |
-| action persisted but UI not updated | source of truth is SQLite; React Query repopulates after restart |
+| action persisted but UI not updated | source of truth is the local database; React Query repopulates after restart |
 | crash during upload | retry same ChangeSet/root hash; server returns existing receipt |
 | duplicate upload | unique receipt keys make it a no-op; changed hash is a tamper error |
 | network loss after server accepted upload | client queries receipt by ChangeSet ID/idempotency key |
@@ -938,7 +1149,7 @@ A cached record must not become readable to another OS/application user merely b
 | rejected reducer | mark action rejected, block required dependents, and preserve evidence; independent groups follow explicit policy |
 | approval becomes stale | return to review with new plan hash and explanation; do not reuse old approval |
 | schema migration fails | preserve encrypted backup and pending ledger; do not open partially migrated DB for writes |
-| corrupted SQLite | quarantine DB; recover projections from server; salvage pending signed ledger only through a validated recovery tool/process |
+| corrupted local database | quarantine DB; recover projections from server; salvage pending signed ledger only through a validated recovery tool/process |
 | device clock drift | preserve local time as evidence, but use server receipt/merge time for authority; flag excessive skew |
 | permission revoked offline | local capture may continue only within existing grant terms; submission/merge reauthorization blocks unauthorized canonical execution |
 | entity archived to PG | api-server hydrates according to PR #3 before reducer; client remains store-agnostic |
@@ -949,32 +1160,92 @@ Local projection effects are optimistic presentation state, never proof that the
 
 ---
 
-## 22. Schema migrations, rollout, and rollback
+## 22. Schema migrations and client schema evolution
 
-### Desktop migrations after long absence
+This is the hardest operational problem in the plan. At scale there are hundreds of independent client databases, each at an arbitrary application version, each holding pending financial intent, and any of them may be offline for weeks. The engine supplies migration *primitives*; it supplies no answer to fleet skew. Lumiere owns the model below.
 
-Ship a monotonic SQLite migration graph in the signed desktop application. A device must be able to migrate its local DB before network access.
+### 22.1 What is disposable and what is not
 
-Startup sequence:
+Every migration decision follows from this split.
+
+| Class | Contents | On migration failure |
+|---|---|---|
+| **Disposable** | `projection_*` tables, derived indexes, caches, cursors | drop and re-pull from the server (§10.4 `resnapshot`) |
+| **Precious** | ChangeSets, actions, hash chains, approvals, temp-ID mappings, capability grants, device identity, physical-event evidence | never dropped; migration must preserve or export them, and refuse to proceed if it cannot |
+
+The projection is a cache of server truth. The ledger is the only thing on the device that exists nowhere else. **A migration that cannot preserve the ledger must not run.** This is what makes aggressive projection migration safe: the expensive-to-preserve half is small, append-only, and never needs schema-aware rewriting.
+
+Structural consequence: **the ledger and the projection are migrated by two separate, independently versioned migration graphs.** A projection schema change caused by an ordinary ERP field addition must never touch ledger tables. Ledger schema changes are rare, reviewed individually, and additive-only.
+
+```text
+schema_version         projection graph — may be rebuilt, may skip versions via resnapshot
+ledger_version         ledger graph — strictly forward, additive, never rebuilt
+action_schema_version  per-reducer intent encoding — upcast only (§22.4)
+```
+
+### 22.2 Startup sequence
+
+Ship a monotonic migration graph in the signed desktop application. A device must be able to migrate its local DB **before** network access — a device that needs the network to become openable is a device that cannot recover in the field.
 
 1. authenticate/unlock the local profile;
-2. verify DB integrity and application/schema compatibility;
-3. create an encrypted backup/checkpoint;
-4. migrate in a transaction where SQLite permits;
-5. migrate projection schema, manifests, ChangeSet envelopes, and action codecs separately;
-6. verify hash chains and pending-action decodability;
-7. open the repository;
-8. reconnect and negotiate server protocol/schema ranges when available.
+2. verify integrity (`PRAGMA integrity_check`), and assert no engine-level sync/replication feature is enabled (§5.0);
+3. read `schema_version`, `ledger_version`, `action_schema_version`, and the application version that last wrote the file;
+4. refuse to open read-write if the file was written by a **newer** application than the one running (downgrade protection — a common real cause of corruption after a staged rollout is rolled back);
+5. create an encrypted backup/checkpoint;
+6. migrate the ledger graph first, additively, in a transaction;
+7. migrate or rebuild the projection graph (§22.3);
+8. verify hash chains and that every pending action is still decodable under a supported `action_schema_version`;
+9. open the repository;
+10. reconnect when available and negotiate the three versions from §10.9.
 
-Projection tables are disposable and may be rebuilt. Pending ChangeSets, actions, approvals, hashes, and temp-ID mappings are not disposable.
+### 22.3 The long-absence path: migrate or rebuild
 
-If a device is too old for an available direct migration:
+For a device N versions behind, replaying N sequential projection migrations is the slow, fragile option — and it is usually unnecessary, because the projection is disposable.
 
-- preserve/export the encrypted immutable ledger in a versioned recovery envelope;
+Decision rule at startup:
+
+```text
+if ledger migration path missing            → §22.5 recovery envelope, do not open read-write
+if projection versions contiguous and cheap → migrate in place
+if projection versions skip, are expensive,
+   or any migration is destructive          → DROP projection, mark resources for resnapshot,
+                                              rebuild from server on reconnect
+```
+
+Rebuild is the **preferred** path for long-absent devices, not the fallback. It collapses N migrations into one server-authorized re-pull, and it re-applies current field policy — a device offline for six weeks may have lost permissions, and a rebuild naturally purges material an in-place migration would have carried forward.
+
+The cost is bandwidth, so it is bounded by policy: rebuild honours §16 selective-sync limits, and a device on a metered link may run degraded (ledger open for capture and push, projection empty, reads unavailable) rather than block on a large download. **Pending capture and push must never require the projection to be current.**
+
+### 22.4 Action schema evolution
+
+Pending actions are the genuinely hard case: immutable bytes, authored weeks ago, that must still mean exactly what the user intended.
+
+- upcast reducer arguments only through deterministic, versioned, generated migrations;
+- upcasting is a **pure function over recorded bytes**; it may not consult current server state, current defaults, or the projection — an upcast that reads today's data is silently rewriting the user's intent;
+- **never reinterpret an old action as a different reducer meaning.** If a reducer's semantics changed, the old version is a distinct action type, retired separately;
+- a new required argument with no safe default makes old actions non-upcastable — they must route to human review, not receive a fabricated value;
+- the original bytes and hash chain are retained after upcast; the upcast result is derived, never a replacement;
+- the server independently validates upcast results; it does not trust the client's upcast.
+
+Every upcast needs a golden fixture: recorded bytes at version N, expected typed action at version N+1, asserted in CI (§25).
+
+### 22.5 Devices too old for any available path
+
+- preserve/export the encrypted immutable ledger in a versioned recovery envelope that is readable by a documented tool, independent of the projection schema;
+- allow ledger-only upload where the server still supports that `action_schema_version`, so weeks of captured work can land even if the device must then be wiped and re-seeded;
 - rebuild only the authorized projection after upgrade/reconnect;
-- upcast reducer arguments only through deterministic, versioned generated migrations;
-- never reinterpret an old action as a different reducer meaning;
-- keep the server able to reject unsupported action schema versions with an actionable upgrade path.
+- keep the server able to reject unsupported action schema versions with an actionable upgrade path — never a silent drop.
+
+### 22.6 Fleet-level obligations
+
+Hundreds of client databases make this a fleet problem, not a device problem:
+
+- **support window:** publish a maximum supported offline duration and a minimum supported application version; both are protocol parameters (§10.9) and both bound server-side event retention (§10.3);
+- **staged rollout with skew tolerance:** the server must expect to serve several client schema versions simultaneously and be tested that way;
+- **forward-compatible pull frames:** an older client must skip unknown fields in a pull frame rather than fail, so a server-side additive change does not strand the fleet;
+- **telemetry as an early warning:** report `schema_version`, `ledger_version`, migration outcome, and offline age (§26) so devices approaching the unsupported window are found before they are stranded;
+- **CI matrix:** generate a database at each supported historical version, with pending actions present, and assert both migrate-in-place and drop-and-rebuild succeed with zero ledger loss;
+- **no server migration may assume a synchronized fleet.** Server-side changes are additive until telemetry proves the old shape is gone.
 
 ### Rollout
 
@@ -1019,9 +1290,11 @@ Conceptual generated outputs:
 generated/schema-ir.json
 generated/reducer-manifest.json
 generated/offline-policy-manifest.json
-generated/sqlite/schema.sql
-generated/sqlite/migrations/*
-generated/sqlite/codecs.rs or wrapper-neutral codec fixtures
+generated/libsql/schema.sql
+generated/libsql/migrations/projection/*
+generated/libsql/migrations/ledger/*
+generated/libsql/action-upcasts/*
+generated/libsql/codecs.rs or wrapper-neutral codec fixtures
 frontend/packages/offline/src/generated/*
 ```
 
@@ -1035,14 +1308,14 @@ SpacetimeDB module
 ↕ Lumiere schema/reducer IR
 ├── current query registry/SQL metadata
 ├── PG DDL/codecs/archive/hydration manifests
-├── SQLite DDL/migrations/codecs
+├── libSQL DDL/migrations/codecs
 ├── offline policy/reducer manifests
 └── frontend typed repository contracts
 ```
 
 The current `make check-codegen` message instructs developers to regenerate TypeScript and codegen; the future target must also run/check `generate-stdb-rust-sdk` deterministically.
 
-Golden codec tests must share fixtures across Rust server, Postgres codec, SQLite codec, and TypeScript transport for `u64`, timestamps, identities, enums, nullable values, structured values, and relation keys.
+Golden codec tests must share fixtures across Rust server, Postgres codec, libSQL codec, and TypeScript transport for `u64`, timestamps, identities, enums, nullable values, structured values, and relation keys.
 
 ---
 
@@ -1055,22 +1328,28 @@ Golden codec tests must share fixtures across Rust server, Postgres codec, SQLit
 - [ ] Define synchronization revision/event completeness and per-record versions.
 - [ ] Introduce store-agnostic `ResourceReadPlan` and authorized projection contract from PR #3.
 - [ ] Extend resource/reducer manifests with offline/sync metadata.
-- [ ] Define ChangeSet/action/state/policy wire contracts and protocol versions.
+- [ ] Define ChangeSet/action/state/policy wire contracts and the three negotiated versions (§10.9).
+- [ ] Specify the pull/push protocol of §10 as a versioned wire contract with frame kinds and cursor semantics.
 - [ ] Define reducer idempotency eligibility gate.
-- [ ] Select desktop wrapper, encrypted SQLite distribution, and secure-storage adapters through a short ADR/spike.
+- [ ] Confirm libSQL binding fit for the chosen wrapper and pin the open configuration in §5.0 as code, asserted at startup.
+- [ ] Implement the §5.0.1 encryption layering: enrolment-time full-disk-encryption check, keychain-backed `Aes256Cbc` key, and the CI assertions that the file is encrypted and no replication target is configured.
+- [ ] Select desktop wrapper and secure-storage adapters through a short spike.
+- [ ] Assert engine-level sync/replication is disabled and enforce it in CI.
+- [ ] Define the projection/ledger migration split, version triple, and supported offline window (§22).
 - [ ] Extend `make check-codegen`.
 
-**Exit gate:** generated contracts preserve exact types; no offline generator parses TypeScript; no action can be marked offline-eligible without version, policy, dependency, and idempotency metadata.
+**Exit gate:** generated contracts preserve exact types; no offline generator parses TypeScript; no action can be marked offline-eligible without version, policy, dependency, and idempotency metadata; no code path allows engine-level replication of business tables.
 
-### Phase 1 — read-only authorized SQLite projection
+### Phase 1 — read-only authorized libSQL projection
 
-- [ ] Generate SQLite schema/codecs for a small reference-data set.
-- [ ] Add snapshot/delta sync API using resolved server authorization.
-- [ ] Implement encrypted profile/device lifecycle and migration engine.
+- [ ] Generate libSQL schema/codecs for a small reference-data set.
+- [ ] Implement the §10.4 pull channel, including `revoke`, `resnapshot`, and `policy_change` frames.
+- [ ] Implement encrypted profile/device lifecycle and both migration graphs.
+- [ ] Prove drop-and-rebuild recovery for a projection several versions behind.
 - [ ] Put `useStdbQuery` behind the online/offline data gateway.
 - [ ] Prove permission reduction, company switch, logout, restart, corruption recovery, and selective eviction.
 
-**Exit gate:** offline reads survive restart; no unauthorized field/row reaches disk; projection can be rebuilt without affecting canonical state.
+**Exit gate:** offline reads survive restart; no unauthorized field/row reaches disk; projection can be rebuilt without affecting canonical state; a database written by a newer app version refuses to open read-write.
 
 ### Phase 2 — low-risk ChangeSet pilot
 
@@ -1112,7 +1391,7 @@ A future branch sync node may coordinate several local POS/workstations during W
 ### Unit
 
 - hierarchical policy resolution and most-restrictive-wins behavior;
-- schema/reducer/SQLite codecs, especially full-range `u64` and timestamps;
+- schema/reducer/libSQL codecs, especially full-range `u64` and timestamps;
 - capability signature/scope/expiry/grace evaluation;
 - action canonicalization and hash-chain verification;
 - dependency DAG ordering, cycle rejection, optional edges, and blocked dependents;
@@ -1120,11 +1399,11 @@ A future branch sync node may coordinate several local POS/workstations during W
 - field-aware and semantic conflict classification;
 - approval freshness and separation of duties;
 - selective-sync policy and authorized-field deletion;
-- SQLite migration/upcast compatibility.
+- projection and ledger migration graphs, drop-and-rebuild recovery, and action upcast compatibility.
 
 ### Codegen
 
-`make check-codegen` must fail for drift between Rust bindings, schema IR, reducer IR, SQLite schema/migrations/codecs, PG artifacts when introduced, offline manifests, reducer invalidation, and frontend contracts.
+`make check-codegen` must fail for drift between Rust bindings, schema IR, reducer IR, libSQL schema/migrations/codecs, PG artifacts when introduced, offline manifests, reducer invalidation, and frontend contracts.
 
 Golden tests cover enums, optional values, IDs, identities, relation metadata, custom structs, unknown enum variants, and malformed/out-of-range values.
 
@@ -1142,6 +1421,12 @@ Golden tests cover enums, optional values, IDs, identities, relation metadata, c
 - permission/company/org revocation;
 - capability expiry and degraded modes;
 - multi-day outage and multi-version desktop migration;
+- long-absence rebuild: projection dropped and re-pulled while pending ChangeSets survive intact;
+- device several versions behind with non-upcastable pending actions routed to review;
+- version-skew matrix: server serving several client schema/protocol versions at once;
+- older client receiving pull frames containing unknown additive fields;
+- attempted open of a database written by a newer application version;
+- startup refusal when an engine-level sync/replication target is configured;
 - encrypted DB unlock/logout/account switch;
 - corrupted DB projection rebuild with pending ledger recovery;
 - entity moved to Postgres cold tier before reconnect once PR #3 exists.
@@ -1167,7 +1452,7 @@ online login + authorized sync
 
 POS is an early high-value E2E: customer/product sync, offline cash sale with lines/payment, restart, reconnect, conflict/review, canonical order/payment/stock/audit verification, and duplicate-upload protection.
 
-Also test that an unauthorized/sensitive field is absent from the SQLite file, not merely hidden by UI.
+Also test that an unauthorized/sensitive field is absent from the local database file, not merely hidden by UI.
 
 ---
 
@@ -1189,7 +1474,7 @@ Server metrics:
 
 Desktop health (privacy-minimized and uploaded when connected):
 
-- SQLite schema version, size, integrity status, and migration result;
+- projection `schema_version`, `ledger_version`, database size, integrity status, and migration result;
 - pending ChangeSet/action counts and oldest age;
 - last applied revision and sync error category;
 - capability state without exposing secret material;
@@ -1204,7 +1489,7 @@ Operational alerts should cover stuck high-risk/physical-event queues, repeated 
 
 ## 27. Open questions
 
-1. Which desktop runtime and encrypted SQLite distribution meet packaging, update, keychain, Linux deployment, and support requirements for target customers?
+1. Which desktop runtime meets packaging, update, keychain, Linux deployment, and support requirements for target customers, and does it carry usable `libsql` bindings?
 2. What SpacetimeDB mechanism can prove a complete per-organization sync revision stream for every offline-eligible reducer?
 3. Should synchronization revision be organization-wide or organization+company partitioned while preserving cross-company workflows?
 4. Which existing reducers already have transactionally enforced idempotency/business keys, and which require signature/core-function changes?
@@ -1219,6 +1504,10 @@ Operational alerts should cover stuck high-risk/physical-event queues, repeated 
 13. What are acceptable local DB size, initial sync time, and low-bandwidth delta budgets for alpha hardware/connectivity?
 14. When PR #3 is implemented, which cold resources may be synced on demand without rehydration, and which pending actions must pin/hydrate rows?
 15. What legal retention and user-disclosure rules apply to physical-event evidence, device signatures, location, and local approvals?
+16. ~~Is libSQL's encryption at rest sufficient for compliance on its own?~~ **Resolved (§5.0.1):** no — full-disk encryption is the primary control, `Aes256Cbc` the second layer, integrity from the §15 hash chain, and minimisation via `NeverLocal`. Remaining sub-question: does any target-market regulation name a specific field that must be both local and separately encrypted?
+17. What is the committed maximum supported offline duration, and what server-side event retention and migration-support window does it imply?
+18. At what fleet size does drop-and-rebuild recovery become bandwidth-prohibitive for target customer connectivity, and what degraded mode applies there?
+19. Is there any future case where a read-only, non-authoritative replica for bulk reference-data seeding is worth the added surface and the risk of an enabled replication path?
 
 ---
 
@@ -1226,8 +1515,8 @@ Operational alerts should cover stuck high-risk/physical-event queues, repeated 
 
 | Date | Decision | Rationale |
 |---|---|---|
-| 2026-08-18 | Use SQLite from the first offline desktop release | Durable relational queries, transactions, migrations, indexes, and recoverability are required; opaque JSON snapshots are not an adequate primary store. |
-| 2026-08-18 | Generate SQLite from the future Rust-bindings → Lumiere IR chain | Prevents type/schema drift and avoids extending the current TypeScript parser. |
+| 2026-08-18 | Use an embedded SQLite-dialect database from the first offline desktop release | Durable relational queries, transactions, migrations, indexes, and recoverability are required; opaque JSON snapshots are not an adequate primary store. |
+| 2026-08-18 | Generate client schema from the future Rust-bindings → Lumiere IR chain | Prevents type/schema drift and avoids extending the current TypeScript parser. |
 | 2026-08-18 | Treat Postgres cold tier and `ResourceReadPlan` as proposed prerequisites/integrations, not existing code | Repository investigation confirms neither is implemented. |
 | 2026-08-18 | Make offline one ChangeSet producer | Reuses reconciliation/review for AI, imports, integrations, bulk operations, and automation. |
 | 2026-08-18 | Persist reducer intents, never canonical raw CRUD | Preserves multi-table reducer invariants and one authoritative mutation path. |
@@ -1241,3 +1530,15 @@ Operational alerts should cover stuck high-risk/physical-event queues, repeated 
 | 2026-08-18 | Synchronize the authorized API projection, not STDB/PG stores independently | Keeps authorization, field policy, pagination, and hot/cold behavior server-owned. |
 | 2026-08-18 | Keep desktop runtime behind repository/security ports | Allows Deno Desktop or Tauri without leaking wrapper APIs through React/domain code. |
 | 2026-08-18 | Defer branch/LAN synchronization | Single-device offline provides alpha value without premature distributed-systems complexity. |
+| 2026-08-18 | Adopt **libSQL** as the client storage engine, opened as a purely local database | Closes the open "which SQLite distribution" question with a production-proven engine providing encryption at rest, WAL, and Rust/JS bindings, while inheriting SQLite's durability lineage and keeping generated artifacts portable. |
+| 2026-08-18 | Do **not** use embedded replicas, engine sync, or offline writes for canonical business state | Default resolution is row-level last-write-wins, replication bypasses reducers, the remote would become a second authority, and client-side transform hooks are not server authorization. Startup fails closed if a replication target is configured. |
+| 2026-08-18 | Keep the sync protocol Lumiere-owned and engine-independent (§10) | The protocol must survive an engine swap and must be inspectable and testable; pull carries authorized rows, push carries reducer intents, and the asymmetry is what makes ERP correctness possible. |
+| 2026-08-18 | Consume the engine through a thin surface: SQL, transactions, durability, encryption, WAL | Keeps the §19 adapter boundary credible and the engine choice reversible. Features a single-writer desktop app cannot use (concurrent-write concurrency, async I/O, vector search) are not reasons to change engines. |
+| 2026-08-18 | Treat SQLite **dialect portability**, not the engine brand, as the real insurance | The dependency is an embedded library over a SQLite-compatible file, with no hosted service in the runtime path. Keeping generated artifacts to plain SQLite dialect preserves a fallback to any SQLite-dialect engine without touching domain code. |
+| 2026-08-18 | Mandate OS full-disk encryption as the **primary** at-rest control; libSQL `Aes256Cbc` is the second layer | Only full-disk encryption covers WAL, journals, temp files, OS swap, crash dumps, and backups, and it is the control compliance assessors recognise. Database-level encryption alone leaves all of that exposed. |
+| 2026-08-18 | Claim confidentiality but **not** tamper-evidence from the database cipher | `Aes256Cbc` is unauthenticated with no per-page MAC. Ledger integrity comes from the §15 hash chain; the projection is a disposable cache where corruption forces a rebuild rather than a false business fact. |
+| 2026-08-18 | Prefer `NeverLocal` over client-side field encryption for sensitive data | Absent beats encrypted: a running application holds its own keys, so field-level encryption buys little while costing queryability and codec complexity. Minimising what reaches disk is the stronger lever. |
+| 2026-08-18 | Split projection and ledger into two independently versioned migration graphs | The projection is a disposable cache of server truth; the ledger is irreplaceable. The split lets long-absent devices rebuild aggressively without ever risking pending intent. |
+| 2026-08-18 | Prefer drop-and-rebuild over long in-place migration chains for long-absent devices | Collapses N migrations into one server-authorized re-pull and naturally re-applies current field policy, purging material an in-place migration would carry forward. |
+| 2026-08-18 | Require action upcasts to be pure functions over recorded bytes | An upcast that consults current state silently rewrites the user's original intent; non-upcastable actions must reach human review, never a fabricated default. |
+| 2026-08-18 | Publish a supported offline window and minimum client version as protocol parameters | Server event retention, migration support, and fleet telemetry all depend on a committed bound; without one, "offline for weeks" has no testable definition. |
