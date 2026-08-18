@@ -41,6 +41,11 @@ pub async fn run_expense_integration_worker() -> anyhow::Result<()> {
     expense_integration_worker::serve().await
 }
 
+/// Run the standalone audit-log cold-tier drainer service.
+pub async fn run_audit_cold_drainer() -> anyhow::Result<()> {
+    cold_tier::audit_drainer::serve().await
+}
+
 /// Run the standalone project payroll/calendar/e-invoice intent worker service.
 pub async fn run_project_integration_worker() -> anyhow::Result<()> {
     project_integration_worker::serve().await

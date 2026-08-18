@@ -22,8 +22,11 @@
 //!    boolean operator precedence bugs.
 //! 3. `page` must be bounded — archive-capable reads are never unbounded.
 
+pub mod audit_drainer;
 pub mod conventions;
 pub mod cursor;
+pub mod ledger;
+pub mod migrate;
 pub mod pg_pool;
 
 /// The canonical read contract for one API resource request.

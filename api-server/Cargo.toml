@@ -30,6 +30,10 @@ path = "src/bin/hr-integration-worker.rs"
 name = "workflow-worker"
 path = "src/bin/workflow-worker.rs"
 
+[[bin]]
+name = "audit-cold-drainer"
+path = "src/bin/audit-cold-drainer.rs"
+
 [dependencies]
 anyhow.workspace = true
 aes-gcm.workspace = true
