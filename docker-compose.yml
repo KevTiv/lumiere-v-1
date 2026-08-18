@@ -79,6 +79,16 @@ services:
       WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID:-}
       LUMIERE_REPORT_RENDERER_URL: http://chromium-worker:8090
       LUMIERE_REPORT_ARTIFACT_DIR: /var/lib/lumiere/owner-reports
+      # Cold-tier storage (docs/plans/sliding-window-cold-tier.md). Optional: if
+      # unset, audit-log reads fall back to hot-only (see cold_tier::pg_pool).
+      # Point at the managed Postgres instance once provisioned; PG_TLS_MODE
+      # must be "require" here since NODE_ENV=production fails closed otherwise.
+      PG_HOST: ${PG_HOST:-}
+      PG_PORT: ${PG_PORT:-5432}
+      PG_DATABASE: ${PG_DATABASE:-lumiere}
+      PG_USER: ${PG_USER:-lumiere}
+      PG_PASSWORD: ${PG_PASSWORD:-}
+      PG_TLS_MODE: ${PG_TLS_MODE:-require}
     volumes:
       - owner-report-artifacts:/var/lib/lumiere/owner-reports
     expose:
@@ -141,6 +151,33 @@ services:
       LUMIERE_WORKFLOW_EXTERNAL_WEBHOOK_TIMEOUT_MS: ${LUMIERE_WORKFLOW_EXTERNAL_WEBHOOK_TIMEOUT_MS:-10000}
     expose:
       - "8093"
+    restart: unless-stopped
+
+  audit-cold-drainer:
+    build:
+      context: .
+      dockerfile: Dockerfile.rust
+      args:
+        BIN: audit-cold-drainer
+    environment:
+      NODE_ENV: production
+      STDB_HOST: ${STDB_HOST:-https://maincloud.spacetimedb.com}
+      STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE}
+      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN}
+      # This service's only job is draining to Postgres, so PG here is
+      # required (not optional the way it is for api-server) — fails closed
+      # rather than idling silently with nothing to do.
+      PG_HOST: ${PG_HOST:?set PG_HOST}
+      PG_PORT: ${PG_PORT:-5432}
+      PG_DATABASE: ${PG_DATABASE:-lumiere}
+      PG_USER: ${PG_USER:-lumiere}
+      PG_PASSWORD: ${PG_PASSWORD:?set PG_PASSWORD}
+      PG_TLS_MODE: ${PG_TLS_MODE:-require}
+      LUMIERE_AUDIT_DRAINER_POLL_SECS: ${LUMIERE_AUDIT_DRAINER_POLL_SECS:-5}
+      LUMIERE_AUDIT_DRAINER_BATCH: ${LUMIERE_AUDIT_DRAINER_BATCH:-200}
+      LUMIERE_AUDIT_DRAINER_PORT: 8094
+    expose:
+      - "8094"
     restart: unless-stopped
 
   ai-gateway:
