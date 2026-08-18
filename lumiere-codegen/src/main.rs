@@ -1,4 +1,5 @@
-//! Loads canonical registries from `stdb-auth` and emits TypeScript for the frontend.
+//! Loads canonical registries from `stdb-auth` and emits TypeScript for the frontend,
+//! plus the Lumiere schema IR and cold-tier artifacts from SpacetimeDB-generated Rust bindings.
 //!
 //! ```text
 //! cargo run -p lumiere-codegen
@@ -6,10 +7,16 @@
 //! API_CODEGEN_STDB_INVALIDATION_OUT=frontend/packages/query-hooks/src/generated/stdb-reducer-invalidation.ts
 //! ```
 
+mod archive_manifest_emit;
+mod codec_emit;
 mod erp_org_sql_emit;
+mod hydration_manifest_emit;
+mod pg_ddl_emit;
 mod query_exec_audit;
 mod registry_emit;
+mod schema_ir;
 mod sql_columns_emit;
+mod stdb_bindings_parse;
 mod stdb_invalidation_emit;
 
 use anyhow::{Context, Result};
@@ -116,6 +123,93 @@ fn main() -> Result<()> {
         &allowlist_json,
     )?;
 
+    // ── 2. Schema IR: STDB Rust bindings → lumiere-schema-manifest.json ─────
+
+    let bindings_dir = manifest_dir.join("../api-server/src/stdb_sdk_bindings");
+    let schema_manifest = stdb_bindings_parse::parse_bindings(&bindings_dir)
+        .context("extracting schema IR from STDB Rust bindings")?;
+
+    let schema_manifest_json =
+        serde_json::to_string_pretty(&schema_manifest).context("serialise schema manifest")?;
+    let schema_manifest_path =
+        manifest_dir.join("../crates/stdb-auth/assets/lumiere-schema-manifest.json");
+    write_file(&schema_manifest_path, &schema_manifest_json)?;
+
+    // ── 3. Archive manifest: validate candidates + emit archive-manifest.json ─
+
+    let candidates_path = manifest_dir.join("archive-candidates.json");
+    let candidates_json = fs::read_to_string(&candidates_path)
+        .with_context(|| format!("read {}", candidates_path.display()))?;
+
+    let archive_manifest_json =
+        archive_manifest_emit::emit_archive_manifest(&candidates_json, &schema_manifest)
+            .context("generating archive manifest")?;
+    let archive_manifest_path =
+        manifest_dir.join("../crates/stdb-auth/assets/archive-manifest.json");
+    write_file(&archive_manifest_path, &archive_manifest_json)?;
+
+    // ── 4. PG DDL: one SQL file per active archive candidate ─────────────────
+
+    let candidates_value: Value = serde_json::from_str(&candidates_json)
+        .context("re-parse archive-candidates.json for DDL step")?;
+    let candidates_arr = candidates_value["candidates"]
+        .as_array()
+        .context("archive-candidates.json: 'candidates' must be an array")?;
+
+    let mut ddl_count = 0;
+    for cand in candidates_arr {
+        let table = cand["table"].as_str().unwrap_or_default();
+        let cold_table = cand["cold_table"].as_str().unwrap_or_default();
+        if table.is_empty() || cold_table.is_empty() {
+            continue;
+        }
+        let cfg = pg_ddl_emit::ArchiveCandidateConfig { table, cold_table };
+        let ddl = pg_ddl_emit::emit_cold_table_ddl(&schema_manifest, &cfg)
+            .with_context(|| format!("generating DDL for '{table}' → '{cold_table}'"))?;
+        let ddl_path = manifest_dir
+            .join("../api-server/src/generated/pg_ddl")
+            .join(format!("{cold_table}.sql"));
+        write_file(&ddl_path, &ddl)?;
+        println!("Wrote {}", ddl_path.display());
+        ddl_count += 1;
+    }
+
+    // ── 5. Codec manifest: STDB ↔ PG type mapping per archive candidate ──────
+
+    let codec_manifest_json = codec_emit::emit_codec_manifest(&candidates_json, &schema_manifest)
+        .context("generating codec manifest")?;
+    let codec_manifest_path = manifest_dir.join("../crates/stdb-auth/assets/codec-manifest.json");
+    write_file(&codec_manifest_path, &codec_manifest_json)?;
+    println!("Wrote {}", codec_manifest_path.display());
+
+    // ── 6. Hydration manifest: reducers that may target archived rows ────────
+    //
+    // The policy list is driven by `hydration-policies.json` (empty for Phase 1
+    // since audit_log is append-only and immutable).  Each policy is validated
+    // against the schema manifest and the active archive-candidate table set.
+
+    let archive_tables: Vec<String> = candidates_arr
+        .iter()
+        .filter_map(|c| c["table"].as_str().map(String::from))
+        .collect();
+
+    let hydration_policies_path = manifest_dir.join("hydration-policies.json");
+    let hydration_policies_json = fs::read_to_string(&hydration_policies_path)
+        .with_context(|| format!("read {}", hydration_policies_path.display()))?;
+
+    let hydration_manifest_json = hydration_manifest_emit::emit_hydration_manifest(
+        &hydration_policies_json,
+        &schema_manifest,
+        &archive_tables,
+    )
+    .context("generating hydration manifest")?;
+    let hydration_manifest_path =
+        manifest_dir.join("../crates/stdb-auth/assets/hydration-manifest.json");
+    write_file(&hydration_manifest_path, &hydration_manifest_json)?;
+    println!("Wrote {}", hydration_manifest_path.display());
+
+    // ── 7. Summary ────────────────────────────────────────────────────────────
+
     let key_count = serde_json::from_str::<Value>(&registry_text)?
         .as_object()
         .map(|o| o.len())
@@ -138,11 +232,20 @@ fn main() -> Result<()> {
         erp_org_rows.len(),
         erp_subs_path.display()
     );
+    println!(
+        "lumiere-codegen: {} tables in schema IR ({} enum types) from {}",
+        schema_manifest.tables.len(),
+        schema_manifest.enum_types.len(),
+        bindings_dir.display()
+    );
+    println!("lumiere-codegen: {ddl_count} cold PG DDL file(s) from archive-candidates.json");
     println!("Wrote {}", registry_path_out.display());
     println!("Wrote {}", stdb_inv_path.display());
     println!("Wrote {}", sql_columns_frontend.display());
     println!("Wrote {}", sql_columns_rust.display());
     println!("Wrote {}", row_type_out.display());
     println!("Wrote {}", erp_org_rust.display());
+    println!("Wrote {}", schema_manifest_path.display());
+    println!("Wrote {}", archive_manifest_path.display());
     Ok(())
 }

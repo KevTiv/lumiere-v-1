@@ -1,0 +1,5 @@
+{
+  "_comment": "Reducer hydration policies for the sliding-window cold tier. A policy declares that a reducer may target an archived row by id; the api-server hydrates the row from PG before invoking the reducer. Phase 1 (audit_log) is append-only and immutable — no reducer mutates an audit row by id — so this list is empty. Populate it in Phase 2 when mutable transactional resources gain cold_eligible_at + archive_version.",
+  "version": 1,
+  "policies": []
+}

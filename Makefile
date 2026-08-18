@@ -847,6 +847,11 @@ check-codegen: codegen
 		crates/stdb-auth/assets/erp-org-sql.json \
 		crates/stdb-auth/assets/resource_registry.json \
 		crates/stdb-auth/assets/query_exec_non_registry.json \
+		crates/stdb-auth/assets/lumiere-schema-manifest.json \
+		crates/stdb-auth/assets/archive-manifest.json \
+		crates/stdb-auth/assets/codec-manifest.json \
+		crates/stdb-auth/assets/hydration-manifest.json \
+		api-server/src/generated/pg_ddl/ \
 		2>/dev/null || true
 	@git diff --exit-code -- \
 		frontend/packages/stdb/src/generated/query-registry.ts \
@@ -856,7 +861,12 @@ check-codegen: codegen
 		crates/stdb-auth/assets/stdb-generated-sql-columns.json \
 		crates/stdb-auth/assets/erp-org-sql.json \
 		crates/stdb-auth/assets/resource_registry.json \
-		crates/stdb-auth/assets/query_exec_non_registry.json || \
+		crates/stdb-auth/assets/query_exec_non_registry.json \
+		crates/stdb-auth/assets/lumiere-schema-manifest.json \
+		crates/stdb-auth/assets/archive-manifest.json \
+		crates/stdb-auth/assets/codec-manifest.json \
+		crates/stdb-auth/assets/hydration-manifest.json \
+		api-server/src/generated/pg_ddl/ || \
 		(echo "Generated artifacts are out of date. Run: make generate-stdb-ts-sdk && make codegen" && exit 1)
 
 # Fail if coverage/create-params mappers use magic FK sentinels (`?? 0n` / `|| 0n`).

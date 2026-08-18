@@ -1,7 +1,7 @@
 # Audit-log cold-by-default: first resource in the sliding-window architecture
 
-**Status:** Proposed — revised 2026-08-18 after architecture review  
-**Tracks:** `storage-tier`, `audit`, `production-readiness`  
+**Status:** Proposed — revised 2026-08-18 after architecture review
+**Tracks:** `storage-tier`, `audit`, `production-readiness`
 **Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [backup-recovery-followup.md](./backup-recovery-followup.md)
 
 ---
@@ -163,6 +163,31 @@ Apply:
 - final `LIMIT 500`/cursor after merge.
 
 If PG is unavailable, returning only the STDB tail is **not** a complete audit history. The response must explicitly fail or identify degraded/incomplete historical data according to the API contract.
+
+### 6.1 Consumer inventory (Phase 0 audit)
+
+The existing `audit-log` read contract is already bounded, so it is safe to
+enable cold reads without first adding a cursor. The inventory:
+
+| Consumer | Location | Contract used |
+|---|---|---|
+| Server read path | `api-server/src/query_exec.rs` `audit-log` arm | `SELECT … FROM audit_log WHERE organization_id = ?`; then `sort_rows_by_id_desc`; then `truncate(500)`. No cursor, no pagination params, no `company_id` filter in SQL (company visibility is enforced by field projection). |
+| Settings audit panel | `frontend/packages/ui/src/settings/audit-log.tsx` → `useAuditLog` | `GET /api/query/audit-log`, no query params. Renders the 500-row result with client-side search/action-filter and CSV export. |
+| Per-record audit tab | `frontend/packages/ui/src/entity-views/record-audit-tab.tsx` → `useAuditLog` | Same endpoint and same 500-row page, filtered client-side by `table_name` + `record_id`. |
+
+Findings:
+
+1. Both frontend consumers call the same single endpoint and rely on the
+   latest 500 rows by `id DESC`. No consumer passes a cursor today.
+2. The per-record tab relies on the relevant audit rows being within the
+   latest 500. This is a **pre-existing** limitation, not introduced by the
+   cold tier; the cold merge must preserve it exactly (top 500 by `id DESC`
+   across PG ∪ STDB tail, deduped by id, STDB preferred).
+3. The `ResourceReadPlan` for `audit-log` is therefore:
+   `order = [id DESC]`, `limit = 500`, `cursor = None`. The global cursor
+   contract (`api-server/src/cold_tier/cursor.rs`) is defined but unused for
+   Phase 1; it exists so future mutable resources can adopt keyset pagination
+   without changing the encoding.
 
 ---
 

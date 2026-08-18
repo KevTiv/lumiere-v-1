@@ -1,7 +1,7 @@
 # Sliding-window hot/cold storage tier (SpacetimeDB → Postgres)
 
-**Status:** Proposed — revised 2026-08-18 after architecture review  
-**Tracks:** `storage-tier`, `production-readiness`, `horizontal-scaling-investigation`  
+**Status:** Proposed — revised 2026-08-18 after architecture review
+**Tracks:** `storage-tier`, `production-readiness`, `horizontal-scaling-investigation`
 **Related:** [audit-log-cold-by-default.md](./audit-log-cold-by-default.md) · [backup-recovery-followup.md](./backup-recovery-followup.md) · [offline-changeset-sync.md](./offline-changeset-sync.md)
 
 ---
@@ -398,17 +398,27 @@ Configuration must distinguish local and production TLS modes and fail closed wh
 
 ### Phase 0 — safety foundation
 
-- [ ] Generate Rust client bindings for api-server from the SpacetimeDB module as part of the canonical codegen flow.
-- [ ] Add schema-IR extraction from generated Rust bindings.
-- [ ] Generate PG DDL/codecs from schema IR.
-- [ ] Add `ResourceReadPlan` and STDB/PG compilers.
-- [ ] Add generated archive/hydration manifests.
-- [ ] Define archive-version and payload-hash conventions.
-- [ ] Add production PG TLS configuration.
-- [ ] Define global cursor/ordering contract and audit each archive candidate's consumers.
-- [ ] Extend `make check-codegen`.
+- [x] Generate Rust client bindings for api-server from the SpacetimeDB module as part of the canonical codegen flow.
+- [x] Add schema-IR extraction from generated Rust bindings.
+- [x] Generate PG DDL/codecs from schema IR.
+- [x] Add `ResourceReadPlan` and STDB/PG compilers.
+- [x] Add generated archive/hydration manifests.
+- [x] Define archive-version and payload-hash conventions.
+- [x] Add production PG TLS configuration.
+- [x] Define global cursor/ordering contract and audit each archive candidate's consumers.
+- [x] Extend `make check-codegen`.
 
 **Exit gate:** no archive-capable code relies on TS parsing, independent PG authorization logic, silent type coercion, or unbounded merge behavior.
+
+Phase 0 deliverables live in:
+
+- `lumiere-codegen/src/{schema_ir,stdb_bindings_parse,pg_ddl_emit,codec_emit,archive_manifest_emit,hydration_manifest_emit}.rs`
+- `api-server/src/cold_tier/{mod,conventions,cursor,pg_pool}.rs`
+- generated assets: `crates/stdb-auth/assets/{lumiere-schema-manifest,archive-manifest,codec-manifest,hydration-manifest}.json`
+- generated DDL: `api-server/src/generated/pg_ddl/cold_audit_log.sql`
+- config: `lumiere-codegen/{archive-candidates,hydration-policies}.json`
+
+Note: `make generate-stdb-rust-sdk` regenerates `api-server/src/stdb_sdk_bindings/` (requires the SpacetimeDB CLI + module); `make codegen` then derives every downstream artifact from those bindings. `make check-codegen` fails on drift across the whole chain.
 
 ### Phase 1 — audit log cold path
 
@@ -475,3 +485,6 @@ Measure actual SpacetimeDB memory/restart behavior and evaluate per-org sharding
 | 2026-08-18 | Version-aware PG UPSERT | Supports rehydration and re-archival. |
 | 2026-08-18 | API-orchestrated hydration before reducer call | Avoids invalid reducer→procedure→continue control flow. |
 | 2026-08-18 | Cross-tier transfer ledger required | Independent backups need a provable common recovery boundary. |
+| 2026-08-18 | Keyset cursors, not offset, for cold pagination | Rows move hot→cold between requests; offset is unstable, keyset predicates on the last seen key value. |
+| 2026-08-18 | Hydration manifest is codegen-validated even when empty | The generator + CI gate exist in Phase 0; Phase 1 audit_log is append-only so the policy list is empty. |
+| 2026-08-18 | u64 order-key cursors encoded as decimal strings | Lossless round-trip across the JSON-based cursor format (matches the API JSON representation for U64 columns). |
