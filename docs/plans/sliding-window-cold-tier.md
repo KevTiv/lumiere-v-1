@@ -2,7 +2,7 @@
 
 **Status:** Proposed — revised 2026-08-18 after architecture review  
 **Tracks:** `storage-tier`, `production-readiness`, `horizontal-scaling-investigation`  
-**Related:** [audit-log-cold-by-default.md](./audit-log-cold-by-default.md) · [backup-recovery-followup.md](./backup-recovery-followup.md)
+**Related:** [audit-log-cold-by-default.md](./audit-log-cold-by-default.md) · [backup-recovery-followup.md](./backup-recovery-followup.md) · [offline-changeset-sync.md](./offline-changeset-sync.md)
 
 ---
 
