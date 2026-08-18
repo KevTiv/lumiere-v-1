@@ -1,10 +1,19 @@
 //! Validate `api-server/src/query_exec.rs` early-return match arms against the resource registry.
+//!
+//! Lint-only pipeline: it never writes a generated artifact, so `run` just
+//! returns `Ok(())` on success.
 
+use crate::paths::Paths;
+use crate::support::read_to_string;
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use std::collections::BTreeSet;
-use std::fs;
-use std::path::Path;
+
+pub fn run(paths: &Paths, registry_text: &str) -> Result<()> {
+    let allowlist_json = read_to_string(&paths.query_exec_non_registry_json)?;
+    let query_exec_rs = read_to_string(&paths.query_exec_rs)?;
+    audit_query_exec_special_cases(&query_exec_rs, registry_text, &allowlist_json)
+}
 
 /// Resources with custom SQL in `execute_resource_query` that are intentionally absent from
 /// `resource_registry.json` (virtual/inbox views, import jobs, policy snapshots, etc.).
@@ -131,24 +140,10 @@ pub fn audit_query_exec_special_cases(
     Ok(())
 }
 
-pub fn audit_query_exec_from_paths(manifest_dir: &Path) -> Result<()> {
-    let query_exec = manifest_dir.join("../api-server/src/query_exec.rs");
-    let registry = manifest_dir.join("../crates/stdb-auth/assets/resource_registry.json");
-    let allowlist = manifest_dir.join("../crates/stdb-auth/assets/query_exec_non_registry.json");
-
-    let query_exec_rs = fs::read_to_string(&query_exec)
-        .with_context(|| format!("read {}", query_exec.display()))?;
-    let registry_json =
-        fs::read_to_string(&registry).with_context(|| format!("read {}", registry.display()))?;
-    let allowlist_json =
-        fs::read_to_string(&allowlist).with_context(|| format!("read {}", allowlist.display()))?;
-
-    audit_query_exec_special_cases(&query_exec_rs, &registry_json, &allowlist_json)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::support::read_to_string;
     use std::path::PathBuf;
 
     fn manifest_dir() -> PathBuf {
@@ -157,7 +152,9 @@ mod tests {
 
     #[test]
     fn query_exec_early_arms_align_with_registry_allowlist() {
-        audit_query_exec_from_paths(&manifest_dir()).expect("query_exec audit");
+        let paths = Paths::resolve(&manifest_dir());
+        let registry_text = read_to_string(&paths.resource_registry_json).unwrap();
+        run(&paths, &registry_text).expect("query_exec audit");
     }
 
     #[test]

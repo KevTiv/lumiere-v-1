@@ -39,7 +39,7 @@
 use anyhow::{Context, Result};
 use serde_json::Value;
 
-use crate::schema_ir::{GeneratedTableSchema, GeneratedType, LumiereSchemaManifest};
+use crate::cold_tier::schema_ir::{GeneratedTableSchema, GeneratedType, LumiereSchemaManifest};
 
 /// Build the codec manifest for all archive-candidate tables.
 ///
@@ -194,7 +194,7 @@ fn api_json_repr(ty: &GeneratedType) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema_ir::*;
+    use crate::cold_tier::schema_ir::*;
 
     fn audit_log_manifest() -> LumiereSchemaManifest {
         LumiereSchemaManifest {

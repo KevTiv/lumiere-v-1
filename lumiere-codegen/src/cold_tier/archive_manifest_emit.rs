@@ -20,7 +20,7 @@
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
 
-use crate::schema_ir::LumiereSchemaManifest;
+use crate::cold_tier::schema_ir::LumiereSchemaManifest;
 
 /// Parse and validate `archive-candidates.json`, cross-reference with the schema
 /// manifest, and return the serialised archive manifest JSON string.
@@ -149,7 +149,7 @@ pub fn emit_archive_manifest(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema_ir::*;
+    use crate::cold_tier::schema_ir::*;
 
     fn minimal_manifest(table: &str) -> LumiereSchemaManifest {
         LumiereSchemaManifest {

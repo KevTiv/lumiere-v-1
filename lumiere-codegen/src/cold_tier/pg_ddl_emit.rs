@@ -34,7 +34,7 @@
 
 use anyhow::Result;
 
-use crate::schema_ir::{GeneratedTableSchema, GeneratedType, LumiereSchemaManifest};
+use crate::cold_tier::schema_ir::{GeneratedTableSchema, GeneratedType, LumiereSchemaManifest};
 
 /// Config for one archive candidate (from `archive-candidates.json`).
 #[derive(Debug)]
@@ -179,7 +179,7 @@ fn pg_type_for(ty: &GeneratedType) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema_ir::*;
+    use crate::cold_tier::schema_ir::*;
 
     fn audit_log_schema() -> GeneratedTableSchema {
         GeneratedTableSchema {

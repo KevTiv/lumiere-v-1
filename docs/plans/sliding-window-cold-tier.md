@@ -412,7 +412,7 @@ Configuration must distinguish local and production TLS modes and fail closed wh
 
 Phase 0 deliverables live in:
 
-- `lumiere-codegen/src/{schema_ir,stdb_bindings_parse,pg_ddl_emit,codec_emit,archive_manifest_emit,hydration_manifest_emit}.rs`
+- `lumiere-codegen/src/cold_tier/{schema_ir,stdb_bindings_parse,pg_ddl_emit,codec_emit,archive_manifest_emit,hydration_manifest_emit}.rs`
 - `api-server/src/cold_tier/{mod,conventions,cursor,pg_pool}.rs`
 - generated assets: `crates/stdb-auth/assets/{lumiere-schema-manifest,archive-manifest,codec-manifest,hydration-manifest}.json`
 - generated DDL: `api-server/src/generated/pg_ddl/cold_audit_log.sql`

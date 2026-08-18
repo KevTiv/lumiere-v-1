@@ -23,7 +23,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-use crate::schema_ir::{
+use crate::cold_tier::schema_ir::{
     GeneratedColumn, GeneratedEnumType, GeneratedIndex, GeneratedPrimaryKey, GeneratedTableSchema,
     GeneratedType, LumiereSchemaManifest,
 };

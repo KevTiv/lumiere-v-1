@@ -27,7 +27,7 @@
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
 
-use crate::schema_ir::LumiereSchemaManifest;
+use crate::cold_tier::schema_ir::LumiereSchemaManifest;
 
 /// Emit the validated hydration manifest JSON.
 ///
@@ -115,7 +115,7 @@ pub fn emit_hydration_manifest(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema_ir::*;
+    use crate::cold_tier::schema_ir::*;
 
     fn manifest_with(table: &str) -> LumiereSchemaManifest {
         LumiereSchemaManifest {
