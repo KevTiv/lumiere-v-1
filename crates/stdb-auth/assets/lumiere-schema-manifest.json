@@ -5605,7 +5605,7 @@
           "columns": [
             "run_id"
           ],
-          "unique": false
+          "unique": true
         }
       ]
     },
@@ -6626,7 +6626,7 @@
           "columns": [
             "environment_key"
           ],
-          "unique": false
+          "unique": true
         },
         {
           "name": "ai_skill_certification_environment_fixture_id",
@@ -6807,7 +6807,7 @@
           "columns": [
             "certification_request_id"
           ],
-          "unique": false
+          "unique": true
         },
         {
           "name": "ai_skill_certification_evidence_fixture_id",
@@ -6964,7 +6964,7 @@
           "columns": [
             "request_key"
           ],
-          "unique": false
+          "unique": true
         },
         {
           "name": "ai_skill_certification_request_skill_version_id",
@@ -7064,7 +7064,7 @@
           "columns": [
             "profile_key"
           ],
-          "unique": false
+          "unique": true
         }
       ]
     },
@@ -7236,7 +7236,7 @@
           "columns": [
             "fixture_key"
           ],
-          "unique": false
+          "unique": true
         },
         {
           "name": "ai_skill_fixture_organization_id",
@@ -7622,7 +7622,7 @@
           "columns": [
             "version_key"
           ],
-          "unique": false
+          "unique": true
         }
       ]
     },
@@ -13882,7 +13882,7 @@
           "columns": [
             "code"
           ],
-          "unique": false
+          "unique": true
         }
       ]
     },
@@ -15951,7 +15951,7 @@
           "name": "scheduled_at",
           "sql_name": "scheduled_at",
           "ty": {
-            "Struct": "__sdk::ScheduleAt"
+            "Struct": "ScheduleAt"
           },
           "nullable": false
         },
@@ -46308,7 +46308,7 @@
           "name": "scheduled_at",
           "sql_name": "scheduled_at",
           "ty": {
-            "Struct": "__sdk::ScheduleAt"
+            "Struct": "ScheduleAt"
           },
           "nullable": false
         },
@@ -48480,7 +48480,7 @@
           "columns": [
             "landed_cost_id"
           ],
-          "unique": false
+          "unique": true
         },
         {
           "name": "stock_landed_cost_application_organization_id",
@@ -52190,7 +52190,7 @@
           "columns": [
             "billing_run_key"
           ],
-          "unique": false
+          "unique": true
         },
         {
           "name": "subscription_billing_run_organization_id",
@@ -53082,7 +53082,7 @@
           "columns": [
             "idempotency_key"
           ],
-          "unique": false
+          "unique": true
         },
         {
           "name": "subscription_payment_intent_organization_id",
@@ -53643,7 +53643,7 @@
           "columns": [
             "idempotency_key"
           ],
-          "unique": false
+          "unique": true
         },
         {
           "name": "subscription_tax_settle_intent_organization_id",
@@ -53914,7 +53914,7 @@
           "columns": [
             "idempotency_key"
           ],
-          "unique": false
+          "unique": true
         },
         {
           "name": "subscription_usage_event_organization_id",
@@ -54465,7 +54465,7 @@
           "name": "scheduled_at",
           "sql_name": "scheduled_at",
           "ty": {
-            "Struct": "__sdk::ScheduleAt"
+            "Struct": "ScheduleAt"
           },
           "nullable": false
         },
@@ -55212,14 +55212,14 @@
           "columns": [
             "email"
           ],
-          "unique": false
+          "unique": true
         },
         {
           "name": "user_credential_identity",
           "columns": [
             "identity"
           ],
-          "unique": false
+          "unique": true
         }
       ]
     },

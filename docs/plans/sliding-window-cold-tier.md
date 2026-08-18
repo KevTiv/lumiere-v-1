@@ -398,7 +398,7 @@ Configuration must distinguish local and production TLS modes and fail closed wh
 
 ### Phase 0 — safety foundation
 
-- [x] Generate Rust client bindings for api-server from the SpacetimeDB module as part of the canonical codegen flow.
+- [x] Generate Rust client bindings for api-server from the SpacetimeDB module (manual step: `make generate-stdb-rust-sdk`, requires the SpacetimeDB CLI + a running module — not yet gated by `make check-codegen`, see note below).
 - [x] Add schema-IR extraction from generated Rust bindings.
 - [x] Generate PG DDL/codecs from schema IR.
 - [x] Add `ResourceReadPlan` and STDB/PG compilers.
@@ -418,7 +418,7 @@ Phase 0 deliverables live in:
 - generated DDL: `api-server/src/generated/pg_ddl/cold_audit_log.sql`
 - config: `lumiere-codegen/{archive-candidates,hydration-policies}.json`
 
-Note: `make generate-stdb-rust-sdk` regenerates `api-server/src/stdb_sdk_bindings/` (requires the SpacetimeDB CLI + module); `make codegen` then derives every downstream artifact from those bindings. `make check-codegen` fails on drift across the whole chain.
+Note: `make generate-stdb-rust-sdk` regenerates `api-server/src/stdb_sdk_bindings/` (requires the SpacetimeDB CLI + module); `make codegen` then derives every downstream artifact from those bindings. `make check-codegen` only verifies that the derived artifacts match the *currently committed* bindings — it does **not** re-run `generate-stdb-rust-sdk` against the live module, so it cannot catch drift between the deployed SpacetimeDB schema and the committed bindings. Whoever changes the module schema must run `make generate-stdb-rust-sdk && make codegen` and commit the result; this is not yet CI-enforced.
 
 ### Phase 1 — audit log cold path
 

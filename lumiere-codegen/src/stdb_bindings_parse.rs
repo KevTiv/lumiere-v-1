@@ -88,15 +88,18 @@ pub fn parse_bindings(bindings_dir: &Path) -> Result<LumiereSchemaManifest> {
             });
         }
 
-        // Indexes: every IxCol that is not the PK column becomes a non-unique
-        // B-tree index.  The PK already has its own unique constraint.
+        // Indexes: every IxCol that is not the PK column becomes a B-tree
+        // index.  The PK already has its own unique constraint; a column that
+        // also appears in a secondary `add_unique_constraint::<..>(...)` call
+        // (a `#[unique]` field) must keep its unique index instead of being
+        // downgraded to a plain non-unique one.
         let indexes: Vec<GeneratedIndex> = ix_col_names
             .iter()
             .filter(|col| *col != &info.pk_field)
             .map(|col| GeneratedIndex {
                 name: format!("{}_{}", info.sql_name, col),
                 columns: vec![col.clone()],
-                unique: false,
+                unique: info.secondary_unique_fields.contains(col),
             })
             .collect();
 
@@ -149,6 +152,11 @@ struct TableFileInfo {
     sql_name: String,
     pk_field: String,
     pk_type_str: String,
+    /// Field names from every `add_unique_constraint::<..>("field", ...)` call
+    /// after the first (the first is the primary key, captured in `pk_field`).
+    /// These correspond to `#[unique]` columns and must produce a unique index,
+    /// not a plain B-tree index.
+    secondary_unique_fields: Vec<String>,
 }
 
 pub(crate) enum TypeKind {
@@ -348,6 +356,26 @@ fn parse_table_file_src(src: &str, file_name: &str) -> Result<TableFileInfo> {
         .with_context(|| format!("'{}': missing closing '\"' for pk_field", file_name))?;
     let pk_field = after_q1_uq[..q2_uq].to_string();
 
+    // ── extract every subsequent add_unique_constraint::<..>("field", ...) ──
+    // These are `#[unique]` columns beyond the primary key; each must produce
+    // a *unique* index in the generated PG DDL, not a plain B-tree index.
+    let mut secondary_unique_fields: Vec<String> = Vec::new();
+    let mut scan_from = pos_uq + marker_uq.len();
+    while let Some(rel) = src[scan_from..].find(marker_uq) {
+        let pos = scan_from + rel;
+        let after = &src[pos + marker_uq.len()..];
+        let Some(gt) = after.find('>') else { break };
+        let after_gt = &after[gt + 1..];
+        let Some(q1) = after_gt.find('"') else { break };
+        let after_q1 = &after_gt[q1 + 1..];
+        let Some(q2) = after_q1.find('"') else { break };
+        let field = after_q1[..q2].to_string();
+        if !field.is_empty() && field != pk_field {
+            secondary_unique_fields.push(field);
+        }
+        scan_from = pos + marker_uq.len();
+    }
+
     if rust_type_name.is_empty() || sql_name.is_empty() || pk_field.is_empty() {
         bail!(
             "'{}': extracted empty value (rust_name='{}', sql='{}', pk='{}')",
@@ -369,6 +397,7 @@ fn parse_table_file_src(src: &str, file_name: &str) -> Result<TableFileInfo> {
         sql_name,
         pk_field,
         pk_type_str,
+        secondary_unique_fields,
     })
 }
 
@@ -563,7 +592,10 @@ pub fn strip_option(type_str: &str) -> (bool, &str) {
 ///
 /// Unrecognised type names are resolved against `kind_map`:
 /// - known `Enum` → `GeneratedType::Enum`
-/// - everything else → `GeneratedType::Struct`
+/// - known `Struct` → `GeneratedType::Struct`
+/// - absent from `kind_map` → an error (see the `None` arm below); this is
+///   never a struct-shaped guess, so an SDK type that isn't a user-defined
+///   struct/enum (e.g. `__sdk::ScheduleAt`) must be listed explicitly here.
 pub fn parse_type_str(s: &str, kind_map: &BTreeMap<String, TypeKind>) -> Result<GeneratedType> {
     let s = s.trim();
     match s {
@@ -581,6 +613,10 @@ pub fn parse_type_str(s: &str, kind_map: &BTreeMap<String, TypeKind>) -> Result<
         "String" => return Ok(GeneratedType::String),
         "__sdk::Identity" => return Ok(GeneratedType::Identity),
         "__sdk::Timestamp" => return Ok(GeneratedType::Timestamp),
+        // Scheduled-reducer marker (`enum ScheduleAt { Time(Timestamp), Interval(TimeDuration) }`
+        // in the SDK). Not a user struct/enum in kind_map, so it must be named
+        // here explicitly; encoded the same way a Struct would be (JSONB).
+        "__sdk::ScheduleAt" => return Ok(GeneratedType::Struct("ScheduleAt".to_string())),
         _ => {}
     }
 
@@ -600,10 +636,18 @@ pub fn parse_type_str(s: &str, kind_map: &BTreeMap<String, TypeKind>) -> Result<
         return parse_type_str(inner, kind_map);
     }
 
-    // User-defined type — check kind map.
+    // User-defined type — check kind map.  A name absent from the map is a
+    // scan gap (module not indexed, typo, or new generator output shape), not
+    // evidence of a struct — treat it as an error rather than silently
+    // guessing JSONB, since a wrong guess here produces PG DDL/codecs that
+    // diverge from the real STDB representation with no build-time signal.
     match kind_map.get(s) {
         Some(TypeKind::Enum { .. }) => Ok(GeneratedType::Enum(s.to_string())),
-        Some(TypeKind::Struct) | None => Ok(GeneratedType::Struct(s.to_string())),
+        Some(TypeKind::Struct) => Ok(GeneratedType::Struct(s.to_string())),
+        None => bail!(
+            "unrecognized type '{}': not found among scanned *_type.rs struct/enum definitions",
+            s
+        ),
     }
 }
 

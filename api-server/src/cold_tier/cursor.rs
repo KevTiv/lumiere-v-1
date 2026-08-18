@@ -90,63 +90,62 @@ pub fn decode_cursor(cursor: &str, order: &[ReadOrder]) -> Result<Vec<ScalarValu
 /// key the fragment is `col < $n` (DESC) or `col > $n` (ASC).  Multi-key
 /// cursors use a row-value comparison `(col1, col2) < ($n, $m)`.
 ///
-/// `placeholder` is a function that maps a 1-based bind index to a SQL
-/// placeholder string (e.g. `$1` for PG or `?` for STDB).  This keeps the
-/// cursor logic independent of the store-specific placeholder style.
-pub fn cursor_predicate<F>(
+/// `placeholder` maps a 1-based bind index to a SQL placeholder string (e.g.
+/// `$1` for PG or `?` for STDB).  `quote_col` quotes a column identifier for
+/// the target store (e.g. `"col"` for PG or `` `col` `` for STDB).  Both are
+/// injected so this stays independent of the store-specific syntax.
+pub fn cursor_predicate<F, Q>(
     order: &[ReadOrder],
     cursor_values: &[ScalarValue],
     placeholder: F,
-) -> (String, Vec<ScalarValue>)
+    quote_col: Q,
+) -> Result<(String, Vec<ScalarValue>), CursorError>
 where
     F: Fn(usize) -> String,
+    Q: Fn(&str) -> String,
 {
-    if order.len() != cursor_values.len() || order.is_empty() {
-        return (String::new(), Vec::new());
+    if order.is_empty() {
+        return Err(CursorError::EmptyOrder);
+    }
+    if order.len() != cursor_values.len() {
+        return Err(CursorError::LengthMismatch {
+            expected: order.len(),
+            actual: cursor_values.len(),
+        });
     }
 
     let binds: Vec<ScalarValue> = cursor_values.to_vec();
 
     if order.len() == 1 {
-        let col = &order[0].column;
+        let col = quote_col(&order[0].column);
         let op = match order[0].direction {
             OrderDirection::Desc => "<",
             OrderDirection::Asc => ">",
         };
         let p = placeholder(1);
-        return (format!("{col} {op} {p}"), binds);
+        return Ok((format!("{col} {op} {p}"), binds));
     }
 
     // Multi-key: row-value comparison (col1, col2, ...) < ($1, $2, ...).
-    // Both STDB SQL and Postgres support row-value comparisons.
-    let cols: Vec<String> = order.iter().map(|o| o.column.clone()).collect();
-    let dirs: Vec<String> = order
-        .iter()
-        .map(|o| match o.direction {
-            OrderDirection::Desc => "DESC".to_string(),
-            OrderDirection::Asc => "ASC".to_string(),
-        })
-        .collect();
-    let placeholders: Vec<String> = (1..=order.len()).map(|i| placeholder(i)).collect();
-
-    // For a multi-key cursor we use the standard row comparison.  Note that
-    // row comparison with mixed ASC/DESC is only correct when all directions
-    // agree; the read-plan resolver must append a deterministic tie-breaker.
+    // Both STDB SQL and Postgres support row-value comparisons, but a single
+    // operator only compares correctly when every key sorts the same
+    // direction — a mixed-direction row comparison would silently pick the
+    // wrong rows, so reject it instead of guessing.  The read-plan resolver
+    // must append a same-direction tie-breaker (typically the primary key).
     let all_desc = order.iter().all(|o| o.direction == OrderDirection::Desc);
     let all_asc = order.iter().all(|o| o.direction == OrderDirection::Asc);
-    let op = if all_desc {
-        "<"
-    } else if all_asc {
-        ">"
-    } else {
-        "<"
-    };
+    if !all_desc && !all_asc {
+        return Err(CursorError::MixedDirection);
+    }
+    let op = if all_desc { "<" } else { ">" };
 
-    let _ = dirs; // suppressed: documented limitation above
-    (
+    let cols: Vec<String> = order.iter().map(|o| quote_col(&o.column)).collect();
+    let placeholders: Vec<String> = (1..=order.len()).map(|i| placeholder(i)).collect();
+
+    Ok((
         format!("({}) {op} ({})", cols.join(", "), placeholders.join(", ")),
         binds,
-    )
+    ))
 }
 
 /// Errors that can occur while decoding a cursor.
@@ -164,40 +163,50 @@ pub enum CursorError {
     /// A cursor value has an unsupported scalar type.
     #[error("cursor value has an unsupported scalar type")]
     UnsupportedScalar,
+    /// A multi-key cursor's order columns don't all sort the same direction,
+    /// so a single row-value comparison operator can't express it correctly.
+    #[error("multi-key cursor requires all order columns to share one sort direction")]
+    MixedDirection,
 }
 
+// Each scalar is tagged with its variant so decoding never has to guess a
+// type from the JSON shape alone — e.g. a Text value that happens to look
+// like a number (`"007"`) must not be reinterpreted as U64 on decode.
 fn scalar_to_json(v: &ScalarValue) -> Value {
     match v {
         ScalarValue::U64(n) => {
             // u64 may exceed JSON's safe integer range; encode as a decimal
             // string so the round-trip is lossless (matches the API JSON
             // representation for U64 columns).
-            Value::String(n.to_string())
+            serde_json::json!({ "u64": n.to_string() })
         }
-        ScalarValue::I64(n) => Value::Number((*n).into()),
-        ScalarValue::Text(s) => Value::String(s.clone()),
-        ScalarValue::Bool(b) => Value::Bool(*b),
+        ScalarValue::I64(n) => serde_json::json!({ "i64": n }),
+        ScalarValue::Text(s) => serde_json::json!({ "text": s }),
+        ScalarValue::Bool(b) => serde_json::json!({ "bool": b }),
     }
 }
 
 fn json_to_scalar(v: &Value) -> Result<ScalarValue, CursorError> {
-    match v {
-        Value::String(s) => {
-            // Strings may be u64-as-string (lossless) or genuine text.  Try
-            // u64 first so encoded id cursors round-trip as U64.
-            if let Ok(n) = s.parse::<u64>() {
-                Ok(ScalarValue::U64(n))
-            } else {
-                Ok(ScalarValue::Text(s.clone()))
-            }
-        }
-        Value::Number(n) => n
+    let obj = v.as_object().ok_or(CursorError::UnsupportedScalar)?;
+    if let Some(Value::String(s)) = obj.get("u64") {
+        return s
+            .parse::<u64>()
+            .map(ScalarValue::U64)
+            .map_err(|_| CursorError::UnsupportedScalar);
+    }
+    if let Some(n) = obj.get("i64") {
+        return n
             .as_i64()
             .map(ScalarValue::I64)
-            .ok_or(CursorError::UnsupportedScalar),
-        Value::Bool(b) => Ok(ScalarValue::Bool(*b)),
-        _ => Err(CursorError::UnsupportedScalar),
+            .ok_or(CursorError::UnsupportedScalar);
     }
+    if let Some(Value::String(s)) = obj.get("text") {
+        return Ok(ScalarValue::Text(s.clone()));
+    }
+    if let Some(Value::Bool(b)) = obj.get("bool") {
+        return Ok(ScalarValue::Bool(*b));
+    }
+    Err(CursorError::UnsupportedScalar)
 }
 
 // ---------------------------------------------------------------------------
@@ -282,7 +291,8 @@ mod tests {
     fn cursor_predicate_single_key_desc() {
         let order = order_id_desc();
         let values = vec![ScalarValue::U64(100)];
-        let (frag, binds) = cursor_predicate(&order, &values, |i| format!("${i}"));
+        let (frag, binds) =
+            cursor_predicate(&order, &values, |i| format!("${i}"), |c| c.to_string()).unwrap();
         assert_eq!(frag, "id < $1");
         assert_eq!(binds.len(), 1);
         assert!(matches!(binds[0], ScalarValue::U64(100)));
@@ -294,15 +304,27 @@ mod tests {
             column: "id".into(),
             direction: OrderDirection::Asc,
         }];
-        let (frag, _) = cursor_predicate(&order, &[ScalarValue::U64(100)], |i| format!("${i}"));
+        let (frag, _) = cursor_predicate(
+            &order,
+            &[ScalarValue::U64(100)],
+            |i| format!("${i}"),
+            |c| c.to_string(),
+        )
+        .unwrap();
         assert_eq!(frag, "id > $1");
     }
 
     #[test]
     fn cursor_predicate_stdb_question_mark() {
         let order = order_id_desc();
-        let (frag, _) = cursor_predicate(&order, &[ScalarValue::U64(100)], |_| "?".into());
-        assert_eq!(frag, "id < ?");
+        let (frag, _) = cursor_predicate(
+            &order,
+            &[ScalarValue::U64(100)],
+            |_| "?".into(),
+            |c| format!("`{c}`"),
+        )
+        .unwrap();
+        assert_eq!(frag, "`id` < ?");
     }
 
     #[test]
@@ -318,8 +340,39 @@ mod tests {
             },
         ];
         let values = vec![ScalarValue::I64(123), ScalarValue::U64(456)];
-        let (frag, binds) = cursor_predicate(&order, &values, |i| format!("${i}"));
+        let (frag, binds) =
+            cursor_predicate(&order, &values, |i| format!("${i}"), |c| c.to_string()).unwrap();
         assert_eq!(frag, "(created_at, id) < ($1, $2)");
         assert_eq!(binds.len(), 2);
+    }
+
+    #[test]
+    fn cursor_predicate_mixed_direction_is_an_error() {
+        let order = vec![
+            ReadOrder {
+                column: "created_at".into(),
+                direction: OrderDirection::Asc,
+            },
+            ReadOrder {
+                column: "id".into(),
+                direction: OrderDirection::Desc,
+            },
+        ];
+        let values = vec![ScalarValue::I64(123), ScalarValue::U64(456)];
+        let err =
+            cursor_predicate(&order, &values, |i| format!("${i}"), |c| c.to_string()).unwrap_err();
+        assert!(matches!(err, CursorError::MixedDirection));
+    }
+
+    #[test]
+    fn text_value_that_looks_numeric_round_trips_as_text() {
+        let order = vec![ReadOrder {
+            column: "ref_code".into(),
+            direction: OrderDirection::Desc,
+        }];
+        let values = vec![ScalarValue::Text("007".into())];
+        let cursor = encode_cursor(&order, &values).unwrap();
+        let decoded = decode_cursor(&cursor, &order).unwrap();
+        assert!(matches!(&decoded[0], ScalarValue::Text(s) if s == "007"));
     }
 }

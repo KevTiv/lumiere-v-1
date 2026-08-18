@@ -124,11 +124,14 @@ impl PageSpec {
 /// Compile a [`ResourceReadPlan`] into a SpacetimeDB SQL fragment.
 ///
 /// Returns `(sql_text, bind_values)` where bind values are positional (`$1`,
-/// `$2`, …) in the same order as the returned vec.
+/// `$2`, …) in the same order as the returned vec.  Errors if `plan.page.cursor`
+/// is set but malformed, or doesn't decode against `plan.order`.
 ///
 /// Phase 0: skeleton only — full implementation comes in Phase 1 alongside the
 /// audit-log read-path migration.
-pub fn compile_stdb_sql(plan: &ResourceReadPlan) -> (String, Vec<ScalarValue>) {
+pub fn compile_stdb_sql(
+    plan: &ResourceReadPlan,
+) -> Result<(String, Vec<ScalarValue>), cursor::CursorError> {
     compile_sql(plan, QuotingStyle::StdbBacktick)
 }
 
@@ -137,7 +140,9 @@ pub fn compile_stdb_sql(plan: &ResourceReadPlan) -> (String, Vec<ScalarValue>) {
 /// Returns `(sql_text, bind_values)` — same contract as [`compile_stdb_sql`].
 ///
 /// Phase 0: skeleton only — full implementation comes in Phase 1.
-pub fn compile_pg_sql(plan: &ResourceReadPlan) -> (String, Vec<ScalarValue>) {
+pub fn compile_pg_sql(
+    plan: &ResourceReadPlan,
+) -> Result<(String, Vec<ScalarValue>), cursor::CursorError> {
     compile_sql(plan, QuotingStyle::PgDollar)
 }
 
@@ -149,24 +154,65 @@ enum QuotingStyle {
     PgDollar,
 }
 
-fn compile_sql(plan: &ResourceReadPlan, style: QuotingStyle) -> (String, Vec<ScalarValue>) {
+/// Quote a table/column identifier for the given store, doubling any embedded
+/// quote character so a crafted identifier can't break out of the quoted
+/// context and inject SQL — matching the safety `QuotingStyle` documents.
+fn quote_ident(name: &str, style: QuotingStyle) -> String {
+    match style {
+        QuotingStyle::StdbBacktick => format!("`{}`", name.replace('`', "``")),
+        QuotingStyle::PgDollar => format!("\"{}\"", name.replace('"', "\"\"")),
+    }
+}
+
+fn compile_sql(
+    plan: &ResourceReadPlan,
+    style: QuotingStyle,
+) -> Result<(String, Vec<ScalarValue>), cursor::CursorError> {
     let mut binds: Vec<ScalarValue> = Vec::new();
 
     // SELECT
-    let cols = plan.projection.join(", ");
-    let mut sql = format!("SELECT {cols} FROM {table}", table = plan.table);
+    let cols = plan
+        .projection
+        .iter()
+        .map(|c| quote_ident(c, style))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let mut sql = format!(
+        "SELECT {cols} FROM {table}",
+        table = quote_ident(&plan.table, style)
+    );
 
     // WHERE
     let mut conditions: Vec<String> = Vec::new();
 
     // Mandatory org scope — always first.
     let org_bind = push_bind(&mut binds, ScalarValue::U64(plan.organization_id), style);
-    conditions.push(format!("organization_id = {org_bind}"));
+    conditions.push(format!(
+        "{} = {org_bind}",
+        quote_ident("organization_id", style)
+    ));
 
     // Optional company scope.
     if let Some(company_id) = plan.company_id {
         let co_bind = push_bind(&mut binds, ScalarValue::U64(company_id), style);
-        conditions.push(format!("company_id = {co_bind}"));
+        conditions.push(format!("{} = {co_bind}", quote_ident("company_id", style)));
+    }
+
+    // Keyset cursor — resumes after the last row of the previous page.
+    if let Some(cursor_str) = &plan.page.cursor {
+        let cursor_values = cursor::decode_cursor(cursor_str, &plan.order)?;
+        let base = binds.len();
+        let (frag, cursor_binds) = cursor::cursor_predicate(
+            &plan.order,
+            &cursor_values,
+            |i| match style {
+                QuotingStyle::StdbBacktick => "?".to_string(),
+                QuotingStyle::PgDollar => format!("${}", base + i),
+            },
+            |col| quote_ident(col, style),
+        )?;
+        conditions.push(frag);
+        binds.extend(cursor_binds);
     }
 
     // Additional predicates.
@@ -189,7 +235,7 @@ fn compile_sql(plan: &ResourceReadPlan, style: QuotingStyle) -> (String, Vec<Sca
                     OrderDirection::Asc => "ASC",
                     OrderDirection::Desc => "DESC",
                 };
-                format!("{} {dir}", o.column)
+                format!("{} {dir}", quote_ident(&o.column, style))
             })
             .collect::<Vec<_>>()
             .join(", ");
@@ -200,7 +246,7 @@ fn compile_sql(plan: &ResourceReadPlan, style: QuotingStyle) -> (String, Vec<Sca
     // LIMIT
     sql.push_str(&format!(" LIMIT {}", plan.page.limit));
 
-    (sql, binds)
+    Ok((sql, binds))
 }
 
 fn compile_predicate(
@@ -211,25 +257,32 @@ fn compile_predicate(
     match pred {
         ReadPredicate::Eq { column, value } => {
             let b = push_bind(binds, value.clone(), style);
-            format!("{column} = {b}")
+            format!("{} = {b}", quote_ident(column, style))
         }
-        ReadPredicate::IsNull { column } => format!("{column} IS NULL"),
-        ReadPredicate::IsNotNull { column } => format!("{column} IS NOT NULL"),
+        ReadPredicate::IsNull { column } => format!("{} IS NULL", quote_ident(column, style)),
+        ReadPredicate::IsNotNull { column } => {
+            format!("{} IS NOT NULL", quote_ident(column, style))
+        }
         ReadPredicate::Gte { column, value } => {
             let b = push_bind(binds, value.clone(), style);
-            format!("{column} >= {b}")
+            format!("{} >= {b}", quote_ident(column, style))
         }
         ReadPredicate::Lte { column, value } => {
             let b = push_bind(binds, value.clone(), style);
-            format!("{column} <= {b}")
+            format!("{} <= {b}", quote_ident(column, style))
         }
         ReadPredicate::In { column, values } => {
+            if values.is_empty() {
+                // No values can match; `column IN ()` is invalid SQL, so
+                // compile the empty case to a predicate that is always false.
+                return "FALSE".to_string();
+            }
             let placeholders = values
                 .iter()
                 .map(|v| push_bind(binds, v.clone(), style))
                 .collect::<Vec<_>>()
                 .join(", ");
-            format!("{column} IN ({placeholders})")
+            format!("{} IN ({placeholders})", quote_ident(column, style))
         }
         ReadPredicate::Or(left, right) => {
             let l = compile_predicate(left, binds, style);
@@ -242,7 +295,7 @@ fn compile_predicate(
 fn push_bind(binds: &mut Vec<ScalarValue>, value: ScalarValue, style: QuotingStyle) -> String {
     binds.push(value);
     match style {
-        QuotingStyle::StdbBacktick => format!("?"),
+        QuotingStyle::StdbBacktick => "?".to_string(),
         QuotingStyle::PgDollar => format!("${}", binds.len()),
     }
 }
@@ -277,9 +330,9 @@ mod tests {
     #[test]
     fn pg_sql_contains_org_scope() {
         let plan = audit_plan();
-        let (sql, binds) = compile_pg_sql(&plan);
-        assert!(sql.contains("organization_id = $1"), "SQL: {sql}");
-        assert!(sql.contains("company_id = $2"), "SQL: {sql}");
+        let (sql, binds) = compile_pg_sql(&plan).unwrap();
+        assert!(sql.contains("\"organization_id\" = $1"), "SQL: {sql}");
+        assert!(sql.contains("\"company_id\" = $2"), "SQL: {sql}");
         assert!(matches!(binds[0], ScalarValue::U64(42)));
         assert!(matches!(binds[1], ScalarValue::U64(7)));
     }
@@ -287,16 +340,16 @@ mod tests {
     #[test]
     fn pg_sql_contains_order_and_limit() {
         let plan = audit_plan();
-        let (sql, _) = compile_pg_sql(&plan);
-        assert!(sql.contains("ORDER BY id DESC"), "SQL: {sql}");
+        let (sql, _) = compile_pg_sql(&plan).unwrap();
+        assert!(sql.contains("ORDER BY \"id\" DESC"), "SQL: {sql}");
         assert!(sql.contains("LIMIT 500"), "SQL: {sql}");
     }
 
     #[test]
     fn stdb_sql_uses_question_mark_placeholders() {
         let plan = audit_plan();
-        let (sql, _) = compile_stdb_sql(&plan);
-        assert!(sql.contains("organization_id = ?"), "SQL: {sql}");
+        let (sql, _) = compile_stdb_sql(&plan).unwrap();
+        assert!(sql.contains("`organization_id` = ?"), "SQL: {sql}");
     }
 
     #[test]
@@ -311,10 +364,43 @@ mod tests {
                 value: ScalarValue::U64(7),
             }),
         ));
-        let (sql, _) = compile_pg_sql(&plan);
+        let (sql, _) = compile_pg_sql(&plan).unwrap();
         assert!(
-            sql.contains("(company_id IS NULL OR company_id ="),
+            sql.contains("(\"company_id\" IS NULL OR \"company_id\" ="),
             "SQL: {sql}"
         );
+    }
+
+    #[test]
+    fn in_predicate_with_empty_values_compiles_to_false() {
+        let mut plan = audit_plan();
+        plan.predicates.push(ReadPredicate::In {
+            column: "company_id".into(),
+            values: vec![],
+        });
+        let (sql, _) = compile_pg_sql(&plan).unwrap();
+        assert!(sql.contains("AND FALSE"), "SQL: {sql}");
+    }
+
+    #[test]
+    fn cursor_applies_keyset_predicate() {
+        let mut plan = audit_plan();
+        let cursor = cursor::encode_cursor(&plan.order, &[ScalarValue::U64(100)]).unwrap();
+        plan.page.cursor = Some(cursor);
+        let (sql, binds) = compile_pg_sql(&plan).unwrap();
+        assert!(sql.contains("\"id\" < $3"), "SQL: {sql}");
+        assert!(matches!(binds[2], ScalarValue::U64(100)));
+    }
+
+    #[test]
+    fn malformed_cursor_is_rejected() {
+        let mut plan = audit_plan();
+        plan.page.cursor = Some("not-a-valid-cursor!!".into());
+        assert!(compile_pg_sql(&plan).is_err());
+    }
+
+    #[test]
+    fn quoted_identifier_neutralizes_embedded_quote() {
+        assert_eq!(quote_ident(r#"a"b"#, QuotingStyle::PgDollar), "\"a\"\"b\"");
     }
 }
