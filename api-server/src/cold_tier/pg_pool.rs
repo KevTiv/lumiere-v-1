@@ -24,6 +24,7 @@
 //! | `PG_POOL_MAX` | `10` | no |
 //! | `PG_CONNECT_TIMEOUT_SECS` | `10` | no |
 
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
@@ -183,6 +184,34 @@ fn rustls_config() -> Result<rustls::ClientConfig> {
     Ok(rustls::ClientConfig::builder()
         .with_root_certificates(roots)
         .with_no_client_auth())
+}
+
+/// Process-wide cold-tier PG pool, built lazily on first use.
+///
+/// Reads used by resource read paths (e.g. the audit-log merge in
+/// `cold_tier::audit_read`) call this instead of threading a pool through
+/// every `execute_resource_query*` call site — those call sites serve ~40
+/// resources and only one currently needs PG.
+///
+/// If `PgConfig::from_env()`/`build_pool` fails (PG not configured, or a
+/// production TLS misconfiguration), this logs once and returns `None`
+/// forever for the life of the process — callers must treat that as "cold
+/// tier unavailable, hot-only" per the plan's failure-behavior table, not as
+/// a fatal error. This deliberately does not fail process startup: the cold
+/// tier is opt-in infrastructure that may not exist yet in a given
+/// environment (see `docs/plans/audit-log-cold-by-default.md`).
+static SHARED_POOL: OnceLock<Option<Pool>> = OnceLock::new();
+
+pub fn shared_pool() -> Option<&'static Pool> {
+    SHARED_POOL
+        .get_or_init(|| match PgConfig::from_env().and_then(|cfg| build_pool(&cfg)) {
+            Ok(pool) => Some(pool),
+            Err(error) => {
+                tracing::warn!(%error, "cold-tier PG pool unavailable; cold reads will be hot-only");
+                None
+            }
+        })
+        .as_ref()
 }
 
 // ---------------------------------------------------------------------------

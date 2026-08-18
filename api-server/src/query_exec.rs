@@ -1454,16 +1454,7 @@ pub async fn execute_resource_query_for_company(
                 .map_err(|e| ApiError::Internal(e.to_string()));
         }
         "audit-log" => {
-            let sql = format!(
-                "SELECT id, organization_id, company_id, table_name, record_id, action, old_values, new_values, session_id, ip_address, user_agent, timestamp FROM audit_log WHERE organization_id = {organization_id}"
-            );
-            let mut rows = client
-                .query_sql(&sql)
-                .await
-                .map_err(|e| ApiError::Internal(e.to_string()))?;
-            sort_rows_by_id_desc(&mut rows);
-            rows.truncate(500);
-            return Ok(rows);
+            return crate::cold_tier::audit_read::merged_rows(client, organization_id).await;
         }
         "audit-rules" => {
             let sql = format!(

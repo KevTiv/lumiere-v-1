@@ -39,6 +39,7 @@ use stdb_client::StdbClient;
 
 use super::{conventions, ledger, migrate, pg_pool};
 use crate::config::Config;
+use crate::metrics;
 use crate::state::AppState;
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -82,7 +83,10 @@ pub async fn drain_batch(stdb: &StdbClient, pool: &Pool, batch_size: u32) -> Res
                 ip_address, user_agent, timestamp, metadata \
          FROM audit_log ORDER BY id ASC LIMIT {batch_size}"
     );
-    let raw_rows = stdb.query_sql(&sql).await.context("query audit_log batch")?;
+    let raw_rows = stdb
+        .query_sql(&sql)
+        .await
+        .context("query audit_log batch")?;
 
     let mut stats = DrainStats {
         read: raw_rows.len(),
@@ -109,21 +113,49 @@ pub async fn drain_batch(stdb: &StdbClient, pool: &Pool, batch_size: u32) -> Res
 
 /// Drain one row through UPSERT → ledger → finalize → mark. Returns whether
 /// the STDB row was finalized (deleted) this call.
+///
+/// Metrics are recorded at the point each stage actually succeeds/fails,
+/// not inferred from this function's overall `Result` — a `record_transfer`
+/// or `mark_finalized` failure after the row is already durably in PG (and,
+/// for the latter, already finalized) is a bookkeeping miss, not a forward
+/// or finalize failure, so it's logged but doesn't flip this row to
+/// "failed" in [`DrainStats`].
 async fn drain_one(pool: &Pool, stdb: &StdbClient, raw: &Value) -> Result<bool> {
     let row = parse_audit_row(raw)?;
 
-    upsert_cold_audit_log(pool, &row).await?;
-    ledger::record_transfer(pool, "audit_log", &row.id, &row.organization_id, 1, &row.checksum)
-        .await?;
+    if let Err(error) = upsert_cold_audit_log(pool, &row).await {
+        metrics::inc_audit_cold_forward_failure();
+        return Err(error).context("upsert cold_audit_log");
+    }
+    metrics::inc_audit_cold_forwarded();
 
-    stdb.call_reducer(
-        "finalize_audit_log_archive",
-        json!([row.id_u64, row.checksum]),
+    if let Err(error) = ledger::record_transfer(
+        pool,
+        "audit_log",
+        &row.id,
+        &row.organization_id,
+        1,
+        &row.checksum,
     )
     .await
-    .context("call finalize_audit_log_archive")?;
+    {
+        tracing::error!(%error, id = %row.id, "audit cold drain: record_transfer failed after successful upsert");
+    }
 
-    ledger::mark_finalized(pool, "audit_log", &row.id).await?;
+    if let Err(error) = stdb
+        .call_reducer(
+            "finalize_audit_log_archive",
+            json!([row.id_u64, row.checksum]),
+        )
+        .await
+    {
+        metrics::inc_audit_cold_finalize_failure();
+        return Err(error).context("call finalize_audit_log_archive");
+    }
+
+    if let Err(error) = ledger::mark_finalized(pool, "audit_log", &row.id).await {
+        tracing::error!(%error, id = %row.id, "audit cold drain: mark_finalized failed after successful finalize");
+    }
 
     Ok(true)
 }
@@ -297,21 +329,33 @@ fn require_string(row: &Value, field: &str) -> Result<String> {
     row.get(field)
         .and_then(|v| v.as_str())
         .map(str::to_string)
-        .ok_or_else(|| anyhow!("audit_log.{field}: expected string, got {:?}", row.get(field)))
+        .ok_or_else(|| {
+            anyhow!(
+                "audit_log.{field}: expected string, got {:?}",
+                row.get(field)
+            )
+        })
 }
 
 fn optional_string(row: &Value, field: &str) -> Result<Option<String>> {
     match row.get(field) {
         None | Some(Value::Null) => Ok(None),
         Some(Value::String(s)) => Ok(Some(s.clone())),
-        Some(other) => Err(anyhow!("audit_log.{field}: expected string or null, got {other}")),
+        Some(other) => Err(anyhow!(
+            "audit_log.{field}: expected string or null, got {other}"
+        )),
     }
 }
 
 fn changed_fields_array(row: &Value, field: &str) -> Result<Vec<String>> {
     row.get(field)
         .and_then(|v| v.as_array())
-        .ok_or_else(|| anyhow!("audit_log.{field}: expected array, got {:?}", row.get(field)))?
+        .ok_or_else(|| {
+            anyhow!(
+                "audit_log.{field}: expected array, got {:?}",
+                row.get(field)
+            )
+        })?
         .iter()
         .map(|el| {
             el.as_str()
@@ -355,12 +399,16 @@ fn identity_hex_and_bytes(row: &Value, field: &str) -> Result<(String, Vec<u8>)>
                 anyhow::bail!("audit_log.{field}: expected 64 hex chars, got '{s}'");
             }
             let lower = stripped.to_ascii_lowercase();
-            let bytes = hex::decode(&lower).with_context(|| format!("audit_log.{field}: hex decode"))?;
+            let bytes =
+                hex::decode(&lower).with_context(|| format!("audit_log.{field}: hex decode"))?;
             Ok((lower, bytes))
         }
         Value::Array(arr) => {
             if arr.len() != 32 {
-                anyhow::bail!("audit_log.{field}: expected 32-byte array, got len {}", arr.len());
+                anyhow::bail!(
+                    "audit_log.{field}: expected 32-byte array, got len {}",
+                    arr.len()
+                );
             }
             let mut bytes = Vec::with_capacity(32);
             for el in arr {
@@ -374,6 +422,43 @@ fn identity_hex_and_bytes(row: &Value, field: &str) -> Result<(String, Vec<u8>)>
         }
         other => anyhow::bail!("audit_log.{field}: expected hex string or byte array, got {other}"),
     }
+}
+
+/// Undrained-row count is capped at this probe limit — `audit_log` has no
+/// STDB SQL `COUNT(*)`/aggregate support to rely on (SpacetimeDB's SQL
+/// subset is intentionally minimal: select/where/order/limit, no
+/// aggregates), so this reads as "at least N rows, N ≤ cap", not an exact
+/// count. Still useful for alerting: a probe that keeps returning the cap
+/// means the drainer is falling behind.
+const BACKLOG_PROBE_LIMIT: u32 = 10_000;
+
+/// Probe the undrained `audit_log` backlog and publish
+/// `audit_cold_backlog_rows` / `audit_cold_oldest_row_seconds`.
+async fn update_backlog_metrics(stdb: &StdbClient) -> Result<()> {
+    let rows = stdb
+        .query_sql(&format!(
+            "SELECT timestamp FROM audit_log ORDER BY id ASC LIMIT {BACKLOG_PROBE_LIMIT}"
+        ))
+        .await
+        .context("audit backlog probe query")?;
+
+    metrics::set_audit_cold_backlog_rows(rows.len() as u64);
+
+    let oldest_micros = rows
+        .first()
+        .and_then(|r| timestamp_micros_i64(r, "timestamp").ok());
+    if let Some(oldest_micros) = oldest_micros {
+        let now_micros = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_micros() as i64;
+        let age_seconds = ((now_micros - oldest_micros).max(0) / 1_000_000) as u64;
+        metrics::set_audit_cold_oldest_row_seconds(age_seconds);
+    } else {
+        metrics::set_audit_cold_oldest_row_seconds(0);
+    }
+
+    Ok(())
 }
 
 /// Start the standalone audit-cold-drainer service: PG schema check, then a
@@ -414,9 +499,11 @@ pub async fn serve() -> Result<()> {
     let worker_pool = pool.clone();
     tokio::spawn(async move {
         loop {
+            let started = std::time::Instant::now();
             match drain_batch(&worker_state.stdb, &worker_pool, batch).await {
                 Ok(stats) => {
                     worker_ready.store(true, Ordering::Relaxed);
+                    metrics::set_audit_cold_batch_duration_seconds(started.elapsed().as_secs_f64());
                     if stats.read > 0 {
                         tracing::info!(
                             read = stats.read,
@@ -432,6 +519,11 @@ pub async fn serve() -> Result<()> {
                     tracing::error!(%error, "audit cold drainer: batch query failed");
                 }
             }
+
+            if let Err(error) = update_backlog_metrics(&worker_state.stdb).await {
+                tracing::warn!(%error, "audit cold drainer: backlog probe failed");
+            }
+
             tokio::time::sleep(Duration::from_secs(poll_secs)).await;
         }
     });

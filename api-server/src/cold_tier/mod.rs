@@ -23,6 +23,7 @@
 //! 3. `page` must be bounded — archive-capable reads are never unbounded.
 
 pub mod audit_drainer;
+pub mod audit_read;
 pub mod conventions;
 pub mod cursor;
 pub mod ledger;
