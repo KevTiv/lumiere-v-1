@@ -31,6 +31,7 @@ pub mod migrate;
 pub mod pg_codec;
 pub mod pg_pool;
 pub mod pos_order_drainer;
+pub mod pos_order_read;
 
 /// The canonical read contract for one API resource request.
 ///
@@ -152,6 +153,44 @@ pub fn compile_pg_sql(
     compile_sql(plan, QuotingStyle::PgDollar)
 }
 
+/// Substitute `compile_stdb_sql`'s `?` placeholders with literal values.
+///
+/// `StdbClient::query_sql` sends a plain SQL string over HTTP — there is no
+/// separate parameter-binding channel the way `tokio-postgres` has for the
+/// PG side, so the `?` placeholders `compile_stdb_sql` emits must be turned
+/// into an actually-executable query by inlining literals before sending.
+///
+/// Safe against injection from the bind *values* themselves: `Text` values
+/// are single-quote-escaped, and every other variant is a Rust primitive
+/// with no free-text representation. It is not "safe" against a caller
+/// constructing malformed SQL some other way — the emitted `?` characters
+/// are only ever placeholder tokens `compile_sql` itself produces via
+/// `push_bind`, never literal content, so a 1:1 in-order substitution is
+/// correct as long as `sql` came from `compile_stdb_sql`.
+pub fn inline_stdb_literals(sql: &str, binds: &[ScalarValue]) -> String {
+    let mut out = String::with_capacity(sql.len());
+    let mut bind_iter = binds.iter();
+    for ch in sql.chars() {
+        if ch == '?' {
+            if let Some(value) = bind_iter.next() {
+                out.push_str(&stdb_literal(value));
+                continue;
+            }
+        }
+        out.push(ch);
+    }
+    out
+}
+
+fn stdb_literal(value: &ScalarValue) -> String {
+    match value {
+        ScalarValue::U64(n) => n.to_string(),
+        ScalarValue::I64(n) => n.to_string(),
+        ScalarValue::Bool(b) => b.to_string(),
+        ScalarValue::Text(s) => format!("'{}'", s.replace('\'', "''")),
+    }
+}
+
 #[derive(Clone, Copy)]
 enum QuotingStyle {
     /// SpacetimeDB uses backtick-quoted identifiers.
@@ -177,10 +216,22 @@ fn compile_sql(
     let mut binds: Vec<ScalarValue> = Vec::new();
 
     // SELECT
+    //
+    // A projection entry may carry a `column::CAST` suffix (e.g. `"id::TEXT"`)
+    // — needed on the PG side to read NUMERIC/JSONB columns back without a
+    // bignum crate (tokio-postgres has no native NUMERIC decoder). Applied
+    // only for PgDollar; stripped for StdbBacktick, since STDB returns
+    // natively typed JSON and has no use for a PG cast hint.
     let cols = plan
         .projection
         .iter()
-        .map(|c| quote_ident(c, style))
+        .map(|c| match c.split_once("::") {
+            Some((name, cast)) => match style {
+                QuotingStyle::PgDollar => format!("{}::{cast}", quote_ident(name, style)),
+                QuotingStyle::StdbBacktick => quote_ident(name, style),
+            },
+            None => quote_ident(c, style),
+        })
         .collect::<Vec<_>>()
         .join(", ");
     let mut sql = format!(
@@ -213,7 +264,9 @@ fn compile_sql(
             &cursor_values,
             |i| match style {
                 QuotingStyle::StdbBacktick => "?".to_string(),
-                QuotingStyle::PgDollar => format!("${}", base + i),
+                QuotingStyle::PgDollar => {
+                    format!("${}{}", base + i, pg_cast_suffix(&cursor_values[i - 1]))
+                }
             },
             |col| quote_ident(col, style),
         )?;
@@ -299,11 +352,65 @@ fn compile_predicate(
 }
 
 fn push_bind(binds: &mut Vec<ScalarValue>, value: ScalarValue, style: QuotingStyle) -> String {
+    let cast = pg_cast_suffix(&value);
     binds.push(value);
     match style {
         QuotingStyle::StdbBacktick => "?".to_string(),
-        QuotingStyle::PgDollar => format!("${}", binds.len()),
+        QuotingStyle::PgDollar => format!("${}{cast}", binds.len()),
     }
+}
+
+/// Cast suffix needed on a PG placeholder for this value's SQL type. Only
+/// `U64` needs one: it's always bound as decimal text (no bignum crate — see
+/// `pg_codec`'s module doc for the read-side half of this), so without an
+/// explicit `::NUMERIC` a comparison against a `NUMERIC(20,0)` column (e.g.
+/// `organization_id`) is a text/numeric type mismatch Postgres rejects
+/// outright, rather than silently comparing wrong. Every other `ScalarValue`
+/// variant already binds as its natively-matching PG type.
+fn pg_cast_suffix(value: &ScalarValue) -> &'static str {
+    match value {
+        ScalarValue::U64(_) => "::NUMERIC",
+        ScalarValue::I64(_) | ScalarValue::Text(_) | ScalarValue::Bool(_) => "",
+    }
+}
+
+/// An owned `ScalarValue` converted to whatever native Rust type actually
+/// binds against `compile_pg_sql`'s placeholders (which carry the matching
+/// `::NUMERIC` cast for `U64` — see [`pg_cast_suffix`]). Any caller
+/// executing a `compile_pg_sql` query against `tokio-postgres` needs this;
+/// it's not specific to one resource.
+#[derive(Debug, Clone)]
+pub enum PgBind {
+    /// `U64`, bound as decimal text — matches the `::NUMERIC` cast every
+    /// `U64` placeholder carries.
+    NumericText(String),
+    Int(i64),
+    Text(String),
+    Bool(bool),
+}
+
+impl PgBind {
+    pub fn as_sql(&self) -> &(dyn tokio_postgres::types::ToSql + Sync) {
+        match self {
+            PgBind::NumericText(s) | PgBind::Text(s) => s,
+            PgBind::Int(n) => n,
+            PgBind::Bool(b) => b,
+        }
+    }
+}
+
+/// Convert `compile_pg_sql`'s bind values into their `tokio-postgres`
+/// binding representation, in order.
+pub fn scalar_binds_to_pg(values: &[ScalarValue]) -> Vec<PgBind> {
+    values
+        .iter()
+        .map(|v| match v {
+            ScalarValue::U64(n) => PgBind::NumericText(n.to_string()),
+            ScalarValue::I64(n) => PgBind::Int(*n),
+            ScalarValue::Text(s) => PgBind::Text(s.clone()),
+            ScalarValue::Bool(b) => PgBind::Bool(*b),
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -337,8 +444,11 @@ mod tests {
     fn pg_sql_contains_org_scope() {
         let plan = audit_plan();
         let (sql, binds) = compile_pg_sql(&plan).unwrap();
-        assert!(sql.contains("\"organization_id\" = $1"), "SQL: {sql}");
-        assert!(sql.contains("\"company_id\" = $2"), "SQL: {sql}");
+        assert!(
+            sql.contains("\"organization_id\" = $1::NUMERIC"),
+            "SQL: {sql}"
+        );
+        assert!(sql.contains("\"company_id\" = $2::NUMERIC"), "SQL: {sql}");
         assert!(matches!(binds[0], ScalarValue::U64(42)));
         assert!(matches!(binds[1], ScalarValue::U64(7)));
     }
@@ -394,7 +504,7 @@ mod tests {
         let cursor = cursor::encode_cursor(&plan.order, &[ScalarValue::U64(100)]).unwrap();
         plan.page.cursor = Some(cursor);
         let (sql, binds) = compile_pg_sql(&plan).unwrap();
-        assert!(sql.contains("\"id\" < $3"), "SQL: {sql}");
+        assert!(sql.contains("\"id\" < $3::NUMERIC"), "SQL: {sql}");
         assert!(matches!(binds[2], ScalarValue::U64(100)));
     }
 
@@ -408,5 +518,33 @@ mod tests {
     #[test]
     fn quoted_identifier_neutralizes_embedded_quote() {
         assert_eq!(quote_ident(r#"a"b"#, QuotingStyle::PgDollar), "\"a\"\"b\"");
+    }
+
+    #[test]
+    fn projection_cast_suffix_applies_for_pg_and_strips_for_stdb() {
+        let mut plan = audit_plan();
+        plan.projection = vec!["id::TEXT".into(), "action".into()];
+
+        let (pg_sql, _) = compile_pg_sql(&plan).unwrap();
+        assert!(pg_sql.contains("\"id\"::TEXT"), "SQL: {pg_sql}");
+
+        let (stdb_sql, _) = compile_stdb_sql(&plan).unwrap();
+        assert!(stdb_sql.contains("`id`"), "SQL: {stdb_sql}");
+        assert!(!stdb_sql.contains("::TEXT"), "SQL: {stdb_sql}");
+    }
+
+    #[test]
+    fn inline_stdb_literals_substitutes_in_order() {
+        let mut plan = audit_plan();
+        plan.predicates.push(ReadPredicate::Eq {
+            column: "action".into(),
+            value: ScalarValue::Text("it's fine".into()),
+        });
+        let (sql, binds) = compile_stdb_sql(&plan).unwrap();
+        let inlined = inline_stdb_literals(&sql, &binds);
+
+        assert!(!inlined.contains('?'), "SQL: {inlined}");
+        assert!(inlined.contains("= 42"), "SQL: {inlined}");
+        assert!(inlined.contains("'it''s fine'"), "SQL: {inlined}");
     }
 }

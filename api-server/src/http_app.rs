@@ -38,6 +38,11 @@ struct OrgQuery {
     organization_id: Option<u64>,
     #[serde(rename = "companyId")]
     company_id: Option<u64>,
+    /// Keyset cursor for paginated resources (currently only "pos-orders");
+    /// other resources ignore it.
+    cursor: Option<String>,
+    /// Page size for paginated resources; other resources ignore it.
+    limit: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -114,6 +119,24 @@ async fn get_query(
     } else {
         state.client_with_token(&session.stdb_token)
     };
+    // "pos-orders" is cursor-paginated (hot+cold merge) and needs a response
+    // envelope beyond the generic `{"data": [...]}` — special-cased here
+    // rather than folded into `execute_resource_query_for_company`, whose
+    // signature is shared by ~40 resources that don't need a cursor.
+    if resource == "pos-orders" {
+        let page = crate::cold_tier::pos_order_read::merged_page(
+            &client,
+            org_id,
+            q.company_id,
+            q.cursor.clone(),
+            q.limit,
+        )
+        .await?;
+        return Ok(Json(
+            json!({ "data": page.rows, "nextCursor": page.next_cursor }),
+        ));
+    }
+
     let data = execute_resource_query_for_company(
         &client,
         &resource,

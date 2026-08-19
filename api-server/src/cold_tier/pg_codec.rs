@@ -10,18 +10,25 @@
 //!
 //! ## What this does NOT decide
 //!
-//! It decodes by `pg_type` alone (`"NUMERIC(20,0)"`, `"BIGINT"`, `"TEXT"`,
-//! ...) rather than the richer `stdb_type` — `lumiere-codegen` is a bin-only
-//! crate (no `[lib]`), so `GeneratedType` isn't importable here, and
-//! `pg_type` is a small closed set that's sufficient for binding: the only
-//! ambiguity it introduces is `BIGINT`, which is shared by `Timestamp` and
-//! plain signed-integer columns — resolved by checking the JSON shape at
-//! decode time (`{"microsSinceUnixEpoch": ...}` vs a raw number) rather than
-//! needing to know the source type up front.
+//! Write-side decoding (`decode_row`) works from `pg_type` alone
+//! (`"NUMERIC(20,0)"`, `"BIGINT"`, `"TEXT"`, ...) rather than the richer
+//! `stdb_type` — `lumiere-codegen` is a bin-only crate (no `[lib]`), so
+//! `GeneratedType` isn't importable here, and `pg_type` is a small closed
+//! set that's sufficient for binding: the only ambiguity it introduces is
+//! `BIGINT`, shared by `Timestamp` and plain signed-integer columns —
+//! resolved by checking the JSON shape at decode time
+//! (`{"microsSinceUnixEpoch": ...}` vs a raw number) rather than needing to
+//! know the source type up front.
+//!
+//! Read-side reconstruction (`row_to_hot_json`) can't use that trick — a
+//! `BIGINT` value coming back from Postgres has no shape to inspect, just a
+//! plain integer — so it *does* need `stdb_type`, checked only as an exact
+//! string equality (`"Timestamp"`), never parsed generically.
 
 use anyhow::{anyhow, Context, Result};
-use serde_json::Value;
+use serde_json::{json, Value};
 use tokio_postgres::types::ToSql;
+use tokio_postgres::Row;
 
 use super::conventions;
 
@@ -32,6 +39,11 @@ pub struct ColumnCodec {
     pub name: String,
     /// e.g. `"NUMERIC(20,0)"`, `"TEXT"`, `"BIGINT"`, `"BYTEA"`, `"JSONB"`.
     pub pg_type: String,
+    /// `lumiere-codegen`'s `GeneratedType` Debug string for this column
+    /// (e.g. `"U64"`, `"Timestamp"`, `"Identity"`) — used only to
+    /// disambiguate `BIGINT` on read (see module doc); never parsed beyond
+    /// an exact string check.
+    pub stdb_type: String,
     pub nullable: bool,
 }
 
@@ -54,10 +66,105 @@ pub fn load_columns(codec_manifest_json: &str, table: &str) -> Result<Vec<Column
                     .as_str()
                     .ok_or_else(|| anyhow!("codec-manifest.json: column missing 'pg_type'"))?
                     .to_string(),
+                stdb_type: c["stdb_type"]
+                    .as_str()
+                    .ok_or_else(|| anyhow!("codec-manifest.json: column missing 'stdb_type'"))?
+                    .to_string(),
                 nullable: c["nullable"].as_bool().unwrap_or(false),
             })
         })
         .collect()
+}
+
+/// Build `ResourceReadPlan.projection` entries for a cold-tier read:
+/// `"column::TEXT"` for `NUMERIC`/`JSONB` columns (tokio-postgres has no
+/// native decoder for either without a bignum crate — see module doc),
+/// plain `"column"` otherwise. `compile_stdb_sql` strips the `::CAST`
+/// suffix automatically, so this same projection list is valid for both
+/// compilers.
+pub fn projection_with_pg_casts(columns: &[ColumnCodec]) -> Vec<String> {
+    columns
+        .iter()
+        .map(|c| match c.pg_type.as_str() {
+            "NUMERIC(20,0)" | "JSONB" => format!("{}::TEXT", c.name),
+            _ => c.name.clone(),
+        })
+        .collect()
+}
+
+/// Reconstruct one PG cold row into the same camelCase/number/timestamp-
+/// object JSON shape `StdbClient::query_sql` returns for hot rows — so a
+/// caller can merge hot and cold rows without caring which store a row
+/// came from. `row`'s columns must be in the same order as `columns`, cast
+/// per `projection_with_pg_casts` (i.e. actually queried via that helper).
+pub fn row_to_hot_json(columns: &[ColumnCodec], row: &Row) -> Result<Value> {
+    let mut map = serde_json::Map::new();
+    for (i, col) in columns.iter().enumerate() {
+        let value = read_pg_column(col, row, i)
+            .with_context(|| format!("column '{}' (index {i})", col.name))?;
+        map.insert(snake_to_camel(&col.name), value);
+    }
+    Ok(Value::Object(map))
+}
+
+fn read_pg_column(col: &ColumnCodec, row: &Row, i: usize) -> Result<Value> {
+    Ok(match col.pg_type.as_str() {
+        "NUMERIC(20,0)" => {
+            let s: Option<String> = row.try_get(i)?;
+            match s {
+                Some(s) => {
+                    let n: u64 = s
+                        .parse()
+                        .with_context(|| format!("non-numeric NUMERIC text '{s}'"))?;
+                    json!(n)
+                }
+                None => Value::Null,
+            }
+        }
+        "BIGINT" => {
+            let n: Option<i64> = row.try_get(i)?;
+            match n {
+                Some(n) if col.stdb_type == "Timestamp" => json!({ "microsSinceUnixEpoch": n }),
+                Some(n) => json!(n),
+                None => Value::Null,
+            }
+        }
+        "INTEGER" => {
+            let n: Option<i32> = row.try_get(i)?;
+            n.map(|n| json!(n)).unwrap_or(Value::Null)
+        }
+        "DOUBLE PRECISION" => {
+            let n: Option<f64> = row.try_get(i)?;
+            n.map(|n| json!(n)).unwrap_or(Value::Null)
+        }
+        "REAL" => {
+            let n: Option<f32> = row.try_get(i)?;
+            n.map(|n| json!(n)).unwrap_or(Value::Null)
+        }
+        "BOOLEAN" => {
+            let b: Option<bool> = row.try_get(i)?;
+            b.map(Value::Bool).unwrap_or(Value::Null)
+        }
+        "BYTEA" => {
+            let b: Option<Vec<u8>> = row.try_get(i)?;
+            b.map(|b| Value::String(hex::encode(b)))
+                .unwrap_or(Value::Null)
+        }
+        "JSONB" => {
+            // Read via the ::TEXT cast (projection_with_pg_casts), same reason
+            // NUMERIC needs one: no with-serde_json-1 feature on tokio-postgres.
+            let s: Option<String> = row.try_get(i)?;
+            match s {
+                Some(s) => serde_json::from_str(&s).context("parse JSONB text")?,
+                None => Value::Null,
+            }
+        }
+        "TEXT" => {
+            let s: Option<String> = row.try_get(i)?;
+            s.map(Value::String).unwrap_or(Value::Null)
+        }
+        other => anyhow::bail!("unhandled pg_type '{other}' on read"),
+    })
 }
 
 /// A decoded, bindable value for one column.
@@ -346,58 +453,67 @@ fn snake_to_camel(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
 
     fn cols() -> Vec<ColumnCodec> {
         vec![
             ColumnCodec {
                 name: "id".into(),
                 pg_type: "NUMERIC(20,0)".into(),
+                stdb_type: "U64".into(),
                 nullable: false,
             },
             ColumnCodec {
                 name: "company_id".into(),
                 pg_type: "NUMERIC(20,0)".into(),
+                stdb_type: "U64".into(),
                 nullable: true,
             },
             ColumnCodec {
                 name: "uid".into(),
                 pg_type: "TEXT".into(),
+                stdb_type: "String".into(),
                 nullable: false,
             },
             ColumnCodec {
                 name: "amount_paid".into(),
                 pg_type: "DOUBLE PRECISION".into(),
+                stdb_type: "F64".into(),
                 nullable: false,
             },
             ColumnCodec {
                 name: "to_invoice".into(),
                 pg_type: "BOOLEAN".into(),
+                stdb_type: "Bool".into(),
                 nullable: false,
             },
             ColumnCodec {
                 name: "lines".into(),
                 pg_type: "JSONB".into(),
+                stdb_type: "Vec(U64)".into(),
                 nullable: false,
             },
             ColumnCodec {
                 name: "user_id".into(),
                 pg_type: "BYTEA".into(),
+                stdb_type: "Identity".into(),
                 nullable: false,
             },
             ColumnCodec {
                 name: "date_order".into(),
                 pg_type: "BIGINT".into(),
+                stdb_type: "Timestamp".into(),
                 nullable: false,
             },
             ColumnCodec {
                 name: "cold_eligible_at".into(),
                 pg_type: "BIGINT".into(),
+                stdb_type: "Timestamp".into(),
                 nullable: true,
             },
             ColumnCodec {
                 name: "archive_version".into(),
                 pg_type: "NUMERIC(20,0)".into(),
+                stdb_type: "U64".into(),
                 nullable: false,
             },
         ]
@@ -473,5 +589,14 @@ mod tests {
         assert_eq!(snake_to_camel("cold_eligible_at"), "coldEligibleAt");
         assert_eq!(snake_to_camel("id"), "id");
         assert_eq!(snake_to_camel("uid"), "uid");
+    }
+
+    #[test]
+    fn projection_casts_numeric_and_jsonb_only() {
+        let projection = projection_with_pg_casts(&cols());
+        assert_eq!(projection[0], "id::TEXT"); // NUMERIC(20,0)
+        assert_eq!(projection[2], "uid"); // TEXT — no cast
+        assert_eq!(projection[5], "lines::TEXT"); // JSONB
+        assert_eq!(projection[7], "date_order"); // BIGINT — no cast
     }
 }
