@@ -3,6 +3,7 @@ pub mod cancellation_test;
 pub mod commission_settle_test;
 pub mod gap_fixes_test;
 pub mod oms_extensions_test;
+pub mod pos_order_finalize_test;
 pub mod sale_order_update_test;
 pub mod sales_core_test;
 
@@ -38,8 +39,23 @@ pub fn run_all_sales_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_sales_cancel_invoiced_rejected_test(ctx)?;
     run_sales_cancel_cross_org_rejected_test(ctx)?;
     run_sales_cancel_nonexistent_rejected_test(ctx)?;
+    run_pos_order_finalize_test(ctx)?;
     log::info!("✅ run_all_sales_tests complete");
     Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn run_pos_order_finalize_test(ctx: &ReducerContext) -> Result<(), String> {
+    pos_order_finalize_test::test_pos_order_finalize_deletes_on_version_match(ctx)
+        .map_err(|e| format!("pos_order_finalize_version_match: {e}"))?;
+    pos_order_finalize_test::test_pos_order_finalize_refuses_on_version_mismatch(ctx)
+        .map_err(|e| format!("pos_order_finalize_version_mismatch: {e}"))?;
+    pos_order_finalize_test::test_pos_order_finalize_refuses_on_cold_eligible_at_mismatch(ctx)
+        .map_err(|e| format!("pos_order_finalize_cold_eligible_at_mismatch: {e}"))?;
+    pos_order_finalize_test::test_pos_order_finalize_is_idempotent_when_already_gone(ctx)
+        .map_err(|e| format!("pos_order_finalize_idempotent: {e}"))?;
+    pos_order_finalize_test::test_pos_order_finalize_rejects_unregistered_caller(ctx)
+        .map_err(|e| format!("pos_order_finalize_unregistered_caller: {e}"))
 }
 
 #[spacetimedb::reducer]

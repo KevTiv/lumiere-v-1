@@ -21,6 +21,11 @@ use crate::core::users::user_profile;
 /// `service_name` used by the audit-log cold drainer (`api-server/src/cold_tier/audit_drainer.rs`).
 pub(crate) const AUDIT_COLD_DRAINER_SERVICE: &str = "audit_cold_drainer";
 
+/// `service_name` used by the pos_order cold drainer (Phase 2; worker not yet
+/// built — blocked on regenerating STDB bindings against a live module, see
+/// `finalize_pos_order_archive` in `spacetimedb/src/sales/pos_transactions.rs`).
+pub(crate) const POS_ORDER_COLD_DRAINER_SERVICE: &str = "pos_order_cold_drainer";
+
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = cold_tier_service_identity,

@@ -888,6 +888,97 @@ pub fn create_pos_order(
     Ok(())
 }
 
+// ============================================================================
+// COLD-TIER ARCHIVE FINALIZE
+// ============================================================================
+//
+// Version-checked finalize, per the general (mutable-resource) protocol in
+// docs/plans/sliding-window-cold-tier.md §6.1 — unlike audit_log's checksum-
+// based finalize (audit_log is append-only with no archive_version/
+// cold_eligible_at concept), this is the "real" protocol every future
+// mutable archive candidate follows:
+//
+//   1. worker reads (id, archive_version, cold_eligible_at, full payload);
+//   2. worker UPSERTs into PG, verifies the write;
+//   3. worker calls this reducer with the values it read in step 1;
+//   4. this reducer re-reads the row and deletes only if archive_version and
+//      cold_eligible_at are BOTH still exactly what the worker saw — proving
+//      no business mutation (or rehydration) happened in between.
+//
+// `PosOrder` has no reducer that mutates a row after `create_pos_order`
+// today (confirmed by audit — see the Phase 2 planning notes), so in
+// practice `archive_version` never changes and this rarely rejects. The
+// check exists anyway because a future mutator could change that, and the
+// finalize reducer must not silently stop protecting the row.
+
+/// Internal: delete a `pos_order` row once the pos-order cold drainer has
+/// durably UPSERTed and verified the exact same version in `cold_pos_order`.
+///
+/// Called only by the registered pos-order drainer identity (see
+/// `core::cold_tier_identity`), never by frontend clients.
+#[spacetimedb::reducer]
+pub fn finalize_pos_order_archive(
+    ctx: &ReducerContext,
+    id: u64,
+    expected_archive_version: u64,
+    expected_cold_eligible_at_micros: i64,
+) -> Result<(), String> {
+    if !crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
+        ctx,
+        crate::core::cold_tier_identity::POS_ORDER_COLD_DRAINER_SERVICE,
+    ) {
+        return Err(
+            "finalize_pos_order_archive: caller is not the registered pos-order cold-drainer identity"
+                .to_string(),
+        );
+    }
+
+    finalize_pos_order_archive_checked(
+        ctx,
+        id,
+        expected_archive_version,
+        expected_cold_eligible_at_micros,
+    )
+}
+
+/// The version-check/deletion logic, split out so tests can exercise it
+/// directly — same reasoning as `audit::finalize_audit_log_archive_checked`:
+/// a single reducer invocation can't fake `ctx.sender()` as the registered
+/// drainer identity, so the identity gate is tested separately.
+pub(crate) fn finalize_pos_order_archive_checked(
+    ctx: &ReducerContext,
+    id: u64,
+    expected_archive_version: u64,
+    expected_cold_eligible_at_micros: i64,
+) -> Result<(), String> {
+    let Some(row) = ctx.db.pos_order().id().find(id) else {
+        // Already finalized by a prior/racing call.
+        return Ok(());
+    };
+
+    if row.archive_version != expected_archive_version {
+        return Err(format!(
+            "pos_order {id}: archive_version changed (expected {expected_archive_version}, now {}); refusing to delete",
+            row.archive_version
+        ));
+    }
+
+    // Comparing the full Option (not just unwrapping) also covers "row
+    // remains eligible": if a future rehydration path clears
+    // cold_eligible_at back to None, this becomes `None != Some(expected)`
+    // and fails closed, same as any other value drift.
+    let actual = row.cold_eligible_at.map(|t| t.to_micros_since_unix_epoch());
+    if actual != Some(expected_cold_eligible_at_micros) {
+        return Err(format!(
+            "pos_order {id}: cold_eligible_at changed or row is no longer eligible \
+             (expected {expected_cold_eligible_at_micros}, now {actual:?}); refusing to delete"
+        ));
+    }
+
+    ctx.db.pos_order().id().delete(&id);
+    Ok(())
+}
+
 #[reducer]
 pub fn create_loyalty_card(
     ctx: &ReducerContext,
