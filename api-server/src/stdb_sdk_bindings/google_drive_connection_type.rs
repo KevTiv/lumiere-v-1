@@ -14,6 +14,7 @@ use super::sync_status_type::SyncStatus;
 pub struct GoogleDriveConnection {
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: Option<u64>,
     pub name: String,
     pub account_email: String,
     pub account_id: String,
@@ -54,6 +55,7 @@ impl __sdk::InModule for GoogleDriveConnection {
 pub struct GoogleDriveConnectionCols {
     pub id: __sdk::__query_builder::Col<GoogleDriveConnection, u64>,
     pub organization_id: __sdk::__query_builder::Col<GoogleDriveConnection, u64>,
+    pub company_id: __sdk::__query_builder::Col<GoogleDriveConnection, Option<u64>>,
     pub name: __sdk::__query_builder::Col<GoogleDriveConnection, String>,
     pub account_email: __sdk::__query_builder::Col<GoogleDriveConnection, String>,
     pub account_id: __sdk::__query_builder::Col<GoogleDriveConnection, String>,
@@ -91,6 +93,7 @@ impl __sdk::__query_builder::HasCols for GoogleDriveConnection {
         GoogleDriveConnectionCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             name: __sdk::__query_builder::Col::new(table_name, "name"),
             account_email: __sdk::__query_builder::Col::new(table_name, "account_email"),
             account_id: __sdk::__query_builder::Col::new(table_name, "account_id"),

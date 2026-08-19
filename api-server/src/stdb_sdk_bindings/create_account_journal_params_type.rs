@@ -2,46 +2,53 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+use spacetimedb_sdk::__codegen::{
+	self as __sdk,
+	__lib,
+	__sats,
+	__ws,
+};
 
 use super::journal_type_type::JournalType;
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateAccountJournalParams {
-    pub company_id: Option<u64>,
+    pub company_id: Option::<u64>,
     pub name: String,
     pub code: String,
     pub r#type: JournalType,
-    pub currency_id: Option<u64>,
-    pub default_account_id: Option<u64>,
-    pub suspense_account_id: Option<u64>,
-    pub loss_account_id: Option<u64>,
-    pub profit_account_id: Option<u64>,
-    pub bank_account_id: Option<u64>,
-    pub payment_credit_account_id: Option<u64>,
-    pub payment_debit_account_id: Option<u64>,
-    pub invoice_reference_type: Option<String>,
-    pub invoice_reference_model: Option<String>,
-    pub sequence_id: Option<u64>,
-    pub refund_sequence_id: Option<u64>,
-    pub sequence_override_regex: Option<String>,
-    pub secure_sequence_id: Option<u64>,
-    pub alias_name: Option<String>,
-    pub alias_domain: Option<String>,
-    pub sale_activity_type_id: Option<u64>,
-    pub sale_activity_user_id: Option<u64>,
-    pub sale_activity_note: Option<String>,
-    pub sale_activity_date_deadline: Option<__sdk::Timestamp>,
+    pub currency_id: Option::<u64>,
+    pub default_account_id: Option::<u64>,
+    pub suspense_account_id: Option::<u64>,
+    pub loss_account_id: Option::<u64>,
+    pub profit_account_id: Option::<u64>,
+    pub bank_account_id: Option::<u64>,
+    pub payment_credit_account_id: Option::<u64>,
+    pub payment_debit_account_id: Option::<u64>,
+    pub invoice_reference_type: Option::<String>,
+    pub invoice_reference_model: Option::<String>,
+    pub sequence_id: Option::<u64>,
+    pub refund_sequence_id: Option::<u64>,
+    pub sequence_override_regex: Option::<String>,
+    pub secure_sequence_id: Option::<u64>,
+    pub alias_name: Option::<String>,
+    pub alias_domain: Option::<String>,
+    pub sale_activity_type_id: Option::<u64>,
+    pub sale_activity_user_id: Option::<u64>,
+    pub sale_activity_note: Option::<String>,
+    pub sale_activity_date_deadline: Option::<__sdk::Timestamp>,
     pub restrict_mode_hash_table: bool,
     pub active: bool,
     pub at_least_one_inbound: bool,
     pub at_least_one_outbound: bool,
-    pub dedicated_payment_method_ids: Vec<u64>,
+    pub dedicated_payment_method_ids: Vec::<u64>,
     pub sale_activity_done: bool,
-    pub metadata: Option<String>,
+    pub metadata: Option::<String>,
 }
+
 
 impl __sdk::InModule for CreateAccountJournalParams {
     type Module = super::RemoteModule;
 }
+

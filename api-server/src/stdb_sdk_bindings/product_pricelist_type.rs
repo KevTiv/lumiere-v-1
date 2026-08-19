@@ -11,6 +11,7 @@ use super::discount_policy_type::DiscountPolicy;
 pub struct ProductPricelist {
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: Option<u64>,
     pub name: String,
     pub currency_id: u64,
     pub discount_policy: DiscountPolicy,
@@ -28,6 +29,7 @@ impl __sdk::InModule for ProductPricelist {
 pub struct ProductPricelistCols {
     pub id: __sdk::__query_builder::Col<ProductPricelist, u64>,
     pub organization_id: __sdk::__query_builder::Col<ProductPricelist, u64>,
+    pub company_id: __sdk::__query_builder::Col<ProductPricelist, Option<u64>>,
     pub name: __sdk::__query_builder::Col<ProductPricelist, String>,
     pub currency_id: __sdk::__query_builder::Col<ProductPricelist, u64>,
     pub discount_policy: __sdk::__query_builder::Col<ProductPricelist, DiscountPolicy>,
@@ -41,6 +43,7 @@ impl __sdk::__query_builder::HasCols for ProductPricelist {
         ProductPricelistCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             name: __sdk::__query_builder::Col::new(table_name, "name"),
             currency_id: __sdk::__query_builder::Col::new(table_name, "currency_id"),
             discount_policy: __sdk::__query_builder::Col::new(table_name, "discount_policy"),

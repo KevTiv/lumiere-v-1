@@ -470,11 +470,15 @@ fn try_parse_field_line(line: &str) -> Option<(String, String)> {
     if name.is_empty() {
         return None;
     }
+    // Some spacetimedb-cli versions emit turbofish generics (`Option::<u64>`,
+    // `Vec::<String>`) instead of `Option<u64>`/`Vec<String>` — normalize here
+    // so every downstream prefix check (`strip_option`, the `Vec<`/`Option<`
+    // matches in `parse_type_str`) only ever has to handle one form.
     let raw_type = rest[colon + 2..]
         .trim()
         .trim_end_matches(',')
         .trim()
-        .to_string();
+        .replace("::<", "<");
     if raw_type.is_empty() {
         return None;
     }
@@ -757,6 +761,30 @@ pub struct AuditLog {
             ("user_identity".to_string(), "__sdk::Identity".to_string())
         );
         assert_eq!(fields[6], ("ref".to_string(), "Option<String>".to_string()));
+    }
+
+    #[test]
+    fn parse_struct_fields_normalizes_turbofish_generics() {
+        // Some spacetimedb-cli versions emit `Option::<u64>` / `Vec::<String>`
+        // (turbofish) instead of `Option<u64>` / `Vec<String>` — confirmed
+        // against real regenerated bindings (e.g. account_account_type_type.rs's
+        // `pub company_id: Option::<u64>,`). Without normalizing this, `strip_option`
+        // and the `Vec</Option<` prefix checks in `parse_type_str` never match,
+        // and the type falls through to "unrecognized type" instead of being
+        // parsed as a nullable u64.
+        let src = r#"
+pub struct AccountAccountType {
+    pub id: u64,
+    pub company_id: Option::<u64>,
+    pub tags: Vec::<String>,
+}
+"#;
+        let fields = parse_struct_fields(src, "AccountAccountType").unwrap();
+        assert_eq!(
+            fields[1],
+            ("company_id".to_string(), "Option<u64>".to_string())
+        );
+        assert_eq!(fields[2], ("tags".to_string(), "Vec<String>".to_string()));
     }
 
     #[test]

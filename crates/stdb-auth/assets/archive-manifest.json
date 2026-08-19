@@ -22,6 +22,28 @@
         "organization_id"
       ],
       "table": "audit_log"
+    },
+    {
+      "cold_table": "cold_pos_order",
+      "finalize_reducer": "finalize_pos_order_archive",
+      "mode": "versioned",
+      "order_by": [
+        {
+          "column": "id",
+          "direction": "ASC"
+        }
+      ],
+      "pg_ddl_file": "api-server/src/generated/pg_ddl/cold_pos_order.sql",
+      "primary_key": {
+        "column_name": "id",
+        "rust_type": "U64"
+      },
+      "rust_name": "PosOrder",
+      "scope_columns": [
+        "company_id",
+        "organization_id"
+      ],
+      "table": "pos_order"
     }
   ],
   "version": 1

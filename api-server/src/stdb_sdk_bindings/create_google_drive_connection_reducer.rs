@@ -4,12 +4,14 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::drive_conflict_policy_type::DriveConflictPolicy;
 use super::sync_direction_type::SyncDirection;
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct CreateGoogleDriveConnectionArgs {
     pub organization_id: u64,
+    pub company_id: Option<u64>,
     pub name: String,
     pub account_email: String,
     pub account_id: String,
@@ -21,6 +23,7 @@ pub(super) struct CreateGoogleDriveConnectionArgs {
     pub webhook_url: Option<String>,
     pub webhook_secret_reference: Option<String>,
     pub sync_direction: SyncDirection,
+    pub conflict_policy: Option<DriveConflictPolicy>,
     pub sync_frequency_minutes: u32,
     pub allowed_file_types: Vec<String>,
     pub max_file_size_mb: u32,
@@ -30,6 +33,7 @@ impl From<CreateGoogleDriveConnectionArgs> for super::Reducer {
     fn from(args: CreateGoogleDriveConnectionArgs) -> Self {
         Self::CreateGoogleDriveConnection {
             organization_id: args.organization_id,
+            company_id: args.company_id,
             name: args.name,
             account_email: args.account_email,
             account_id: args.account_id,
@@ -41,6 +45,7 @@ impl From<CreateGoogleDriveConnectionArgs> for super::Reducer {
             webhook_url: args.webhook_url,
             webhook_secret_reference: args.webhook_secret_reference,
             sync_direction: args.sync_direction,
+            conflict_policy: args.conflict_policy,
             sync_frequency_minutes: args.sync_frequency_minutes,
             allowed_file_types: args.allowed_file_types,
             max_file_size_mb: args.max_file_size_mb,
@@ -66,6 +71,7 @@ pub trait create_google_drive_connection {
     fn create_google_drive_connection(
         &self,
         organization_id: u64,
+        company_id: Option<u64>,
         name: String,
         account_email: String,
         account_id: String,
@@ -77,12 +83,14 @@ pub trait create_google_drive_connection {
         webhook_url: Option<String>,
         webhook_secret_reference: Option<String>,
         sync_direction: SyncDirection,
+        conflict_policy: Option<DriveConflictPolicy>,
         sync_frequency_minutes: u32,
         allowed_file_types: Vec<String>,
         max_file_size_mb: u32,
     ) -> __sdk::Result<()> {
         self.create_google_drive_connection_then(
             organization_id,
+            company_id,
             name,
             account_email,
             account_id,
@@ -94,6 +102,7 @@ pub trait create_google_drive_connection {
             webhook_url,
             webhook_secret_reference,
             sync_direction,
+            conflict_policy,
             sync_frequency_minutes,
             allowed_file_types,
             max_file_size_mb,
@@ -110,6 +119,7 @@ pub trait create_google_drive_connection {
     fn create_google_drive_connection_then(
         &self,
         organization_id: u64,
+        company_id: Option<u64>,
         name: String,
         account_email: String,
         account_id: String,
@@ -121,6 +131,7 @@ pub trait create_google_drive_connection {
         webhook_url: Option<String>,
         webhook_secret_reference: Option<String>,
         sync_direction: SyncDirection,
+        conflict_policy: Option<DriveConflictPolicy>,
         sync_frequency_minutes: u32,
         allowed_file_types: Vec<String>,
         max_file_size_mb: u32,
@@ -135,6 +146,7 @@ impl create_google_drive_connection for super::RemoteReducers {
     fn create_google_drive_connection_then(
         &self,
         organization_id: u64,
+        company_id: Option<u64>,
         name: String,
         account_email: String,
         account_id: String,
@@ -146,6 +158,7 @@ impl create_google_drive_connection for super::RemoteReducers {
         webhook_url: Option<String>,
         webhook_secret_reference: Option<String>,
         sync_direction: SyncDirection,
+        conflict_policy: Option<DriveConflictPolicy>,
         sync_frequency_minutes: u32,
         allowed_file_types: Vec<String>,
         max_file_size_mb: u32,
@@ -157,6 +170,7 @@ impl create_google_drive_connection for super::RemoteReducers {
         self.imp.invoke_reducer_with_callback(
             CreateGoogleDriveConnectionArgs {
                 organization_id,
+                company_id,
                 name,
                 account_email,
                 account_id,
@@ -168,6 +182,7 @@ impl create_google_drive_connection for super::RemoteReducers {
                 webhook_url,
                 webhook_secret_reference,
                 sync_direction,
+                conflict_policy,
                 sync_frequency_minutes,
                 allowed_file_types,
                 max_file_size_mb,

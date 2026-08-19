@@ -2,7 +2,12 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+use spacetimedb_sdk::__codegen::{
+	self as __sdk,
+	__lib,
+	__sats,
+	__ws,
+};
 
 use super::move_type_type::MoveType;
 
@@ -10,36 +15,38 @@ use super::move_type_type::MoveType;
 #[sats(crate = __lib)]
 pub struct CreateAccountMoveParams {
     pub idempotency_key: String,
-    pub company_id: Option<u64>,
+    pub company_id: Option::<u64>,
     pub journal_id: u64,
     pub move_type: MoveType,
     pub date: __sdk::Timestamp,
     pub name: String,
-    pub r#ref: Option<String>,
+    pub r#ref: Option::<String>,
     pub auto_post: bool,
     pub to_check: bool,
     pub is_storno: bool,
-    pub partner_id: Option<u64>,
-    pub partner_bank_id: Option<u64>,
-    pub fiscal_position_id: Option<u64>,
-    pub invoice_date: Option<__sdk::Timestamp>,
-    pub invoice_date_due: Option<__sdk::Timestamp>,
-    pub invoice_payment_term_id: Option<u64>,
-    pub payment_reference: Option<String>,
-    pub invoice_origin: Option<String>,
-    pub invoice_partner_display_name: Option<String>,
-    pub invoice_cash_rounding_id: Option<u64>,
-    pub partner_shipping_id: Option<u64>,
-    pub sale_order_id: Option<u64>,
-    pub invoice_incoterm_id: Option<u64>,
-    pub incoterm_location: Option<String>,
-    pub campaign_id: Option<u64>,
-    pub source_id: Option<u64>,
-    pub medium_id: Option<u64>,
-    pub secure_sequence_number: Option<u64>,
-    pub metadata: Option<String>,
+    pub partner_id: Option::<u64>,
+    pub partner_bank_id: Option::<u64>,
+    pub fiscal_position_id: Option::<u64>,
+    pub invoice_date: Option::<__sdk::Timestamp>,
+    pub invoice_date_due: Option::<__sdk::Timestamp>,
+    pub invoice_payment_term_id: Option::<u64>,
+    pub payment_reference: Option::<String>,
+    pub invoice_origin: Option::<String>,
+    pub invoice_partner_display_name: Option::<String>,
+    pub invoice_cash_rounding_id: Option::<u64>,
+    pub partner_shipping_id: Option::<u64>,
+    pub sale_order_id: Option::<u64>,
+    pub invoice_incoterm_id: Option::<u64>,
+    pub incoterm_location: Option::<String>,
+    pub campaign_id: Option::<u64>,
+    pub source_id: Option::<u64>,
+    pub medium_id: Option::<u64>,
+    pub secure_sequence_number: Option::<u64>,
+    pub metadata: Option::<String>,
 }
+
 
 impl __sdk::InModule for CreateAccountMoveParams {
     type Module = super::RemoteModule;
 }
+

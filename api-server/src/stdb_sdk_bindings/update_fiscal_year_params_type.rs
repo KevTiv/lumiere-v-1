@@ -2,23 +2,31 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+use spacetimedb_sdk::__codegen::{
+	self as __sdk,
+	__lib,
+	__sats,
+	__ws,
+};
+
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct UpdateFiscalYearParams {
-    pub name: Option<String>,
-    pub date_from: Option<__sdk::Timestamp>,
-    pub date_to: Option<__sdk::Timestamp>,
-    pub r#type: Option<String>,
-    pub carry_over_accounts: Option<Vec<u64>>,
-    pub closing_move_id: Option<Option<u64>>,
-    pub opening_move_id: Option<Option<u64>>,
-    pub is_adjustment: Option<bool>,
-    pub notes: Option<Option<String>>,
-    pub metadata: Option<Option<String>>,
+    pub name: Option::<String>,
+    pub date_from: Option::<__sdk::Timestamp>,
+    pub date_to: Option::<__sdk::Timestamp>,
+    pub r#type: Option::<String>,
+    pub carry_over_accounts: Option::<Vec::<u64>>,
+    pub closing_move_id: Option::<Option::<u64>>,
+    pub opening_move_id: Option::<Option::<u64>>,
+    pub is_adjustment: Option::<bool>,
+    pub notes: Option::<Option::<String>>,
+    pub metadata: Option::<Option::<String>>,
 }
+
 
 impl __sdk::InModule for UpdateFiscalYearParams {
     type Module = super::RemoteModule;
 }
+

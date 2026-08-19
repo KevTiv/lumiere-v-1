@@ -10,6 +10,7 @@ use super::pos_order_state_type::PosOrderState;
 #[sats(crate = __lib)]
 pub struct PosOrder {
     pub id: u64,
+    pub organization_id: u64,
     pub uid: String,
     pub ticket_number: Option<String>,
     pub session_id: u64,
@@ -58,6 +59,8 @@ pub struct PosOrder {
     pub write_uid: __sdk::Identity,
     pub write_date: __sdk::Timestamp,
     pub metadata: Option<String>,
+    pub cold_eligible_at: Option<__sdk::Timestamp>,
+    pub archive_version: u64,
 }
 
 impl __sdk::InModule for PosOrder {
@@ -69,6 +72,7 @@ impl __sdk::InModule for PosOrder {
 /// Provides typed access to columns for query building.
 pub struct PosOrderCols {
     pub id: __sdk::__query_builder::Col<PosOrder, u64>,
+    pub organization_id: __sdk::__query_builder::Col<PosOrder, u64>,
     pub uid: __sdk::__query_builder::Col<PosOrder, String>,
     pub ticket_number: __sdk::__query_builder::Col<PosOrder, Option<String>>,
     pub session_id: __sdk::__query_builder::Col<PosOrder, u64>,
@@ -117,6 +121,8 @@ pub struct PosOrderCols {
     pub write_uid: __sdk::__query_builder::Col<PosOrder, __sdk::Identity>,
     pub write_date: __sdk::__query_builder::Col<PosOrder, __sdk::Timestamp>,
     pub metadata: __sdk::__query_builder::Col<PosOrder, Option<String>>,
+    pub cold_eligible_at: __sdk::__query_builder::Col<PosOrder, Option<__sdk::Timestamp>>,
+    pub archive_version: __sdk::__query_builder::Col<PosOrder, u64>,
 }
 
 impl __sdk::__query_builder::HasCols for PosOrder {
@@ -124,6 +130,7 @@ impl __sdk::__query_builder::HasCols for PosOrder {
     fn cols(table_name: &'static str) -> Self::Cols {
         PosOrderCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
             uid: __sdk::__query_builder::Col::new(table_name, "uid"),
             ticket_number: __sdk::__query_builder::Col::new(table_name, "ticket_number"),
             session_id: __sdk::__query_builder::Col::new(table_name, "session_id"),
@@ -181,6 +188,8 @@ impl __sdk::__query_builder::HasCols for PosOrder {
             write_uid: __sdk::__query_builder::Col::new(table_name, "write_uid"),
             write_date: __sdk::__query_builder::Col::new(table_name, "write_date"),
             metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
+            cold_eligible_at: __sdk::__query_builder::Col::new(table_name, "cold_eligible_at"),
+            archive_version: __sdk::__query_builder::Col::new(table_name, "archive_version"),
         }
     }
 }
@@ -190,6 +199,7 @@ impl __sdk::__query_builder::HasCols for PosOrder {
 /// Provides typed access to indexed columns for query building.
 pub struct PosOrderIxCols {
     pub id: __sdk::__query_builder::IxCol<PosOrder, u64>,
+    pub organization_id: __sdk::__query_builder::IxCol<PosOrder, u64>,
     pub partner_id: __sdk::__query_builder::IxCol<PosOrder, Option<u64>>,
     pub session_id: __sdk::__query_builder::IxCol<PosOrder, u64>,
 }
@@ -199,6 +209,7 @@ impl __sdk::__query_builder::HasIxCols for PosOrder {
     fn ix_cols(table_name: &'static str) -> Self::IxCols {
         PosOrderIxCols {
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             partner_id: __sdk::__query_builder::IxCol::new(table_name, "partner_id"),
             session_id: __sdk::__query_builder::IxCol::new(table_name, "session_id"),
         }

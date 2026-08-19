@@ -9,6 +9,7 @@ use super::discount_policy_type::DiscountPolicy;
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreatePricelistParams {
+    pub company_id: Option<u64>,
     pub name: String,
     pub currency_id: u64,
     pub discount_policy: DiscountPolicy,

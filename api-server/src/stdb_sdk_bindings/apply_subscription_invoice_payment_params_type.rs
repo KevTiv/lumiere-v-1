@@ -2,7 +2,13 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+use spacetimedb_sdk::__codegen::{
+	self as __sdk,
+	__lib,
+	__sats,
+	__ws,
+};
+
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
@@ -11,14 +17,16 @@ pub struct ApplySubscriptionInvoicePaymentParams {
     pub payment_journal_id: u64,
     pub bank_account_id: u64,
     pub receivable_account_id: u64,
-    pub amount: Option<f64>,
-    pub payment_date: Option<__sdk::Timestamp>,
+    pub amount: Option::<f64>,
+    pub payment_date: Option::<__sdk::Timestamp>,
     pub cogs_account_id: u64,
     pub inventory_account_id: u64,
-    pub r#ref: Option<String>,
-    pub memo: Option<String>,
+    pub r#ref: Option::<String>,
+    pub memo: Option::<String>,
 }
+
 
 impl __sdk::InModule for ApplySubscriptionInvoicePaymentParams {
     type Module = super::RemoteModule;
 }
+

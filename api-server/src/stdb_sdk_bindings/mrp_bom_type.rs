@@ -2,7 +2,12 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+use spacetimedb_sdk::__codegen::{
+	self as __sdk,
+	__lib,
+	__sats,
+	__ws,
+};
 
 use super::bom_type_type::BomType;
 
@@ -20,28 +25,30 @@ pub struct MrpBom {
     pub company_id: u64,
     pub ready_to_produce: String,
     pub consumption: String,
-    pub picking_type_id: Option<u64>,
-    pub location_src_id: Option<u64>,
-    pub location_dest_id: Option<u64>,
-    pub warehouse_id: Option<u64>,
-    pub routing_id: Option<u64>,
-    pub bom_line_ids: Vec<u64>,
-    pub byproduct_ids: Vec<u64>,
-    pub operation_ids: Vec<u64>,
-    pub message_follower_ids: Vec<u64>,
-    pub activity_ids: Vec<u64>,
-    pub message_ids: Vec<u64>,
+    pub picking_type_id: Option::<u64>,
+    pub location_src_id: Option::<u64>,
+    pub location_dest_id: Option::<u64>,
+    pub warehouse_id: Option::<u64>,
+    pub routing_id: Option::<u64>,
+    pub bom_line_ids: Vec::<u64>,
+    pub byproduct_ids: Vec::<u64>,
+    pub operation_ids: Vec::<u64>,
+    pub message_follower_ids: Vec::<u64>,
+    pub activity_ids: Vec::<u64>,
+    pub message_ids: Vec::<u64>,
     pub estimated_cost: f64,
     pub create_uid: __sdk::Identity,
     pub create_date: __sdk::Timestamp,
     pub write_uid: __sdk::Identity,
     pub write_date: __sdk::Timestamp,
-    pub metadata: Option<String>,
+    pub metadata: Option::<String>,
 }
+
 
 impl __sdk::InModule for MrpBom {
     type Module = super::RemoteModule;
 }
+
 
 /// Column accessor struct for the table `MrpBom`.
 ///
@@ -58,23 +65,23 @@ pub struct MrpBomCols {
     pub company_id: __sdk::__query_builder::Col<MrpBom, u64>,
     pub ready_to_produce: __sdk::__query_builder::Col<MrpBom, String>,
     pub consumption: __sdk::__query_builder::Col<MrpBom, String>,
-    pub picking_type_id: __sdk::__query_builder::Col<MrpBom, Option<u64>>,
-    pub location_src_id: __sdk::__query_builder::Col<MrpBom, Option<u64>>,
-    pub location_dest_id: __sdk::__query_builder::Col<MrpBom, Option<u64>>,
-    pub warehouse_id: __sdk::__query_builder::Col<MrpBom, Option<u64>>,
-    pub routing_id: __sdk::__query_builder::Col<MrpBom, Option<u64>>,
-    pub bom_line_ids: __sdk::__query_builder::Col<MrpBom, Vec<u64>>,
-    pub byproduct_ids: __sdk::__query_builder::Col<MrpBom, Vec<u64>>,
-    pub operation_ids: __sdk::__query_builder::Col<MrpBom, Vec<u64>>,
-    pub message_follower_ids: __sdk::__query_builder::Col<MrpBom, Vec<u64>>,
-    pub activity_ids: __sdk::__query_builder::Col<MrpBom, Vec<u64>>,
-    pub message_ids: __sdk::__query_builder::Col<MrpBom, Vec<u64>>,
+    pub picking_type_id: __sdk::__query_builder::Col<MrpBom, Option::<u64>>,
+    pub location_src_id: __sdk::__query_builder::Col<MrpBom, Option::<u64>>,
+    pub location_dest_id: __sdk::__query_builder::Col<MrpBom, Option::<u64>>,
+    pub warehouse_id: __sdk::__query_builder::Col<MrpBom, Option::<u64>>,
+    pub routing_id: __sdk::__query_builder::Col<MrpBom, Option::<u64>>,
+    pub bom_line_ids: __sdk::__query_builder::Col<MrpBom, Vec::<u64>>,
+    pub byproduct_ids: __sdk::__query_builder::Col<MrpBom, Vec::<u64>>,
+    pub operation_ids: __sdk::__query_builder::Col<MrpBom, Vec::<u64>>,
+    pub message_follower_ids: __sdk::__query_builder::Col<MrpBom, Vec::<u64>>,
+    pub activity_ids: __sdk::__query_builder::Col<MrpBom, Vec::<u64>>,
+    pub message_ids: __sdk::__query_builder::Col<MrpBom, Vec::<u64>>,
     pub estimated_cost: __sdk::__query_builder::Col<MrpBom, f64>,
     pub create_uid: __sdk::__query_builder::Col<MrpBom, __sdk::Identity>,
     pub create_date: __sdk::__query_builder::Col<MrpBom, __sdk::Timestamp>,
     pub write_uid: __sdk::__query_builder::Col<MrpBom, __sdk::Identity>,
     pub write_date: __sdk::__query_builder::Col<MrpBom, __sdk::Timestamp>,
-    pub metadata: __sdk::__query_builder::Col<MrpBom, Option<String>>,
+    pub metadata: __sdk::__query_builder::Col<MrpBom, Option::<String>>,
 }
 
 impl __sdk::__query_builder::HasCols for MrpBom {
@@ -100,10 +107,7 @@ impl __sdk::__query_builder::HasCols for MrpBom {
             bom_line_ids: __sdk::__query_builder::Col::new(table_name, "bom_line_ids"),
             byproduct_ids: __sdk::__query_builder::Col::new(table_name, "byproduct_ids"),
             operation_ids: __sdk::__query_builder::Col::new(table_name, "operation_ids"),
-            message_follower_ids: __sdk::__query_builder::Col::new(
-                table_name,
-                "message_follower_ids",
-            ),
+            message_follower_ids: __sdk::__query_builder::Col::new(table_name, "message_follower_ids"),
             activity_ids: __sdk::__query_builder::Col::new(table_name, "activity_ids"),
             message_ids: __sdk::__query_builder::Col::new(table_name, "message_ids"),
             estimated_cost: __sdk::__query_builder::Col::new(table_name, "estimated_cost"),
@@ -112,6 +116,7 @@ impl __sdk::__query_builder::HasCols for MrpBom {
             write_uid: __sdk::__query_builder::Col::new(table_name, "write_uid"),
             write_date: __sdk::__query_builder::Col::new(table_name, "write_date"),
             metadata: __sdk::__query_builder::Col::new(table_name, "metadata"),
+
         }
     }
 }
@@ -134,8 +139,10 @@ impl __sdk::__query_builder::HasIxCols for MrpBom {
             id: __sdk::__query_builder::IxCol::new(table_name, "id"),
             organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
             product_id: __sdk::__query_builder::IxCol::new(table_name, "product_id"),
+
         }
     }
 }
 
 impl __sdk::__query_builder::CanBeLookupTable for MrpBom {}
+

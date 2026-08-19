@@ -14,6 +14,7 @@ use super::verification_status_type::VerificationStatus;
 pub struct WhatsAppBusinessAccount {
     pub id: u64,
     pub organization_id: u64,
+    pub company_id: Option<u64>,
     pub name: String,
     pub phone_number: String,
     pub phone_number_id: String,
@@ -62,6 +63,7 @@ impl __sdk::InModule for WhatsAppBusinessAccount {
 pub struct WhatsAppBusinessAccountCols {
     pub id: __sdk::__query_builder::Col<WhatsAppBusinessAccount, u64>,
     pub organization_id: __sdk::__query_builder::Col<WhatsAppBusinessAccount, u64>,
+    pub company_id: __sdk::__query_builder::Col<WhatsAppBusinessAccount, Option<u64>>,
     pub name: __sdk::__query_builder::Col<WhatsAppBusinessAccount, String>,
     pub phone_number: __sdk::__query_builder::Col<WhatsAppBusinessAccount, String>,
     pub phone_number_id: __sdk::__query_builder::Col<WhatsAppBusinessAccount, String>,
@@ -112,6 +114,7 @@ impl __sdk::__query_builder::HasCols for WhatsAppBusinessAccount {
         WhatsAppBusinessAccountCols {
             id: __sdk::__query_builder::Col::new(table_name, "id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            company_id: __sdk::__query_builder::Col::new(table_name, "company_id"),
             name: __sdk::__query_builder::Col::new(table_name, "name"),
             phone_number: __sdk::__query_builder::Col::new(table_name, "phone_number"),
             phone_number_id: __sdk::__query_builder::Col::new(table_name, "phone_number_id"),

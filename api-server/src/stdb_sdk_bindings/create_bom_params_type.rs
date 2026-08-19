@@ -2,15 +2,20 @@
 // WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 
 #![allow(unused, clippy::all)]
-use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+use spacetimedb_sdk::__codegen::{
+	self as __sdk,
+	__lib,
+	__sats,
+	__ws,
+};
 
-use super::bom_line_input_type::BomLineInput;
 use super::bom_type_type::BomType;
+use super::bom_line_input_type::BomLineInput;
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CreateBomParams {
-    pub company_id: Option<u64>,
+    pub company_id: Option::<u64>,
     pub r#type: BomType,
     pub product_id: u64,
     pub product_qty: f64,
@@ -18,15 +23,17 @@ pub struct CreateBomParams {
     pub ready_to_produce: String,
     pub consumption: String,
     pub sequence: u32,
-    pub lines: Vec<BomLineInput>,
-    pub picking_type_id: Option<u64>,
-    pub location_src_id: Option<u64>,
-    pub location_dest_id: Option<u64>,
-    pub warehouse_id: Option<u64>,
-    pub routing_id: Option<u64>,
-    pub metadata: Option<String>,
+    pub lines: Vec::<BomLineInput>,
+    pub picking_type_id: Option::<u64>,
+    pub location_src_id: Option::<u64>,
+    pub location_dest_id: Option::<u64>,
+    pub warehouse_id: Option::<u64>,
+    pub routing_id: Option::<u64>,
+    pub metadata: Option::<String>,
 }
+
 
 impl __sdk::InModule for CreateBomParams {
     type Module = super::RemoteModule;
 }
+

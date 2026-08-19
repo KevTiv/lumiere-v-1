@@ -11,6 +11,8 @@ pub struct CreateFleetVehicleParams {
     pub vehicle_type: String,
     pub license_plate: Option<String>,
     pub driver_name: Option<String>,
+    pub driver_id: Option<u64>,
+    pub service_type_id: Option<u64>,
     pub metadata: Option<String>,
 }
 

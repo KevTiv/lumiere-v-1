@@ -19,6 +19,7 @@ pub struct AmendSubscriptionParams {
     pub income_account_id: Option<u64>,
     pub receivable_account_id: Option<u64>,
     pub notes: Option<String>,
+    pub parent_line_id: Option<u64>,
 }
 
 impl __sdk::InModule for AmendSubscriptionParams {

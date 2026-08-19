@@ -146,6 +146,483 @@
         "archived_at",
         "payload_checksum"
       ]
+    },
+    "pos_order": {
+      "cold_table": "cold_pos_order",
+      "columns": [
+        {
+          "api_json": "string",
+          "name": "id",
+          "nullable": false,
+          "pg_bind": "to_sql_numeric",
+          "pg_from": "from_sql_numeric_to_string",
+          "pg_type": "NUMERIC(20,0)",
+          "stdb_type": "U64"
+        },
+        {
+          "api_json": "string",
+          "name": "organization_id",
+          "nullable": false,
+          "pg_bind": "to_sql_numeric",
+          "pg_from": "from_sql_numeric_to_string",
+          "pg_type": "NUMERIC(20,0)",
+          "stdb_type": "U64"
+        },
+        {
+          "api_json": "string",
+          "name": "uid",
+          "nullable": false,
+          "pg_bind": "to_sql_text",
+          "pg_from": "from_sql_text",
+          "pg_type": "TEXT",
+          "stdb_type": "String"
+        },
+        {
+          "api_json": "string",
+          "name": "ticket_number",
+          "nullable": true,
+          "pg_bind": "to_sql_text",
+          "pg_from": "from_sql_text",
+          "pg_type": "TEXT",
+          "stdb_type": "String"
+        },
+        {
+          "api_json": "string",
+          "name": "session_id",
+          "nullable": false,
+          "pg_bind": "to_sql_numeric",
+          "pg_from": "from_sql_numeric_to_string",
+          "pg_type": "NUMERIC(20,0)",
+          "stdb_type": "U64"
+        },
+        {
+          "api_json": "string",
+          "name": "config_id",
+          "nullable": false,
+          "pg_bind": "to_sql_numeric",
+          "pg_from": "from_sql_numeric_to_string",
+          "pg_type": "NUMERIC(20,0)",
+          "stdb_type": "U64"
+        },
+        {
+          "api_json": "string",
+          "name": "state",
+          "nullable": false,
+          "pg_bind": "to_sql_text",
+          "pg_from": "from_sql_text",
+          "pg_type": "TEXT",
+          "stdb_type": "Enum(\"PosOrderState\")"
+        },
+        {
+          "api_json": "string",
+          "name": "user_id",
+          "nullable": false,
+          "pg_bind": "to_sql_bytea",
+          "pg_from": "from_sql_bytea_to_hex_string",
+          "pg_type": "BYTEA",
+          "stdb_type": "Identity"
+        },
+        {
+          "api_json": "number",
+          "name": "amount_paid",
+          "nullable": false,
+          "pg_bind": "to_sql_f64",
+          "pg_from": "from_sql_f64_to_number",
+          "pg_type": "DOUBLE PRECISION",
+          "stdb_type": "F64"
+        },
+        {
+          "api_json": "number",
+          "name": "amount_return",
+          "nullable": false,
+          "pg_bind": "to_sql_f64",
+          "pg_from": "from_sql_f64_to_number",
+          "pg_type": "DOUBLE PRECISION",
+          "stdb_type": "F64"
+        },
+        {
+          "api_json": "number",
+          "name": "amount_tax",
+          "nullable": false,
+          "pg_bind": "to_sql_f64",
+          "pg_from": "from_sql_f64_to_number",
+          "pg_type": "DOUBLE PRECISION",
+          "stdb_type": "F64"
+        },
+        {
+          "api_json": "number",
+          "name": "amount_total",
+          "nullable": false,
+          "pg_bind": "to_sql_f64",
+          "pg_from": "from_sql_f64_to_number",
+          "pg_type": "DOUBLE PRECISION",
+          "stdb_type": "F64"
+        },
+        {
+          "api_json": "number",
+          "name": "amount_discount",
+          "nullable": false,
+          "pg_bind": "to_sql_f64",
+          "pg_from": "from_sql_f64_to_number",
+          "pg_type": "DOUBLE PRECISION",
+          "stdb_type": "F64"
+        },
+        {
+          "api_json": "number",
+          "name": "amount_delivery",
+          "nullable": false,
+          "pg_bind": "to_sql_f64",
+          "pg_from": "from_sql_f64_to_number",
+          "pg_type": "DOUBLE PRECISION",
+          "stdb_type": "F64"
+        },
+        {
+          "api_json": "number",
+          "name": "amount_subtotal",
+          "nullable": false,
+          "pg_bind": "to_sql_f64",
+          "pg_from": "from_sql_f64_to_number",
+          "pg_type": "DOUBLE PRECISION",
+          "stdb_type": "F64"
+        },
+        {
+          "api_json": "string",
+          "name": "company_id",
+          "nullable": false,
+          "pg_bind": "to_sql_numeric",
+          "pg_from": "from_sql_numeric_to_string",
+          "pg_type": "NUMERIC(20,0)",
+          "stdb_type": "U64"
+        },
+        {
+          "api_json": "string",
+          "name": "pricelist_id",
+          "nullable": false,
+          "pg_bind": "to_sql_numeric",
+          "pg_from": "from_sql_numeric_to_string",
+          "pg_type": "NUMERIC(20,0)",
+          "stdb_type": "U64"
+        },
+        {
+          "api_json": "string",
+          "name": "partner_id",
+          "nullable": true,
+          "pg_bind": "to_sql_numeric",
+          "pg_from": "from_sql_numeric_to_string",
+          "pg_type": "NUMERIC(20,0)",
+          "stdb_type": "U64"
+        },
+        {
+          "api_json": "string",
+          "name": "sequence_number",
+          "nullable": false,
+          "pg_bind": "to_sql_bigint_u",
+          "pg_from": "from_sql_bigint_to_string",
+          "pg_type": "BIGINT",
+          "stdb_type": "U32"
+        },
+        {
+          "api_json": "number",
+          "name": "loyalty_points",
+          "nullable": false,
+          "pg_bind": "to_sql_f64",
+          "pg_from": "from_sql_f64_to_number",
+          "pg_type": "DOUBLE PRECISION",
+          "stdb_type": "F64"
+        },
+        {
+          "api_json": "boolean",
+          "name": "to_invoice",
+          "nullable": false,
+          "pg_bind": "to_sql_bool",
+          "pg_from": "from_sql_bool",
+          "pg_type": "BOOLEAN",
+          "stdb_type": "Bool"
+        },
+        {
+          "api_json": "boolean",
+          "name": "is_tipped",
+          "nullable": false,
+          "pg_bind": "to_sql_bool",
+          "pg_from": "from_sql_bool",
+          "pg_type": "BOOLEAN",
+          "stdb_type": "Bool"
+        },
+        {
+          "api_json": "number",
+          "name": "tip_amount",
+          "nullable": false,
+          "pg_bind": "to_sql_f64",
+          "pg_from": "from_sql_f64_to_number",
+          "pg_type": "DOUBLE PRECISION",
+          "stdb_type": "F64"
+        },
+        {
+          "api_json": "string",
+          "name": "access_token",
+          "nullable": true,
+          "pg_bind": "to_sql_text",
+          "pg_from": "from_sql_text",
+          "pg_type": "TEXT",
+          "stdb_type": "String"
+        },
+        {
+          "api_json": "array",
+          "name": "lines",
+          "nullable": false,
+          "pg_bind": "to_sql_jsonb",
+          "pg_from": "from_sql_jsonb_to_array",
+          "pg_type": "JSONB",
+          "stdb_type": "Vec(U64)"
+        },
+        {
+          "api_json": "array",
+          "name": "statement_ids",
+          "nullable": false,
+          "pg_bind": "to_sql_jsonb",
+          "pg_from": "from_sql_jsonb_to_array",
+          "pg_type": "JSONB",
+          "stdb_type": "Vec(U64)"
+        },
+        {
+          "api_json": "string",
+          "name": "pos_reference",
+          "nullable": true,
+          "pg_bind": "to_sql_text",
+          "pg_from": "from_sql_text",
+          "pg_type": "TEXT",
+          "stdb_type": "String"
+        },
+        {
+          "api_json": "string",
+          "name": "sale_journal",
+          "nullable": false,
+          "pg_bind": "to_sql_numeric",
+          "pg_from": "from_sql_numeric_to_string",
+          "pg_type": "NUMERIC(20,0)",
+          "stdb_type": "U64"
+        },
+        {
+          "api_json": "string",
+          "name": "account_move",
+          "nullable": true,
+          "pg_bind": "to_sql_numeric",
+          "pg_from": "from_sql_numeric_to_string",
+          "pg_type": "NUMERIC(20,0)",
+          "stdb_type": "U64"
+        },
+        {
+          "api_json": "string",
+          "name": "picking_id",
+          "nullable": true,
+          "pg_bind": "to_sql_numeric",
+          "pg_from": "from_sql_numeric_to_string",
+          "pg_type": "NUMERIC(20,0)",
+          "stdb_type": "U64"
+        },
+        {
+          "api_json": "string",
+          "name": "picking_type_id",
+          "nullable": true,
+          "pg_bind": "to_sql_numeric",
+          "pg_from": "from_sql_numeric_to_string",
+          "pg_type": "NUMERIC(20,0)",
+          "stdb_type": "U64"
+        },
+        {
+          "api_json": "string",
+          "name": "location_id",
+          "nullable": false,
+          "pg_bind": "to_sql_numeric",
+          "pg_from": "from_sql_numeric_to_string",
+          "pg_type": "NUMERIC(20,0)",
+          "stdb_type": "U64"
+        },
+        {
+          "api_json": "string",
+          "name": "note",
+          "nullable": true,
+          "pg_bind": "to_sql_text",
+          "pg_from": "from_sql_text",
+          "pg_type": "TEXT",
+          "stdb_type": "String"
+        },
+        {
+          "api_json": "string",
+          "name": "nb_print",
+          "nullable": false,
+          "pg_bind": "to_sql_bigint_u",
+          "pg_from": "from_sql_bigint_to_string",
+          "pg_type": "BIGINT",
+          "stdb_type": "U32"
+        },
+        {
+          "api_json": "string",
+          "name": "pos_name",
+          "nullable": true,
+          "pg_bind": "to_sql_text",
+          "pg_from": "from_sql_text",
+          "pg_type": "TEXT",
+          "stdb_type": "String"
+        },
+        {
+          "api_json": "string",
+          "name": "pos_version",
+          "nullable": true,
+          "pg_bind": "to_sql_text",
+          "pg_from": "from_sql_text",
+          "pg_type": "TEXT",
+          "stdb_type": "String"
+        },
+        {
+          "api_json": "string",
+          "name": "pos_session_version",
+          "nullable": true,
+          "pg_bind": "to_sql_text",
+          "pg_from": "from_sql_text",
+          "pg_type": "TEXT",
+          "stdb_type": "String"
+        },
+        {
+          "api_json": "string",
+          "name": "crm_team_id",
+          "nullable": true,
+          "pg_bind": "to_sql_numeric",
+          "pg_from": "from_sql_numeric_to_string",
+          "pg_type": "NUMERIC(20,0)",
+          "stdb_type": "U64"
+        },
+        {
+          "api_json": "string",
+          "name": "procurement_group_id",
+          "nullable": true,
+          "pg_bind": "to_sql_numeric",
+          "pg_from": "from_sql_numeric_to_string",
+          "pg_type": "NUMERIC(20,0)",
+          "stdb_type": "U64"
+        },
+        {
+          "api_json": "number",
+          "name": "margin",
+          "nullable": false,
+          "pg_bind": "to_sql_f64",
+          "pg_from": "from_sql_f64_to_number",
+          "pg_type": "DOUBLE PRECISION",
+          "stdb_type": "F64"
+        },
+        {
+          "api_json": "number",
+          "name": "margin_percent",
+          "nullable": false,
+          "pg_bind": "to_sql_f64",
+          "pg_from": "from_sql_f64_to_number",
+          "pg_type": "DOUBLE PRECISION",
+          "stdb_type": "F64"
+        },
+        {
+          "api_json": "boolean",
+          "name": "is_partially_paid",
+          "nullable": false,
+          "pg_bind": "to_sql_bool",
+          "pg_from": "from_sql_bool",
+          "pg_type": "BOOLEAN",
+          "stdb_type": "Bool"
+        },
+        {
+          "api_json": "string",
+          "name": "shipping_date",
+          "nullable": true,
+          "pg_bind": "to_sql_bigint",
+          "pg_from": "from_sql_bigint_to_iso_string",
+          "pg_type": "BIGINT",
+          "stdb_type": "Timestamp"
+        },
+        {
+          "api_json": "string",
+          "name": "last_order_preparation_change",
+          "nullable": true,
+          "pg_bind": "to_sql_text",
+          "pg_from": "from_sql_text",
+          "pg_type": "TEXT",
+          "stdb_type": "String"
+        },
+        {
+          "api_json": "string",
+          "name": "date_order",
+          "nullable": false,
+          "pg_bind": "to_sql_bigint",
+          "pg_from": "from_sql_bigint_to_iso_string",
+          "pg_type": "BIGINT",
+          "stdb_type": "Timestamp"
+        },
+        {
+          "api_json": "string",
+          "name": "create_uid",
+          "nullable": false,
+          "pg_bind": "to_sql_bytea",
+          "pg_from": "from_sql_bytea_to_hex_string",
+          "pg_type": "BYTEA",
+          "stdb_type": "Identity"
+        },
+        {
+          "api_json": "string",
+          "name": "create_date",
+          "nullable": false,
+          "pg_bind": "to_sql_bigint",
+          "pg_from": "from_sql_bigint_to_iso_string",
+          "pg_type": "BIGINT",
+          "stdb_type": "Timestamp"
+        },
+        {
+          "api_json": "string",
+          "name": "write_uid",
+          "nullable": false,
+          "pg_bind": "to_sql_bytea",
+          "pg_from": "from_sql_bytea_to_hex_string",
+          "pg_type": "BYTEA",
+          "stdb_type": "Identity"
+        },
+        {
+          "api_json": "string",
+          "name": "write_date",
+          "nullable": false,
+          "pg_bind": "to_sql_bigint",
+          "pg_from": "from_sql_bigint_to_iso_string",
+          "pg_type": "BIGINT",
+          "stdb_type": "Timestamp"
+        },
+        {
+          "api_json": "string",
+          "name": "metadata",
+          "nullable": true,
+          "pg_bind": "to_sql_text",
+          "pg_from": "from_sql_text",
+          "pg_type": "TEXT",
+          "stdb_type": "String"
+        },
+        {
+          "api_json": "string",
+          "name": "cold_eligible_at",
+          "nullable": true,
+          "pg_bind": "to_sql_bigint",
+          "pg_from": "from_sql_bigint_to_iso_string",
+          "pg_type": "BIGINT",
+          "stdb_type": "Timestamp"
+        },
+        {
+          "api_json": "string",
+          "name": "archive_version",
+          "nullable": false,
+          "pg_bind": "to_sql_numeric",
+          "pg_from": "from_sql_numeric_to_string",
+          "pg_type": "NUMERIC(20,0)",
+          "stdb_type": "U64"
+        }
+      ],
+      "extra_columns": [
+        "archived_at",
+        "payload_checksum"
+      ]
     }
   },
   "version": 1

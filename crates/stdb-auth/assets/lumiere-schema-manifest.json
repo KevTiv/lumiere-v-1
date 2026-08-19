@@ -10215,6 +10215,67 @@
       ]
     },
     {
+      "rust_name": "ColdTierServiceIdentity",
+      "sql_name": "cold_tier_service_identity",
+      "primary_key": {
+        "column_name": "id",
+        "ty": "U64"
+      },
+      "columns": [
+        {
+          "name": "id",
+          "sql_name": "id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
+          "name": "service_name",
+          "sql_name": "service_name",
+          "ty": "String",
+          "nullable": false
+        },
+        {
+          "name": "identity",
+          "sql_name": "identity",
+          "ty": "Identity",
+          "nullable": false
+        },
+        {
+          "name": "is_active",
+          "sql_name": "is_active",
+          "ty": "Bool",
+          "nullable": false
+        },
+        {
+          "name": "registered_by",
+          "sql_name": "registered_by",
+          "ty": "Identity",
+          "nullable": false
+        },
+        {
+          "name": "registered_at",
+          "sql_name": "registered_at",
+          "ty": "Timestamp",
+          "nullable": false
+        },
+        {
+          "name": "retired_at",
+          "sql_name": "retired_at",
+          "ty": "Timestamp",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "cold_tier_service_identity_service_name",
+          "columns": [
+            "service_name"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
       "rust_name": "CommodityPriceIndex",
       "sql_name": "commodity_price_index",
       "primary_key": {
@@ -17170,7 +17231,13 @@
         {
           "name": "driver_id",
           "sql_name": "driver_id",
-          "ty": "Identity",
+          "ty": "U64",
+          "nullable": true
+        },
+        {
+          "name": "service_type_id",
+          "sql_name": "service_type_id",
+          "ty": "U64",
           "nullable": true
         },
         {
@@ -17279,6 +17346,79 @@
           "name": "fleet_vehicle_status",
           "columns": [
             "status"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "rust_name": "FleetVehicleServiceType",
+      "sql_name": "fleet_vehicle_service_type",
+      "primary_key": {
+        "column_name": "id",
+        "ty": "U64"
+      },
+      "columns": [
+        {
+          "name": "id",
+          "sql_name": "id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
+          "name": "organization_id",
+          "sql_name": "organization_id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
+          "name": "company_id",
+          "sql_name": "company_id",
+          "ty": "U64",
+          "nullable": true
+        },
+        {
+          "name": "name",
+          "sql_name": "name",
+          "ty": "String",
+          "nullable": false
+        },
+        {
+          "name": "is_active",
+          "sql_name": "is_active",
+          "ty": "Bool",
+          "nullable": false
+        },
+        {
+          "name": "create_uid",
+          "sql_name": "create_uid",
+          "ty": "Identity",
+          "nullable": false
+        },
+        {
+          "name": "create_date",
+          "sql_name": "create_date",
+          "ty": "Timestamp",
+          "nullable": false
+        },
+        {
+          "name": "write_uid",
+          "sql_name": "write_uid",
+          "ty": "Identity",
+          "nullable": false
+        },
+        {
+          "name": "write_date",
+          "sql_name": "write_date",
+          "ty": "Timestamp",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "fleet_vehicle_service_type_organization_id",
+          "columns": [
+            "organization_id"
           ],
           "unique": false
         }
@@ -17934,6 +18074,12 @@
           "nullable": false
         },
         {
+          "name": "company_id",
+          "sql_name": "company_id",
+          "ty": "U64",
+          "nullable": true
+        },
+        {
           "name": "name",
           "sql_name": "name",
           "ty": "String",
@@ -18332,6 +18478,43 @@
       ]
     },
     {
+      "rust_name": "HelpdeskSlaCheckJob",
+      "sql_name": "helpdesk_sla_check_job",
+      "primary_key": {
+        "column_name": "scheduled_id",
+        "ty": "U64"
+      },
+      "columns": [
+        {
+          "name": "scheduled_id",
+          "sql_name": "scheduled_id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
+          "name": "scheduled_at",
+          "sql_name": "scheduled_at",
+          "ty": {
+            "Struct": "ScheduleAt"
+          },
+          "nullable": false
+        },
+        {
+          "name": "organization_id",
+          "sql_name": "organization_id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
+          "name": "ticket_id",
+          "sql_name": "ticket_id",
+          "ty": "U64",
+          "nullable": false
+        }
+      ],
+      "indexes": []
+    },
+    {
       "rust_name": "HelpdeskStage",
       "sql_name": "helpdesk_stage",
       "primary_key": {
@@ -18461,6 +18644,62 @@
           "name": "helpdesk_team_organization_id",
           "columns": [
             "organization_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "rust_name": "HelpdeskTeamMember",
+      "sql_name": "helpdesk_team_member",
+      "primary_key": {
+        "column_name": "id",
+        "ty": "U64"
+      },
+      "columns": [
+        {
+          "name": "id",
+          "sql_name": "id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
+          "name": "organization_id",
+          "sql_name": "organization_id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
+          "name": "team_id",
+          "sql_name": "team_id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
+          "name": "identity",
+          "sql_name": "identity",
+          "ty": "Identity",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "sql_name": "created_at",
+          "ty": "Timestamp",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "helpdesk_team_member_organization_id",
+          "columns": [
+            "organization_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "helpdesk_team_member_team_id",
+          "columns": [
+            "team_id"
           ],
           "unique": false
         }
@@ -25211,6 +25450,12 @@
           "nullable": false
         },
         {
+          "name": "company_id",
+          "sql_name": "company_id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
           "name": "action_type",
           "sql_name": "action_type",
           "ty": "String",
@@ -25312,6 +25557,12 @@
         {
           "name": "organization_id",
           "sql_name": "organization_id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
+          "name": "company_id",
+          "sql_name": "company_id",
           "ty": "U64",
           "nullable": false
         },
@@ -25714,6 +25965,12 @@
           "nullable": false
         },
         {
+          "name": "company_id",
+          "sql_name": "company_id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
           "name": "sensor_type",
           "sql_name": "sensor_type",
           "ty": "String",
@@ -25790,6 +26047,12 @@
         {
           "name": "organization_id",
           "sql_name": "organization_id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
+          "name": "company_id",
+          "sql_name": "company_id",
           "ty": "U64",
           "nullable": false
         },
@@ -32060,6 +32323,12 @@
           "nullable": false
         },
         {
+          "name": "organization_id",
+          "sql_name": "organization_id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
           "name": "uid",
           "sql_name": "uid",
           "ty": "String",
@@ -32352,9 +32621,28 @@
           "sql_name": "metadata",
           "ty": "String",
           "nullable": true
+        },
+        {
+          "name": "cold_eligible_at",
+          "sql_name": "cold_eligible_at",
+          "ty": "Timestamp",
+          "nullable": true
+        },
+        {
+          "name": "archive_version",
+          "sql_name": "archive_version",
+          "ty": "U64",
+          "nullable": false
         }
       ],
       "indexes": [
+        {
+          "name": "pos_order_organization_id",
+          "columns": [
+            "organization_id"
+          ],
+          "unique": false
+        },
         {
           "name": "pos_order_partner_id",
           "columns": [
@@ -34384,6 +34672,12 @@
           "sql_name": "organization_id",
           "ty": "U64",
           "nullable": false
+        },
+        {
+          "name": "company_id",
+          "sql_name": "company_id",
+          "ty": "U64",
+          "nullable": true
         },
         {
           "name": "name",
@@ -37334,6 +37628,92 @@
           "name": "project_task_state",
           "columns": [
             "state"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "rust_name": "ProjectTaskStage",
+      "sql_name": "project_task_stage",
+      "primary_key": {
+        "column_name": "id",
+        "ty": "U64"
+      },
+      "columns": [
+        {
+          "name": "id",
+          "sql_name": "id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
+          "name": "organization_id",
+          "sql_name": "organization_id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
+          "name": "company_id",
+          "sql_name": "company_id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
+          "name": "project_id",
+          "sql_name": "project_id",
+          "ty": "U64",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "sql_name": "name",
+          "ty": "String",
+          "nullable": false
+        },
+        {
+          "name": "sequence",
+          "sql_name": "sequence",
+          "ty": "U32",
+          "nullable": false
+        },
+        {
+          "name": "is_closed",
+          "sql_name": "is_closed",
+          "ty": "Bool",
+          "nullable": false
+        },
+        {
+          "name": "active",
+          "sql_name": "active",
+          "ty": "Bool",
+          "nullable": false
+        },
+        {
+          "name": "create_uid",
+          "sql_name": "create_uid",
+          "ty": "Identity",
+          "nullable": false
+        },
+        {
+          "name": "create_date",
+          "sql_name": "create_date",
+          "ty": "Timestamp",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "project_task_stage_organization_id",
+          "columns": [
+            "organization_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "project_task_stage_project_id",
+          "columns": [
+            "project_id"
           ],
           "unique": false
         }
@@ -56952,6 +57332,12 @@
           "sql_name": "organization_id",
           "ty": "U64",
           "nullable": false
+        },
+        {
+          "name": "company_id",
+          "sql_name": "company_id",
+          "ty": "U64",
+          "nullable": true
         },
         {
           "name": "name",
