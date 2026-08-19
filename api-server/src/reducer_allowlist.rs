@@ -53,6 +53,9 @@ pub fn blocked_reducer_reason(reducer: &str, mode: ReducerAllowlistMode) -> Opti
         "delete_organization" | "purge_organization_data" => {
             Some("destructive organization reducers are not callable via the public API")
         }
+        "finalize_audit_log_archive" => {
+            Some("cold-tier finalize reducers require the trusted drainer's server identity")
+        }
         "record_ai_skill_test_run"
         | "claim_ai_skill_certification"
         | "complete_ai_skill_certification"
@@ -124,6 +127,17 @@ mod tests {
                 "{reducer} should not be callable through the public API",
             );
         }
+    }
+
+    #[test]
+    fn strict_blocks_audit_cold_tier_finalize() {
+        assert!(
+            blocked_reducer_reason("finalize_audit_log_archive", ReducerAllowlistMode::Strict)
+                .is_some(),
+            "finalize_audit_log_archive has no auth check of its own — it trusts the caller's \
+             checksum, so it must not be reachable through the public API (only the drainer's \
+             server-token client calls it directly against SpacetimeDB, bypassing this gateway)"
+        );
     }
 
     #[test]

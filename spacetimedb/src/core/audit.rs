@@ -40,7 +40,7 @@ use crate::helpers::check_permission;
 /// Compute the canonical checksum for one `AuditLog` row. See the module
 /// note above `finalize_audit_log_archive` for why this must mirror the
 /// drainer's `canonical_row_json` exactly.
-fn audit_log_canonical_checksum(row: &AuditLog) -> String {
+pub(crate) fn audit_log_canonical_checksum(row: &AuditLog) -> String {
     use sha2::{Digest, Sha256};
 
     let value = serde_json::json!({
