@@ -117,12 +117,17 @@ pub struct PosSession {
     accessor = pos_order,
     public,
     index(accessor = pos_order_by_session, btree(columns = [session_id])),
-    index(accessor = pos_order_by_partner, btree(columns = [partner_id]))
+    index(accessor = pos_order_by_partner, btree(columns = [partner_id])),
+    index(accessor = pos_order_by_org, btree(columns = [organization_id]))
 )]
 pub struct PosOrder {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Direct org scope (cold-tier read plans and every other archive-candidate
+    /// table assume this is a plain column, not derivable only via
+    /// `session_id` → `PosSession.organization_id`).
+    pub organization_id: u64,
     pub uid: String,
     pub ticket_number: Option<String>,
     pub session_id: u64,
@@ -171,6 +176,22 @@ pub struct PosOrder {
     pub write_uid: Identity,
     pub write_date: Timestamp,
     pub metadata: Option<String>,
+    /// Cold-tier: when this row became archive-eligible (docs/plans/sliding-
+    /// window-cold-tier.md §5). `PosOrder` is created directly in a terminal
+    /// state (`Paid`) with no reducer ever mutating it afterward, so this is
+    /// stamped at creation time — unlike resources with a separate
+    /// "finalize the transaction" transition, there's no later event to wait
+    /// for. `None` is reserved for a possible future non-terminal creation
+    /// path (e.g. an unpaid/held order); no such path exists today.
+    pub cold_eligible_at: Option<Timestamp>,
+    /// Cold-tier: generation counter for the archived representation.
+    /// Starts at 1 (matches `conventions::ARCHIVE_VERSION_INITIAL` in
+    /// `api-server/src/cold_tier/conventions.rs` — this crate can't import
+    /// that one, it's a native/wasm split, so the constant is duplicated
+    /// here as a literal). No reducer increments it today because nothing
+    /// mutates a `PosOrder` after creation; a future mutator would need to
+    /// bump it, matching the version-checked finalize/rehydration protocol.
+    pub archive_version: u64,
 }
 
 #[table(
@@ -687,6 +708,7 @@ pub fn create_pos_order(
 
     let order = ctx.db.pos_order().insert(PosOrder {
         id: 0,
+        organization_id,
         uid: uid.clone(),
         ticket_number: Some(format!("TICKET-{}", uid)),
         session_id: params.session_id,
@@ -735,6 +757,8 @@ pub fn create_pos_order(
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         metadata: None,
+        cold_eligible_at: Some(ctx.timestamp),
+        archive_version: 1,
     });
 
     for line_id in &line_ids {

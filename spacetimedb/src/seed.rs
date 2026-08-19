@@ -9061,6 +9061,7 @@ Prioritize high-severity findings and cite related records."#,
     let pos_order_uid = format!("{}-{}-1", pos_config_frontdesk.id, pos_session_history.id);
     let pos_order_demo = ctx.db.pos_order().insert(PosOrder {
         id: 0,
+        organization_id: org_id,
         uid: pos_order_uid.clone(),
         ticket_number: Some(format!("TICKET-{}", pos_order_uid)),
         session_id: pos_session_history.id,
@@ -9109,6 +9110,8 @@ Prioritize high-severity findings and cite related records."#,
         write_uid: seeder,
         write_date: ctx.timestamp,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
+        cold_eligible_at: Some(ctx.timestamp),
+        archive_version: 1,
     });
     ctx.db.pos_order_line().id().update(PosOrderLine {
         order_id: pos_order_demo.id,
