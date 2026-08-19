@@ -56,6 +56,9 @@ pub fn blocked_reducer_reason(reducer: &str, mode: ReducerAllowlistMode) -> Opti
         "finalize_audit_log_archive" => {
             Some("cold-tier finalize reducers require the trusted drainer's server identity")
         }
+        "register_cold_tier_service_identity" => {
+            Some("cold-tier service identity registration is an ops action, not an app action")
+        }
         "record_ai_skill_test_run"
         | "claim_ai_skill_certification"
         | "complete_ai_skill_certification"
@@ -138,6 +141,15 @@ mod tests {
              checksum, so it must not be reachable through the public API (only the drainer's \
              server-token client calls it directly against SpacetimeDB, bypassing this gateway)"
         );
+    }
+
+    #[test]
+    fn strict_blocks_cold_tier_service_identity_registration() {
+        assert!(blocked_reducer_reason(
+            "register_cold_tier_service_identity",
+            ReducerAllowlistMode::Strict
+        )
+        .is_some());
     }
 
     #[test]

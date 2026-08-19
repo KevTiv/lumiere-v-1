@@ -21,6 +21,20 @@
 //! next batch will simply not see that row again (it's gone from STDB), and
 //! [`crate::cold_tier::ledger::mark_finalized`] can be re-run for stragglers
 //! by a recovery/audit job if needed.
+//!
+//! ## One-time setup: registering this drainer's identity
+//!
+//! `finalize_audit_log_archive` only trusts calls from the identity
+//! registered as `"audit_cold_drainer"` in SpacetimeDB's
+//! `cold_tier_service_identity` table (`spacetimedb/src/core/cold_tier_identity.rs`)
+//! — a checksum only authenticates *which row*, never *who's allowed to
+//! delete it*, and this service's identity (the shared `STDB_SERVER_TOKEN`
+//! this drainer uses via `AppState::stdb`) is otherwise indistinguishable
+//! from any other caller holding a valid SpacetimeDB identity token. Before
+//! this drainer can finalize anything in a new environment, a superuser
+//! must call, once, directly against SpacetimeDB (not through api-server's
+//! gateway — `register_cold_tier_service_identity` is blocked there):
+//! `register_cold_tier_service_identity(service_name: "audit_cold_drainer", identity: <this drainer's STDB_SERVER_TOKEN identity>)`.
 
 use std::{
     net::SocketAddr,

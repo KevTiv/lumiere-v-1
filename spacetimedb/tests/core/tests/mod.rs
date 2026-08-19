@@ -27,7 +27,9 @@ pub fn run_core_audit_finalize_test(ctx: &ReducerContext) -> Result<(), String> 
     audit_finalize_test::test_finalize_is_idempotent_when_already_gone(ctx)
         .map_err(|e| format!("finalize_idempotent: {e}"))?;
     audit_finalize_test::test_finalize_rejects_checksum_from_a_different_row(ctx)
-        .map_err(|e| format!("finalize_cross_row_checksum: {e}"))
+        .map_err(|e| format!("finalize_cross_row_checksum: {e}"))?;
+    audit_finalize_test::test_finalize_rejects_unregistered_caller(ctx)
+        .map_err(|e| format!("finalize_unregistered_caller: {e}"))
 }
 
 #[spacetimedb::reducer]

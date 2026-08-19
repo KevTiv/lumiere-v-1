@@ -224,6 +224,30 @@ pub fn finalize_audit_log_archive(
     id: u64,
     expected_payload_checksum: String,
 ) -> Result<(), String> {
+    if !crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
+        ctx,
+        crate::core::cold_tier_identity::AUDIT_COLD_DRAINER_SERVICE,
+    ) {
+        return Err(
+            "finalize_audit_log_archive: caller is not the registered audit cold-drainer identity"
+                .to_string(),
+        );
+    }
+
+    finalize_audit_log_archive_checked(ctx, id, expected_payload_checksum)
+}
+
+/// The checksum-verification/deletion logic, split out from the reducer so
+/// tests can exercise it directly without needing to fake `ctx.sender()` as
+/// the registered drainer identity (there's no way to do that from within a
+/// single reducer invocation — `ctx.sender()` is fixed for the whole call).
+/// The identity gate itself is covered separately by calling the public
+/// reducer as an unregistered caller and expecting it to fail.
+pub(crate) fn finalize_audit_log_archive_checked(
+    ctx: &ReducerContext,
+    id: u64,
+    expected_payload_checksum: String,
+) -> Result<(), String> {
     let Some(row) = ctx.db.audit_log().id().find(id) else {
         // Already finalized by a prior/racing call.
         return Ok(());
