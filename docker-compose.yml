@@ -180,6 +180,31 @@ services:
       - "8094"
     restart: unless-stopped
 
+  pos-order-cold-drainer:
+    build:
+      context: .
+      dockerfile: Dockerfile.rust
+      args:
+        BIN: pos-order-cold-drainer
+    environment:
+      NODE_ENV: production
+      STDB_HOST: ${STDB_HOST:-https://maincloud.spacetimedb.com}
+      STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE}
+      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN}
+      # Same reasoning as audit-cold-drainer: PG is this service's only job.
+      PG_HOST: ${PG_HOST:?set PG_HOST}
+      PG_PORT: ${PG_PORT:-5432}
+      PG_DATABASE: ${PG_DATABASE:-lumiere}
+      PG_USER: ${PG_USER:-lumiere}
+      PG_PASSWORD: ${PG_PASSWORD:?set PG_PASSWORD}
+      PG_TLS_MODE: ${PG_TLS_MODE:-require}
+      LUMIERE_POS_ORDER_DRAINER_POLL_SECS: ${LUMIERE_POS_ORDER_DRAINER_POLL_SECS:-5}
+      LUMIERE_POS_ORDER_DRAINER_BATCH: ${LUMIERE_POS_ORDER_DRAINER_BATCH:-200}
+      LUMIERE_POS_ORDER_DRAINER_PORT: 8095
+    expose:
+      - "8095"
+    restart: unless-stopped
+
   ai-gateway:
     build:
       context: .

@@ -11,22 +11,37 @@ use deadpool_postgres::Pool;
 
 use super::ledger;
 
-/// Generated per-resource cold-table DDL. Each entry is
-/// `(source .sql file description, DDL text)`; kept as a `const` include so
-/// this stays in lockstep with whatever `lumiere-codegen` last emitted,
-/// without needing a filesystem read at runtime.
-const COLD_AUDIT_LOG_DDL: &str =
-    include_str!("../generated/pg_ddl/cold_audit_log.sql");
+/// Generated per-resource cold-table DDL, one `include_str!` per active
+/// archive candidate (`lumiere-codegen/archive-candidates.json`). `include_str!`
+/// keeps this in lockstep with whatever `lumiere-codegen` last emitted
+/// without a filesystem read at runtime — but it does mean each new
+/// candidate needs a line added here; there's no glob-at-compile-time this
+/// crate does automatically.
+const GENERATED_COLD_TABLE_DDL: &[(&str, &str)] = &[
+    (
+        "cold_audit_log.sql",
+        include_str!("../generated/pg_ddl/cold_audit_log.sql"),
+    ),
+    (
+        "cold_pos_order.sql",
+        include_str!("../generated/pg_ddl/cold_pos_order.sql"),
+    ),
+];
 
 /// Apply every cold-tier DDL statement. Safe to call unconditionally on
 /// process startup.
 pub async fn ensure_schema(pool: &Pool) -> Result<()> {
-    let client = pool.get().await.context("get PG client for ensure_schema")?;
-
-    client
-        .batch_execute(COLD_AUDIT_LOG_DDL)
+    let client = pool
+        .get()
         .await
-        .context("apply cold_audit_log.sql")?;
+        .context("get PG client for ensure_schema")?;
+
+    for (file_name, ddl) in GENERATED_COLD_TABLE_DDL {
+        client
+            .batch_execute(ddl)
+            .await
+            .with_context(|| format!("apply {file_name}"))?;
+    }
 
     client
         .batch_execute(ledger::ARCHIVE_TRANSFER_DDL)

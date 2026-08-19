@@ -28,7 +28,9 @@ pub mod conventions;
 pub mod cursor;
 pub mod ledger;
 pub mod migrate;
+pub mod pg_codec;
 pub mod pg_pool;
+pub mod pos_order_drainer;
 
 /// The canonical read contract for one API resource request.
 ///

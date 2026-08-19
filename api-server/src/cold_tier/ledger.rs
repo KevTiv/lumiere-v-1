@@ -46,7 +46,10 @@ pub async fn record_transfer(
     archive_version: i64,
     payload_checksum: &str,
 ) -> Result<()> {
-    let client = pool.get().await.context("get PG client for record_transfer")?;
+    let client = pool
+        .get()
+        .await
+        .context("get PG client for record_transfer")?;
     client
         .execute(
             "INSERT INTO archive_transfer \
@@ -74,7 +77,10 @@ pub async fn record_transfer(
 /// Mark `resource`/`row_id`'s transfer as finalized (the STDB row has been
 /// deleted). Idempotent — safe to call even if already marked.
 pub async fn mark_finalized(pool: &Pool, resource: &str, row_id: &str) -> Result<()> {
-    let client = pool.get().await.context("get PG client for mark_finalized")?;
+    let client = pool
+        .get()
+        .await
+        .context("get PG client for mark_finalized")?;
     client
         .execute(
             "UPDATE archive_transfer SET stdb_finalized_at = now() \
@@ -93,7 +99,8 @@ mod tests {
     #[test]
     fn ddl_creates_expected_table_and_index() {
         assert!(ARCHIVE_TRANSFER_DDL.contains("CREATE TABLE IF NOT EXISTS archive_transfer"));
-        assert!(ARCHIVE_TRANSFER_DDL.contains("CONSTRAINT archive_transfer_pkey PRIMARY KEY (resource, row_id)"));
+        assert!(ARCHIVE_TRANSFER_DDL
+            .contains("CONSTRAINT archive_transfer_pkey PRIMARY KEY (resource, row_id)"));
         assert!(ARCHIVE_TRANSFER_DDL.contains("CREATE INDEX IF NOT EXISTS archive_transfer_org"));
     }
 }
