@@ -1,7 +1,7 @@
 # Agent control plane and model-routing plan
 
 **Status:** Proposed — future runtime plan 2026-08-20
-**Tracks:** `agent-control-plane`, `model-routing`, `planner-executor`, `verification`, `artifacts`, `skills`, `small-model-ux`
+**Tracks:** `agent-control-plane`, `model-routing`, `planner-executor`, `verification`, `artifacts`, `skills`, `small-model-ux`, `plugin-seams`, `execution-tracing`
 **Related:** [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md) · [agent-ir-codegen-extension-plan.md](./agent-ir-codegen-extension-plan.md) · [scaleway-cloudflare-bootstrap-deployment-plan.md](./scaleway-cloudflare-bootstrap-deployment-plan.md)
 
 ---
@@ -25,6 +25,7 @@ Agent Control Plane
   ├── deterministic analysis engine
   ├── verifier
   ├── artifact store
+  ├── execution event log
   └── presentation composer
         ↓
 Generated capability registry
@@ -49,6 +50,9 @@ STDB / bounded durable contracts
 9. **Conversation transcript is not the long-term memory model.** Sessions reference compact state and durable artifacts.
 10. **Specialist sub-agents are narrowly scoped workers, not unrestricted clones.**
 11. **AI/provider outage degrades AI only; ordinary ERP continues operating.**
+12. **Replaceable provider seams are allowed only where replacement cannot redefine ERP authority.**
+13. **Agent execution is append-only traceable.** Durable task/tool/model/artifact events can reconstruct what the harness did without exposing hidden chain-of-thought.
+14. **ERP history and agent execution history remain distinct.** They correlate through `operation_id`, `correlation_id`, and artifact references rather than sharing one authority log.
 
 ---
 
@@ -91,8 +95,6 @@ The effective budget is runtime policy. IR may provide hints but must not hard-c
 
 Do not expose the complete generated ERP tool registry to each model call.
 
-Target pipeline:
-
 ```text
 user objective
    ↓
@@ -109,18 +111,11 @@ planner/model context
 
 Discovery may combine deterministic tags, lexical search, embeddings, and skill metadata. Security remains invocation-time authorization, not discovery filtering.
 
-Measure:
-
-- tool count exposed per call;
-- capability discovery precision/recall;
-- tokens spent describing tools;
-- failed tool-selection rate.
+Measure tool count per call, discovery precision/recall, tool-description tokens, and failed tool-selection rate.
 
 ---
 
 ## 5. Model router
-
-Provider-neutral abstraction:
 
 ```ts
 interface ModelRouter {
@@ -136,28 +131,76 @@ interface ModelExecutionPolicy {
 }
 ```
 
-Initial logical classes:
+Logical classes remain `Fast`, `Standard`, and `Deep`. Deployment config maps those classes to Scaleway-hosted models initially. Provider/model names stay outside IR.
 
-```text
-Fast
-  routing / classification / extraction / lightweight verification
-
-Standard
-  normal ERP questions / planning / summarization / drafting
-
-Deep
-  ambiguous multi-step analysis / research synthesis / exceptional tasks
-```
-
-Deployment config initially maps these classes to Scaleway-hosted models. Provider/model names stay outside IR so model replacement needs no contract regeneration.
-
-The router should support escalation only when objective evidence justifies it, e.g. failed plan validation, unresolved ambiguity, or verifier failure.
+Escalation should happen only after objective failures such as plan validation failure, unresolved ambiguity, or verifier failure.
 
 ---
 
-## 6. Planner → executor → verifier loop
+## 6. Replaceable seams / plugin architecture
 
-Canonical task loop:
+Borrow the useful seam discipline from plugin-oriented harnesses, but do not make ERP authority pluggable.
+
+### Safe replacement seams
+
+```text
+ModelProvider
+EmbeddingProvider
+SemanticIndexProvider
+SandboxProvider
+ResearchProvider
+DocumentProcessor
+OCRProvider
+AgentPersistence
+ContextRetriever
+TelemetrySink
+PresentationRenderer
+```
+
+Each seam follows a narrow contract:
+
+```text
+definition
+   ↓
+provider implementation
+   ↓
+consumer
+```
+
+Providers must not receive broader credentials/capabilities than their contract requires.
+
+### Intentionally non-pluggable authority
+
+```text
+Casbin authorization semantics
+STDB reducer/business invariants
+OrganizationPlacement ownership
+ordered durable sequencing
+ERP application-contract semantics
+confirmation/risk enforcement
+```
+
+A plugin/provider may help execute, retrieve, render, index, or infer. It may not redefine whether an ERP action is allowed or valid.
+
+### Provider registration requirements
+
+Every provider should expose structural metadata such as:
+
+```ts
+interface AgentProviderDescriptor {
+  id: ProviderId
+  kind: ProviderKind
+  version: string
+  capabilities: readonly ProviderCapability[]
+  healthCheck: HealthCheckPolicy
+}
+```
+
+Runtime registration is deployment configuration, not generated ERP contract metadata.
+
+---
+
+## 7. Planner → executor → verifier loop
 
 ```text
 UNDERSTAND
@@ -179,85 +222,152 @@ insufficient? ──→ bounded REPLAN
 PRESENT
 ```
 
-Hard iteration limits prevent agent wandering.
+Hard iteration limits prevent agent wandering. Planner output should prefer typed plans over prose.
 
-Planner output should prefer typed plans over prose whenever a formal plan exists:
-
-```ts
-interface ToolPlanStep {
-  capability: CapabilityKey
-  input: unknown
-  expectedResult: ToolResultExpectation
-}
-```
-
-Execution validates schemas, capability availability, risk/confirmation requirements, admission policy, and budget before invocation.
+Execution validates schemas, capability availability, risk/confirmation requirements, admission policy, budget, and trusted actor/org context before invocation.
 
 ---
 
-## 7. Deterministic analytical execution
+## 8. Guarded capability execution pipeline
 
-Use the existing `AnalysisPlan`/`AnalysisResult` foundation as the default data-analysis substrate.
-
-Example:
+Use one common execution lifecycle for generated ERP capabilities:
 
 ```text
-"Which customers are becoming payment risks?"
-   ↓
-planner chooses receivables + payment history
-   ↓
-authorized source datasets
-   ↓
-analysis engine
-  group customer
-  compare periods
-  payment-delay delta
-  top-N deterioration
-   ↓
-compact AnalysisResult
-   ↓
-model interpretation
+CapabilityRequested
+      ↓
+input/schema validation
+      ↓
+trusted actor/org resolution
+      ↓
+Casbin authorization
+      ↓
+risk / confirmation
+      ↓
+admission / budget
+      ↓
+STDB operation
+      ↓
+result shaping
+      ↓
+verification / provenance
+      ↓
+CapabilityResult
 ```
 
-The model should not calculate financial totals from raw rows when deterministic code can do so.
+Support explicit pre/post execution middleware for timeout, retry policy where safe, metrics, redaction, and tracing. Middleware cannot bypass authorization or change business semantics.
+
+Mutations never gain transparent retry unless the generated operation explicitly declares idempotency semantics.
 
 ---
 
-## 8. Verification layer
+## 9. Append-only agent execution event model
 
-Verification should be first-class rather than relying only on another model prompt.
+Persist a typed append-only event stream for agent execution. This is the source for replay/debugging/session reconstruction, but **not** canonical ERP history.
 
-Start deterministic:
-
-- output validates against declared schema;
-- numeric claims map to `AnalysisResult` values;
-- mentioned entity IDs/names exist in source artifacts;
-- source capability/provenance is authorized;
-- no result exceeds disclosure/cardinality policy;
-- mutations still require normal confirmation and reducer validation.
-
-Optionally add a cheap semantic verifier model for prose-to-evidence consistency.
-
-Conceptual result:
+Candidate events:
 
 ```ts
-interface VerificationResult {
-  supported: boolean
-  unsupportedClaims: readonly ClaimRef[]
-  warnings: readonly VerificationWarning[]
-  evidenceRefs: readonly ArtifactRef[]
+type AgentExecutionEvent =
+  | TaskStarted
+  | PlanCreated
+  | ModelRequestStarted
+  | ModelResponseReceived
+  | CapabilitySelected
+  | CapabilityRequested
+  | CapabilityAuthorized
+  | CapabilityDenied
+  | CapabilityStarted
+  | CapabilityCompleted
+  | ArtifactCreated
+  | VerificationCompleted
+  | ReplanRequested
+  | TaskCompleted
+  | TaskFailed
+```
+
+Envelope:
+
+```ts
+interface AgentEventEnvelope<T> {
+  sessionId: AgentSessionId
+  taskId: AgentTaskId
+  seq: number
+  occurredAt: string
+  operationId?: OperationId
+  correlationId: CorrelationId
+  parentEventSeq?: number
+  payload: T
 }
 ```
 
-Unsupported findings should be removed, qualified, or surfaced as uncertainty rather than invented.
+Requirements:
+
+- monotonically ordered per task/session;
+- append-only durable persistence;
+- enough information to reconstruct user-visible task state and tool/action lineage;
+- model-visible context must be reconstructable from durable refs/events plus authoritative artifacts;
+- no hidden chain-of-thought storage requirement;
+- sensitive prompt/result content may be redacted or referenced by artifact/hash according to policy.
+
+### Traceability model
+
+The UI/debugger should be able to render a causal tree:
+
+```text
+Task
+ ├─ Plan
+ ├─ Capability call
+ │   ├─ authorization
+ │   ├─ execution
+ │   ├─ shaping
+ │   └─ artifact
+ ├─ Verification
+ └─ Presentation
+```
+
+This provides a stack-trace-like explanation of **actions and evidence**, not private reasoning.
 
 ---
 
-## 9. Artifact-first memory
+## 10. Replay, resume, and fork semantics
 
-Persist useful outputs as typed artifacts instead of retaining giant chat transcripts.
+Plan for replayable agent sessions from stable event boundaries.
 
-Candidate artifacts:
+Support later:
+
+```text
+resume task
+replay trace without re-executing side effects
+fork from stable step
+retry a failed model step with another provider
+compare alternative interpretation/presentation
+```
+
+Rules:
+
+- historical business mutations are never replayed merely because an agent trace is replayed;
+- read-only capability results may reuse versioned artifacts when still valid;
+- re-execution of live capabilities requires current authorization/admission checks;
+- forks get new task IDs/correlation roots while retaining parent trace references;
+- expired/stale artifacts must be detected rather than silently reused.
+
+---
+
+## 11. Deterministic analytical execution
+
+Use the existing `AnalysisPlan`/`AnalysisResult` foundation as the default data-analysis substrate. The model should not calculate financial totals from raw rows when deterministic code can do so.
+
+---
+
+## 12. Verification layer
+
+Start deterministic: schema validity, numeric evidence matching, entity existence, authorized provenance, disclosure/cardinality limits, and normal reducer/confirmation enforcement for mutations. A cheap semantic verifier may later check prose-to-evidence consistency.
+
+---
+
+## 13. Artifact-first memory
+
+Persist useful outputs as typed artifacts:
 
 ```text
 AnalysisArtifact
@@ -269,23 +379,11 @@ ImportProposal
 ReportArtifact
 ```
 
-Each artifact should include provenance:
-
-```ts
-interface ArtifactProvenance {
-  taskId: AgentTaskId
-  operationIds: readonly OperationId[]
-  sourceArtifacts: readonly ArtifactRef[]
-  planFingerprint?: string
-  createdAt: string
-}
-```
-
-Session context references artifact IDs and concise summaries. Large raw data stays in its authorized server-side storage tier.
+Each artifact carries task/operation/source provenance. Session context references artifact IDs and concise summaries; large raw data remains server-side.
 
 ---
 
-## 10. Session/context compiler
+## 14. Session/context compiler
 
 Maintain structured session state:
 
@@ -299,98 +397,52 @@ interface AgentSessionState {
 }
 ```
 
-Generate each model call's context from the minimum relevant pieces rather than replaying the entire conversation.
-
-Context compiler inputs may include:
-
-- current task/objective;
-- selected skill instructions;
-- 3–10 relevant tool descriptors;
-- compact artifact summaries;
-- required evidence/result excerpts;
-- current approval/confirmation state.
-
-Track context size and irrelevant-context rate as product metrics.
+Compile model context from current objective, selected skill, small tool set, compact artifact summaries, evidence excerpts, and approval state rather than replaying full transcript history.
 
 ---
 
-## 11. Skills
+## 15. Skills
 
-Skills are reviewed workflow/reasoning compositions over generated capabilities, not generated business APIs.
+Skills remain reviewed workflow/reasoning compositions over generated capabilities. They never retain permissions and every capability step re-authorizes at runtime.
 
-Suggested package shape:
+---
+
+## 16. Specialist sub-agents
+
+Prefer narrowly scoped specialists such as accounting analysis, research, document, import mapping, presentation, and verification agents. Specialists receive only the capabilities/artifacts/budget needed for their delegated task.
+
+---
+
+## 17. Durable vs runtime vs telemetry events
+
+Keep three event concerns separate:
 
 ```text
-skills/
-  receivables-review/
-    SKILL.md
-    workflow.json
-    validation.json
+Durable AgentExecutionEvent
+→ what happened / replay / trace
+
+Runtime progress event
+→ what is happening now / SSE UI
+
+Telemetry span/metric/log
+→ operational performance/cost
 ```
 
-`SKILL.md` contains procedural guidance; `workflow.json` references stable capabilities/analysis shapes; `validation.json` defines structural expectations.
+OpenTelemetry/PostHog projections must not become canonical agent memory. Durable agent events can carry trace/span IDs for correlation.
 
-Capability IR may generate discovery metadata and compatibility hints, but skills remain system/admin/user-authored reviewed compositions.
-
-Saved skills never retain permissions. Every step re-authorizes at runtime.
+ERP audit/change history remains separate and links through operation/correlation IDs.
 
 ---
 
-## 12. Specialist sub-agents
+## 18. User experience
 
-Prefer narrowly scoped specialists:
+The system may use several small model calls internally but present one coherent assistant. SSE may expose useful statuses such as checking receivables, comparing periods, verifying findings, or preparing visualization.
 
-```text
-AccountingAnalysisAgent
-ResearchAgent
-DocumentAgent
-ImportMappingAgent
-PresentationAgent
-VerificationAgent
-```
-
-Each definition specifies:
-
-```ts
-interface SpecialistAgentPolicy {
-  allowedCapabilityDomains: readonly DomainKey[]
-  allowedSkills: readonly SkillId[]
-  reasoningClass: ReasoningClass
-  budgetProfile: AgentBudgetProfile
-}
-```
-
-A specialist receives only the artifacts/data required for its delegated task. It does not inherit unrestricted parent tools.
+The UI should also support an inspectable action trace showing tools/capabilities, authorization result, artifacts, evidence, verification, and outcomes without exposing low-level chain-of-thought.
 
 ---
 
-## 13. User experience
-
-The system may use several small model calls internally but present one coherent assistant experience.
-
-For long tasks, stream structured progress events through HTTP/SSE:
-
-```text
-Understanding request…
-Checking receivables…
-Comparing periods…
-Verifying findings…
-Preparing visualization…
-```
-
-Do not expose low-level chain-of-thought. Expose task status, tool/workflow progress, approvals, artifacts, and useful intermediate results.
-
-The UI should allow users to:
-
-- inspect sources/artifacts;
-- revise an analysis request;
-- approve consequential actions;
-- reuse/save a workflow as a reviewed skill candidate;
-- continue work from an artifact rather than restarting chat context.
-
----
-
-## 14. Initial Scaleway implementation
+## 19. Initial Scaleway implementation
 
 Deploy the control-plane runtime near the trusted backend in Paris.
 
@@ -408,50 +460,43 @@ ModelRouter
 Scaleway Generative APIs
 ```
 
-Prefer serverless/pay-per-use inference initially. Dedicated inference is an economic/runtime decision made later from measured usage.
-
-Instrument per organization/task:
-
-- model calls/tokens;
-- model class/provider;
-- capability calls;
-- analysis input/output cardinality;
-- latency per phase;
-- retries/replans;
-- verifier failures;
-- estimated inference cost.
+Prefer serverless/pay-per-use inference initially. Instrument model calls/tokens/class/provider, capability calls, shaping cardinality, phase latency, retries/replans, verifier failures, estimated inference cost, and event-log persistence health.
 
 ---
 
-## 15. Phases
+## 20. Phases
 
 ### ACP0 — control-plane skeleton
 
 - [ ] define `AgentTask`, `AgentPlan`, `AgentBudget`, session state, and artifact refs;
 - [ ] implement generated capability-index search + Casbin filtering;
 - [ ] implement provider-neutral model router interface;
+- [ ] define safe provider/plugin seam registry and mark ERP authority surfaces non-pluggable;
 - [ ] separate planner and executor interfaces;
 - [ ] enforce task/tool/model budgets;
 - [ ] use deterministic analysis engine for large tabular results;
+- [ ] add guarded capability execution middleware;
 - [ ] add structured SSE task-status events.
 
-**Exit gate:** a normal ERP analysis task can discover a small authorized tool set, plan, execute deterministic analysis, and present a verified result using a configurable small/standard model.
+### ACP1 — execution trace + artifact + verification foundation
 
-### ACP1 — artifact + verification foundation
-
+- [ ] persist typed append-only `AgentExecutionEvent` records;
+- [ ] correlate agent events with ERP `operation_id` / `correlation_id`;
 - [ ] persist analysis/presentation/draft/research artifact metadata;
 - [ ] build context compiler from objective + artifacts + selected tools/skills;
 - [ ] add deterministic claim/evidence verification;
+- [ ] add action-trace/debug view sourced from durable events;
 - [ ] measure context/token reduction against transcript/raw-result baseline;
 - [ ] add bounded replan after verifier/plan failure.
 
-### ACP2 — skills + specialists
+### ACP2 — replay/fork + skills + specialists
 
+- [ ] define stable replay boundaries and no-side-effect replay semantics;
+- [ ] support resume/fork metadata without re-executing historical mutations;
 - [ ] define reviewed skill format and registry;
 - [ ] add capability/skill discovery integration;
 - [ ] add one accounting specialist and one document/research specialist;
-- [ ] prove delegated agents receive narrower capability sets and budgets;
-- [ ] keep runtime authorization per capability step.
+- [ ] prove delegated agents receive narrower capability sets and budgets.
 
 ### ACP3 — model-quality/economics tuning
 
@@ -459,28 +504,17 @@ Instrument per organization/task:
 - [ ] record quality, latency, token and cost metrics per class;
 - [ ] add escalation rules based on objective failures rather than user-tier hardcoding;
 - [ ] choose Scaleway model mapping from measured results;
-- [ ] preserve provider portability.
+- [ ] validate provider swaps through the seam contracts without ERP code changes.
 
 ---
 
-## 16. Required evaluation corpus
+## 21. Required evaluation corpus
 
-Before declaring the harness worthwhile, maintain representative tasks such as:
-
-- locate/explain a specific invoice/order;
-- compare receivables periods;
-- identify payment deterioration and produce chart intent;
-- summarize a bounded audit history;
-- map an uploaded dataset into a draft import proposal;
-- draft a document from approved ERP context;
-- research/synthesize from supplied source findings;
-- propose but do not execute a consequential mutation.
-
-Evaluate small and larger models against identical deterministic tools and evidence, measuring correctness rather than prose preference alone.
+Maintain representative tasks for invoice/order lookup, receivables analysis, audit-history summarization, uploaded dataset mapping, document drafting, research synthesis, and consequential mutation proposals. Add harness tests for trace reconstruction, denied capability calls, provider failure, replay without duplicate side effects, and provider replacement.
 
 ---
 
-## 17. Explicitly deferred
+## 22. Explicitly deferred
 
 - unrestricted autonomous agents;
 - arbitrary model-generated code execution;
@@ -489,21 +523,27 @@ Evaluate small and larger models against identical deterministic tools and evide
 - raw transcript as canonical memory;
 - direct LLM access to PG/STDB/Object Storage;
 - automatic execution of financial mutations;
-- autonomous skill publication from observed behavior.
+- autonomous skill publication from observed behavior;
+- making Casbin/STDB/business authority replaceable plugins;
+- full event-sourced ERP state inside the agent log.
 
 ---
 
-## 18. Acceptance criteria
+## 23. Acceptance criteria
 
 The control plane is successful when:
 
 - smaller models can complete representative ERP tasks reliably because discovery, execution, analysis, verification, and memory are handled structurally;
 - the model sees a bounded relevant capability set rather than the entire ERP API;
 - model/provider changes require deployment configuration, not application-contract regeneration;
+- provider/plugin seams can be replaced without changing ERP authority semantics;
 - task budgets prevent unbounded recursive/tool/token usage;
 - large data stays server-side and reaches models through compact evidence/artifacts;
 - analytical claims are tied to structured provenance/evidence;
 - sessions can continue from artifacts without replaying full historical transcripts;
+- durable append-only execution events can reconstruct the user-visible action trace;
+- replay/fork never duplicates historical business mutations;
+- agent events correlate cleanly with ERP audit/change operations;
 - specialists receive narrower capabilities than their parent task;
 - Casbin/STDB remain authorization/business authorities;
 - the UX presents one coherent assistant despite multi-model/sub-agent execution internally.
