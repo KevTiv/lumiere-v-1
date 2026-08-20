@@ -1,8 +1,8 @@
 # STDB-owned transactional core with durable Postgres projection
 
 **Status:** Proposed — production-contract alignment 2026-08-20
-**Tracks:** `contract-ir`, `generated-client-sdk`, `contract-migration`, `durable-postgres`, `tenant-onboarding`, `stdb-query-boundary`
-**Related:** [audit-log-cold-by-default.md](./audit-log-cold-by-default.md) · [backup-recovery-followup.md](./backup-recovery-followup.md) · [offline-changeset-sync.md](./offline-changeset-sync.md)
+**Tracks:** `contract-ir`, `generated-client-sdk`, `contract-migration`, `durable-postgres`, `tenant-onboarding`, `stdb-query-boundary`, `traffic-resilience`
+**Related:** [audit-log-cold-by-default.md](./audit-log-cold-by-default.md) · [backup-recovery-followup.md](./backup-recovery-followup.md) · [offline-changeset-sync.md](./offline-changeset-sync.md) · [audit-auth-operation-context-plan.md](./audit-auth-operation-context-plan.md) · [traffic-resilience-admission-control-plan.md](./traffic-resilience-admission-control-plan.md)
 
 ---
 
@@ -11,6 +11,8 @@
 Keep SpacetimeDB as Lumiere's single business-logic and application-query authority. Postgres is a durable per-organization projection and historical store. Frontend/runtime callers consume generated typed application contracts rather than raw reducer names, positional payloads, transport URLs, handwritten cache keys, or locally duplicated generated types.
 
 Before extending the durable path, establish a stable generated application-contract layer and migrate existing frontend usage onto it. The migration must be scriptable, repeatable, idempotent, and CI-enforced so the legacy transport/type ecosystem can be deleted rather than maintained indefinitely.
+
+Traffic resilience is part of the contract boundary as well: generated operations carry structural traffic classification so Kong and application admission control can apply bounded, server-authoritative rate/concurrency/retry policy without moving business logic into the gateway.
 
 ```text
 frontend / client
@@ -21,6 +23,9 @@ private generated npm SDK
       ├── React Query hooks + query keys
       ├── mutation invalidation metadata
       └── subscription bindings
+      │
+      ▼
+Kong + server admission boundary
       │
       ▼
 SpacetimeDB function boundary
@@ -39,7 +44,7 @@ Reducers cannot perform network I/O. Durable reads therefore use an STDB procedu
 
 The concrete goal is:
 
-> business decisions stay inside the SpacetimeDB module; generated contracts provide the stable typed application boundary; migration tooling converts existing frontend usage onto that boundary; Postgres executes bounded durable contracts already authorized and shaped by STDB.
+> business decisions stay inside the SpacetimeDB module; generated contracts provide the stable typed application boundary; migration tooling converts existing frontend usage onto that boundary; traffic/admission policy bounds ecosystem load; Postgres executes bounded durable contracts already authorized and shaped by STDB.
 
 Initial production remains one STDB instance + one Postgres database. Organization placement keeps the durable layer shard-ready without expanding this branch into general scaling work.
 
@@ -58,6 +63,10 @@ Initial production remains one STDB instance + one Postgres database. Organizati
 9. **Procedures are transport/orchestration only and must reuse STDB-owned business/query-policy logic.**
 10. **Tenant placement is runtime/onboarding configuration, not generated schema or application-contract IR.**
 11. **No row leaves STDB until its exact durable version is verified on the resolved PG store.**
+12. **All security-sensitive audit/admission identity is server-derived, never client-authored.**
+13. **Every external operation has bounded rate, payload, timeout, and downstream concurrency policy.**
+14. **Overload fails fast and locally through 429/503 shedding rather than cascading into STDB/PG/workers.**
+15. **Mutation retries require explicit idempotency semantics; retries must not be amplified across client/gateway/service layers.**
 
 ---
 
@@ -79,6 +88,7 @@ query | command | subscription
 cache tags / invalidation
 transport target metadata
 legacy migration metadata
+traffic class / idempotency metadata
 no business policy
 
               │ generates
@@ -93,6 +103,17 @@ private npm package
   query-key factories
   subscription adapters
   transport serialization
+
+              │ calls
+              ▼
+
+Kong + admission control
+────────────────────────────
+edge request bounds
+rate limits
+upstream health/timeouts
+server-derived actor/org budgets
+concurrency pools / load shedding
 
               │ calls
               ▼
@@ -135,6 +156,9 @@ It is not accepted directly from the frontend.
 client generated query
         │
         ▼
+Kong / admission policy
+        │
+        ▼
 STDB durable-query procedure
         │
         ├─ with_tx
@@ -161,6 +185,9 @@ A durable-only mutable row becomes hot before ordinary reducer logic proceeds:
 
 ```text
 client generated command
+      │
+      ▼
+Kong / admission policy
       │
       ▼
 STDB hydration procedure
@@ -248,7 +275,8 @@ lumiere-codegen
               ├── typed inputs/outputs
               ├── cache/invalidation metadata
               ├── subscriptions
-              └── migration aliases/legacy mappings
+              ├── migration aliases/legacy mappings
+              └── traffic class/idempotency metadata
                     ↓
             generated private artifacts
               ├── Rust contract crate
@@ -276,6 +304,7 @@ pub struct GeneratedApplicationOperation {
     pub output: GeneratedTypeRef,
     pub cache_tags: Vec<CacheTag>,
     pub invalidates: Vec<CacheTag>,
+    pub traffic: GeneratedOperationTrafficPolicy,
 }
 ```
 
@@ -366,7 +395,9 @@ Remove or demote:
 - PG-side duplicated authorization/business filters;
 - frontend features depending directly on generated STDB bindings/reducer names;
 - handwritten feature transport wrappers/query-key conventions where generated equivalents exist;
-- locally duplicated generated contract/type surfaces after package adoption.
+- locally duplicated generated contract/type surfaces after package adoption;
+- minute-only gateway limiting as the primary resilience strategy;
+- transparent multi-layer retries for mutations.
 
 Keep:
 
@@ -380,7 +411,9 @@ Keep:
 - hydration manifests;
 - PG TLS/pooling;
 - transfer ledger;
-- schema/codegen drift checks.
+- schema/codegen drift checks;
+- Kong as ingress policy enforcement;
+- application-level admission/load shedding for true operation cost.
 
 ---
 
@@ -394,13 +427,14 @@ Keep:
 - [ ] generate framework-neutral typed services;
 - [ ] generate React Query hooks, query-key factories, invalidation helpers, and subscription adapters;
 - [ ] centralize bigint/wire serialization, auth/session propagation, error normalization, and connection semantics in one transport boundary;
+- [ ] add structural operation traffic-class/idempotency metadata for gateway/client/admission policy;
 - [ ] publish generated contract types/services/hooks through the private npm package and generated Rust contract types through the private crate;
 - [ ] keep codegen implementation and business logic in `lumiere-v-1`;
 - [ ] migrate Sales as the representative proof domain;
 - [ ] align durable-query metadata with the same application-contract source;
 - [ ] add codegen drift tests.
 
-**Exit gate:** Sales runs end-to-end through generated typed services/hooks, with no raw reducer/resource transport usage in Sales application code, and no business rule is implemented outside STDB to access durable data.
+**Exit gate:** Sales runs end-to-end through generated typed services/hooks, with no raw reducer/resource transport usage in Sales application code, no business rule is implemented outside STDB to access durable data, and every generated external operation has a traffic classification.
 
 ### Phase 0.5 — generated contract adoption and legacy transport removal
 
@@ -490,13 +524,14 @@ pnpm lint
 pnpm test
 ```
 
-Plus domain/runtime tests for migrated query, command, subscription, cache invalidation, and auth/session propagation behavior.
+Plus domain/runtime tests for migrated query, command, subscription, cache invalidation, auth/session propagation, and retry/reconnect behavior.
 
 - [ ] compare representative before/after query payloads and reducer inputs;
 - [ ] verify React Query cache identity remains deterministic;
 - [ ] verify generated invalidation refreshes the same required resource surfaces;
 - [ ] verify no organization/company scope is lost during object-input migration;
-- [ ] verify offline/realtime compatibility adapters continue to work until their dedicated migration lands.
+- [ ] verify offline/realtime compatibility adapters continue to work until their dedicated migration lands;
+- [ ] verify generated hooks do not introduce unbounded retries/refetch/reconnect storms.
 
 #### 0.5.5 CI legacy deny-list
 
@@ -518,15 +553,12 @@ Allow exceptions only in explicitly named compatibility/transport implementation
 
 Only after `migrate:contracts:check` is clean and tests pass:
 
-- [ ] remove old generic STDB query/reducer hooks superseded by generated hooks;
-- [ ] remove redundant local generated application types now supplied by the package;
-- [ ] remove superseded `stdb-gateway`/feature wrappers while retaining the single canonical transport adapter;
-- [ ] remove old reducer/resource string constants used only by migrated callers;
-- [ ] remove duplicate query-key/invalidation manifests;
-- [ ] remove duplicate wire/bigint serialization helpers;
-- [ ] remove temporary compatibility exports.
-
-**Exit gate:** the full frontend passes typecheck/lint/tests and `pnpm migrate:contracts:check`; migrated application code consumes the private generated package; legacy generic hooks/types/transports have no ordinary application callers; CI prevents those APIs from being reintroduced.
+- [ ] delete superseded generic query/reducer hooks;
+- [ ] delete duplicated local generated contract types;
+- [ ] delete obsolete reducer/resource string constants;
+- [ ] delete redundant cache-key/invalidation manifests;
+- [ ] delete transport wrappers replaced by the generated SDK;
+- [ ] retain only compatibility surfaces still required by explicitly tracked migration work.
 
 ### Phase 1 — tenant-aware durable gateway
 
@@ -535,7 +567,7 @@ Only after `migrate:contracts:check` is clean and tests pass:
 - [ ] make organization onboarding assign one durable store;
 - [ ] durable gateway resolves organization → PG store internally;
 - [ ] reject caller-provided shard/store overrides;
-- [ ] add tenant-isolation tests.
+- [ ] tenant-isolation tests.
 
 ### Phase 2 — prove durable read
 
@@ -544,9 +576,10 @@ Use `audit_log` first:
 - [ ] STDB procedure resolves/authorizes a bounded historical query;
 - [ ] procedure calls durable gateway outside a transaction;
 - [ ] gateway executes only the generated durable contract;
-- [ ] expose the operation through the generated SDK, not a direct PG endpoint;
+- [ ] expose the operation through the generated SDK rather than a direct durable endpoint;
+- [ ] enforce durable-read admission/pagination/time/result bounds;
 - [ ] verify org/company/field policy cannot be bypassed;
-- [ ] verify one-PG deployment remains simple.
+- [ ] verify one-PG deployment behavior remains simple.
 
 ### Phase 3 — prove mutable rehydration
 
@@ -555,10 +588,11 @@ Use one mutable transactional resource:
 - [ ] STDB procedure determines hydration need;
 - [ ] fetch durable row through tenant-resolved gateway;
 - [ ] validate row/version/org in a fresh STDB transaction;
-- [ ] hydrate idempotently;
-- [ ] invoke existing reducer logic;
-- [ ] generated command hook/service invokes the stable application operation rather than hydration transport directly;
-- [ ] add concurrency, crash, retry, and stale-version tests.
+- [ ] call hydration reducer/helper;
+- [ ] call existing business reducer;
+- [ ] generated command hook/service invokes the stable application operation, not the hydration transport directly;
+- [ ] ensure mutation retry/idempotency semantics are explicit;
+- [ ] concurrency, crash, retry, and stale-version tests.
 
 ### Phase 4 — optional second PG store correctness proof
 
@@ -582,10 +616,9 @@ This remains a correctness proof, not an autoscaling project.
 - capacity prediction;
 - distributed query federation;
 - automatic tenant migration;
-- moving business logic into Postgres, the api-server, generated npm packages, or the contract crate;
-- moving code-generation implementation into generated-artifact repositories;
-- reducers directly performing external I/O;
-- inventing domain semantics inside codemods.
+- moving business logic into Postgres, the api-server, Kong, or generated packages;
+- using Kong as the only DDoS/resilience layer;
+- reducers directly performing external I/O.
 
 ---
 
@@ -594,28 +627,28 @@ This remains a correctness proof, not an autoscaling project.
 At minimum:
 
 1. application-contract IR exposes only explicitly approved STDB operations;
-2. generated service types match Rust-generated STDB bindings;
-3. generated hooks and framework-neutral services resolve identical stable operation identifiers;
-4. generated invalidation produces deterministic query-key invalidation;
-5. wire serialization is centralized;
-6. migration codemods are idempotent;
-7. migration check fails when legacy mapped usage remains;
-8. ambiguous migration cases fail/report rather than silently guessing;
-9. migrated positional reducer arguments preserve organization/company scope in named inputs;
-10. migrated frontend behavior passes typecheck/lint/tests;
-11. legacy deny-list rejects reintroduction outside explicit compatibility files;
-12. durable queries can only be produced after STDB-owned authorization/scope resolution;
-13. durable gateway rejects unknown/unplaced organizations and caller-selected stores;
-14. org A cannot access org B durable data even when keys collide;
-15. field-level policy is preserved in durable contracts;
-16. pagination/order are deterministic across active/durable boundaries;
-17. no external HTTP occurs while an STDB transaction is open;
-18. hydration rejects org/version mismatch;
-19. existing business reducers remain independent of storage topology;
-20. archive finalize rejects stale versions;
-21. one-PG deployment needs no application special case;
-22. two configured PG stores isolate test organizations;
-23. codegen drift CI fails when private-package artifacts differ from the committed contract source.
+2. generated service input/output types match Rust-generated STDB bindings;
+3. generated React Query hooks and framework-neutral services resolve the same stable operation identifiers;
+4. mutation invalidation metadata produces deterministic query-key invalidation;
+5. wire serialization/deserialization is centralized;
+6. a representative frontend domain contains no direct reducer-name/resource-URL transport calls after migration;
+7. traffic classes/idempotency metadata exist for externally callable generated operations;
+8. burst/reconnect/refetch storms remain bounded by gateway/client/admission policy;
+9. durable queries can only be produced after STDB-owned authorization/scope resolution;
+10. durable gateway rejects unknown/unplaced organizations;
+11. durable gateway cannot accept caller-selected PG stores;
+12. org A cannot query org B durable data even when resource/PK values collide;
+13. field-level policy from STDB is preserved in the durable contract;
+14. pagination/order are deterministic across hot/durable boundaries;
+15. no external HTTP call occurs while an STDB transaction is held open;
+16. hydration rejects organization/version mismatch;
+17. normal business reducers remain unchanged by durable storage topology;
+18. archive finalize still rejects stale versions;
+19. one-PG deployment works without special-case application code;
+20. two configured PG stores can host separate test organizations without cross-store access;
+21. codegen drift CI fails when generated private-package artifacts no longer match the committed STDB contract source;
+22. overload returns bounded 429/503 outcomes instead of unbounded queue growth;
+23. mutation retries are never transparently amplified across multiple layers.
 
 ---
 
@@ -623,20 +656,18 @@ At minimum:
 
 This branch is complete when:
 
-- SpacetimeDB remains the only business-logic authority;
+- SpacetimeDB remains the only business-logic boundary;
 - reducers remain the only implementation of state-changing business commands;
 - views/subscriptions remain the normal active-state read surface;
-- application callers consume stable generated operations rather than raw STDB reducer/binding details;
-- the private npm package provides generated framework-neutral services plus isolated React Query hooks/query keys/subscription adapters;
-- the private Rust crate/npm package remain generated distribution artifacts, not business-logic homes;
-- private package publication is followed by deterministic consumer migration/checks rather than leaving dual APIs indefinitely;
-- migration scripts can deterministically migrate/check frontend contract adoption;
-- the frontend no longer ordinarily consumes superseded generic STDB hooks, raw transport URLs, positional reducer arrays, duplicate generated application types, or handwritten cache aliases where generated contracts exist;
-- CI prevents migrated legacy APIs from returning;
+- application callers consume stable generated operation contracts instead of raw STDB binding/reducer details;
+- private npm/crate artifacts contain generated output only;
+- frontend consumers are migrated through repeatable codemods and legacy transport/types are removed;
+- client-provided audit metadata cannot establish actor/org/role/permission/session identity;
+- external operations have traffic classifications and bounded retry behavior;
+- Kong and application admission controls can shed excess load before STDB/PG/workers saturate;
 - procedures are used only where external durable I/O is required;
-- durable query authorization/planning remains STDB-owned;
+- durable query authorization/planning is STDB-owned;
 - Postgres executes generated, bounded, already-authorized durable contracts only;
 - organization onboarding establishes PG placement;
 - schema/codegen identifies organization-scoped durable resources without embedding topology;
-- the api-server/durable gateway contains infrastructure concerns only;
 - broader scaling remains outside this branch.
