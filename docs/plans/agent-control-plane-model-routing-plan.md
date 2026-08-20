@@ -184,8 +184,6 @@ A plugin/provider may help execute, retrieve, render, index, or infer. It may no
 
 ### Provider registration requirements
 
-Every provider should expose structural metadata such as:
-
 ```ts
 interface AgentProviderDescriptor {
   id: ProviderId
@@ -310,8 +308,6 @@ Requirements:
 - sensitive prompt/result content may be redacted or referenced by artifact/hash according to policy.
 
 ### Traceability model
-
-The UI/debugger should be able to render a causal tree:
 
 ```text
 Task
