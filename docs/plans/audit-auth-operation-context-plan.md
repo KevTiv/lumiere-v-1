@@ -1,22 +1,24 @@
 # Audit, auth, and operation-context integrity plan
 
 **Status:** Proposed — 2026-08-20
-**Tracks:** `audit-integrity`, `server-auth`, `operation-context`, `observability`
-**Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [audit-log-cold-by-default.md](./audit-log-cold-by-default.md) · [frontend-multisurface-workflow-presentation-plan.md](./frontend-multisurface-workflow-presentation-plan.md)
+**Tracks:** `audit-integrity`, `server-auth`, `operation-context`, `observability`, `admission-control`
+**Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [audit-log-cold-by-default.md](./audit-log-cold-by-default.md) · [frontend-multisurface-workflow-presentation-plan.md](./frontend-multisurface-workflow-presentation-plan.md) · [traffic-resilience-admission-control-plan.md](./traffic-resilience-admission-control-plan.md)
 
 ---
 
 ## 1. Objective
 
-Make reducer execution, authorization evidence, durable audit records, and observability correlation share one explicit operation context without trusting client-supplied identity or authorization metadata.
+Make reducer execution, authorization evidence, durable audit records, observability correlation, and authenticated admission control share one explicit operation context without trusting client-supplied identity or authorization metadata.
 
-The client may provide correlation and UX-origin metadata only. Security-sensitive context is resolved and enforced server-side from the authenticated SpacetimeDB/session context before reducers execute.
+The client may provide correlation and UX-origin metadata only. Security-sensitive context is resolved and enforced server-side from the authenticated SpacetimeDB/session context before reducers execute or authenticated per-user/per-organization admission budgets are applied.
 
 ```text
 client intent
   + operation_id / correlation_id / surface
         ↓
-STDB auth/session boundary
+edge/Kong source controls
+        ↓
+STDB/server auth boundary
         ├── resolve actor
         ├── resolve organization
         ├── resolve effective roles/capabilities
@@ -24,11 +26,11 @@ STDB auth/session boundary
         └── authorize operation
         ↓
 TrustedOperationContext
-        ↓
-reducer / procedure
-        ├── business transition
-        ├── durable audit entry
-        └── telemetry correlation
+        ├── authenticated admission control
+        └── reducer / procedure
+              ├── business transition
+              ├── durable audit entry
+              └── telemetry correlation
 ```
 
 ---
@@ -69,13 +71,14 @@ The server/STDB module derives this context from the authenticated session and a
 The client must never be able to supply or override:
 
 - `actor_id`;
-- `organization_id` as an authorization source;
+- `organization_id` as an authorization or quota source;
 - roles or permissions;
 - permission-set version;
 - auth/session identity;
 - tenant/shard/store placement;
 - impersonation identity;
-- authorization decisions.
+- authorization decisions;
+- authenticated admission/quota identity or traffic class overrides.
 
 If an operation input contains an organization/resource identifier for business semantics, the reducer must still verify it against the trusted session scope.
 
@@ -95,6 +98,8 @@ pub struct OperationContext {
 Prefer constructing this envelope at one server/STDB boundary and passing it internally rather than making every reducer reconstruct authentication state independently.
 
 Generated application contracts may carry the `ClientOperationContext` wire shape, but generated clients must not expose setters for trusted fields.
+
+Authenticated admission control should consume `OperationContext.trusted` plus generated structural operation traffic metadata. It must not accept caller-authored quota keys.
 
 ---
 
@@ -163,6 +168,7 @@ Keep the schemas related but distinct.
 
 - richer diagnostic metadata;
 - timings, spans, retry counts, infrastructure identifiers, error stacks;
+- gateway/admission outcomes and queue depth;
 - PostHog/product analytics and OpenTelemetry/ClickHouse correlation;
 - retention/PII policy independent of audit.
 
@@ -209,9 +215,39 @@ The exact APIs should fit SpacetimeDB's generated reducer/procedure constraints,
 
 ---
 
-## 8. IR/codegen changes
+## 8. Admission-control integration
 
-Application-contract IR should describe correlation context structurally without encoding authorization policy.
+Pre-auth edge controls may use trusted source-network information from the deployment edge. Authenticated budgets are applied only after the trusted operation context is resolved.
+
+Conceptual flow:
+
+```rust
+let op = resolve_operation_context(ctx, input.context, operation)?;
+let permit = admission.acquire(AdmissionContext {
+    actor_id: op.trusted.actor_id,
+    organization_id: op.trusted.organization_id,
+    operation,
+    traffic_class: generated_traffic_class(operation),
+    correlation_id: op.client.correlation_id,
+})?;
+```
+
+Admission telemetry may include:
+
+```text
+traffic_class
+admission_outcome
+queue_depth
+retry_after
+```
+
+but canonical business audit should only record admission/rate-limit facts when they are relevant security/compliance evidence.
+
+---
+
+## 9. IR/codegen changes
+
+Application-contract IR should describe correlation context and traffic semantics structurally without encoding authorization policy.
 
 Example metadata:
 
@@ -222,6 +258,7 @@ pub struct GeneratedApplicationOperation {
     pub input: GeneratedTypeRef,
     pub output: GeneratedTypeRef,
     pub accepts_client_operation_context: bool,
+    pub traffic: GeneratedOperationTrafficPolicy,
 }
 ```
 
@@ -233,15 +270,15 @@ Generated npm/Rust clients may create/propagate:
 - workflow ID;
 - causation ID.
 
-They may not generate or serialize trusted actor/role/permission/tenant placement fields as caller-controlled operation metadata.
+They may not generate or serialize trusted actor/role/permission/tenant placement/quota fields as caller-controlled operation metadata.
 
 ---
 
-## 9. Offline and queued operations
+## 10. Offline and queued operations
 
-Offline changesets may preserve their original client operation/correlation IDs, but authorization is re-evaluated when the queued operation is reviewed/applied online.
+Offline changesets may preserve their original client operation/correlation IDs, but authorization and admission are re-evaluated when the queued operation is reviewed/applied online.
 
-Never treat cached historical roles/permissions from the offline device as authoritative.
+Never treat cached historical roles/permissions or prior quota state from the offline device as authoritative.
 
 Audit should distinguish:
 
@@ -253,7 +290,7 @@ This is especially important for the planned PR-style offline review workflow.
 
 ---
 
-## 10. Migration phases
+## 11. Migration phases
 
 ### Phase A0 — inventory
 
@@ -261,7 +298,8 @@ This is especially important for the planned PR-style offline review workflow.
 - [ ] inventory all audit writers and metadata shapes;
 - [ ] identify client-supplied organization/user identifiers currently treated as authoritative;
 - [ ] inventory existing auth/session resolution helpers;
-- [ ] inventory existing request/correlation identifiers.
+- [ ] inventory existing request/correlation identifiers;
+- [ ] inventory authenticated rate/quota keys currently derived from request data.
 
 ### Phase A1 — trusted context foundation
 
@@ -287,39 +325,42 @@ This is especially important for the planned PR-style offline review workflow.
 - [ ] update generated contracts/codemods where reducer input shapes change;
 - [ ] add CI checks preventing direct client-authoritative actor/role/org metadata patterns.
 
-### Phase A4 — telemetry bridge
+### Phase A4 — admission + telemetry bridge
 
+- [ ] make authenticated admission consume trusted actor/org context;
 - [ ] emit OpenTelemetry spans/events using the same operation IDs;
 - [ ] map product analytics events to correlation/operation IDs where appropriate;
 - [ ] ensure telemetry redaction/PII policy differs from durable audit policy;
-- [ ] prove one user action can be correlated from frontend analytics to reducer audit and durable projection without trusting analytics as evidence.
+- [ ] prove one user action can be correlated from frontend analytics through admission/reducer audit and durable projection without trusting analytics as evidence.
 
 ---
 
-## 11. Required tests
+## 12. Required tests
 
-1. forged `actor_id`, role, permission, shard/store, or session fields cannot affect authorization;
+1. forged `actor_id`, role, permission, shard/store, session, or quota identity fields cannot affect authorization/admission;
 2. organization inputs are always verified against authoritative session/membership scope;
 3. audit records use server-derived actor/org/auth context;
 4. permission/role changes between requests are reflected by the next operation context;
 5. audit context remains correct through procedures and durable rehydration flows;
-6. offline queued actions are re-authorized at apply/review time;
-7. operation/correlation IDs survive web/Expo → STDB → durable gateway tracing;
+6. offline queued actions are re-authorized and re-admitted at apply/review time;
+7. operation/correlation IDs survive web/Expo → admission → STDB → durable gateway tracing;
 8. duplicate/retried operations preserve idempotency semantics and useful causation metadata;
 9. generated clients cannot construct trusted context fields through supported APIs;
-10. audit schema remains usable without PostHog/ClickHouse/telemetry availability.
+10. audit schema remains usable without PostHog/ClickHouse/telemetry availability;
+11. authenticated per-org/actor budgets cannot be bypassed using caller-controlled organization metadata.
 
 ---
 
-## 12. Acceptance criteria
+## 13. Acceptance criteria
 
 This plan is complete when:
 
 - audit identity and authorization evidence are always server-derived;
 - clients only contribute correlation/UX-origin metadata;
 - reducer/procedure execution uses one canonical trusted operation-context resolution path;
-- application-contract IR propagates stable correlation context without exposing trusted fields;
+- authenticated admission control uses the same server-derived actor/org identity;
+- application-contract IR propagates stable correlation/traffic context without exposing trusted fields;
 - durable audit entries can explain actor, organization, operation, permission snapshot, entity/version transition, and outcome;
 - audit and telemetry share correlation IDs but remain separate trust/retention domains;
-- offline/replayed operations are re-authorized against current authoritative state;
-- legacy caller-controlled audit/auth metadata paths are removed or explicitly non-authoritative.
+- offline/replayed operations are re-authorized/re-admitted against current authoritative state;
+- legacy caller-controlled audit/auth/admission identity paths are removed or explicitly non-authoritative.
