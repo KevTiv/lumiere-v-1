@@ -57,7 +57,7 @@ Application-contract IR
 11. **Agent actions and analysis transformations share operation/correlation IDs with audit and telemetry.**
 12. **AI/provider failure never blocks ordinary ERP workflows.**
 13. **Provider/plugin replacement never changes ERP authority semantics.**
-14. **Agent execution tracing is runtime state, not ERP business state.** It correlates with ERP operations but does not replace the durable business/audit history.
+14. **Agent execution tracing is runtime state, not ERP business state.** It correlates with ERP operations but does not replace durable business/audit history.
 
 ---
 
@@ -219,15 +219,7 @@ interface GeneratedOperationTraceMetadata {
 }
 ```
 
-The runtime event log links to authoritative ERP operations using:
-
-```text
-operation_id
-correlation_id
-artifact refs
-```
-
-This enables replay/debug/action tracing without making the agent log the canonical ERP state history.
+The runtime event log links to authoritative ERP operations using `operation_id`, `correlation_id`, and artifact refs. This enables replay/debug/action tracing without making the agent log canonical ERP history.
 
 ---
 
@@ -286,7 +278,7 @@ Deploy the initial harness near the trusted backend in Paris. Interactive model 
 
 For analytical workloads, the model decides **which authorized information and transformation it needs**, while deterministic server-side logic performs bulk manipulation.
 
-Avoid raw 10k-row JSON model context. Prefer authorized source capability → typed server-side dataset → validated `AnalysisPlan` → compact `AnalysisResult` → model interpretation.
+Avoid raw large JSON model context. Prefer authorized source capability → typed server-side dataset → validated `AnalysisPlan` → compact `AnalysisResult` → model interpretation.
 
 ```ts
 export interface AnalysisPlan {
