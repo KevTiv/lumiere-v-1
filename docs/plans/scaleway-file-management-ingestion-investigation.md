@@ -1,7 +1,7 @@
 # Scaleway file management, ingestion, and document-processing investigation
 
 **Status:** Investigation — 2026-08-20
-**Tracks:** `file-management`, `object-storage`, `dataset-import`, `document-processing`, `mistral-ocr`, `agent-capabilities`
+**Tracks:** `file-management`, `object-storage`, `dataset-import`, `document-processing`, `mistral-ocr`, `agent-capabilities`, `manual-fallback`
 **Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md) · [regional-stdb-scaleway-durable-foundation.md](./regional-stdb-scaleway-durable-foundation.md)
 
 ---
@@ -11,6 +11,8 @@
 Investigate and define the production architecture for first-class organization files on Scaleway while preserving the current STDB authority model.
 
 The target is to support user-managed Excel/CSV/PDF/document workflows, OCR/extraction, AI-assisted inspection, import proposals, generated reports/content, and durable archival without allowing Object Storage, OCR workers, or AI models to become business-authority surfaces.
+
+A core requirement is graceful manual fallback: file management and import/review workflows must remain fully usable when OCR, AI, parser inference, or enrichment services are unavailable, disabled, or uncertain.
 
 ```text
 user / agent
@@ -31,6 +33,8 @@ processing pipeline
    ↓
 normalized artifact / Dataset / ImportProposal
    ↓
+manual review/correction always available
+   ↓
 STDB reducer approval/apply
 ```
 
@@ -42,12 +46,14 @@ STDB reducer approval/apply
 2. **Files are organization-scoped resources.** All file operations resolve organization and permissions server-side.
 3. **AI/OCR output is untrusted derived content.** It may propose structure/content but cannot directly mutate ERP records.
 4. **Imports use proposal/review/apply semantics.** Excel/CSV/document extraction never bypasses reducers.
-5. **All processing is idempotent and content-addressed where practical.** Re-upload/retry must not create duplicate business effects.
-6. **Large file bytes never flow through STDB tables.** STDB stores refs, hashes, metadata, state, and workflow records.
-7. **PG durable projection stores long-lived file metadata/history, not duplicate blobs unless explicitly needed for recovery manifests.**
-8. **Object access is mediated.** Frontend/agent receives short-lived upload/download capability, never raw permanent bucket credentials.
-9. **Generated application IR may expose file/content operations structurally, but Casbin remains the authorization source.**
-10. **Processing failures are isolated from ordinary ERP traffic via bounded queues/concurrency and traffic classes.**
+5. **Manual operation is first-class.** Users can manage files, correct metadata, map columns/fields, classify documents, and complete review/apply flows without AI/OCR availability.
+6. **All processing is idempotent and content-addressed where practical.** Re-upload/retry must not create duplicate business effects.
+7. **Large file bytes never flow through STDB tables.** STDB stores refs, hashes, metadata, state, and workflow records.
+8. **PG durable projection stores long-lived file metadata/history, not duplicate blobs unless explicitly needed for recovery manifests.**
+9. **Object access is mediated.** Frontend/agent receives short-lived upload/download capability, never raw permanent bucket credentials.
+10. **Generated application IR may expose file/content operations structurally, but Casbin remains the authorization source.**
+11. **Processing failures are isolated from ordinary ERP traffic via bounded queues/concurrency and traffic classes.**
+12. **Automation failure never blocks ordinary file CRUD/navigation.** Move/rename/version/download/attach/manual import mapping remain independent from enrichment workers.
 
 ---
 
@@ -139,9 +145,9 @@ verify object exists / hash / size / media type
       ↓
 FileVersion becomes Available
       ↓
-processing request(s)
+optional processing request(s)
       ↓
-normalized derived artifacts
+normalized derived artifacts / NeedsReview
 ```
 
 Investigate lifecycle states such as:
@@ -159,11 +165,81 @@ pub enum FileProcessingState {
 }
 ```
 
+`Available` must be a usable state on its own. Processing enriches the file but is not required to list, organize, download, version, attach, or manually review it.
+
 Finalization must not trust caller-supplied size/hash/object location without server verification.
 
 ---
 
-## 6. Spreadsheet / tabular ingestion
+## 6. Manual/user-driven fallback requirements
+
+The frontend must expose file-management workflows that remain useful without automation.
+
+At minimum investigate first-class UX for:
+
+- create folder/logical collection;
+- upload, download, rename, move, copy, archive, restore, delete where policy permits;
+- create/inspect file versions and version history;
+- attach/detach files to ERP entities;
+- manually set classification/document type/tags/description;
+- manually select spreadsheet sheet/header row/data range;
+- manually map spreadsheet columns to import fields;
+- manually correct inferred types, currencies, dates, identifiers, and validation errors;
+- manually enter/correct extracted PDF fields alongside the source-page preview;
+- manually mark OCR regions/fields as accepted/rejected/unknown;
+- manually create an import proposal even when AI inference is unavailable;
+- retry, skip, replace, or cancel failed processing jobs without losing the original file;
+- inspect source provenance for any generated/extracted value.
+
+Design principle:
+
+```text
+base file workflow
+  works without AI/OCR
+       ↓
+automation adds suggestions
+       ↓
+user can accept/edit/reject
+```
+
+Avoid designing screens where `Processing` is a blocking modal state that prevents ordinary file interaction.
+
+### Manual fallback states
+
+Investigate explicit UX states such as:
+
+```text
+Automation unavailable
+Automation pending
+Automation failed
+Automation low-confidence
+Manual review requested
+Manual-only mode
+```
+
+These are workflow states, not permission bypasses. All user actions still pass through generated capabilities, Casbin, and STDB validation.
+
+### User-maintained import templates
+
+For recurring spreadsheets maintained by customers/accountants, investigate organization-owned mapping templates:
+
+```rust
+pub struct ImportMappingTemplate {
+    pub organization_id: OrganizationId,
+    pub resource: ResourceKey,
+    pub name: String,
+    pub source_shape_fingerprint: Option<ContentHash>,
+    pub mappings: Vec<FieldMapping>,
+    pub created_by: UserId,
+    pub version: u64,
+}
+```
+
+This provides a non-AI path where a user maps a workbook once and safely reuses that mapping for later uploads.
+
+---
+
+## 7. Spreadsheet / tabular ingestion
 
 Use Excel/CSV onboarding as the first end-to-end proof.
 
@@ -178,7 +254,9 @@ workbook/sheet metadata
   ↓
 normalized Dataset
   ↓
-schema inference / mapping proposal
+optional schema inference / mapping proposal
+  ↓
+manual mapping/correction always available
   ↓
 field-level validation
   ↓
@@ -201,13 +279,14 @@ Investigate:
 - import mapping persistence for repeat uploads maintained by the same organization;
 - deterministic import fingerprinting/idempotency;
 - reconciliation semantics when an uploaded sheet represents updates rather than creates;
-- reusable mapping templates per organization/accountant.
+- reusable mapping templates per organization/accountant;
+- manual mapping UX that does not depend on an AI-produced first guess.
 
 No spreadsheet row becomes ERP state without STDB-owned validation/business reducers.
 
 ---
 
-## 7. PDF/document ingestion and Mistral OCR
+## 8. PDF/document ingestion and Mistral OCR
 
 Investigate Mistral OCR as one document processor, not the canonical document model.
 
@@ -233,6 +312,8 @@ DocumentExtraction
    ↓
 optional structured extraction agent
    ↓
+manual correction/review
+   ↓
 proposal / content workspace / dataset
 ```
 
@@ -256,6 +337,7 @@ Investigation questions:
 - page-level/table provenance necessary for citations back into original documents;
 - OCR retries and idempotency;
 - confidence thresholds and human-review UX;
+- ability to continue with manual extraction/correction when OCR is unavailable;
 - prompt-injection/untrusted-document handling before extracted text reaches agents;
 - retention policy for raw OCR responses vs normalized extraction;
 - regional latency and processing concurrency limits.
@@ -264,7 +346,7 @@ OCR output must be treated as untrusted extracted content and cannot authorize o
 
 ---
 
-## 8. Derived artifacts and datasets
+## 9. Derived artifacts and datasets
 
 Avoid stuffing large extraction payloads into STDB active tables.
 
@@ -276,6 +358,7 @@ STDB
   processing state
   Dataset metadata
   ImportProposal workflow
+  manual-review state
   authorization/business state
 
 PG durable
@@ -294,7 +377,7 @@ Define stable references between these layers and content hashes so artifacts ca
 
 ---
 
-## 9. File manipulation / generated content
+## 10. File manipulation / generated content
 
 Investigate first-class operations for:
 
@@ -310,9 +393,11 @@ Investigate first-class operations for:
 
 Keep manipulation operations capability-based and organization-scoped. Generated tools should accept `FileAssetRef`/`DatasetRef`, never arbitrary filesystem paths.
 
+Every automation-backed manipulation should have a user-driven equivalent or a clear manual fallback where practical.
+
 ---
 
-## 10. IR / generated capability integration
+## 11. IR / generated capability integration
 
 Extend the investigation around application-contract IR with file/content operation kinds.
 
@@ -343,11 +428,17 @@ Candidate generated operations:
 files.upload.create_intent
 files.upload.finalize
 files.list
+files.rename
+files.move
+files.version.list
+files.metadata.update
 files.download.create_intent
 files.process.request
+files.process.cancel
 files.extract.get
 datasets.inspect
 datasets.map.create
+datasets.map.update
 imports.proposal.create
 imports.proposal.validate
 imports.proposal.apply
@@ -356,9 +447,11 @@ content.document.generate
 
 Tool discovery may expose these to the AI harness, but every invocation passes through server auth + Casbin and then STDB-owned business/workflow validation.
 
+The same generated operations should back ordinary manual frontend interactions; do not create an AI-only file API.
+
 ---
 
-## 11. Agent and AI-panel integration
+## 12. Agent and AI-panel integration
 
 The AI panel should consume file capabilities through the same generated registry used by UI clients.
 
@@ -387,20 +480,20 @@ For contract/legal/content workflows:
 ```text
 source files
   ↓
-OCR/extraction
+OCR/extraction (optional accelerator)
   ↓
 research/content workspace
   ↓
 content proposal with source provenance
   ↓
-user review/finalize/export
+user review/edit/finalize/export
 ```
 
-Models may research, summarize, transform, and propose; they do not bypass capability authorization or reducer/business workflows.
+Models may research, summarize, transform, and propose; they do not bypass capability authorization or reducer/business workflows. If agent/OCR services are disabled, users must still be able to open files, edit metadata, perform manual mappings/review, and continue supported workflows.
 
 ---
 
-## 12. Security and resilience investigation
+## 13. Security and resilience investigation
 
 Required topics:
 
@@ -418,13 +511,14 @@ Required topics:
 - OCR/parser poison-job handling;
 - PII/logging/redaction policy;
 - audit records for upload/download/import/finalize/delete actions;
-- retention/legal-hold implications.
+- retention/legal-hold implications;
+- degradation behavior proving provider outages do not block base file CRUD or manual review.
 
 File processing must not share unbounded worker capacity with interactive ERP requests.
 
 ---
 
-## 13. Offline / regional-cell implications
+## 14. Offline / regional-cell implications
 
 Investigate how file metadata behaves with future regional STDB cells:
 
@@ -433,23 +527,26 @@ Investigate how file metadata behaves with future regional STDB cells:
 - uploads/downloads should continue through signed URLs rather than proxying bytes through a distant STDB cell;
 - offline Expo stores metadata, thumbnails, selected files, and queued intents locally as appropriate;
 - offline-generated imports remain proposals until reconnected and authorized;
+- manual file navigation/metadata editing should degrade predictably when the bytes are not locally cached;
 - future disconnected/self-hosted cells may require a local blob store plus later object replication, but this is out of scope for the current implementation.
 
 The file model must not assume the execution cell and physical object-storage region are identical.
 
 ---
 
-## 14. Investigation proof cases
+## 15. Investigation proof cases
 
 ### Proof A — Excel onboarding
 
 - upload `.xlsx` through signed intent;
 - parse sheets into Dataset;
-- infer/map customer/vendor/accounting fields;
+- infer/map customer/vendor/accounting fields when automation is available;
+- prove the same mapping can be completed manually from scratch;
 - show validation preview;
 - create ImportProposal;
 - apply through STDB reducers;
-- preserve source-file + row provenance.
+- preserve source-file + row provenance;
+- save/reuse an organization-owned mapping template.
 
 ### Proof B — PDF invoice/document OCR
 
@@ -458,6 +555,7 @@ The file model must not assume the execution cell and physical object-storage re
 - produce provider-neutral DocumentExtraction;
 - display original page alongside extracted fields/text;
 - allow user correction;
+- disable/fail OCR and prove the user can manually enter/correct the draft fields;
 - create a draft/proposal only;
 - prove no OCR result can directly mutate accounting state.
 
@@ -467,34 +565,48 @@ The file model must not assume the execution cell and physical object-storage re
 - reads allowed Dataset metadata/rows;
 - combines with approved ERP queries;
 - emits renderer-neutral chart/table presentation;
-- audit/telemetry retain correlation IDs.
+- audit/telemetry retain correlation IDs;
+- remove AI availability and prove the Dataset remains inspectable/exportable through normal UI.
+
+### Proof D — provider outage/manual continuity
+
+- simulate Mistral OCR/enrichment outage;
+- upload/list/move/rename/download/version files successfully;
+- create manual spreadsheet mapping/import proposal;
+- manually classify/correct a document;
+- queue optional enrichment for later retry;
+- prove no user data or review state is lost.
 
 ---
 
-## 15. Deliverables from investigation
+## 16. Deliverables from investigation
 
 - [ ] recommended STDB/PG/Object Storage ownership split;
 - [ ] canonical FileAsset/FileVersion/Dataset/ImportProposal schemas;
 - [ ] Scaleway Object Storage topology recommendation;
 - [ ] upload/download signed-intent design;
+- [ ] baseline manual file-management UX/capability set;
 - [ ] spreadsheet parser/runtime recommendation;
+- [ ] manual mapping + reusable organization template design;
 - [ ] provider-neutral document extraction schema;
 - [ ] Mistral OCR integration recommendation and constraints;
+- [ ] manual OCR/document review fallback design;
 - [ ] file-processing worker/queue topology;
 - [ ] security/threat-model findings;
 - [ ] IR capability additions required;
 - [ ] migration/backfill implications for existing attachments/reports;
-- [ ] proof implementation plan for Excel + PDF OCR.
+- [ ] proof implementation plan for Excel + PDF OCR + provider-outage continuity.
 
 ---
 
-## 16. Explicitly out of scope for this investigation
+## 17. Explicitly out of scope for this investigation
 
 - building a full Google Drive/SharePoint replacement;
 - collaborative document editing engine;
 - arbitrary agent filesystem access;
 - direct model bucket credentials;
 - OCR output directly mutating ERP state;
+- making AI/OCR mandatory for ordinary file management;
 - active-active object-store replication across African cells;
 - implementing disconnected-cell blob replication;
 - legal-document correctness guarantees from OCR/LLM output.
