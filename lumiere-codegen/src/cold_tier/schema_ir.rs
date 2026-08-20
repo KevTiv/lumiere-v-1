@@ -12,12 +12,27 @@ use serde::{Deserialize, Serialize};
 /// Root manifest written to `lumiere-schema-manifest.json`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LumiereSchemaManifest {
-    /// Monotonically increasing version; bump when the IR shape changes.
+    /// Monotonically increasing version; bump when the serialized IR shape changes.
     pub version: u32,
     /// All tables found in the generated Rust bindings, sorted by `sql_name`.
     pub tables: Vec<GeneratedTableSchema>,
     /// All enum types found in the generated Rust bindings, sorted by `rust_name`.
     pub enum_types: Vec<GeneratedEnumType>,
+}
+
+/// Deployment-independent tenant scope derived from a table's schema.
+///
+/// Physical tenant-to-Postgres-shard placement intentionally does not live in
+/// the generated schema manifest. Moving an organization between shards must be
+/// a runtime/onboarding concern and must not require schema regeneration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GeneratedTenantScope {
+    /// Table carries an `organization_id` column and can be routed to the
+    /// durable Postgres shard selected for that organization.
+    Organization,
+    /// Table has no organization ownership column and must not be implicitly
+    /// routed through an organization-scoped durable store.
+    Global,
 }
 
 /// One SpacetimeDB table extracted from the generated Rust bindings.
@@ -33,6 +48,25 @@ pub struct GeneratedTableSchema {
     pub columns: Vec<GeneratedColumn>,
     /// Non-PK indexes derived from the `IxCols` struct in the type file.
     pub indexes: Vec<GeneratedIndex>,
+}
+
+impl GeneratedTableSchema {
+    /// Returns the organization ownership column when this table is tenant-scoped.
+    pub fn organization_column(&self) -> Option<&GeneratedColumn> {
+        self.columns
+            .iter()
+            .find(|column| column.sql_name == "organization_id")
+    }
+
+    /// Classifies the table for generated durable-Postgres routing without
+    /// coupling the schema IR to physical shard topology.
+    pub fn tenant_scope(&self) -> GeneratedTenantScope {
+        if self.organization_column().is_some() {
+            GeneratedTenantScope::Organization
+        } else {
+            GeneratedTenantScope::Global
+        }
+    }
 }
 
 /// Primary key descriptor for a table.
@@ -52,7 +86,7 @@ pub struct GeneratedColumn {
     /// SpacetimeDB table fields use snake_case, so this is also the SQL column
     /// name. No camelCase conversion is needed for cold-tier columns.
     pub name: String,
-    /// SQL column name.  For generated STDB bindings this is always identical
+    /// SQL column name. For generated STDB bindings this is always identical
     /// to `name`, but we carry it explicitly so downstream generators do not
     /// need to re-derive it.
     pub sql_name: String,
@@ -82,7 +116,7 @@ pub struct GeneratedIndex {
 /// ## Type mapping rule (u64 / PG BIGINT)
 ///
 /// `BIGINT` is signed and cannot represent the full `u64` domain losslessly.
-/// The plan requires an explicit choice per deployment.  Generators should emit
+/// The plan requires an explicit choice per deployment. Generators should emit
 /// `NUMERIC(20,0)` for `U64` columns unless overridden by a repository-wide
 /// convention documented in the cold-tier plan.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,7 +124,7 @@ pub enum GeneratedType {
     U8,
     U16,
     U32,
-    /// Full unsigned 64-bit integer.  Map to `NUMERIC(20,0)` in PG.
+    /// Full unsigned 64-bit integer. Map to `NUMERIC(20,0)` in PG.
     U64,
     I8,
     I16,
@@ -99,16 +133,16 @@ pub enum GeneratedType {
     F32,
     F64,
     Bool,
-    /// UTF-8 text.  Map to `TEXT` in PG.
+    /// UTF-8 text. Map to `TEXT` in PG.
     String,
     /// SpacetimeDB `Timestamp` (microseconds since Unix epoch, signed i64).
     /// Map to `BIGINT` in PG.
     Timestamp,
-    /// SpacetimeDB `Identity` (32-byte opaque identifier).  Map to `BYTEA` in PG.
+    /// SpacetimeDB `Identity` (32-byte opaque identifier). Map to `BYTEA` in PG.
     Identity,
-    /// Ordered list.  Map to `JSONB` in PG (encoded as a JSON array).
+    /// Ordered list. Map to `JSONB` in PG (encoded as a JSON array).
     Vec(Box<GeneratedType>),
-    /// Named enum type from the bindings.  Map to `TEXT` in PG (canonical variant name).
+    /// Named enum type from the bindings. Map to `TEXT` in PG (canonical variant name).
     Enum(String),
     /// Named struct type from the bindings (nested composite).
     /// Map to `JSONB` in PG (encoded as a JSON object).
