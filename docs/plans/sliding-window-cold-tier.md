@@ -1,51 +1,124 @@
-# Sliding-window hot/cold storage tier (SpacetimeDB → Postgres)
+# Durable Postgres projection with organization-scoped tenant placement
 
-**Status:** Proposed — revised 2026-08-18 after architecture review
-**Tracks:** `storage-tier`, `production-readiness`, `horizontal-scaling-investigation`
+**Status:** Proposed — narrowed 2026-08-20
+**Tracks:** `durable-postgres`, `tenant-onboarding`, `organization-sharding`
 **Related:** [audit-log-cold-by-default.md](./audit-log-cold-by-default.md) · [backup-recovery-followup.md](./backup-recovery-followup.md) · [offline-changeset-sync.md](./offline-changeset-sync.md)
 
 ---
 
 ## 1. Decision
 
-Use SpacetimeDB as the authoritative hot transactional engine and Postgres as a generated cold projection for historical rows, but only behind explicit safety invariants.
+Keep SpacetimeDB as Lumiere's authoritative hot transactional engine and business-logic boundary. Use Postgres as the durable historical projection, with every organization-scoped Postgres access resolved through a tenant placement layer.
 
-The original direction remains valid, but implementation must not begin from a generic “fan out two SQL queries and merge JSON” model. The cold tier must preserve the same authorization, company scope, field projection, ordering, pagination, row-version, and recovery semantics as the hot tier.
+This branch no longer attempts to design general horizontal scaling, distributed SpacetimeDB topology, read replicas, Kubernetes placement, or automatic capacity management.
+
+The concrete goal is smaller:
+
+> make organization onboarding assign a durable Postgres placement once, make every durable read/write resolve through that placement, and keep the schema/codegen layer independent from physical shard topology.
+
+Initial production can still run one SpacetimeDB instance and one Postgres database. The routing abstraction exists so additional Postgres shards can be added later without rewriting repositories, codegen, archive workers, or API contracts.
+
+---
+
+## 2. Ownership model
+
+```text
+organization
+    │
+    ▼
+tenant placement
+    │
+    ├── SpacetimeDB hot state
+    │     reducers
+    │     active transactional state
+    │     realtime subscriptions
+    │     business invariants
+    │
+    └── Postgres durable shard
+          full durable projection
+          historical reads
+          reporting / restore source
+          archived inactive rows
+```
 
 ### Non-negotiable invariants
 
-1. **SpacetimeDB remains authoritative for business decisions and writes.**
-2. **Postgres is a generated projection, not a second business engine.**
-3. **No STDB row is deleted until the exact archived version is durably present in PG.**
-4. **All cold reads use the same resolved read contract as hot reads.** No independent PG authorization or filter logic.
-5. **Re-hydration is orchestrated before a normal reducer call.** A reducer does not call a procedure and then continue its transaction.
-6. **Archive-capable reads must be bounded.** Millions of cold rows must never be merged into one unbounded API response.
-7. **Cross-tier recovery must be provable.** Independent backups are insufficient without an archive transfer ledger/watermark.
-8. **Frontend compatibility is a goal, not permission to weaken semantics.** Existing callers remain unchanged where the server can preserve the exact contract; transactional resources may require pagination work before archival is enabled.
+1. **SpacetimeDB owns business decisions and reducer transactions.**
+2. **Postgres is durable storage/projection, not a second business engine.**
+3. **Every organization-scoped PG operation requires an already-resolved organization identity.**
+4. **Callers never select a PG pool/shard directly.** They receive a durable store from the tenant resolver.
+5. **Tenant placement is runtime configuration, not generated schema.** Moving an organization must not regenerate bindings or migrations.
+6. **Organization-scoped tables must carry `organization_id`.** Generated tooling may classify them from that schema fact.
+7. **No row is evicted from STDB until its exact durable version is verified in the organization’s PG shard.**
+8. **Authorization and field policy are resolved once before either hot or durable reads.**
 
 ---
 
-## 2. Why this is needed
+## 3. Tenant onboarding and placement
 
-Alpha tenants may import 5–10 years of POS, sales, stock, and accounting history. Keeping all historical transactional rows in SpacetimeDB's in-memory working set is unnecessary and can increase memory pressure and restart/replay cost.
+Organization creation/onboarding owns durable placement.
 
-Initial archive candidates:
+```rust
+pub struct TenantPlacement {
+    pub organization_id: OrganizationId,
+    pub durable_store: DurableStoreId,
+}
+```
 
-- `pos_order`, `pos_order_line`, `pos_payment`
-- `sale_order`, `sale_order_line`
-- `stock_move`
-- `account_move`, `account_move_line` for closed periods only
-- `audit_log` as a special first workload
+The first deployment may contain only:
 
-Master/reference tables, active workflow rows, permissions, org/auth data, fiscal configuration, chart-of-accounts data, and other frequently referenced state remain hot.
+```text
+DurableStoreId("pg-primary")
+```
+
+so every tenant resolves to the same Postgres cluster. Adding a second cluster later becomes a placement-data change rather than an application rewrite.
+
+### Resolver boundary
+
+```rust
+pub trait TenantStoreResolver {
+    fn resolve(&self, organization_id: OrganizationId) -> Result<TenantStores>;
+}
+
+pub struct TenantStores {
+    pub durable: PgPool,
+}
+```
+
+The exact pool wrapper may differ, but the dependency direction is mandatory:
+
+```text
+request/session
+    ↓
+organization_id
+    ↓
+TenantStoreResolver
+    ↓
+organization's durable PG store
+    ↓
+repository / query / archive operation
+```
+
+Forbidden pattern:
+
+```rust
+state.pg_pool.get().await?;
+```
+
+Required shape:
+
+```rust
+let stores = state.tenant_stores.resolve(organization_id)?;
+let conn = stores.durable.get().await?;
+```
+
+This branch does not need a dynamic shard-balancing algorithm. Placement may initially be explicit/static.
 
 ---
 
-## 3. Schema/codegen architecture
+## 4. Schema IR and codegen
 
-### 3.1 Source-of-truth chain
-
-Cold-tier schema generation must be server-side and derive from SpacetimeDB-generated **Rust** bindings, not generated TypeScript files.
+### 4.1 Source-of-truth chain
 
 ```text
 SpacetimeDB Rust module definitions
@@ -62,81 +135,72 @@ lumiere-codegen
         ▼
 GeneratedSchemaManifest / schema IR
         ├── PG DDL + migrations
-        ├── STDB ↔ PG serialization metadata
+        ├── STDB ↔ PG codecs
         ├── archive metadata
-        ├── generated read-plan metadata
+        ├── generated read metadata
         └── generated hydration metadata
 ```
 
-SpacetimeDB-generated Rust bindings mirror module table types and expose server-side representations such as `u64`, `Option<Timestamp>`, enums, `Identity`, and `Vec<T>`. Generated `*_table.rs` bindings expose table identity and index/primary-key information.
+Generated Rust bindings remain the schema input. Downstream generators must not recover DB types by parsing generated TypeScript.
 
-Do **not** make downstream generators parse TypeScript to recover database types.
+### 4.2 Organization scope is schema; shard placement is not
 
-### 3.2 Stable Lumiere schema IR
-
-Generated Rust source is an input, not the public schema API for every generator. `lumiere-codegen` normalizes the generated bindings into one stable internal manifest:
+The schema IR may derive whether a table is organization-scoped from the presence of `organization_id`:
 
 ```rust
-pub struct GeneratedTableSchema {
-    pub table: String,
-    pub primary_key: GeneratedPrimaryKey,
-    pub columns: Vec<GeneratedColumn>,
-    pub indexes: Vec<GeneratedIndex>,
+pub enum GeneratedTenantScope {
+    Organization,
+    Global,
 }
 
-pub struct GeneratedColumn {
-    pub name: String,
-    pub ty: GeneratedType,
-    pub nullable: bool,
-}
-
-pub enum GeneratedType {
-    U64,
-    I64,
-    U32,
-    F64,
-    Bool,
-    String,
-    Timestamp,
-    Identity,
-    Vec(Box<GeneratedType>),
-    Enum(String),
-    Struct(String),
+impl GeneratedTableSchema {
+    pub fn tenant_scope(&self) -> GeneratedTenantScope;
+    pub fn organization_column(&self) -> Option<&GeneratedColumn>;
 }
 ```
 
-Every cold-tier generator consumes this IR. PG DDL, codecs, read projection, migration logic, archive metadata, and hydration metadata must not independently parse generated source.
+This branch exposes those helpers without changing the serialized manifest shape.
 
-### 3.3 Type mapping rule
+Do **not** add values such as `pg_shard_1`, database URLs, regions, hostnames, or tenant-placement IDs to generated schema artifacts. Those values change operationally and belong to onboarding/runtime configuration.
 
-Postgres `BIGINT` is signed. It is not a lossless representation of the full Rust `u64` domain.
+Generated PG/archive tooling should use `tenant_scope()` to fail closed when an organization-routed durable operation targets a table that has no organization ownership column.
 
-The schema IR must make this explicit. Choose one of:
+### 4.3 Type mapping remains unchanged
 
-- `NUMERIC(20,0)` for full `u64` fidelity;
-- a checked `BIGINT` mapping with a repository-wide invariant that IDs never exceed `i64::MAX`;
-- text/decimal representation where interoperability requires it.
-
-Never silently coerce malformed or out-of-range IDs to `0`.
-
-### 3.4 CI gate
-
-`make check-codegen` must fail when:
-
-- Rust bindings drift from the SpacetimeDB module;
-- schema IR drifts from generated Rust bindings;
-- PG DDL/migrations drift from schema IR;
-- archive/hydration manifests reference missing tables, columns, reducers, or primary keys.
+Postgres `BIGINT` is signed and cannot losslessly represent the complete Rust `u64` domain. Continue using the existing explicit mapping rule (`NUMERIC(20,0)` unless a repository-wide checked invariant chooses otherwise).
 
 ---
 
-## 4. Shared read contract
+## 5. Durable write and eviction path
 
-### 4.1 One read plan, two compilers
+The existing compare-and-finalize safety model remains useful, but the PG target is now selected by tenant placement.
 
-Today `query_exec.rs` and `stdb-auth` resolve organization/company scope, field-access projection, resource-specific predicates, and ordering. Cold reads must reuse that resolution rather than independently querying PG.
+```text
+eligible STDB row
+    │ organization_id
+    ▼
+TenantStoreResolver
+    │
+    ▼
+organization PG shard
+    │
+    ├── UPSERT exact archive_version
+    ├── verify id + version + payload hash
+    ▼
+STDB finalize reducer
+    │
+    └── delete only if version / eligibility still match
+```
 
-Introduce a store-agnostic read plan:
+The worker must never derive a shard from a table name, request field, or untrusted payload. It resolves only from the authoritative `organization_id` associated with the operation.
+
+The `archive_transfer` ledger remains organization-scoped and must live on the same durable shard as the archived row, or carry enough placement identity to prove which durable store was verified.
+
+---
+
+## 6. Durable read path
+
+`ResourceReadPlan` remains the shared semantic contract:
 
 ```rust
 pub struct ResourceReadPlan {
@@ -151,340 +215,149 @@ pub struct ResourceReadPlan {
 }
 ```
 
-Flow:
+Execution becomes:
 
 ```text
 authenticated request
-  ↓
-resolve session + org/company + field policy
-  ↓
+    ↓
+resolve org/company/field policy
+    ↓
 ResourceReadPlan
-  ├── compile to STDB SQL
-  └── compile to PG SQL
-  ↓
-merge already-equivalent row shapes
+    ↓
+TenantStoreResolver(plan.organization_id)
+    ↓
+STDB + resolved PG durable store
+    ↓
+bounded merged result
 ```
 
-The plan is the single source of truth for:
+No PG compiler or repository may accept a caller-provided shard identifier independently from the organization-bound plan/context.
 
-- organization isolation;
-- company isolation;
-- field-level access;
-- soft-delete/archive filters;
-- resource-specific predicates;
-- ordering;
-- cursor/limit semantics.
-
-### 4.2 Predicate correctness
-
-Never inject an unparenthesized predicate such as:
-
-```sql
-organization_id = ? AND cold_eligible_at IS NULL OR cold_eligible_at >= ...
-```
-
-Represent it structurally, or compile it as:
-
-```sql
-organization_id = ?
-AND (
-  cold_eligible_at IS NULL
-  OR cold_eligible_at >= ...
-)
-```
-
-### 4.3 Pagination is a prerequisite
-
-Do not enable transactional cold reads for a resource whose API contract can return an unbounded historical set.
-
-Before a resource enters Phase 2:
-
-- inventory every frontend/server consumer;
-- define deterministic order keys;
-- define cursor/limit semantics across both stores;
-- ensure a merged page is globally ordered and bounded;
-- add frontend pagination only where required.
-
-The cold tier must not move the memory problem from SpacetimeDB into the API server or browser.
-
-### 4.4 Merge semantics
-
-For a bounded page:
-
-1. resolve one `ResourceReadPlan`;
-2. query hot and cold stores concurrently where the requested page may span both;
-3. normalize using generated codecs;
-4. dedupe by primary key and archive version, preferring the current STDB row;
-5. globally sort;
-6. apply the final page boundary once, after merge.
-
-A unified HTTP response cannot return hot rows and then later append cold rows. If partial-result behavior is desired, it requires an explicit API/frontend contract.
+Existing bounded pagination, global ordering, dedupe, and STDB-wins-current-version rules remain unchanged.
 
 ---
 
-## 5. Archive eligibility and row versioning
+## 7. Rehydration
 
-Each archive-capable transactional table gains:
-
-```rust
-pub cold_eligible_at: Option<Timestamp>,
-pub archive_version: u64,
-```
-
-`archive_version` increments whenever a change affects the archived representation.
-
-Reducers remain responsible for eligibility. The worker never derives business/fiscal state independently.
-
-Examples:
-
-| Resource | Eligible when |
-|---|---|
-| POS order | terminal paid/invoiced/cancelled state |
-| Sale order | `done` / `cancel` |
-| Stock move | `done` and otherwise safe to archive |
-| Account move | posted **and** fiscal period closed |
-| Child rows | parent eligible and child version stable |
-
----
-
-## 6. Safe eviction protocol
-
-The original read → PG insert → unconditional STDB delete sequence is unsafe because a row can change between the worker read and delete.
-
-Use compare-and-finalize semantics.
-
-### 6.1 Worker flow
+Late mutation of a durable-only row remains orchestrated before the normal reducer call:
 
 ```text
-1. Read eligible STDB rows including:
-   id, organization_id, cold_eligible_at, archive_version, full payload
-
-2. UPSERT exact version into PG.
-
-3. Verify PG contains (id, archive_version, payload hash/checksum).
-
-4. Call an internal STDB finalize reducer with:
-   table, id, expected_archive_version, expected_cold_eligible_at
-
-5. Finalize reducer atomically re-reads the row and deletes only if:
-   - id still exists;
-   - archive_version is unchanged;
-   - cold_eligible_at is unchanged;
-   - row remains eligible.
-
-6. If any check fails, do not delete. Retry from the new STDB version later.
+mutation request
+    ↓
+organization context
+    ↓
+resolve organization PG shard
+    ↓
+fetch durable row
+    ↓
+hydrate into STDB if still absent
+    ↓
+call existing reducer
 ```
 
-The worker must never mutate STDB rows through ad-hoc SQL. Final deletion is a reducer transaction.
+Hydration must verify that the durable row belongs to the resolved organization before inserting it into hot state.
 
-### 6.2 PG UPSERT
-
-`ON CONFLICT DO NOTHING` is insufficient after rehydration.
-
-Use version-aware generated UPSERT semantics:
-
-```sql
-ON CONFLICT (id) DO UPDATE
-SET ...,
-    archive_version = EXCLUDED.archive_version,
-    archived_at = now()
-WHERE EXCLUDED.archive_version > cold_table.archive_version;
-```
-
-### 6.3 Transfer ledger
-
-Persist an `archive_transfer` record containing at least:
-
-- resource/table;
-- row id;
-- organization id;
-- archive version;
-- payload hash;
-- PG transfer timestamp;
-- STDB finalize timestamp/transaction identifier where available.
-
-This ledger supports auditability and disaster-recovery validation.
+Reducers remain unchanged and do not learn about Postgres or shard placement.
 
 ---
 
-## 7. Re-hydration for late mutations
+## 8. Implementation scope
 
-A reducer cannot detect a missing row, call an external-data procedure, and then continue the same already-running reducer transaction.
+### Phase 0 — keep existing cold-tier safety foundation
 
-Re-hydration is orchestrated **before** the normal reducer call.
+Retain the already-built pieces that directly support durable PG:
 
-### 7.1 Generated hydration policy
+- [x] Rust STDB bindings as codegen input;
+- [x] stable schema IR;
+- [x] PG DDL/codecs generation;
+- [x] `ResourceReadPlan` and store compilers;
+- [x] archive/hydration manifests;
+- [x] archive-version and payload-hash conventions;
+- [x] production PG TLS configuration;
+- [x] bounded cursor/order contract;
+- [x] `make check-codegen` drift checks.
 
-Generate metadata for reducers that may target archived rows:
+### Phase 1 — organization-aware durable store resolution
 
-```rust
-pub struct ReducerHydrationPolicy {
-    pub reducer: &'static str,
-    pub table: &'static str,
-    pub id_arg: ReducerArgPath,
-}
-```
+- [ ] add durable-store/tenant-placement configuration;
+- [ ] add `TenantStoreResolver` abstraction;
+- [ ] make organization onboarding assign a durable store;
+- [ ] remove direct global PG-pool access from durable repositories/workers;
+- [ ] propagate resolved organization context through PG query/archive/hydration paths;
+- [x] expose organization-scope helpers in schema IR without serializing topology;
+- [ ] fail codegen/runtime validation when an organization-routed durable table lacks `organization_id`;
+- [ ] tenant isolation tests proving org A cannot read/write org B's durable shard context.
 
-### 7.2 API call flow
+**Exit gate:** application code can run with one PG database, but no organization-scoped durable path depends on there being only one PG database.
 
-```text
-frontend
-  ↓ unchanged
-POST /api/call/:reducer
-  ↓
-api-server resolves ReducerHydrationPolicy
-  ↓
-if target row is absent from STDB:
-    call generated SpacetimeDB hydration procedure
-      1. HTTP GET cold row from internal api-server endpoint
-      2. open procedure transaction
-      3. insert row if still absent
-      4. clear cold_eligible_at
-      5. preserve/increment archive_version by generated rule
-  ↓
-api-server calls original reducer normally
-```
+### Phase 2 — prove the durable path
 
-The hydration procedure only hydrates. It does not attempt to call back into an already-running reducer transaction.
+Use `audit_log` first, then one mutable transactional resource:
 
-The hydration transaction must be idempotent because procedure transaction closures may be retried.
+- [ ] write/verify through resolved durable store;
+- [ ] checked STDB finalize;
+- [ ] scoped historical read;
+- [ ] rehydration for the mutable resource;
+- [ ] crash/retry/version-race tests;
+- [ ] backup/restore validation for the tenant placement + durable data pair.
 
-### 7.3 Stale PG copy while hot
+### Phase 3 — optional second Postgres shard proof
 
-PG may retain the previous cold version while the row is hot again. Read merge prefers the current STDB row/version. Re-eviction performs version-aware PG UPSERT before finalizing STDB deletion.
+Only after the single-store path works:
 
----
+- [ ] configure a second ordinary Postgres durable store;
+- [ ] onboard a test organization directly onto it;
+- [ ] verify reads/writes/archive/hydration never cross stores;
+- [ ] document a manual tenant-placement migration procedure with copy → verify → routing flip → rollback.
 
-## 8. Audit log specialization
-
-Audit log is the first workload, but the existing `audit_log` table itself acts as the durable transactional outbox rather than adding a second JSON queue.
-
-This proves:
-
-- Rust-binding → schema-IR → PG DDL generation;
-- PG TLS/pooling;
-- transfer/finalize mechanics;
-- PG read path;
-- cross-tier observability;
-- backup/recovery ledger;
-
-without first taking on mutable transactional rows.
+This is a correctness proof, not an autoscaling project.
 
 ---
 
-## 9. Postgres client and TLS
+## 9. Explicitly out of scope for this branch
 
-Use `tokio-postgres` + `deadpool-postgres` if that remains the lightweight stack, but production managed Postgres must use an actual TLS connector. `NoTls` is development-only.
+Drop the previous general scaling investigation from this PR:
 
-Configuration must distinguish local and production TLS modes and fail closed when production requires TLS but it is absent.
+- SpacetimeDB horizontal scaling strategy;
+- automatic STDB tenant sharding;
+- Kubernetes topology;
+- PG read replicas;
+- automatic shard balancing/rebalancing;
+- cross-region placement;
+- capacity prediction;
+- distributed query federation;
+- automatic live tenant migration;
+- generalized multi-store orchestration beyond organization → durable PG placement.
 
----
-
-## 10. Failure behavior
-
-| Failure | Required behavior |
-|---|---|
-| PG read unavailable | Do not silently claim complete historical results. Return explicit degraded/error metadata appropriate to the resource contract. |
-| PG archive write fails | Keep STDB row. Retry. |
-| Worker crashes after PG write | STDB row remains until checked finalize succeeds. Re-run is idempotent. |
-| Row mutates during archive | Finalize reducer rejects stale expected version. New version remains hot. |
-| PG has stale older version after rehydration | STDB wins reads; next archive performs version-aware UPSERT. |
-| PG schema drift | CI/codegen gate blocks deploy. |
-| Hydration PG/API failure | Original mutation is not attempted; return a clear reducer-call error. |
+Those decisions should be driven by production measurements later.
 
 ---
 
-## 11. Implementation phases
+## 10. Required tests
 
-### Phase 0 — safety foundation
+At minimum:
 
-- [x] Generate Rust client bindings for api-server from the SpacetimeDB module (manual step: `make generate-stdb-rust-sdk`, requires the SpacetimeDB CLI + a running module — not yet gated by `make check-codegen`, see note below).
-- [x] Add schema-IR extraction from generated Rust bindings.
-- [x] Generate PG DDL/codecs from schema IR.
-- [x] Add `ResourceReadPlan` and STDB/PG compilers.
-- [x] Add generated archive/hydration manifests.
-- [x] Define archive-version and payload-hash conventions.
-- [x] Add production PG TLS configuration.
-- [x] Define global cursor/ordering contract and audit each archive candidate's consumers.
-- [x] Extend `make check-codegen`.
-
-**Exit gate:** no archive-capable code relies on TS parsing, independent PG authorization logic, silent type coercion, or unbounded merge behavior.
-
-Phase 0 deliverables live in:
-
-- `lumiere-codegen/src/cold_tier/{schema_ir,stdb_bindings_parse,pg_ddl_emit,codec_emit,archive_manifest_emit,hydration_manifest_emit}.rs`
-- `api-server/src/cold_tier/{mod,conventions,cursor,pg_pool}.rs`
-- generated assets: `crates/stdb-auth/assets/{lumiere-schema-manifest,archive-manifest,codec-manifest,hydration-manifest}.json`
-- generated DDL: `api-server/src/generated/pg_ddl/cold_audit_log.sql`
-- config: `lumiere-codegen/{archive-candidates,hydration-policies}.json`
-
-Note: `make generate-stdb-rust-sdk` regenerates `api-server/src/stdb_sdk_bindings/` (requires the SpacetimeDB CLI + module); `make codegen` then derives every downstream artifact from those bindings. `make check-codegen` only verifies that the derived artifacts match the *currently committed* bindings — it does **not** re-run `generate-stdb-rust-sdk` against the live module, so it cannot catch drift between the deployed SpacetimeDB schema and the committed bindings. Whoever changes the module schema must run `make generate-stdb-rust-sdk && make codegen` and commit the result; this is not yet CI-enforced.
-
-### Phase 1 — audit log cold path
-
-Implement the dedicated audit plan using existing `audit_log` as the transactional outbox.
-
-**Exit gate:** audit rows reach PG, are verified, and are removed from STDB only through checked finalize logic; reads remain correctly scoped.
-
-### Phase 2 — first mutable transactional resource
-
-Start with one resource after consumer/pagination audit:
-
-- [ ] `cold_eligible_at` + `archive_version`;
-- [ ] reducer-owned eligibility stamping;
-- [ ] generated PG schema/codecs;
-- [ ] worker UPSERT + verify;
-- [ ] version-checked STDB finalize reducer;
-- [ ] shared dual-store read page;
-- [ ] mutation rehydration policy where required;
-- [ ] concurrency/failure integration tests.
-
-Do not expand until this resource survives load, crash, mutation-race, authorization, and restore tests.
-
-### Phase 3 — remaining resources + operations
-
-- [ ] expand resources one by one;
-- [ ] per-org windows;
-- [ ] backlog/status/dry-run admin APIs;
-- [ ] metrics and alerts;
-- [ ] human-approved AI action-draft surface;
-- [ ] pilot runbook.
-
-### Phase 4 — scaling decision
-
-Measure actual SpacetimeDB memory/restart behavior and evaluate per-org sharding/native scaling alternatives. Treat the cold tier as reversible architecture.
+1. onboarding produces exactly one valid durable placement for an organization;
+2. resolving the same organization is deterministic;
+3. an unknown/unplaced organization fails closed;
+4. durable reads cannot override the organization-derived store;
+5. archive writes and transfer-ledger writes use the same resolved store;
+6. hydration rejects a row whose `organization_id` differs from the request context;
+7. an organization-scoped durable table without `organization_id` is rejected;
+8. single-PG deployment behavior is unchanged;
+9. two configured PG stores can host different test organizations without cross-tenant access.
 
 ---
 
-## 12. Required tests
+## 11. Acceptance criteria
 
-- tenant A cold rows never appear for tenant B;
-- company-private cold rows respect the same company scope as hot rows;
-- field permissions produce the same projection from both stores;
-- global order/cursor is correct across hot/cold;
-- PG failure does not masquerade as a complete historical result;
-- mutation between worker read and finalize cannot lose the newer version;
-- worker crash after PG write is idempotent;
-- rehydrated row can mutate and later re-archive with a newer PG version;
-- stale PG version never overrides hot STDB data;
-- schema/codegen drift fails CI;
-- restore test proves every finalized STDB deletion is recoverable from the selected PG recovery point.
+This branch is complete when:
 
----
-
-## 13. Decision log
-
-| Date | Decision | Rationale |
-|---|---|---|
-| 2026-08-17 | Use SpacetimeDB hot + Postgres cold | Historical imports may exceed a comfortable hot working set. |
-| 2026-08-18 | Generate cold metadata from SpacetimeDB-generated Rust bindings | Server-side generated types are a more coherent schema input than frontend TS artifacts. |
-| 2026-08-18 | Normalize generated Rust into a stable Lumiere schema IR | Downstream generators should not each parse generated source. |
-| 2026-08-18 | Shared `ResourceReadPlan` for STDB and PG | Prevents authorization/company/field/filter drift. |
-| 2026-08-18 | Pagination is a precondition for transactional archival | Prevents moving the memory problem into API/browser. |
-| 2026-08-18 | Version-checked finalize reducer | Prevents data loss when a row mutates during archival. |
-| 2026-08-18 | Version-aware PG UPSERT | Supports rehydration and re-archival. |
-| 2026-08-18 | API-orchestrated hydration before reducer call | Avoids invalid reducer→procedure→continue control flow. |
-| 2026-08-18 | Cross-tier transfer ledger required | Independent backups need a provable common recovery boundary. |
-| 2026-08-18 | Keyset cursors, not offset, for cold pagination | Rows move hot→cold between requests; offset is unstable, keyset predicates on the last seen key value. |
-| 2026-08-18 | Hydration manifest is codegen-validated even when empty | The generator + CI gate exist in Phase 0; Phase 1 audit_log is append-only so the policy list is empty. |
-| 2026-08-18 | u64 order-key cursors encoded as decimal strings | Lossless round-trip across the JSON-based cursor format (matches the API JSON representation for U64 columns). |
+- SpacetimeDB still owns reducer/business logic;
+- Postgres is the durable historical projection;
+- organization onboarding establishes durable PG placement;
+- every organization-scoped PG operation resolves through that placement;
+- schema/codegen can identify organization-scoped tables without embedding topology;
+- one-PG deployment remains the default and simplest production setup;
+- a second PG store can be introduced by configuration/onboarding rather than repository rewrites;
+- broader scaling work has been removed from the branch scope.
