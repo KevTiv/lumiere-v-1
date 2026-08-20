@@ -2,7 +2,7 @@
 
 **Status:** Proposed — 2026-08-20
 **Tracks:** `frontend-architecture`, `workflow-ir`, `presentation-ir`, `nextjs`, `expo`, `gpui-readiness`
-**Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [overview-dashboard-subagent-plan.md](./overview-dashboard-subagent-plan.md)
+**Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [overview-dashboard-subagent-plan.md](./overview-dashboard-subagent-plan.md) · [organization-onboarding-workflow-subagent-plan.md](./organization-onboarding-workflow-subagent-plan.md)
 
 ---
 
@@ -13,7 +13,7 @@ Make Lumiere's frontend architecture surface-independent enough to support:
 - Next.js as the primary dense desktop/web ERP surface;
 - Expo / React Native as the mobile and field-work surface;
 - a future lean native shell (for example GPUI) without reimplementing business workflows;
-- dashboarding, reporting, forms, approvals, list/detail flows, and workflow state using shared behavior and presentation intent rather than copied page implementations.
+- dashboarding, reporting, forms, approvals, list/detail flows, onboarding, and workflow state using shared behavior and presentation intent rather than copied page implementations.
 
 The goal is **not** one universal component tree. The goal is one shared application/workflow/presentation model with platform-specific renderers.
 
@@ -36,6 +36,16 @@ platform renderer
    └── future GPUI / Rust
 ```
 
+Two complementary proofs anchor the architecture:
+
+```text
+Organization Onboarding
+  -> workflow/state/form/resume proof
+
+Overview Dashboard
+  -> dashboard/report/composition proof
+```
+
 ---
 
 ## 2. Architectural rules
@@ -45,9 +55,10 @@ platform renderer
 3. **No workflow/business decision may exist only inside a React component tree.**
 4. **Backend application contracts remain the only data/command source.**
 5. **Presentation metadata must not duplicate backend authorization/business logic.**
-6. **Platform renderers own layout, accessibility, density, gestures, keyboard behavior, and native interaction details.**
-7. **A future non-React renderer must be possible without redesigning the workflow model.**
-8. **Custom UI is allowed where a workflow truly benefits from it; metadata-driven rendering is a default, not a prison.**
+6. **Workflow progress must derive from authoritative application state, not renderer-local step indexes.**
+7. **Platform renderers own layout, accessibility, density, gestures, keyboard behavior, navigation mechanics, and native interaction details.**
+8. **A future non-React renderer must be possible without redesigning the workflow model.**
+9. **Custom UI is allowed where a workflow truly benefits from it; metadata-driven rendering is a default, not a prison.**
 
 ---
 
@@ -57,40 +68,23 @@ platform renderer
 
 Source: generated `@lumiere/contracts` / Rust contract crate.
 
-Owns:
-
-- typed queries;
-- typed commands;
-- subscriptions;
-- operation names;
-- transport serialization;
-- cache/invalidation metadata.
-
-Does not own presentation.
+Owns typed queries, commands, subscriptions, operation names, transport serialization, and cache/invalidation metadata. It does not own presentation or workflow policy.
 
 ### 3.2 Workflow model
 
 Framework-neutral definitions describing how users complete domain work.
 
-Example:
-
 ```ts
 export interface WorkflowDefinition<TState extends string> {
   id: string;
   states: readonly TState[];
+  steps?: readonly WorkflowStepDefinition[];
   actions: readonly WorkflowActionDefinition[];
   surfaces: WorkflowSurfaceBindings;
 }
 ```
 
-Representative definitions:
-
-- sales order lifecycle;
-- purchase approval;
-- invoice review;
-- inventory receipt;
-- CRM follow-up;
-- offline changeset review.
+Representative definitions include organization onboarding, sales order lifecycle, purchase approval, invoice review, inventory receipt, CRM follow-up, and offline changeset review.
 
 ### 3.3 Presentation model
 
@@ -127,15 +121,7 @@ The definition describes *what* should be available, not DOM/native layout detai
 
 ### 3.4 Design foundations
 
-Create a renderer-neutral token package containing semantic tokens only:
-
-- spacing;
-- typography;
-- semantic colors/status;
-- density;
-- radius;
-- motion timing where meaningful;
-- breakpoints/categories as semantics, not CSS implementation.
+Create a renderer-neutral token package containing semantic spacing, typography, colors/status, density, radius, motion timing where meaningful, and breakpoint/category semantics rather than CSS implementation details.
 
 ### 3.5 Platform renderers
 
@@ -167,39 +153,15 @@ Do not force React packages into the Rust/native path.
 
 ### Next.js / web
 
-Optimize for:
-
-- dense data tables;
-- keyboard-first workflows;
-- split panes;
-- drag/drop where useful;
-- print/export;
-- complex reporting;
-- large-screen dashboards;
-- accessibility and browser-native behavior.
+Optimize for dense data tables, keyboard-first workflows, split panes, drag/drop where useful, print/export, complex reporting, large-screen dashboards, and browser accessibility.
 
 ### Expo / native
 
-Optimize for:
-
-- mobile-first workflows;
-- field/warehouse/service tasks;
-- camera/document capture;
-- offline-first interaction;
-- push/deep links;
-- step-driven workflows;
-- bottom sheets / native navigation;
-- adaptive list/detail layouts on tablets.
+Optimize for mobile-first workflows, field/warehouse/service tasks, offline interaction, push/deep links, step-driven workflows, native navigation/sheets, and adaptive list/detail layouts on tablets.
 
 ### Future GPUI/native desktop
 
-Optimize for:
-
-- low-memory fast startup;
-- native virtualization;
-- command palette / keyboard-driven usage;
-- multi-pane workspace;
-- long-lived operational sessions.
+Optimize for low-memory fast startup, native virtualization, command-palette/keyboard usage, multi-pane workspace, and long-lived operational sessions.
 
 The GPUI path is a future proof, not branch scope.
 
@@ -239,26 +201,29 @@ Do not encode CSS grid positions as canonical dashboard semantics.
 
 ## 6. Workflow composition model
 
-Example target:
+Organization onboarding is the first workflow proof because it exercises forms, state transitions, resumability, validation, backend provisioning status, and renderer-specific navigation.
+
+Target shape:
 
 ```ts
-const purchaseApproval = defineWorkflow({
-  id: "purchasing.order.approval",
-  states: ["draft", "submitted", "approved", "rejected"],
+const organizationOnboarding = defineWorkflow({
+  id: "organization.onboarding",
+  states: ["draft", "profile", "team", "provisioning", "review", "active"],
   actions: {
-    submit: contracts.purchasing.orders.submit,
-    approve: contracts.purchasing.orders.approve,
-    reject: contracts.purchasing.orders.reject,
+    saveProfile: contracts.organization.onboarding.saveProfile,
+    inviteTeam: contracts.organization.onboarding.inviteTeam,
+    continue: contracts.organization.onboarding.continue,
+    activate: contracts.organization.onboarding.activate,
   },
   surfaces: {
-    list: purchaseOrderList,
-    detail: purchaseOrderDetail,
-    activity: purchaseOrderActivity,
+    form: organizationOnboardingForm,
+    progress: organizationOnboardingProgress,
+    completion: organizationWorkspaceIntent,
   },
 });
 ```
 
-The renderer decides whether this becomes a web split-pane, mobile stack, tablet master/detail, or future GPUI inspector.
+The exact states/actions must follow existing backend truth; the frontend model must not invent business transitions. The renderer decides whether this becomes a web stepper/split-pane, mobile native stack, tablet adaptive flow, or future GPUI inspector.
 
 ---
 
@@ -268,43 +233,58 @@ Do not rewrite all existing UI.
 
 ### Phase F0 — inventory and primitives
 
-- [ ] inventory existing page shells, dashboard cards, tables, form frames, detail layouts, action bars, and workflow-specific wrappers;
-- [ ] classify each as token / primitive / presentation pattern / domain-specific component;
+- [ ] inventory existing page shells, onboarding frames, dashboard cards, tables, form frames, detail layouts, action bars, and workflow-specific wrappers;
+- [ ] classify each as token / primitive / presentation pattern / workflow primitive / domain-specific component;
 - [ ] identify duplicated frames whose differences are only layout/transport wiring;
 - [ ] define minimal `workflow-core` and `presentation-core` types;
 - [ ] define design-token package boundary.
 
-**Exit gate:** one canonical model exists for list, detail, workflow action, metric, dashboard section, and report table intent.
+**Exit gate:** one canonical model exists for workflow step/action/progress, list, detail, metric, dashboard section, navigation intent, and report table intent.
 
 ### Phase F1 — web renderer proof
 
-- [ ] implement presentation renderers using existing web components where possible;
+- [ ] implement presentation/workflow renderers using existing web components where possible;
 - [ ] wrap rather than rewrite stable existing components;
-- [ ] prove list/detail/action composition through presentation definitions;
+- [ ] prove list/detail/action/form composition through shared definitions;
 - [ ] ensure direct backend usage remains through generated contracts only.
 
-**Exit gate:** one existing Next.js workflow is rendered from shared workflow/presentation definitions without losing current capability.
+### Phase F2A — Organization Onboarding workflow proof
 
-### Phase F2 — Overview Dashboard proof
+Use `organization-onboarding-workflow-subagent-plan.md`.
 
-Use the Overview Dashboard sub-plan as the first overall UI architecture proof.
+- [ ] map existing onboarding reducers/queries and current UI steps;
+- [ ] make authoritative workflow state resumable from STDB-backed contracts;
+- [ ] model step/form/action/progress/navigation semantics framework-neutrally;
+- [ ] render the workflow through Next.js using existing form primitives where suitable;
+- [ ] remove client-only workflow authority and raw transport/reducer usage from the migrated flow;
+- [ ] prove retry/recovery/idempotency for interruption and provisioning failure.
+
+**Exit gate:** onboarding can refresh/restart and resume from authoritative state; renderer navigation cannot bypass reducer-owned transitions.
+
+### Phase F2B — Overview Dashboard presentation proof
+
+Use `overview-dashboard-subagent-plan.md`.
 
 - [ ] model dashboard sections declaratively;
 - [ ] reuse existing metrics/reports through generated contracts;
+- [ ] include at least one actionable workflow queue;
 - [ ] implement web renderer;
 - [ ] ensure dashboard definitions contain no DOM/CSS-specific layout decisions;
-- [ ] define mobile priority/stack behavior in presentation metadata where needed.
+- [ ] define mobile priority/stack behavior semantically where needed.
+
+**Exit gate:** Overview is useful operationally and is rendered from a framework-neutral dashboard definition.
 
 ### Phase F3 — Expo starter surface
 
 - [ ] add Expo workspace/app;
 - [ ] consume the same private contract package;
 - [ ] consume shared workflow/presentation definitions;
-- [ ] implement native renderers for metric, list, detail, form/action, workflow queue, and dashboard sections;
-- [ ] prove one real workflow end-to-end on iOS/Android;
+- [ ] implement native renderers for metric, list, detail, form/action, workflow progress, workflow queue, and dashboard sections;
+- [ ] implement Organization Onboarding end-to-end on iOS/Android;
+- [ ] render Overview Dashboard from the same definition;
 - [ ] keep platform-specific navigation and interaction details native.
 
-**Exit gate:** one workflow and the Overview Dashboard operate from the same shared definitions on web and Expo without sharing layout components.
+**Exit gate:** Organization Onboarding and Overview Dashboard both operate from the same shared definitions on web and Expo without sharing layout components.
 
 ### Phase F4 — reporting and dashboard composition
 
@@ -316,15 +296,15 @@ Use the Overview Dashboard sub-plan as the first overall UI architecture proof.
 
 ### Phase F5 — legacy frame removal
 
-- [ ] remove duplicated page shells superseded by presentation renderers;
+- [ ] remove duplicated page/onboarding/dashboard shells superseded by presentation/workflow renderers;
 - [ ] remove feature-local table/form/dashboard wrappers that encode only reusable composition;
 - [ ] retain bespoke domain components where they carry genuine workflow value;
 - [ ] add CI/import rules preventing new direct dependencies from feature code into transport or raw generated STDB bindings.
 
 ### Phase F6 — renderer independence check
 
-- [ ] serialize a representative workflow/presentation definition into a renderer-neutral test fixture;
-- [ ] prove it can be consumed without React assumptions;
+- [ ] serialize representative onboarding workflow and dashboard definitions into renderer-neutral test fixtures;
+- [ ] prove they can be consumed without React assumptions;
 - [ ] optionally build a tiny Rust/CLI/native proof consuming the same conceptual contract;
 - [ ] do **not** build a production GPUI client in this phase.
 
@@ -334,26 +314,16 @@ Use the Overview Dashboard sub-plan as the first overall UI architecture proof.
 
 Prefer composition primitives over custom page frames.
 
-Good:
-
 ```text
 Page
   Header
-  FilterBar
-  EntityList
+  Progress / FilterBar
+  Content
   Inspector
   WorkflowActions
 ```
 
-Avoid creating domain-specific wrappers when they only change labels or spacing.
-
-Keep bespoke components when they provide domain-specific interaction, for example:
-
-- warehouse barcode receiving;
-- accounting reconciliation canvas;
-- manufacturing scheduling board;
-- complex drag/drop planning;
-- custom analytical visualization.
+Avoid domain-specific wrappers when they only change labels or spacing. Keep bespoke components when they provide domain-specific interaction such as warehouse barcode receiving, accounting reconciliation, manufacturing scheduling, complex planning, or specialized analytical visualization.
 
 ---
 
@@ -361,14 +331,16 @@ Keep bespoke components when they provide domain-specific interaction, for examp
 
 1. shared workflow definitions contain no React/DOM/native imports;
 2. presentation definitions contain no raw transport paths or reducer names;
-3. web and Expo renderers can consume the same dashboard definition;
-4. web and Expo actions resolve the same generated contract operations;
-5. renderer-specific layout changes do not alter workflow semantics;
-6. business authorization remains backend-owned;
-7. one migrated workflow retains parity with the current web implementation;
-8. Overview Dashboard data sources are contract-driven and renderer-independent;
-9. shared packages do not import `next`, `react-dom`, or `react-native`;
-10. future non-React consumption remains possible from serialized/typed presentation definitions.
+3. onboarding progress derives from authoritative application state;
+4. web and Expo renderers can consume the same onboarding workflow definition;
+5. web and Expo renderers can consume the same dashboard definition;
+6. web and Expo actions resolve the same generated contract operations;
+7. renderer-specific layout/navigation changes do not alter workflow semantics;
+8. business authorization and validation remain backend-owned;
+9. onboarding survives refresh/interruption and resumes correctly;
+10. Overview Dashboard data sources are contract-driven and renderer-independent;
+11. shared packages do not import `next`, `react-dom`, or `react-native`;
+12. future non-React consumption remains possible from serialized/typed workflow/presentation definitions.
 
 ---
 
@@ -379,6 +351,7 @@ This plan is successful when:
 - Next.js remains a first-class dense ERP surface;
 - Expo can be added without duplicating workflow/business logic;
 - shared frontend architecture centers on workflow/presentation definitions, not universal components;
+- Organization Onboarding proves stateful/resumable workflow composition from shared definitions;
 - Overview Dashboard proves dashboard/report composition from shared definitions;
 - existing stable components are reused behind renderer boundaries rather than rewritten by default;
 - repeated custom page frames are reduced materially;
