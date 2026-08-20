@@ -327,6 +327,34 @@ confirmOrder.mutate({ orderId });
 
 and away from `/api/query/*`, `/api/call/*`, reducer-name strings, positional arrays, local generated STDB types, manual bigint serialization, and handwritten cache aliases.
 
+### 8.5 Package publishing and migration are one workflow
+
+The private npm/crate work is not complete when artifacts are merely published. Publishing must trigger or enable a repository migration step that updates consumers onto the generated contract surface and then proves the legacy surface is unused.
+
+Recommended workflow:
+
+```text
+STDB/codegen change
+      ↓
+generate schema + application IR
+      ↓
+publish private crate/npm artifacts
+      ↓
+pin compatible versions in lumiere-v-1
+      ↓
+run pnpm migrate:contracts
+      ↓
+run pnpm migrate:contracts:check
+      ↓
+typecheck/lint/tests
+      ↓
+delete superseded legacy hooks/types/transports
+      ↓
+CI deny-list prevents regression
+```
+
+Package publication scripts should print the exact follow-up migration/check commands and CI should verify that the pinned package contract fingerprint matches the generated IR expected by the repository.
+
 ---
 
 ## 9. What changes from the previous branch objective
@@ -601,6 +629,7 @@ This branch is complete when:
 - application callers consume stable generated operations rather than raw STDB reducer/binding details;
 - the private npm package provides generated framework-neutral services plus isolated React Query hooks/query keys/subscription adapters;
 - the private Rust crate/npm package remain generated distribution artifacts, not business-logic homes;
+- private package publication is followed by deterministic consumer migration/checks rather than leaving dual APIs indefinitely;
 - migration scripts can deterministically migrate/check frontend contract adoption;
 - the frontend no longer ordinarily consumes superseded generic STDB hooks, raw transport URLs, positional reducer arrays, duplicate generated application types, or handwritten cache aliases where generated contracts exist;
 - CI prevents migrated legacy APIs from returning;
