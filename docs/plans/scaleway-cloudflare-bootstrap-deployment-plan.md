@@ -2,7 +2,7 @@
 
 **Status:** Proposed — near-term deployment target 2026-08-20
 **Tracks:** `deployment`, `scaleway`, `cloudflare`, `managed-postgres`, `stdb`, `ai-harness`, `bootstrap-cost`
-**Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [regional-stdb-scaleway-durable-foundation.md](./regional-stdb-scaleway-durable-foundation.md) · [traffic-resilience-admission-control-plan.md](./traffic-resilience-admission-control-plan.md) · [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md)
+**Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [regional-stdb-scaleway-durable-foundation.md](./regional-stdb-scaleway-durable-foundation.md) · [traffic-resilience-admission-control-plan.md](./traffic-resilience-admission-control-plan.md) · [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md) · [production-readiness-release-hardening-plan.md](./production-readiness-release-hardening-plan.md)
 
 ---
 
@@ -49,6 +49,8 @@ The deployment must remain a small physical instance of the final architecture r
 8. **AI/provider failure must not prevent ordinary ERP operation.**
 9. **Provider-specific endpoints/regions stay in deployment/runtime configuration, not application-contract IR.**
 10. **Cost/usage telemetry is collected per organization and capability class so infrastructure upgrades follow measured demand.**
+11. **A deployment is a compatible release set.** IR/codegen, STDB module, PG schema, web/mobile contract, and runtime configuration versions must be observable and checked rather than deployed as unrelated artifacts.
+12. **Production dependence on backups starts only after restore/reconstruction has been exercised.**
 
 ---
 
@@ -146,6 +148,8 @@ Required deployment work:
 - backup/PITR verification procedure;
 - restore drill before treating backups as production-ready;
 - PG capacity/connection metrics associated with organization/capability usage.
+
+The durable schema version, migration state, backup restore target, and reconstructed STDB watermark must participate in the production-readiness evidence defined in the release-hardening plan.
 
 ---
 
@@ -314,9 +318,10 @@ Do not hard-code commercial pricing tiers into IR. Collect the measurements need
 - [ ] provision Scaleway Managed PostgreSQL in Paris;
 - [ ] provision initial STDB Paris runtime;
 - [ ] establish private/internal network paths where practical;
-- [ ] configure TLS/secrets/service identities;
+- [ ] configure TLS/secrets/service identities using the provider-neutral lifecycle defined by the production-readiness plan;
 - [ ] configure durable gateway connectivity;
-- [ ] test PG migrations, backups and restore.
+- [ ] test PG migrations, backups and restore;
+- [ ] record deployed release/contract/schema versions.
 
 ### D1 — put Cloudflare in front
 
@@ -350,6 +355,16 @@ Do not hard-code commercial pricing tiers into IR. Collect the measurements need
 - [ ] emit source/provenance + row/count/hash metadata for auditability;
 - [ ] measure token reduction versus raw-context baseline.
 
+### D5 — production-readiness rehearsal
+
+- [ ] validate release manifest/version compatibility across IR, generated contracts, STDB, PG, and clients;
+- [ ] exercise a forward release and safe application rollback;
+- [ ] perform managed-PG restore into a disposable target;
+- [ ] reconstruct representative STDB organization state and verify watermarks/integrity;
+- [ ] rotate at least one service credential without broad downtime;
+- [ ] run deployed tenant-isolation tests through the real ingress/auth/data paths;
+- [ ] enable initial synthetic checks and operator diagnostics before broad paid rollout.
+
 ---
 
 ## 13. Exit criteria
@@ -365,6 +380,9 @@ The first production topology is ready when:
 - at least one analytical AI workflow uses deterministic server-side shaping before model interpretation;
 - provider/model failure does not block normal ERP workflows;
 - per-org infrastructure and AI cost signals are measurable;
+- release/contract/schema versions are observable and incompatible combinations fail closed;
+- managed-PG restore plus representative STDB reconstruction has been exercised;
+- tenant-isolation tests pass across every enabled production surface;
 - adding a future regional STDB cell is a placement/deployment change rather than an application-contract rewrite.
 
 ---
@@ -379,4 +397,5 @@ The first production topology is ready when:
 - raw model access to SQL/PG/Object Storage;
 - arbitrary model-generated code execution;
 - file/Object Storage implementation until storage is provisioned;
-- payment-provider deployment.
+- payment-provider deployment;
+- full operator/admin UI, final SLO thresholds, recurring DR automation, and payment-provider incident handling until the relevant production services are online.
