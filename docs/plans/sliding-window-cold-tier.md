@@ -1,8 +1,8 @@
 # STDB-owned transactional core with durable Postgres projection
 
 **Status:** Proposed — production-contract alignment 2026-08-20
-**Tracks:** `organization-placement`, `contract-ir`, `generated-client-sdk`, `contract-migration`, `durable-postgres`, `tenant-onboarding`, `stdb-query-boundary`, `traffic-resilience`
-**Related:** [regional-stdb-scaleway-durable-foundation.md](./regional-stdb-scaleway-durable-foundation.md) · [audit-log-cold-by-default.md](./audit-log-cold-by-default.md) · [backup-recovery-followup.md](./backup-recovery-followup.md) · [offline-changeset-sync.md](./offline-changeset-sync.md) · [audit-auth-operation-context-plan.md](./audit-auth-operation-context-plan.md) · [traffic-resilience-admission-control-plan.md](./traffic-resilience-admission-control-plan.md)
+**Tracks:** `organization-placement`, `contract-ir`, `generated-client-sdk`, `contract-migration`, `durable-postgres`, `tenant-onboarding`, `stdb-query-boundary`, `traffic-resilience`, `agent-capability-ir`
+**Related:** [regional-stdb-scaleway-durable-foundation.md](./regional-stdb-scaleway-durable-foundation.md) · [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md) · [audit-log-cold-by-default.md](./audit-log-cold-by-default.md) · [backup-recovery-followup.md](./backup-recovery-followup.md) · [offline-changeset-sync.md](./offline-changeset-sync.md) · [audit-auth-operation-context-plan.md](./audit-auth-operation-context-plan.md) · [traffic-resilience-admission-control-plan.md](./traffic-resilience-admission-control-plan.md)
 
 ---
 
@@ -14,19 +14,22 @@ Before extending the durable or client contract paths, establish a canonical org
 
 The long-term deployment direction is one authoritative STDB execution cell per organization at a time, with Scaleway Postgres as the durable convergence/recovery layer. The current branch only lays the metadata/recovery foundation; it does not implement multi-region STDB or active-active replication.
 
+The application-contract IR also becomes the source for generated harness-safe capability/tool descriptors. The AI harness, web, Expo, and future clients consume the same stable ERP operations. Casbin-style server policy remains the sole authorization authority; capability metadata is structural and never grants access by itself.
+
 Traffic resilience is part of the contract boundary as well: generated operations carry structural traffic classification so Kong and application admission control can apply bounded, server-authoritative rate/concurrency/retry policy without moving business logic into the gateway.
 
 ```text
-frontend / client
+frontend / client / AI harness
       │
       ▼
-private generated npm SDK
+private generated npm SDK + capability registry
       │
       ▼
-Kong + server admission boundary
+Kong + server auth/admission boundary
       │
-      ▼
-OrganizationPlacementResolver
+      ├── resolve actor/org
+      ├── Casbin capability evaluation
+      └── resolve OrganizationPlacement
       │
       ▼
 SpacetimeDB execution cell
@@ -54,21 +57,25 @@ Initial production remains one logical execution cell + one STDB deployment + on
 3. **Organization lifecycle, execution cell, placement generation, and durable-store placement are server-controlled runtime state.**
 4. **Placement generation fences stale cells/routes during future migration/reactivation.**
 5. **Generated contracts contain structural/application metadata, never business policy.**
-6. **Frontend application code consumes stable named operations instead of raw reducer names, resource URLs, positional argument arrays, or raw STDB binding details.**
-7. **Migration scripts are generated/manifest-driven and idempotent.**
-8. **Legacy transport/type APIs are temporary compatibility surfaces and are deleted after migration.**
-9. **Postgres is durable convergence/history/recovery storage, not a second business engine.**
-10. **The api-server/durable gateway does not independently compile business/resource policy.**
-11. **STDB resolves organization/company scope, field policy, resource predicates, ordering, pagination, and hydration decisions before durable I/O.**
-12. **Procedures are transport/orchestration only and must reuse STDB-owned business/query-policy logic.**
-13. **No row leaves STDB until its exact durable version is verified on the resolved PG store.**
-14. **Durable business transitions have a monotonic per-organization commit sequence and measurable PG durability watermark.**
-15. **Audit explains who/why; canonical change records reconstruct what; snapshots bound replay cost.**
-16. **All security-sensitive audit/admission identity is server-derived, never client-authored.**
-17. **Every external operation has bounded rate, payload, timeout, and downstream concurrency policy.**
-18. **Overload fails fast and locally through 429/503 shedding rather than cascading into STDB/PG/workers.**
-19. **Mutation retries require explicit idempotency semantics; retries must not be amplified across client/gateway/service layers.**
-20. **SQLite/offline clients queue intent and working sets; reconnect still crosses the STDB reducer boundary.**
+6. **Casbin-style server policy is the single authorization authority for frontend and agent capabilities.**
+7. **The AI harness never gains a parallel business API or trusted identity/permission model.**
+8. **Frontend application code and harness code consume stable named operations instead of raw reducer names, resource URLs, positional argument arrays, or raw STDB binding details.**
+9. **Migration scripts are generated/manifest-driven and idempotent.**
+10. **Legacy transport/type APIs are temporary compatibility surfaces and are deleted after migration.**
+11. **Postgres is durable convergence/history/recovery storage, not a second business engine.**
+12. **The api-server/durable gateway does not independently compile business/resource policy.**
+13. **STDB resolves organization/company scope, field policy, resource predicates, ordering, pagination, and hydration decisions before durable I/O.**
+14. **Procedures are transport/orchestration only and must reuse STDB-owned business/query-policy logic.**
+15. **No row leaves STDB until its exact durable version is verified on the resolved PG store.**
+16. **Durable business transitions have a monotonic per-organization commit sequence and measurable PG durability watermark.**
+17. **Audit explains who/why; canonical change records reconstruct what; snapshots bound replay cost.**
+18. **All security-sensitive audit/admission identity is server-derived, never client-authored.**
+19. **Every external operation has bounded rate, payload, timeout, and downstream concurrency policy.**
+20. **Overload fails fast and locally through 429/503 shedding rather than cascading into STDB/PG/workers.**
+21. **Mutation retries require explicit idempotency semantics; retries must not be amplified across client/gateway/service layers.**
+22. **SQLite/offline clients queue intent and working sets; reconnect still crosses the STDB reducer boundary.**
+23. **Saved skills/workflows never retain authorization; capability checks are re-evaluated at execution time.**
+24. **Content-safety/prompt-safety models may filter/classify but never authorize ERP operations.**
 
 ---
 
@@ -97,7 +104,10 @@ stable operation names
 typed inputs / outputs
 query | command | subscription
 cache tags / invalidation
-traffic class / idempotency metadata
+traffic class / idempotency
+capability key / operation risk
+confirmation metadata
+presentation/file extension points
 no business policy
 
               │ generates
@@ -107,14 +117,21 @@ Private contract artifacts
 ────────────────────────────
 Rust contract crate
 private npm package
+  framework-neutral services
+  React Query hooks
+  query-key factories
+  subscription adapters
+  capability/tool registry
+  JSON-schema descriptors
 
               │ calls
               ▼
 
-Kong + admission control
+Kong + auth + admission control
 ────────────────────────────
 request bounds / rate limits
-server-derived actor/org budgets
+server-derived actor/org
+Casbin capability evaluation
 concurrency pools / load shedding
 
               │ resolve placement
@@ -284,13 +301,39 @@ Suspension/archival never means destructive deletion. Reactivation uses durable 
 
 ---
 
-## 9. IR, codegen, and private packages
+## 9. IR, codegen, private packages, and harness tooling
 
-The existing schema IR/application-contract IR split remains. IR identifies organization scope and operation semantics, but physical cell/PG topology remains runtime placement state.
+The schema IR/application-contract IR split remains. IR identifies organization scope and operation semantics, but physical cell/PG topology remains runtime placement state.
 
-Generated application operations may carry traffic/idempotency/migration metadata, while placement resolution, business policy, and authorization stay outside generated packages.
+Application-contract IR should generate the same stable operations for ordinary clients and the AI harness. Add structural metadata sufficient to build a capability registry:
+
+```rust
+pub enum GeneratedOperationRisk {
+    ReadOnly,
+    Presentation,
+    Draft,
+    BusinessMutation,
+    FinancialMutation,
+}
+
+pub struct GeneratedCapabilityDescriptor {
+    pub operation: OperationName,
+    pub input: GeneratedTypeRef,
+    pub output: GeneratedTypeRef,
+    pub required_capability: CapabilityKey,
+    pub risk: GeneratedOperationRisk,
+    pub requires_confirmation: bool,
+    pub traffic: GeneratedOperationTrafficPolicy,
+}
+```
+
+`required_capability` is a stable Casbin policy key; IR never emits role assignments or authorization policy. The server resolves trusted actor/org context, filters capability discovery for ergonomics, and re-authorizes every invocation.
+
+Generated packages may expose provider-neutral tool descriptors/JSON schemas, presentation capability descriptors, and organization-scoped file/content resource references. Raw bucket keys, arbitrary filesystem paths, SQL, reducer strings, and arbitrary URLs are never harness tools.
 
 Package publication and frontend codemod migration remain one workflow; legacy raw hooks/types/transports are removed after generated contract adoption.
+
+See `agent-harness-capability-ir-foundation.md` for the harness-specific extension points and deferred scope.
 
 ---
 
@@ -315,14 +358,21 @@ Package publication and frontend codemod migration remain one workflow; legacy r
 
 **Exit gate:** all tenant-aware infrastructure routes through one canonical organization placement/lifecycle model, and durable/audit metadata can later support ordered reconstruction without implementing multi-region STDB today.
 
-### Phase 1 — production contract/IR boundary
+### Phase 1 — production contract/IR + capability boundary
 
 - [ ] split structural schema IR from caller-facing application-contract IR;
 - [ ] define stable named operations and generated services/hooks;
 - [ ] centralize serialization/auth/error/retry semantics;
 - [ ] add traffic-class/idempotency metadata;
+- [ ] add stable `CapabilityKey`, operation risk, and confirmation metadata to explicitly approved operations;
+- [ ] generate JSON-schema-compatible input/output descriptors;
+- [ ] generate provider-neutral capability/tool registry artifacts;
+- [ ] add server-side Casbin-backed capability filtering adapter;
+- [ ] prove every tool invocation re-authorizes through trusted actor/org context;
+- [ ] reserve typed presentation and file/content capability namespaces without adding raw storage access;
 - [ ] publish private npm/crate artifacts;
 - [ ] migrate Sales as representative domain;
+- [ ] prove one read-only and one draft/proposal operation can be exposed through generated harness tooling;
 - [ ] add codegen drift tests.
 
 ### Phase 1.5 — generated contract adoption and legacy transport removal
@@ -330,7 +380,8 @@ Package publication and frontend codemod migration remain one workflow; legacy r
 - [ ] run manifest-driven idempotent codemods;
 - [ ] migrate generic query/reducer hooks and raw transport usage;
 - [ ] enforce `migrate:contracts:check` and CI deny-list;
-- [ ] delete superseded hooks/types/transports after verification.
+- [ ] delete superseded hooks/types/transports after verification;
+- [ ] CI prevents harness code from dispatching raw reducer strings or bypassing generated operations.
 
 ### Phase 2 — tenant-aware durable gateway
 
@@ -381,7 +432,11 @@ This is a correctness proof, not an autoscaling or active-active project.
 - self-hosted disconnected cell packaging;
 - full replay engine implementation;
 - payment-provider implementations;
-- moving business logic into Postgres, the api-server, Kong, or generated packages.
+- autonomous skill generation from observed behavior;
+- production legal-research/content agents;
+- unrestricted code execution or filesystem access;
+- direct model access to Object Storage;
+- moving business logic into Postgres, the api-server, Kong, generated packages, or the AI harness.
 
 ---
 
@@ -398,14 +453,18 @@ At minimum:
 7. audit and canonical change records share operation identifiers but remain separate schemas;
 8. snapshot manifests bind an exact reconstructable durable point;
 9. application-contract IR exposes only explicitly approved STDB operations;
-10. generated hooks/services resolve stable operations without raw reducer/resource paths;
-11. burst/reconnect/refetch storms remain bounded;
-12. durable gateway cannot accept caller-selected PG stores;
-13. org A cannot query org B durable data;
-14. no external HTTP call occurs while an STDB transaction is held open;
-15. hydration rejects organization/generation/version mismatch;
-16. overload returns bounded 429/503 outcomes;
-17. mutation retries are never transparently amplified across layers.
+10. generated hooks/services and harness tools resolve the same stable operations;
+11. generated capability discovery cannot elevate permissions;
+12. every harness tool invocation is re-authorized against server-derived actor/org context;
+13. capability metadata includes risk/confirmation/traffic information without embedding Casbin role assignments;
+14. burst/reconnect/refetch storms remain bounded;
+15. durable gateway cannot accept caller-selected PG stores;
+16. org A cannot query org B durable data;
+17. no external HTTP call occurs while an STDB transaction is held open;
+18. hydration rejects organization/generation/version mismatch;
+19. overload returns bounded 429/503 outcomes;
+20. mutation retries are never transparently amplified across layers;
+21. harness code cannot dispatch arbitrary reducer names, raw SQL, bucket keys, or arbitrary HTTP URLs through supported APIs.
 
 ---
 
@@ -418,9 +477,11 @@ This branch is complete when:
 - initial production still runs one logical cell + one STDB + one PG;
 - future regional STDB placement is a routing/runtime concern rather than an application rewrite;
 - Scaleway PG can serve as the durable convergence/history/recovery layer;
-- durable transitions can be ordered and measured through commit sequence/watermark metadata;
-- audit explains actor/context while canonical changes + snapshots enable future reconstruction;
-- dormant organizations retain versioned data/migration metadata sufficient for later reactivation;
-- generated contracts/private packages remain the stable frontend boundary;
-- Kong/admission policy bounds load before STDB/PG/workers saturate;
-- broader multi-region, PG replication topology, active-active STDB, and payment-provider implementation remain deferred.
+- application callers use stable generated operation contracts;
+- frontend and AI harness share the same generated operation/capability source;
+- Casbin-backed authorization remains the sole capability permission source;
+- generated tool descriptors provide typed input/output, risk, confirmation, traffic, and stable capability keys without embedding business policy;
+- the harness can expose approved ERP tools without a parallel application API;
+- private npm/crate artifacts remain generated-output-only;
+- legacy hooks/types/transports are removed through repeatable migration tooling;
+- broader multi-region, AI orchestration, file import, skill-learning, and payment-provider implementations remain future consumers of these foundations.
