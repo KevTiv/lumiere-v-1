@@ -8,12 +8,7 @@
 
 ## 1. Objective
 
-Make Lumiere's frontend architecture surface-independent enough to support:
-
-- Next.js as the primary dense desktop/web ERP surface;
-- Expo / React Native as the mobile and field-work surface;
-- a future lean native shell (for example GPUI) without reimplementing business workflows;
-- dashboarding, reporting, forms, approvals, list/detail flows, onboarding, and workflow state using shared behavior and presentation intent rather than copied page implementations.
+Make Lumiere's frontend architecture surface-independent enough to support Next.js as the primary dense desktop/web ERP surface, Expo / React Native as the mobile and field-work surface, and a future lean native shell such as GPUI without reimplementing business workflows.
 
 The goal is **not** one universal component tree. The goal is one shared application/workflow/presentation model with platform-specific renderers.
 
