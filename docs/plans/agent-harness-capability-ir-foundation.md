@@ -1,21 +1,24 @@
 # Agent harness capability IR foundation
 
 **Status:** Proposed — 2026-08-20
-**Tracks:** `application-contract-ir`, `agent-harness`, `capability-registry`, `casbin`, `files`, `presentation`
-**Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [frontend-multisurface-workflow-presentation-plan.md](./frontend-multisurface-workflow-presentation-plan.md) · [audit-auth-operation-context-plan.md](./audit-auth-operation-context-plan.md)
+**Tracks:** `application-contract-ir`, `agent-harness`, `capability-registry`, `casbin`, `analysis-shaping`, `files`, `presentation`
+**Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [scaleway-cloudflare-bootstrap-deployment-plan.md](./scaleway-cloudflare-bootstrap-deployment-plan.md) · [frontend-multisurface-workflow-presentation-plan.md](./frontend-multisurface-workflow-presentation-plan.md) · [audit-auth-operation-context-plan.md](./audit-auth-operation-context-plan.md)
 
 ---
 
 ## 1. Objective
 
-Make the generated application-contract IR usable as the single typed capability source for the AI harness, ordinary frontend clients, future content/file workflows, and presentation tooling.
+Make the generated application-contract IR usable as the single typed capability source for the AI harness, ordinary frontend clients, future content/file workflows, analytical shaping, and presentation tooling.
 
 The AI harness must not gain a parallel API surface or a separate authorization model. It should consume generated capability descriptors for the same stable ERP operations used by web/Expo clients, with all effective permissions resolved through the existing Casbin-style server authorization boundary.
+
+The harness should also avoid treating raw ERP query responses as model context. Bulk data remains server-side and is reduced through typed deterministic analysis plans before compact results reach the model.
 
 ```text
 Application-contract IR
         │
         ├── ERP operation descriptors
+        ├── analysis/data-shaping descriptors
         ├── file/content capability descriptors
         ├── presentation capability descriptors
         └── risk / confirmation / traffic metadata
@@ -27,9 +30,15 @@ Application-contract IR
         server auth + Casbin evaluation
                 ↓
         STDB reducer/view/procedure boundary
+                ↓
+       typed server-side result/dataset
+                ↓
+     deterministic analysis shaping
+                ↓
+          compact model context
 ```
 
-The branch should generate enough structural tooling now that later Scaleway-hosted LLM orchestration can discover and invoke approved ERP capabilities without bespoke adapters for every domain.
+The branch should generate enough structural tooling now that later Scaleway-hosted LLM orchestration can discover and invoke approved ERP capabilities without bespoke adapters for every domain or wastefully ingesting large raw payloads.
 
 ---
 
@@ -41,10 +50,12 @@ The branch should generate enough structural tooling now that later Scaleway-hos
 4. **STDB reducers remain authoritative for business mutations and invariants.**
 5. **Generated capability metadata is structural; it does not encode authorization policy or business rules.**
 6. **Raw SQL, arbitrary reducer dispatch, arbitrary HTTP URLs, bucket keys, or filesystem paths are not agent tools.**
-7. **Sensitive mutations require explicit risk/confirmation semantics in addition to authorization.**
-8. **Saved skills/workflows never retain permissions; each step is re-authorized at execution time.**
-9. **Content-safety/prompt-safety models may filter or classify requests but never authorize business actions.**
-10. **Agent actions share operation/correlation IDs with audit and telemetry.**
+7. **Raw ERP result payloads are not the default LLM context.** Large/bulk results remain server-side and are shaped first.
+8. **Sensitive mutations require explicit risk/confirmation semantics in addition to authorization.**
+9. **Saved skills/workflows never retain permissions; each step is re-authorized at execution time.**
+10. **Content-safety/prompt-safety models may filter or classify requests but never authorize business actions.**
+11. **Agent actions and analysis transformations share operation/correlation IDs with audit and telemetry.**
+12. **AI/provider failure never blocks ordinary ERP workflows.**
 
 ---
 
@@ -69,6 +80,7 @@ pub struct GeneratedCapabilityDescriptor {
     pub risk: GeneratedOperationRisk,
     pub requires_confirmation: bool,
     pub traffic: GeneratedOperationTrafficPolicy,
+    pub analysis: Option<GeneratedAnalysisCapability>,
     pub presentation: Option<GeneratedPresentationCapability>,
 }
 ```
@@ -80,6 +92,7 @@ Example keys:
 ```text
 accounting.receivables.read
 reporting.visualize
+analysis.receivables.compare_periods
 files.dataset.inspect
 contracts.draft
 legal.research
@@ -101,6 +114,7 @@ export interface AgentToolDefinition<TInput, TOutput> {
   outputSchema: JsonSchema
   risk: OperationRisk
   requiresConfirmation: boolean
+  resultPolicy?: ToolResultPolicy
 }
 ```
 
@@ -122,6 +136,8 @@ LLM chooses typed tool
 server re-authorizes invocation
         ↓
 STDB operation executes
+        ↓
+result policy decides direct-small result vs server-side dataset/shaping
 ```
 
 Tool discovery filtering is an ergonomic optimization, not the security boundary; every invocation is re-authorized.
@@ -287,28 +303,180 @@ provider adapter
   └── future local/offline model runtime
 ```
 
-This prevents provider/model changes from changing ERP capability semantics.
+Deploy the initial harness near the trusted backend in the Scaleway Paris home region. Interactive model output should use HTTP/SSE; STDB websocket subscriptions remain responsible for ERP realtime state.
+
+This prevents provider/model changes from changing ERP capability semantics or application connectivity.
 
 ---
 
-## 10. Phase H0 — IR/tooling foundation
+## 10. Token-aware result shaping
+
+### 10.1 Principle
+
+For analytical workloads, the model should decide **which authorized information and transformation it needs**, while deterministic server-side logic performs bulk manipulation.
+
+Avoid:
+
+```text
+STDB/PG query
+   ↓
+10,000 raw rows
+   ↓
+serialize JSON
+   ↓
+LLM context
+```
+
+Prefer:
+
+```text
+LLM selects/query capability
+   ↓
+Casbin-authorized STDB/durable query
+   ↓
+server-side typed dataset
+   ↓
+AnalysisPlan
+  filter
+  group
+  aggregate
+  compare
+  project
+   ↓
+compact AnalysisResult
+   ↓
+LLM explains/interprets
+```
+
+### 10.2 Typed analysis plan
+
+Prefer a constrained declarative plan rather than arbitrary generated code:
+
+```ts
+export interface AnalysisPlan {
+  source: DatasetHandle
+  steps: readonly AnalysisStep[]
+  output: AnalysisOutputSpec
+}
+
+type AnalysisStep =
+  | FilterStep
+  | ProjectStep
+  | GroupByStep
+  | AggregateStep
+  | ComparePeriodsStep
+  | TopNStep
+  | TimeseriesStep
+```
+
+The plan can be model-produced, but the runtime validates it against generated schemas, Casbin-authorized source capabilities, cardinality limits, and traffic/admission policy before execution.
+
+### 10.3 Tool result policies
+
+Operations should be able to declare structural result handling:
+
+```ts
+type ToolResultPolicy =
+  | { kind: "direct"; maxBytes: number }
+  | { kind: "dataset"; maxRows: number }
+  | { kind: "aggregate-first"; allowedShapes: AnalysisShape[] }
+```
+
+This allows small semantic results to go directly to the model while forcing large tabular/history results through shaping.
+
+### 10.4 Analysis result provenance
+
+A shaped result should preserve enough provenance to explain what happened without retaining the entire raw model context:
+
+```ts
+interface AnalysisResult<T> {
+  data: T
+  sourceOperation: OperationName
+  sourceFingerprint: string
+  inputRowCount: number
+  outputRowCount: number
+  planFingerprint: string
+  generatedAt: string
+}
+```
+
+Audit/telemetry should correlate:
+
+```text
+user request
+→ source operation
+→ analysis plan
+→ shaped result
+→ model response
+→ presentation intent
+```
+
+### 10.5 Sandboxed advanced transformations
+
+A typed declarative engine is the default. If advanced user/agent-generated scripting is later needed, it must execute in a distinct constrained sandbox with:
+
+- no arbitrary network access;
+- no raw PG/STDB credentials;
+- no Object Storage credentials;
+- immutable authorized input datasets;
+- hard CPU/memory/time/output limits;
+- allowlisted libraries/functions;
+- explicit input/output schemas;
+- operation/correlation provenance;
+- no privilege expansion beyond the source capability set.
+
+The sandbox transforms data; it does not become another authorization or business-logic engine.
+
+### 10.6 Example accountant workflow
+
+```text
+"Which customers deteriorated most in payment behavior this quarter?"
+        ↓
+agent selects accounting.receivables.history
+        ↓
+server authorizes through Casbin
+        ↓
+raw history remains server-side
+        ↓
+AnalysisPlan:
+  group customer
+  compare periods
+  calculate avg payment delay delta
+  top 20 deteriorations
+        ↓
+compact 20-row AnalysisResult
+        ↓
+model explains findings
+        ↓
+presentation.table + presentation.timeseries
+```
+
+This should be the preferred pattern for dashboard/reporting/AI analysis of ERP datasets.
+
+---
+
+## 11. Phase H0 — IR/tooling foundation
 
 - [ ] add stable `CapabilityKey` metadata to explicitly approved application operations;
 - [ ] add operation risk + confirmation metadata;
 - [ ] generate JSON-schema-compatible input/output descriptors from canonical contract types;
 - [ ] generate framework-neutral `AgentToolDefinition`/capability registry artifacts in the private npm package and Rust contract crate where useful;
+- [ ] add structural tool-result policy metadata for direct vs dataset/aggregate-first handling;
 - [ ] add server-side capability filtering adapter backed by existing Casbin-style authorization;
 - [ ] ensure every tool invocation re-resolves trusted actor/org context and re-authorizes the capability;
-- [ ] propagate operation/correlation context into agent invocations, audit, and telemetry;
+- [ ] define typed `DatasetHandle`, `AnalysisPlan`, `AnalysisStep`, and `AnalysisResult` contracts;
+- [ ] implement a minimal deterministic shaping engine for filter/project/group/aggregate/period comparison/top-N/timeseries;
+- [ ] ensure source datasets remain server-side unless explicitly bounded for model context;
+- [ ] propagate operation/correlation/analysis-plan provenance into audit and telemetry;
 - [ ] reserve typed presentation capability descriptors compatible with presentation-core;
 - [ ] reserve file/content resource references and capability namespaces without implementing raw bucket access;
-- [ ] add CI checks preventing agent/harness code from dispatching raw reducer strings or bypassing generated operations.
+- [ ] add CI checks preventing agent/harness code from dispatching raw reducer strings, raw SQL, or bypassing generated operations.
 
-**Exit gate:** one read-only representative operation and one draft/proposal operation can be exposed to a harness through generated tool metadata, filtered by server-side Casbin policy, invoked through the normal STDB contract boundary, and correlated in audit/telemetry without any harness-specific business API.
+**Exit gate:** one read-only representative operation and one draft/proposal operation can be exposed through generated tool metadata, and one accountant-style analytical query can execute through authorized source capability → deterministic shaping → compact model context → presentation intent without placing its raw ERP row set in the LLM prompt.
 
 ---
 
-## 11. Explicitly deferred
+## 12. Explicitly deferred
 
 - autonomous skill generation from user behavior;
 - production legal-research agents;
@@ -320,19 +488,23 @@ This prevents provider/model changes from changing ERP capability semantics.
 - AI-authored authorization decisions;
 - provider-specific model policy in application IR;
 - full Excel/PDF import implementation;
-- automatic financial mutations.
+- automatic financial mutations;
+- general-purpose sandbox scripting before the constrained analysis-plan path is proven.
 
 ---
 
-## 12. Acceptance criteria
+## 13. Acceptance criteria
 
 This foundation is successful when:
 
 - frontend and AI harness share the same generated application operations;
 - Casbin-backed policy remains the sole capability authorization source;
 - capability discovery and invocation cannot elevate user permissions;
-- generated tool definitions expose typed inputs/outputs, risk, confirmation, traffic, and stable capability keys;
+- generated tool definitions expose typed inputs/outputs, risk, confirmation, traffic, stable capability keys, and result-shaping policy;
+- large analytical ERP results remain server-side and reach the model only through bounded deterministic `AnalysisResult` shapes;
+- analysis plans are validated against generated schemas, authorized sources, and admission limits;
 - STDB remains authoritative for mutations/business invariants;
 - presentation/file/content concepts have typed extension points without creating parallel APIs;
-- audit/telemetry can identify agent-originated operations using the same operation context as ordinary clients;
+- audit/telemetry can identify agent-originated source operations and shaping plans using the same operation context as ordinary clients;
+- model/provider failure leaves ordinary ERP operation unaffected;
 - later Scaleway LLM, file import, content workspace, and skill systems can be added as consumers rather than forcing another ERP communication layer.
