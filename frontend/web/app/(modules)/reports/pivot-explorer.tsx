@@ -27,6 +27,7 @@ import { FileSpreadsheet, Save, Trash2 } from "lucide-react"
 
 type PivotExplorerProps = {
   organizationId: bigint
+  companyId?: bigint
   financialReports: Record<string, unknown>[]
   trialBalances: Record<string, unknown>[]
 }
@@ -51,14 +52,15 @@ function columnKey(label: string, index: number): string {
 
 export function PivotExplorer({
   organizationId,
+  companyId,
   financialReports,
   trialBalances,
 }: PivotExplorerProps) {
   const { t } = useTranslation()
   const { data: savedReports = [] } = useSavedReports(organizationId)
-  const createSavedReport = useCreateSavedReport(organizationId)
-  const updateSavedReport = useUpdateSavedReport(organizationId)
-  const deleteSavedReport = useDeleteSavedReport(organizationId)
+  const createSavedReport = useCreateSavedReport(organizationId, companyId)
+  const updateSavedReport = useUpdateSavedReport(organizationId, companyId)
+  const deleteSavedReport = useDeleteSavedReport(organizationId, companyId)
 
   const generatedReports = useMemo(
     () =>

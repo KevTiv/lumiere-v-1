@@ -1,9 +1,8 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
 
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Organization / company / privacy mutations via Next.js BFF `POST /api/call/:reducer`.
+ * Organization / company / privacy mutations via the api-server BFF `POST /api/call/:reducer`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` organization-company hooks.
  */
 export const ORGANIZATION_COMPANY_BFF_REDUCERS = [
@@ -31,20 +30,6 @@ export function organizationCompanyBffCallUrl(
 ): string {
   const base = `/api/call/${reducer}`;
   return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
-
-export function organizationCompanyBffPost(
-  reducer: OrganizationCompanyBffReducerKey,
-  args: unknown[],
-): { urlPath: string; init: RequestInit } {
-  return {
-    urlPath: organizationCompanyBffCallUrl(reducer),
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
-    },
-  };
 }
 
 const ORGANIZATION_COMPANY_HINT_OVERRIDES: Partial<

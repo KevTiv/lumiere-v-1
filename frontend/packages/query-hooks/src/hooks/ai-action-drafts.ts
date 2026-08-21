@@ -1,10 +1,11 @@
 "use client"
 
+
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { resolveActionDraftRecordHref } from "@lumiere/erp-shared/action-draft-links"
 import { toCreateAiActionDraftParams } from "@lumiere/erp-shared/ai-create-params"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { i18n } from "@lumiere/i18n"
-import { aiActionDraftsBffPost } from "@lumiere/stdb/commands"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch } from "../http"
@@ -226,7 +227,7 @@ export function useExpireAiActionDrafts(organizationId: number, companyId: numbe
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      const { urlPath, init } = aiActionDraftsBffPost("expire_ai_action_drafts", [])
+      const { urlPath, init } = stdbBffCommandPost("expire_ai_action_drafts", { companyId: companyId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -249,9 +250,7 @@ export function useCreateAiActionDraft(organizationId: number, companyId: number
         uiContextJson: args.uiContextJson,
       })
       if (!params) throw new Error(i18n.t("common.paramsMapper.invalidAiActionDraft"))
-      const { urlPath, init } = aiActionDraftsBffPost("create_ai_action_draft", [
-        stdbParamsToJson(params, "CreateAiActionDraftParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_ai_action_draft", { companyId: companyId, params: stdbParamsToJson(params, "CreateAiActionDraftParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -266,7 +265,7 @@ export function useApproveAiActionDraft(organizationId: number, companyId: numbe
   return useMutation({
     mutationFn: async (args: number | { draftId: number; companyId?: number }) => {
       const draftId = typeof args === "number" ? args : args.draftId
-      const { urlPath, init } = aiActionDraftsBffPost("approve_ai_action_draft", [draftId])
+      const { urlPath, init } = stdbBffCommandPost("approve_ai_action_draft", { companyId: companyId, draftId: draftId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -285,10 +284,7 @@ export function useRejectAiActionDraft(organizationId: number, companyId: number
       reason?: string
       companyId?: number
     }) => {
-      const { urlPath, init } = aiActionDraftsBffPost("reject_ai_action_draft", [
-        args.draftId,
-        args.reason?.trim() || "Rejected by user",
-      ])
+      const { urlPath, init } = stdbBffCommandPost("reject_ai_action_draft", { companyId: companyId, draftId: args.draftId, reason: args.reason?.trim() || "Rejected by user" })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -307,13 +303,10 @@ export function useUpdateAiActionDraftParams(organizationId: number, companyId: 
       summary?: string
       companyId?: number
     }) => {
-      const { urlPath, init } = aiActionDraftsBffPost("update_ai_action_draft_params", [
-        args.draftId,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("update_ai_action_draft_params", { companyId: companyId, draftId: args.draftId, params: stdbParamsToJson({
           params_json: args.paramsJson,
           summary: args.summary ?? null,
-        }, "UpdateAiActionDraftParamsParams"),
-      ])
+        }, "UpdateAiActionDraftParamsParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },

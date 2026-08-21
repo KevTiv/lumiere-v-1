@@ -1,14 +1,12 @@
 "use client"
 
+
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 /**
  * Proposals hooks — SpacetimeDB API (org + company scoped mutators).
  */
 
 
-import {
-  proposalsBffPost,
-  type ProposalsBffReducerKey,
-} from "@lumiere/stdb/commands"
 import { encodeOptionalU64, stdbParamsToJson } from "@lumiere/stdb/stdb-params-json"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
@@ -396,13 +394,7 @@ export function useUpsertProposalSection(organizationId: bigint, companyId?: big
         params.sectionId != null && String(params.sectionId) !== ""
           ? toScalarU64(params.sectionId)
           : 0n
-      const { urlPath, init } = proposalsBffPost("upsert_proposal_section", [
-        organizationId,
-        company,
-        toScalarU64(params.proposalId),
-        sectionId,
-        params.expectedRevision ?? 0,
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("upsert_proposal_section", { companyId: company, proposalId: toScalarU64(params.proposalId), sectionId: sectionId, expectedRevision: params.expectedRevision ?? 0, params: stdbParamsToJson(
           {
             title: params.title,
             content: params.content,
@@ -411,8 +403,7 @@ export function useUpsertProposalSection(organizationId: bigint, companyId?: big
             aiSuggestion: params.aiSuggestion ?? null,
           },
           "UpsertProposalSectionParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to upsert proposal section")
     },
@@ -436,12 +427,7 @@ export function useResolveProposalSectionConflict(
       aiSuggestion?: string | null
     }) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("resolve_proposal_section_conflict", [
-        organizationId,
-        company,
-        toScalarU64(params.proposalId),
-        toScalarU64(params.sectionId),
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("resolve_proposal_section_conflict", { companyId: company, proposalId: toScalarU64(params.proposalId), sectionId: toScalarU64(params.sectionId), params: stdbParamsToJson(
           {
             title: params.title,
             content: params.content,
@@ -450,8 +436,7 @@ export function useResolveProposalSectionConflict(
             aiSuggestion: params.aiSuggestion ?? null,
           },
           "UpsertProposalSectionParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to resolve proposal section conflict")
     },
@@ -464,10 +449,7 @@ export function useCreateProposal(organizationId: bigint, companyId?: bigint) {
   return useMutation<void, Error, CreateProposalParams>({
     mutationFn: async (params) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("create_proposal", [
-        organizationId,
-        company,
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("create_proposal", { companyId: company, params: stdbParamsToJson(
           {
             title: params.title,
             clientName: params.clientName,
@@ -485,8 +467,7 @@ export function useCreateProposal(organizationId: bigint, companyId?: bigint) {
             metadata: params.metadata ?? null,
           },
           "CreateProposalParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to create proposal")
     },
@@ -502,11 +483,7 @@ export function useUpdateProposal(organizationId: bigint, companyId?: bigint) {
     } & UpdateProposalParams) => {
       const company = requireCompany(companyId)
       const { proposalId, ...fields } = params
-      const { urlPath, init } = proposalsBffPost("update_proposal", [
-        organizationId,
-        company,
-        toScalarU64(proposalId),
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("update_proposal", { companyId: company, proposalId: toScalarU64(proposalId), params: stdbParamsToJson(
           {
             title: fields.title ?? null,
             clientName: fields.clientName ?? null,
@@ -524,8 +501,7 @@ export function useUpdateProposal(organizationId: bigint, companyId?: bigint) {
             metadata: fields.metadata ?? null,
           },
           "UpdateProposalParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update proposal")
     },
@@ -541,12 +517,7 @@ export function useUpdateProposalStatus(organizationId: bigint, companyId?: bigi
       status: string
     }) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("update_proposal_status", [
-        organizationId,
-        company,
-        toScalarU64(params.proposalId),
-        params.status,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_proposal_status", { companyId: company, proposalId: toScalarU64(params.proposalId), status: params.status })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update proposal status")
     },
@@ -559,11 +530,7 @@ export function useApproveProposal(organizationId: bigint, companyId?: bigint) {
   return useMutation({
     mutationFn: async (proposalId: bigint | number | string) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("approve_proposal", [
-        organizationId,
-        company,
-        toScalarU64(proposalId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("approve_proposal", { companyId: company, proposalId: toScalarU64(proposalId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to approve proposal")
     },
@@ -583,18 +550,13 @@ export function useRecordProposalBidDecision(
       rationale: string
     }) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("record_proposal_bid_decision", [
-        organizationId,
-        company,
-        toScalarU64(params.proposalId),
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("record_proposal_bid_decision", { companyId: company, proposalId: toScalarU64(params.proposalId), params: stdbParamsToJson(
           {
             decision: params.decision,
             rationale: params.rationale,
           },
           "RecordProposalBidDecisionParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to record proposal bid decision")
     },
@@ -609,11 +571,7 @@ export function useAddProposalLineItem(organizationId: bigint, companyId?: bigin
       proposalId: bigint | number | string
     } & AddProposalLineItemParams) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("add_proposal_line_item", [
-        organizationId,
-        company,
-        toScalarU64(params.proposalId),
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("add_proposal_line_item", { companyId: company, proposalId: toScalarU64(params.proposalId), params: stdbParamsToJson(
           {
             sectionId:
               params.sectionId != null ? toScalarU64(params.sectionId) : null,
@@ -630,8 +588,7 @@ export function useAddProposalLineItem(organizationId: bigint, companyId?: bigin
             notes: params.notes ?? null,
           },
           "AddProposalLineItemParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to add proposal line item")
     },
@@ -646,11 +603,7 @@ export function useUpdateProposalLineItem(organizationId: bigint, companyId?: bi
       lineItemId: bigint | number | string
     } & UpdateProposalLineItemParams) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("update_proposal_line_item", [
-        organizationId,
-        company,
-        toScalarU64(params.lineItemId),
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("update_proposal_line_item", { companyId: company, lineItemId: toScalarU64(params.lineItemId), params: stdbParamsToJson(
           {
             quantity: params.quantity ?? null,
             priceUnit: params.priceUnit ?? null,
@@ -659,8 +612,7 @@ export function useUpdateProposalLineItem(organizationId: bigint, companyId?: bi
             description: params.description ?? null,
           },
           "UpdateProposalLineItemParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update proposal line item")
     },
@@ -673,11 +625,7 @@ export function useDeleteProposalLineItem(organizationId: bigint, companyId?: bi
   return useMutation({
     mutationFn: async (lineItemId: bigint | number | string) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("delete_proposal_line_item", [
-        organizationId,
-        company,
-        toScalarU64(lineItemId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("delete_proposal_line_item", { companyId: company, lineItemId: toScalarU64(lineItemId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to delete proposal line item")
     },
@@ -690,11 +638,7 @@ export function useDeleteProposalSection(organizationId: bigint, companyId?: big
   return useMutation({
     mutationFn: async (sectionId: bigint | number | string) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("delete_proposal_section", [
-        organizationId,
-        company,
-        toScalarU64(sectionId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("delete_proposal_section", { companyId: company, sectionId: toScalarU64(sectionId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to delete proposal section")
     },
@@ -710,12 +654,7 @@ export function useSaveProposalVersion(organizationId: bigint, companyId?: bigin
       message: string
     }) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("save_proposal_version", [
-        organizationId,
-        company,
-        toScalarU64(params.proposalId),
-        params.message,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("save_proposal_version", { companyId: company, proposalId: toScalarU64(params.proposalId), message: params.message })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to save proposal version")
     },
@@ -731,12 +670,7 @@ export function useRestoreProposalVersion(organizationId: bigint, companyId?: bi
       versionId: bigint | number | string
     }) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("restore_proposal_version", [
-        organizationId,
-        company,
-        toScalarU64(params.proposalId),
-        toScalarU64(params.versionId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("restore_proposal_version", { companyId: company, proposalId: toScalarU64(params.proposalId), versionId: toScalarU64(params.versionId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to restore proposal version")
     },
@@ -756,18 +690,9 @@ export function useAddProposalSourceDoc(organizationId: bigint, companyId?: bigi
       documentId?: bigint | number | string | null
     }) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("add_proposal_source_doc", [
-        organizationId,
-        company,
-        toScalarU64(params.proposalId),
-        params.name,
-        params.content,
-        params.docType,
-        params.wordCount,
-        encodeOptionalU64(
+      const { urlPath, init } = stdbBffCommandPost("add_proposal_source_doc", { companyId: company, proposalId: toScalarU64(params.proposalId), name: params.name, content: params.content, docType: params.docType, wordCount: params.wordCount, documentId: encodeOptionalU64(
           params.documentId != null ? toScalarU64(params.documentId) : null,
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to add proposal source document")
     },
@@ -780,11 +705,7 @@ export function useDeleteProposalSourceDoc(organizationId: bigint, companyId?: b
   return useMutation({
     mutationFn: async (docId: bigint | number | string) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("delete_proposal_source_doc", [
-        organizationId,
-        company,
-        toScalarU64(docId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("delete_proposal_source_doc", { companyId: company, docId: toScalarU64(docId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to delete proposal source document")
     },
@@ -799,11 +720,7 @@ export function useUpdateProposalSourceDoc(organizationId: bigint, companyId?: b
       docId: bigint | number | string
     } & UpdateProposalSourceDocParams) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("update_proposal_source_doc", [
-        organizationId,
-        company,
-        toScalarU64(params.docId),
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("update_proposal_source_doc", { companyId: company, docId: toScalarU64(params.docId), params: stdbParamsToJson(
           {
             name: params.name ?? null,
             content: params.content ?? null,
@@ -813,8 +730,7 @@ export function useUpdateProposalSourceDoc(organizationId: bigint, companyId?: b
               params.documentId != null ? toScalarU64(params.documentId) : null,
           },
           "UpdateProposalSourceDocParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update proposal source document")
     },
@@ -836,12 +752,7 @@ export function useReorderProposalLineItems(
       orderedIds: Array<bigint | number | string>
     }) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("reorder_proposal_line_items", [
-        organizationId,
-        company,
-        toScalarU64(params.proposalId),
-        params.orderedIds.map((id) => toScalarU64(id)),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("reorder_proposal_line_items", { companyId: company, proposalId: toScalarU64(params.proposalId), orderedIds: params.orderedIds.map((id) => toScalarU64(id)) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to reorder proposal line items")
     },
@@ -858,15 +769,9 @@ export function useUpdateProposalPresence(organizationId: bigint, companyId?: bi
       userName: string
     }) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("update_proposal_presence", [
-        organizationId,
-        company,
-        toScalarU64(params.proposalId),
-        encodeOptionalU64(
+      const { urlPath, init } = stdbBffCommandPost("update_proposal_presence", { companyId: company, proposalId: toScalarU64(params.proposalId), sectionId: encodeOptionalU64(
           params.sectionId != null ? toScalarU64(params.sectionId) : null,
-        ),
-        params.userName,
-      ])
+        ), userName: params.userName })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update proposal presence")
     },
@@ -881,11 +786,7 @@ export function useClearProposalPresence(organizationId: bigint, companyId?: big
   return useMutation({
     mutationFn: async (proposalId: bigint | number | string) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("clear_proposal_presence", [
-        organizationId,
-        company,
-        toScalarU64(proposalId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("clear_proposal_presence", { companyId: company, proposalId: toScalarU64(proposalId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to clear proposal presence")
     },
@@ -906,17 +807,9 @@ export function useAddProposalComment(organizationId: bigint, companyId?: bigint
       authorName: string
     }) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("add_proposal_comment", [
-        organizationId,
-        company,
-        toScalarU64(params.proposalId),
-        toScalarU64(params.sectionId),
-        params.content,
-        encodeOptionalU64(
+      const { urlPath, init } = stdbBffCommandPost("add_proposal_comment", { companyId: company, proposalId: toScalarU64(params.proposalId), sectionId: toScalarU64(params.sectionId), content: params.content, parentId: encodeOptionalU64(
           params.parentId != null ? toScalarU64(params.parentId) : null,
-        ),
-        params.authorName,
-      ])
+        ), authorName: params.authorName })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to add proposal comment")
     },
@@ -929,11 +822,7 @@ export function useResolveProposalComment(organizationId: bigint, companyId?: bi
   return useMutation({
     mutationFn: async (commentId: bigint | number | string) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("resolve_proposal_comment", [
-        organizationId,
-        company,
-        toScalarU64(commentId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("resolve_proposal_comment", { companyId: company, commentId: toScalarU64(commentId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to resolve proposal comment")
     },
@@ -953,18 +842,13 @@ export function useConvertProposalToSaleOrder(
       pricelistId: bigint | number | string
     }) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("convert_proposal_to_sale_order", [
-        organizationId,
-        company,
-        toScalarU64(params.proposalId),
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("convert_proposal_to_sale_order", { companyId: company, proposalId: toScalarU64(params.proposalId), params: stdbParamsToJson(
           {
             warehouseId: toScalarU64(params.warehouseId),
             pricelistId: toScalarU64(params.pricelistId),
           },
           "ConvertProposalToSaleOrderParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to convert proposal to sale order")
     },
@@ -984,33 +868,18 @@ export function useConvertProposalToProject(
       pricingType: string
     }) => {
       const company = requireCompany(companyId)
-      const { urlPath, init } = proposalsBffPost("convert_proposal_to_project", [
-        organizationId,
-        company,
-        toScalarU64(params.proposalId),
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("convert_proposal_to_project", { companyId: company, proposalId: toScalarU64(params.proposalId), params: stdbParamsToJson(
           {
             billType: params.billType,
             pricingType: params.pricingType,
           },
           "ConvertProposalToProjectParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to convert proposal to project")
     },
     onSuccess: () => invalidateProposalQueries(qc),
   })
-}
-
-async function postProposalReducer(
-  reducer: ProposalsBffReducerKey,
-  args: unknown[],
-  errorMessage: string,
-): Promise<void> {
-  const { urlPath, init } = proposalsBffPost(reducer, args)
-  const r = await apiFetch(urlPath, init)
-  if (!r.ok) throw new Error(errorMessage)
 }
 
 export function useCreateProposalTemplate(
@@ -1020,26 +889,23 @@ export function useCreateProposalTemplate(
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: CreateProposalTemplateParams) => {
-      await postProposalReducer(
-        "create_proposal_template",
-        [
-          organizationId,
-          requireCompany(companyId),
-          stdbParamsToJson(
-            {
-              name: params.name,
-              category: params.category,
-              locale: params.locale,
-              countryPackKey: params.countryPackKey ?? null,
-              sectionsJson: params.sectionsJson,
-              isActive: params.isActive,
-              metadata: params.metadata ?? null,
-            },
-            "CreateProposalTemplateParams",
-          ),
-        ],
-        "Failed to create proposal template",
-      )
+      const { urlPath, init } = stdbBffCommandPost("create_proposal_template", {
+        companyId: requireCompany(companyId),
+        params: stdbParamsToJson(
+          {
+            name: params.name,
+            category: params.category,
+            locale: params.locale,
+            countryPackKey: params.countryPackKey ?? null,
+            sectionsJson: params.sectionsJson,
+            isActive: params.isActive,
+            metadata: params.metadata ?? null,
+          },
+          "CreateProposalTemplateParams",
+        ),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create proposal template")
     },
     onSuccess: () => invalidateProposalQueries(qc),
   })
@@ -1055,16 +921,13 @@ export function useApplyProposalTemplate(
       proposalId: bigint | number | string
       templateId: bigint | number | string
     }) => {
-      await postProposalReducer(
-        "apply_proposal_template",
-        [
-          organizationId,
-          requireCompany(companyId),
-          toScalarU64(params.proposalId),
-          toScalarU64(params.templateId),
-        ],
-        "Failed to apply proposal template",
-      )
+      const { urlPath, init } = stdbBffCommandPost("apply_proposal_template", {
+        companyId: requireCompany(companyId),
+        proposalId: toScalarU64(params.proposalId),
+        templateId: toScalarU64(params.templateId),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to apply proposal template")
     },
     onSuccess: () => invalidateProposalQueries(qc),
   })
@@ -1089,14 +952,13 @@ export function useUpsertProposalComplianceRequirement(
       evidenceDocumentId?: bigint | number | string | null
       sequence: number
     }) => {
-      await postProposalReducer(
+      const { urlPath, init } = stdbBffCommandPost(
         "upsert_proposal_compliance_requirement",
-        [
-          organizationId,
-          requireCompany(companyId),
-          toScalarU64(params.proposalId),
-          optionalScalarU64(params.requirementId) ?? 0n,
-          stdbParamsToJson(
+        {
+          companyId: requireCompany(companyId),
+          proposalId: toScalarU64(params.proposalId),
+          requirementId: optionalScalarU64(params.requirementId) ?? 0n,
+          params: stdbParamsToJson(
             {
               requirementKey: params.requirementKey,
               title: params.title,
@@ -1110,9 +972,10 @@ export function useUpsertProposalComplianceRequirement(
             },
             "UpsertProposalComplianceRequirementParams",
           ),
-        ],
-        "Failed to upsert compliance requirement",
+        },
       )
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to upsert compliance requirement")
     },
     onSuccess: () => invalidateProposalQueries(qc),
   })
@@ -1127,28 +990,25 @@ export function useApplyProposalAnalysis(
     mutationFn: async (params: {
       proposalId: bigint | number | string
     } & ApplyProposalAnalysisParams) => {
-      await postProposalReducer(
-        "apply_proposal_analysis",
-        [
-          organizationId,
-          requireCompany(companyId),
-          toScalarU64(params.proposalId),
-          stdbParamsToJson(
-            {
-              source: params.source,
-              isMock: params.isMock,
-              findingsJson: params.findingsJson,
-              requirementsJson: params.requirementsJson,
-              evaluationCriteriaJson: params.evaluationCriteriaJson,
-              suggestedSectionsJson: params.suggestedSectionsJson,
-              scoreJson: params.scoreJson ?? null,
-              materializeCompliance: params.materializeCompliance,
-            },
-            "ApplyProposalAnalysisParams",
-          ),
-        ],
-        "Failed to apply proposal analysis",
-      )
+      const { urlPath, init } = stdbBffCommandPost("apply_proposal_analysis", {
+        companyId: requireCompany(companyId),
+        proposalId: toScalarU64(params.proposalId),
+        params: stdbParamsToJson(
+          {
+            source: params.source,
+            isMock: params.isMock,
+            findingsJson: params.findingsJson,
+            requirementsJson: params.requirementsJson,
+            evaluationCriteriaJson: params.evaluationCriteriaJson,
+            suggestedSectionsJson: params.suggestedSectionsJson,
+            scoreJson: params.scoreJson ?? null,
+            materializeCompliance: params.materializeCompliance,
+          },
+          "ApplyProposalAnalysisParams",
+        ),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to apply proposal analysis")
     },
     onSuccess: () => invalidateProposalQueries(qc),
   })
@@ -1165,13 +1025,12 @@ export function useCreateProposalIntegrationIntent(
         proposalId: bigint | number | string
       } & CreateProposalIntegrationIntentParams,
     ) => {
-      await postProposalReducer(
+      const { urlPath, init } = stdbBffCommandPost(
         "create_proposal_integration_intent",
-        [
-          organizationId,
-          requireCompany(companyId),
-          toScalarU64(params.proposalId),
-          stdbParamsToJson(
+        {
+          companyId: requireCompany(companyId),
+          proposalId: toScalarU64(params.proposalId),
+          params: stdbParamsToJson(
             {
               proposalVersionId: optionalScalarU64(params.proposalVersionId),
               intentType: params.intentType,
@@ -1181,9 +1040,10 @@ export function useCreateProposalIntegrationIntent(
             },
             "CreateProposalIntegrationIntentParams",
           ),
-        ],
-        "Failed to create proposal integration intent",
+        },
       )
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create proposal integration intent")
     },
     onSuccess: () => invalidateProposalQueries(qc),
   })
@@ -1200,13 +1060,12 @@ export function useUpsertProposalProcurementScore(
         proposalId: bigint | number | string
       } & UpsertProposalProcurementScoreParams,
     ) => {
-      await postProposalReducer(
+      const { urlPath, init } = stdbBffCommandPost(
         "upsert_proposal_procurement_score",
-        [
-          organizationId,
-          requireCompany(companyId),
-          toScalarU64(params.proposalId),
-          stdbParamsToJson(
+        {
+          companyId: requireCompany(companyId),
+          proposalId: toScalarU64(params.proposalId),
+          params: stdbParamsToJson(
             {
               countryPackKey: params.countryPackKey,
               scoreKind: params.scoreKind,
@@ -1216,11 +1075,11 @@ export function useUpsertProposalProcurementScore(
             },
             "UpsertProposalProcurementScoreParams",
           ),
-        ],
-        "Failed to upsert procurement score",
+        },
       )
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to upsert procurement score")
     },
     onSuccess: () => invalidateProposalQueries(qc),
   })
 }
-

@@ -599,12 +599,12 @@ function CrmClientLoaded({
 
   const createLead = useCreateLead(orgId)
   const createOpportunity = useCreateOpportunity(orgId, { companyId: operatingCompanyId ?? undefined })
-  const createOpportunityLine = useCreateOpportunityLine(orgId)
+  const createOpportunityLine = useCreateOpportunityLine(orgId, { companyId: operatingCompanyId ?? undefined })
   const updateOpportunity = useUpdateOpportunity(orgId, { companyId: operatingCompanyId ?? undefined })
   const createContact = useCreateContact(orgId, { companyId: operatingCompanyId ?? undefined })
   const createActivity = useCreateActivity(orgId)
   const convertLead = useConvertLeadToCustomer(orgId)
-  const convertOppToOrder = useConvertOpportunityToSaleOrder(orgId)
+  const convertOppToOrder = useConvertOpportunityToSaleOrder(orgId, { companyId: operatingCompanyId ?? undefined })
   const deleteContact = useDeleteContact(orgId)
   const deleteLead = useDeleteLead(orgId)
   const assignTag = useAssignTagToContact(orgId)
@@ -1892,6 +1892,7 @@ function CrmClientLoaded({
       await createOpportunityLine.mutateAsync({
         opportunityId: String(opportunityId),
         params,
+        companyId: operatingCompanyId ?? undefined,
       })
     }
   }
@@ -1940,6 +1941,7 @@ function CrmClientLoaded({
         await convertOppToOrder.mutateAsync({
           opportunityId: workflowModal.opportunityId,
           params: p,
+          companyId: operatingCompanyId ?? undefined,
         })
         phCapture("opportunity_converted_to_order", { organization_id: organizationId })
       } else if (workflowModal.kind === "assignTag") {

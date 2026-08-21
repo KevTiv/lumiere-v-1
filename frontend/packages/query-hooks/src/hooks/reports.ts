@@ -1,5 +1,7 @@
 "use client"
 
+
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 /**
  * Reports hooks — Phase 4 of API Gateway Refactor
  *
@@ -11,7 +13,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
-import { reportsBffPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { i18n } from "@lumiere/i18n"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
@@ -138,13 +139,20 @@ function invalidateReportsModule(
   ])
 }
 
+function requireOperatingCompany(companyId: bigint | undefined): bigint {
+  if (companyId == null || companyId <= 0n) {
+    throw new Error("Operating company is required for this report action")
+  }
+  return companyId
+}
+
 // ── Mutations — financial reports lifecycle ───────────────────────────────────
 
 /**
  * Creates a draft `FinancialReport`, resolves its id from SQL, then calls
  * `generate_financial_report` to build trial balance lines.
  */
-export function useCreateFinancialReportFlow(organizationId: bigint) {
+export function useCreateFinancialReportFlow(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (formData) => {
@@ -161,7 +169,10 @@ export function useCreateFinancialReportFlow(organizationId: bigint) {
         0,
       )
 
-      const createCall = reportsBffPost("create_financial_report", [stdbParamsToJson(params)])
+      const createCall = stdbBffCommandPost("create_financial_report", {
+        companyId: requireOperatingCompany(companyId),
+        params: stdbParamsToJson(params),
+      })
       const createRes = await apiFetch(createCall.urlPath, createCall.init)
       if (!createRes.ok) throw new Error('Failed to create financial report')
 
@@ -179,7 +190,10 @@ export function useCreateFinancialReportFlow(organizationId: bigint) {
         )
       }
 
-      const genCall = reportsBffPost("generate_financial_report", [Number(created.id)])
+      const genCall = stdbBffCommandPost("generate_financial_report", {
+        companyId: requireOperatingCompany(companyId),
+        reportId: Number(created.id),
+      })
       const genRes = await apiFetch(genCall.urlPath, genCall.init)
       if (!genRes.ok) throw new Error('Failed to generate financial report')
     },
@@ -189,11 +203,14 @@ export function useCreateFinancialReportFlow(organizationId: bigint) {
   })
 }
 
-export function useGenerateFinancialReport(organizationId: bigint) {
+export function useGenerateFinancialReport(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string | number | bigint>({
     mutationFn: async (reportId) => {
-      const { urlPath, init } = reportsBffPost("generate_financial_report", [reportId])
+      const { urlPath, init } = stdbBffCommandPost("generate_financial_report", {
+        companyId: requireOperatingCompany(companyId),
+        reportId,
+      })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to regenerate report')
@@ -204,7 +221,7 @@ export function useGenerateFinancialReport(organizationId: bigint) {
   })
 }
 
-export function useExportFinancialReport(organizationId: bigint) {
+export function useExportFinancialReport(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<
     void,
@@ -212,10 +229,11 @@ export function useExportFinancialReport(organizationId: bigint) {
     { reportId: string | number | bigint; exportFormat: 'pdf' | 'xlsx' | 'csv' }
   >({
     mutationFn: async ({ reportId, exportFormat }) => {
-      const { urlPath, init } = reportsBffPost("export_financial_report", [
+      const { urlPath, init } = stdbBffCommandPost("export_financial_report", {
+        companyId: requireOperatingCompany(companyId),
         reportId,
-        stdbParamsToJson({ exportFormat }),
-      ])
+        params: stdbParamsToJson({ exportFormat }),
+      })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to export report')
@@ -232,11 +250,14 @@ export function useExportFinancialReport(organizationId: bigint) {
   })
 }
 
-export function useArchiveFinancialReport(organizationId: bigint) {
+export function useArchiveFinancialReport(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string | number | bigint>({
     mutationFn: async (reportId) => {
-      const { urlPath, init } = reportsBffPost("archive_financial_report", [reportId])
+      const { urlPath, init } = stdbBffCommandPost("archive_financial_report", {
+        companyId: requireOperatingCompany(companyId),
+        reportId,
+      })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to archive report')
@@ -247,11 +268,14 @@ export function useArchiveFinancialReport(organizationId: bigint) {
   })
 }
 
-export function useDeleteFinancialReport(organizationId: bigint) {
+export function useDeleteFinancialReport(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string | number | bigint>({
     mutationFn: async (reportId) => {
-      const { urlPath, init } = reportsBffPost("delete_financial_report", [reportId])
+      const { urlPath, init } = stdbBffCommandPost("delete_financial_report", {
+        companyId: requireOperatingCompany(companyId),
+        reportId,
+      })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete report')
@@ -262,7 +286,7 @@ export function useDeleteFinancialReport(organizationId: bigint) {
   })
 }
 
-export function useGenerateEuVatReport(organizationId: bigint) {
+export function useGenerateEuVatReport(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (formData) => {
@@ -276,15 +300,16 @@ export function useGenerateEuVatReport(organizationId: bigint) {
       }
       const dateFrom = stbTimestampFromDate(new Date(String(dateFromRaw)))
       const dateTo = stbTimestampFromDate(new Date(String(dateToRaw)))
-      const { urlPath, init } = reportsBffPost("generate_eu_vat_report", [
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("generate_eu_vat_report", {
+        companyId: requireOperatingCompany(companyId),
+        params: stdbParamsToJson({
           name,
           dateFrom,
           dateTo,
           currencyId,
           locale,
         }),
-      ])
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorReports(r))
     },
@@ -294,7 +319,7 @@ export function useGenerateEuVatReport(organizationId: bigint) {
   })
 }
 
-export function useCreateSavedReport(organizationId: bigint) {
+export function useCreateSavedReport(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (formData) => {
@@ -304,7 +329,10 @@ export function useCreateSavedReport(organizationId: bigint) {
         params as object,
         "CreateSavedReportParams",
       )
-      const { urlPath, init } = reportsBffPost("create_saved_report", [encodedParams])
+      const { urlPath, init } = stdbBffCommandPost("create_saved_report", {
+        companyId: requireOperatingCompany(companyId),
+        params: encodedParams,
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorReports(r))
     },
@@ -314,13 +342,14 @@ export function useCreateSavedReport(organizationId: bigint) {
   })
 }
 
-export function useUpdateSavedReport(organizationId: bigint) {
+export function useUpdateSavedReport(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { savedReportId: string | number | bigint; formData: Record<string, unknown> }>({
     mutationFn: async ({ savedReportId, formData }) => {
-      const { urlPath, init } = reportsBffPost("update_saved_report", [
+      const { urlPath, init } = stdbBffCommandPost("update_saved_report", {
+        companyId: requireOperatingCompany(companyId),
         savedReportId,
-        stdbParamsToJson({
+        params: stdbParamsToJson({
           name: formData.name != null ? String(formData.name).trim() : undefined,
           rowDimension:
             formData.rowDimension != null ? String(formData.rowDimension) : undefined,
@@ -342,7 +371,7 @@ export function useUpdateSavedReport(organizationId: bigint) {
           isActive: formData.isActive != null ? Boolean(formData.isActive) : undefined,
           metadata: undefined,
         }),
-      ])
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorReports(r))
     },
@@ -352,11 +381,14 @@ export function useUpdateSavedReport(organizationId: bigint) {
   })
 }
 
-export function useDeleteSavedReport(organizationId: bigint) {
+export function useDeleteSavedReport(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string | number | bigint>({
     mutationFn: async (savedReportId) => {
-      const { urlPath, init } = reportsBffPost("delete_saved_report", [savedReportId])
+      const { urlPath, init } = stdbBffCommandPost("delete_saved_report", {
+        companyId: requireOperatingCompany(companyId),
+        savedReportId,
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorReports(r))
     },
@@ -388,11 +420,7 @@ export function useCreateReportTemplate(organizationId: bigint) {
       const params = toCreateReportTemplateParams(formData)
       if (!params) throw new Error('Invalid template parameters')
       const companyId = companyIdStringOrNull(formData)
-      const { urlPath, init } = reportsBffPost("create_report_template", [
-        organizationId,
-        companyId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_report_template", { companyId: companyId, params: stdbParamsToJson(params) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create report template')
@@ -403,7 +431,10 @@ export function useCreateReportTemplate(organizationId: bigint) {
   })
 }
 
-export function useUpdateReportTemplate(organizationId: bigint) {
+export function useUpdateReportTemplate(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
   const qc = useQueryClient()
   return useMutation<
     void,
@@ -411,11 +442,7 @@ export function useUpdateReportTemplate(organizationId: bigint) {
     { templateId: string | number | bigint; params: Record<string, unknown> }
   >({
     mutationFn: async ({ templateId, params }) => {
-      const { urlPath, init } = reportsBffPost("update_report_template", [
-        organizationId,
-        templateId,
-        stdbParamsToJson(params as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_report_template", { companyId: requireOperatingCompany(companyId), templateId: templateId, params: stdbParamsToJson(params as object) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update report template')
@@ -433,11 +460,7 @@ export function useCreateScheduledReport(organizationId: bigint) {
       const params = toCreateScheduledReportParams(formData)
       if (!params) throw new Error('Invalid scheduled report parameters')
       const companyId = companyIdNumberOrNull(formData)
-      const { urlPath, init } = reportsBffPost("create_scheduled_report", [
-          organizationId,
-          companyId,
-          stdbParamsToJson(params),
-        ])
+      const { urlPath, init } = stdbBffCommandPost("create_scheduled_report", { companyId: companyId, params: stdbParamsToJson(params) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create scheduled report')
@@ -455,11 +478,7 @@ export function useCreateAnalyticsMetric(organizationId: bigint) {
       const params = toCreateAnalyticsMetricParams(formData)
       if (!params) throw new Error('Invalid metric parameters')
       const companyId = companyIdNumberOrNull(formData)
-      const { urlPath, init } = reportsBffPost("create_analytics_metric", [
-          organizationId,
-          companyId,
-          stdbParamsToJson(params),
-        ])
+      const { urlPath, init } = stdbBffCommandPost("create_analytics_metric", { companyId: companyId, params: stdbParamsToJson(params) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create analytics metric')
@@ -470,7 +489,10 @@ export function useCreateAnalyticsMetric(organizationId: bigint) {
   })
 }
 
-export function useUpdateMetricValues(organizationId: bigint) {
+export function useUpdateMetricValues(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
   const qc = useQueryClient()
   return useMutation<
     void,
@@ -481,11 +503,7 @@ export function useUpdateMetricValues(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ metricId, params }) => {
-      const { urlPath, init } = reportsBffPost("update_metric_values", [
-          organizationId,
-          metricId,
-          stdbParamsToJson(params),
-        ])
+      const { urlPath, init } = stdbBffCommandPost("update_metric_values", { companyId: requireOperatingCompany(companyId), metricId: metricId, params: stdbParamsToJson(params) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update metric values')
@@ -508,11 +526,7 @@ export function useRecordReportRun(organizationId: bigint) {
           ? params.nextRun.toISOString()
           : String(params.nextRun)
 
-      const { urlPath, init } = reportsBffPost("record_report_run", [
-          organizationId,
-          params.reportId,
-          nextRun,
-        ])
+      const { urlPath, init } = stdbBffCommandPost("record_report_run", { reportId: params.reportId, nextRun: nextRun })
 
 
       const r = await apiFetch(urlPath, init)
@@ -524,7 +538,7 @@ export function useRecordReportRun(organizationId: bigint) {
   })
 }
 
-export function useCreateTrialBalanceEntry(organizationId: bigint) {
+export function useCreateTrialBalanceEntry(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (formData) => {
@@ -533,7 +547,10 @@ export function useCreateTrialBalanceEntry(organizationId: bigint) {
         (() => {
           throw new Error(i18n.t("common.paramsMapper.invalidTrialBalanceEntry"))
         })()
-      const { urlPath, init } = reportsBffPost("create_trial_balance_entry", [stdbParamsToJson(params as object)])
+      const { urlPath, init } = stdbBffCommandPost("create_trial_balance_entry", {
+        companyId: requireOperatingCompany(companyId),
+        params: stdbParamsToJson(params as object),
+      })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create trial balance entry')
@@ -546,7 +563,7 @@ export function useCreateTrialBalanceEntry(organizationId: bigint) {
 
 // ── Mutations — dashboard & widgets (6 missing reducers) ────────────────────
 
-export function useUpdateFinancialReport(organizationId: bigint) {
+export function useUpdateFinancialReport(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<
     void,
@@ -555,7 +572,11 @@ export function useUpdateFinancialReport(organizationId: bigint) {
   >({
     mutationFn: async ({ reportId, patch }) => {
       const params = toUpdateFinancialReportParams(patch)
-      const { urlPath, init } = reportsBffPost("update_financial_report", [reportId, stdbParamsToJson(params)])
+      const { urlPath, init } = stdbBffCommandPost("update_financial_report", {
+        companyId: requireOperatingCompany(companyId),
+        reportId,
+        params: stdbParamsToJson(params),
+      })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update financial report')
@@ -573,7 +594,7 @@ export function useCreateDashboard(organizationId: bigint) {
       const params = toCreateDashboardParams(formData)
       if (!params.name.trim()) throw new Error('Dashboard name is required')
       const companyId = companyIdFromDashboardForm(formData)
-      const { urlPath, init } = reportsBffPost("create_dashboard", [organizationId, companyId, stdbParamsToJson(params)])
+      const { urlPath, init } = stdbBffCommandPost("create_dashboard", { companyId: companyId, params: stdbParamsToJson(params) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create dashboard')
@@ -592,7 +613,7 @@ export function useCreateDashboardWidget(organizationId: bigint) {
       if (!params.name.trim()) throw new Error('Widget name is required')
       if (!params.model.trim()) throw new Error('Data source / model is required')
       const companyId = companyIdFromDashboardWidgetForm(formData)
-      const { urlPath, init } = reportsBffPost("create_dashboard_widget", [organizationId, companyId, stdbParamsToJson(params)])
+      const { urlPath, init } = stdbBffCommandPost("create_dashboard_widget", { companyId: companyId, params: stdbParamsToJson(params) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create dashboard widget')
@@ -611,7 +632,7 @@ export function useAddWidgetToDashboard(organizationId: bigint) {
     { dashboardId: string | number | bigint; widgetId: string | number | bigint; layout?: Record<string, unknown> }
   >({
     mutationFn: async ({ dashboardId, widgetId }) => {
-      const { urlPath, init } = reportsBffPost("add_widget_to_dashboard", [organizationId, dashboardId, widgetId])
+      const { urlPath, init } = stdbBffCommandPost("add_widget_to_dashboard", { dashboardId: dashboardId, widgetId: widgetId })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add widget to dashboard')
@@ -641,7 +662,10 @@ function recordToWidgetLayoutParams(layout: Record<string, unknown>) {
   }
 }
 
-export function useUpdateWidgetLayout(organizationId: bigint) {
+export function useUpdateWidgetLayout(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
   const qc = useQueryClient()
   return useMutation<
     void,
@@ -652,11 +676,7 @@ export function useUpdateWidgetLayout(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ widgetId, layout }) => {
-      const { urlPath, init } = reportsBffPost("update_widget_layout", [
-          organizationId,
-          widgetId,
-          stdbParamsToJson(recordToWidgetLayoutParams(layout)),
-        ])
+      const { urlPath, init } = stdbBffCommandPost("update_widget_layout", { companyId: requireOperatingCompany(companyId), widgetId: widgetId, params: stdbParamsToJson(recordToWidgetLayoutParams(layout)) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update widget layout')
@@ -684,16 +704,12 @@ export function useShareDashboard(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ dashboardId, params }) => {
-      const { urlPath, init } = reportsBffPost("share_dashboard", [
-        organizationId,
-        dashboardId,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("share_dashboard", { dashboardId: dashboardId, params: stdbParamsToJson({
           shareWith: params.shareWith,
           shareWithGroups: params.shareWithGroups.map((id) =>
             typeof id === "bigint" ? id : BigInt(String(id)),
           ),
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to share dashboard')
     },
@@ -709,7 +725,7 @@ function useImportReportTemplateCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = reportsBffPost("import_report_template_csv", [organizationId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_report_template_csv", { csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorReports(res))
@@ -723,7 +739,7 @@ function useImportAnalyticsMetricCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = reportsBffPost("import_analytics_metric_csv", [organizationId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_analytics_metric_csv", { csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorReports(res))

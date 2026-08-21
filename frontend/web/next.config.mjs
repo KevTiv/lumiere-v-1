@@ -31,11 +31,31 @@ function posthogRewrites() {
   ]
 }
 
+/**
+ * Local/dev fallback for Rust-owned generic ERP APIs. Production ingress sends
+ * these prefixes directly to api-server, so they do not need Next route files.
+ */
+function rustApiRewrites() {
+  const raw = process.env.LUMIERE_API_SERVER_URL?.trim() ?? ''
+  if (!raw || raw === 'false' || raw === 'off') return []
+  const base = raw.replace(/\/$/, '')
+  return [
+    {
+      source: '/api/query/:path*',
+      destination: `${base}/v1/query/:path*`,
+    },
+    {
+      source: '/api/call/:path*',
+      destination: `${base}/v1/call/:path*`,
+    },
+  ]
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   skipTrailingSlashRedirect: true,
   async rewrites() {
-    return posthogRewrites()
+    return [...rustApiRewrites(), ...posthogRewrites()]
   },
   typescript: {
     ignoreBuildErrors: true,

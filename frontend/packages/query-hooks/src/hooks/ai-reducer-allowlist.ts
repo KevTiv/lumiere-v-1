@@ -1,7 +1,8 @@
 "use client"
 
+
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import type { UpdateAiReducerAllowlistParams } from "@lumiere/stdb/types"
-import { aiReducerAllowlistBffPost } from "@lumiere/stdb/commands"
 import { toCreateAiReducerAllowlistParams } from "@lumiere/erp-shared/settings-create-params"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -41,10 +42,7 @@ export function useCreateAiReducerAllowlist(organizationId: number) {
     mutationFn: async (formData: Record<string, unknown>) => {
       const params = toCreateAiReducerAllowlistParams(formData)
       if (!params) throw new Error("Invalid allowlist form data")
-      const { urlPath, init } = aiReducerAllowlistBffPost("create_ai_reducer_allowlist", [
-        organizationId,
-        stdbParamsToJson(params, "CreateAiReducerAllowlistParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_ai_reducer_allowlist", { params: stdbParamsToJson(params, "CreateAiReducerAllowlistParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -59,11 +57,7 @@ export function useUpdateAiReducerAllowlist(organizationId: number) {
       allowlistId: number
       params: UpdateAiReducerAllowlistParams
     }) => {
-      const { urlPath, init } = aiReducerAllowlistBffPost("update_ai_reducer_allowlist", [
-        organizationId,
-        args.allowlistId,
-        stdbParamsToJson(args.params, "UpdateAiReducerAllowlistParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_ai_reducer_allowlist", { allowlistId: args.allowlistId, params: stdbParamsToJson(args.params, "UpdateAiReducerAllowlistParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -75,10 +69,7 @@ export function useDeleteAiReducerAllowlist(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (allowlistId: number) => {
-      const { urlPath, init } = aiReducerAllowlistBffPost("delete_ai_reducer_allowlist", [
-        organizationId,
-        allowlistId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("delete_ai_reducer_allowlist", { allowlistId: allowlistId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -90,10 +81,7 @@ export function useSetAiReducerAllowlistEnabled(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { allowlistId: number; enabled: boolean }) => {
-      const { urlPath, init } = aiReducerAllowlistBffPost(
-        "set_ai_reducer_allowlist_enabled",
-        [organizationId, args.allowlistId, args.enabled],
-      )
+      const { urlPath, init } = stdbBffCommandPost("set_ai_reducer_allowlist_enabled", { allowlistId: args.allowlistId, enabled: args.enabled })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },

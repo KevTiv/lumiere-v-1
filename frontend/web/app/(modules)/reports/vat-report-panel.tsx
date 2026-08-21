@@ -23,6 +23,7 @@ import { currencyOptionsFromRows } from "@/lib/form-lookup"
 
 type VatReportPanelProps = {
   organizationId: bigint
+  companyId?: bigint
   financialReports: Record<string, unknown>[]
 }
 
@@ -58,12 +59,12 @@ function mutationErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() !== "" ? error.message : fallback
 }
 
-export function VatReportPanel({ organizationId, financialReports }: VatReportPanelProps) {
+export function VatReportPanel({ organizationId, companyId, financialReports }: VatReportPanelProps) {
   const { t } = useTranslation()
   const { toast } = useToast()
-  const generateEuVatReport = useGenerateEuVatReport(organizationId)
-  const exportFinancialReport = useExportFinancialReport(organizationId)
-  const archiveFinancialReport = useArchiveFinancialReport(organizationId)
+  const generateEuVatReport = useGenerateEuVatReport(organizationId, companyId)
+  const exportFinancialReport = useExportFinancialReport(organizationId, companyId)
+  const archiveFinancialReport = useArchiveFinancialReport(organizationId, companyId)
   const { data: currencies = [] } = useCurrencies()
 
   const [name, setName] = useState("EU VAT Return")

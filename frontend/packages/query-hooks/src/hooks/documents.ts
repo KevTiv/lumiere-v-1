@@ -1,5 +1,7 @@
 "use client"
 
+
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 /**
  * Documents hooks — Phase 4 of API Gateway Refactor
  *
@@ -11,7 +13,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
-import { documentsBffPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   CreateDocumentParams,
@@ -129,11 +130,7 @@ export function useCreateDocument(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateDocumentParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = documentsBffPost("create_document", [
-        organizationId,
-        companyId,
-        stdbParamsToJson(params as object, "CreateDocumentParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_document", { companyId: companyId, params: stdbParamsToJson(params as object, "CreateDocumentParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create document')
     },
@@ -151,11 +148,7 @@ export function useUpdateDocument(organizationId: bigint) {
       documentId: bigint | number | string
       params: Record<string, unknown>
     }) => {
-      const { urlPath, init } = documentsBffPost("update_document", [
-        organizationId,
-        toScalarU64(documentId),
-        stdbParamsToJson(params as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_document", { documentId: toScalarU64(documentId), params: stdbParamsToJson(params as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update document')
     },
@@ -167,10 +160,7 @@ export function useDeleteDocument(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (documentId: bigint | number | string) => {
-      const { urlPath, init } = documentsBffPost("delete_document", [
-        organizationId,
-        toScalarU64(documentId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("delete_document", { documentId: toScalarU64(documentId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete document')
     },
@@ -187,10 +177,7 @@ export function useRestoreDocument(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (documentId: bigint | number | string) => {
-      const { urlPath, init } = documentsBffPost("restore_document", [
-        organizationId,
-        toScalarU64(documentId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("restore_document", { documentId: toScalarU64(documentId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
@@ -219,11 +206,7 @@ export function useLockDocument(organizationId: bigint) {
         typeof input === "object" && input !== null && "documentId" in input
           ? (input.leaseSeconds ?? null)
           : null
-      const { urlPath, init } = documentsBffPost("lock_document", [
-        organizationId,
-        toScalarU64(documentId),
-        leaseSeconds == null ? null : Number(leaseSeconds),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("lock_document", { documentId: toScalarU64(documentId), leaseSeconds: leaseSeconds == null ? null : Number(leaseSeconds) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to lock document')
     },
@@ -235,10 +218,7 @@ export function useUnlockDocument(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (documentId: bigint | number | string) => {
-      const { urlPath, init } = documentsBffPost("unlock_document", [
-        organizationId,
-        toScalarU64(documentId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("unlock_document", { documentId: toScalarU64(documentId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to unlock document')
     },
@@ -256,11 +236,7 @@ export function useAddDocumentVersion(organizationId: bigint) {
       documentId: bigint | number | string
       params: Record<string, unknown>
     }) => {
-      const { urlPath, init } = documentsBffPost("add_document_version", [
-        organizationId,
-        toScalarU64(documentId),
-        stdbParamsToJson(params as object, "AddDocumentVersionParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("add_document_version", { documentId: toScalarU64(documentId), params: stdbParamsToJson(params as object, "AddDocumentVersionParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add document version')
     },
@@ -275,10 +251,7 @@ export function useRecordDocumentView(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (documentId: bigint | number | string) => {
-      const { urlPath, init } = documentsBffPost("record_document_view", [
-        organizationId,
-        toScalarU64(documentId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("record_document_view", { documentId: toScalarU64(documentId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to record document view')
     },
@@ -296,11 +269,7 @@ export function useSetDocumentIndexContent(organizationId: bigint) {
       documentId: bigint | number | string
       params: { content: string; language?: string }
     }) => {
-      const { urlPath, init } = documentsBffPost("set_document_index_content", [
-        organizationId,
-        toScalarU64(documentId),
-        stdbParamsToJson(params as object, "SetDocumentIndexContentParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("set_document_index_content", { documentId: toScalarU64(documentId), params: stdbParamsToJson(params as object, "SetDocumentIndexContentParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
@@ -318,11 +287,7 @@ export function useSetDocumentRetention(organizationId: bigint) {
       documentId: bigint | number | string
       params: { classificationId?: bigint; retentionDays?: number }
     }) => {
-      const { urlPath, init } = documentsBffPost("set_document_retention", [
-        organizationId,
-        toScalarU64(documentId),
-        stdbParamsToJson(params as object, "SetDocumentRetentionParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("set_document_retention", { documentId: toScalarU64(documentId), params: stdbParamsToJson(params as object, "SetDocumentRetentionParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
@@ -338,7 +303,7 @@ export function usePurgeExpiredDocuments(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      const { urlPath, init } = documentsBffPost("purge_expired_documents", [organizationId])
+      const { urlPath, init } = stdbBffCommandPost("purge_expired_documents", {  })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
@@ -355,13 +320,10 @@ export function useScheduleDocumentRetentionPurge(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params?: { delaySeconds?: number }) => {
-      const { urlPath, init } = documentsBffPost("schedule_document_retention_purge", [
-        organizationId,
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("schedule_document_retention_purge", { params: stdbParamsToJson(
           { delaySeconds: params?.delaySeconds ?? 60 } as object,
           "ScheduleDocumentRetentionPurgeParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
@@ -383,11 +345,7 @@ export function useApplyDocumentLegalHold(organizationId: bigint) {
       documentId: bigint | number | string
       reason: string
     }) => {
-      const { urlPath, init } = documentsBffPost("apply_document_legal_hold", [
-        organizationId,
-        toScalarU64(documentId),
-        stdbParamsToJson({ reason, metadata: undefined } as object, "ApplyDocumentLegalHoldParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("apply_document_legal_hold", { documentId: toScalarU64(documentId), params: stdbParamsToJson({ reason, metadata: undefined } as object, "ApplyDocumentLegalHoldParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
@@ -404,11 +362,7 @@ export function useUpdateDocumentPresence(organizationId: bigint) {
       documentId: bigint | number | string
       userName: string
     }) => {
-      const { urlPath, init } = documentsBffPost("update_document_presence", [
-        organizationId,
-        toScalarU64(documentId),
-        userName,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_document_presence", { documentId: toScalarU64(documentId), userName: userName })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
@@ -430,11 +384,7 @@ export function useCreateDocumentSignatureRequest(organizationId: bigint) {
         metadata?: string
       }
     }) => {
-      const { urlPath, init } = documentsBffPost("create_document_signature_request", [
-        organizationId,
-        toScalarU64(documentId),
-        stdbParamsToJson(params as object, "CreateDocumentSignatureRequestParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_document_signature_request", { documentId: toScalarU64(documentId), params: stdbParamsToJson(params as object, "CreateDocumentSignatureRequestParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
@@ -449,11 +399,7 @@ export function useCreateDocumentFolder(organizationId: bigint) {
       const companyId = params.companyId != null ? String(params.companyId) : null
       const payload = companyId === null ? params : { ...params, companyId: undefined }
 
-      const { urlPath, init } = documentsBffPost("create_document_folder", [
-        organizationId,
-        companyId,
-        stdbParamsToJson(payload as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_document_folder", { companyId: companyId, params: stdbParamsToJson(payload as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create document folder')
     },
@@ -472,11 +418,7 @@ export function useUpdateDocumentFolder(organizationId: bigint) {
       folderId: ScalarId
       params: Record<string, unknown>
     }) => {
-      const { urlPath, init } = documentsBffPost("update_document_folder", [
-        organizationId,
-        toScalarU64(folderId),
-        stdbParamsToJson(params, "UpdateDocumentFolderParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_document_folder", { folderId: toScalarU64(folderId), params: stdbParamsToJson(params, "UpdateDocumentFolderParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
@@ -489,10 +431,7 @@ export function useDeleteDocumentFolder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (folderId: ScalarId) => {
-      const { urlPath, init } = documentsBffPost("delete_document_folder", [
-        organizationId,
-        toScalarU64(folderId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("delete_document_folder", { folderId: toScalarU64(folderId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
@@ -509,10 +448,7 @@ export function useCreateKnowledgeArticle(organizationId: bigint, companyId?: bi
         ...params,
         ...(params.companyId == null && companyId != null ? { companyId } : {}),
       }
-      const { urlPath, init } = documentsBffPost("create_knowledge_article", [
-        organizationId,
-        stdbParamsToJson(payload as object, "CreateKnowledgeArticleParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_knowledge_article", { params: stdbParamsToJson(payload as object, "CreateKnowledgeArticleParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create knowledge article')
     },
@@ -538,11 +474,7 @@ export function useUpdateKnowledgeArticle(organizationId: bigint, companyId?: bi
         ...params,
         ...(params['companyId'] == null && companyId != null ? { companyId } : {}),
       }
-      const { urlPath, init } = documentsBffPost("update_knowledge_article", [
-        organizationId,
-        toScalarU64(articleId),
-        stdbParamsToJson(payload as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_knowledge_article", { articleId: toScalarU64(articleId), params: stdbParamsToJson(payload as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update knowledge article')
     },
@@ -558,10 +490,7 @@ export function useDeleteKnowledgeArticle(organizationId: bigint, _companyId?: b
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (articleId: bigint | number | string) => {
-      const { urlPath, init } = documentsBffPost("delete_knowledge_article", [
-        organizationId,
-        toScalarU64(articleId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("delete_knowledge_article", { articleId: toScalarU64(articleId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete knowledge article')
     },
@@ -577,10 +506,7 @@ export function useLockKnowledgeArticle(organizationId: bigint, _companyId?: big
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (articleId: bigint | number | string) => {
-      const { urlPath, init } = documentsBffPost("lock_knowledge_article", [
-        organizationId,
-        toScalarU64(articleId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("lock_knowledge_article", { articleId: toScalarU64(articleId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to lock knowledge article')
     },
@@ -596,10 +522,7 @@ export function useUnlockKnowledgeArticle(organizationId: bigint, _companyId?: b
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (articleId: bigint | number | string) => {
-      const { urlPath, init } = documentsBffPost("unlock_knowledge_article", [
-        organizationId,
-        toScalarU64(articleId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("unlock_knowledge_article", { articleId: toScalarU64(articleId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to unlock knowledge article')
     },
@@ -625,11 +548,7 @@ export function useSetArticlePublished(organizationId: bigint, companyId?: bigin
         ...params,
         ...(params['companyId'] == null && companyId != null ? { companyId } : {}),
       }
-      const { urlPath, init } = documentsBffPost("set_article_published", [
-        organizationId,
-        toScalarU64(articleId),
-        stdbParamsToJson(payload as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("set_article_published", { articleId: toScalarU64(articleId), params: stdbParamsToJson(payload as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update article publication state')
     },
@@ -651,11 +570,7 @@ export function useAddArticleMember(organizationId: bigint, _companyId?: bigint)
       articleId: bigint | number | string
       member: string
     }) => {
-      const { urlPath, init } = documentsBffPost("add_article_member", [
-        organizationId,
-        toScalarU64(articleId),
-        member,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("add_article_member", { articleId: toScalarU64(articleId), member: member })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add article member')
     },
@@ -677,11 +592,7 @@ export function useRemoveArticleMember(organizationId: bigint, _companyId?: bigi
       articleId: bigint | number | string
       member: string
     }) => {
-      const { urlPath, init } = documentsBffPost("remove_article_member", [
-        organizationId,
-        toScalarU64(articleId),
-        member,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("remove_article_member", { articleId: toScalarU64(articleId), member: member })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to remove article member')
     },
@@ -701,10 +612,7 @@ export function useCreateKnowledgeCategory(organizationId: bigint, companyId?: b
         ...params,
         ...(params['companyId'] == null && companyId != null ? { companyId } : {}),
       }
-      const { urlPath, init } = documentsBffPost("create_knowledge_category", [
-        organizationId,
-        stdbParamsToJson(payload as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_knowledge_category", { params: stdbParamsToJson(payload as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create knowledge category')
     },
@@ -730,11 +638,7 @@ export function useUpdateKnowledgeCategory(organizationId: bigint, companyId?: b
         ...params,
         ...(params['companyId'] == null && companyId != null ? { companyId } : {}),
       }
-      const { urlPath, init } = documentsBffPost("update_knowledge_category", [
-        organizationId,
-        toScalarU64(categoryId),
-        stdbParamsToJson(payload as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_knowledge_category", { categoryId: toScalarU64(categoryId), params: stdbParamsToJson(payload as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update knowledge category')
     },
@@ -750,10 +654,7 @@ export function useDeleteKnowledgeCategory(organizationId: bigint, _companyId?: 
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (categoryId: bigint | number | string) => {
-      const { urlPath, init } = documentsBffPost("delete_knowledge_category", [
-        organizationId,
-        toScalarU64(categoryId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("delete_knowledge_category", { categoryId: toScalarU64(categoryId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete knowledge category')
     },
@@ -769,10 +670,7 @@ function useImportKnowledgeCategoryCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = documentsBffPost("import_knowledge_category_csv", [
-        organizationId,
-        csvData,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("import_knowledge_category_csv", { csvData: csvData })
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorDocuments(res))
     },
@@ -785,10 +683,7 @@ function useImportKnowledgeArticleCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = documentsBffPost("import_knowledge_article_csv", [
-        organizationId,
-        csvData,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("import_knowledge_article_csv", { csvData: csvData })
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorDocuments(res))
     },
@@ -835,10 +730,7 @@ export function useCreateDocumentProcessingJob(organizationId: bigint, companyId
         if (n <= 0n) throw new Error("AI agent id must be a positive integer")
         aiAgentId = n
       }
-      const { urlPath, init } = documentsBffPost("create_document_processing_job", [
-        organizationId,
-        companyId,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("create_document_processing_job", { companyId: companyId, params: stdbParamsToJson({
           document_type: documentType,
           job_type: jobType,
           ai_agent_id: aiAgentId,
@@ -850,8 +742,7 @@ export function useCreateDocumentProcessingJob(organizationId: bigint, companyId
             typeof params.metadata === "string" && params.metadata.trim() !== ""
               ? params.metadata.trim()
               : null,
-        } as object),
-      ])
+        } as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
@@ -889,12 +780,7 @@ export function useCompleteDocumentProcessingJob(organizationId: bigint) {
         cost,
         errorMessage,
       }
-      const { urlPath, init } = documentsBffPost("complete_document_processing_job", [
-        organizationId,
-        companyIdArg(row),
-        jobId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("complete_document_processing_job", { companyId: companyIdArg(row), jobId: jobId, params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
@@ -908,11 +794,7 @@ export function useApproveDocumentProcessingJob(organizationId: bigint) {
   return useMutation({
     mutationFn: async (row: Record<string, unknown>) => {
       const jobId = rowId(row)
-      const { urlPath, init } = documentsBffPost("approve_document_processing_job", [
-        organizationId,
-        companyIdArg(row),
-        jobId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("approve_document_processing_job", { companyId: companyIdArg(row), jobId: jobId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
@@ -932,12 +814,7 @@ export function useAcknowledgeInsight(organizationId: bigint) {
       actionTaken: string | null
     }) => {
       const insightId = rowId(row)
-      const { urlPath, init } = documentsBffPost("acknowledge_insight", [
-        organizationId,
-        companyIdArg(row),
-        insightId,
-        actionTaken,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("acknowledge_insight", { companyId: companyIdArg(row), insightId: insightId, actionTaken: actionTaken })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },

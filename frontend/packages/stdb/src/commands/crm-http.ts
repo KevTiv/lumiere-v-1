@@ -1,9 +1,9 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
-
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * CRM mutations invoked via Next.js BFF `POST /api/call/:reducer` (forwarded to api-server `/v1/call/:reducer`).
+ * CRM reducer metadata for the named api-server command transport.
+ * The frontend sends `POST /api/call/:reducer` with a named object; api-server
+ * injects organization scope and validates any selected company context.
  * Keys match SpacetimeDB reducer snake_case names.
  */
 export const CRM_BFF_REDUCERS = [
@@ -72,33 +72,6 @@ export const CRM_BFF_REDUCERS = [
 ] as const;
 
 export type CrmBffReducerKey = (typeof CRM_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<CrmBffReducerKey>([
-  "convert_opportunity_to_sale_order",
-  "create_opportunity_line",
-  "update_contact_parent",
-  "create_forecast_snapshot",
-]);
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function crmBffCallUrl(reducer: CrmBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
-
-export function crmBffPost(
-  reducer: CrmBffReducerKey,
-  args: unknown[],
-): { urlPath: string; init: RequestInit } {
-  return {
-    urlPath: crmBffCallUrl(reducer),
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
-    },
-  };
-}
 
 /** Subscription resource keys whose mirrors should reflect CRM reducer effects (compose with `auth`). */
 export const CRM_COMMAND_SUBSCRIPTION_HINTS: Record<

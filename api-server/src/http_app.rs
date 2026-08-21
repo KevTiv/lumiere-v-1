@@ -170,24 +170,25 @@ async fn post_call(
         .organization_id
         .ok_or_else(|| ApiError::Forbidden("No organization assigned".into()))?;
 
-    let contract = stdb_client::reducer_contract(&reducer).ok_or_else(|| {
-        ApiError::Forbidden(format!(
-            "Reducer '{reducer}' is not exposed by the module contract"
-        ))
-    })?;
-    if contract.exposure != Exposure::Session {
-        return Err(ApiError::Forbidden(format!(
-            "Reducer '{reducer}' is not session-exposed"
-        )));
-    }
+    let contract = session_reducer_contract(&reducer)?;
 
-    let mut args: Vec<Value> = if let Some(a) = body.as_array() {
-        a.clone()
+    let named_input = body.is_object();
+    let mut args: Vec<Value> = if let Some(arguments) = body.as_array() {
+        arguments.clone()
+    } else if named_input {
+        named_command_args(contract, body, org_id)?
     } else {
-        vec![body]
+        return Err(ApiError::Unprocessable(
+            "Reducer body must be a named object or legacy argument array".into(),
+        ));
     };
 
     if q.with_company {
+        if named_input {
+            return Err(ApiError::Unprocessable(
+                "withCompany is only supported by the legacy positional call format".into(),
+            ));
+        }
         let client = state.client_with_token(&session.stdb_token);
         let company_id = default_company_id(&client, org_id)
             .await?
@@ -197,15 +198,103 @@ async fn post_call(
         args = next;
     }
 
-    let company_id = validate_reducer_scope(contract, &args, org_id)?;
-    let call = ReducerCall::from_name(&reducer, Value::Array(args))
+    execute_reducer_call(&state, &session.stdb_token, contract, args, org_id).await
+}
+
+fn session_reducer_contract(reducer: &str) -> Result<&'static ReducerContract, ApiError> {
+    let contract = stdb_client::reducer_contract(reducer).ok_or_else(|| {
+        ApiError::Forbidden(format!(
+            "Reducer '{reducer}' is not exposed by the module contract"
+        ))
+    })?;
+    if contract.exposure != Exposure::Session {
+        return Err(ApiError::Forbidden(format!(
+            "Reducer '{reducer}' is not session-exposed"
+        )));
+    }
+    Ok(contract)
+}
+
+fn named_command_args(
+    contract: &'static ReducerContract,
+    body: Value,
+    organization_id: u64,
+) -> Result<Vec<Value>, ApiError> {
+    let mut fields = body
+        .as_object()
+        .cloned()
+        .ok_or_else(|| ApiError::Unprocessable("Command body must be a JSON object".into()))?;
+    let mut args = Vec::with_capacity(contract.params.len());
+
+    for (position, parameter) in contract.params.iter().enumerate() {
+        if Some(position) == contract.organization_position {
+            args.push(json!(organization_id));
+            continue;
+        }
+        let camel_name = snake_to_lower_camel(parameter.name);
+        let snake_value = fields.remove(parameter.name);
+        let camel_value = (camel_name != parameter.name)
+            .then(|| fields.remove(&camel_name))
+            .flatten();
+        if snake_value.is_some() && camel_value.is_some() {
+            return Err(ApiError::Unprocessable(format!(
+                "Reducer '{}' received both '{}' and '{}'",
+                contract.name, parameter.name, camel_name
+            )));
+        }
+        let value = snake_value.or(camel_value).ok_or_else(|| {
+            ApiError::Unprocessable(format!(
+                "Reducer '{}' requires named field '{}'",
+                contract.name, camel_name
+            ))
+        })?;
+        args.push(value);
+    }
+
+    if !fields.is_empty() {
+        let mut names: Vec<_> = fields.keys().cloned().collect();
+        names.sort();
+        return Err(ApiError::Unprocessable(format!(
+            "Reducer '{}' received unknown or server-owned fields: {}",
+            contract.name,
+            names.join(", ")
+        )));
+    }
+    Ok(args)
+}
+
+fn snake_to_lower_camel(name: &str) -> String {
+    let mut result = String::with_capacity(name.len());
+    let mut uppercase_next = false;
+    for character in name.chars() {
+        if character == '_' {
+            uppercase_next = true;
+        } else if uppercase_next {
+            result.extend(character.to_uppercase());
+            uppercase_next = false;
+        } else {
+            result.push(character);
+        }
+    }
+    result
+}
+
+async fn execute_reducer_call(
+    state: &AppState,
+    stdb_token: &str,
+    contract: &'static ReducerContract,
+    args: Vec<Value>,
+    organization_id: u64,
+) -> Result<Json<Value>, ApiError> {
+    let company_ids = validate_reducer_scope(contract, &args, organization_id)?;
+    let call = ReducerCall::from_name(contract.name, Value::Array(args))
         .map_err(|error| ApiError::Unprocessable(error.to_string()))?;
-    let client = state.client_with_token(&session.stdb_token);
-    if let Some(company_id) = company_id {
+    let client = state.client_with_token(stdb_token);
+    for company_id in company_ids {
         let rows = state
             .stdb
             .query_sql(&format!(
-                "SELECT id FROM company WHERE id = {company_id} AND organization_id = {org_id} LIMIT 1"
+                "SELECT id FROM company WHERE id = {company_id} AND organization_id = {organization_id} LIMIT 1"
             ))
             .await
             .map_err(|error| ApiError::Internal(error.to_string()))?;
@@ -227,7 +316,8 @@ fn validate_reducer_scope(
     contract: &'static ReducerContract,
     args: &[Value],
     session_organization_id: u64,
-) -> Result<Option<u64>, ApiError> {
+) -> Result<Vec<u64>, ApiError> {
+    let company_scope_paths = stdb_client::company_scope_paths(contract.name);
     if let Some(position) = contract.organization_position {
         let requested_organization =
             args.get(position).and_then(Value::as_u64).ok_or_else(|| {
@@ -241,27 +331,94 @@ fn validate_reducer_scope(
                 "organization scope mismatch for reducer call".into(),
             ));
         }
-    } else if contract.company_position.is_none() && contract.unscoped_reason.is_none() {
+    } else if contract.company_position.is_none()
+        && company_scope_paths.is_empty()
+        && contract.unscoped_reason.is_none()
+    {
         return Err(ApiError::Forbidden(format!(
             "Reducer '{}' has no reviewed tenant scope",
             contract.name
         )));
     }
 
-    let company_id = contract
-        .company_position
-        .and_then(|position| args.get(position))
-        .and_then(Value::as_u64);
+    let mut company_ids = Vec::new();
+    if company_scope_paths.is_empty() {
+        if let Some(position) = contract.company_position {
+            let value = args.get(position).ok_or_else(|| {
+                ApiError::Unprocessable(format!(
+                    "Reducer '{}' requires company scope at argument {position}",
+                    contract.name
+                ))
+            })?;
+            if let Some(company_id) = decode_company_id(contract.name, value, false)? {
+                company_ids.push(company_id);
+            }
+        }
+    } else {
+        for company_path in company_scope_paths {
+            let mut value = args.get(company_path.parameter_position);
+            for segment in company_path.path {
+                value = value.and_then(|value| value.get(*segment));
+            }
+            let Some(value) = value else {
+                if company_path.required {
+                    return Err(ApiError::Unprocessable(format!(
+                        "Reducer '{}' requires company scope at argument {} path {}",
+                        contract.name,
+                        company_path.parameter_position,
+                        company_path.path.join(".")
+                    )));
+                }
+                continue;
+            };
+            if let Some(company_id) =
+                decode_company_id(contract.name, value, company_path.nullable)?
+            {
+                if !company_ids.contains(&company_id) {
+                    company_ids.push(company_id);
+                }
+            }
+        }
+    }
     if contract.organization_position.is_none()
-        && contract.company_position.is_some()
-        && company_id.is_none()
+        && (contract.company_position.is_some() || !company_scope_paths.is_empty())
+        && company_ids.is_empty()
     {
         return Err(ApiError::Unprocessable(format!(
             "Reducer '{}' requires a company_id scope",
             contract.name
         )));
     }
-    Ok(company_id)
+    Ok(company_ids)
+}
+
+fn decode_company_id(
+    reducer_name: &str,
+    value: &Value,
+    nullable: bool,
+) -> Result<Option<u64>, ApiError> {
+    if let Some(company_id) = value.as_u64() {
+        return Ok(Some(company_id));
+    }
+    if value.is_null() || value.get("none").is_some() {
+        return if nullable {
+            Ok(None)
+        } else {
+            Err(ApiError::Unprocessable(format!(
+                "Reducer '{reducer_name}' requires a non-null company_id"
+            )))
+        };
+    }
+    if let Some(some) = value.get("some") {
+        return some.as_u64().map(Some).ok_or_else(|| {
+            ApiError::Unprocessable(format!(
+                "Reducer '{reducer_name}' has an invalid company_id option"
+            ))
+        });
+    }
+    Err(ApiError::Unprocessable(format!(
+        "Reducer '{reducer_name}' has an invalid company_id"
+    )))
 }
 
 fn load_dotenv_files() {
@@ -415,8 +572,35 @@ mod tests {
         let contract = stdb_client::reducer_contract("delete_company").expect("delete_company");
         assert_eq!(
             validate_reducer_scope(contract, &[json!(42)], 7).unwrap(),
-            Some(42)
+            vec![42]
         );
+    }
+
+    #[test]
+    fn nested_optional_company_scope_decodes_stdb_option_json() {
+        let contract = stdb_client::reducer_contract("create_contact").expect("create_contact");
+        assert_eq!(
+            validate_reducer_scope(
+                contract,
+                &[json!(7), json!({ "company_id": { "some": 42 } })],
+                7,
+            )
+            .unwrap(),
+            vec![42]
+        );
+        assert_eq!(
+            validate_reducer_scope(
+                contract,
+                &[json!(7), json!({ "company_id": { "none": [] } })],
+                7,
+            )
+            .unwrap(),
+            Vec::<u64>::new()
+        );
+        assert!(matches!(
+            validate_reducer_scope(contract, &[json!(7), json!({ "company_id": "wrong" })], 7,),
+            Err(ApiError::Unprocessable(_))
+        ));
     }
 
     #[test]
@@ -436,5 +620,52 @@ mod tests {
         assert!(contract.company_position.is_none());
         assert!(contract.unscoped_reason.is_some());
         assert!(validate_reducer_scope(contract, &[json!({})], 7).is_ok());
+    }
+
+    #[test]
+    fn named_command_injects_organization_at_the_contract_position() {
+        let contract = stdb_client::reducer_contract("assign_role").expect("assign_role");
+        let args = named_command_args(
+            contract,
+            json!({
+                "user_identity": {},
+                "role_id": 9,
+                "params": {}
+            }),
+            7,
+        )
+        .expect("valid named command");
+
+        assert_eq!(args, vec![json!({}), json!(9), json!(7), json!({})]);
+    }
+
+    #[test]
+    fn named_command_rejects_client_supplied_tenant_and_missing_fields() {
+        let contract = stdb_client::reducer_contract("create_lead").expect("create_lead");
+        assert!(matches!(
+            named_command_args(contract, json!({ "organization_id": 99, "params": {} }), 7,),
+            Err(ApiError::Unprocessable(_))
+        ));
+        assert!(matches!(
+            named_command_args(contract, json!({}), 7),
+            Err(ApiError::Unprocessable(_))
+        ));
+    }
+
+    #[test]
+    fn named_command_accepts_camel_case_without_allowing_alias_duplicates() {
+        let contract =
+            stdb_client::reducer_contract("confirm_sales_order").expect("confirm_sales_order");
+        let args = named_command_args(contract, json!({ "companyId": 9, "orderId": 12 }), 7)
+            .expect("camel-case input");
+        assert_eq!(args, vec![json!(7), json!(9), json!(12)]);
+        assert!(matches!(
+            named_command_args(
+                contract,
+                json!({ "companyId": 9, "company_id": 9, "orderId": 12 }),
+                7,
+            ),
+            Err(ApiError::Unprocessable(_))
+        ));
     }
 }

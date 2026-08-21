@@ -1,4 +1,3 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
 
 import type { ReducerCommandContractMeta } from "./types";
 
@@ -19,20 +18,6 @@ export function aiReducerAllowlistBffCallUrl(
   reducer: AiReducerAllowlistBffReducerKey,
 ): string {
   return `/api/call/${reducer}`;
-}
-
-export function aiReducerAllowlistBffPost(
-  reducer: AiReducerAllowlistBffReducerKey,
-  args: unknown[],
-): { urlPath: string; init: RequestInit } {
-  return {
-    urlPath: aiReducerAllowlistBffCallUrl(reducer),
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
-    },
-  };
 }
 
 const HINT_OVERRIDES: Partial<

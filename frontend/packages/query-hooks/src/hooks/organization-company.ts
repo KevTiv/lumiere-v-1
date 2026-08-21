@@ -1,7 +1,8 @@
 "use client"
 
 
-import { organizationCompanyBffPost } from "@lumiere/stdb/commands"
+
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { apiFetch } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
@@ -138,10 +139,7 @@ export function useCreateCompany(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = organizationCompanyBffPost("create_company", [
-        organizationId,
-        stdbParamsToJson(params as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_company", { params: stdbParamsToJson(params as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -153,10 +151,7 @@ export function useUpdateCompany() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { companyId: bigint; organizationId: number; params: Record<string, unknown> }) => {
-      const { urlPath, init } = organizationCompanyBffPost("update_company", [
-        args.companyId,
-        stdbParamsToJson(args.params as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_company", { companyId: args.companyId, params: stdbParamsToJson(args.params as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
@@ -178,14 +173,10 @@ export function useSetCompanyCountryPack() {
       enabled: boolean
       configuration?: string
     }) => {
-      const { urlPath, init } = organizationCompanyBffPost("set_company_country_pack", [
-        args.organizationId,
-        args.companyId,
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("set_company_country_pack", { companyId: args.companyId, params: stdbParamsToJson(
           { packKey: args.packKey, enabled: args.enabled, configuration: args.configuration },
           "SetCompanyCountryPackParams",
-        ),
-      ])
+        ) })
       const response = await apiFetch(urlPath, init)
       if (!response.ok) throw new Error(await parseCallError(response))
       return args.organizationId
@@ -202,10 +193,7 @@ export function useSetCompanyVerticalPack() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { companyId: bigint; organizationId: number; packKey: "distributor_wholesaler"; enabled: boolean; configuration?: string }) => {
-      const { urlPath, init } = organizationCompanyBffPost("set_company_vertical_pack", [
-        args.companyId,
-        stdbParamsToJson({ packKey: args.packKey, enabled: args.enabled, configuration: args.configuration }, "SetCompanyVerticalPackParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("set_company_vertical_pack", { companyId: args.companyId, params: stdbParamsToJson({ packKey: args.packKey, enabled: args.enabled, configuration: args.configuration }, "SetCompanyVerticalPackParams") })
       const response = await apiFetch(urlPath, init)
       if (!response.ok) throw new Error(await parseCallError(response))
       return args.organizationId
@@ -221,10 +209,7 @@ export function useUpdateCompanyAddress() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { companyId: bigint; organizationId: number; params: Record<string, unknown> }) => {
-      const { urlPath, init } = organizationCompanyBffPost("update_company_address", [
-        args.companyId,
-        stdbParamsToJson(args.params as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_company_address", { companyId: args.companyId, params: stdbParamsToJson(args.params as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
@@ -239,10 +224,7 @@ export function useUpdateCompanyBusiness() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { companyId: bigint; organizationId: number; params: Record<string, unknown> }) => {
-      const { urlPath, init } = organizationCompanyBffPost("update_company_business", [
-        args.companyId,
-        stdbParamsToJson(args.params as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_company_business", { companyId: args.companyId, params: stdbParamsToJson(args.params as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
@@ -257,10 +239,7 @@ export function useUpdateCompanyHierarchy() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { companyId: bigint; organizationId: number; params: Record<string, unknown> }) => {
-      const { urlPath, init } = organizationCompanyBffPost("update_company_hierarchy", [
-        args.companyId,
-        stdbParamsToJson(args.params as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_company_hierarchy", { companyId: args.companyId, params: stdbParamsToJson(args.params as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
@@ -275,7 +254,7 @@ export function useDeleteCompany() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { companyId: bigint; organizationId: number }) => {
-      const { urlPath, init } = organizationCompanyBffPost("delete_company", [args.companyId])
+      const { urlPath, init } = stdbBffCommandPost("delete_company", { companyId: args.companyId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
@@ -290,10 +269,7 @@ export function useCreateDataClassification(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = organizationCompanyBffPost("create_data_classification", [
-        organizationId,
-        stdbParamsToJson(params as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_data_classification", { params: stdbParamsToJson(params as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -305,10 +281,7 @@ export function useCreateDataClassificationRule(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = organizationCompanyBffPost("create_data_classification_rule", [
-        organizationId,
-        stdbParamsToJson(params as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_data_classification_rule", { params: stdbParamsToJson(params as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -320,9 +293,7 @@ export function useExecuteRetentionPurge(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      const { urlPath, init } = organizationCompanyBffPost("execute_retention_purge", [
-        organizationId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("execute_retention_purge", {  })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },

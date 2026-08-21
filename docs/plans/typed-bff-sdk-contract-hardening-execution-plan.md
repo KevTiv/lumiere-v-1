@@ -1,0 +1,332 @@
+# Typed BFF SDK and contract hardening — execution plan
+
+**Status:** Ready for implementation — 2026-08-21
+**First pickup:** `frontend/packages/query-hooks/src/hooks/accounting.ts`
+**First reducer:** `create_account_account` through `useCreateAccountAccount`
+**Companion caller:** `frontend/web/app/(modules)/accounting/accounting-client.tsx`
+**Tracks:** canonical IR, contracts extraction, write-path hardening, typed reads,
+generated codecs, generated SDK, frontend type debt
+
+## 1. Outcome
+
+Make canonical IR the only source for operation names, input/output types, scope,
+exposure, invalidation, resource row types, and wire encoding. Generate compact
+Rust and TypeScript targets in `lumiere-contracts`, then make `api-server` the
+typed BFF boundary.
+
+The end-state request flow is:
+
+```text
+typed business SDK
+  -> generated operation request + TypeScript codec
+  -> api-server generated Rust decoder/validator
+  -> typed ReducerCall
+  -> SpacetimeDB reducer
+```
+
+Normal browser business code does not construct reducer arrays, choose reducer
+names dynamically, or normalize SATS values by handwritten reducer registries.
+Business rules remain in reducers. Generated code owns only types, codecs,
+scope provenance, operation metadata, validation, and transport mechanics.
+
+## 2. Scope and tenant invariants
+
+These are generation invariants, not conventions:
+
+- `organization_id` is injected from the authenticated api-server session and
+  is rejected when supplied by a client;
+- `company_id` is a client-selected legal-entity scope and is validated as
+  belonging to the authenticated organization;
+- mutation code must never discover or inject the first/default company on the
+  server;
+- a frontend SDK may avoid repeating `companyId` by being explicitly bound to
+  the user's selected company, for example
+  `sdk.forCompany(selectedCompanyId).workflows.create(input)`;
+- customer, contact, partner, order, and other record IDs are ordinary domain
+  inputs, not tenant identifiers;
+- exposure and authorization remain independent: generated exposure controls
+  reachability, while reducers continue to enforce permissions and business
+  invariants.
+
+## 3. Current baseline
+
+Measured on this branch on 2026-08-21:
+
+| Surface | Current state |
+|---|---:|
+| Domain `*-http.ts` command files | 32 |
+| `Record<string, unknown>` in frontend TS/TSX | 2,548 |
+| Outside generated/test/contract-test code | 2,495 |
+| Direct positional BFF sites | 3 |
+| Broad hidden positional adapter | accounting, about 23 hook wrappers |
+
+The direct residuals are:
+
+- the generic `useAccountingCallMutation` adapter;
+- `validate_stock_picking` / `validate_stock_picking_backorder`, which stay
+  denied until explicit organization checks are added;
+- `execute_replenishment_rule`, which requires a caller-owned UUID retained
+  across retries as its idempotency key.
+
+The current `OperationInputMap` proves that generated named inputs work, but it
+is not yet the complete BFF contract: output, codec, resource, invalidation,
+and structured scope metadata are not all available through one generated
+operation descriptor.
+
+## 4. Canonical operation and resource model
+
+Extend canonical IR with a target-neutral descriptor equivalent to:
+
+```ts
+interface Operations {
+  create_workflow: {
+    kind: "mutation"
+    input: CreateWorkflowInput
+    output: void
+    exposure: "session"
+    scope: {
+      organization: { source: "server_session" }
+      company: { source: "client_selection"; path: "companyId" }
+    }
+    invalidates: readonly ["workflows", "workflow-versions"]
+    codec: "create_workflow@1"
+  }
+}
+```
+
+Resources use the same type graph:
+
+```ts
+interface Resources {
+  contacts: {
+    query: ContactListQuery
+    row: Contact
+    scope: "organization+optional-company"
+  }
+}
+```
+
+IR stores references into the canonical type graph rather than copying type
+definitions into operation/resource metadata.
+
+## 5. Sequenced implementation
+
+### Phase 0 — stabilize and republish the current contract delta
+
+- normalize accidental full-file formatting churn before review;
+- publish the six reviewed proposal exposure changes and regenerated IR to
+  `lumiere-contracts`;
+- atomically update the Rust and TypeScript contract pins;
+- verify generated output is reproducible from the published IR digest.
+
+**Exit:** both repositories are clean at one immutable contract revision.
+
+### Phase 1 — complete operation/resource IR
+
+Primary application generator files:
+
+- `lumiere-codegen/src/contract_ir.rs`;
+- `lumiere-codegen/src/reducer_contract.rs`;
+- `lumiere-codegen/src/frontend_registry/stdb_invalidation_emit.rs`.
+
+Add or verify, per operation:
+
+- stable operation ID and reducer target;
+- input and output type references;
+- `client_input`, `server_context`, and ordered `wire_arguments`;
+- nested scope paths and nullability;
+- exposure, invalidated resources, idempotency requirements, and codec ID;
+- operation kind (`mutation`, `query`, `procedure`, or low-level escape hatch).
+
+Add or verify, per resource:
+
+- row type reference;
+- query/filter/cursor input type reference;
+- scope metadata and source operation/table references.
+
+**Exit:** no target generator needs to inspect Rust source, generated bindings,
+or a handwritten reducer parameter registry.
+
+### Phase 2 — generate compact targets in `lumiere-contracts`
+
+Extend `lumiere-contracts/scripts/generate-from-ir.py` to emit:
+
+TypeScript:
+
+- `packages/contracts/src/generated/operations.ts`;
+- `packages/contracts/src/generated/resources.ts`;
+- `packages/contracts/src/generated/wire-codecs.ts`;
+- domain SDK modules and a compact root client.
+
+Rust:
+
+- `crates/lumiere-contracts/src/generated/operations.rs`;
+- `crates/lumiere-contracts/src/generated/resources.rs`;
+- `crates/lumiere-contracts/src/generated/wire_codecs.rs`.
+
+Keep generated modules domain-partitioned or table-driven. Do not return to one
+file per reducer unless a measured compiler/tooling constraint requires it.
+
+**Exit:** both packages build solely from the pinned IR in a network-disabled
+checkout with no `lumiere-v-1` source tree.
+
+### Phase 3 — cross-language wire codecs and golden fixtures
+
+Generate matching TypeScript encoders and Rust decoders for:
+
+- `u64` without JavaScript precision loss;
+- timestamps and identities;
+- SATS option and enum representations;
+- arrays and nested structs;
+- nullable/optional fields and alias rejection;
+- unknown-field, duplicate-alias, overflow, and malformed-tag errors.
+
+Generate shared JSON fixtures containing valid inputs, canonical wire values,
+and expected failures. Run every fixture against both implementations.
+
+**Exit:** the same fixture corpus proves TypeScript encoding and Rust decoding
+agree for every reachable operation type.
+
+### Phase 4 — make api-server the typed operation boundary
+
+- add an operation endpoint backed by generated Rust operation metadata/DTOs;
+- validate exposure, session organization, selected-company membership,
+  idempotency, and wire shape before constructing `ReducerCall`;
+- dispatch only through typed `ReducerCall`;
+- retain raw reducer arrays temporarily under an explicitly named compatibility
+  or admin endpoint with separate exposure and observability;
+- reject arrays on normal business-operation routes after migration reaches
+  zero.
+
+**Exit:** api-server normal business routes cannot dispatch an arbitrary reducer
+name or an arbitrary JSON array.
+
+### Phase 5 — generate the business TypeScript SDK and migrate writes
+
+The public shape is domain-oriented:
+
+```ts
+const accounting = sdk.forCompany(selectedCompanyId).accounting
+await accounting.accounts.create(input)
+```
+
+The generated SDK must not contain defaults, permissions, workflow decisions,
+or form behavior. Auth/session and selected-company providers bind transport
+context; operation modules encode and send generated requests.
+
+Migrate one domain at a time. A migrated domain must delete its positional
+adapter and unused `*-http.ts` transport function in the same change.
+
+**Exit:** no normal mutation hook accepts `unknown[]` and no browser call uses
+`?withCompany=true`.
+
+### Phase 6 — generate typed reads
+
+- generate query input and row/result types from resource IR;
+- expose domain methods such as
+  `sdk.crm.contacts.list(query): Promise<Contact[]>`;
+- decode boundary JSON from `unknown` into generated resource DTOs;
+- preserve pagination/cursor and field-policy metadata without returning
+  `Record<string, unknown>[]`.
+
+**Exit:** migrated domains have typed mutation inputs and typed query results.
+
+### Phase 7 — delete redundant layers
+
+Delete only after consumer counts reach zero:
+
+- the 32 handwritten domain `*-http.ts` transport helpers;
+- `REDUCER_PARAM_STRUCTS`, flat option-index maps, and reducer-specific logic
+  from `frontend/packages/stdb/src/stdb-params-json.ts`;
+- the local generated proxy files replaced by package exports;
+- generic `unknown[]` mutation paths, except one explicitly named low-level or
+  admin escape hatch;
+- copied/generated targets still produced by the transitional publisher.
+
+Audit api-server imports before removing the 3,021 Rust SDK binding files. If
+api-server only needs generated DTOs plus dynamic query/reducer transport,
+replace the binding dependency with compact operation/resource targets and
+delete the bindings from its dependency graph.
+
+**Exit:** generation reduces application repository volume rather than moving
+the same file-per-reducer surface between directories.
+
+### Phase 8 — ratchet `Record<string, unknown>` to boundary-only use
+
+Add an AST-based check using the existing TypeScript compiler API:
+
+- `scripts/check-record-string-unknown.ts`;
+- `scripts/record-string-unknown-policy.json`.
+
+Initial CI behavior:
+
+- record the current per-file baseline;
+- fail on any new occurrence or increased per-file count;
+- give new files a zero baseline;
+- permit a small explicit allowlist for JSON parsing, transport interop, and
+  genuinely arbitrary metadata;
+- require boundary JSON to enter as `unknown` and pass a generated decoder;
+- use explicit recursive `JsonValue` / `JsonObject` types for arbitrary JSON.
+
+Burn down by domain. Once a domain reaches zero, remove its baseline entries so
+the prohibition becomes permanent for hooks, UI props, form parameters, query
+results, reducer inputs, and domain services.
+
+**Exit:** only the reviewed parsing/interop allowlist may contain the type.
+
+## 6. First implementation slice
+
+Start in `frontend/packages/query-hooks/src/hooks/accounting.ts`.
+
+1. Make `useAccountingCallMutation` generic over the generated operation key.
+2. Replace `unknown[]` with `StdbBffCommandInput<K>`.
+3. Replace `accountingBffPost(reducer, args)` with
+   `stdbBffCommandPost(reducer, input)`.
+4. Migrate `create_account_account` first:
+   - hook: `useCreateAccountAccount`;
+   - generated input: `{ params: CreateAccountAccountParams }`;
+   - caller: `frontend/web/app/(modules)/accounting/accounting-client.tsx`;
+   - remove `organizationId` from the request payload;
+   - place the explicitly selected company in `params.companyId`;
+   - decode/encode through the generated codec rather than reducer-specific
+     branches in `stdb-params-json.ts`.
+5. Continue through the remaining wrappers until the accounting adapter has
+   zero positional consumers.
+6. Delete `accountingBffPost` and its `withCompany` behavior when `rg` confirms
+   zero executable consumers.
+
+This slice is deliberately first because it validates the operation-map API,
+generic hook inference, selected-company provenance, and deletion mechanics
+without waiting for the complete generated SDK.
+
+## 7. PR sequence and gates
+
+1. **Accounting positional adapter removal** — first reducer plus remaining
+   wrappers; no new generator architecture.
+2. **IR operation/resource descriptor completion** — schema and invariants.
+3. **Contracts-owned TS/Rust codec emitters + golden fixtures.**
+4. **Typed api-server operation endpoint + compatibility metrics.**
+5. **Generated business SDK pilot** — accounting or CRM, followed by domain
+   migration/deletion PRs.
+6. **Typed resource reads.**
+7. **`Record<string, unknown>` AST baseline and domain burn-down.**
+8. **Rust SDK binding dependency audit and deletion.**
+
+Every PR must pass:
+
+- deterministic generation and IR checksum verification;
+- Rust and TypeScript typechecks;
+- cross-language golden codec fixtures;
+- org-A/company-B negative tenant tests;
+- unknown-field, alias-duplication, optional/enum/u64/timestamp codec tests;
+- generated-output and forbidden-pattern drift checks;
+- a measured consumer/deletion count in the PR description.
+
+## 8. Non-goals
+
+- moving business rules or authorization decisions into generated SDK code;
+- making company scope server-defaulted for mutations;
+- exposing denied reducers merely to make frontend compilation pass;
+- replacing `Record<string, unknown>` with `any` or unchecked casts;
+- deleting Rust bindings before import/dependency evidence proves they are
+  unnecessary.

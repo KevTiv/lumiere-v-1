@@ -1,14 +1,7 @@
 "use client"
 
-/**
- * Manufacturing hooks — Phase 4 of API Gateway Refactor
- *
- * Wraps REST API calls with React Query for the Manufacturing module.
- * All hooks accept organizationId: bigint matching the stdb hooks interface.
- */
 
-
-import { manufacturingBffPost } from "@lumiere/stdb/commands"
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
@@ -135,10 +128,7 @@ export function useCreateManufacturingOrder(organizationId: bigint, companyId?: 
         params as unknown as Record<string, unknown>,
         companyId,
       ) as CreateMrpProductionParams
-      const { urlPath, init } = manufacturingBffPost('create_manufacturing_order', [
-        organizationId,
-        stdbParamsToJson(scoped, "CreateMrpProductionParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_manufacturing_order", { params: stdbParamsToJson(scoped, "CreateMrpProductionParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create manufacturing order')
     },
@@ -155,10 +145,7 @@ export function useCreateBom(organizationId: bigint, companyId?: bigint) {
         params as unknown as Record<string, unknown>,
         companyId,
       ) as CreateBomParams
-      const { urlPath, init } = manufacturingBffPost('create_bom', [
-        organizationId,
-        stdbParamsToJson(scoped, "CreateBomParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_bom", { params: stdbParamsToJson(scoped, "CreateBomParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create BOM')
     },
@@ -174,10 +161,7 @@ export function useCreateWorkcenter(organizationId: bigint, companyId?: bigint) 
         params as unknown as Record<string, unknown>,
         companyId,
       ) as CreateWorkcenterParams
-      const { urlPath, init } = manufacturingBffPost('create_workcenter', [
-        organizationId,
-        stdbParamsToJson(scoped, "CreateWorkcenterParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_workcenter", { params: stdbParamsToJson(scoped, "CreateWorkcenterParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create workcenter')
     },
@@ -191,11 +175,7 @@ export function useConfirmManufacturingOrder(organizationId: bigint, companyId: 
   return useMutation({
     mutationFn: async (productionId: string | number | bigint) => {
       if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = manufacturingBffPost('confirm_manufacturing_order', [
-        organizationId,
-        companyId,
-        productionId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("confirm_manufacturing_order", { companyId: companyId, moId: productionId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to confirm manufacturing order')
     },
@@ -211,11 +191,7 @@ export function useStartManufacturingOrder(organizationId: bigint, companyId: bi
   return useMutation({
     mutationFn: async (productionId: string | number | bigint) => {
       if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = manufacturingBffPost('start_manufacturing_order', [
-        organizationId,
-        companyId,
-        productionId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("start_manufacturing_order", { companyId: companyId, moId: productionId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start manufacturing order')
     },
@@ -231,11 +207,7 @@ export function useFinishManufacturingOrder(organizationId: bigint, companyId: b
   return useMutation({
     mutationFn: async (productionId: string | number | bigint) => {
       if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = manufacturingBffPost('finish_manufacturing_order', [
-        organizationId,
-        companyId,
-        productionId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("finish_manufacturing_order", { companyId: companyId, moId: productionId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to finish manufacturing order')
     },
@@ -253,11 +225,7 @@ export function useCancelManufacturingOrder(organizationId: bigint, companyId: b
   return useMutation({
     mutationFn: async (productionId: string | number | bigint) => {
       if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = manufacturingBffPost('cancel_manufacturing_order', [
-        organizationId,
-        companyId,
-        productionId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("cancel_manufacturing_order", { companyId: companyId, moId: productionId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel manufacturing order')
     },
@@ -273,11 +241,7 @@ export function useStartWorkorder(organizationId: bigint, companyId: bigint) {
   return useMutation({
     mutationFn: async (workorderId: string | number | bigint) => {
       if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = manufacturingBffPost('start_workorder', [
-        organizationId,
-        companyId,
-        workorderId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("start_workorder", { companyId: companyId, workorderId: workorderId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start workorder')
     },
@@ -293,11 +257,7 @@ export function useFinishWorkorder(organizationId: bigint, companyId: bigint) {
   return useMutation({
     mutationFn: async (workorderId: string | number | bigint) => {
       if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = manufacturingBffPost('finish_workorder', [
-        organizationId,
-        companyId,
-        workorderId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("finish_workorder", { companyId: companyId, workorderId: workorderId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to finish workorder')
     },
@@ -319,7 +279,7 @@ export function useBlockWorkcenter(organizationId: bigint) {
       workcenterId: string | number | bigint
       reason: string
     }) => {
-      const { urlPath, init } = manufacturingBffPost('block_workcenter', [organizationId, workcenterId, reason])
+      const { urlPath, init } = stdbBffCommandPost("block_workcenter", { workcenterId: workcenterId, reason: reason })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to block workcenter')
     },
@@ -332,7 +292,7 @@ export function useUnblockWorkcenter(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (workcenterId: string | number | bigint) => {
-      const { urlPath, init } = manufacturingBffPost('unblock_workcenter', [organizationId, workcenterId])
+      const { urlPath, init } = stdbBffCommandPost("unblock_workcenter", { workcenterId: workcenterId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to unblock workcenter')
     },
@@ -350,11 +310,7 @@ export function useCheckMoAvailability(organizationId: bigint, companyId: bigint
   return useMutation({
     mutationFn: async (moId: string | number | bigint) => {
       if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = manufacturingBffPost('check_mo_availability', [
-        organizationId,
-        companyId,
-        moId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("check_mo_availability", { companyId: companyId, moId: moId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -371,12 +327,7 @@ export function useProduceManufacturingOrder(organizationId: bigint, companyId: 
   return useMutation({
     mutationFn: async ({ moId, qty }: { moId: string | number | bigint; qty: number }) => {
       if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = manufacturingBffPost('produce_manufacturing_order', [
-        organizationId,
-        companyId,
-        moId,
-        qty,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("produce_manufacturing_order", { companyId: companyId, moId: moId, qtyProducing: qty })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -393,11 +344,7 @@ export function useConsumeMoMaterials(organizationId: bigint, companyId: bigint)
   return useMutation({
     mutationFn: async (moId: string | number | bigint) => {
       if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = manufacturingBffPost('consume_mo_materials', [
-        organizationId,
-        companyId,
-        moId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("consume_mo_materials", { companyId: companyId, moId: moId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -414,7 +361,7 @@ export function useCreateWorkorder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = manufacturingBffPost('create_workorder', [organizationId, params])
+      const { urlPath, init } = stdbBffCommandPost("create_workorder", { params: params })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -435,12 +382,7 @@ export function useUpdateBom(organizationId: bigint, companyId: bigint) {
       bomId: string | number | bigint
       params: Record<string, unknown>
     }) => {
-      const { urlPath, init } = manufacturingBffPost('update_bom', [
-        organizationId,
-        companyId,
-        bomId,
-        params,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_bom", { bomId: bomId, params: params })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -452,7 +394,7 @@ export function useDeleteBom(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (bomId: string | number | bigint) => {
-      const { urlPath, init } = manufacturingBffPost('delete_bom', [organizationId, companyId, bomId])
+      const { urlPath, init } = stdbBffCommandPost("delete_bom", { bomId: bomId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -464,7 +406,7 @@ export function useComputeBomCost(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (bomId: string | number | bigint) => {
-      const { urlPath, init } = manufacturingBffPost('compute_bom_cost', [organizationId, companyId, bomId])
+      const { urlPath, init } = stdbBffCommandPost("compute_bom_cost", { bomId: bomId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -476,7 +418,7 @@ export function useExplodeBom(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (bomId: string | number | bigint) => {
-      const { urlPath, init } = manufacturingBffPost('explode_bom', [organizationId, companyId, bomId])
+      const { urlPath, init } = stdbBffCommandPost("explode_bom", { bomId: bomId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -489,7 +431,7 @@ export function useCreateRoutingWorkcenter(organizationId: bigint, companyId: bi
   const orgKey = rqBigIntKey(organizationId)
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = manufacturingBffPost('create_routing_workcenter', [organizationId, companyId, params])
+      const { urlPath, init } = stdbBffCommandPost("create_routing_workcenter", { params: params })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -511,7 +453,7 @@ export function useUpdateWorkcenter(organizationId: bigint, companyId: bigint) {
       params: Record<string, unknown>
     }) => {
       const scoped = withCompanyScope(params, companyId)
-      const { urlPath, init } = manufacturingBffPost('update_workcenter', [organizationId, workcenterId, scoped])
+      const { urlPath, init } = stdbBffCommandPost("update_workcenter", { workcenterId: workcenterId, params: scoped })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -531,12 +473,7 @@ export function useLogWorkcenterProductivity(organizationId: bigint, companyId: 
       params: Record<string, unknown>
     }) => {
       if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = manufacturingBffPost('log_workcenter_productivity', [
-        organizationId,
-        companyId,
-        workcenterId,
-        params,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("log_workcenter_productivity", { workcenterId: workcenterId, params: params })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -553,7 +490,7 @@ export function useCompleteProductivityLog(organizationId: bigint, companyId: bi
   return useMutation({
     mutationFn: async (logId: string | number | bigint) => {
       if (!companyId) throw new Error("Active company required")
-      const { urlPath, init } = manufacturingBffPost('complete_productivity_log', [organizationId, companyId, logId])
+      const { urlPath, init } = stdbBffCommandPost("complete_productivity_log", { logId: logId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -568,7 +505,7 @@ export function useImportWorkcenterCsv(organizationId: bigint, companyId: bigint
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = manufacturingBffPost('import_workcenter_csv', [organizationId, companyId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_workcenter_csv", { companyId: companyId, csvData: csvData })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -581,7 +518,7 @@ export function useImportBomCsv(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = manufacturingBffPost('import_bom_csv', [organizationId, companyId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_bom_csv", { companyId: companyId, csvData: csvData })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -593,7 +530,7 @@ export function useImportBomLineCsv(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = manufacturingBffPost('import_bom_line_csv', [organizationId, companyId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_bom_line_csv", { companyId: companyId, csvData: csvData })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -605,7 +542,7 @@ export function useImportManufacturingOrderCsv(organizationId: bigint, companyId
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = manufacturingBffPost('import_manufacturing_order_csv', [organizationId, companyId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_manufacturing_order_csv", { companyId: companyId, csvData: csvData })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -625,11 +562,7 @@ export function useLinkDeviceToWorkcenter(organizationId: bigint) {
       deviceId: string | number | bigint
       workcenterId: string | number | bigint
     }) => {
-      const { urlPath, init } = manufacturingBffPost('link_device_to_workcenter', [
-        organizationId,
-        deviceId,
-        workcenterId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("link_device_to_workcenter", { deviceId: deviceId, workcenterId: workcenterId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },

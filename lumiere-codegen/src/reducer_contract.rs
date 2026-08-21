@@ -23,6 +23,28 @@ struct ExposureEntry {
     unscoped_reason: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct CompanyScopeMetadataFile {
+    version: u32,
+    reducers: Vec<CompanyScopeReducer>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CompanyScopeReducer {
+    name: String,
+    #[serde(default)]
+    company_paths: Vec<CompanyPathAnnotation>,
+    #[serde(default)]
+    asserts_no_company_parameter: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+struct CompanyPathAnnotation {
+    path: Vec<String>,
+    required: bool,
+    nullable: bool,
+}
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 enum Exposure {
@@ -40,6 +62,9 @@ struct ReducerManifest {
 struct ReducerEntry {
     name: String,
     params: Vec<ReducerParam>,
+    client_input: ClientInput,
+    server_context: ServerContext,
+    wire_arguments: Vec<WireArgument>,
     lifecycle: String,
     scope: ReducerScope,
     exposure: Exposure,
@@ -69,6 +94,61 @@ struct ScopeParam {
     position: usize,
 }
 
+/// Names the reducer parameters that a client may provide to an object-shaped
+/// command endpoint.  The parameter position is the canonical reference back
+/// to `params`; this metadata deliberately does not repeat a type definition.
+#[derive(Debug, Serialize)]
+struct ClientInput {
+    fields: Vec<ClientInputField>,
+}
+
+#[derive(Debug, Serialize)]
+struct ClientInputField {
+    parameter_position: usize,
+}
+
+/// Describes values resolved at the API boundary and validations applied to
+/// client-selected scope values.  Organization scope is trusted session
+/// context; company scope remains client-selected, but is checked against it.
+#[derive(Debug, Serialize)]
+struct ServerContext {
+    fields: Vec<ServerContextField>,
+    validations: Vec<ContextValidation>,
+}
+
+#[derive(Debug, Serialize)]
+struct ServerContextField {
+    parameter_position: usize,
+    name: &'static str,
+    source: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+struct ContextValidation {
+    parameter_position: usize,
+    path: Vec<String>,
+    required: bool,
+    nullable: bool,
+    rule: &'static str,
+}
+
+/// Maps the object-shaped input back to the positional SpacetimeDB wire call.
+/// `parameter_position` references `params`, avoiding another copy of the
+/// parameter's name or type in every target emitter.
+#[derive(Debug, Serialize)]
+struct WireArgument {
+    position: usize,
+    parameter_position: usize,
+    source: WireArgumentSource,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum WireArgumentSource {
+    ServerContext { field: &'static str },
+    ClientInput,
+}
+
 pub fn run(paths: &Paths) -> Result<()> {
     let schema_text = read_to_string(&paths.module_schema_json)?;
     let schema: Value = serde_json::from_str(&schema_text)
@@ -85,6 +165,30 @@ pub fn run(paths: &Paths) -> Result<()> {
             "unsupported reducer exposure version {}",
             exposure_file.version
         );
+    }
+    let company_scope_text = read_to_string(&paths.company_scope_metadata_json)?;
+    let company_scope_file: CompanyScopeMetadataFile = serde_json::from_str(&company_scope_text)
+        .with_context(|| {
+            format!(
+                "parse company scope metadata {}",
+                paths.company_scope_metadata_json.display()
+            )
+        })?;
+    if company_scope_file.version != 1 {
+        bail!(
+            "unsupported company scope metadata version {}",
+            company_scope_file.version
+        );
+    }
+    let mut company_scope_by_name = BTreeMap::new();
+    for annotation in company_scope_file.reducers {
+        let name = annotation.name.clone();
+        if company_scope_by_name
+            .insert(name.clone(), annotation)
+            .is_some()
+        {
+            bail!("duplicate company scope metadata entry: {name}");
+        }
     }
 
     let mut exposure_by_name = BTreeMap::new();
@@ -108,6 +212,11 @@ pub fn run(paths: &Paths) -> Result<()> {
         .filter_map(|reducer| reducer.get("name").and_then(Value::as_str))
         .collect();
     validate_exposure_names(&exposure_by_name, &schema_names)?;
+    for name in company_scope_by_name.keys() {
+        if !schema_names.contains(name.as_str()) {
+            bail!("company scope metadata names reducer absent from module schema: {name}");
+        }
+    }
 
     let mut entries = Vec::with_capacity(reducers.len());
     for reducer in reducers {
@@ -115,6 +224,12 @@ pub fn run(paths: &Paths) -> Result<()> {
             reducer,
             &type_names,
             exposure_by_name.get(
+                reducer
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default(),
+            ),
+            company_scope_by_name.get(
                 reducer
                     .get("name")
                     .and_then(Value::as_str)
@@ -182,6 +297,7 @@ fn parse_reducer(
     reducer: &Value,
     type_names: &BTreeMap<u64, String>,
     exposure: Option<&ExposureEntry>,
+    company_scope: Option<&CompanyScopeReducer>,
 ) -> Result<ReducerEntry> {
     let name = reducer
         .get("name")
@@ -261,15 +377,174 @@ fn parse_reducer(
         None => (Exposure::Denied, None, None),
     };
 
+    let (client_input, server_context, wire_arguments) =
+        build_input_metadata(&name, &params, &scope, company_scope)?;
+
     Ok(ReducerEntry {
         name,
         params,
+        client_input,
+        server_context,
+        wire_arguments,
         lifecycle,
         scope,
         exposure: exposure_value,
         exposure_reason,
         unscoped_reason,
     })
+}
+
+fn build_input_metadata(
+    reducer_name: &str,
+    params: &[ReducerParam],
+    scope: &ReducerScope,
+    company_scope: Option<&CompanyScopeReducer>,
+) -> Result<(ClientInput, ServerContext, Vec<WireArgument>)> {
+    let organization_position = scope.organization.as_ref().map(|scope| scope.position);
+    let company_position = scope.company.as_ref().map(|scope| scope.position);
+
+    let mut client_fields = Vec::with_capacity(params.len());
+    let mut context_fields = Vec::new();
+    let mut validations = Vec::new();
+    let mut wire_arguments = Vec::with_capacity(params.len());
+
+    if let Some(position) = organization_position {
+        context_fields.push(ServerContextField {
+            parameter_position: position,
+            name: "organization_id",
+            source: "authenticated_session.organization_id",
+        });
+    }
+    if let Some(position) = company_position {
+        validations.push(ContextValidation {
+            parameter_position: position,
+            path: Vec::new(),
+            required: true,
+            nullable: params
+                .get(position)
+                .is_some_and(|param| is_optional_integer_kind(&param.kind)),
+            rule: "belongs_to_organization_if_present",
+        });
+    }
+    if let Some(metadata) = company_scope {
+        if metadata.asserts_no_company_parameter
+            && (company_position.is_some() || !metadata.company_paths.is_empty())
+        {
+            bail!("reducer {reducer_name} both asserts and declares company scope");
+        }
+        for annotation in &metadata.company_paths {
+            let (root, nested_path) = annotation
+                .path
+                .split_first()
+                .with_context(|| format!("reducer {reducer_name} has an empty company path"))?;
+            let position = params
+                .iter()
+                .position(|param| &param.name == root)
+                .with_context(|| {
+                    format!(
+                        "reducer {reducer_name} company path root {root} is not a reducer parameter"
+                    )
+                })?;
+            if nested_path.is_empty() && root != "company_id" {
+                bail!("reducer {reducer_name} direct company path must target company_id");
+            }
+            if !nested_path.is_empty()
+                && nested_path.last().map(String::as_str) != Some("company_id")
+            {
+                bail!("reducer {reducer_name} nested company path must end in company_id");
+            }
+            if !nested_path.is_empty() && params[position].ref_target.is_none() {
+                bail!("reducer {reducer_name} nested company path root {root} is not a named input type");
+            }
+            let validation = ContextValidation {
+                parameter_position: position,
+                path: nested_path.to_vec(),
+                required: annotation.required,
+                nullable: annotation.nullable,
+                rule: "belongs_to_organization_if_present",
+            };
+            if let Some(existing) = validations.iter().find(|item| {
+                item.parameter_position == validation.parameter_position
+                    && item.path == validation.path
+            }) {
+                if existing.required != validation.required
+                    || existing.nullable != validation.nullable
+                {
+                    bail!("reducer {reducer_name} has conflicting company path metadata");
+                }
+            } else {
+                validations.push(validation);
+            }
+        }
+    }
+
+    for (position, param) in params.iter().enumerate() {
+        let is_organization_context = organization_position == Some(position);
+        if !is_organization_context {
+            client_fields.push(ClientInputField {
+                parameter_position: position,
+            });
+        }
+
+        let source = if is_organization_context {
+            WireArgumentSource::ServerContext {
+                field: "organization_id",
+            }
+        } else {
+            WireArgumentSource::ClientInput
+        };
+        wire_arguments.push(WireArgument {
+            position,
+            parameter_position: position,
+            source,
+        });
+
+        if param.name == "organization_id" && !is_organization_context {
+            bail!(
+                "organization_id parameter at position {position} is not marked as server context"
+            );
+        }
+    }
+
+    if let Some(position) = organization_position {
+        if position >= params.len() || params[position].name != "organization_id" {
+            bail!("organization scope position {position} does not reference organization_id");
+        }
+    }
+    if let Some(position) = company_position {
+        if position >= params.len() || params[position].name != "company_id" {
+            bail!("company scope position {position} does not reference company_id");
+        }
+    }
+
+    // Keep these descriptors mechanically complete.  Every wire position must
+    // be represented exactly once, and every non-server parameter must remain
+    // available through client_input.
+    if wire_arguments.len() != params.len()
+        || wire_arguments
+            .iter()
+            .enumerate()
+            .any(|(position, argument)| {
+                argument.position != position || argument.parameter_position != position
+            })
+    {
+        bail!("wire argument metadata does not cover reducer parameters exactly once");
+    }
+    let expected_client_fields = params.len() - usize::from(organization_position.is_some());
+    if client_fields.len() != expected_client_fields {
+        bail!("client input metadata omits or duplicates reducer parameters");
+    }
+
+    Ok((
+        ClientInput {
+            fields: client_fields,
+        },
+        ServerContext {
+            fields: context_fields,
+            validations,
+        },
+        wire_arguments,
+    ))
 }
 
 fn resolve_type(
@@ -408,7 +683,27 @@ fn emit_rust_contract(manifest: &ReducerManifest) -> String {
             option_string(reducer.unscoped_reason.as_deref()),
         ).unwrap();
     }
-    out.push_str("];\n\npub mod reducer_names {\n    use super::ReducerName;\n");
+    out.push_str("];\n\npub fn company_scope_paths(reducer_name: &str) -> &'static [CompanyScopePath] {\n    match reducer_name {\n");
+    for reducer in &manifest.reducers {
+        let nested = reducer
+            .server_context
+            .validations
+            .iter()
+            .filter(|validation| !validation.path.is_empty())
+            .collect::<Vec<_>>();
+        if !nested.is_empty() {
+            writeln!(
+                out,
+                "        {:?} => {},",
+                reducer.name,
+                rust_company_scope_paths(&nested)
+            )
+            .unwrap();
+        }
+    }
+    out.push_str(
+        "        _ => &[],\n    }\n}\n\npub mod reducer_names {\n    use super::ReducerName;\n",
+    );
     for reducer in &manifest.reducers {
         writeln!(
             out,
@@ -431,6 +726,26 @@ fn emit_rust_contract(manifest: &ReducerManifest) -> String {
     }
     out.push_str("}\n");
     out
+}
+
+fn rust_company_scope_paths(validations: &[&ContextValidation]) -> String {
+    let entries = validations
+        .iter()
+        .map(|validation| {
+            let path = validation
+                .path
+                .iter()
+                .map(|segment| format!("{segment:?}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!(
+                "CompanyScopePath {{ parameter_position: {}, path: &[{}], required: {}, nullable: {} }}",
+                validation.parameter_position, path, validation.required, validation.nullable
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("&[{entries}]")
 }
 
 fn validate_binding_args(manifest: &ReducerManifest, bindings_dir: &std::path::Path) -> Result<()> {
@@ -525,6 +840,14 @@ fn const_name(name: &str) -> String {
 mod tests {
     use super::*;
 
+    fn param(name: &str, kind: &str) -> ReducerParam {
+        ReducerParam {
+            name: name.to_owned(),
+            kind: kind.to_owned(),
+            ref_target: None,
+        }
+    }
+
     #[test]
     fn resolves_named_refs() {
         let names = BTreeMap::from([(7, "ExampleParams".to_owned())]);
@@ -555,5 +878,136 @@ mod tests {
         )]);
         let schema_names = BTreeSet::from(["confirm_sales_order"]);
         assert!(validate_exposure_names(&exposure, &schema_names).is_err());
+    }
+
+    #[test]
+    fn input_metadata_injects_organization_but_keeps_company_client_selected() {
+        let params = vec![
+            param("organization_id", "u64"),
+            param("company_id", "u64"),
+            param("order_id", "u64"),
+        ];
+        let scope = ReducerScope {
+            organization: Some(ScopeParam {
+                parameter: "organization_id",
+                position: 0,
+            }),
+            company: Some(ScopeParam {
+                parameter: "company_id",
+                position: 1,
+            }),
+        };
+
+        let (client_input, server_context, wire_arguments) =
+            build_input_metadata("test_reducer", &params, &scope, None).unwrap();
+
+        assert_eq!(
+            client_input
+                .fields
+                .iter()
+                .map(|field| field.parameter_position)
+                .collect::<Vec<_>>(),
+            vec![1, 2]
+        );
+        assert_eq!(server_context.fields.len(), 1);
+        assert_eq!(server_context.fields[0].parameter_position, 0);
+        assert_eq!(server_context.fields[0].name, "organization_id");
+        assert_eq!(
+            server_context.fields[0].source,
+            "authenticated_session.organization_id"
+        );
+        assert_eq!(server_context.validations.len(), 1);
+        assert_eq!(server_context.validations[0].parameter_position, 1);
+        assert!(server_context.validations[0].path.is_empty());
+        assert_eq!(
+            server_context.validations[0].rule,
+            "belongs_to_organization_if_present"
+        );
+        assert!(matches!(
+            wire_arguments[0].source,
+            WireArgumentSource::ServerContext {
+                field: "organization_id"
+            }
+        ));
+        assert!(matches!(
+            wire_arguments[1].source,
+            WireArgumentSource::ClientInput
+        ));
+        assert!(matches!(
+            wire_arguments[2].source,
+            WireArgumentSource::ClientInput
+        ));
+    }
+
+    #[test]
+    fn input_metadata_keeps_unscoped_parameters_as_client_input() {
+        let params = vec![param("token", "string"), param("serial", "string")];
+        let (client_input, server_context, wire_arguments) =
+            build_input_metadata("test_reducer", &params, &ReducerScope::default(), None).unwrap();
+
+        assert_eq!(
+            client_input
+                .fields
+                .iter()
+                .map(|field| field.parameter_position)
+                .collect::<Vec<_>>(),
+            vec![0, 1]
+        );
+        assert!(server_context.fields.is_empty());
+        assert!(server_context.validations.is_empty());
+        assert!(wire_arguments
+            .iter()
+            .all(|argument| matches!(argument.source, WireArgumentSource::ClientInput)));
+    }
+
+    #[test]
+    fn input_metadata_references_nested_company_scope_without_copying_its_type() {
+        let params = vec![
+            param("organization_id", "u64"),
+            ReducerParam {
+                name: "params".to_owned(),
+                kind: "ref".to_owned(),
+                ref_target: Some("CreateContactParams".to_owned()),
+            },
+        ];
+        let scope = ReducerScope {
+            organization: Some(ScopeParam {
+                parameter: "organization_id",
+                position: 0,
+            }),
+            company: None,
+        };
+        let company_scope = CompanyScopeReducer {
+            name: "create_contact".to_owned(),
+            company_paths: vec![CompanyPathAnnotation {
+                path: vec!["params".to_owned(), "company_id".to_owned()],
+                required: false,
+                nullable: true,
+            }],
+            asserts_no_company_parameter: false,
+        };
+
+        let (_, server_context, _) =
+            build_input_metadata("create_contact", &params, &scope, Some(&company_scope)).unwrap();
+        assert_eq!(server_context.validations.len(), 1);
+        let validation = &server_context.validations[0];
+        assert_eq!(validation.parameter_position, 1);
+        assert_eq!(validation.path, ["company_id"]);
+        assert!(!validation.required);
+        assert!(validation.nullable);
+    }
+
+    #[test]
+    fn input_metadata_rejects_scope_positions_that_do_not_match_parameter_names() {
+        let params = vec![param("organization_id", "u64")];
+        let scope = ReducerScope {
+            organization: Some(ScopeParam {
+                parameter: "organization_id",
+                position: 1,
+            }),
+            company: None,
+        };
+
+        assert!(build_input_metadata("test_reducer", &params, &scope, None).is_err());
     }
 }

@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "path_convention": "canonical_schema_snake_case",
+  "path_root": "named_operation_request",
+  "policy": {
+    "organization": {
+      "source": "authenticated_session",
+      "client_input": "forbidden",
+      "validation": "exact_session_organization"
+    },
+    "company": {
+      "source": "client_selected",
+      "validation": "must_belong_to_session_organization",
+      "nullability": "only_when_declared_by_operation"
+    },
+    "other_ids": "ordinary_domain_input"
+  },
+  "reducers": [
+    {
+      "name": "create_contact",
+      "company_paths": [
+        {
+          "path": ["params", "company_id"],
+          "required": false,
+          "nullable": true,
+          "meaning": "selected legal entity for the contact"
+        }
+      ]
+    },
+    {
+      "name": "create_lead",
+      "company_paths": [],
+      "asserts_no_company_parameter": true,
+      "notes": "CreateLeadParams has company_name but no company_id. Do not infer or default company scope from company_name, partner_id, or another ordinary domain field."
+    },
+    {
+      "name": "create_opportunity",
+      "company_paths": [
+        {
+          "path": ["params", "company_id"],
+          "required": false,
+          "nullable": true,
+          "meaning": "selected legal entity for the opportunity"
+        }
+      ]
+    },
+    {
+      "name": "delete_company",
+      "company_paths": [
+        {
+          "path": ["company_id"],
+          "required": true,
+          "nullable": false,
+          "meaning": "company being deleted"
+        }
+      ]
+    }
+  ]
+}

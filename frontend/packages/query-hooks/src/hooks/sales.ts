@@ -1,14 +1,7 @@
 "use client"
 
-/**
- * Sales hooks — Phase 4 of API Gateway Refactor
- *
- * Wraps REST API calls with React Query for the Sales module.
- * All hooks accept organizationId: bigint matching the stdb hooks interface.
- */
 
-
-import { salesBffPost } from "@lumiere/stdb/commands"
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../http"
@@ -229,7 +222,7 @@ export function useCreateSaleOrder(organizationId: bigint, companyId?: bigint) {
         withCompanyScope(params as Record<string, unknown>, companyId),
         "CreateSaleOrderParams",
       )
-      const { urlPath, init } = salesBffPost("create_sale_order", [organizationId, json])
+      const { urlPath, init } = stdbBffCommandPost("create_sale_order", { params: json })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create sale order')
     },
@@ -249,11 +242,7 @@ export function useConfirmSaleOrder(organizationId: bigint, companyId?: bigint) 
       if (companyId == null || companyId === 0n) {
         throw new Error("companyId is required to confirm a sale order")
       }
-      const { urlPath, init } = salesBffPost("confirm_sales_order", [
-        organizationId,
-        companyId,
-        orderId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("confirm_sales_order", { companyId: companyId, orderId: orderId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw await salesReducerError(r, "Failed to confirm sale order")
     },
@@ -277,11 +266,7 @@ export function useRefreshSaleOrderPromiseDates(
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (orderId: bigint | number | string) => {
-      const { urlPath, init } = salesBffPost("refresh_sale_order_promise_dates", [
-        organizationId,
-        companyId,
-        orderId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("refresh_sale_order_promise_dates", { companyId: companyId, orderId: orderId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw await salesReducerError(r, "Failed to refresh promise dates")
     },
@@ -298,10 +283,7 @@ export function useSendSaleOrderQuotation(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (orderId: bigint | number | string) => {
-      const { urlPath, init } = salesBffPost("send_sale_order_quotation", [
-        organizationId,
-        orderId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("send_sale_order_quotation", { orderId: orderId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw await salesReducerError(r, "Failed to send quotation")
     },
@@ -321,17 +303,13 @@ export function useAcceptSaleOrderQuotation(organizationId: bigint) {
       signedBy: string
       signature?: string | null
     }) => {
-      const { urlPath, init } = salesBffPost("accept_sale_order_quotation", [
-        organizationId,
-        toScalarU64(params.orderId),
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("accept_sale_order_quotation", { orderId: toScalarU64(params.orderId), params: stdbParamsToJson(
           {
             signedBy: params.signedBy,
             signature: params.signature ?? null,
           },
           "AcceptSaleOrderQuotationParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw await salesReducerError(r, "Failed to accept quotation")
     },
@@ -345,11 +323,7 @@ export function useApplySalePromotion(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: { orderId: bigint | number | string; promotionCode: string }) => {
-      const { urlPath, init } = salesBffPost("apply_sale_promotion_to_order", [
-        organizationId,
-        toScalarU64(params.orderId),
-        stdbParamsToJson({ promotionCode: params.promotionCode }),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("apply_sale_promotion_to_order", { orderId: toScalarU64(params.orderId), params: stdbParamsToJson({ promotionCode: params.promotionCode }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await r.text().catch(() => "Failed to apply promotion"))
     },
@@ -367,10 +341,7 @@ export function useApplySaleOrderOptions(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (orderId: bigint | number | string) => {
-      const { urlPath, init } = salesBffPost("apply_sale_order_options", [
-        organizationId,
-        toScalarU64(orderId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("apply_sale_order_options", { orderId: toScalarU64(orderId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await r.text().catch(() => "Failed to apply options"))
     },
@@ -391,11 +362,7 @@ export function useCreateExchangeOrderFromReturn(
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (returnOrderId: bigint | number | string) => {
-      const { urlPath, init } = salesBffPost("create_exchange_order_from_return", [
-        organizationId,
-        companyId,
-        toScalarU64(returnOrderId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_exchange_order_from_return", { companyId: companyId, returnOrderId: toScalarU64(returnOrderId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await r.text().catch(() => "Failed to create exchange order"))
     },
@@ -410,11 +377,7 @@ export function useCancelSaleOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: { orderId: bigint | number | string; reason?: string | null }) => {
-      const { urlPath, init } = salesBffPost("cancel_sale_order", [
-          organizationId,
-          params.orderId,
-          params.reason ?? null,
-        ])
+      const { urlPath, init } = stdbBffCommandPost("cancel_sale_order", { orderId: params.orderId, reason: params.reason ?? null })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         const body = await r.text().catch(() => "")
@@ -438,7 +401,7 @@ export function useComputeSoTotals(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (orderId: bigint | number | string) => {
-      const { urlPath, init } = salesBffPost("compute_so_totals", [organizationId, orderId])
+      const { urlPath, init } = stdbBffCommandPost("compute_so_totals", { orderId: orderId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to recalculate order totals')
     },
@@ -454,7 +417,7 @@ export function useCreatePricelist(organizationId: bigint) {
   return useMutation<void, Error, CreatePricelistParams>({
     mutationFn: async (params) => {
       const json = stdbParamsToJson(params as object)
-      const { urlPath, init } = salesBffPost("create_pricelist", [organizationId, json])
+      const { urlPath, init } = stdbBffCommandPost("create_pricelist", { params: json })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create pricelist')
     },
@@ -472,14 +435,21 @@ export function useUpdatePricelist(organizationId: bigint) {
       discountPolicy?: string
       isActive?: boolean
     }) => {
-      const { urlPath, init } = salesBffPost("update_pricelist", [
-          organizationId,
-          params.pricelistId,
-          params.name ?? null,
-          params.currencyId != null ? params.currencyId : null,
-          params.discountPolicy ?? null,
-          params.isActive ?? null,
-        ])
+      const discountPolicy = params.discountPolicy
+      if (
+        discountPolicy != null &&
+        discountPolicy !== "WithDiscount" &&
+        discountPolicy !== "WithoutDiscount"
+      ) {
+        throw new Error("Invalid discount policy")
+      }
+      const { urlPath, init } = stdbBffCommandPost("update_pricelist", {
+        pricelistId: params.pricelistId,
+        name: params.name ?? null,
+        currencyId: params.currencyId ?? null,
+        discountPolicy: discountPolicy == null ? null : { tag: discountPolicy },
+        isActive: params.isActive ?? null,
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update pricelist')
     },
@@ -491,10 +461,7 @@ export function useCreatePricelistItem(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreatePricelistItemParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = salesBffPost("create_pricelist_item", [
-        organizationId,
-        stdbParamsToJson(params as object, "CreatePricelistItemParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_pricelist_item", { params: stdbParamsToJson(params as object, "CreatePricelistItemParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create pricelist item')
     },
@@ -509,7 +476,7 @@ export function useDeletePricelist(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (pricelistId: bigint | number | string) => {
-      const { urlPath, init } = salesBffPost("delete_pricelist", [organizationId, pricelistId])
+      const { urlPath, init } = stdbBffCommandPost("delete_pricelist", { pricelistId: pricelistId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete pricelist')
     },
@@ -524,7 +491,7 @@ export function useDeletePricelistItem(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (itemId: bigint | number | string) => {
-      const { urlPath, init } = salesBffPost("delete_pricelist_item", [organizationId, itemId])
+      const { urlPath, init } = stdbBffCommandPost("delete_pricelist_item", { itemId: itemId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete pricelist item')
     },
@@ -543,7 +510,7 @@ export function useCreatePickingBatch(organizationId: bigint, companyId?: bigint
         withCompanyScope(params as Record<string, unknown>, companyId),
         "CreatePickingBatchParams",
       )
-      const { urlPath, init } = salesBffPost("create_picking_batch", [organizationId, json])
+      const { urlPath, init } = stdbBffCommandPost("create_picking_batch", { params: json })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create picking batch')
     },
@@ -555,7 +522,7 @@ export function useStartPickingBatch(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (batchId: bigint | number | string) => {
-      const { urlPath, init } = salesBffPost("start_picking_batch", [organizationId, batchId])
+      const { urlPath, init } = stdbBffCommandPost("start_picking_batch", { batchId: batchId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start picking batch')
     },
@@ -567,7 +534,7 @@ export function useCompletePickingBatch(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (batchId: bigint | number | string) => {
-      const { urlPath, init } = salesBffPost("complete_picking_batch", [organizationId, batchId])
+      const { urlPath, init } = stdbBffCommandPost("complete_picking_batch", { batchId: batchId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to complete picking batch')
     },
@@ -579,7 +546,7 @@ export function useCancelPickingBatch(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (batchId: bigint | number | string) => {
-      const { urlPath, init } = salesBffPost("cancel_picking_batch", [organizationId, batchId])
+      const { urlPath, init } = stdbBffCommandPost("cancel_picking_batch", { batchId: batchId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel picking batch')
     },
@@ -593,12 +560,7 @@ export function useUpdateSaleOrder(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { orderId: bigint | number | string; params: Partial<UpdateSaleOrderParams> }>({
     mutationFn: async ({ orderId, params }) => {
-      const { urlPath, init } = salesBffPost("update_sale_order", [
-          organizationId,
-          companyId,
-          toScalarU64(orderId),
-          stdbParamsToJson(finalizeUpdateSaleOrderParams(params), "UpdateSaleOrderParams"),
-        ])
+      const { urlPath, init } = stdbBffCommandPost("update_sale_order", { companyId: companyId, orderId: toScalarU64(orderId), params: stdbParamsToJson(finalizeUpdateSaleOrderParams(params), "UpdateSaleOrderParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update sale order')
     },
@@ -616,7 +578,7 @@ export function useLockSaleOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, bigint | number | string>({
     mutationFn: async (orderId) => {
-      const { urlPath, init } = salesBffPost("lock_sale_order", [organizationId, toScalarU64(orderId)])
+      const { urlPath, init } = stdbBffCommandPost("lock_sale_order", { orderId: toScalarU64(orderId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to lock sale order')
     },
@@ -628,7 +590,7 @@ export function useUnlockSaleOrder(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, bigint | number | string>({
     mutationFn: async (orderId) => {
-      const { urlPath, init } = salesBffPost("unlock_sale_order", [organizationId, toScalarU64(orderId)])
+      const { urlPath, init } = stdbBffCommandPost("unlock_sale_order", { orderId: toScalarU64(orderId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to unlock sale order')
     },
@@ -642,11 +604,7 @@ export function useCreateSaleOrderLine(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { orderId: bigint | number | string; params: CreateSaleOrderLineParams }>({
     mutationFn: async ({ orderId, params }) => {
-      const { urlPath, init } = salesBffPost("create_sale_order_line", [
-          organizationId,
-          toScalarU64(orderId),
-          stdbParamsToJson(params as object, "CreateSaleOrderLineParams"),
-        ])
+      const { urlPath, init } = stdbBffCommandPost("create_sale_order_line", { orderId: toScalarU64(orderId), params: stdbParamsToJson(params as object, "CreateSaleOrderLineParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create sale order line')
     },
@@ -658,12 +616,7 @@ export function useUpdateSaleOrderLine(organizationId: bigint, companyId: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, { lineId: bigint | number | string; params: Record<string, unknown> }>({
     mutationFn: async ({ lineId, params }) => {
-      const { urlPath, init } = salesBffPost("update_sale_order_line", [
-          organizationId,
-          companyId,
-          toScalarU64(lineId),
-          stdbParamsToJson(params as object),
-        ])
+      const { urlPath, init } = stdbBffCommandPost("update_sale_order_line", { companyId: companyId, lineId: toScalarU64(lineId), params: stdbParamsToJson(params as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update sale order line')
     },
@@ -675,7 +628,7 @@ export function useDeleteSaleOrderLine(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, bigint | number | string>({
     mutationFn: async (lineId) => {
-      const { urlPath, init } = salesBffPost("delete_sale_order_line", [organizationId, toScalarU64(lineId)])
+      const { urlPath, init } = stdbBffCommandPost("delete_sale_order_line", { lineId: toScalarU64(lineId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete sale order line')
     },
@@ -708,11 +661,7 @@ export function useCreateInvoiceFromSaleOrder(organizationId: bigint) {
         } as object,
         "CreateInvoiceFromSaleOrderParams",
       )
-      const { urlPath, init } = salesBffPost("create_invoice_from_sale_order", [
-          organizationId,
-          u64(orderId),
-          encodedParams,
-        ])
+      const { urlPath, init } = stdbBffCommandPost("create_invoice_from_sale_order", { saleOrderId: u64(orderId), params: encodedParams })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
@@ -731,11 +680,7 @@ export function useCreateReturnOrder(organizationId: bigint, companyId: bigint) 
   return useMutation<void, Error, CreateReturnOrderParams>({
     mutationFn: async (params) => {
       const json = stdbParamsToJson(params as object, "CreateReturnOrderParams")
-      const { urlPath, init } = salesBffPost("create_return_order", [
-        organizationId,
-        companyId,
-        json,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_return_order", { companyId: companyId, params: json })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
@@ -751,11 +696,7 @@ export function useConfirmReturnOrder(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (returnOrderId: bigint | number | string) => {
-      const { urlPath, init } = salesBffPost("confirm_return_order", [
-        organizationId,
-        companyId,
-        toScalarU64(returnOrderId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("confirm_return_order", { companyId: companyId, returnOrderId: toScalarU64(returnOrderId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
@@ -772,11 +713,7 @@ export function useCancelReturnOrder(organizationId: bigint, companyId: bigint) 
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (returnOrderId: bigint | number | string) => {
-      const { urlPath, init } = salesBffPost("cancel_return_order", [
-        organizationId,
-        companyId,
-        toScalarU64(returnOrderId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("cancel_return_order", { companyId: companyId, returnOrderId: toScalarU64(returnOrderId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
@@ -807,12 +744,7 @@ export function useCreateCreditNoteFromReturnOrder(organizationId: bigint, compa
         } as object,
         "CreateCreditNoteFromReturnOrderParams",
       )
-      const { urlPath, init } = salesBffPost("create_credit_note_from_return_order", [
-        organizationId,
-        companyId,
-        toScalarU64(returnOrderId),
-        encodedParams,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_credit_note_from_return_order", { companyId: companyId, returnOrderId: toScalarU64(returnOrderId), params: encodedParams })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
@@ -832,7 +764,7 @@ export function useImportSaleOrderCsv(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = salesBffPost("import_sale_order_csv", [organizationId, companyId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_sale_order_csv", { companyId: companyId, csvData: csvData })
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorSales(res))
     },
@@ -847,7 +779,7 @@ export function useImportSaleOrderLineCsv(organizationId: bigint, companyId: big
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = salesBffPost("import_sale_order_line_csv", [organizationId, companyId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_sale_order_line_csv", { companyId: companyId, csvData: csvData })
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorSales(res))
     },
@@ -881,11 +813,7 @@ export function useCreateDeliveryCarrier(organizationId: bigint, companyId: bigi
   return useMutation<void, Error, CreateDeliveryCarrierParams>({
     mutationFn: async (params) => {
       const json = stdbParamsToJson(params as object)
-      const { urlPath, init } = salesBffPost("create_delivery_carrier", [
-          organizationId,
-          companyId,
-          json,
-        ])
+      const { urlPath, init } = stdbBffCommandPost("create_delivery_carrier", { companyId: companyId, params: json })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create delivery carrier')
     },
@@ -898,11 +826,7 @@ export function useCreateDeliveryPriceRule(organizationId: bigint, companyId: bi
   return useMutation<void, Error, CreateDeliveryPriceRuleParams>({
     mutationFn: async (params) => {
       const json = stdbParamsToJson(params as object)
-      const { urlPath, init } = salesBffPost("create_delivery_price_rule", [
-          organizationId,
-          companyId,
-          json,
-        ])
+      const { urlPath, init } = stdbBffCommandPost("create_delivery_price_rule", { companyId: companyId, params: json })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create delivery price rule')
     },
@@ -915,11 +839,7 @@ export function useCreateShippingMethod(organizationId: bigint, companyId: bigin
   return useMutation<void, Error, CreateShippingMethodParams>({
     mutationFn: async (params) => {
       const json = stdbParamsToJson(params as object)
-      const { urlPath, init } = salesBffPost("create_shipping_method", [
-          organizationId,
-          companyId,
-          json,
-        ])
+      const { urlPath, init } = stdbBffCommandPost("create_shipping_method", { companyId: companyId, params: json })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create shipping method')
     },
@@ -932,11 +852,7 @@ export function useCreatePaymentMethod(organizationId: bigint, companyId: bigint
   return useMutation<void, Error, CreatePaymentMethodParams>({
     mutationFn: async (params) => {
       const json = stdbParamsToJson(params as object)
-      const { urlPath, init } = salesBffPost("create_payment_method", [
-          organizationId,
-          companyId,
-          json,
-        ])
+      const { urlPath, init } = stdbBffCommandPost("create_payment_method", { companyId: companyId, params: json })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create payment method')
     },
@@ -949,7 +865,7 @@ export function useCreateLoyaltyProgram(organizationId: bigint, companyId: bigin
   return useMutation<void, Error, CreateLoyaltyProgramParams>({
     mutationFn: async (params) => {
       const json = stdbParamsToJson(params as object)
-      const { urlPath, init } = salesBffPost("create_loyalty_program", [organizationId, json])
+      const { urlPath, init } = stdbBffCommandPost("create_loyalty_program", { params: json })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create loyalty program')
     },
@@ -967,13 +883,7 @@ export function useCreateLoyaltyCard(organizationId: bigint, companyId: bigint) 
     { partnerId: bigint | number | string | null; programId: bigint | number | string; code: string; points: number }
   >({
     mutationFn: async ({ partnerId, programId, code, points }) => {
-      const { urlPath, init } = salesBffPost("create_loyalty_card", [
-          organizationId,
-          partnerId === null || partnerId === '' ? null : toScalarU64(partnerId),
-          toScalarU64(programId),
-          code,
-          points,
-        ])
+      const { urlPath, init } = stdbBffCommandPost("create_loyalty_card", { partnerId: partnerId === null || partnerId === '' ? null : toScalarU64(partnerId), programId: toScalarU64(programId), code: code, points: points })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create loyalty card')
     },
@@ -1015,11 +925,7 @@ export function useSettleSaleCommissions(organizationId: bigint, companyId: bigi
         },
         "SettleSaleCommissionsParams",
       )
-      const { urlPath, init } = salesBffPost("settle_sale_commissions", [
-        organizationId,
-        companyId,
-        encoded,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("settle_sale_commissions", { companyId: companyId, params: encoded })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
@@ -1036,11 +942,7 @@ export function useCancelSaleCommission(organizationId: bigint, companyId: bigin
   const qc = useQueryClient()
   return useMutation<void, Error, { commissionId: bigint | number | string }>({
     mutationFn: async ({ commissionId }) => {
-      const { urlPath, init } = salesBffPost("cancel_sale_commission", [
-        organizationId,
-        companyId,
-        toScalarU64(commissionId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("cancel_sale_commission", { companyId: companyId, commissionId: toScalarU64(commissionId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
@@ -1064,11 +966,7 @@ export function useAccrueSaleCommission(organizationId: bigint) {
         { ratePercent },
         "AccrueSaleCommissionParams",
       )
-      const { urlPath, init } = salesBffPost("accrue_sale_commission", [
-        organizationId,
-        toScalarU64(orderId),
-        encoded,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("accrue_sale_commission", { orderId: toScalarU64(orderId), params: encoded })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
@@ -1087,11 +985,7 @@ export function useReverseSaleCommissionSettlement(
   const qc = useQueryClient()
   return useMutation<void, Error, { commissionId: bigint | number | string }>({
     mutationFn: async ({ commissionId }) => {
-      const { urlPath, init } = salesBffPost("reverse_sale_commission_settlement", [
-        organizationId,
-        companyId,
-        toScalarU64(commissionId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("reverse_sale_commission_settlement", { companyId: companyId, commissionId: toScalarU64(commissionId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
@@ -1116,11 +1010,7 @@ export function useCreateSaleCommissionPlan(
         withCompanyScope(params as Record<string, unknown>, companyId),
         "CreateSaleCommissionPlanParams",
       )
-      const { urlPath, init } = salesBffPost("create_sale_commission_plan", [
-        organizationId,
-        companyId,
-        encoded,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_sale_commission_plan", { companyId: companyId, params: encoded })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
@@ -1137,11 +1027,7 @@ export function useCreateSaleCommissionPlanSplit(
         params as object,
         "CreateSaleCommissionPlanSplitParams",
       )
-      const { urlPath, init } = salesBffPost("create_sale_commission_plan_split", [
-        organizationId,
-        companyId,
-        encoded,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_sale_commission_plan_split", { companyId: companyId, params: encoded })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
@@ -1155,11 +1041,7 @@ export function useCreateSaleContract(organizationId: bigint, companyId: bigint)
         withCompanyScope(params as Record<string, unknown>, companyId),
         "CreateSaleContractParams",
       )
-      const { urlPath, init } = salesBffPost("create_sale_contract", [
-        organizationId,
-        companyId,
-        encoded,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_sale_contract", { companyId: companyId, params: encoded })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
@@ -1176,11 +1058,7 @@ export function useCreateSaleCpqConstraint(
         withCompanyScope(params as Record<string, unknown>, companyId),
         "CreateSaleCpqConstraintParams",
       )
-      const { urlPath, init } = salesBffPost("create_sale_cpq_constraint", [
-        organizationId,
-        companyId,
-        encoded,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_sale_cpq_constraint", { companyId: companyId, params: encoded })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
@@ -1197,11 +1075,7 @@ export function useCreateSalesIntegrationIntent(
         withCompanyScope(params as Record<string, unknown>, companyId),
         "CreateSalesIntegrationIntentParams",
       )
-      const { urlPath, init } = salesBffPost("create_sales_integration_intent", [
-        organizationId,
-        companyId,
-        encoded,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_sales_integration_intent", { companyId: companyId, params: encoded })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
@@ -1225,12 +1099,7 @@ export function useRecordSalesIntegrationResult(
         params as object,
         "RecordSalesIntegrationResultParams",
       )
-      const { urlPath, init } = salesBffPost("record_sales_integration_result", [
-        organizationId,
-        companyId,
-        toScalarU64(intentId),
-        encoded,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("record_sales_integration_result", { companyId: companyId, intentId: toScalarU64(intentId), params: encoded })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
@@ -1255,12 +1124,7 @@ export function useApplyOmnichannelAllocation(
         params as object,
         "ApplyOmnichannelAllocationParams",
       )
-      const { urlPath, init } = salesBffPost("apply_omnichannel_allocation", [
-        organizationId,
-        companyId,
-        toScalarU64(orderId),
-        encoded,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("apply_omnichannel_allocation", { companyId: companyId, orderId: toScalarU64(orderId), params: encoded })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },
@@ -1278,11 +1142,7 @@ export function useScheduleSalesSlaEscalation(
 ) {
   return useMutation<void, Error, { delaySecs: number }>({
     mutationFn: async ({ delaySecs }) => {
-      const { urlPath, init } = salesBffPost("schedule_sales_sla_escalation", [
-        organizationId,
-        companyId,
-        delaySecs,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("schedule_sales_sla_escalation", { companyId: companyId, delaySecs: delaySecs })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorSales(r))
     },

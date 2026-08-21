@@ -1,5 +1,7 @@
 "use client"
 
+
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 /**
  * HR hooks — Phase 4 of API Gateway Refactor
  *
@@ -11,7 +13,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
-import { hrBffPost } from "@lumiere/stdb/commands"
 import type {
   CreateContractParams,
   CreateDepartmentParams,
@@ -177,17 +178,14 @@ export function useCreateHrApplicant(organizationId: bigint, companyId?: bigint)
     }
   >({
     mutationFn: async (params) => {
-      const { urlPath, init } = hrBffPost('create_hr_applicant', [
-        organizationId,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("create_hr_applicant", { params: stdbParamsToJson({
           companyId: params.companyId ?? companyId,
           jobPositionId: params.jobPositionId,
           name: params.name,
           email: params.email,
           stage: params.stage ?? 'applied',
           notes: params.notes,
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create applicant')
     },
@@ -205,16 +203,11 @@ export function useUpdateHrApplicant(organizationId: bigint, companyId?: bigint)
   >({
     mutationFn: async (params) => {
       if (companyId == null) throw new Error('companyId required')
-      const { urlPath, init } = hrBffPost('update_hr_applicant', [
-        organizationId,
-        companyId,
-        params.applicantId,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("update_hr_applicant", { companyId: companyId, applicantId: params.applicantId, params: stdbParamsToJson({
           stage: params.stage,
           email: params.email,
           notes: params.notes,
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update applicant')
     },
@@ -356,15 +349,11 @@ export function useRefreshHrCapacityForecast(organizationId: bigint, companyId?:
   >({
     mutationFn: async ({ periodStart, periodEnd, employeeId }) => {
       if (companyId == null) throw new Error('Company scope required')
-      const { urlPath, init } = hrBffPost('refresh_hr_capacity_forecast', [
-        organizationId,
-        companyId,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("refresh_hr_capacity_forecast", { companyId: companyId, params: stdbParamsToJson({
           employeeId: employeeId ?? null,
           periodStart,
           periodEnd,
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to refresh HR capacity forecast')
     },
@@ -491,10 +480,7 @@ export function useCreateDepartment(organizationId: bigint, companyId?: bigint) 
         ...params,
         companyId: params.companyId ?? companyId,
       })
-      const { urlPath, init } = hrBffPost("create_department", [
-        organizationId,
-        stdbParamsToJson(finalized),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_department", { params: stdbParamsToJson(finalized) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create department')
@@ -512,10 +498,7 @@ export function useCreateJobPosition(organizationId: bigint, companyId?: bigint)
         ...params,
         companyId: params.companyId ?? companyId,
       })
-      const { urlPath, init } = hrBffPost("create_job_position", [
-        organizationId,
-        stdbParamsToJson(finalized),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_job_position", { params: stdbParamsToJson(finalized) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create job position')
@@ -533,10 +516,7 @@ export function useCreateEmployee(organizationId: bigint, companyId?: bigint) {
         ...params,
         companyId: params.companyId ?? companyId,
       })
-      const { urlPath, init } = hrBffPost("create_employee", [
-        organizationId,
-        stdbParamsToJson(finalized),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_employee", { params: stdbParamsToJson(finalized) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create employee')
@@ -551,11 +531,7 @@ export function useCreateLeaveRequest(organizationId: bigint, companyId: bigint)
   return useMutation<void, Error, Partial<CreateLeaveRequestParams>>({
     mutationFn: async (params) => {
       const finalized = finalizeCreateLeaveRequestParams(params)
-      const { urlPath, init } = hrBffPost("create_leave_request", [
-          organizationId,
-          companyId,
-          stdbParamsToJson(finalized),
-        ])
+      const { urlPath, init } = stdbBffCommandPost("create_leave_request", { companyId: companyId, params: stdbParamsToJson(finalized) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create leave request')
@@ -573,10 +549,7 @@ export function useCreateContract(organizationId: bigint, companyId?: bigint) {
         ...params,
         companyId: params.companyId ?? companyId,
       })
-      const { urlPath, init } = hrBffPost("create_contract", [
-        organizationId,
-        stdbParamsToJson(finalized),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_contract", { params: stdbParamsToJson(finalized) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create contract')
@@ -594,10 +567,7 @@ export function useCreatePayslip(organizationId: bigint, companyId?: bigint) {
         ...params,
         companyId: params.companyId ?? companyId,
       })
-      const { urlPath, init } = hrBffPost("create_payslip", [
-        organizationId,
-        stdbParamsToJson(finalized),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_payslip", { params: stdbParamsToJson(finalized) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create payslip')
@@ -627,11 +597,7 @@ export function useCreateAttendancePunch(organizationId: bigint, companyId: bigi
   const qc = useQueryClient()
   return useMutation<void, Error, CreateAttendancePunchParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = hrBffPost("create_attendance_punch", [
-        organizationId,
-        companyId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_attendance_punch", { companyId: companyId, params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to record attendance punch')
     },
@@ -644,11 +610,7 @@ export function useCreateWorkSchedule(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, CreateWorkScheduleParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = hrBffPost("create_work_schedule", [
-        organizationId,
-        companyId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_work_schedule", { companyId: companyId, params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create work schedule')
     },
@@ -664,11 +626,7 @@ export function useUpdateDepartment(organizationId: bigint, companyId?: bigint) 
   return useMutation<void, Error, { departmentId: number; params: Partial<UpdateDepartmentParams> }>({
     mutationFn: async ({ departmentId, params }) => {
       const patch = { ...params, companyId: params.companyId ?? companyId }
-      const { urlPath, init } = hrBffPost("update_department", [
-        organizationId,
-        departmentId,
-        stdbParamsToJson(patch),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_department", { departmentId: departmentId, params: stdbParamsToJson(patch) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update department')
@@ -683,11 +641,7 @@ export function useUpdateJobPosition(organizationId: bigint, companyId?: bigint)
   return useMutation<void, Error, { jobId: number; params: Partial<UpdateJobPositionParams> }>({
     mutationFn: async ({ jobId, params }) => {
       const patch = { ...params, companyId: params.companyId ?? companyId }
-      const { urlPath, init } = hrBffPost("update_job_position", [
-        organizationId,
-        jobId,
-        stdbParamsToJson(patch),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_job_position", { jobId: jobId, params: stdbParamsToJson(patch) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update job position')
@@ -701,12 +655,7 @@ export function useUpdateEmployee(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { employeeId: number; params: Partial<UpdateEmployeeParams> }>({
     mutationFn: async ({ employeeId, params }) => {
-      const { urlPath, init } = hrBffPost("update_employee", [
-        organizationId,
-        companyId ?? null,
-        employeeId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_employee", { companyId: companyId ?? null, employeeId: employeeId, params: stdbParamsToJson(params) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update employee')
@@ -734,16 +683,11 @@ export function useArchiveEmployee(organizationId: bigint, companyId?: bigint) {
       overrideIncompleteChecklist,
       overrideReason,
     }) => {
-      const { urlPath, init } = hrBffPost("archive_employee", [
-        organizationId,
-        companyId ?? null,
-        employeeId,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("archive_employee", { companyId: companyId ?? null, employeeId: employeeId, params: stdbParamsToJson({
           terminationDate,
           overrideIncompleteChecklist: overrideIncompleteChecklist ?? false,
           overrideReason: overrideReason ?? null,
-        }),
-      ])
+        }) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to archive employee')
@@ -757,11 +701,7 @@ export function useStartOffboarding(organizationId: bigint, companyId?: bigint) 
   const qc = useQueryClient()
   return useMutation<void, Error, number>({
     mutationFn: async (employeeId) => {
-      const { urlPath, init } = hrBffPost("start_offboarding", [
-        organizationId,
-        companyId ?? null,
-        employeeId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("start_offboarding", { companyId: companyId ?? null, employeeId: employeeId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start offboarding')
     },
@@ -775,12 +715,7 @@ export function useCompleteOffboardingItem(organizationId: bigint, companyId?: b
   const qc = useQueryClient()
   return useMutation<void, Error, { employeeId: number; item: string; notes?: string }>({
     mutationFn: async ({ employeeId, item, notes }) => {
-      const { urlPath, init } = hrBffPost("complete_offboarding_item", [
-        organizationId,
-        companyId ?? null,
-        employeeId,
-        stdbParamsToJson({ item, notes: notes ?? null }),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("complete_offboarding_item", { companyId: companyId ?? null, employeeId: employeeId, params: stdbParamsToJson({ item, notes: notes ?? null }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to complete offboarding item')
     },
@@ -803,16 +738,12 @@ export function useCreateOnboardingTemplate(organizationId: bigint, companyId?: 
     }
   >({
     mutationFn: async (params) => {
-      const { urlPath, init } = hrBffPost("create_onboarding_template", [
-        organizationId,
-        companyId ?? null,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("create_onboarding_template", { companyId: companyId ?? null, params: stdbParamsToJson({
           name: params.name,
           description: params.description ?? null,
           active: params.active ?? true,
           items: params.items,
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -827,12 +758,7 @@ export function useAssignOnboardingTemplate(organizationId: bigint, companyId?: 
   const qc = useQueryClient()
   return useMutation<void, Error, { employeeId: number; templateId: number }>({
     mutationFn: async ({ employeeId, templateId }) => {
-      const { urlPath, init } = hrBffPost("assign_onboarding_template", [
-        organizationId,
-        companyId ?? null,
-        employeeId,
-        stdbParamsToJson({ templateId }),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("assign_onboarding_template", { companyId: companyId ?? null, employeeId: employeeId, params: stdbParamsToJson({ templateId }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -847,12 +773,7 @@ export function useCompleteOnboardingItem(organizationId: bigint, companyId?: bi
   const qc = useQueryClient()
   return useMutation<void, Error, { employeeId: number; templateItemId: number; notes?: string }>({
     mutationFn: async ({ employeeId, templateItemId, notes }) => {
-      const { urlPath, init } = hrBffPost("complete_onboarding_item", [
-        organizationId,
-        companyId ?? null,
-        employeeId,
-        stdbParamsToJson({ templateItemId, notes: notes ?? null }),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("complete_onboarding_item", { companyId: companyId ?? null, employeeId: employeeId, params: stdbParamsToJson({ templateItemId, notes: notes ?? null }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -866,11 +787,7 @@ export function useMarkOnboardingDone(organizationId: bigint, companyId?: bigint
   const qc = useQueryClient()
   return useMutation<void, Error, number>({
     mutationFn: async (employeeId) => {
-      const { urlPath, init } = hrBffPost("mark_onboarding_done", [
-        organizationId,
-        companyId ?? null,
-        employeeId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("mark_onboarding_done", { companyId: companyId ?? null, employeeId: employeeId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -896,18 +813,14 @@ export function useCreatePerformanceCycle(organizationId: bigint, companyId?: bi
     }
   >({
     mutationFn: async (params) => {
-      const { urlPath, init } = hrBffPost("create_performance_cycle", [
-        organizationId,
-        companyId ?? null,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("create_performance_cycle", { companyId: companyId ?? null, params: stdbParamsToJson({
           name: params.name,
           description: params.description ?? null,
           startDate: stbTimestampFromDate(params.startDate),
           endDate: stbTimestampFromDate(params.endDate),
           state: params.state ?? "draft",
           active: params.active ?? true,
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -934,11 +847,7 @@ export function useAddPerformanceGoal(organizationId: bigint, companyId?: bigint
     }
   >({
     mutationFn: async ({ cycleId, ...params }) => {
-      const { urlPath, init } = hrBffPost("add_performance_goal", [
-        organizationId,
-        companyId ?? null,
-        cycleId,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("add_performance_goal", { companyId: companyId ?? null, cycleId: cycleId, params: stdbParamsToJson({
           employeeId: params.employeeId,
           title: params.title,
           description: params.description ?? null,
@@ -946,8 +855,7 @@ export function useAddPerformanceGoal(organizationId: bigint, companyId?: bigint
           weight: params.weight ?? 1,
           state: params.state ?? "draft",
           reviewerEmployeeId: params.reviewerEmployeeId ?? null,
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -966,12 +874,7 @@ export function useSubmitPerformanceReview(organizationId: bigint, companyId?: b
     { reviewId: number; selfRating: number; summary?: string }
   >({
     mutationFn: async ({ reviewId, selfRating, summary }) => {
-      const { urlPath, init } = hrBffPost("submit_performance_review", [
-        organizationId,
-        companyId ?? null,
-        reviewId,
-        stdbParamsToJson({ selfRating, summary: summary ?? null }),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("submit_performance_review", { companyId: companyId ?? null, reviewId: reviewId, params: stdbParamsToJson({ selfRating, summary: summary ?? null }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -989,12 +892,7 @@ export function useCompletePerformanceReview(organizationId: bigint, companyId?:
     { reviewId: number; managerRating: number; summary?: string }
   >({
     mutationFn: async ({ reviewId, managerRating, summary }) => {
-      const { urlPath, init } = hrBffPost("complete_performance_review", [
-        organizationId,
-        companyId ?? null,
-        reviewId,
-        stdbParamsToJson({ managerRating, summary: summary ?? null }),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("complete_performance_review", { companyId: companyId ?? null, reviewId: reviewId, params: stdbParamsToJson({ managerRating, summary: summary ?? null }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1012,16 +910,12 @@ export function useCreateBenefitPlan(organizationId: bigint, companyId?: bigint)
     { name: string; description?: string; planType: string; active?: boolean }
   >({
     mutationFn: async (params) => {
-      const { urlPath, init } = hrBffPost("create_benefit_plan", [
-        organizationId,
-        companyId ?? null,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("create_benefit_plan", { companyId: companyId ?? null, params: stdbParamsToJson({
           name: params.name,
           description: params.description ?? null,
           planType: params.planType,
           active: params.active ?? true,
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1039,15 +933,11 @@ export function useAssignBenefitEnrollment(organizationId: bigint, companyId?: b
     { planId: number; employeeId: number; effectiveFrom?: Date }
   >({
     mutationFn: async ({ planId, employeeId, effectiveFrom }) => {
-      const { urlPath, init } = hrBffPost("assign_benefit_enrollment", [
-        organizationId,
-        companyId ?? null,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("assign_benefit_enrollment", { companyId: companyId ?? null, params: stdbParamsToJson({
           planId,
           employeeId,
           effectiveFrom: stbTimestampFromDate(effectiveFrom ?? new Date()),
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1061,11 +951,7 @@ export function useUnenrollBenefitEnrollment(organizationId: bigint, companyId?:
   const qc = useQueryClient()
   return useMutation<void, Error, number>({
     mutationFn: async (enrollmentId) => {
-      const { urlPath, init } = hrBffPost("unenroll_benefit_enrollment", [
-        organizationId,
-        companyId ?? null,
-        enrollmentId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("unenroll_benefit_enrollment", { companyId: companyId ?? null, enrollmentId: enrollmentId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1091,19 +977,14 @@ export function useCreateHrEmployeeDocument(organizationId: bigint, companyId?: 
     }
   >({
     mutationFn: async ({ employeeId, docType, attachmentId, purpose, title, notes, active }) => {
-      const { urlPath, init } = hrBffPost("create_hr_employee_document", [
-        organizationId,
-        companyId ?? null,
-        employeeId,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("create_hr_employee_document", { companyId: companyId ?? null, employeeId: employeeId, params: stdbParamsToJson({
           docType,
           attachmentId,
           purpose,
           title: title ?? null,
           notes: notes ?? null,
           active: active ?? true,
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1117,13 +998,7 @@ export function useDeleteHrEmployeeDocument(organizationId: bigint, companyId?: 
   const qc = useQueryClient()
   return useMutation<void, Error, { employeeId: number; documentId: number; reason?: string }>({
     mutationFn: async ({ employeeId, documentId, reason }) => {
-      const { urlPath, init } = hrBffPost("delete_hr_employee_document", [
-        organizationId,
-        companyId ?? null,
-        employeeId,
-        documentId,
-        stdbParamsToJson({ reason: reason ?? null }),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("delete_hr_employee_document", { companyId: companyId ?? null, employeeId: employeeId, documentId: documentId, params: stdbParamsToJson({ reason: reason ?? null }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -1139,11 +1014,7 @@ export function useCreateLeaveType(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateLeaveTypeParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = hrBffPost("create_leave_type", [
-          organizationId,
-          companyId,
-          stdbParamsToJson(params, "CreateLeaveTypeParams"),
-        ])
+      const { urlPath, init } = stdbBffCommandPost("create_leave_type", { companyId: companyId, params: stdbParamsToJson(params, "CreateLeaveTypeParams") })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create leave type')
@@ -1157,12 +1028,7 @@ export function useUpdateLeaveType(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { leaveTypeId: ScalarId; params: Partial<UpdateLeaveTypeParams> }>({
     mutationFn: async ({ leaveTypeId, params }) => {
-      const { urlPath, init } = hrBffPost("update_leave_type", [
-          organizationId,
-          companyId,
-          toScalarU64(leaveTypeId),
-          stdbParamsToJson(finalizeUpdateLeaveTypeParams(params)),
-        ])
+      const { urlPath, init } = stdbBffCommandPost("update_leave_type", { companyId: companyId, leaveTypeId: toScalarU64(leaveTypeId), params: stdbParamsToJson(finalizeUpdateLeaveTypeParams(params)) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update leave type')
@@ -1176,11 +1042,7 @@ export function useSubmitLeave(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (leaveId) => {
-      const { urlPath, init } = hrBffPost("submit_leave", [
-        organizationId,
-        companyId,
-        toScalarU64(leaveId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("submit_leave", { companyId: companyId, leaveId: toScalarU64(leaveId) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to submit leave')
@@ -1195,11 +1057,7 @@ export function useApproveLeave(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (leaveId) => {
-      const { urlPath, init } = hrBffPost("approve_leave", [
-        organizationId,
-        companyId,
-        toScalarU64(leaveId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("approve_leave", { companyId: companyId, leaveId: toScalarU64(leaveId) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to approve leave')
@@ -1214,11 +1072,7 @@ export function useRefuseLeave(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (leaveId) => {
-      const { urlPath, init } = hrBffPost("refuse_leave", [
-        organizationId,
-        companyId,
-        toScalarU64(leaveId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("refuse_leave", { companyId: companyId, leaveId: toScalarU64(leaveId) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to refuse leave')
@@ -1233,11 +1087,7 @@ export function useResetLeaveToDraft(organizationId: bigint, companyId: bigint) 
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (leaveId) => {
-      const { urlPath, init } = hrBffPost("reset_leave_to_draft", [
-        organizationId,
-        companyId,
-        toScalarU64(leaveId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("reset_leave_to_draft", { companyId: companyId, leaveId: toScalarU64(leaveId) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to reset leave to draft')
@@ -1255,11 +1105,7 @@ export function useUpdateContract(organizationId: bigint, companyId?: bigint) {
   return useMutation<void, Error, { contractId: number; params: Partial<UpdateContractParams> }>({
     mutationFn: async ({ contractId, params }) => {
       const patch = { ...params, companyId: params.companyId ?? companyId }
-      const { urlPath, init } = hrBffPost("update_contract", [
-        organizationId,
-        contractId,
-        stdbParamsToJson(patch),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_contract", { contractId: contractId, params: stdbParamsToJson(patch) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contract')
@@ -1275,11 +1121,7 @@ export function useOpenContract(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, number>({
     mutationFn: async (contractId) => {
-      const { urlPath, init } = hrBffPost("open_contract", [
-        organizationId,
-        companyId ?? null,
-        contractId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("open_contract", { companyId: companyId ?? null, contractId: contractId })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to open contract')
@@ -1293,11 +1135,7 @@ export function useExpireContract(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { contractId: number }>({
     mutationFn: async ({ contractId }) => {
-      const { urlPath, init } = hrBffPost("expire_contract", [
-        organizationId,
-        companyId ?? null,
-        contractId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("expire_contract", { companyId: companyId ?? null, contractId: contractId })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to expire contract')
@@ -1311,11 +1149,7 @@ export function useCancelContract(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, number>({
     mutationFn: async (contractId) => {
-      const { urlPath, init } = hrBffPost("cancel_contract", [
-        organizationId,
-        companyId ?? null,
-        contractId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("cancel_contract", { companyId: companyId ?? null, contractId: contractId })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel contract')
@@ -1331,10 +1165,7 @@ export function useCreatePayrollStructure(organizationId: bigint, _companyId?: b
   const qc = useQueryClient()
   return useMutation<void, Error, CreatePayrollStructureParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = hrBffPost("create_payroll_structure", [
-        organizationId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_payroll_structure", { params: stdbParamsToJson(params) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create payroll structure')
@@ -1348,10 +1179,7 @@ export function useCreateSalaryRule(organizationId: bigint, _companyId?: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, CreateSalaryRuleParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = hrBffPost("create_salary_rule", [
-        organizationId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_salary_rule", { params: stdbParamsToJson(params) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create salary rule')
@@ -1365,16 +1193,12 @@ export function useConfirmPayslip(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { payslipId: number; grossWage?: number; netWage?: number; calculationSource?: string }>({
     mutationFn: async ({ payslipId, grossWage, netWage, calculationSource }) => {
-      const { urlPath, init } = hrBffPost("confirm_payslip", [
-          organizationId,
-          toScalarU64(payslipId),
-          stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("confirm_payslip", { payslipId: toScalarU64(payslipId), params: stdbParamsToJson({
             companyId: companyId != null ? toScalarU64(companyId) : undefined,
             grossWage: grossWage ?? 0,
             netWage: netWage ?? 0,
             calculationSource: calculationSource ?? "manual",
-          }),
-        ])
+          }) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to approve payslip for export')
@@ -1392,16 +1216,11 @@ export function useCreatePayrollExportIntent(organizationId: bigint, companyId?:
     { payslipId: number; idempotencyKey: string; payload: string; packKey?: string }
   >({
     mutationFn: async ({ payslipId, idempotencyKey, payload, packKey }) => {
-      const { urlPath, init } = hrBffPost("create_payroll_export_intent", [
-        organizationId,
-        companyId ?? null,
-        toScalarU64(payslipId),
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("create_payroll_export_intent", { companyId: companyId ?? null, payslipId: toScalarU64(payslipId), params: stdbParamsToJson({
           idempotencyKey,
           payload,
           packKey,
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create payroll export intent')
     },
@@ -1449,9 +1268,7 @@ export function useCreateHrIntegrationIntent(organizationId: bigint, companyId?:
       exportIntentId,
       metadata,
     }) => {
-      const { urlPath, init } = hrBffPost('create_hr_integration_intent', [
-        organizationId,
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("create_hr_integration_intent", { params: stdbParamsToJson(
           {
             companyId,
             intentKind,
@@ -1463,8 +1280,7 @@ export function useCreateHrIntegrationIntent(organizationId: bigint, companyId?:
             metadata,
           },
           'CreateHrIntegrationIntentParams',
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create HR integration intent')
     },
@@ -1498,19 +1314,14 @@ export function usePostPayslip(organizationId: bigint, companyId?: bigint) {
       taxWithholdingAccountId,
       accountingDate,
     }) => {
-      const { urlPath, init } = hrBffPost("post_payslip", [
-        organizationId,
-        companyId ?? null,
-        toScalarU64(payslipId),
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("post_payslip", { companyId: companyId ?? null, payslipId: toScalarU64(payslipId), params: stdbParamsToJson({
           journalId: toScalarU64(journalId),
           expenseAccountId: toScalarU64(expenseAccountId),
           payableAccountId: toScalarU64(payableAccountId),
           taxWithholdingAccountId:
             taxWithholdingAccountId != null ? toScalarU64(taxWithholdingAccountId) : undefined,
           accountingDate: stbTimestampFromDate(accountingDate),
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to post payslip to GL')
     },
@@ -1523,7 +1334,7 @@ export function useCancelPayslip(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, number>({
     mutationFn: async (payslipId) => {
-      const { urlPath, init } = hrBffPost("cancel_payslip", [organizationId, payslipId, companyId ?? null])
+      const { urlPath, init } = stdbBffCommandPost("cancel_payslip", { companyId: payslipId, payslipId: companyId ?? null })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to cancel payslip')
@@ -1541,7 +1352,7 @@ function useImportHrResourceCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = hrBffPost("import_hr_resource_csv", [organizationId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_hr_resource_csv", { csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
@@ -1555,7 +1366,7 @@ function useImportHrDepartmentCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = hrBffPost("import_hr_department_csv", [organizationId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_hr_department_csv", { csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
@@ -1569,7 +1380,7 @@ function useImportHrJobPositionCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = hrBffPost("import_hr_job_position_csv", [organizationId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_hr_job_position_csv", { csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
@@ -1583,7 +1394,7 @@ function useImportHrEmployeeCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = hrBffPost("import_hr_employee_csv", [organizationId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_hr_employee_csv", { csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
@@ -1597,7 +1408,7 @@ function useImportHrContractCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = hrBffPost("import_hr_contract_csv", [organizationId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_hr_contract_csv", { csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
@@ -1611,7 +1422,7 @@ function useImportHrLeaveTypeCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = hrBffPost("import_hr_leave_type_csv", [organizationId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_hr_leave_type_csv", { csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
@@ -1625,7 +1436,7 @@ function useImportHrLeaveCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = hrBffPost("import_hr_leave_csv", [organizationId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_hr_leave_csv", { csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
@@ -1639,7 +1450,7 @@ function useImportHrPayrollStructureCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = hrBffPost("import_hr_payroll_structure_csv", [organizationId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_hr_payroll_structure_csv", { csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
@@ -1653,7 +1464,7 @@ function useImportHrSalaryRuleCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = hrBffPost("import_hr_salary_rule_csv", [organizationId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_hr_salary_rule_csv", { csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))
@@ -1667,7 +1478,7 @@ function useImportHrPayslipCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = hrBffPost("import_hr_payslip_csv", [organizationId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_hr_payslip_csv", { csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallError(res))

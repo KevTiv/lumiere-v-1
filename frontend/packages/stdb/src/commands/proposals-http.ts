@@ -1,9 +1,7 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
-
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Proposals mutations via Next.js BFF `POST /api/call/:reducer`.
+ * Proposals mutations via the api-server BFF `POST /api/call/:reducer`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` proposals hooks.
  */
 export const PROPOSALS_BFF_REDUCERS = [
@@ -47,26 +45,9 @@ export const PROPOSALS_BFF_REDUCERS = [
 
 export type ProposalsBffReducerKey = (typeof PROPOSALS_BFF_REDUCERS)[number];
 
-const WITH_COMPANY_QUERY = new Set<ProposalsBffReducerKey>();
-
 /** Same-origin path used by `apiFetch` in the web app. */
 export function proposalsBffCallUrl(reducer: ProposalsBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
-
-export function proposalsBffPost(
-  reducer: ProposalsBffReducerKey,
-  args: unknown[],
-): { urlPath: string; init: RequestInit } {
-  return {
-    urlPath: proposalsBffCallUrl(reducer),
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
-    },
-  };
+  return `/api/call/${reducer}`;
 }
 
 const PROPOSALS_HINT_OVERRIDES: Partial<

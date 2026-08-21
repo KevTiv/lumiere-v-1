@@ -1,8 +1,8 @@
 "use client"
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { aiSkillsBffPost } from "@lumiere/stdb/commands"
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   AssignTeamMemberSkillParams,
@@ -187,10 +187,7 @@ export function useCreateAiSkill(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: CreateAiSkillParams) => {
-      const { urlPath, init } = aiSkillsBffPost("create_ai_skill", [
-        organizationId,
-        stdbParamsToJson(params as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_ai_skill", { params: stdbParamsToJson(params as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseAiError(r))
     },
@@ -205,10 +202,7 @@ export function useUpsertAiSkill(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: UpsertAiSkillParams) => {
-      const { urlPath, init } = aiSkillsBffPost("upsert_ai_skill", [
-        organizationId,
-        stdbParamsToJson(params as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("upsert_ai_skill", { params: stdbParamsToJson(params as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseAiError(r))
     },
@@ -223,11 +217,7 @@ export function useSetAiSkillActive(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { skillId: number; active: boolean }) => {
-      const { urlPath, init } = aiSkillsBffPost("set_ai_skill_active", [
-        organizationId,
-        args.skillId,
-        args.active,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("set_ai_skill_active", { skillId: args.skillId, active: args.active })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseAiError(r))
     },
@@ -242,10 +232,7 @@ export function useAssignTeamMemberSkill(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: AssignTeamMemberSkillParams) => {
-      const { urlPath, init } = aiSkillsBffPost("assign_team_member_skill", [
-        organizationId,
-        stdbParamsToJson(params as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("assign_team_member_skill", { params: stdbParamsToJson(params as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseAiError(r))
     },
@@ -261,10 +248,7 @@ export function useUnassignTeamMemberSkill(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (teamMemberSkillId: number) => {
-      const { urlPath, init } = aiSkillsBffPost("unassign_team_member_skill", [
-        organizationId,
-        teamMemberSkillId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("unassign_team_member_skill", { teamMemberSkillId: teamMemberSkillId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseAiError(r))
     },

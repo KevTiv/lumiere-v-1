@@ -1,5 +1,6 @@
 "use client"
 
+
 /**
  * Auth hooks — Phase 4 of API Gateway Refactor
  *
@@ -8,7 +9,13 @@
  */
 
 
-import { authBffPost, stdbBffPost } from "@lumiere/stdb/commands"
+/**
+ * Auth hooks — Phase 4 of API Gateway Refactor
+ *
+ * Wraps REST API calls with React Query for the Auth module.
+ * All hooks accept organizationId: bigint matching the stdb hooks interface.
+ */
+import { stdbBffCommandPost } from "@lumiere/stdb/commands";
 import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -475,10 +482,7 @@ export function useCreateRole(organizationId: bigint) {
             ? String(formData.metadata)
             : null,
       }
-      const { urlPath, init } = authBffPost("create_role", [
-        organizationId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_role", { params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create role')
     },
@@ -496,10 +500,7 @@ export function useUpdateRole(organizationId: bigint) {
     { roleId: string | number | bigint; params: Record<string, unknown> }
   >({
     mutationFn: async ({ roleId, params }) => {
-      const { urlPath, init } = authBffPost("update_role", [
-        toScalarU64(roleId),
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_role", { roleId: toScalarU64(roleId), params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update role')
     },
@@ -526,18 +527,13 @@ export function useAssignRole(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ userIdentity, roleId, params }) => {
-      const { urlPath, init } = authBffPost("assign_role", [
-        userIdentity.trim(),
-        toScalarU64(roleId),
-        organizationId,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("assign_role", { userIdentity: userIdentity.trim(), roleId: toScalarU64(roleId), params: stdbParamsToJson({
           expiresAtMicros:
             params.expiresAtMicros != null && String(params.expiresAtMicros).trim() !== ''
               ? toScalarU64(params.expiresAtMicros as ScalarId)
               : null,
           metadata: params.metadata,
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign role')
     },
@@ -551,10 +547,7 @@ export function useRevokeRole(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { assignmentId: string | number | bigint }>({
     mutationFn: async ({ assignmentId }) => {
-      const { urlPath, init } = authBffPost("revoke_role", [
-        organizationId,
-        toScalarU64(assignmentId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("revoke_role", { assignmentId: toScalarU64(assignmentId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to revoke role')
     },
@@ -571,10 +564,7 @@ export function useCreateAuditRule(organizationId: bigint) {
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (formData) => {
       const params = toCreateAuditRuleParams(formData)
-      const { urlPath, init } = authBffPost("create_audit_rule", [
-        organizationId,
-        stdbParamsToJson(params, "CreateAuditRuleParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_audit_rule", { params: stdbParamsToJson(params, "CreateAuditRuleParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create audit rule')
     },
@@ -592,10 +582,7 @@ export function useUpdateAuditRule(organizationId: bigint) {
     { ruleId: string | number | bigint; params: Record<string, unknown> }
   >({
     mutationFn: async ({ ruleId, params }) => {
-      const { urlPath, init } = authBffPost("update_audit_rule", [
-        toScalarU64(ruleId),
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_audit_rule", { ruleId: toScalarU64(ruleId), params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update audit rule')
     },
@@ -624,9 +611,7 @@ export function useLogAuditEvent(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, LogAuditEventInput>({
     mutationFn: async (params) => {
-      const { urlPath, init } = authBffPost("log_audit_event", [
-        organizationId,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("log_audit_event", { params: stdbParamsToJson({
           companyId:
             params.companyId != null ? toScalarU64(params.companyId as ScalarId) : null,
           tableName: params.tableName,
@@ -640,8 +625,7 @@ export function useLogAuditEvent(organizationId: bigint) {
           ipAddress: params.ipAddress,
           userAgent: params.userAgent,
           metadata: params.metadata,
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to log audit event')
     },
@@ -693,10 +677,7 @@ export function useUpdateUserPassword(organizationId: bigint) {
     { targetIdentity: string; newPasswordHash: string }
   >({
     mutationFn: async ({ targetIdentity, newPasswordHash }) => {
-      const { urlPath, init } = authBffPost("update_user_password", [
-        targetIdentity.trim(),
-        newPasswordHash,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_user_password", { targetIdentity: targetIdentity.trim(), newPasswordHash: newPasswordHash })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update user password')
     },
@@ -710,7 +691,7 @@ export function useUpdateUserProfile(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = authBffPost("update_user_profile", [stdbParamsToJson(params)])
+      const { urlPath, init } = stdbBffCommandPost("update_user_profile", { params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update user profile')
     },
@@ -731,10 +712,7 @@ export function useUpdateOrgMemberRole(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ userOrgId, roleName }) => {
-      const { urlPath, init } = authBffPost("update_org_member_role", [
-        toScalarU64(userOrgId),
-        roleName,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_org_member_role", { userOrgId: toScalarU64(userOrgId), roleName: roleName })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update org member role')
     },
@@ -756,11 +734,7 @@ export function useUpdateUserOrganizationStatus(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ userOrgId, isActive, isDefault = false }) => {
-      const { urlPath, init } = authBffPost("update_user_organization_status", [
-        toScalarU64(userOrgId),
-        isActive,
-        isDefault,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_user_organization_status", { userOrgId: toScalarU64(userOrgId), isActive: isActive, isDefault: isDefault })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update user organization status')
     },
@@ -774,10 +748,7 @@ export function useRemoveUserFromOrganization(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string | number | bigint>({
     mutationFn: async (userIdentity) => {
-      const { urlPath, init } = authBffPost("remove_user_from_organization", [
-        identityHexForAssign(String(userIdentity)),
-        organizationId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("remove_user_from_organization", { userIdentity: identityHexForAssign(String(userIdentity)) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to remove user from organization')
     },
@@ -798,10 +769,7 @@ export function useUpdateOrgMemberDetails(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ userOrgId, params }) => {
-      const { urlPath, init } = authBffPost("update_org_member_details", [
-        toScalarU64(userOrgId),
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_org_member_details", { userOrgId: toScalarU64(userOrgId), params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update org member details')
     },
@@ -822,7 +790,7 @@ export function useUpdateUserEmail(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ email, emailVerified }) => {
-      const { urlPath, init } = authBffPost("update_user_email", [email.trim(), emailVerified])
+      const { urlPath, init } = stdbBffCommandPost("update_user_email", { email: email.trim(), emailVerified: emailVerified })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update user email')
     },
@@ -838,10 +806,7 @@ export function useCreateUserSession(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (sessionParams) => {
-      const { urlPath, init } = authBffPost("create_user_session", [
-        organizationId,
-        stdbParamsToJson(sessionParams),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_user_session", { params: stdbParamsToJson(sessionParams) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create user session')
     },
@@ -855,7 +820,7 @@ export function useEndUserSession(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string | number | bigint>({
     mutationFn: async (sessionId) => {
-      const { urlPath, init } = authBffPost("end_user_session", [toScalarU64(sessionId)])
+      const { urlPath, init } = stdbBffCommandPost("end_user_session", { sessionId: toScalarU64(sessionId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to end user session')
     },
@@ -880,17 +845,14 @@ export function useRecordPrivacyConsent(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, RecordPrivacyConsentInput>({
     mutationFn: async (params) => {
-      const { urlPath, init } = authBffPost("record_privacy_consent", [
-        organizationId,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("record_privacy_consent", { params: stdbParamsToJson({
           contactId: toScalarU64(params.contactId),
           consentType: params.consentType,
           granted: params.granted,
           ipAddress: params.ipAddress,
           userAgent: params.userAgent,
           metadata: params.metadata,
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to record privacy consent')
     },
@@ -912,11 +874,10 @@ export function useUpdateGoogleDriveCredentials(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ userId, credentials }) => {
-      const { urlPath, init } = authBffPost("update_google_drive_credentials", [
-        organizationId,
-        userId,
-        stdbParamsToJson(credentials),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_google_drive_credentials", {
+        connectionId: toScalarU64(userId),
+        credentialsReference: JSON.stringify(credentials),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update Google Drive credentials')
     },
@@ -937,11 +898,7 @@ export function useUpdateWhatsappCredentials(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ userId, credentials }) => {
-      const { urlPath, init } = authBffPost("update_whatsapp_credentials", [
-        organizationId,
-        userId,
-        stdbParamsToJson(credentials),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_whatsapp_credentials", { accountId: userId, params: stdbParamsToJson(credentials) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update WhatsApp credentials')
     },
@@ -987,10 +944,9 @@ export function useGrantFieldPermission(organizationId: bigint) {
         action: { tag: action },
         allowed_fields: allowedFields,
       }
-      const { urlPath, init } = stdbBffPost("grant_field_permission", [
-        organizationId,
-        stdbParamsToJson(params, "GrantFieldPermissionParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("grant_field_permission", {
+        params: stdbParamsToJson(params, "GrantFieldPermissionParams"),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to grant field permission")
     },
@@ -1005,10 +961,9 @@ export function useRevokeFieldPermission(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, string | number | bigint>({
     mutationFn: async (permissionId) => {
-      const { urlPath, init } = stdbBffPost("revoke_field_permission", [
-        organizationId,
-        toScalarU64(permissionId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("revoke_field_permission", {
+        permissionId: toScalarU64(permissionId),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to revoke field permission")
     },
@@ -1047,10 +1002,9 @@ export function useCreateSodConflictRule(organizationId: bigint) {
         is_active: formData.isActive !== false,
         metadata: optionalStringField(formData.metadata),
       }
-      const { urlPath, init } = stdbBffPost("create_sod_conflict_rule", [
-        organizationId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_sod_conflict_rule", {
+        params: stdbParamsToJson(params),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to create SoD conflict rule")
     },
@@ -1091,11 +1045,10 @@ export function useUpdateSodConflictRule(organizationId: bigint) {
           return s === "" ? null : s
         }),
       }
-      const { urlPath, init } = stdbBffPost("update_sod_conflict_rule", [
-        organizationId,
-        toScalarU64(ruleId),
+      const { urlPath, init } = stdbBffCommandPost("update_sod_conflict_rule", {
+        ruleId: toScalarU64(ruleId),
         params,
-      ])
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update SoD conflict rule")
     },
@@ -1117,14 +1070,13 @@ export function useGrantDelegatedAdminScope(organizationId: bigint) {
     { companyId: bigint | number | string; userIdentity: string; metadata?: string }
   >({
     mutationFn: async ({ companyId, userIdentity, metadata }) => {
-      const { urlPath, init } = stdbBffPost("grant_delegated_admin_scope", [
-        organizationId,
-        toScalarU64(companyId),
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("grant_delegated_admin_scope", {
+        companyId: toScalarU64(companyId),
+        params: stdbParamsToJson({
           user_identity: identityForReducer(userIdentity),
           metadata: metadata ?? null,
         }),
-      ])
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to grant delegated admin scope")
     },
@@ -1138,10 +1090,9 @@ export function useRevokeDelegatedAdminScope(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, bigint | number | string>({
     mutationFn: async (scopeId) => {
-      const { urlPath, init } = stdbBffPost("revoke_delegated_admin_scope", [
-        organizationId,
-        toScalarU64(scopeId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("revoke_delegated_admin_scope", {
+        scopeId: toScalarU64(scopeId),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to revoke delegated admin scope")
     },
@@ -1183,11 +1134,10 @@ export function useAddOrgMember(organizationId: bigint) {
         isDefault: Boolean(formData.isDefault),
         metadata: optionalStringField(formData.metadata),
       }
-      const { urlPath, init } = stdbBffPost("add_org_member", [
-        identityForReducer(String(formData.userIdentity ?? "")),
-        organizationId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("add_org_member", {
+        userIdentity: identityForReducer(String(formData.userIdentity ?? "")),
+        params: stdbParamsToJson(params),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to add organization member")
     },
@@ -1217,11 +1167,10 @@ export function useAddUserToOrganization(organizationId: bigint) {
         isDefault: Boolean(formData.isDefault),
         metadata: optionalStringField(formData.metadata),
       }
-      const { urlPath, init } = stdbBffPost("add_user_to_organization", [
-        identityForReducer(String(formData.userIdentity ?? "")),
-        organizationId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("add_user_to_organization", {
+        userIdentity: identityForReducer(String(formData.userIdentity ?? "")),
+        params: stdbParamsToJson(params),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to add user to organization")
     },
@@ -1239,11 +1188,11 @@ export function useCreatePasswordResetToken(organizationId: bigint) {
     { targetIdentity: string; tokenHash: string; expiresAt: unknown }
   >({
     mutationFn: async ({ targetIdentity, tokenHash, expiresAt }) => {
-      const { urlPath, init } = stdbBffPost("create_password_reset_token", [
-        identityForReducer(targetIdentity),
+      const { urlPath, init } = stdbBffCommandPost("create_password_reset_token", {
+        targetIdentity: identityForReducer(targetIdentity),
         tokenHash,
-        timestampFromDatetime(expiresAt),
-      ])
+        expiresAt: timestampFromDatetime(expiresAt),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to create password reset token")
     },
@@ -1268,14 +1217,13 @@ export function useCreateUserInviteReducer(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ roleId, email, tokenHash, invitedBy, expiresAt }) => {
-      const { urlPath, init } = stdbBffPost("create_user_invite", [
-        organizationId,
-        toScalarU64(roleId),
-        email.trim(),
+      const { urlPath, init } = stdbBffCommandPost("create_user_invite", {
+        roleId: toScalarU64(roleId),
+        email: email.trim(),
         tokenHash,
-        identityForReducer(invitedBy),
-        timestampFromDatetime(expiresAt),
-      ])
+        invitedBy: identityForReducer(invitedBy),
+        expiresAt: timestampFromDatetime(expiresAt),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to create user invite")
     },
@@ -1298,12 +1246,12 @@ export function useStoreUserCredential(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ newIdentity, email, passwordHash, stdbTokenEnc }) => {
-      const { urlPath, init } = stdbBffPost("store_user_credential", [
-        identityForReducer(newIdentity),
-        email.trim(),
+      const { urlPath, init } = stdbBffCommandPost("store_user_credential", {
+        newIdentity: identityForReducer(newIdentity),
+        email: email.trim(),
         passwordHash,
         stdbTokenEnc,
-      ])
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to store user credential")
     },
@@ -1327,13 +1275,13 @@ export function useStoreSsoUserCredential(organizationId: bigint) {
     }
   >({
     mutationFn: async ({ newIdentity, email, stdbTokenEnc, workosUserId, emailVerified }) => {
-      const { urlPath, init } = stdbBffPost("store_sso_user_credential", [
-        identityForReducer(newIdentity),
-        email.trim(),
+      const { urlPath, init } = stdbBffCommandPost("store_sso_user_credential", {
+        newIdentity: identityForReducer(newIdentity),
+        email: email.trim(),
         stdbTokenEnc,
-        workosUserId.trim(),
+        workosUserId: workosUserId.trim(),
         emailVerified,
-      ])
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to store SSO user credential")
     },
@@ -1351,10 +1299,10 @@ export function useLinkWorkosUser(organizationId: bigint) {
     { targetIdentity: string; workosUserId: string }
   >({
     mutationFn: async ({ targetIdentity, workosUserId }) => {
-      const { urlPath, init } = stdbBffPost("link_workos_user", [
-        identityForReducer(targetIdentity),
-        workosUserId.trim(),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("link_workos_user", {
+        targetIdentity: identityForReducer(targetIdentity),
+        workosUserId: workosUserId.trim(),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to link WorkOS user")
     },

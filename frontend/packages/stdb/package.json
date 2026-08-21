@@ -17,7 +17,6 @@
     "./proposal-row-types": "./src/proposal-row-types.ts",
     "./warehouse-3d": "./src/warehouse-3d-types.ts",
     "./generated/types": "./src/generated/types.ts",
-    "./generated/types/reducers": "./src/generated/types/reducers.ts",
     "./generated/query-registry": "./src/generated/query-registry.ts",
     "./field-policy": "./src/field-policy.ts",
     "./live": "./src/live/index.ts",
@@ -30,7 +29,7 @@
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
-    "@lumiere/contracts": "github:KevTiv/lumiere-contracts#423fcfe86863afd6d69b65df15ff253f0f85995b&path:packages/contracts",
+    "@lumiere/contracts": "github:KevTiv/lumiere-contracts#5415afacd90651039daf9c1de325e09bf741de44&path:packages/contracts",
     "spacetimedb": "2.8.2"
   },
   "peerDependencies": {

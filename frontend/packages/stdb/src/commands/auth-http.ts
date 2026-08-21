@@ -1,4 +1,3 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
 
 import type { ReducerCommandContractMeta } from "./types";
 
@@ -41,20 +40,6 @@ const WITH_COMPANY_QUERY = new Set<AuthBffReducerKey>();
 export function authBffCallUrl(reducer: AuthBffReducerKey): string {
   const base = `/api/call/${reducer}`;
   return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
-
-export function authBffPost(
-  reducer: AuthBffReducerKey,
-  args: unknown[],
-): { urlPath: string; init: RequestInit } {
-  return {
-    urlPath: authBffCallUrl(reducer),
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
-    },
-  };
 }
 
 const AUTH_HINT_OVERRIDES: Partial<Record<AuthBffReducerKey, readonly string[]>> = {

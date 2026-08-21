@@ -2,7 +2,7 @@
 
 **Status:** Active — IR handoff implemented 2026-08-21
 **Role:** executable sequencing for [private-generated-contracts-repo.md](./private-generated-contracts-repo.md), scoped to the artifacts that must move *before* the application-contract IR is built
-**Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [agent-ir-codegen-extension-plan.md](./agent-ir-codegen-extension-plan.md) · [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md) · [organization-placement-lifecycle-phase0.md](./organization-placement-lifecycle-phase0.md)
+**Related:** [typed-bff-sdk-contract-hardening-execution-plan.md](./typed-bff-sdk-contract-hardening-execution-plan.md) · [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [agent-ir-codegen-extension-plan.md](./agent-ir-codegen-extension-plan.md) · [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md) · [organization-placement-lifecycle-phase0.md](./organization-placement-lifecycle-phase0.md)
 
 ---
 
@@ -43,8 +43,11 @@ The original plan treated all generator implementation as a
 - `lumiere-contracts` consumes a pinned IR digest and owns target-specific
   TypeScript/Rust emission, domain directories, mechanical React Query hooks,
   barrels, export maps, compatibility checks, and package publishing;
-- handwritten form mappers, parameter finalizers, authorization, and business
-  rules stay in `lumiere-v-1`.
+- form mappers and parameter finalizers that contain real UX coercion, defaults,
+  validation, authorization, or business rules stay in `lumiere-v-1`;
+- mechanical field copies, tenant-parameter insertion, positional reducer
+  assembly, and transport wrappers are generated from IR or handled once by the
+  Rust API BFF rather than repeated per frontend operation.
 
 No contracts build may clone or inspect mutable application source. This avoids
 two repositories independently deciding what Rust/STDB means.

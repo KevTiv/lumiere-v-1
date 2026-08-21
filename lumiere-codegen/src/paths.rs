@@ -44,6 +44,7 @@ pub struct Paths {
     // ── reducer_contract ─────────────────────────────────────────────────
     pub module_schema_json: PathBuf,
     pub reducer_exposure_json: PathBuf,
+    pub company_scope_metadata_json: PathBuf,
     pub reducer_manifest_out: PathBuf,
     pub reducer_contract_rust_out: PathBuf,
     pub stdb_bff_reducers_ts_out: PathBuf,
@@ -121,6 +122,7 @@ impl Paths {
 
             module_schema_json: contracts_staging_dir.join("module-schema.json"),
             reducer_exposure_json: manifest_dir.join("reducer-exposure.json"),
+            company_scope_metadata_json: manifest_dir.join("company-scope-metadata.json"),
             reducer_manifest_out: staging_manifests.join("reducer-manifest.json"),
             reducer_contract_rust_out: repo_root
                 .join("crates/stdb-client/src/generated_reducer_contract.rs"),

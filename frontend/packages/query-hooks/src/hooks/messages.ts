@@ -1,13 +1,7 @@
 "use client"
 
-/**
- * Messages hooks — Phase 4 of API Gateway Refactor
- *
- * Wraps REST API calls with React Query for the Messages module.
- */
 
-
-import { messagesBffPost } from "@lumiere/stdb/commands"
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type { CreateInvoiceReminderBatchParams, CreateMessageBatchParams, CreateMessageTemplateParams, ReviewMessageBatchParams } from "@lumiere/stdb/types"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -65,7 +59,7 @@ export function useCreateMessageBatch(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateMessageBatchParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = messagesBffPost("create_message_batch", [organizationId, stdbParamsToJson(params, "CreateMessageBatchParams")])
+      const { urlPath, init } = stdbBffCommandPost("create_message_batch", { params: stdbParamsToJson(params, "CreateMessageBatchParams") })
       const response = await apiFetch(urlPath, init)
       if (!response.ok) throw new Error(await response.text() || "Unable to create message batch")
     },
@@ -77,10 +71,7 @@ export function useCreateInvoiceReminderBatch(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateInvoiceReminderBatchParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = messagesBffPost("create_invoice_reminder_batch", [
-        organizationId,
-        stdbParamsToJson(params, "CreateInvoiceReminderBatchParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_invoice_reminder_batch", { params: stdbParamsToJson(params, "CreateInvoiceReminderBatchParams") })
       const response = await apiFetch(urlPath, init)
       if (!response.ok) throw new Error(await response.text() || "Unable to create invoice reminder batch")
     },
@@ -92,10 +83,7 @@ export function useCreateMessageTemplate(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateMessageTemplateParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = messagesBffPost("create_message_template", [
-        organizationId,
-        stdbParamsToJson(params, "CreateMessageTemplateParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_message_template", { params: stdbParamsToJson(params, "CreateMessageTemplateParams") })
       const response = await apiFetch(urlPath, init)
       if (!response.ok) throw new Error(await response.text() || "Unable to create message template")
     },
@@ -107,7 +95,7 @@ export function useReviewMessageBatch(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { batchId: bigint; params: ReviewMessageBatchParams }>({
     mutationFn: async ({ batchId, params }) => {
-      const { urlPath, init } = messagesBffPost("review_message_batch", [organizationId, batchId, stdbParamsToJson(params, "ReviewMessageBatchParams")])
+      const { urlPath, init } = stdbBffCommandPost("review_message_batch", { batchId: batchId, params: stdbParamsToJson(params, "ReviewMessageBatchParams") })
       const response = await apiFetch(urlPath, init)
       if (!response.ok) throw new Error(await response.text() || "Unable to review message batch")
     },
@@ -121,14 +109,7 @@ export function usePostMessage(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, PostMessageInput>({
     mutationFn: async ({ model, resId, body, parentId, attachmentIds }) => {
-      const { urlPath, init } = messagesBffPost("post_message", [
-        organizationId,
-        model,
-        toScalarU64(resId),
-        body,
-        parentId != null ? toScalarU64(parentId) : null,
-        attachmentIds.map((id) => toScalarU64(id)),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("post_message", { model: model, resId: toScalarU64(resId), body: body, parentId: parentId != null ? toScalarU64(parentId) : null, attachmentIds: attachmentIds.map((id) => toScalarU64(id)) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to post message')
     },
@@ -157,12 +138,7 @@ export function useSubscribeToRecord(organizationId: bigint) {
     { resModel: string; resId: bigint | number | string; subtypes: string[] }
   >({
     mutationFn: async ({ resModel, resId, subtypes }) => {
-      const { urlPath, init } = messagesBffPost("subscribe_to_record", [
-        organizationId,
-        resModel,
-        toScalarU64(resId),
-        subtypes,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("subscribe_to_record", { resModel: resModel, resId: toScalarU64(resId), subtypes: subtypes })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to subscribe to record')
     },
@@ -175,11 +151,7 @@ export function useUnsubscribeFromRecord(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { resModel: string; resId: bigint | number | string }>({
     mutationFn: async ({ resModel, resId }) => {
-      const { urlPath, init } = messagesBffPost("unsubscribe_from_record", [
-        organizationId,
-        resModel,
-        toScalarU64(resId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("unsubscribe_from_record", { resModel: resModel, resId: toScalarU64(resId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to unsubscribe from record')
     },
@@ -196,12 +168,7 @@ export function usePostInternalNote(organizationId: bigint) {
     { model: string; resId: bigint | number | string; body: string }
   >({
     mutationFn: async ({ model, resId, body }) => {
-      const { urlPath, init } = messagesBffPost("post_internal_note", [
-        organizationId,
-        model,
-        toScalarU64(resId),
-        body,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("post_internal_note", { model: model, resId: toScalarU64(resId), body: body })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to post internal note')
     },

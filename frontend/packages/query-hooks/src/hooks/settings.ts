@@ -1,7 +1,8 @@
 "use client"
 
 
-import { settingsBffPost, stdbBffPost } from "@lumiere/stdb/commands"
+
+import { stdbBffCommandPost } from "@lumiere/stdb/commands";
 import { apiFetch, rqBigIntKey } from "../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 /**
@@ -19,10 +20,7 @@ export function useUpsertOrganizationSettings(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (settings) => {
-      const { urlPath, init } = settingsBffPost('upsert_organization_settings', [
-        organizationId,
-        stdbParamsToJson(settings as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("upsert_organization_settings", { params: stdbParamsToJson(settings as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to save organization settings')
     },
@@ -37,10 +35,7 @@ export function useUpdateOrganization(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = settingsBffPost('update_organization', [
-        organizationId,
-        stdbParamsToJson(params as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_organization", { params: stdbParamsToJson(params as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update organization')
     },
@@ -54,9 +49,7 @@ export function useCreateOrganization() {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = settingsBffPost('create_organization', [
-        stdbParamsToJson(params as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_organization", { params: stdbParamsToJson(params as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create organization')
     },
@@ -86,7 +79,10 @@ export function useCreateCountry() {
   const qc = useQueryClient()
   return useMutation<void, Error, { code: string; params: Record<string, unknown> }>({
     mutationFn: async ({ code, params }) => {
-      const { urlPath, init } = stdbBffPost('create_country', [code.trim(), stdbParamsToJson(params)])
+      const { urlPath, init } = stdbBffCommandPost('create_country', {
+        code: code.trim(),
+        params: stdbParamsToJson(params),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create country')
     },
@@ -100,7 +96,10 @@ export function useCreateCurrency() {
   const qc = useQueryClient()
   return useMutation<void, Error, { code: string; params: Record<string, unknown> }>({
     mutationFn: async ({ code, params }) => {
-      const { urlPath, init } = stdbBffPost('create_currency', [code.trim(), stdbParamsToJson(params)])
+      const { urlPath, init } = stdbBffCommandPost('create_currency', {
+        code: code.trim(),
+        params: stdbParamsToJson(params),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create currency')
     },

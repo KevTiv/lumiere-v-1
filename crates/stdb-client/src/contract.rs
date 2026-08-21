@@ -29,6 +29,17 @@ pub struct ReducerParam {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub struct CompanyScopePath {
+    /// Position of the root reducer parameter in the positional STDB call.
+    pub parameter_position: usize,
+    /// Canonical snake_case path within that parameter; empty for a direct
+    /// `company_id` parameter.
+    pub path: &'static [&'static str],
+    pub required: bool,
+    pub nullable: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
 pub struct ReducerContract {
     pub name: &'static str,
     pub params: &'static [ReducerParam],

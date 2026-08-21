@@ -126,7 +126,6 @@ node -e '
     const entries = [
       "generated/index.ts",
       "generated/types.ts",
-      "generated/types/reducers.ts",
       "generated/types/procedures.ts",
       "generated/query-registry.ts",
       "generated/role_table.ts",

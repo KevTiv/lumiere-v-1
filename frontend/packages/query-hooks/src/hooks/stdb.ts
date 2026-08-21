@@ -14,7 +14,12 @@ import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useErpSession } from '@lumiere/erp-session'
 
-import { stdbBffPost, type StdbBffReducerKey } from "@lumiere/stdb/commands"
+import {
+  stdbBffCommandPost,
+  type StdbBffCommandInput,
+  type StdbBffReducerKey,
+} from "@lumiere/stdb/commands"
+import type { OperationInputMap } from "@lumiere/contracts/generated/operation-inputs"
 import { isSubscriptionReady, useSubscriptionCache } from "@lumiere/stdb/live"
 
 import { apiFetch, coalesceQueryInitialData } from "../http"
@@ -74,8 +79,10 @@ export function invalidateStdbQueryResources(
  * POST `/api/call/:reducer` and invalidate listed `stdb` query resources on success.
  * When `invalidateResources` is omitted or empty, uses `STDB_REDUCER_INVALIDATION` from codegen manifest.
  */
-export function useStdbCallMutation(
-  reducerName: StdbBffReducerKey,
+type NamedReducerKey = Extract<StdbBffReducerKey, keyof OperationInputMap>
+
+export function useStdbCallMutation<K extends NamedReducerKey>(
+  reducerName: K,
   organizationId: bigint | number,
   invalidateResources?: readonly string[],
 ) {
@@ -84,9 +91,9 @@ export function useStdbCallMutation(
     invalidateResources != null && invalidateResources.length > 0
       ? invalidateResources
       : stdbInvalidationFor(reducerName)
-  return useMutation({
-    mutationFn: async (args: unknown[]) => {
-      const { urlPath, init } = stdbBffPost(reducerName, args)
+  return useMutation<void, Error, StdbBffCommandInput<K>>({
+    mutationFn: async (input) => {
+      const { urlPath, init } = stdbBffCommandPost(reducerName, input)
       const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         const json = await r.json().catch(() => ({})) as Record<string, unknown>
@@ -106,12 +113,12 @@ export function useStdbCallMutation(
  *
  * @example
  * const confirm = useStdbReducer('confirm_sales_order')
- * confirm.mutate([orgId, orderId])
+ * confirm.mutate({ companyId, orderId })
  */
-export function useStdbReducer(reducerName: StdbBffReducerKey) {
-  return useMutation({
-    mutationFn: async (args: unknown[]) => {
-      const { urlPath, init } = stdbBffPost(reducerName, args)
+export function useStdbReducer<K extends NamedReducerKey>(reducerName: K) {
+  return useMutation<void, Error, StdbBffCommandInput<K>>({
+    mutationFn: async (input) => {
+      const { urlPath, init } = stdbBffCommandPost(reducerName, input)
       const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         const json = await r.json().catch(() => ({})) as Record<string, unknown>
@@ -184,8 +191,8 @@ export function useStdbQuery(
  * const create = useStdbReducerWithInvalidation('create_lead', 'leads', orgId)
  * create.mutate([orgId, { name: 'New Lead' }])
  */
-export function useStdbReducerWithInvalidation(
-  reducerName: StdbBffReducerKey,
+export function useStdbReducerWithInvalidation<K extends NamedReducerKey>(
+  reducerName: K,
   invalidateResource: string,
   organizationId: bigint | number,
 ) {

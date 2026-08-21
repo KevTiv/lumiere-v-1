@@ -1,13 +1,13 @@
 import type { DbConnection } from "../generated";
-import type { EnsureDevAdminParams } from "../generated/types/reducers";
+import type { OperationInputMap } from "@lumiere/contracts/generated/operation-inputs";
 import type { ReducerCommandContractMeta } from "./types";
 
-export type EnsureDevAdminInput = EnsureDevAdminParams;
+export type EnsureDevAdminInput = OperationInputMap["ensure_dev_admin"];
 
 /** Stable facade over generated `EnsureDevAdminParams` (currently `{}`). */
 export function normalizeEnsureDevAdminInput(
   input?: EnsureDevAdminInput,
-): EnsureDevAdminParams {
+): EnsureDevAdminInput {
   return input ?? {};
 }
 

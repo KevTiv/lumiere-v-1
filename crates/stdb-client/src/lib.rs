@@ -8,8 +8,9 @@ use serde_json::Value;
 
 mod contract;
 pub use contract::{
-    reducer_contract, reducer_names, Exposure, IntoReducerCall, ReducerCall, ReducerContract,
-    ReducerContractError, ReducerName, ReducerParam, ScalarKind,
+    company_scope_paths, reducer_contract, reducer_names, CompanyScopePath, Exposure,
+    IntoReducerCall, ReducerCall, ReducerContract, ReducerContractError, ReducerName, ReducerParam,
+    ScalarKind,
 };
 
 #[derive(Debug, thiserror::Error)]

@@ -192,6 +192,16 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "apply_proposal_analysis",
+      "exposure": "session",
+      "reason": "reviewed proposal reducer: requires proposal write permission and validates organization/company scope before every write"
+    },
+    {
+      "name": "apply_proposal_template",
+      "exposure": "session",
+      "reason": "reviewed proposal reducer: requires proposal write permission and validates organization/company scope before every write"
+    },
+    {
       "name": "apply_reconciliation_rules",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -1451,6 +1461,16 @@
       "name": "create_proposal",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "create_proposal_integration_intent",
+      "exposure": "session",
+      "reason": "reviewed proposal reducer: requires proposal write permission and validates organization/company scope before every write"
+    },
+    {
+      "name": "create_proposal_template",
+      "exposure": "session",
+      "reason": "reviewed proposal reducer: requires proposal write permission and validates organization/company scope before every write"
     },
     {
       "name": "create_purchase_blanket_order",
@@ -4224,6 +4244,16 @@
       "name": "upsert_partner_credit_control",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "upsert_proposal_compliance_requirement",
+      "exposure": "session",
+      "reason": "reviewed proposal reducer: requires proposal write permission and validates organization/company scope before every write"
+    },
+    {
+      "name": "upsert_proposal_procurement_score",
+      "exposure": "session",
+      "reason": "reviewed proposal reducer: requires proposal write permission and validates organization/company scope before every write"
     },
     {
       "name": "upsert_proposal_section",

@@ -1,12 +1,8 @@
 "use client"
 
-import {
-  documentExportUrl,
-  templatesBffPost,
-  type DocumentExportFormat,
-  type DocumentExportKind,
-  type DocumentPdfKind,
-} from "@lumiere/stdb/commands"
+
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import { documentExportUrl, type DocumentExportFormat, type DocumentExportKind, type DocumentPdfKind } from "@lumiere/stdb/commands";
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
@@ -65,11 +61,7 @@ export function useCreateDocumentTemplate(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = templatesBffPost("create_document_template", [
-        organizationId,
-        null,
-        stdbParamsToJson(params, "CreateDocumentTemplateParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_document_template", { companyId: null, params: stdbParamsToJson(params, "CreateDocumentTemplateParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -83,11 +75,7 @@ export function useCreateMailTemplate(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = templatesBffPost("create_mail_template", [
-        organizationId,
-        null,
-        stdbParamsToJson(params, "CreateMailTemplateParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_mail_template", { companyId: null, params: stdbParamsToJson(params, "CreateMailTemplateParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -107,17 +95,13 @@ export function useQueueMailFromTemplate(organizationId: number, companyId: numb
       recipientEmail: string
       contextJson?: string | null
     }) => {
-      const { urlPath, init } = templatesBffPost("queue_mail_from_template", [
-        organizationId,
-        companyId,
-        {
+      const { urlPath, init } = stdbBffCommandPost("queue_mail_from_template", { companyId: companyId, params: {
           template_id: input.templateId,
           model: input.model,
           res_id: input.resId,
           recipient_email: input.recipientEmail,
           context_json: input.contextJson ?? null,
-        },
-      ])
+        } })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },

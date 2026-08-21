@@ -3,7 +3,7 @@
 **Status:** Implemented locally; v0.3.0 contracts publish and database migration verification pending — 2026-08-21
 **Tracks:** `stdb-query-boundary`, `contract-ir`, `codegen`, `api-gateway`, `runtime-upgrade`
 **Role:** executable sequencing for workstream 1 of [stdb-pg-api-contract-consistency-plan.md](./stdb-pg-api-contract-consistency-plan.md)
-**Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [contracts-extraction-execution-plan.md](./contracts-extraction-execution-plan.md) · [agent-ir-codegen-extension-plan.md](./agent-ir-codegen-extension-plan.md)
+**Related:** [typed-bff-sdk-contract-hardening-execution-plan.md](./typed-bff-sdk-contract-hardening-execution-plan.md) · [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [contracts-extraction-execution-plan.md](./contracts-extraction-execution-plan.md) · [agent-ir-codegen-extension-plan.md](./agent-ir-codegen-extension-plan.md)
 
 ---
 
@@ -161,6 +161,47 @@ Sequenced smallest-blast-radius first. Each step is a PR that ships with a calle
 - [ ] absorb the TS `Option<T>` breaking change;
 - [ ] verify the 2.8.2 accessor-rename migration fix does not alter existing accessors;
 - [x] no procedures adopted in this step — the bump only removes the constraint on the read-boundary decision.
+
+### Step 8 — named command inputs and one Rust BFF
+
+- [x] allow object bodies on `POST /v1/call/:reducer` while retaining positional
+  arrays as a compatibility format;
+- [x] inject `organization_id` from the authenticated session at its generated
+  contract position and reject client-supplied tenant scope;
+- [x] keep `company_id` as client-selected legal-entity context and validate it
+  belongs to the authenticated organization;
+- [x] migrate `create_lead` as the first named-input caller;
+- [x] remove the pure Next.js query/call route handlers; production Kong routes
+  directly to Rust and local/E2E uses configuration-level rewrites;
+- [x] extend canonical IR with `client_input`, `server_context`, and
+  `wire_arguments` references so input ownership and positional encoding are
+  generated rather than inferred by each consumer;
+- [x] represent nested company-scope paths explicitly for composite params;
+- [x] emit a shallow, domain-partitioned TypeScript operation-input map and one
+  generic command client rather than per-reducer transport wrappers;
+- [ ] migrate callers by domain, retire `withCompany`, and delete positional
+  helpers after inventory reaches zero — the remaining executable positional
+  surface is one generic accounting adapter plus two inventory sites. The
+  inventory validators stay denied pending defense-in-depth ownership checks;
+  replenishment execution still needs a caller-owned, retry-stable idempotency
+  UUID. The generic accounting adapter still hides roughly 23 positional hook
+  inputs and is the final broad frontend migration;
+- [ ] route every Rust-owned production and local/E2E prefix directly before
+  removing the remaining pure Next.js forwarding handlers.
+
+`organization_id` is the hard tenant boundary. `company_id` selects a legal
+entity inside that tenant; customer, contact, partner, order, and other record
+ids remain ordinary domain inputs. Structurally similar domain types retain
+their semantic names and reference one canonical type definition.
+
+The generated TypeScript operation-input map is published and pinned at
+`lumiere-contracts@5415afacd90651039daf9c1de325e09bf741de44`. The former
+generated reducer alias file is removed; frontend commands now derive their
+input shape from `OperationInputMap`.
+
+Six proposal reducers were security-reviewed, promoted to session exposure,
+regenerated, and migrated to named inputs. Their updated exposure manifest and
+contract IR still need republishing before the external contracts pin can move.
 
 ---
 

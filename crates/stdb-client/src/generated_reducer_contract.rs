@@ -5781,8 +5781,8 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "apply_pending_project_integration_intents", params: PARAMS_51, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "apply_project_change_order", params: PARAMS_52, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "apply_project_integration_intent", params: PARAMS_53, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "apply_proposal_analysis", params: PARAMS_54, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "apply_proposal_template", params: PARAMS_55, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "apply_proposal_analysis", params: PARAMS_54, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "apply_proposal_template", params: PARAMS_55, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "apply_reconciliation_rules", params: PARAMS_56, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "apply_sale_order_options", params: PARAMS_57, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "apply_sale_promotion_to_order", params: PARAMS_58, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -6100,8 +6100,8 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "create_proposal", params: PARAMS_370, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "create_proposal_clarification", params: PARAMS_371, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "create_proposal_clause", params: PARAMS_372, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "create_proposal_integration_intent", params: PARAMS_373, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "create_proposal_template", params: PARAMS_374, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "create_proposal_integration_intent", params: PARAMS_373, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "create_proposal_template", params: PARAMS_374, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "create_public_holiday", params: PARAMS_375, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "create_purchase_blanket_order", params: PARAMS_376, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "create_purchase_contract", params: PARAMS_377, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -7019,8 +7019,8 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "upsert_expense_policy", params: PARAMS_1289, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "upsert_organization_settings", params: PARAMS_1290, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "upsert_partner_credit_control", params: PARAMS_1291, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "upsert_proposal_compliance_requirement", params: PARAMS_1292, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "upsert_proposal_procurement_score", params: PARAMS_1293, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "upsert_proposal_compliance_requirement", params: PARAMS_1292, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "upsert_proposal_procurement_score", params: PARAMS_1293, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "upsert_proposal_section", params: PARAMS_1294, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "upsert_search_embedding", params: PARAMS_1295, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "upsert_subscription_price_index", params: PARAMS_1296, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -7041,6 +7041,14 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "waive_tax_deadline", params: PARAMS_1311, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "worker_heartbeat", params: PARAMS_1312, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
 ];
+
+pub fn company_scope_paths(reducer_name: &str) -> &'static [CompanyScopePath] {
+    match reducer_name {
+        "create_contact" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: false, nullable: true }],
+        "create_opportunity" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: false, nullable: true }],
+        _ => &[],
+    }
+}
 
 pub mod reducer_names {
     use super::ReducerName;
