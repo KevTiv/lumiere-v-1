@@ -76,9 +76,9 @@ jobs:
     name: Contracts drift
     runs-on: ubuntu-latest
     env:
-      # Matches the spacetimedb-sdk = "=2.0.1" pin in api-server and
-      # lumiere-contracts. Bump both together.
-      SPACETIME_CLI_VERSION: "2.0.1"
+      # Must match the module crate used for authoritative schema extraction.
+      # Rust/TS client pins move atomically with the next contracts release.
+      SPACETIME_CLI_VERSION: "2.8.2"
     steps:
       - uses: actions/checkout@v4
 

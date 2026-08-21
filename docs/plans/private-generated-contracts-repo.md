@@ -1,16 +1,22 @@
 # Private generated ERP contracts repository
 
-**Status:** Proposed — architecture plan only  
-**Tracks:** `codegen`, `contracts`, `github-packages`, `rust`, `typescript`, `reviewability`  
+**Status:** Active — canonical IR boundary introduced 2026-08-21
+**Tracks:** `codegen`, `contracts`, `github-packages`, `rust`, `typescript`, `reviewability`
 **Related:** [offline-changeset-sync.md](./offline-changeset-sync.md) · [sliding-window-cold-tier.md](./sliding-window-cold-tier.md)
 
-> **Investigation constraint:** this plan must move **only generated codegen output consumed by the ERP**. It must **not** move business logic, reducer logic, authorization logic, schema/codegen implementation, generator source, handwritten adapters, runtime orchestration, or domain rules out of `lumiere-v-1`.
+> **Boundary constraint:** `lumiere-v-1` remains authoritative for translating
+> Rust/STDB source and application annotations into canonical IR. Target-specific
+> emission, package assembly, compatibility validation, and publishing may move
+> to `lumiere-contracts`. Business logic, authorization, handwritten adapters,
+> runtime orchestration, and domain rules never move.
 
 ---
 
 ## 1. Decision
 
-Create a private GitHub repository, tentatively `KevTiv/lumiere-contracts`, whose sole purpose is to store, version, validate, and distribute generated ERP contract artifacts produced by `lumiere-codegen` and SpacetimeDB generation.
+Use the private `KevTiv/lumiere-contracts` repository to consume pinned Lumiere
+IR, emit target-specific code, validate compatibility, and distribute ERP
+contract packages.
 
 `lumiere-v-1` remains the source repository for:
 
@@ -21,29 +27,28 @@ Create a private GitHub repository, tentatively `KevTiv/lumiere-contracts`, whos
 - handwritten application/runtime adapters;
 - API, sync, approval and reducer orchestration.
 
-`lumiere-contracts` receives only generated outputs that consumers need in order to compile or interact with the ERP contract surface.
+`lumiere-contracts` consumes one pinned, checksummed canonical IR artifact. It
+owns downstream generated outputs that consumers need in order to compile or
+interact with the ERP contract surface.
 
 ```text
-lumiere-v-1
-  owns source of truth + generators
+lumiere-v-1: Rust/STDB source + application annotations
         │
+        ▼ authoritative extraction and normalization
+canonical lumiere-contract-ir-v1.json + .sha256
+        │ immutable artifact pinned by checksum
         ▼
-  lumiere-codegen / spacetime generate
+lumiere-contracts: target-specific emitters + packaging
         │
-        ▼
- generated staging output
-        │
-        ▼
-private GitHub repo: lumiere-contracts
-        │
-        ├── Rust generated contracts
-        ├── TypeScript generated contracts
-        ├── generated Drizzle schema
-        ├── generated sync/reducer manifests
-        └── generated SQL/schema artifacts where required by consumers
+        ├── @lumiere/contracts (types, params, operations)
+        ├── @lumiere/query-hooks-generated (mechanical hooks)
+        ├── lumiere-contracts Rust crate
+        └── manifests / compatibility reports
 ```
 
-The goal is to remove generated type noise from normal application pull requests while keeping all domain and generator ownership in the main repository.
+The goal is to remove generated type noise from normal application pull
+requests while keeping domain ownership and authoritative source
+interpretation in the main repository.
 
 ---
 
@@ -61,8 +66,9 @@ Before moving any file, classify it into exactly one category.
 | Generated Postgres/SQLite DDL artifacts | Investigate | Move only if consumed as released contract artifacts rather than build intermediates |
 | SpacetimeDB reducers | **No** | Business logic remains in `lumiere-v-1` |
 | Domain validation/invariants | **No** | Business logic remains in `lumiere-v-1` |
-| `lumiere-codegen/src/**` | **No** | Generator implementation remains in `lumiere-v-1` |
-| Schema IR construction/parsing | **No** | Generator architecture remains in `lumiere-v-1` |
+| IR extraction/normalization | **No** | Authoritative Rust/STDB interpretation remains in `lumiere-v-1` |
+| Target-specific emitters | Yes | May move once they consume only pinned canonical IR |
+| Package/export-map assembly | Yes | Distribution responsibility, not source interpretation |
 | Authorization / policy / approval code | **No** | Runtime/business responsibility |
 | Sync engine logic | **No** | Runtime orchestration, not a generated contract |
 | Handwritten adapters around generated SDKs | **No** | Runtime integration responsibility |
@@ -72,13 +78,34 @@ Before moving any file, classify it into exactly one category.
 
 The extraction must never turn `lumiere-contracts` into a second application or source-of-truth repository.
 
-A file belongs in `lumiere-contracts` only when all of the following are true:
+A generated artifact belongs in `lumiere-contracts` only when all of the
+following are true:
 
 1. it is generated deterministically;
 2. it can be regenerated from source that remains in `lumiere-v-1`;
 3. consumers require it for typing, schemas, serialization, generated DB access, or protocol compatibility;
 4. it contains no authoritative business decision logic;
-5. deleting the contracts repo would not remove the ability to regenerate the artifact from `lumiere-v-1`.
+5. deleting the contracts repo would not remove the ability to regenerate the canonical IR from `lumiere-v-1`.
+
+### 2.2 Canonical handoff
+
+The extractor writes:
+
+```text
+.contracts-staging/ir/
+├── lumiere-contract-ir-v1.json
+└── lumiere-contract-ir-v1.json.sha256
+```
+
+The envelope records `ir_version`, `source_commit`, `source_dirty`, a semantic
+`schema_hash`, and complete `operations`, `resources`, `tables`, and indexed
+`types`. The semantic hash excludes source provenance; the sidecar checksum
+covers the complete artifact. Release automation must reject `source_dirty:
+true`.
+
+The contracts repository must never clone or inspect a mutable
+`lumiere-v-1` checkout during generation. Its build input is an immutable IR
+artifact selected by digest.
 
 ---
 
@@ -88,15 +115,20 @@ A file belongs in `lumiere-contracts` only when all of the following are true:
 lumiere-contracts/
 ├── README.md
 ├── CONTRACT_VERSION
+├── ir/
+│   ├── PIN.json
+│   └── lumiere-contract-ir-v1.json
 ├── packages/
-│   └── contracts/
-│       ├── package.json
-│       └── src/
-│           ├── resources/
-│           ├── reducers/
-│           ├── drizzle/
-│           ├── sync/
-│           └── index.ts
+│   ├── contracts/
+│   │   ├── package.json
+│   │   └── src/
+│   │       ├── resources/
+│   │       ├── reducers/
+│   │       ├── drizzle/
+│   │       ├── sync/
+│   │       └── index.ts
+│   └── query-hooks/
+│       └── generated React Query hooks only
 ├── crates/
 │   └── lumiere-contracts/
 │       ├── Cargo.toml
@@ -116,7 +148,10 @@ lumiere-contracts/
     └── sqlite/
 ```
 
-This repository should contain as little handwritten code as possible. Handwritten files are limited to package metadata, CI/release configuration, documentation, and thin package/crate export files where generation does not produce them.
+Handwritten code in this repository is limited to target emitters, IR and
+compatibility validators, package metadata/export maps, CI/release
+configuration, and documentation. Emitters transform IR mechanically; they do
+not infer application semantics or carry business/authorization decisions.
 
 ---
 
@@ -168,22 +203,23 @@ Keep these version concepts distinct:
 
 ## 5. Generation and release flow
 
-The generator remains in `lumiere-v-1`.
+IR extraction remains in `lumiere-v-1`; target-specific generation moves to
+`lumiere-contracts`.
 
 Target flow:
 
 ```text
 lumiere-v-1 source changes
         ↓
-run existing generation + lumiere-codegen
+extract and validate canonical IR
         ↓
-emit all distributable contracts into neutral staging directory
+publish immutable IR artifact + checksum
         ↓
-validate generated output
+pin IR digest in lumiere-contracts
         ↓
-update private lumiere-contracts repository
+run repository-owned emitters
         ↓
-contract-only PR
+validate compatibility + package exports
         ↓
 merge + tag
         ↓
@@ -339,14 +375,15 @@ This keeps normal ERP PRs focused on behavior rather than generated file churn w
 
 This plan is complete only when:
 
-1. `lumiere-v-1` remains the sole home of business logic and generator implementation.
-2. `lumiere-contracts` contains only generated ERP contract outputs plus minimal packaging/release scaffolding.
+1. `lumiere-v-1` remains the sole home of business logic and authoritative IR extraction/normalization.
+2. `lumiere-contracts` contains target-specific emitters, generated ERP contract outputs, and packaging/release scaffolding, but no Rust/STDB source interpretation.
 3. TypeScript consumers use a private `@lumiere/contracts` package published from GitHub.
 4. Rust consumers use the private GitHub contracts repository through pinned tag/SHA dependencies.
 5. generated Drizzle/resource/reducer/sync types can be consumed without checking their generated source into normal ERP application directories.
 6. generated contract changes are reviewed in dedicated contract PRs.
 7. normal ERP PRs no longer contain large generated type churn except documented runtime-glue exceptions.
-8. removing the contracts repository never removes the source required to regenerate it from `lumiere-v-1`.
+8. removing the contracts repository never removes the source required to regenerate canonical IR from `lumiere-v-1`.
+9. contract generation succeeds from a pinned IR file with network access to `lumiere-v-1` disabled.
 
 ---
 
@@ -355,7 +392,7 @@ This plan is complete only when:
 - Moving SpacetimeDB reducer implementations.
 - Moving domain/business validation.
 - Moving authorization, field policy, approval policy, or organization/company scoping logic.
-- Moving `lumiere-codegen` source code or schema-IR implementation.
+- Moving authoritative Rust/STDB parsing or IR normalization.
 - Making `lumiere-contracts` an authoritative schema-authoring repository.
 - Implementing a new Cargo registry service.
 - Moving application sync-engine logic into the contracts repository.

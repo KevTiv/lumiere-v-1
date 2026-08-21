@@ -102,7 +102,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	e2e-crm-isolation \
 	init-stack docker-dev docker-dev-iot \
-	codegen check-codegen check-reducer-contracts-drift lint-reducer-call-literals api-server-run \
+	codegen check-codegen check-contract-ir check-reducer-contracts-drift lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
 	module-check module-build module-generate-ts module-generate-rust \
@@ -144,11 +144,12 @@ help-legacy:
 	@echo "  docker-dev-iot          Start the OrbStack stack with the optional IoT gateway"
 	@echo "  contracts-staging-from-pinned  Populate .contracts-staging/ from the pinned lumiere-contracts tag (no spacetime CLI needed; use before codegen/check-codegen/cargo build if you haven't run generate-stdb-rust-sdk)"
 	@echo "  schema-snapshot        Fetch the published module schema into .contracts-staging/module-schema.json over CI-safe HTTP"
-	@echo "  codegen                 Emit query/SQL artifacts plus the reducer manifest and typed call contracts"
+	@echo "  codegen                 Extract canonical contract IR plus local runtime/audit artifacts"
 	@echo "  check-codegen           Fail if generated artifacts drift from sources (CI). Requires .contracts-staging/ (see contracts-staging-from-pinned)"
+	@echo "  check-contract-ir       Validate the versioned IR envelope and both SHA-256 hashes"
 	@echo "  check-reducer-contracts-drift  CI-safe live-schema drift check for reducer-manifest.json"
 	@echo "  check-contracts-drift   Full bindings/manifests drift check (requires spacetime CLI)"
-	@echo "  publish-contracts VERSION=x.y.z  Publish fresh bindings/manifests to lumiere-contracts as a new tagged release"
+	@echo "  publish-contracts VERSION=x.y.z  Transitional release: publish canonical IR plus current generated packages"
 	@echo ""
 	@echo "  --- Cloud ---"
 	@echo "  publish-cloud        Publish to maincloud"
@@ -845,7 +846,10 @@ docker-dev-iot:
 codegen: schema-snapshot
 	cargo run -p lumiere-codegen
 
-check-codegen: codegen lint-reducer-call-literals
+check-contract-ir: codegen
+	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v1.json
+
+check-codegen: codegen check-contract-ir lint-reducer-call-literals
 	@git add -N \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		frontend/packages/stdb/src/commands/generated-stdb-bff-reducers.ts \
@@ -881,9 +885,10 @@ contracts-staging-from-pinned:
 		exit 1; \
 	fi; \
 	rm -rf .contracts-staging; \
-	mkdir -p .contracts-staging/bindings .contracts-staging/manifests .contracts-staging/ts/generated; \
+	mkdir -p .contracts-staging/bindings .contracts-staging/manifests .contracts-staging/ts/generated .contracts-staging/ir; \
 	cp -R "$$CHECKOUT/crates/lumiere-contracts/src/bindings/." .contracts-staging/bindings/; \
 	cp "$$CHECKOUT/manifests/"*.json .contracts-staging/manifests/; \
+	if [ -d "$$CHECKOUT/ir" ]; then cp -R "$$CHECKOUT/ir/." .contracts-staging/ir/; fi; \
 	cp -R "$$CHECKOUT/packages/contracts/src/generated/." .contracts-staging/ts/generated/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" .contracts-staging/ts/; \
@@ -908,7 +913,7 @@ check-reducer-contracts-drift: schema-snapshot codegen
 # surfacing at runtime. Requires the `spacetime` CLI (not available in CI —
 # see `contracts-staging-from-pinned` for the CI-safe path). See
 # docs/plans/contracts-extraction-execution-plan.md §5.2, §5.4.
-check-contracts-drift: schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
+check-contracts-drift: schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen check-contract-ir
 	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
 	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
 		echo "check-contracts-drift: could not resolve the pinned lumiere-contracts checkout (run cargo fetch first); skipping" >&2; \

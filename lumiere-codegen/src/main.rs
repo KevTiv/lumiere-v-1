@@ -4,6 +4,7 @@
 //! 2. [`erp_org_sql`] — ERP org-subscription SQL, cross-checked against the registry
 //! 3. [`query_exec_audit`] — lints `query_exec.rs` against the registry (no writes)
 //! 4. [`cold_tier`] — STDB bindings → schema IR → PG DDL/codec/archive/hydration manifests
+//! 5. [`contract_ir`] — canonical, versioned handoff for downstream emitters
 //!
 //! ```text
 //! cargo run -p lumiere-codegen
@@ -15,6 +16,7 @@
 //! new generated artifact there, not as an inline `.join(...)` in a pipeline.
 
 mod cold_tier;
+mod contract_ir;
 mod erp_org_sql;
 mod frontend_registry;
 mod paths;
@@ -37,6 +39,7 @@ fn main() -> Result<()> {
     query_exec_audit::run(&paths, &registry_text)?;
     cold_tier::run(&paths)?;
     reducer_contract::run(&paths)?;
+    contract_ir::run(&paths, &registry_text)?;
 
     Ok(())
 }

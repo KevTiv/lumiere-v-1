@@ -74,12 +74,12 @@ The read-boundary question ("should plan resolution move into an STDB procedure?
 
 | Release | Date | Relevance |
 |---|---|---|
-| 2.0.1 | — | **current pin**; procedures gated behind `features = ["unstable"]` |
+| 2.0.1 | — | former module pin; procedures gated behind `features = ["unstable"]` |
 | 2.4.0 | 2026-06-03 | regression: `ctx.sender` / `ctx.connection_id` always empty inside procedures |
 | **2.5.0** | 2026-06-11 | **procedures graduate to stable** — ungated from `unstable` (PR #5164), along with `ProcedureContext`, `with_tx`/`try_with_tx`, scheduled procedures, and the outgoing HTTP client `ctx.http` |
 | 2.6.1 | 2026-07-01 | fixes the 2.4 identity regression; TS `Option<T>` codegen becomes truly optional keys (**breaking for TS consumers**) |
 | 2.7.1 | 2026-07-30 | V10 schema serialization retains column defaults — fixes schema diff, `extract-schema`, and codegen |
-| 2.8.2 | 2026-08-18 | latest; fixes table-accessor rename auto-migration |
+| 2.8.2 | 2026-08-18 | **current module + CI CLI pin**; fixes table-accessor rename auto-migration |
 
 `ctx.http` graduating alongside procedures matters as much as procedures themselves: it is the sanctioned way for the module to reach the durable gateway, which is what §5 of the cold-tier plan describes.
 
@@ -154,6 +154,7 @@ Sequenced smallest-blast-radius first. Each step is a PR that ships with a calle
 ### Step 7 (optional, gated on §2) — version bump
 
 - [x] bump the module `spacetimedb` dependency to 2.8.2 and regenerate the staged Rust and TypeScript contracts with the 2.8.2 CLI;
+- [x] align the contracts-drift CI CLI with the 2.8.2 module crate;
 - [ ] publish the module, publish `lumiere-contracts` v0.3.0, and atomically move the Rust/TypeScript client pins;
 - [ ] absorb the TS `Option<T>` breaking change;
 - [ ] verify the 2.8.2 accessor-rename migration fix does not alter existing accessors;

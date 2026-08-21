@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Publishes .contracts-staging/{bindings,manifests,ts} to the lumiere-contracts
-# repo as a new tagged release covering both the Rust crate and the TS
-# package under one tag (single release boundary — see
-# docs/plans/private-generated-contracts-repo.md §4.3), and prints the
-# dependency lines to bump in this repo.
+# Transitional publisher. It publishes the canonical, checksummed IR handoff
+# plus the current bindings/manifests/TS outputs under one tag. Target-specific
+# emission moves to lumiere-contracts next; once that repository can regenerate
+# every package from IR alone, remove the direct output-copying sections below.
 #
 # Prerequisites: `make generate-stdb-rust-sdk && make generate-stdb-ts-sdk &&
 # make codegen` must have already populated .contracts-staging/. Run via
@@ -28,12 +27,25 @@ if [[ ! -d "$STAGING/ts/generated" ]]; then
   echo "error: $STAGING/ts/generated missing — run make generate-stdb-ts-sdk && make codegen first" >&2
   exit 1
 fi
+if [[ ! -f "$STAGING/ir/lumiere-contract-ir-v1.json" || ! -f "$STAGING/ir/lumiere-contract-ir-v1.json.sha256" ]]; then
+  echo "error: canonical contract IR missing — run make codegen first" >&2
+  exit 1
+fi
+
+python3 "$ROOT/scripts/verify-contract-ir.py" \
+  "$STAGING/ir/lumiere-contract-ir-v1.json" --require-clean
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 git clone --quiet "$CONTRACTS_REPO" "$WORK/repo"
 cd "$WORK/repo"
+
+# Immutable source handoff. Downstream emitters must eventually consume only
+# this file selected by its sidecar digest; they must not inspect lumiere-v-1.
+mkdir -p ir
+cp "$STAGING/ir/lumiere-contract-ir-v1.json" ir/
+cp "$STAGING/ir/lumiere-contract-ir-v1.json.sha256" ir/
 
 rm -rf crates/lumiere-contracts/src/bindings
 mkdir -p crates/lumiere-contracts/src/bindings

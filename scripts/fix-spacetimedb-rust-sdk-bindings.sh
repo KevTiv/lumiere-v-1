@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# SpacetimeDB 2.0.1 Rust client codegen can emit invalid Rust for columns named
-# Rust keywords (e.g. `type`, `ref`). Run after: spacetime generate --lang rust ...
+# SpacetimeDB Rust client codegen may emit invalid Rust for columns named Rust
+# keywords (e.g. `type`, `ref`). Run after: spacetime generate --lang rust ...
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIR="${1:-$ROOT/.contracts-staging/bindings}"

@@ -105,7 +105,7 @@
     "account-moves",
     "account-move-lines"
   ],
-  "unreconcile_account_bank_statement_line": [
+  "unreconciled_account_bank_statement_line": [
     "bank-statements",
     "bank-statement-lines",
     "bank-match-candidates",
