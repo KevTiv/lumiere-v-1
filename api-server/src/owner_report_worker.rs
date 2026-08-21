@@ -108,7 +108,10 @@ async fn process_batch(state: &AppState) -> anyhow::Result<usize> {
         ensure_worker_registration(state, organization_id).await?;
         state
             .stdb
-            .call_reducer("dispatch_due_owner_reports", json!([organization_id]))
+            .call_reducer(stdb_client::reducer_call!(
+                "dispatch_due_owner_reports",
+                json!([organization_id])
+            ))
             .await?;
     }
 
@@ -128,7 +131,10 @@ async fn process_batch(state: &AppState) -> anyhow::Result<usize> {
     for job in &jobs {
         if let Err(error) = state
             .stdb
-            .call_reducer("claim_queue_job", json!([job.organization_id, job.id]))
+            .call_reducer(stdb_client::reducer_call!(
+                "claim_queue_job",
+                json!([job.organization_id, job.id])
+            ))
             .await
         {
             tracing::debug!(job_id = job.id, %error, "owner-report job was claimed elsewhere");
@@ -140,22 +146,22 @@ async fn process_batch(state: &AppState) -> anyhow::Result<usize> {
             if let Ok(payload) = serde_json::from_str::<OwnerReportJob>(&job.payload) {
                 let _ = state
                     .stdb
-                    .call_reducer(
+                    .call_reducer(stdb_client::reducer_call!(
                         "fail_scheduled_owner_report_run",
                         json!([
                             job.organization_id,
                             payload.scheduled_report_run_id,
                             error_message
                         ]),
-                    )
+                    ))
                     .await;
             }
             let _ = state
                 .stdb
-                .call_reducer(
+                .call_reducer(stdb_client::reducer_call!(
                     "complete_queue_job",
                     json!([job.organization_id, job.id, error.to_string()]),
-                )
+                ))
                 .await;
         }
     }
@@ -196,22 +202,22 @@ async fn ensure_worker_registration(state: &AppState, organization_id: u64) -> a
         let worker: WorkerRow = serde_json::from_value(row)?;
         state
             .stdb
-            .call_reducer("worker_heartbeat", json!([organization_id, worker.id]))
+            .call_reducer(stdb_client::reducer_call!(
+                "worker_heartbeat",
+                json!([organization_id, worker.id])
+            ))
             .await?;
     } else {
         state
             .stdb
-            .call_reducer(
-                "register_queue_worker",
-                json!([
+            .call_reducer(stdb_client::reducer_call!("register_queue_worker", json!([
                     organization_id,
                     {
                         "name": state.config.owner_report_worker_name,
                         "queues": ["owner_report"],
                         "metadata": serde_json::json!({ "service": "owner-report-worker" }).to_string(),
                     }
-                ]),
-            )
+                ]),))
             .await?;
     }
     Ok(())
@@ -254,7 +260,7 @@ async fn process_job(state: &AppState, job: &QueueRow) -> anyhow::Result<()> {
     .map_err(|error| anyhow::anyhow!("record owner report artifact: {error:?}"))?;
     state
         .stdb
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "complete_scheduled_owner_report_run",
             json!([
                 job.organization_id,
@@ -262,14 +268,14 @@ async fn process_job(state: &AppState, job: &QueueRow) -> anyhow::Result<()> {
                 artifact.id,
                 artifact.document_id,
             ]),
-        )
+        ))
         .await?;
     state
         .stdb
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "complete_queue_job",
             json!([job.organization_id, job.id, null]),
-        )
+        ))
         .await?;
     Ok(())
 }

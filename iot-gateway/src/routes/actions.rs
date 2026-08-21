@@ -42,7 +42,7 @@ pub async fn ack(
     let args = json!([req.organization_id, req.action_id, req.result_payload]);
 
     state
-        .call_reducer("acknowledge_iot_action", args)
+        .call_reducer(stdb_client::reducer_call!("acknowledge_iot_action", args))
         .await
         .map_err(|e| {
             tracing::error!("acknowledge_iot_action failed: {}", e);
@@ -69,7 +69,7 @@ pub async fn fail(
     let args = json!([req.organization_id, req.action_id, req.error]);
 
     state
-        .call_reducer("fail_iot_action", args)
+        .call_reducer(stdb_client::reducer_call!("fail_iot_action", args))
         .await
         .map_err(|e| {
             tracing::error!("fail_iot_action failed: {}", e);

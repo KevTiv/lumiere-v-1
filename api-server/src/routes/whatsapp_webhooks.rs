@@ -273,7 +273,10 @@ async fn receive_whatsapp_webhook(
         .ok_or_else(|| ApiError::Internal("STDB_SERVER_TOKEN is not configured".into()))?;
     state
         .client_with_token(owner_token)
-        .call_reducer(reducer, json!([organization_id, params]))
+        .call_reducer(stdb_client::ReducerCall::from_name(
+            reducer,
+            json!([organization_id, params]),
+        ))
         .await
         .map_err(|error| ApiError::Unprocessable(error.to_string()))?;
     Ok((StatusCode::ACCEPTED, Json(json!({ "accepted": true }))))

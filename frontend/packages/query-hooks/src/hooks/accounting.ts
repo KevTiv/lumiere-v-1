@@ -828,9 +828,9 @@ export function useUpdateAccountBankStatement(organizationId: number) {
  */
 export function useUnreconcileAccountBankStatementLine(organizationId: number) {
   return useAccountingCallMutation(
-    "unreconcile_account_bank_statement_line",
+    "unreconciled_account_bank_statement_line",
     organizationId,
-    stdbInvalidationFor("unreconcile_account_bank_statement_line"),
+    stdbInvalidationFor("unreconciled_account_bank_statement_line"),
   )
 }
 

@@ -113,10 +113,10 @@ impl LumiereStdbExt for StdbClient {
         model: &str,
         dim: u32,
     ) -> anyhow::Result<()> {
-        self.call_reducer(
+        self.call_reducer(stdb_client::reducer_call!(
             "mark_embedding_synced",
             json!([organization_id, company_id, embedding_id, model, dim]),
-        )
+        ))
         .await
         .map_err(|e| anyhow::anyhow!("{e}"))
     }
@@ -127,18 +127,21 @@ impl LumiereStdbExt for StdbClient {
         job_id: u64,
         error_message: Option<String>,
     ) -> anyhow::Result<()> {
-        self.call_reducer(
+        self.call_reducer(stdb_client::reducer_call!(
             "complete_queue_job",
             json!([organization_id, job_id, error_message]),
-        )
+        ))
         .await
         .map_err(|e| anyhow::anyhow!("{e}"))
     }
 
     async fn claim_queue_job(&self, organization_id: u64, job_id: u64) -> anyhow::Result<()> {
-        self.call_reducer("claim_queue_job", json!([organization_id, job_id]))
-            .await
-            .map_err(|e| anyhow::anyhow!("{e}"))
+        self.call_reducer(stdb_client::reducer_call!(
+            "claim_queue_job",
+            json!([organization_id, job_id])
+        ))
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))
     }
 
     async fn organization_id_for_company(&self, company_id: u64) -> anyhow::Result<Option<u64>> {

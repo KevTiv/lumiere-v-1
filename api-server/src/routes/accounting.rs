@@ -128,7 +128,10 @@ async fn accounts_post(
 
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("create_account_account", json!([org_id, body]))
+        .call_reducer(stdb_client::reducer_call!(
+            "create_account_account",
+            json!([org_id, body])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok((
@@ -230,7 +233,10 @@ async fn payment_accounts_post(
     let params = payment_account_create_params(&body)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("create_payment_account", json!([org_id, params]))
+        .call_reducer(stdb_client::reducer_call!(
+            "create_payment_account",
+            json!([org_id, params])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok((
@@ -252,7 +258,10 @@ async fn payment_account_put(
     let org_id = require_org(&session)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("update_payment_account", json!([org_id, id, body]))
+        .call_reducer(stdb_client::reducer_call!(
+            "update_payment_account",
+            json!([org_id, id, body])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(
@@ -272,7 +281,10 @@ async fn payment_account_archive(
     let org_id = require_org(&session)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("archive_payment_account", json!([org_id, id]))
+        .call_reducer(stdb_client::reducer_call!(
+            "archive_payment_account",
+            json!([org_id, id])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(
@@ -360,7 +372,10 @@ async fn payment_transactions_post(
     let params = payment_transaction_create_params(&body)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("create_payment_transaction", json!([org_id, params]))
+        .call_reducer(stdb_client::reducer_call!(
+            "create_payment_transaction",
+            json!([org_id, params])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok((
@@ -382,7 +397,10 @@ async fn payment_transaction_put(
     let org_id = require_org(&session)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("update_payment_transaction", json!([org_id, id, body]))
+        .call_reducer(stdb_client::reducer_call!(
+            "update_payment_transaction",
+            json!([org_id, id, body])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(
@@ -402,7 +420,10 @@ async fn payment_transaction_post(
     let org_id = require_org(&session)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("post_payment_transaction", json!([org_id, id]))
+        .call_reducer(stdb_client::reducer_call!(
+            "post_payment_transaction",
+            json!([org_id, id])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(
@@ -422,7 +443,10 @@ async fn payment_transaction_void(
     let org_id = require_org(&session)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("void_payment_transaction", json!([org_id, id]))
+        .call_reducer(stdb_client::reducer_call!(
+            "void_payment_transaction",
+            json!([org_id, id])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(
@@ -462,7 +486,10 @@ async fn payment_transaction_fee_post(
     let params = payment_fee_create_params(&body)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("create_payment_fee", json!([org_id, params]))
+        .call_reducer(stdb_client::reducer_call!(
+            "create_payment_fee",
+            json!([org_id, params])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok((
@@ -484,7 +511,10 @@ async fn payment_transaction_allocate_post(
     let org_id = require_org(&session)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("allocate_payment_transaction", json!([org_id, body]))
+        .call_reducer(stdb_client::reducer_call!(
+            "allocate_payment_transaction",
+            json!([org_id, body])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok((
@@ -506,7 +536,10 @@ async fn payment_transaction_reverse_post(
     let org_id = require_org(&session)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("reverse_payment_transaction", json!([org_id, id, body]))
+        .call_reducer(stdb_client::reducer_call!(
+            "reverse_payment_transaction",
+            json!([org_id, id, body])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(

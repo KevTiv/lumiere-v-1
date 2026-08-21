@@ -183,10 +183,10 @@ pub async fn record_ai_spend(
     agent_id: u64,
     tokens_used: u32,
 ) -> Result<()> {
-    stdb.call_reducer(
+    stdb.call_reducer(stdb_client::reducer_call!(
         "record_ai_spend",
         serde_json::json!([org_id, agent_id, tokens_used]),
-    )
+    ))
     .await
     .context("record_ai_spend reducer failed")
 }

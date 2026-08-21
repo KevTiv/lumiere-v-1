@@ -139,10 +139,10 @@ async fn drain_one(
     .await
     .context("record archive_transfer")?;
 
-    stdb.call_reducer(
+    stdb.call_reducer(stdb_client::reducer_call!(
         "finalize_pos_order_archive",
         json!([id, archive_version, cold_eligible_at_micros]),
-    )
+    ))
     .await
     .context("call finalize_pos_order_archive")?;
 

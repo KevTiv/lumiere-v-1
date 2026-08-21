@@ -157,10 +157,10 @@ async fn drain_one(pool: &Pool, stdb: &StdbClient, raw: &Value) -> Result<bool> 
     }
 
     if let Err(error) = stdb
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "finalize_audit_log_archive",
             json!([row.id_u64, row.checksum]),
-        )
+        ))
         .await
     {
         metrics::inc_audit_cold_finalize_failure();

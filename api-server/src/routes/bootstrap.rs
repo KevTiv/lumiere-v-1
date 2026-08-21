@@ -216,7 +216,10 @@ async fn bootstrap_tenant_post(
     let payload = serde_json::to_value(&arg).map_err(|e| ApiError::Internal(e.to_string()))?;
     let client = state.client_with_token(&session.stdb_token);
     match client
-        .call_reducer("bootstrap_new_tenant", json!([payload]))
+        .call_reducer(stdb_client::reducer_call!(
+            "bootstrap_new_tenant",
+            json!([payload])
+        ))
         .await
     {
         Ok(()) => Ok(Json(json!({ "ok": true }))),

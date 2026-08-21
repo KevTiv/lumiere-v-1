@@ -2436,7 +2436,7 @@ export function useCreateWarehouse3dZone(organizationId: bigint) {
     { warehouseId: ScalarId; locationId: ScalarId; params: Record<string, unknown> }
   >({
     mutationFn: async ({ warehouseId, locationId, params }) => {
-      const { urlPath, init } = inventoryBffPost("create_warehouse_3d_zone", [organizationId, toScalarU64(warehouseId), toScalarU64(locationId), stdbParamsToJson(params as object)])
+      const { urlPath, init } = inventoryBffPost("create_warehouse_3_d_zone", [organizationId, toScalarU64(warehouseId), toScalarU64(locationId), stdbParamsToJson(params as object)])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create 3D zone')
     },
@@ -2452,7 +2452,7 @@ export function useUpdateWarehouse3dZone(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { zoneId: ScalarId; params: Record<string, unknown> }>({
     mutationFn: async ({ zoneId, params }) => {
-      const { urlPath, init } = inventoryBffPost("update_warehouse_3d_zone", [organizationId, toScalarU64(zoneId), stdbParamsToJson(params as object)])
+      const { urlPath, init } = inventoryBffPost("update_warehouse_3_d_zone", [organizationId, toScalarU64(zoneId), stdbParamsToJson(params as object)])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update 3D zone')
     },
@@ -2467,7 +2467,7 @@ export function useDeleteWarehouse3dZone(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (zoneId) => {
-      const { urlPath, init } = inventoryBffPost("delete_warehouse_3d_zone", [organizationId, toScalarU64(zoneId)])
+      const { urlPath, init } = inventoryBffPost("delete_warehouse_3_d_zone", [organizationId, toScalarU64(zoneId)])
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete 3D zone')
     },

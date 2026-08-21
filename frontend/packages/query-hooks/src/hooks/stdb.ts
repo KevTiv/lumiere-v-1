@@ -14,7 +14,7 @@ import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useErpSession } from '@lumiere/erp-session'
 
-import { stdbBffPost } from "@lumiere/stdb/commands"
+import { stdbBffPost, type StdbBffReducerKey } from "@lumiere/stdb/commands"
 import { isSubscriptionReady, useSubscriptionCache } from "@lumiere/stdb/live"
 
 import { apiFetch, coalesceQueryInitialData } from "../http"
@@ -75,7 +75,7 @@ export function invalidateStdbQueryResources(
  * When `invalidateResources` is omitted or empty, uses `STDB_REDUCER_INVALIDATION` from codegen manifest.
  */
 export function useStdbCallMutation(
-  reducerName: string,
+  reducerName: StdbBffReducerKey,
   organizationId: bigint | number,
   invalidateResources?: readonly string[],
 ) {
@@ -105,10 +105,10 @@ export function useStdbCallMutation(
  * Call any SpacetimeDB reducer by name.
  *
  * @example
- * const confirm = useStdbReducer('confirm_sale_order')
+ * const confirm = useStdbReducer('confirm_sales_order')
  * confirm.mutate([orgId, orderId])
  */
-export function useStdbReducer(reducerName: string) {
+export function useStdbReducer(reducerName: StdbBffReducerKey) {
   return useMutation({
     mutationFn: async (args: unknown[]) => {
       const { urlPath, init } = stdbBffPost(reducerName, args)
@@ -185,7 +185,7 @@ export function useStdbQuery(
  * create.mutate([orgId, { name: 'New Lead' }])
  */
 export function useStdbReducerWithInvalidation(
-  reducerName: string,
+  reducerName: StdbBffReducerKey,
   invalidateResource: string,
   organizationId: bigint | number,
 ) {

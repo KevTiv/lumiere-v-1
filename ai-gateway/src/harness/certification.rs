@@ -945,10 +945,10 @@ fn claim_candidate_sql(batch_size: u32) -> String {
 }
 
 async fn claim_request(stdb: &StdbClient, request: &CertificationRequest) -> Result<()> {
-    stdb.call_reducer(
+    stdb.call_reducer(stdb_client::reducer_call!(
         "claim_ai_skill_certification",
         serde_json::json!([request.organization_id, request.id]),
-    )
+    ))
     .await
     .context("claim AI skill certification")
 }
@@ -999,7 +999,7 @@ async fn complete_request(
 ) -> Result<()> {
     let executor_run_id = reducer_executor_run_id(executor_run_id);
     let metadata = bounded_metadata_text(metadata);
-    stdb.call_reducer(
+    stdb.call_reducer(stdb_client::reducer_call!(
         "complete_ai_skill_certification",
         complete_reducer_args(
             request,
@@ -1008,7 +1008,7 @@ async fn complete_request(
             hashes,
             metadata.as_deref(),
         ),
-    )
+    ))
     .await
     .context("complete AI skill certification")
 }
@@ -1027,7 +1027,7 @@ async fn fail_request(
     let failure_reason = bounded_failure_reason(failure_reason);
     let executor_run_id = reducer_executor_run_id(executor_run_id);
     let metadata = bounded_metadata_text(metadata);
-    stdb.call_reducer(
+    stdb.call_reducer(stdb_client::reducer_call!(
         "fail_ai_skill_certification",
         fail_reducer_args(
             request,
@@ -1037,7 +1037,7 @@ async fn fail_request(
             hashes,
             metadata.as_deref(),
         ),
-    )
+    ))
     .await
     .context("fail AI skill certification")
 }

@@ -6,6 +6,12 @@
 use anyhow::{Context, Result};
 use serde_json::Value;
 
+mod contract;
+pub use contract::{
+    reducer_contract, reducer_names, Exposure, IntoReducerCall, ReducerCall, ReducerContract,
+    ReducerContractError, ReducerName, ReducerParam, ScalarKind,
+};
+
 #[derive(Debug, thiserror::Error)]
 pub enum StdbClientError {
     #[error("SpacetimeDB HTTP {0}: {1}")]
@@ -110,8 +116,15 @@ impl StdbClient {
         self.query_sql(&format!("SELECT * FROM {table}")).await
     }
 
-    /// Call reducer; body is a JSON array of args (no `ReducerContext`).
-    pub async fn call_reducer(&self, reducer: &str, args: Value) -> Result<()> {
+    /// Call a reducer whose name and arguments were validated against the module manifest.
+    pub async fn call_reducer(&self, call: impl IntoReducerCall) -> Result<()> {
+        let call = call.into_reducer_call()?;
+        let (contract, args) = call.into_parts();
+        self.call_reducer_unchecked(contract.name, Value::Array(args))
+            .await
+    }
+
+    async fn call_reducer_unchecked(&self, reducer: &str, args: Value) -> Result<()> {
         let url = format!(
             "{}/v1/database/{}/call/{}",
             self.base_url, self.module, reducer

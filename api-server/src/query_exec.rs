@@ -603,7 +603,10 @@ async fn maybe_log_hr_pii_read(
             "row_count": row_count,
         }
     ]);
-    if let Err(e) = client.call_reducer("log_hr_pii_read", args).await {
+    if let Err(e) = client
+        .call_reducer(stdb_client::reducer_call!("log_hr_pii_read", args))
+        .await
+    {
         tracing::warn!(resource, error = %e, "hr pii read audit failed");
     }
 }

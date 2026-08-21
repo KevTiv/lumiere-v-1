@@ -66,8 +66,8 @@ jobs:
       - name: Verify generated TypeScript matches Rust registry
         run: make check-codegen
 
-      - name: api-server unit tests
-        run: cargo test -p api-server reducer_allowlist
+      - name: api-server reducer contract tests
+        run: cargo test -p api-server http_app::tests
 
       - name: ai-gateway unit tests
         run: cargo test -p ai-gateway health_returns

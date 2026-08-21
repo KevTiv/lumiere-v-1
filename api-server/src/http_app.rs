@@ -26,11 +26,11 @@ use crate::error::ApiError;
 use crate::metrics;
 use crate::middleware::metrics::track_http_metrics;
 use crate::query_exec::{default_company_id, execute_resource_query_for_company};
-use crate::reducer_allowlist::{blocked_reducer_reason, ReducerAllowlistMode};
 use crate::routes;
 use crate::session::resolve_api_session;
 use crate::state::AppState;
 use crate::web_session::stdb_identity_hex_hint;
+use stdb_client::{Exposure, ReducerCall, ReducerContract};
 
 #[derive(Debug, Deserialize)]
 struct OrgQuery {
@@ -170,10 +170,14 @@ async fn post_call(
         .organization_id
         .ok_or_else(|| ApiError::Forbidden("No organization assigned".into()))?;
 
-    let allowlist_mode = ReducerAllowlistMode::from_env();
-    if let Some(reason) = blocked_reducer_reason(&reducer, allowlist_mode) {
+    let contract = stdb_client::reducer_contract(&reducer).ok_or_else(|| {
+        ApiError::Forbidden(format!(
+            "Reducer '{reducer}' is not exposed by the module contract"
+        ))
+    })?;
+    if contract.exposure != Exposure::Session {
         return Err(ApiError::Forbidden(format!(
-            "Reducer '{reducer}' is not allowed: {reason}"
+            "Reducer '{reducer}' is not session-exposed"
         )));
     }
 
@@ -191,21 +195,73 @@ async fn post_call(
         let mut next = vec![json!(org_id), json!(company_id)];
         next.append(&mut args);
         args = next;
-    } else if let Some(requested_org) = args.first().and_then(|v| v.as_u64()) {
-        if requested_org != org_id {
+    }
+
+    let company_id = validate_reducer_scope(contract, &args, org_id)?;
+    let call = ReducerCall::from_name(&reducer, Value::Array(args))
+        .map_err(|error| ApiError::Unprocessable(error.to_string()))?;
+    let client = state.client_with_token(&session.stdb_token);
+    if let Some(company_id) = company_id {
+        let rows = state
+            .stdb
+            .query_sql(&format!(
+                "SELECT id FROM company WHERE id = {company_id} AND organization_id = {org_id} LIMIT 1"
+            ))
+            .await
+            .map_err(|error| ApiError::Internal(error.to_string()))?;
+        if rows.is_empty() {
             return Err(ApiError::Forbidden(
-                "organization scope mismatch for reducer call".into(),
+                "company scope mismatch for reducer call".into(),
             ));
         }
     }
-
-    let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer(&reducer, Value::Array(args))
+        .call_reducer(call)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     Ok(Json(json!({ "ok": true })))
+}
+
+fn validate_reducer_scope(
+    contract: &'static ReducerContract,
+    args: &[Value],
+    session_organization_id: u64,
+) -> Result<Option<u64>, ApiError> {
+    if let Some(position) = contract.organization_position {
+        let requested_organization =
+            args.get(position).and_then(Value::as_u64).ok_or_else(|| {
+                ApiError::Unprocessable(format!(
+                    "Reducer '{}' requires an organization_id at argument {position}",
+                    contract.name
+                ))
+            })?;
+        if requested_organization != session_organization_id {
+            return Err(ApiError::Forbidden(
+                "organization scope mismatch for reducer call".into(),
+            ));
+        }
+    } else if contract.company_position.is_none() && contract.unscoped_reason.is_none() {
+        return Err(ApiError::Forbidden(format!(
+            "Reducer '{}' has no reviewed tenant scope",
+            contract.name
+        )));
+    }
+
+    let company_id = contract
+        .company_position
+        .and_then(|position| args.get(position))
+        .and_then(Value::as_u64);
+    if contract.organization_position.is_none()
+        && contract.company_position.is_some()
+        && company_id.is_none()
+    {
+        return Err(ApiError::Unprocessable(format!(
+            "Reducer '{}' requires a company_id scope",
+            contract.name
+        )));
+    }
+    Ok(company_id)
 }
 
 fn load_dotenv_files() {
@@ -334,4 +390,51 @@ pub async fn serve() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn identity_first_reducer_uses_manifest_organization_position() {
+        let contract = stdb_client::reducer_contract("assign_role").expect("assign_role");
+        assert!(
+            validate_reducer_scope(contract, &[json!({}), json!(9), json!(7), json!({})], 7)
+                .is_ok()
+        );
+        assert!(matches!(
+            validate_reducer_scope(contract, &[json!({}), json!(9), json!(8), json!({})], 7),
+            Err(ApiError::Forbidden(_))
+        ));
+    }
+
+    #[test]
+    fn company_first_reducer_is_not_compared_directly_to_organization() {
+        let contract = stdb_client::reducer_contract("delete_company").expect("delete_company");
+        assert_eq!(
+            validate_reducer_scope(contract, &[json!(42)], 7).unwrap(),
+            Some(42)
+        );
+    }
+
+    #[test]
+    fn zero_arg_and_unknown_reducers_are_not_session_exposed() {
+        let zero_arg = stdb_client::reducer_contract("apply_global_migrations")
+            .expect("apply_global_migrations");
+        assert!(zero_arg.params.is_empty());
+        assert_eq!(zero_arg.exposure, Exposure::Denied);
+        assert!(stdb_client::reducer_contract("not_a_reducer").is_none());
+    }
+
+    #[test]
+    fn reviewed_unscoped_reducer_is_explicit() {
+        let contract = stdb_client::reducer_contract("create_country").expect("create_country");
+        assert_eq!(contract.exposure, Exposure::Session);
+        assert!(contract.organization_position.is_none());
+        assert!(contract.company_position.is_none());
+        assert!(contract.unscoped_reason.is_some());
+        assert!(validate_reducer_scope(contract, &[json!({})], 7).is_ok());
+    }
 }

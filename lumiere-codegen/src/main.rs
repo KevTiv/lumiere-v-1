@@ -19,6 +19,7 @@ mod erp_org_sql;
 mod frontend_registry;
 mod paths;
 mod query_exec_audit;
+mod reducer_contract;
 mod support;
 
 use anyhow::Result;
@@ -35,6 +36,7 @@ fn main() -> Result<()> {
     erp_org_sql::run(&paths, &registry_text)?;
     query_exec_audit::run(&paths, &registry_text)?;
     cold_tier::run(&paths)?;
+    reducer_contract::run(&paths)?;
 
     Ok(())
 }

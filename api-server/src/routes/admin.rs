@@ -69,10 +69,10 @@ async fn suspend_organization(
         .ok_or_else(|| ApiError::NotFound("Billing account not found".into()))?;
 
     client
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "set_billing_status",
             json!([org_id, billing_id, "suspended"]),
-        )
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 

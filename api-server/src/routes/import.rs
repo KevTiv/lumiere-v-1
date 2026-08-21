@@ -28,7 +28,7 @@ const CRM_IMPORT_ENTITIES: &[&str] = &["contact", "lead", "opportunity"];
 /// Runtime opt-in for CRM CSV imports (env `LUMIERE_ENABLE_CRM_CSV_IMPORT`).
 ///
 /// Defaults to **disabled** (containment measure). Mirrors the env-parsing style of
-/// `ReducerAllowlistMode::from_env` in `crate::reducer_allowlist`.
+/// the reducer exposure manifest enforced by the generic call endpoint.
 fn crm_csv_import_enabled() -> bool {
     matches!(
         std::env::var("LUMIERE_ENABLE_CRM_CSV_IMPORT")
@@ -505,7 +505,7 @@ async fn import_entity_post(
     };
 
     client
-        .call_reducer(spec.reducer, args)
+        .call_reducer(stdb_client::ReducerCall::from_name(spec.reducer, args))
         .await
         .map_err(|e| reducer_error_message(&e.to_string()))?;
 

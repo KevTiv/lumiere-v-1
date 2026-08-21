@@ -14,7 +14,6 @@ pub mod owner_report_worker;
 pub mod project_integration_worker;
 pub mod query_exec;
 pub mod realtime;
-pub mod reducer_allowlist;
 pub mod reports;
 pub mod routes;
 pub mod session;

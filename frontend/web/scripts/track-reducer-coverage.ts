@@ -692,7 +692,7 @@ function categorizeByModule(reducerName: string): string {
     create_sale_order: 'sales',
     update_sale_order: 'sales',
     delete_sale_order: 'sales',
-    confirm_sale_order: 'sales',
+    confirm_sales_order: 'sales',
     cancel_sale_order: 'sales',
     lock_sale_order: 'sales',
     unlock_sale_order: 'sales',

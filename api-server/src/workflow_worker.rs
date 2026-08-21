@@ -215,13 +215,16 @@ async fn ensure_worker_registration(state: &AppState, organization_id: u64) -> a
         let worker: WorkerRow = serde_json::from_value(row)?;
         let _ = state
             .stdb
-            .call_reducer("worker_heartbeat", json!([organization_id, worker.id]))
+            .call_reducer(stdb_client::reducer_call!(
+                "worker_heartbeat",
+                json!([organization_id, worker.id])
+            ))
             .await;
         return Ok(worker.id);
     }
     state
         .stdb
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "register_queue_worker",
             json!([
                 organization_id,
@@ -232,7 +235,7 @@ async fn ensure_worker_registration(state: &AppState, organization_id: u64) -> a
                     "metadata": serde_json::json!({ "service": "workflow-worker" }).to_string(),
                 }
             ]),
-        )
+        ))
         .await?;
     let rows = state
         .stdb
@@ -277,7 +280,7 @@ async fn fire_due_timers(state: &AppState, organization_id: u64) -> anyhow::Resu
         let idem = timer_fire_idempotency_key(timer.id, timer.revision);
         if let Err(error) = state
             .stdb
-            .call_reducer(
+            .call_reducer(stdb_client::reducer_call!(
                 "fire_workflow_timer",
                 json!([
                     organization_id,
@@ -291,7 +294,7 @@ async fn fire_due_timers(state: &AppState, organization_id: u64) -> anyhow::Resu
                         "causationId": format!("workflow-timer:{}", timer.id),
                     }
                 ]),
-            )
+            ))
             .await
         {
             tracing::debug!(timer_id = timer.id, %error, "fire_workflow_timer skipped");
@@ -370,7 +373,7 @@ async fn dispatch_external_jobs(
                 .saturating_mul(1_000_000);
         if let Err(error) = state
             .stdb
-            .call_reducer(
+            .call_reducer(stdb_client::reducer_call!(
                 "claim_queue_job",
                 json!([
                     organization_id,
@@ -382,7 +385,7 @@ async fn dispatch_external_jobs(
                         "leaseExpiresAtMicros": lease_expires,
                     }
                 ]),
-            )
+            ))
             .await
         {
             tracing::debug!(job_id = job.id, %error, "claim_queue_job skipped");
@@ -421,7 +424,7 @@ async fn dispatch_external_jobs(
         let record_key = outbox_record_idempotency_key(&payload);
         if let Err(error) = state
             .stdb
-            .call_reducer(
+            .call_reducer(stdb_client::reducer_call!(
                 "record_workflow_outbox_result",
                 json!([
                     organization_id,
@@ -441,7 +444,7 @@ async fn dispatch_external_jobs(
                         "causationId": format!("queue-job:{}", job.id),
                     }
                 ]),
-            )
+            ))
             .await
         {
             tracing::error!(job_id = job.id, %error, "record_workflow_outbox_result failed");
@@ -449,7 +452,7 @@ async fn dispatch_external_jobs(
 
         let _ = state
             .stdb
-            .call_reducer(
+            .call_reducer(stdb_client::reducer_call!(
                 "complete_queue_job",
                 json!([
                     organization_id,
@@ -464,7 +467,7 @@ async fn dispatch_external_jobs(
                         "retryJitterMicros": 0,
                     }
                 ]),
-            )
+            ))
             .await;
     }
     Ok(())
@@ -481,7 +484,7 @@ async fn complete_failed(
 ) -> anyhow::Result<()> {
     state
         .stdb
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "complete_queue_job",
             json!([
                 organization_id,
@@ -496,7 +499,7 @@ async fn complete_failed(
                     "retryJitterMicros": 0,
                 }
             ]),
-        )
+        ))
         .await?;
     Ok(())
 }

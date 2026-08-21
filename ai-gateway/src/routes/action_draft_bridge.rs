@@ -146,7 +146,7 @@ async fn persist_draft(
         }
     ]);
 
-    stdb.call_reducer("create_ai_action_draft", args)
+    stdb.call_reducer(stdb_client::reducer_call!("create_ai_action_draft", args))
         .await
         .map_err(|e| format!("create_ai_action_draft failed: {e}"))?;
 

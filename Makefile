@@ -97,12 +97,12 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	help help-e2e \
 	setup check check-env check-env-prod build validate-subscriptions \
 	start stop publish publish-clear test call-tests logs seed-test-user \
-	generate-stdb-ts-sdk generate-stdb-rust-sdk \
+	generate-stdb-ts-sdk generate-stdb-rust-sdk schema-snapshot \
 	e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	e2e-crm-isolation \
 	init-stack docker-dev docker-dev-iot \
-	codegen check-codegen api-server-run \
+	codegen check-codegen check-reducer-contracts-drift lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
 	module-check module-build module-generate-ts module-generate-rust \
@@ -143,9 +143,11 @@ help-legacy:
 	@echo "  docker-dev              Start the OrbStack local development stack (.env.docker required)"
 	@echo "  docker-dev-iot          Start the OrbStack stack with the optional IoT gateway"
 	@echo "  contracts-staging-from-pinned  Populate .contracts-staging/ from the pinned lumiere-contracts tag (no spacetime CLI needed; use before codegen/check-codegen/cargo build if you haven't run generate-stdb-rust-sdk)"
-	@echo "  codegen                 Emit query-registry, sql-columns, erp-org-sql, invalidation"
+	@echo "  schema-snapshot        Fetch the published module schema into .contracts-staging/module-schema.json over CI-safe HTTP"
+	@echo "  codegen                 Emit query/SQL artifacts plus the reducer manifest and typed call contracts"
 	@echo "  check-codegen           Fail if generated artifacts drift from sources (CI). Requires .contracts-staging/ (see contracts-staging-from-pinned)"
-	@echo "  check-contracts-drift   Fail if the live STDB module has drifted from the pinned lumiere-contracts release (requires spacetime CLI)"
+	@echo "  check-reducer-contracts-drift  CI-safe live-schema drift check for reducer-manifest.json"
+	@echo "  check-contracts-drift   Full bindings/manifests drift check (requires spacetime CLI)"
 	@echo "  publish-contracts VERSION=x.y.z  Publish fresh bindings/manifests to lumiere-contracts as a new tagged release"
 	@echo ""
 	@echo "  --- Cloud ---"
@@ -828,6 +830,9 @@ generate-stdb-rust-sdk:
 	spacetime generate --include-private --lang rust --out-dir ".contracts-staging/bindings" --module-path $(MODULE)
 	bash scripts/fix-spacetimedb-rust-sdk-bindings.sh
 
+schema-snapshot:
+	STDB_MODULE="$(STDB_MODULE)" bash scripts/schema-snapshot.sh
+
 init-stack:
 	STDB_MODULE="$(STDB_MODULE)" bash scripts/init-stack.sh
 
@@ -837,18 +842,22 @@ docker-dev:
 docker-dev-iot:
 	docker compose --env-file .env.docker -f docker-compose.dev.yml --profile iot up --build
 
-codegen:
+codegen: schema-snapshot
 	cargo run -p lumiere-codegen
 
-check-codegen: codegen
+check-codegen: codegen lint-reducer-call-literals
 	@git add -N \
 		frontend/packages/stdb/src/query-resource-row-type.json \
+		frontend/packages/stdb/src/commands/generated-stdb-bff-reducers.ts \
+		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
 		crates/stdb-auth/assets/query_exec_non_registry.json \
 		api-server/src/generated/pg_ddl/ \
 		2>/dev/null || true
 	@git diff --exit-code -- \
 		frontend/packages/stdb/src/query-resource-row-type.json \
+		frontend/packages/stdb/src/commands/generated-stdb-bff-reducers.ts \
+		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
 		crates/stdb-auth/assets/query_exec_non_registry.json \
 		api-server/src/generated/pg_ddl/ || \
@@ -878,9 +887,20 @@ contracts-staging-from-pinned:
 	cp -R "$$CHECKOUT/packages/contracts/src/generated/." .contracts-staging/ts/generated/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" .contracts-staging/ts/; \
+	STDB_MODULE="$(STDB_MODULE)" bash scripts/schema-snapshot.sh; \
 	echo "contracts-staging-from-pinned: populated .contracts-staging/ from $$CHECKOUT"
 
-# Bindings + the six generated manifests now live in lumiere-contracts, not in
+# CI-safe reducer drift check. Unlike full bindings drift, schema retrieval is
+# plain HTTP and does not require the SpacetimeDB CLI.
+check-reducer-contracts-drift: schema-snapshot codegen
+	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
+	if [ ! -f "$$CHECKOUT/manifests/reducer-manifest.json" ]; then \
+		echo "check-reducer-contracts-drift: pinned contracts predate reducer-manifest.json; publish v0.3.0" >&2; \
+		exit 1; \
+	fi; \
+	diff "$$CHECKOUT/manifests/reducer-manifest.json" .contracts-staging/manifests/reducer-manifest.json
+
+# Bindings + the seven generated manifests now live in lumiere-contracts, not in
 # this repo. This target regenerates them into .contracts-staging/ from the
 # live SpacetimeDB module and diffs that staging output against the
 # currently pinned lumiere-contracts tag, so drift between the deployed STDB
@@ -888,7 +908,7 @@ contracts-staging-from-pinned:
 # surfacing at runtime. Requires the `spacetime` CLI (not available in CI —
 # see `contracts-staging-from-pinned` for the CI-safe path). See
 # docs/plans/contracts-extraction-execution-plan.md §5.2, §5.4.
-check-contracts-drift: generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
+check-contracts-drift: schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
 	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
 	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
 		echo "check-contracts-drift: could not resolve the pinned lumiere-contracts checkout (run cargo fetch first); skipping" >&2; \
@@ -904,13 +924,16 @@ check-contracts-drift: generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
 
 # Publish freshly generated bindings + manifests to lumiere-contracts as a new
 # tagged release, then print the Cargo.toml dependency line to bump.
-publish-contracts: generate-stdb-rust-sdk codegen
+publish-contracts: schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
 	@if [ -z "$(VERSION)" ]; then echo "usage: make publish-contracts VERSION=x.y.z" >&2; exit 1; fi
 	bash scripts/publish-contracts.sh "$(VERSION)"
 
 # Fail if coverage/create-params mappers use magic FK sentinels (`?? 0n` / `|| 0n`).
 lint-no-magic-fk-zero:
 	bash scripts/lint-no-magic-fk-zero.sh
+
+lint-reducer-call-literals:
+	bash scripts/lint-reducer-call-literals.sh
 
 # ACC-RI-018: retained accounting double assertions require an adjacent rationale.
 lint-accounting-as-unknown-as:

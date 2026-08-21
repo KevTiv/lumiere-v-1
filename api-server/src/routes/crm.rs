@@ -161,7 +161,10 @@ async fn leads_post(
     let params = lead_create_params(&body)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("create_lead", json!([org_id, params]))
+        .call_reducer(stdb_client::reducer_call!(
+            "create_lead",
+            json!([org_id, params])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok((
@@ -248,10 +251,10 @@ async fn lead_put(
 
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "update_lead",
             json!([org_id, lead_id, Value::Object(params)]),
-        )
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
@@ -275,7 +278,10 @@ async fn lead_delete(
         .map_err(|_| ApiError::BadRequest("Invalid lead ID".into()))?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("delete_lead", json!([org_id, lead_id]))
+        .call_reducer(stdb_client::reducer_call!(
+            "delete_lead",
+            json!([org_id, lead_id])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(
@@ -419,7 +425,10 @@ async fn contacts_post(
     let params = contact_create_params(&body)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("create_contact", json!([org_id, params]))
+        .call_reducer(stdb_client::reducer_call!(
+            "create_contact",
+            json!([org_id, params])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok((
@@ -557,7 +566,10 @@ async fn contact_identities_post(
     let params = contact_identity_create_params(&body)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("create_contact_identity", json!([org_id, params]))
+        .call_reducer(stdb_client::reducer_call!(
+            "create_contact_identity",
+            json!([org_id, params])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok((
@@ -580,7 +592,10 @@ async fn contact_identity_put(
     let params = contact_identity_update_params(&body)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("update_contact_identity", json!([org_id, id, params]))
+        .call_reducer(stdb_client::reducer_call!(
+            "update_contact_identity",
+            json!([org_id, id, params])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(
@@ -604,10 +619,10 @@ async fn contact_identity_verify(
         .ok_or_else(|| ApiError::BadRequest("missing state".into()))?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "verify_contact_identity",
             json!([org_id, id, to_unit_enum(state_value)?]),
-        )
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(
@@ -627,7 +642,10 @@ async fn contact_identity_archive(
     let org_id = require_org(&session)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("archive_contact_identity", json!([org_id, id]))
+        .call_reducer(stdb_client::reducer_call!(
+            "archive_contact_identity",
+            json!([org_id, id])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(
@@ -683,7 +701,10 @@ async fn contact_roles_post(
     let params = contact_role_assign_params(&body)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("assign_contact_role", json!([org_id, params]))
+        .call_reducer(stdb_client::reducer_call!(
+            "assign_contact_role",
+            json!([org_id, params])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok((
@@ -706,10 +727,10 @@ async fn contact_role_end(
     let reason = body.get("reason").cloned().unwrap_or(Value::Null);
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "end_contact_role",
             json!([org_id, id, { "reason": reason }]),
-        )
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(

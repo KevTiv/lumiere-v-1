@@ -40,6 +40,13 @@ pub struct Paths {
     pub codec_manifest_out: PathBuf,
     pub hydration_policies_json: PathBuf,
     pub hydration_manifest_out: PathBuf,
+
+    // ── reducer_contract ─────────────────────────────────────────────────
+    pub module_schema_json: PathBuf,
+    pub reducer_exposure_json: PathBuf,
+    pub reducer_manifest_out: PathBuf,
+    pub reducer_contract_rust_out: PathBuf,
+    pub stdb_bff_reducers_ts_out: PathBuf,
 }
 
 impl Paths {
@@ -51,13 +58,15 @@ impl Paths {
         let assets = repo_root.join("crates/stdb-auth/assets");
         let frontend = repo_root.join("frontend");
         // Gitignored staging checkout for artifacts destined for the
-        // `lumiere-contracts` repo (generated STDB Rust bindings + the six
+        // `lumiere-contracts` repo (generated STDB Rust bindings + the seven
         // generated manifests). Generation reads/writes staging;
         // `lumiere-v-1` itself never depends on these files directly at
         // runtime — that goes through the pinned `lumiere-contracts` crate
         // instead. See docs/plans/contracts-extraction-execution-plan.md.
-        let contracts_staging_dir =
-            PathBuf::from(env_or_default("CONTRACTS_STAGING_DIR", ".contracts-staging"));
+        let contracts_staging_dir = PathBuf::from(env_or_default(
+            "CONTRACTS_STAGING_DIR",
+            ".contracts-staging",
+        ));
         let staging_manifests = contracts_staging_dir.join("manifests");
         // Gitignored staging for the TypeScript half of the same contracts
         // release: the raw `spacetime generate --lang typescript` output
@@ -70,12 +79,18 @@ impl Paths {
             resource_registry_json: assets.join("resource_registry.json"),
             query_registry_ts_out: PathBuf::from(env_or_default(
                 "API_CODEGEN_REGISTRY_OUT",
-                staging_ts.join("generated/query-registry.ts").to_str().unwrap(),
+                staging_ts
+                    .join("generated/query-registry.ts")
+                    .to_str()
+                    .unwrap(),
             )),
             reducer_stdb_invalidation_json: manifest_dir.join("reducer-stdb-invalidation.json"),
             stdb_invalidation_ts_out: PathBuf::from(env_or_default(
                 "API_CODEGEN_STDB_INVALIDATION_OUT",
-                staging_ts.join("stdb-reducer-invalidation.ts").to_str().unwrap(),
+                staging_ts
+                    .join("stdb-reducer-invalidation.ts")
+                    .to_str()
+                    .unwrap(),
             )),
             types_ts: staging_ts.join("generated/types.ts"),
             stdb_generated_dir: staging_ts.join("generated"),
@@ -99,6 +114,14 @@ impl Paths {
             codec_manifest_out: staging_manifests.join("codec-manifest.json"),
             hydration_policies_json: manifest_dir.join("hydration-policies.json"),
             hydration_manifest_out: staging_manifests.join("hydration-manifest.json"),
+
+            module_schema_json: contracts_staging_dir.join("module-schema.json"),
+            reducer_exposure_json: manifest_dir.join("reducer-exposure.json"),
+            reducer_manifest_out: staging_manifests.join("reducer-manifest.json"),
+            reducer_contract_rust_out: repo_root
+                .join("crates/stdb-client/src/generated_reducer_contract.rs"),
+            stdb_bff_reducers_ts_out: frontend
+                .join("packages/stdb/src/commands/generated-stdb-bff-reducers.ts"),
         }
     }
 }

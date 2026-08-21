@@ -1,24 +1,20 @@
 import { stringifyReducerCallBody } from "@lumiere/api-client";
 
 import type { ReducerCommandContractMeta } from "./types";
+import {
+  STDB_BFF_REDUCERS,
+  type StdbBffReducerKey,
+} from "./generated-stdb-bff-reducers";
 
-/**
- * Generic SpacetimeDB reducer calls via Next.js BFF `POST /api/call/:reducer`.
- * Used by `@lumiere/query-hooks/hooks/stdb` (`useStdbReducer`, `useStdbCallMutation`).
- *
- * Typed domains should prefer their own `*BffPost` wrappers; this module accepts any reducer name at runtime.
- */
-export const STDB_BFF_REDUCERS = [] as const;
-
-export type StdbBffReducerKey = string;
+export { STDB_BFF_REDUCERS, type StdbBffReducerKey };
 
 /** Same-origin path used by `apiFetch` in the web app. */
-export function stdbBffCallUrl(reducer: string): string {
+export function stdbBffCallUrl(reducer: StdbBffReducerKey): string {
   return `/api/call/${encodeURIComponent(reducer)}`;
 }
 
 export function stdbBffPost(
-  reducer: string,
+  reducer: StdbBffReducerKey,
   args: unknown[],
 ): { urlPath: string; init: RequestInit } {
   return {
@@ -32,7 +28,7 @@ export function stdbBffPost(
 }
 
 export function stdbCommandContract(
-  reducer: string,
+  reducer: StdbBffReducerKey,
 ): ReducerCommandContractMeta {
   return {
     reducerName: reducer,
