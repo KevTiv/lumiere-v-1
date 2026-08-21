@@ -142,8 +142,11 @@ help-legacy:
 	@echo "  init-stack              Create .env.docker, publish the local module, and configure service tokens"
 	@echo "  docker-dev              Start the OrbStack local development stack (.env.docker required)"
 	@echo "  docker-dev-iot          Start the OrbStack stack with the optional IoT gateway"
+	@echo "  contracts-staging-from-pinned  Populate .contracts-staging/ from the pinned lumiere-contracts tag (no spacetime CLI needed; use before codegen/check-codegen/cargo build if you haven't run generate-stdb-rust-sdk)"
 	@echo "  codegen                 Emit query-registry, sql-columns, erp-org-sql, invalidation"
-	@echo "  check-codegen           Fail if generated artifacts drift from sources (CI)"
+	@echo "  check-codegen           Fail if generated artifacts drift from sources (CI). Requires .contracts-staging/ (see contracts-staging-from-pinned)"
+	@echo "  check-contracts-drift   Fail if the live STDB module has drifted from the pinned lumiere-contracts release (requires spacetime CLI)"
+	@echo "  publish-contracts VERSION=x.y.z  Publish fresh bindings/manifests to lumiere-contracts as a new tagged release"
 	@echo ""
 	@echo "  --- Cloud ---"
 	@echo "  publish-cloud        Publish to maincloud"
@@ -857,30 +860,49 @@ check-codegen: codegen
 		api-server/src/generated/pg_ddl/ || \
 		(echo "Generated artifacts are out of date. Run: make generate-stdb-ts-sdk && make codegen" && exit 1)
 
+# Populates .contracts-staging/{bindings,manifests} from the currently
+# pinned lumiere-contracts git dependency instead of a live `spacetime
+# generate` run. Use this when the schema hasn't changed and you just need
+# .contracts-staging present to build/check/test (e.g. in CI, which has no
+# `spacetime` CLI). Requires `cargo fetch` (or any prior cargo invocation)
+# to have already resolved the dependency.
+contracts-staging-from-pinned:
+	@cargo fetch --quiet
+	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
+	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
+		echo "contracts-staging-from-pinned: could not resolve the pinned lumiere-contracts checkout" >&2; \
+		exit 1; \
+	fi; \
+	rm -rf .contracts-staging; \
+	mkdir -p .contracts-staging/bindings .contracts-staging/manifests; \
+	cp -R "$$CHECKOUT/crates/lumiere-contracts/src/bindings/." .contracts-staging/bindings/; \
+	cp "$$CHECKOUT/manifests/"*.json .contracts-staging/manifests/; \
+	echo "contracts-staging-from-pinned: populated .contracts-staging/ from $$CHECKOUT"
+
 # Bindings + the six generated manifests now live in lumiere-contracts, not in
-# this repo. This target regenerates them into .contracts-staging/ and diffs
-# that staging output against the currently pinned lumiere-contracts tag, so
-# drift between the deployed STDB module and the pinned contracts release is
-# caught in CI instead of only surfacing at runtime. See
+# this repo. This target regenerates them into .contracts-staging/ from the
+# live SpacetimeDB module and diffs that staging output against the
+# currently pinned lumiere-contracts tag, so drift between the deployed STDB
+# module and the pinned contracts release is caught locally instead of only
+# surfacing at runtime. Requires the `spacetime` CLI (not available in CI —
+# see `contracts-staging-from-pinned` for the CI-safe path). See
 # docs/plans/contracts-extraction-execution-plan.md §5.2, §5.4.
 check-contracts-drift: generate-stdb-rust-sdk codegen
-	@PINNED_DIR="$$(cargo metadata --format-version1 2>/dev/null | \
-		python3 -c 'import json,sys; d=json.load(sys.stdin); \
-			pkg=[p for p in d["packages"] if p["name"]=="lumiere-contracts"][0]; \
-			print(pkg["manifest_path"].rsplit("/",2)[0])' 2>/dev/null)"; \
-	if [ -z "$$PINNED_DIR" ] || [ ! -d "$$PINNED_DIR/bindings" ]; then \
+	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
+	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
 		echo "check-contracts-drift: could not resolve the pinned lumiere-contracts checkout (run cargo fetch first); skipping" >&2; \
 		exit 0; \
 	fi; \
-	diff -rq "$$PINNED_DIR/bindings" .contracts-staging/bindings && \
-	diff -rq "$$PINNED_DIR/manifests" .contracts-staging/manifests && \
+	diff -rq "$$CHECKOUT/crates/lumiere-contracts/src/bindings" .contracts-staging/bindings && \
+	diff -rq "$$CHECKOUT/manifests" .contracts-staging/manifests && \
 	echo "check-contracts-drift: staging matches pinned lumiere-contracts release" || \
 	(echo "Local generation drifted from the pinned lumiere-contracts tag. Run: make publish-contracts" && exit 1)
 
 # Publish freshly generated bindings + manifests to lumiere-contracts as a new
 # tagged release, then print the Cargo.toml dependency line to bump.
 publish-contracts: generate-stdb-rust-sdk codegen
-	bash scripts/publish-contracts.sh
+	@if [ -z "$(VERSION)" ]; then echo "usage: make publish-contracts VERSION=x.y.z" >&2; exit 1; fi
+	bash scripts/publish-contracts.sh "$(VERSION)"
 
 # Fail if coverage/create-params mappers use magic FK sentinels (`?? 0n` / `|| 0n`).
 lint-no-magic-fk-zero:

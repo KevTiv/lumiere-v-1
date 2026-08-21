@@ -19,6 +19,26 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      # Generated STDB bindings + manifests live in the private
+      # KevTiv/lumiere-contracts repo, consumed as a tag-pinned git
+      # dependency. This runner needs read-only SSH access to fetch it. The
+      # deploy key on lumiere-contracts is read-only, so a compromised
+      # secret here cannot write to that repo. github.com's SSH host key is
+      # pinned to the value GitHub publishes rather than trusted on first
+      # use. See docs/plans/contracts-extraction-execution-plan.md.
+      - name: Configure SSH for private lumiere-contracts dependency
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_ed25519
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
@@ -28,6 +48,14 @@ jobs:
       - name: SpacetimeDB module (cargo check --tests)
         working-directory: spacetimedb
         run: cargo check --tests
+
+      # No `spacetime` CLI in this runner, so bindings can't be regenerated
+      # from the live module here — populate .contracts-staging/ from the
+      # currently pinned lumiere-contracts release instead. Schema-affecting
+      # changes are verified locally via `make check-contracts-drift`
+      # (requires the spacetime CLI) before publishing a new contracts tag.
+      - name: Populate .contracts-staging from pinned lumiere-contracts
+        run: make contracts-staging-from-pinned
 
       - name: Workspace members (api-server, ai-gateway, lumiere-codegen, stdb-auth)
         run: cargo check -p api-server -p ai-gateway -p lumiere-codegen -p stdb-auth

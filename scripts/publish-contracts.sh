@@ -30,6 +30,7 @@ cd "$WORK/repo"
 rm -rf crates/lumiere-contracts/src/bindings
 mkdir -p crates/lumiere-contracts/src/bindings
 cp -R "$STAGING/bindings/." crates/lumiere-contracts/src/bindings/
+rm -rf manifests
 mkdir -p manifests
 cp "$STAGING/manifests/"*.json manifests/
 echo "$VERSION" > CONTRACT_VERSION
