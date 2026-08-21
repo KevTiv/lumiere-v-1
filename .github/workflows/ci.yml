@@ -72,6 +72,56 @@ jobs:
       - name: ai-gateway unit tests
         run: cargo test -p ai-gateway health_returns
 
+  contracts-drift:
+    name: Contracts drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      # Same read-only deploy key as the Rust job — see the comment there.
+      - name: Configure SSH for private lumiere-contracts dependency
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_ed25519
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            spacetimedb
+            .
+
+      # Pinned to the same SpacetimeDB CLI version the generated bindings
+      # were produced with (spacetimedb-sdk = "=2.0.1" in api-server and
+      # lumiere-contracts) so this job's `spacetime generate` output is
+      # directly comparable to what's published.
+      - name: Install spacetime CLI
+        run: |
+          curl -sSf https://install.spacetimedb.com | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/spacetime" version install 2.0.1
+          "$HOME/.local/bin/spacetime" version use 2.0.1
+
+      # Fails when the live SpacetimeDB module schema has changed but nobody
+      # ran `make publish-contracts` to release the corresponding
+      # lumiere-contracts tag — the drift check make check-codegen alone
+      # can't catch, since check-codegen only compares against whatever
+      # bindings are already in .contracts-staging/. See
+      # docs/plans/contracts-extraction-execution-plan.md.
+      - name: Verify STDB module matches pinned lumiere-contracts release
+        run: make check-contracts-drift
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
