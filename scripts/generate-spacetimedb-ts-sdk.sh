@@ -37,3 +37,7 @@ if ! grep -Fqx "$REDUCERS_ANNOTATION" "$INDEX"; then
   fi
   perl -0pi -e 's{\Qexport const reducers = __convertToAccessorMap(reducersSchema.reducersType.reducers);\E}{// \@ts-ignore -- generated module size exceeds TypeScript\x27s instantiation depth in consumers\nexport const reducers = __convertToAccessorMap(reducersSchema.reducersType.reducers);}' "$INDEX"
 fi
+
+# Keep the committed contract artifact byte-stable across CLI versions that
+# disagree only about extra blank lines at end of file.
+perl -0pi -e 's/\n+\z/\n/' "$INDEX"
