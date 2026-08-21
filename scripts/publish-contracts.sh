@@ -96,6 +96,44 @@ node -e '
   cd packages/contracts
   npm install --no-save --silent
   ./node_modules/.bin/tsc --noEmit -p tsconfig.json
+
+  # Type-checking above reads the raw .ts source directly (package.json's
+  # "types" export condition) — no build needed for that. But a real
+  # installed dependency (unlike a pnpm workspace symlink, which resolves
+  # outside node_modules) sits physically inside node_modules, and several
+  # real consumers refuse to execute raw .ts there: Node's own native
+  # type-stripping explicitly excludes node_modules, and bundlers that
+  # don't have this package in their transpile allowlist expect valid JS.
+  # esbuild bundles each entry point into self-contained ESM, inlining the
+  # ~1700 extensionless-relative-import generated files so Node ESM's
+  # stricter resolution rules never see them. `spacetimedb` stays external
+  # since it's a real runtime dependency, not generated content.
+  rm -rf dist
+  node -e '
+    const esbuild = require("esbuild");
+    const entries = [
+      "generated/index.ts",
+      "generated/types.ts",
+      "generated/types/reducers.ts",
+      "generated/types/procedures.ts",
+      "generated/query-registry.ts",
+      "generated/role_table.ts",
+      "generated/user_organization_table.ts",
+      "generated/user_profile_table.ts",
+      "generated/user_role_assignment_table.ts",
+      "stdb-reducer-invalidation.ts",
+    ];
+    esbuild.buildSync({
+      entryPoints: entries.map((e) => `src/${e}`),
+      outbase: "src",
+      outdir: "dist",
+      bundle: true,
+      format: "esm",
+      platform: "neutral",
+      external: ["spacetimedb"],
+      logLevel: "warning",
+    });
+  '
 )
 
 git add -A

@@ -867,10 +867,17 @@ contracts-staging-from-pinned:
 		echo "contracts-staging-from-pinned: could not resolve the pinned lumiere-contracts checkout" >&2; \
 		exit 1; \
 	fi; \
+	if [ ! -d "$$CHECKOUT/packages/contracts/src/generated" ]; then \
+		echo "contracts-staging-from-pinned: $$CHECKOUT/packages/contracts/src/generated missing — pinned tag predates the TS package" >&2; \
+		exit 1; \
+	fi; \
 	rm -rf .contracts-staging; \
-	mkdir -p .contracts-staging/bindings .contracts-staging/manifests; \
+	mkdir -p .contracts-staging/bindings .contracts-staging/manifests .contracts-staging/ts/generated; \
 	cp -R "$$CHECKOUT/crates/lumiere-contracts/src/bindings/." .contracts-staging/bindings/; \
 	cp "$$CHECKOUT/manifests/"*.json .contracts-staging/manifests/; \
+	cp -R "$$CHECKOUT/packages/contracts/src/generated/." .contracts-staging/ts/generated/; \
+	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/; \
+	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" .contracts-staging/ts/; \
 	echo "contracts-staging-from-pinned: populated .contracts-staging/ from $$CHECKOUT"
 
 # Bindings + the six generated manifests now live in lumiere-contracts, not in
@@ -881,7 +888,7 @@ contracts-staging-from-pinned:
 # surfacing at runtime. Requires the `spacetime` CLI (not available in CI —
 # see `contracts-staging-from-pinned` for the CI-safe path). See
 # docs/plans/contracts-extraction-execution-plan.md §5.2, §5.4.
-check-contracts-drift: generate-stdb-rust-sdk codegen
+check-contracts-drift: generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
 	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
 	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
 		echo "check-contracts-drift: could not resolve the pinned lumiere-contracts checkout (run cargo fetch first); skipping" >&2; \
@@ -889,8 +896,11 @@ check-contracts-drift: generate-stdb-rust-sdk codegen
 	fi; \
 	diff -rq "$$CHECKOUT/crates/lumiere-contracts/src/bindings" .contracts-staging/bindings && \
 	diff -rq "$$CHECKOUT/manifests" .contracts-staging/manifests && \
+	diff -rq "$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
+	diff "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/stdb-generated-sql-columns.json && \
+	diff "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" .contracts-staging/ts/stdb-reducer-invalidation.ts && \
 	echo "check-contracts-drift: staging matches pinned lumiere-contracts release" || \
-	(echo "Local generation drifted from the pinned lumiere-contracts tag. Run: make publish-contracts" && exit 1)
+	(echo "Local generation drifted from the pinned lumiere-contracts tag. Run: make publish-contracts VERSION=x.y.z" && exit 1)
 
 # Publish freshly generated bindings + manifests to lumiere-contracts as a new
 # tagged release, then print the Cargo.toml dependency line to bump.
