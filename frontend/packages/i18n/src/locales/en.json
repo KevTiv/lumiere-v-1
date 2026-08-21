@@ -2991,6 +2991,37 @@
           "descriptionPlaceholder": "Internal notes about this contact…"
         }
       },
+      "newContactCategory": {
+        "title": "New contact category",
+        "description": "Create a category for organizing contacts.",
+        "sections": {
+          "category": "Category"
+        },
+        "fields": {
+          "name": "Name",
+          "color": "Color",
+          "colorPlaceholder": "e.g. blue",
+          "parentId": "Parent category",
+          "parentIdNone": "No parent",
+          "isActive": "Active"
+        }
+      },
+      "editContactCategory": {
+        "title": "Edit contact category",
+        "description": "Update the selected contact category.",
+        "submit": "Save changes",
+        "sections": {
+          "category": "Category"
+        },
+        "fields": {
+          "name": "Name",
+          "color": "Color",
+          "colorPlaceholder": "e.g. blue",
+          "parentId": "Parent category",
+          "parentIdNone": "No parent",
+          "isActive": "Active"
+        }
+      },
       "contactIdentity": {
         "createTitle": "Add phone identity",
         "editTitle": "Edit phone identity",
@@ -5555,6 +5586,9 @@
         "Closed": "Closed"
       }
     },
+    "blanketOrders": {
+      "tab": "Blanket orders"
+    },
     "vendors": {
       "title": "Vendors",
       "description": "Supplier and vendor directory",
@@ -5786,7 +5820,8 @@
         "fields": {
           "lineId": "Order line",
           "linePlaceholder": "Select a line with open receipt…",
-          "qty": "Quantity to receive"
+          "qty": "Quantity to receive",
+          "lotId": "Lot or serial number"
         }
       },
       "invoicePurchaseOrderLine": {
@@ -6676,6 +6711,17 @@
           "taxIdsHint": "Comma-separated tax record IDs (optional)"
         }
       },
+      "editSaleOrderLine": {
+        "title": "Edit sale order line",
+        "description": "Update the selected sale order line.",
+        "sections": {
+          "line": "Order line"
+        },
+        "fields": {
+          "lineId": "Order line",
+          "linePlaceholder": "Select an order line…"
+        }
+      },
       "partialDelivery": {
         "title": "Partial delivery",
         "description": "Set done quantity per move line for {{picking}}, then validate the picking.",
@@ -6723,6 +6769,7 @@
       "confirmSelected": "Confirm",
       "sendQuotation": "Send quotation",
       "editOrder": "Edit order",
+      "editOrderLine": "Edit order line",
       "cancelOrders": "Cancel orders",
       "recalculateTotals": "Recalculate totals",
       "accrueCommission": "Accrue commission",
@@ -6760,6 +6807,9 @@
       "readyWorkOrders": "Ready Work Orders",
       "workCenterFallback": "Work Center {{number}}",
       "productFallback": "Product {{id}}"
+    },
+    "errors": {
+      "noActiveCompany": "Select an active company before continuing."
     },
     "manufacturingOrders": {
       "title": "Manufacturing Orders",

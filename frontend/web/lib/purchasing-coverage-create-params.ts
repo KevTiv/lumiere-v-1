@@ -124,6 +124,33 @@ export function toCreateConsignmentAgreementParams(
   }
 }
 
+export function toCreatePurchaseBlanketOrderLineParams(
+  formData: Record<string, unknown>,
+): CreatePurchaseBlanketOrderLineParams | null {
+  const productId = requiredFk(field(formData, "productId", "product_id"))
+  const productUom = requiredFk(field(formData, "productUom", "product_uom"))
+  const committedQuantity = Number(field(formData, "committedQuantity", "committed_quantity"))
+  const priceUnit = Number(field(formData, "priceUnit", "price_unit"))
+  if (
+    productId === undefined ||
+    productUom === undefined ||
+    !Number.isFinite(committedQuantity) ||
+    !Number.isFinite(priceUnit) ||
+    committedQuantity <= 0 ||
+    priceUnit < 0
+  ) {
+    return null
+  }
+
+  return {
+    productId,
+    productUom,
+    committedQuantity,
+    priceUnit,
+    metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
+  }
+}
+
 export function toCreatePurchaseBlanketOrderParams(
   formData: Record<string, unknown>,
 ): CreatePurchaseBlanketOrderParams | null {
@@ -136,30 +163,11 @@ export function toCreatePurchaseBlanketOrderParams(
   if (!Array.isArray(rawLines) || rawLines.length === 0) return null
   const lines: CreatePurchaseBlanketOrderLineParams[] = []
   for (const rawLine of rawLines) {
-    const line = (rawLine ?? {}) as Record<string, unknown>
-    const productId = requiredFk(field(line, "productId", "product_id"))
-    const productUom = requiredFk(field(line, "productUom", "product_uom"))
-    const committedQuantityRaw = field(line, "committedQuantity", "committed_quantity")
-    const priceUnitRaw = field(line, "priceUnit", "price_unit")
-    const committedQuantity = Number(committedQuantityRaw)
-    const priceUnit = Number(priceUnitRaw)
-    if (
-      productId === undefined ||
-      productUom === undefined ||
-      !Number.isFinite(committedQuantity) ||
-      !Number.isFinite(priceUnit) ||
-      committedQuantity <= 0 ||
-      priceUnit < 0
-    ) {
-      return null
-    }
-    lines.push({
-      productId,
-      productUom,
-      committedQuantity,
-      priceUnit,
-      metadata: optionalTrimmedString(field(line, "metadata", "metadata")),
-    })
+    const line = toCreatePurchaseBlanketOrderLineParams(
+      (rawLine ?? {}) as Record<string, unknown>,
+    )
+    if (line == null) return null
+    lines.push(line)
   }
 
   return {

@@ -8,6 +8,7 @@ import type {
   CreateProjectRateCardParams,
   CreateProjectRevenueLineParams,
   CreateProjectRevenueScheduleParams,
+  CreateProjectTaskStageParams,
   CreatePublicHolidayParams,
   CreateResourceAllocationParams,
   CreateWorkingCalendarParams,
@@ -31,6 +32,21 @@ import {
   objectArrayFromForm,
   stbTimestampFromDate,
 } from "@lumiere/erp-shared/create-params-helpers"
+
+export function toCreateProjectTaskStageParams(
+  formData: Record<string, unknown>,
+): CreateProjectTaskStageParams | null {
+  const projectId = optionalBigIntU64(field(formData, "projectId", "project_id"))
+  const name = optionalTrimmedString(field(formData, "name", "name"))
+  if (projectId === undefined || !name) return null
+
+  return {
+    projectId,
+    name,
+    sequence: Math.trunc(num(field(formData, "sequence", "sequence"), 0)),
+    isClosed: Boolean(field(formData, "isClosed", "is_closed")),
+  }
+}
 
 export function toCreateProjectRateCardLineParams(
   formData: Record<string, unknown>,
@@ -237,4 +253,3 @@ export function toCreateWorkingCalendarParams(
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
   }
 }
-
