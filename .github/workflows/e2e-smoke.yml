@@ -129,6 +129,14 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
+      # api-server's build script consumes the generated Rust bindings from
+      # .contracts-staging. Resolve the pinned contracts checkout and stage it
+      # before the E2E target builds api-server.
+      - name: Populate .contracts-staging from pinned lumiere-contracts
+        run: |
+          cargo fetch --locked
+          make contracts-staging-from-pinned
+
       - name: Install Playwright Chromium
         working-directory: frontend/web
         run: pnpm exec playwright install --with-deps chromium
