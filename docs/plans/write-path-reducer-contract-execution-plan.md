@@ -155,6 +155,8 @@ Sequenced smallest-blast-radius first. Each step is a PR that ships with a calle
 
 - [x] bump the module `spacetimedb` dependency to 2.8.2 and regenerate the staged Rust and TypeScript contracts with the 2.8.2 CLI;
 - [x] align the contracts-drift CI CLI with the 2.8.2 module crate;
+- [x] recover narrowly from the 2.8.2 Rust generator's keyword-field
+  formatter failure, then parse-check all repaired bindings with `rustfmt`;
 - [ ] publish the module, publish `lumiere-contracts` v0.3.0, and atomically move the Rust/TypeScript client pins;
 - [ ] absorb the TS `Option<T>` breaking change;
 - [ ] verify the 2.8.2 accessor-rename migration fix does not alter existing accessors;

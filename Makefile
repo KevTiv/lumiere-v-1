@@ -828,8 +828,7 @@ e2e-smoke:
 
 # ── Bindings, code generation, and service entry points ───────────────────────
 generate-stdb-rust-sdk:
-	spacetime generate --include-private --lang rust --out-dir ".contracts-staging/bindings" --module-path $(MODULE)
-	bash scripts/fix-spacetimedb-rust-sdk-bindings.sh
+	bash scripts/generate-spacetimedb-rust-sdk.sh ".contracts-staging/bindings" "$(MODULE)"
 
 schema-snapshot:
 	STDB_MODULE="$(STDB_MODULE)" bash scripts/schema-snapshot.sh
