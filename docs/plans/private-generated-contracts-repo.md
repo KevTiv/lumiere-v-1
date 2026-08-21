@@ -70,6 +70,8 @@ Before moving any file, classify it into exactly one category.
 | Target-specific emitters | Yes | May move once they consume only pinned canonical IR |
 | Package/export-map assembly | Yes | Distribution responsibility, not source interpretation |
 | Authorization / policy / approval code | **No** | Runtime/business responsibility |
+| Declarative capability/tool descriptors | Yes | Inert schemas and metadata only; no execution or policy decisions |
+| Generated enforcement adapters | **No** | Authorization, approval, tenant scope, result policy, and tool execution remain in the trusted runtime |
 | Sync engine logic | **No** | Runtime orchestration, not a generated contract |
 | Handwritten adapters around generated SDKs | **No** | Runtime integration responsibility |
 | Generated SDK runtime code with transport behavior | Investigate | Keep local unless it can be proven to be contract-only |

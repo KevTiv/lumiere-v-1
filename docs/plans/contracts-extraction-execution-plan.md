@@ -175,12 +175,18 @@ Release rules:
   requiring downstream source inspection;
 - [x] add deterministic ordering, operation cross-reference validation, and a
   standalone `make check-contract-ir` verifier;
-- [ ] publish the IR as an immutable release artifact and record its URL/digest
-  in `lumiere-contracts/ir/PIN.json`;
-- [ ] port TypeScript/Rust/manifest emitters to `lumiere-contracts`, accepting
-  only the pinned IR path as input;
-- [ ] make the contracts release workflow run with network access to
-  `lumiere-v-1` disabled;
+- [x] commit a clean canonical artifact and its digest/source pin in
+  `lumiere-contracts/ir/PIN.json` on `feat/canonical-ir-consumer`;
+- [ ] publish that artifact through an immutable contracts release URL after
+  the feature branch and atomic SDK migration are approved;
+- [x] port the query-registry and reducer-invalidation emitters plus the
+  application-operation and resource manifests to a contracts-owned
+  `generate-from-ir` entry point;
+- [ ] port the SpacetimeDB SDK bindings and remaining manifests, which stay
+  version-pinned CLI outputs until schema-IR parity is proven;
+- [x] add a contracts CI job that runs IR generation in a network-disabled,
+  read-only container without a `lumiere-v-1` checkout;
+- [ ] observe the new contracts CI and merge the contracts feature branch;
 - [ ] retire direct copying of `.contracts-staging/{bindings,manifests,ts}`
   after consumers move to the IR-generated packages.
 
@@ -196,8 +202,10 @@ Release rules:
 
 - [x] transitional `make publish-contracts` — validate canonical IR, copy IR
   plus current generated targets, push, and tag;
-- [ ] replace the transitional direct-copy portions with a contracts-owned
-  `generate-from-ir` entry point;
+- [x] add a contracts-owned `generate-from-ir` entry point for the first four
+  IR-derived targets;
+- [ ] replace the remaining transitional direct-copy portions after the SDK
+  binding and manifest emitters reach IR parity;
 - [ ] CI in `lumiere-contracts` validates that every manifest parses and cross-references resolve;
 - [ ] CI in `lumiere-v-1` fails when the pinned tag's manifests differ from what local generation produces.
 
@@ -218,7 +226,13 @@ Extraction is the right moment to fix these, because after extraction the manife
 
 [agent-ir-codegen-extension-plan.md](./agent-ir-codegen-extension-plan.md) requires generating result-policy **enforcement adapters** and a tool registry into the contracts package — i.e. runtime behavior. [private-generated-contracts-repo.md §2](./private-generated-contracts-repo.md) marks "generated SDK runtime code with transport behavior" as *Investigate* and forbids moving authorization/policy code.
 
-The boundary between "generated contract" and "generated enforcement" is undefined in both documents. This first scope avoids the question entirely — bindings and manifests are inert data. It must be answered before the capability IR emits anything into `lumiere-contracts`.
+Decision: `lumiere-contracts` may emit declarative capability descriptors,
+operation schemas, tool-registry data, and pure serialization/validation code.
+It must not emit or own authorization decisions, approval routing, tenant
+scope enforcement, result-policy enforcement, tool execution, or transport
+orchestration. Those runtime adapters remain in `ai-gateway` and consume the
+versioned descriptors. This keeps enforcement reviewable beside the trusted
+runtime while allowing inert capability contracts to share the IR release.
 
 ---
 
