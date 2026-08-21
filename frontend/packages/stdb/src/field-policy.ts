@@ -5,7 +5,7 @@
  * Run `make codegen` to refresh `./generated/query-registry.ts`.
  */
 
-import stdbGeneratedSqlColumns from './stdb-generated-sql-columns.json'
+import stdbGeneratedSqlColumns from '@lumiere/contracts/stdb-generated-sql-columns.json'
 import {
   QUERY_RESOURCE_KEYS,
   RESOURCE_REGISTRY,

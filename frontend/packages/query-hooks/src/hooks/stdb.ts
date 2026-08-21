@@ -18,7 +18,7 @@ import { stdbBffPost } from "@lumiere/stdb/commands"
 import { isSubscriptionReady, useSubscriptionCache } from "@lumiere/stdb/live"
 
 import { apiFetch, coalesceQueryInitialData } from "../http"
-import { stdbInvalidationFor } from "../generated/stdb-reducer-invalidation"
+import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
 
 export function stdbQueryKey(
   resource: string,

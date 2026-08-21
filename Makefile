@@ -248,7 +248,7 @@ publish:
 
 
 generate-stdb-ts-sdk:
-	spacetime generate --include-private --lang typescript --out-dir "frontend/packages/stdb/src/generated" --module-path $(MODULE)
+	spacetime generate --include-private --lang typescript --out-dir ".contracts-staging/ts/generated" --module-path $(MODULE)
 
 publish-clear:
 	LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish $(DB) --module-path $(MODULE) --server local --clear-database -y
@@ -842,18 +842,12 @@ codegen:
 
 check-codegen: codegen
 	@git add -N \
-		frontend/packages/stdb/src/generated/query-registry.ts \
-		frontend/packages/query-hooks/src/generated/stdb-reducer-invalidation.ts \
-		frontend/packages/stdb/src/stdb-generated-sql-columns.json \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		crates/stdb-auth/assets/resource_registry.json \
 		crates/stdb-auth/assets/query_exec_non_registry.json \
 		api-server/src/generated/pg_ddl/ \
 		2>/dev/null || true
 	@git diff --exit-code -- \
-		frontend/packages/stdb/src/generated/query-registry.ts \
-		frontend/packages/query-hooks/src/generated/stdb-reducer-invalidation.ts \
-		frontend/packages/stdb/src/stdb-generated-sql-columns.json \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		crates/stdb-auth/assets/resource_registry.json \
 		crates/stdb-auth/assets/query_exec_non_registry.json \

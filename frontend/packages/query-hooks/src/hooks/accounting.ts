@@ -23,7 +23,7 @@ import type {
 } from "@lumiere/stdb/types"
 import { accountingBffPost, type AccountingBffReducerKey } from "@lumiere/stdb/commands"
 import { invalidateStdbQueryResources, useStdbQuery } from "./stdb"
-import { stdbInvalidationFor } from "../generated/stdb-reducer-invalidation"
+import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
 
 function toScalarU64(v: bigint | number | string): bigint {
   return typeof v === "bigint" ? v : BigInt(String(v))

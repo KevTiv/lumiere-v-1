@@ -59,22 +59,27 @@ impl Paths {
         let contracts_staging_dir =
             PathBuf::from(env_or_default("CONTRACTS_STAGING_DIR", ".contracts-staging"));
         let staging_manifests = contracts_staging_dir.join("manifests");
+        // Gitignored staging for the TypeScript half of the same contracts
+        // release: the raw `spacetime generate --lang typescript` output
+        // plus lumiere-codegen's TS-emitting artifacts. Mirrors
+        // `staging_manifests` above — see
+        // docs/plans/contracts-extraction-execution-plan.md.
+        let staging_ts = contracts_staging_dir.join("ts");
 
         Paths {
             resource_registry_json: assets.join("resource_registry.json"),
             query_registry_ts_out: PathBuf::from(env_or_default(
                 "API_CODEGEN_REGISTRY_OUT",
-                "frontend/packages/stdb/src/generated/query-registry.ts",
+                staging_ts.join("generated/query-registry.ts").to_str().unwrap(),
             )),
             reducer_stdb_invalidation_json: manifest_dir.join("reducer-stdb-invalidation.json"),
             stdb_invalidation_ts_out: PathBuf::from(env_or_default(
                 "API_CODEGEN_STDB_INVALIDATION_OUT",
-                "frontend/packages/query-hooks/src/generated/stdb-reducer-invalidation.ts",
+                staging_ts.join("stdb-reducer-invalidation.ts").to_str().unwrap(),
             )),
-            types_ts: frontend.join("packages/stdb/src/generated/types.ts"),
-            stdb_generated_dir: frontend.join("packages/stdb/src/generated"),
-            sql_columns_frontend_out: frontend
-                .join("packages/stdb/src/stdb-generated-sql-columns.json"),
+            types_ts: staging_ts.join("generated/types.ts"),
+            stdb_generated_dir: staging_ts.join("generated"),
+            sql_columns_frontend_out: staging_ts.join("stdb-generated-sql-columns.json"),
             sql_columns_rust_out: staging_manifests.join("stdb-generated-sql-columns.json"),
             query_resource_row_type_asset: assets.join("query-resource-row-type.json"),
             query_resource_row_type_out: frontend
