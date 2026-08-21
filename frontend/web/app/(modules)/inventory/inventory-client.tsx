@@ -348,7 +348,7 @@ function InventoryClientLoaded({
   useInventoryModuleSubscription()
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
-  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [editProductRow, setEditProductRow] = useState<Record<string, unknown> | null>(null)
   const [variantProductId, setVariantProductId] = useState<ScalarId | null>(null)

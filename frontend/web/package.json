@@ -104,7 +104,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "postcss": "^8.5",
-    "spacetimedb": "2.0.3",
+    "spacetimedb": "2.8.2",
     "tailwindcss": "^4.2.0",
     "tsx": "^4.21.0",
     "tw-animate-css": "1.3.3",

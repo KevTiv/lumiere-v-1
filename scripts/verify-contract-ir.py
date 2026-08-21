@@ -37,6 +37,11 @@ def main() -> None:
         action="store_true",
         help="reject an IR extracted from a dirty source checkout",
     )
+    parser.add_argument(
+        "--expect-schema-hash-from",
+        type=Path,
+        help="require the same semantic schema hash as another IR artifact",
+    )
     args = parser.parse_args()
 
     raw = args.ir.read_bytes()
@@ -104,6 +109,17 @@ def main() -> None:
     schema_hash = f"sha256:{hashlib.sha256(canonical).hexdigest()}"
     if schema_hash != ir["schema_hash"]:
         fail(f"schema hash mismatch: expected {schema_hash}")
+    if args.expect_schema_hash_from is not None:
+        try:
+            expected_ir = json.loads(args.expect_schema_hash_from.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            fail(f"cannot read expected IR: {error}")
+        expected_hash = expected_ir.get("schema_hash")
+        if expected_hash != schema_hash:
+            fail(
+                "semantic schema drift: "
+                f"expected {expected_hash!r} from {args.expect_schema_hash_from}, got {schema_hash!r}"
+            )
 
     checksum_path = args.ir.with_suffix(args.ir.suffix + ".sha256")
     checksum_parts = checksum_path.read_text(encoding="utf-8").split()

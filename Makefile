@@ -251,7 +251,7 @@ publish:
 
 
 generate-stdb-ts-sdk:
-	spacetime generate --include-private --lang typescript --out-dir ".contracts-staging/ts/generated" --module-path $(MODULE)
+	bash scripts/generate-spacetimedb-ts-sdk.sh ".contracts-staging/ts/generated" "$(MODULE)"
 
 publish-clear:
 	LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish $(DB) --module-path $(MODULE) --server local --clear-database -y
@@ -919,10 +919,11 @@ check-contracts-drift: schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-s
 		exit 0; \
 	fi; \
 	diff -rq "$$CHECKOUT/crates/lumiere-contracts/src/bindings" .contracts-staging/bindings && \
-	diff -rq "$$CHECKOUT/manifests" .contracts-staging/manifests && \
-	diff -rq "$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
+	for manifest in .contracts-staging/manifests/*.json; do diff "$$CHECKOUT/manifests/$$(basename "$$manifest")" "$$manifest" || exit 1; done && \
+	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v1.json --require-clean --expect-schema-hash-from "$$CHECKOUT/ir/lumiere-contract-ir-v1.json" && \
+	python3 "$$CHECKOUT/scripts/generate-from-ir.py" --check && \
+	diff -rq -x query-registry.ts "$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
 	diff "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/stdb-generated-sql-columns.json && \
-	diff "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" .contracts-staging/ts/stdb-reducer-invalidation.ts && \
 	echo "check-contracts-drift: staging matches pinned lumiere-contracts release" || \
 	(echo "Local generation drifted from the pinned lumiere-contracts tag. Run: make publish-contracts VERSION=x.y.z" && exit 1)
 

@@ -386,7 +386,7 @@ function HrClientLoaded({
   useHrModuleSubscription()
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
-  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [csvKind, setCsvKind] = useState<HrCsvImportKind | null>(null)
   const [toolbarError, setToolbarError] = useState<string | null>(null)

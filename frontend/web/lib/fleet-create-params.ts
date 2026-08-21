@@ -35,7 +35,8 @@ export function toCreateFleetVehicleParams(
     vehicleType,
     licensePlate: optionalTrimmedString(field(formData, "licensePlate", "license_plate")),
     driverName: optionalTrimmedString(field(formData, "driverName", "driver_name")),
+    driverId: optionalBigIntU64(field(formData, "driverId", "driver_id")),
+    serviceTypeId: optionalBigIntU64(field(formData, "serviceTypeId", "service_type_id")),
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
   }
 }
-

@@ -204,6 +204,7 @@ export function toCreateInvoiceFromSaleOrderParams(
 
 export function toCreatePricelistParams(
   formData: Record<string, unknown>,
+  companyId: bigint,
 ): CreatePricelistParams | null {
   const cid = formData.currencyId
   if (cid === '' || cid == null) return null
@@ -211,6 +212,7 @@ export function toCreatePricelistParams(
   if (currencyId == null) return null
 
   return {
+    companyId,
     name: String(formData.name ?? ''),
     currencyId,
     discountPolicy: discountPolicyFromForm(formData.discountPolicy),

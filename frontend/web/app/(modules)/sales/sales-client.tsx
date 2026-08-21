@@ -354,7 +354,7 @@ function SalesClientLoaded({
   const { currentUser } = useRBAC();
   const runtimeRoleId = currentUser?.roles[0];
   const { orgId } = orgBigInts(organizationId)
-  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId);
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
 
   const saleOrdersTableRuntime = useRuntimeListConfig({
     base: saleOrdersTableConfig(t, {
@@ -2658,7 +2658,7 @@ function SalesClientLoaded({
         }
       }
     } else if (action === 'createPricelist') {
-      const p = toCreatePricelistParams(formData);
+      const p = toCreatePricelistParams(formData, operatingCompanyId);
       if (p) await createPricelist.mutateAsync(p);
     } else if (action === 'createPricelistItem') {
       const p = toCreatePricelistItemParams(formData);

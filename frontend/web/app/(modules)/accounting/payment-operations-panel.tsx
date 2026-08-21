@@ -317,6 +317,7 @@ export function PaymentOperationsPanel({
         feeAccountId: asId(data.feeAccountId) ?? undefined,
         clearingAccountId: asId(data.clearingAccountId) ?? undefined,
         isPrimary: data.isPrimary === true,
+        metadata: undefined,
       })
       setAccountDialogOpen(false)
     } catch (cause) {
@@ -355,6 +356,7 @@ export function PaymentOperationsPanel({
         sourceEntity: sourceEntity || undefined,
         sourceEntityId: sourceEntityId ?? undefined,
         evidenceDocumentIds: idList(data.evidenceDocumentIds),
+        metadata: undefined,
       })
       setTransactionDialogOpen(false)
     } catch (cause) {
@@ -383,6 +385,7 @@ export function PaymentOperationsPanel({
         currencyId: asId(transaction.currencyId) ?? defaultCurrencyId,
         writeOffAmount,
         writeOffAccountId: writeOffAccountId ?? undefined,
+        metadata: undefined,
       })
       setAllocatingTransaction(null)
     } catch (cause) {
@@ -399,7 +402,7 @@ export function PaymentOperationsPanel({
       if (transactionId == null) throw new Error("The selected transaction has no ID")
       await reverseTransaction.mutateAsync({
         transactionId,
-        params: { companyId, reason: stringValue(data.reason) || undefined },
+        params: { companyId, reason: stringValue(data.reason) || undefined, metadata: undefined },
       })
       setReversingTransaction(null)
     } catch (cause) {
@@ -431,6 +434,7 @@ export function PaymentOperationsPanel({
         taxAccountId: taxAccountId ?? undefined,
         taxAmount,
         providerReference: stringValue(data.providerReference) || undefined,
+        metadata: undefined,
       })
       setFeeTransaction(null)
     } catch (cause) {

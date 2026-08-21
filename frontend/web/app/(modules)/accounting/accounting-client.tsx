@@ -424,6 +424,7 @@ function toAddAccountMoveLineParamsFromForm(
       expectedPayDateCurrencyId: undefined,
       expectedPayDateAmount: 0,
       expectedPayDateResidual: 0,
+      metadata: undefined,
     },
   }
 }
