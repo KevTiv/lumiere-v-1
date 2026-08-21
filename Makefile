@@ -822,7 +822,7 @@ e2e-smoke:
 
 # ── Bindings, code generation, and service entry points ───────────────────────
 generate-stdb-rust-sdk:
-	spacetime generate --include-private --lang rust --out-dir "api-server/src/stdb_sdk_bindings" --module-path $(MODULE)
+	spacetime generate --include-private --lang rust --out-dir ".contracts-staging/bindings" --module-path $(MODULE)
 	bash scripts/fix-spacetimedb-rust-sdk-bindings.sh
 
 init-stack:
@@ -843,14 +843,8 @@ check-codegen: codegen
 		frontend/packages/query-hooks/src/generated/stdb-reducer-invalidation.ts \
 		frontend/packages/stdb/src/stdb-generated-sql-columns.json \
 		frontend/packages/stdb/src/query-resource-row-type.json \
-		crates/stdb-auth/assets/stdb-generated-sql-columns.json \
-		crates/stdb-auth/assets/erp-org-sql.json \
 		crates/stdb-auth/assets/resource_registry.json \
 		crates/stdb-auth/assets/query_exec_non_registry.json \
-		crates/stdb-auth/assets/lumiere-schema-manifest.json \
-		crates/stdb-auth/assets/archive-manifest.json \
-		crates/stdb-auth/assets/codec-manifest.json \
-		crates/stdb-auth/assets/hydration-manifest.json \
 		api-server/src/generated/pg_ddl/ \
 		2>/dev/null || true
 	@git diff --exit-code -- \
@@ -858,16 +852,35 @@ check-codegen: codegen
 		frontend/packages/query-hooks/src/generated/stdb-reducer-invalidation.ts \
 		frontend/packages/stdb/src/stdb-generated-sql-columns.json \
 		frontend/packages/stdb/src/query-resource-row-type.json \
-		crates/stdb-auth/assets/stdb-generated-sql-columns.json \
-		crates/stdb-auth/assets/erp-org-sql.json \
 		crates/stdb-auth/assets/resource_registry.json \
 		crates/stdb-auth/assets/query_exec_non_registry.json \
-		crates/stdb-auth/assets/lumiere-schema-manifest.json \
-		crates/stdb-auth/assets/archive-manifest.json \
-		crates/stdb-auth/assets/codec-manifest.json \
-		crates/stdb-auth/assets/hydration-manifest.json \
 		api-server/src/generated/pg_ddl/ || \
 		(echo "Generated artifacts are out of date. Run: make generate-stdb-ts-sdk && make codegen" && exit 1)
+
+# Bindings + the six generated manifests now live in lumiere-contracts, not in
+# this repo. This target regenerates them into .contracts-staging/ and diffs
+# that staging output against the currently pinned lumiere-contracts tag, so
+# drift between the deployed STDB module and the pinned contracts release is
+# caught in CI instead of only surfacing at runtime. See
+# docs/plans/contracts-extraction-execution-plan.md §5.2, §5.4.
+check-contracts-drift: generate-stdb-rust-sdk codegen
+	@PINNED_DIR="$$(cargo metadata --format-version1 2>/dev/null | \
+		python3 -c 'import json,sys; d=json.load(sys.stdin); \
+			pkg=[p for p in d["packages"] if p["name"]=="lumiere-contracts"][0]; \
+			print(pkg["manifest_path"].rsplit("/",2)[0])' 2>/dev/null)"; \
+	if [ -z "$$PINNED_DIR" ] || [ ! -d "$$PINNED_DIR/bindings" ]; then \
+		echo "check-contracts-drift: could not resolve the pinned lumiere-contracts checkout (run cargo fetch first); skipping" >&2; \
+		exit 0; \
+	fi; \
+	diff -rq "$$PINNED_DIR/bindings" .contracts-staging/bindings && \
+	diff -rq "$$PINNED_DIR/manifests" .contracts-staging/manifests && \
+	echo "check-contracts-drift: staging matches pinned lumiere-contracts release" || \
+	(echo "Local generation drifted from the pinned lumiere-contracts tag. Run: make publish-contracts" && exit 1)
+
+# Publish freshly generated bindings + manifests to lumiere-contracts as a new
+# tagged release, then print the Cargo.toml dependency line to bump.
+publish-contracts: generate-stdb-rust-sdk codegen
+	bash scripts/publish-contracts.sh
 
 # Fail if coverage/create-params mappers use magic FK sentinels (`?? 0n` / `|| 0n`).
 lint-no-magic-fk-zero:

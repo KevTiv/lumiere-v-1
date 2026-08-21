@@ -39,6 +39,7 @@ name = "pos-order-cold-drainer"
 path = "src/bin/pos-order-cold-drainer.rs"
 
 [dependencies]
+lumiere-contracts.workspace = true
 anyhow.workspace = true
 aes-gcm.workspace = true
 axum = { workspace = true, features = ["macros", "ws"] }

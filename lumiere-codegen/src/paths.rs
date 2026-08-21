@@ -50,6 +50,15 @@ impl Paths {
         let repo_root = manifest_dir.join("..");
         let assets = repo_root.join("crates/stdb-auth/assets");
         let frontend = repo_root.join("frontend");
+        // Gitignored staging checkout for artifacts destined for the
+        // `lumiere-contracts` repo (generated STDB Rust bindings + the six
+        // generated manifests). Generation reads/writes staging;
+        // `lumiere-v-1` itself never depends on these files directly at
+        // runtime — that goes through the pinned `lumiere-contracts` crate
+        // instead. See docs/plans/contracts-extraction-execution-plan.md.
+        let contracts_staging_dir =
+            PathBuf::from(env_or_default("CONTRACTS_STAGING_DIR", ".contracts-staging"));
+        let staging_manifests = contracts_staging_dir.join("manifests");
 
         Paths {
             resource_registry_json: assets.join("resource_registry.json"),
@@ -66,25 +75,25 @@ impl Paths {
             stdb_generated_dir: frontend.join("packages/stdb/src/generated"),
             sql_columns_frontend_out: frontend
                 .join("packages/stdb/src/stdb-generated-sql-columns.json"),
-            sql_columns_rust_out: assets.join("stdb-generated-sql-columns.json"),
+            sql_columns_rust_out: staging_manifests.join("stdb-generated-sql-columns.json"),
             query_resource_row_type_asset: assets.join("query-resource-row-type.json"),
             query_resource_row_type_out: frontend
                 .join("packages/stdb/src/query-resource-row-type.json"),
 
             erp_subscriptions_ts: frontend.join("packages/stdb/src/queries/erp-subscriptions.ts"),
-            erp_org_sql_rust_out: assets.join("erp-org-sql.json"),
+            erp_org_sql_rust_out: staging_manifests.join("erp-org-sql.json"),
 
             query_exec_non_registry_json: assets.join("query_exec_non_registry.json"),
             query_exec_rs: repo_root.join("api-server/src/query_exec.rs"),
 
-            stdb_bindings_dir: repo_root.join("api-server/src/stdb_sdk_bindings"),
-            schema_manifest_out: assets.join("lumiere-schema-manifest.json"),
+            stdb_bindings_dir: contracts_staging_dir.join("bindings"),
+            schema_manifest_out: staging_manifests.join("lumiere-schema-manifest.json"),
             archive_candidates_json: manifest_dir.join("archive-candidates.json"),
-            archive_manifest_out: assets.join("archive-manifest.json"),
+            archive_manifest_out: staging_manifests.join("archive-manifest.json"),
             cold_ddl_dir: repo_root.join("api-server/src/generated/pg_ddl"),
-            codec_manifest_out: assets.join("codec-manifest.json"),
+            codec_manifest_out: staging_manifests.join("codec-manifest.json"),
             hydration_policies_json: manifest_dir.join("hydration-policies.json"),
-            hydration_manifest_out: assets.join("hydration-manifest.json"),
+            hydration_manifest_out: staging_manifests.join("hydration-manifest.json"),
         }
     }
 }

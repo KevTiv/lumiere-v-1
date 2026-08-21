@@ -43,8 +43,7 @@ use super::{ledger, migrate, pg_codec, pg_pool};
 use crate::config::Config;
 use crate::state::AppState;
 
-const CODEC_MANIFEST_JSON: &str =
-    include_str!("../../../crates/stdb-auth/assets/codec-manifest.json");
+const CODEC_MANIFEST_JSON: &str = lumiere_contracts::manifests::CODEC_MANIFEST;
 const TABLE: &str = "pos_order";
 const COLD_TABLE: &str = "cold_pos_order";
 

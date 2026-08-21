@@ -27,3 +27,7 @@ frontend/web/reports/
 /3. Fix AI certification integrity
 /.claude/worktrees/
 /.claude/settings.local.json
+
+# Staging checkout for generated artifacts pushed to lumiere-contracts.
+# See docs/plans/contracts-extraction-execution-plan.md.
+/.contracts-staging/

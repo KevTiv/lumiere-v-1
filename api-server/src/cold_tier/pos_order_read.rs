@@ -26,8 +26,7 @@ use super::{
 };
 
 const TABLE: &str = "pos_order";
-const CODEC_MANIFEST_JSON: &str =
-    include_str!("../../../crates/stdb-auth/assets/codec-manifest.json");
+const CODEC_MANIFEST_JSON: &str = lumiere_contracts::manifests::CODEC_MANIFEST;
 
 pub const DEFAULT_LIMIT: u32 = 100;
 pub const MAX_LIMIT: u32 = 500;

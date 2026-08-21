@@ -24,7 +24,6 @@ pub mod workflow_reads;
 pub mod workflow_worker;
 
 mod http_app;
-mod stdb_sdk_bindings;
 
 /// Run the HTTP server (env, tracing, bind, serve).
 pub async fn run() -> anyhow::Result<()> {
