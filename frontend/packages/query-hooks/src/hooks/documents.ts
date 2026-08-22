@@ -15,8 +15,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
+  AiDocumentProcessingJob,
+  AiInsight,
   CreateDocumentParams,
   CreateKnowledgeArticleParams,
+  Document,
+  DocumentFolder,
+  KnowledgeArticle,
+  KnowledgeArticleCategory,
 } from "@lumiere/stdb/types"
 
 type ScalarId = bigint | number | string
@@ -31,9 +37,9 @@ import { responseErrorMessage as parseCallErrorDocuments } from "@lumiere/api-cl
 
 export function useDocuments(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: Document[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<Document[]>({
     queryKey: ['documents', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/documents', 'Failed to fetch documents'),
     staleTime: 30_000,
@@ -43,9 +49,9 @@ export function useDocuments(
 
 export function useKnowledgeArticles(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: KnowledgeArticle[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<KnowledgeArticle[]>({
     queryKey: ['knowledge-articles', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/knowledge-articles', 'Failed to fetch knowledge articles'),
     staleTime: 30_000,
@@ -55,9 +61,9 @@ export function useKnowledgeArticles(
 
 export function useKnowledgeCategories(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: KnowledgeArticleCategory[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<KnowledgeArticleCategory[]>({
     queryKey: ['knowledge-categories', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/knowledge-categories', 'Failed to fetch knowledge categories'),
@@ -68,9 +74,9 @@ export function useKnowledgeCategories(
 
 export function useDocumentFolders(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: DocumentFolder[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<DocumentFolder[]>({
     queryKey: ['document-folders', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/document-folders', 'Failed to fetch document folders'),
     staleTime: 30_000,
@@ -80,9 +86,9 @@ export function useDocumentFolders(
 
 export function useAiDocumentProcessingJobs(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: AiDocumentProcessingJob[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<AiDocumentProcessingJob[]>({
     queryKey: ['ai-document-processing-jobs', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -95,8 +101,8 @@ export function useAiDocumentProcessingJobs(
 }
 
 /** Same rows as Settings → AI; shared query key keeps cache in sync across the app. */
-export function useAiInsightsForOrg(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useAiInsightsForOrg(organizationId: bigint, initialData?: AiInsight[]) {
+  return useQuery<AiInsight[]>({
     queryKey: ['ai-insights', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/ai-insights', 'Failed to fetch AI insights'),
     staleTime: 30_000,
@@ -827,6 +833,12 @@ export type DocumentsCsvImportMutations = ReturnType<typeof useDocumentsCsvImpor
 
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
+  AiDocumentProcessingJob,
+  AiInsight,
   CreateDocumentParams,
   CreateKnowledgeArticleParams,
+  Document,
+  DocumentFolder,
+  KnowledgeArticle,
+  KnowledgeArticleCategory,
 } from '@lumiere/stdb/types'

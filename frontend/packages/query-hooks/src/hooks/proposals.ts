@@ -10,7 +10,22 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { encodeOptionalU64, stdbParamsToJson } from "@lumiere/stdb/stdb-params-json"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
-import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
+import type {
+  Proposal,
+  ProposalBidDecision,
+  ProposalClarification,
+  ProposalComment,
+  ProposalComplianceRequirement,
+  ProposalIntegrationIntent,
+  ProposalLineItem,
+  ProposalPresence,
+  ProposalProcurementScore,
+  ProposalSection,
+  ProposalSourceDoc,
+  ProposalTemplate,
+  ProposalVersion,
+} from "@lumiere/stdb/types"
 
 function toScalarU64(v: bigint | number | string): bigint {
   return typeof v === "bigint" ? v : BigInt(String(v))
@@ -190,9 +205,9 @@ export type UpsertProposalProcurementScoreParams = {
 
 export function useProposals(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: Proposal[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<Proposal[]>({
     queryKey: ["proposals", rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList("/api/query/proposals", "Failed to fetch proposals"),
     staleTime: 30_000,
@@ -202,9 +217,9 @@ export function useProposals(
 
 export function useProposalSections(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProposalSection[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProposalSection[]>({
     queryKey: ["proposal-sections", rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList("/api/query/proposal-sections", "Failed to fetch proposal sections"),
@@ -216,9 +231,9 @@ export function useProposalSections(
 export function useProposalLineItems(
   organizationId: bigint,
   proposalId?: bigint,
-  initialData?: QueryRows,
+  initialData?: ProposalLineItem[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProposalLineItem[]>({
     queryKey: ["proposal-line-items", rqBigIntKey(organizationId), proposalId?.toString()],
     queryFn: () =>
       fetchQueryList("/api/query/proposal-line-items", "Failed to fetch proposal line items"),
@@ -229,9 +244,9 @@ export function useProposalLineItems(
 
 export function useProposalVersions(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProposalVersion[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProposalVersion[]>({
     queryKey: ["proposal-versions", rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList("/api/query/proposal-versions", "Failed to fetch proposal versions"),
@@ -242,9 +257,9 @@ export function useProposalVersions(
 
 export function useProposalSourceDocs(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProposalSourceDoc[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProposalSourceDoc[]>({
     queryKey: ["proposal-source-docs", rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList("/api/query/proposal-source-docs", "Failed to fetch proposal source docs"),
@@ -256,9 +271,9 @@ export function useProposalSourceDocs(
 export function useProposalPresence(
   organizationId: bigint,
   proposalId?: bigint,
-  initialData?: QueryRows,
+  initialData?: ProposalPresence[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProposalPresence[]>({
     queryKey: ["proposal-presence", rqBigIntKey(organizationId), proposalId?.toString()],
     queryFn: () =>
       fetchQueryList("/api/query/proposal-presence", "Failed to fetch proposal presence"),
@@ -270,9 +285,9 @@ export function useProposalPresence(
 export function useProposalComments(
   organizationId: bigint,
   proposalId?: bigint,
-  initialData?: QueryRows,
+  initialData?: ProposalComment[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProposalComment[]>({
     queryKey: ["proposal-comments", rqBigIntKey(organizationId), proposalId?.toString()],
     queryFn: () =>
       fetchQueryList("/api/query/proposal-comments", "Failed to fetch proposal comments"),
@@ -283,9 +298,9 @@ export function useProposalComments(
 
 export function useProposalBidDecisions(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProposalBidDecision[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProposalBidDecision[]>({
     queryKey: ["proposal-bid-decisions", rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -299,9 +314,9 @@ export function useProposalBidDecisions(
 
 export function useProposalTemplates(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProposalTemplate[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProposalTemplate[]>({
     queryKey: ["proposal-templates", rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList("/api/query/proposal-templates", "Failed to fetch proposal templates"),
@@ -312,9 +327,9 @@ export function useProposalTemplates(
 
 export function useProposalComplianceRequirements(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProposalComplianceRequirement[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProposalComplianceRequirement[]>({
     queryKey: ["proposal-compliance-requirements", rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -328,9 +343,9 @@ export function useProposalComplianceRequirements(
 
 export function useProposalClarifications(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProposalClarification[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProposalClarification[]>({
     queryKey: ["proposal-clarifications", rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -344,9 +359,9 @@ export function useProposalClarifications(
 
 export function useProposalProcurementScores(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProposalProcurementScore[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProposalProcurementScore[]>({
     queryKey: ["proposal-procurement-scores", rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -360,9 +375,9 @@ export function useProposalProcurementScores(
 
 export function useProposalIntegrationIntents(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProposalIntegrationIntent[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProposalIntegrationIntent[]>({
     queryKey: ["proposal-integration-intents", rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -1083,3 +1098,20 @@ export function useUpsertProposalProcurementScore(
     onSuccess: () => invalidateProposalQueries(qc),
   })
 }
+
+// ── Types (re-exported so client components import from one place) ────────────
+export type {
+  Proposal,
+  ProposalBidDecision,
+  ProposalClarification,
+  ProposalComment,
+  ProposalComplianceRequirement,
+  ProposalIntegrationIntent,
+  ProposalLineItem,
+  ProposalPresence,
+  ProposalProcurementScore,
+  ProposalSection,
+  ProposalSourceDoc,
+  ProposalTemplate,
+  ProposalVersion,
+} from "@lumiere/stdb/types"

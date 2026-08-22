@@ -4,13 +4,20 @@
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   CreateBomParams,
   CreateMrpProductionParams,
   CreateWorkcenterParams,
+  MrpBom,
+  MrpBomLine,
+  MrpProduction,
+  MrpRoutingWorkcenter,
+  MrpWorkcenter,
+  MrpWorkorder,
+  QualityCheck,
 } from "@lumiere/stdb/types"
 
 function invalidateMrpBomsAndLines(qc: QueryClient, organizationId: bigint) {
@@ -35,9 +42,9 @@ function invalidateMrpWorkcenters(qc: QueryClient, organizationId: bigint) {
 
 export function useMrpProductions(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: MrpProduction[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<MrpProduction[]>({
     queryKey: ['mrp-productions', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/mrp-productions', 'Failed to fetch manufacturing orders'),
     staleTime: 30_000,
@@ -47,9 +54,9 @@ export function useMrpProductions(
 
 export function useMrpBoms(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: MrpBom[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<MrpBom[]>({
     queryKey: ['mrp-boms', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/mrp-boms', 'Failed to fetch BOMs'),
     staleTime: 30_000,
@@ -59,9 +66,9 @@ export function useMrpBoms(
 
 export function useMrpBomLines(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: MrpBomLine[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<MrpBomLine[]>({
     queryKey: ['mrp-bom-lines', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/mrp-bom-lines', 'Failed to fetch BOM lines'),
     staleTime: 30_000,
@@ -71,9 +78,9 @@ export function useMrpBomLines(
 
 export function useMrpWorkorders(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: MrpWorkorder[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<MrpWorkorder[]>({
     queryKey: ['mrp-workorders', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/mrp-workorders', 'Failed to fetch workorders'),
     staleTime: 30_000,
@@ -83,9 +90,9 @@ export function useMrpWorkorders(
 
 export function useMrpWorkcenters(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: MrpWorkcenter[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<MrpWorkcenter[]>({
     queryKey: ['mrp-workcenters', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/mrp-workcenters', 'Failed to fetch workcenters'),
     staleTime: 30_000,
@@ -95,9 +102,9 @@ export function useMrpWorkcenters(
 
 export function useMrpRoutingWorkcenters(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: MrpRoutingWorkcenter[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<MrpRoutingWorkcenter[]>({
     queryKey: ['mrp-routing-workcenters', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/mrp-routing-workcenters', 'Failed to fetch routing operations'),
@@ -108,9 +115,9 @@ export function useMrpRoutingWorkcenters(
 
 export function useQualityChecks(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: QualityCheck[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<QualityCheck[]>({
     queryKey: ['quality-checks', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/quality-checks', 'Failed to fetch quality checks'),
     staleTime: 30_000,
@@ -607,3 +614,14 @@ export function useManufacturingMutations(organizationId: bigint, companyId: big
 }
 
 export type ManufacturingMutations = ReturnType<typeof useManufacturingMutations>
+
+// ── Types (re-exported so client components import from one place) ────────────
+export type {
+  MrpBom,
+  MrpBomLine,
+  MrpProduction,
+  MrpRoutingWorkcenter,
+  MrpWorkcenter,
+  MrpWorkorder,
+  QualityCheck,
+} from "@lumiere/stdb/types"

@@ -14,10 +14,19 @@ import { stdbBffCommandPost } from '@lumiere/stdb/commands';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from '../http';
+import { apiFetch, fetchQueryList, rqBigIntKey } from '../http';
 import { toCreateActionParams } from '@lumiere/erp-shared/iot-create-params';
 import { stdbParamsToJson } from '@lumiere/erp-shared/stdb-params-json';
 import { i18n } from '@lumiere/i18n';
+import type {
+  IoTAction,
+  IoTAlert,
+  IoTDevice,
+  IoTHub,
+  IoTPairingToken,
+  IoTTelemetry,
+  IoTThreshold,
+} from '@lumiere/stdb/types';
 
 type ScalarId = bigint | number | string;
 
@@ -25,8 +34,8 @@ import { responseErrorMessage as parseCallError } from '@lumiere/api-client/resp
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
-export function useIotDevices(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useIotDevices(organizationId: bigint, initialData?: IoTDevice[]) {
+  return useQuery<IoTDevice[]>({
     queryKey: ['iot-devices', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/iot-devices', 'Failed to fetch IoT devices'),
@@ -35,8 +44,8 @@ export function useIotDevices(organizationId: bigint, initialData?: QueryRows) {
   });
 }
 
-export function useIotHubs(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useIotHubs(organizationId: bigint, initialData?: IoTHub[]) {
+  return useQuery<IoTHub[]>({
     queryKey: ['iot-hubs', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/iot-hubs', 'Failed to fetch IoT hubs'),
@@ -47,9 +56,9 @@ export function useIotHubs(organizationId: bigint, initialData?: QueryRows) {
 
 export function useIotPairingTokens(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: IoTPairingToken[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<IoTPairingToken[]>({
     queryKey: ['iot-pairing-tokens', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -61,8 +70,8 @@ export function useIotPairingTokens(
   });
 }
 
-export function useIotAlerts(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useIotAlerts(organizationId: bigint, initialData?: IoTAlert[]) {
+  return useQuery<IoTAlert[]>({
     queryKey: ['iot-alerts', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/iot-alerts', 'Failed to fetch IoT alerts'),
@@ -71,8 +80,8 @@ export function useIotAlerts(organizationId: bigint, initialData?: QueryRows) {
   });
 }
 
-export function useIotActions(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useIotActions(organizationId: bigint, initialData?: IoTAction[]) {
+  return useQuery<IoTAction[]>({
     queryKey: ['iot-actions', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/iot-actions', 'Failed to fetch IoT actions'),
@@ -83,9 +92,9 @@ export function useIotActions(organizationId: bigint, initialData?: QueryRows) {
 
 export function useIotTelemetry(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: IoTTelemetry[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<IoTTelemetry[]>({
     queryKey: ['iot-telemetry', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -99,9 +108,9 @@ export function useIotTelemetry(
 
 export function useIotThresholds(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: IoTThreshold[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<IoTThreshold[]>({
     queryKey: ['iot-thresholds', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -568,3 +577,14 @@ export function useTestIotDevice(organizationId: bigint) {
     onSuccess: () => invalidateIotQueries(qc, organizationId),
   });
 }
+
+// ── Types (re-exported so client components import from one place) ────────────
+export type {
+  IoTAction,
+  IoTAlert,
+  IoTDevice,
+  IoTHub,
+  IoTPairingToken,
+  IoTTelemetry,
+  IoTThreshold,
+} from '@lumiere/stdb/types';

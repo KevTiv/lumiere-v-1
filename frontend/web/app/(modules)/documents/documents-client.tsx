@@ -68,6 +68,14 @@ import {
   useApproveDocumentProcessingJob,
   useAcknowledgeInsight,
 } from "@lumiere/query-hooks/hooks/documents"
+import type {
+  AiDocumentProcessingJob,
+  AiInsight,
+  Document,
+  DocumentFolder,
+  KnowledgeArticle,
+  KnowledgeArticleCategory,
+} from "@lumiere/query-hooks/hooks/documents"
 import {
   useDocumentTemplates,
   useMailTemplates,
@@ -95,7 +103,6 @@ import {
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
-import type { QueryRows } from "@/lib/query-fetch"
 import { useAiAgents } from "@lumiere/query-hooks/hooks/ai-agents"
 import { buildEntitySelection } from "@lumiere/query-hooks/ai-ui-context"
 import { useOpenErpAiChat } from "@/lib/erp-ai-context"
@@ -184,13 +191,13 @@ function editDocumentForm(row: Record<string, unknown>): FormConfig {
 }
 
 interface DocumentsClientProps {
-  initialDocuments?: Record<string, unknown>[]
+  initialDocuments?: Document[]
   initialDeletedDocuments?: Record<string, unknown>[]
-  initialArticles?: Record<string, unknown>[]
-  initialCategories?: Record<string, unknown>[]
-  initialFolders?: Record<string, unknown>[]
-  initialProcessingJobs?: Record<string, unknown>[]
-  initialAiInsights?: Record<string, unknown>[]
+  initialArticles?: KnowledgeArticle[]
+  initialCategories?: KnowledgeArticleCategory[]
+  initialFolders?: DocumentFolder[]
+  initialProcessingJobs?: AiDocumentProcessingJob[]
+  initialAiInsights?: AiInsight[]
   organizationId?: number
 }
 
@@ -260,13 +267,13 @@ function DocumentsClientLoaded({
   const { data: documents = [] } = useDocuments(orgId, initialDocuments)
   const { data: deletedDocuments = [] } = useDeletedDocuments(
     orgId,
-    initialDeletedDocuments as QueryRows | undefined,
+    initialDeletedDocuments,
   )
   const { data: articles = [] } = useKnowledgeArticles(orgId, initialArticles)
-  const { data: categories = [] } = useKnowledgeCategories(orgId, initialCategories as QueryRows | undefined)
-  const { data: folders = [] } = useDocumentFolders(orgId, initialFolders as QueryRows | undefined)
-  const { data: processingJobs = [] } = useAiDocumentProcessingJobs(orgId, initialProcessingJobs as QueryRows | undefined)
-  const { data: aiInsights = [] } = useAiInsightsForOrg(orgId, initialAiInsights as QueryRows | undefined)
+  const { data: categories = [] } = useKnowledgeCategories(orgId, initialCategories)
+  const { data: folders = [] } = useDocumentFolders(orgId, initialFolders)
+  const { data: processingJobs = [] } = useAiDocumentProcessingJobs(orgId, initialProcessingJobs)
+  const { data: aiInsights = [] } = useAiInsightsForOrg(orgId, initialAiInsights)
   const { data: documentTemplates = [] } = useDocumentTemplates(organizationId)
   const { data: mailTemplates = [] } = useMailTemplates(organizationId)
   const { data: aiAgents = [] } = useAiAgents(organizationId, organizationId > 0)

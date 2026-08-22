@@ -13,6 +13,15 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import type {
+  AnalyticsMetric,
+  Dashboard,
+  DashboardWidget,
+  FinancialReport,
+  ReportTemplate,
+  ScheduledReport,
+  TrialBalance,
+} from "@lumiere/stdb/types"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { i18n } from "@lumiere/i18n"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
@@ -34,9 +43,9 @@ import {
 
 export function useFinancialReports(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: FinancialReport[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<FinancialReport[]>({
     queryKey: ['financial-reports', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/financial-reports', 'Failed to fetch financial reports'),
     staleTime: 30_000,
@@ -46,9 +55,9 @@ export function useFinancialReports(
 
 export function useTrialBalances(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: TrialBalance[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<TrialBalance[]>({
     queryKey: ['trial-balances', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/trial-balances', 'Failed to fetch trial balances'),
     staleTime: 30_000,
@@ -58,9 +67,9 @@ export function useTrialBalances(
 
 export function useReportTemplates(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ReportTemplate[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ReportTemplate[]>({
     queryKey: ['report-templates', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/report-templates', 'Failed to fetch report templates'),
     staleTime: 30_000,
@@ -70,9 +79,9 @@ export function useReportTemplates(
 
 export function useScheduledReports(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ScheduledReport[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ScheduledReport[]>({
     queryKey: ['scheduled-reports', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/scheduled-reports', 'Failed to fetch scheduled reports'),
     staleTime: 30_000,
@@ -82,9 +91,9 @@ export function useScheduledReports(
 
 export function useAnalyticsMetrics(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: AnalyticsMetric[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<AnalyticsMetric[]>({
     queryKey: ['analytics-metrics', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/analytics-metrics', 'Failed to fetch analytics metrics'),
     staleTime: 30_000,
@@ -104,8 +113,8 @@ export function useSavedReports(
   })
 }
 
-export function useDashboards(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useDashboards(organizationId: bigint, initialData?: Dashboard[]) {
+  return useQuery<Dashboard[]>({
     queryKey: ['dashboards', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/dashboards', 'Failed to fetch dashboards'),
     staleTime: 30_000,
@@ -113,8 +122,8 @@ export function useDashboards(organizationId: bigint, initialData?: QueryRows) {
   })
 }
 
-export function useDashboardWidgets(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useDashboardWidgets(organizationId: bigint, initialData?: DashboardWidget[]) {
+  return useQuery<DashboardWidget[]>({
     queryKey: ['dashboard-widgets', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/dashboard-widgets', 'Failed to fetch dashboard widgets'),
     staleTime: 30_000,
@@ -761,7 +770,14 @@ export type ReportsCsvImportMutations = ReturnType<typeof useReportsCsvImportMut
 
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
+  AnalyticsMetric,
   CreateReportTemplateParams,
   CreateScheduledReportParams,
   CreateFinancialReportParams,
+  Dashboard,
+  DashboardWidget,
+  FinancialReport,
+  ReportTemplate,
+  ScheduledReport,
+  TrialBalance,
 } from '@lumiere/stdb/types'

@@ -26,6 +26,7 @@ import {
   useUpdateProposalStatus,
   useApproveProposal,
 } from "@lumiere/query-hooks/hooks/proposals"
+import type { Proposal } from "@lumiere/query-hooks/hooks/proposals"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { fetchQueryList, rqBigIntKey } from "@lumiere/query-hooks/http"
@@ -41,7 +42,7 @@ import {
 } from "lucide-react"
 
 interface ProposalsClientProps {
-  initialProposals?: Record<string, unknown>[]
+  initialProposals?: Proposal[]
   organizationId?: number
 }
 

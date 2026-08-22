@@ -67,12 +67,12 @@ function createHttpHooks(
   companyId: bigint,
 ): ProposalWorkspaceHooks {
   return {
-    useProposalSections,
-    useProposalSourceDocs,
-    useProposalVersions,
-    useProposalLineItems,
-    useProposalPresence,
-    useProposalComments,
+    useProposalSections: useProposalSections as unknown as ProposalWorkspaceHooks['useProposalSections'],
+    useProposalSourceDocs: useProposalSourceDocs as unknown as ProposalWorkspaceHooks['useProposalSourceDocs'],
+    useProposalVersions: useProposalVersions as unknown as ProposalWorkspaceHooks['useProposalVersions'],
+    useProposalLineItems: useProposalLineItems as unknown as ProposalWorkspaceHooks['useProposalLineItems'],
+    useProposalPresence: useProposalPresence as unknown as ProposalWorkspaceHooks['useProposalPresence'],
+    useProposalComments: useProposalComments as unknown as ProposalWorkspaceHooks['useProposalComments'],
     useProducts: useProducts as unknown as ProposalWorkspaceHooks['useProducts'],
 
     useUpsertProposalSection: () => {
@@ -182,8 +182,9 @@ function createHttpHooks(
         isPending: mutation.isPending,
       }
     },
-    useProposalTemplates,
-    useProposalComplianceRequirements,
+    useProposalTemplates: useProposalTemplates as unknown as ProposalWorkspaceHooks['useProposalTemplates'],
+    useProposalComplianceRequirements:
+      useProposalComplianceRequirements as unknown as ProposalWorkspaceHooks['useProposalComplianceRequirements'],
     useApplyProposalTemplate: wrapOrgCompanyMutation(
       useApplyProposalTemplate,
       organizationId,

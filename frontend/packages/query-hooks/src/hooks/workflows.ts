@@ -22,6 +22,8 @@ import type {
   SignalWorkflowParams,
   SimulateWorkflowParams,
   StartWorkflowParams,
+  Workflow,
+  WorkflowInstance,
 } from "@lumiere/stdb/types"
 
 const wfKeys = (organizationId: bigint) => rqBigIntKey(organizationId)
@@ -47,8 +49,8 @@ function invalidateAllWorkflowQueries(
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
-export function useWorkflows(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useWorkflows(organizationId: bigint, initialData?: Workflow[]) {
+  return useQuery<Workflow[]>({
     queryKey: ["workflows", wfKeys(organizationId)],
     queryFn: () => fetchQueryList("/api/query/workflows", "Failed to fetch workflows"),
     staleTime: 30_000,
@@ -84,8 +86,8 @@ export function useWorkflowEdges(organizationId: bigint, initialData?: QueryRows
   })
 }
 
-export function useWorkflowInstances(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useWorkflowInstances(organizationId: bigint, initialData?: WorkflowInstance[]) {
+  return useQuery<WorkflowInstance[]>({
     queryKey: ["workflow-instances", wfKeys(organizationId)],
     queryFn: () =>
       fetchQueryList("/api/query/workflow-instances", "Failed to fetch workflow instances"),
@@ -474,4 +476,6 @@ export type {
   FireWorkflowTimerParams,
   CancelWorkflowTimerParams,
   CancelWorkflowOutboxParams,
+  Workflow,
+  WorkflowInstance,
 } from "@lumiere/stdb/types"

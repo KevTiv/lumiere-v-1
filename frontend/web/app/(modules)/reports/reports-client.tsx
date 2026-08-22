@@ -74,6 +74,15 @@ import {
   useDashboards,
   useDashboardWidgets,
 } from "@lumiere/query-hooks/hooks/reports"
+import type {
+  AnalyticsMetric,
+  Dashboard,
+  DashboardWidget,
+  FinancialReport,
+  ReportTemplate,
+  ScheduledReport,
+  TrialBalance,
+} from "@lumiere/query-hooks/hooks/reports"
 import { reportStateTag } from "@/lib/reports-create-params"
 import { toCreateTrialBalanceEntryParams } from "@lumiere/erp-shared/reports-create-params"
 import {
@@ -124,13 +133,13 @@ import { QueryBuilder } from "./query-builder"
 export { REPORTS_UI_REDUCERS } from "@/lib/reports-ui-reducers"
 
 interface ReportsClientProps {
-  initialReports?: Record<string, unknown>[]
-  initialBalances?: Record<string, unknown>[]
-  initialReportTemplates?: Record<string, unknown>[]
-  initialScheduledReports?: Record<string, unknown>[]
-  initialAnalyticsMetrics?: Record<string, unknown>[]
-  initialDashboards?: Record<string, unknown>[]
-  initialDashboardWidgets?: Record<string, unknown>[]
+  initialReports?: FinancialReport[]
+  initialBalances?: TrialBalance[]
+  initialReportTemplates?: ReportTemplate[]
+  initialScheduledReports?: ScheduledReport[]
+  initialAnalyticsMetrics?: AnalyticsMetric[]
+  initialDashboards?: Dashboard[]
+  initialDashboardWidgets?: DashboardWidget[]
   organizationId?: number
 }
 

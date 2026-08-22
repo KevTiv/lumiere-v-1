@@ -21,7 +21,6 @@ import type { EntityViewConfig, EntityAction, FormConfig } from '@lumiere/ui';
 import { iotModuleConfig } from '@/lib/module-dashboard-configs';
 import { useIotModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
-import type { QueryRows } from '@/lib/query-fetch';
 import { useStockLocations } from '@lumiere/query-hooks/hooks/inventory';
 import { useOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import {
@@ -56,15 +55,24 @@ import {
   useClaimHubWithToken,
   useTestIotDevice,
 } from '@lumiere/query-hooks/hooks/iot';
+import type {
+  IoTAction,
+  IoTAlert,
+  IoTDevice,
+  IoTHub,
+  IoTPairingToken,
+  IoTTelemetry,
+  IoTThreshold,
+} from '@lumiere/query-hooks/hooks/iot';
 
 interface IotClientProps {
-  initialDevices?: QueryRows;
-  initialHubs?: QueryRows;
-  initialPairingTokens?: QueryRows;
-  initialActions?: QueryRows;
-  initialTelemetry?: QueryRows;
-  initialAlerts?: QueryRows;
-  initialThresholds?: QueryRows;
+  initialDevices?: IoTDevice[];
+  initialHubs?: IoTHub[];
+  initialPairingTokens?: IoTPairingToken[];
+  initialActions?: IoTAction[];
+  initialTelemetry?: IoTTelemetry[];
+  initialAlerts?: IoTAlert[];
+  initialThresholds?: IoTThreshold[];
   organizationId?: number;
 }
 
