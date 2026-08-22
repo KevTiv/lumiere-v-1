@@ -105,7 +105,7 @@ import { HrBenefitsPanel } from "./hr-benefits-panel"
 import { HrRecruitmentPanel } from "./hr-recruitment-panel"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
-import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
+import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import {
   toCreateContractParams,
   toCreateDepartmentParams,
@@ -359,7 +359,7 @@ interface HrClientProps {
   initialLeaves?: Record<string, unknown>[]
   initialContracts?: Record<string, unknown>[]
   initialPayslips?: Record<string, unknown>[]
-  initialPricelists?: Record<string, unknown>[]
+  initialPricelists?: ProductPricelist[]
   organizationId?: number
 }
 

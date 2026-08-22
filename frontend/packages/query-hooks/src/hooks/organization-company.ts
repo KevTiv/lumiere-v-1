@@ -6,6 +6,19 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { apiFetch } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import type { ClearablePatch } from "@lumiere/erp-shared/accounting-create-params"
+import type {
+  Company,
+  CreateCompanyParams,
+  CreateDataClassificationParams,
+  CreateDataClassificationRuleParams,
+  DataClassification,
+  DataClassificationRule,
+  UpdateCompanyAddressParams,
+  UpdateCompanyBusinessParams,
+  UpdateCompanyHierarchyParams,
+  UpdateCompanyParams,
+} from "@lumiere/stdb/types"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
@@ -14,12 +27,12 @@ function stdbQueryKey(resource: string, organizationId: number) {
 }
 
 export function useCompanies(organizationId: number, enabled: boolean) {
-  return useQuery({
+  return useQuery<Company[]>({
     queryKey: stdbQueryKey("companies", organizationId),
     queryFn: async () => {
       const r = await apiFetch("/api/query/companies")
       if (!r.ok) throw new Error(await parseCallError(r))
-      const j = (await r.json()) as { data?: Record<string, unknown>[] }
+      const j = (await r.json()) as { data?: Company[] }
       return j.data ?? []
     },
     enabled: enabled && organizationId > 0,
@@ -99,12 +112,12 @@ export function useCompanyVerticalPacks(companyId: bigint, enabled = true) {
 }
 
 export function useDataClassifications(organizationId: number, enabled: boolean) {
-  return useQuery({
+  return useQuery<DataClassification[]>({
     queryKey: stdbQueryKey("data-classifications", organizationId),
     queryFn: async () => {
       const r = await apiFetch("/api/query/data-classifications")
       if (!r.ok) throw new Error(await parseCallError(r))
-      const j = (await r.json()) as { data?: Record<string, unknown>[] }
+      const j = (await r.json()) as { data?: DataClassification[] }
       return j.data ?? []
     },
     enabled: enabled && organizationId > 0,
@@ -113,12 +126,12 @@ export function useDataClassifications(organizationId: number, enabled: boolean)
 }
 
 export function useDataClassificationRules(organizationId: number, enabled: boolean) {
-  return useQuery({
+  return useQuery<DataClassificationRule[]>({
     queryKey: stdbQueryKey("data-classification-rules", organizationId),
     queryFn: async () => {
       const r = await apiFetch("/api/query/data-classification-rules")
       if (!r.ok) throw new Error(await parseCallError(r))
-      const j = (await r.json()) as { data?: Record<string, unknown>[] }
+      const j = (await r.json()) as { data?: DataClassificationRule[] }
       return j.data ?? []
     },
     enabled: enabled && organizationId > 0,
@@ -138,8 +151,8 @@ function invalidatePrivacyQueries(qc: ReturnType<typeof useQueryClient>, organiz
 export function useCreateCompany(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = stdbBffCommandPost("create_company", { params: stdbParamsToJson(params as object) })
+    mutationFn: async (params: CreateCompanyParams) => {
+      const { urlPath, init } = stdbBffCommandPost("create_company", { params: stdbParamsToJson(params as object, "CreateCompanyParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -150,8 +163,8 @@ export function useCreateCompany(organizationId: number) {
 export function useUpdateCompany() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (args: { companyId: bigint; organizationId: number; params: Record<string, unknown> }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_company", { companyId: args.companyId, params: stdbParamsToJson(args.params as object) })
+    mutationFn: async (args: { companyId: bigint; organizationId: number; params: ClearablePatch<UpdateCompanyParams> }) => {
+      const { urlPath, init } = stdbBffCommandPost("update_company", { companyId: args.companyId, params: stdbParamsToJson(args.params as object, "UpdateCompanyParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
@@ -208,8 +221,8 @@ export function useSetCompanyVerticalPack() {
 export function useUpdateCompanyAddress() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (args: { companyId: bigint; organizationId: number; params: Record<string, unknown> }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_company_address", { companyId: args.companyId, params: stdbParamsToJson(args.params as object) })
+    mutationFn: async (args: { companyId: bigint; organizationId: number; params: ClearablePatch<UpdateCompanyAddressParams> }) => {
+      const { urlPath, init } = stdbBffCommandPost("update_company_address", { companyId: args.companyId, params: stdbParamsToJson(args.params as object, "UpdateCompanyAddressParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
@@ -223,8 +236,8 @@ export function useUpdateCompanyAddress() {
 export function useUpdateCompanyBusiness() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (args: { companyId: bigint; organizationId: number; params: Record<string, unknown> }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_company_business", { companyId: args.companyId, params: stdbParamsToJson(args.params as object) })
+    mutationFn: async (args: { companyId: bigint; organizationId: number; params: ClearablePatch<UpdateCompanyBusinessParams> }) => {
+      const { urlPath, init } = stdbBffCommandPost("update_company_business", { companyId: args.companyId, params: stdbParamsToJson(args.params as object, "UpdateCompanyBusinessParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
@@ -238,8 +251,8 @@ export function useUpdateCompanyBusiness() {
 export function useUpdateCompanyHierarchy() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (args: { companyId: bigint; organizationId: number; params: Record<string, unknown> }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_company_hierarchy", { companyId: args.companyId, params: stdbParamsToJson(args.params as object) })
+    mutationFn: async (args: { companyId: bigint; organizationId: number; params: ClearablePatch<UpdateCompanyHierarchyParams> }) => {
+      const { urlPath, init } = stdbBffCommandPost("update_company_hierarchy", { companyId: args.companyId, params: stdbParamsToJson(args.params as object, "UpdateCompanyHierarchyParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
       return args.organizationId
@@ -268,8 +281,8 @@ export function useDeleteCompany() {
 export function useCreateDataClassification(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = stdbBffCommandPost("create_data_classification", { params: stdbParamsToJson(params as object) })
+    mutationFn: async (params: CreateDataClassificationParams) => {
+      const { urlPath, init } = stdbBffCommandPost("create_data_classification", { params: stdbParamsToJson(params as object, "CreateDataClassificationParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -280,8 +293,8 @@ export function useCreateDataClassification(organizationId: number) {
 export function useCreateDataClassificationRule(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = stdbBffCommandPost("create_data_classification_rule", { params: stdbParamsToJson(params as object) })
+    mutationFn: async (params: CreateDataClassificationRuleParams) => {
+      const { urlPath, init } = stdbBffCommandPost("create_data_classification_rule", { params: stdbParamsToJson(params as object, "CreateDataClassificationRuleParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },

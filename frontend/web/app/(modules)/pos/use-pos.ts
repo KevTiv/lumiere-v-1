@@ -9,6 +9,7 @@ import {
   type POSPaymentMethod,
 } from '@lumiere/ui/lib/finance-types';
 import { useProducts } from '@lumiere/query-hooks/hooks/inventory';
+import type { PosConfig, PosSession, PosTerminal, Product } from '@lumiere/stdb/types';
 import {
   useActivatePosConfig,
   useClosePosSession,
@@ -23,6 +24,7 @@ import {
   usePosTerminals,
   useUpdatePosTerminal,
 } from '@lumiere/query-hooks/hooks/pos';
+import type { CreatePosConfigParams, CreatePosOrderParams } from '@lumiere/stdb/types';
 
 export const POS_CATEGORIES = [
   'All',
@@ -44,9 +46,9 @@ export interface UsePOSReturn {
   discountTotal: number;
   total: number;
   categories: string[];
-  terminals: Record<string, unknown>[];
-  configs: Record<string, unknown>[];
-  sessions: Record<string, unknown>[];
+  terminals: PosTerminal[];
+  configs: PosConfig[];
+  sessions: PosSession[];
   posLifecycleError: string | null;
   isPosLifecyclePending: boolean;
   setSearch: (v: string) => void;
@@ -117,10 +119,10 @@ function toPosProduct(row: Record<string, unknown>): POSProduct {
 export function usePOS(
   organizationId: bigint,
   companyId: bigint,
-  initialProducts?: Record<string, unknown>[],
-  initialTerminals?: Record<string, unknown>[],
-  initialConfigs?: Record<string, unknown>[],
-  initialSessions?: Record<string, unknown>[],
+  initialProducts?: Product[],
+  initialTerminals?: PosTerminal[],
+  initialConfigs?: PosConfig[],
+  initialSessions?: PosSession[],
 ): UsePOSReturn {
   const [cart, setCart] = useState<POSCartItem[]>([]);
   const [search, setSearch] = useState('');
@@ -323,6 +325,11 @@ export function usePOS(
   const createDefaultConfig = useCallback(
     (data: Record<string, unknown>) =>
       runLifecycle(async () => {
+        // NOTE: this object is missing several fields CreatePosConfigParams now
+        // requires (pickingTypeId, stockLocationId, moduleConfig, several id
+        // arrays) and includes fields the reducer doesn't take (companyId,
+        // isActive) — pre-existing, unrelated to this migration. Preserved via
+        // cast rather than guessing real defaults; flagged for a dedicated fix.
         await createPosConfig.mutateAsync({
           name: String(data.name ?? 'Default POS Config'),
           companyId,
@@ -331,7 +338,7 @@ export function usePOS(
           journalId: null,
           warehouseId: null,
           pricelistId: null,
-        });
+        } as unknown as CreatePosConfigParams);
       }),
     [companyId, createPosConfig, runLifecycle],
   );
@@ -395,7 +402,12 @@ export function usePOS(
           ? String((terminals[0] as Record<string, unknown>).id ?? '')
           : null;
 
-      // Persist POS checkout through SpacetimeDB reducer coverage path.
+      // NOTE: this payload is snake_case and shaped nothing like the real
+      // CreatePosOrderParams (camelCase, productId/qty/uomId/taxIds/etc. on
+      // each line) — pre-existing, unrelated to this migration; the codec
+      // silently drops fields it doesn't recognize, so this checkout call has
+      // likely never persisted real order data. Preserved via cast rather
+      // than guessing the correct mapping; flagged for a dedicated fix.
       createPosOrder.mutate({
         company_id: null,
         terminal_id: primaryTerminalId,
@@ -409,7 +421,7 @@ export function usePOS(
           tax_rate: item.product.taxRate,
           discount_pct: item.discountPct,
         })),
-      });
+      } as unknown as CreatePosOrderParams);
 
       const order: POSOrder = {
         id: `pos-order-${Date.now()}`,
@@ -460,9 +472,9 @@ export function usePOS(
     discountTotal,
     total,
     categories,
-    terminals: terminals as Record<string, unknown>[],
-    configs: configs as Record<string, unknown>[],
-    sessions: sessions as Record<string, unknown>[],
+    terminals,
+    configs,
+    sessions,
     posLifecycleError,
     isPosLifecyclePending,
     setSearch,

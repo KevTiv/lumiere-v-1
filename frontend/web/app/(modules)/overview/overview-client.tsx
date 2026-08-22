@@ -19,28 +19,29 @@ import { overviewDashboard } from "@/lib/module-dashboard-configs"
 import { useOverviewModuleSubscription } from "@/lib/module-subscription-hooks"
 import { enumTag, moveTypeTagFromRow } from "@/lib/accounting-post-draft"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
-import { useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
-import { useAccountMoves } from "@lumiere/query-hooks/hooks/accounting"
+import { useSaleOrders, type SaleOrder } from "@lumiere/query-hooks/hooks/sales"
+import { useAccountMoves, type AccountMove } from "@lumiere/query-hooks/hooks/accounting"
 import { usePaymentReconciliations, usePaymentTransactions } from "@lumiere/query-hooks/hooks/accounting"
 import { useStockQuants, useProducts } from "@lumiere/query-hooks/hooks/inventory"
-import { usePurchaseOrders } from "@lumiere/query-hooks/hooks/purchasing"
+import { usePurchaseOrders, type PurchaseOrder } from "@lumiere/query-hooks/hooks/purchasing"
 import { useTasks, useProjects } from "@lumiere/query-hooks/hooks/projects"
-import { useContacts } from "@lumiere/query-hooks/hooks/crm"
+import { useContacts, type Contact } from "@lumiere/query-hooks/hooks/crm"
 import { useAiActionDraftInboxCount } from "@lumiere/query-hooks/hooks/ai-action-drafts"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useMessageBatches } from "@lumiere/query-hooks/hooks/messages"
 import { OwnerControlLoop } from "./owner-control-loop"
+import type { StockQuant, Product } from "@lumiere/stdb/types"
 
 interface OverviewClientProps {
   organizationId?: number
-  initialOrders?: Record<string, unknown>[]
-  initialMoves?: Record<string, unknown>[]
-  initialStockQuants?: Record<string, unknown>[]
-  initialProducts?: Record<string, unknown>[]
+  initialOrders?: SaleOrder[]
+  initialMoves?: AccountMove[]
+  initialStockQuants?: StockQuant[]
+  initialProducts?: Product[]
   initialTasks?: Record<string, unknown>[]
   initialProjects?: Record<string, unknown>[]
-  initialPurchaseOrders?: Record<string, unknown>[]
-  initialContacts?: Record<string, unknown>[]
+  initialPurchaseOrders?: PurchaseOrder[]
+  initialContacts?: Contact[]
 }
 
 function matchesCompany(row: Record<string, unknown>, companyId: number | null): boolean {

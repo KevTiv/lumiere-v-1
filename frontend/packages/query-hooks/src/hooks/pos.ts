@@ -10,8 +10,9 @@ import { stdbBffCommandPost } from '@lumiere/stdb/commands';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from '../http';
+import { apiFetch, fetchQueryList, rqBigIntKey } from '../http';
 import { stdbParamsToJson } from '@lumiere/erp-shared/stdb-params-json';
+import type { CreatePosConfigParams, CreatePosOrderParams, PosConfig, PosSession, PosTerminal } from '@lumiere/stdb/types';
 
 type ScalarId = bigint | number | string;
 
@@ -23,9 +24,9 @@ function toScalarU64(v: ScalarId): bigint {
 
 export function usePosTerminals(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: PosTerminal[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<PosTerminal[]>({
     queryKey: ['pos-terminals', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -37,8 +38,8 @@ export function usePosTerminals(
   });
 }
 
-export function usePosConfigs(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function usePosConfigs(organizationId: bigint, initialData?: PosConfig[]) {
+  return useQuery<PosConfig[]>({
     queryKey: ['pos-configs', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/pos-configs', 'Failed to fetch POS configs'),
@@ -49,9 +50,9 @@ export function usePosConfigs(organizationId: bigint, initialData?: QueryRows) {
 
 export function usePosSessions(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: PosSession[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<PosSession[]>({
     queryKey: ['pos-sessions', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/pos-sessions', 'Failed to fetch POS sessions'),
@@ -130,11 +131,11 @@ export function useUpdatePosTerminal(organizationId: bigint) {
 
 export function useCreatePosConfig(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreatePosConfigParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_pos_config', {
         companyId: companyId,
-        params: stdbParamsToJson(params as object),
+        params: stdbParamsToJson(params as object, 'CreatePosConfigParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create POS config');
@@ -224,10 +225,10 @@ export function useComputePosSessionTotals(organizationId: bigint) {
 
 export function useCreatePosOrder(organizationId: bigint) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreatePosOrderParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_pos_order', {
-        params: stdbParamsToJson(params as object),
+        params: stdbParamsToJson(params as object, 'CreatePosOrderParams'),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create POS order');

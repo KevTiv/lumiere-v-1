@@ -73,7 +73,7 @@ function createHttpHooks(
     useProposalLineItems,
     useProposalPresence,
     useProposalComments,
-    useProducts,
+    useProducts: useProducts as unknown as ProposalWorkspaceHooks['useProducts'],
 
     useUpsertProposalSection: () => {
       const mutation = useUpsertProposalSection(organizationId, companyId)

@@ -50,7 +50,7 @@ export function useImportJobs(organizationId: bigint, enabled = true) {
     queryFn: () => fetchQueryList("/api/query/import-jobs", "Failed to fetch import jobs"),
     enabled: organizationId > 0n && enabled,
     refetchInterval: (query) => {
-      const rows = (query.state.data ?? []) as ImportJobRow[]
+      const rows = (query.state.data ?? []) as unknown as ImportJobRow[]
       const pending = rows.some((row) => {
         const status = String(row.status ?? "")
         return status === "pending" || status === ""

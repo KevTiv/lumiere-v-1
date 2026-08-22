@@ -17,6 +17,7 @@ import {
 } from "@lumiere/ui"
 import type { ManufacturingCsvImportKind } from "@lumiere/ui"
 import type { EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { Product, Warehouse, StockPicking, StockQuant } from "@lumiere/stdb/types"
 import { manufacturingModuleConfig } from "@/lib/module-dashboard-configs"
 import { useManufacturingModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -61,10 +62,10 @@ interface ManufacturingClientProps {
   initialWorkcenters?: Record<string, unknown>[]
   initialRoutingOperations?: Record<string, unknown>[]
   initialIotDevices?: Record<string, unknown>[]
-  initialProducts?: Record<string, unknown>[]
-  initialWarehouses?: Record<string, unknown>[]
-  initialStockPickings?: Record<string, unknown>[]
-  initialStockQuants?: Record<string, unknown>[]
+  initialProducts?: Product[]
+  initialWarehouses?: Warehouse[]
+  initialStockPickings?: StockPicking[]
+  initialStockQuants?: StockQuant[]
   organizationId?: number
 }
 

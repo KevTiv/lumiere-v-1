@@ -357,10 +357,10 @@ export function RoleManagement() {
               <ul className="space-y-2 text-sm">
                 {sodRules.map((rule) => {
                   const id = String(rule.id ?? "")
-                  const a = String(rule.permission_a ?? rule.permissionA ?? "")
-                  const b = String(rule.permission_b ?? rule.permissionB ?? "")
+                  const a = String(rule.permissionA ?? "")
+                  const b = String(rule.permissionB ?? "")
                   const desc = String(rule.description ?? "")
-                  const isActive = rule.is_active !== false && rule.isActive !== false
+                  const isActive = rule.isActive !== false
                   return (
                     <li key={id} className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
                       <div>

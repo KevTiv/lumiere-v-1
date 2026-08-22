@@ -23,6 +23,14 @@ import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { invalidateResourceQueries } from "../subscription-query"
 import { toCreateAuditRuleParams } from "@lumiere/erp-shared/settings-create-params"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import type {
+  AuditLog,
+  AuditRule,
+  DelegatedAdminScope,
+  SodConflictRule,
+  UserOrganization,
+  UserRoleAssignment,
+} from "@lumiere/stdb/types"
 
 type ScalarId = bigint | number | string
 
@@ -32,8 +40,8 @@ function toScalarU64(v: ScalarId): bigint {
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
-export function useAuditLog(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useAuditLog(organizationId: bigint, initialData?: AuditLog[]) {
+  return useQuery<AuditLog[]>({
     queryKey: ['audit-log', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/audit-log', 'Failed to fetch audit log'),
     enabled: organizationId > 0n,
@@ -42,8 +50,8 @@ export function useAuditLog(organizationId: bigint, initialData?: QueryRows) {
   })
 }
 
-export function useAuditRules(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useAuditRules(organizationId: bigint, initialData?: AuditRule[]) {
+  return useQuery<AuditRule[]>({
     queryKey: ['audit-rules', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/audit-rules', 'Failed to fetch audit rules'),
     staleTime: 30_000,
@@ -415,7 +423,7 @@ export function useSettingsRoles(organizationId: bigint) {
 }
 
 export function useUserRoleAssignments(organizationId: bigint) {
-  return useQuery<QueryRows>({
+  return useQuery<UserRoleAssignment[]>({
     queryKey: ['user-role-assignments', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -428,7 +436,7 @@ export function useUserRoleAssignments(organizationId: bigint) {
 }
 
 export function useUserOrganizations(organizationId: bigint) {
-  return useQuery<QueryRows>({
+  return useQuery<UserOrganization[]>({
     queryKey: ['user-organizations', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/user-organization', 'Failed to fetch user organizations'),
@@ -975,10 +983,10 @@ export function useRevokeFieldPermission(organizationId: bigint) {
 }
 
 export function useSodConflictRules(organizationId: bigint) {
-  return useQuery<QueryRows>({
+  return useQuery<SodConflictRule[]>({
     queryKey: ["sod-conflict-rules", rqBigIntKey(organizationId)],
     queryFn: async () => {
-      const list = (await stdbBrowserQuery("sod-conflict-rules")) as QueryRows
+      const list = (await stdbBrowserQuery("sod-conflict-rules")) as SodConflictRule[]
       return Array.isArray(list) ? list : []
     },
     enabled: organizationId > 0n,
@@ -1103,10 +1111,10 @@ export function useRevokeDelegatedAdminScope(organizationId: bigint) {
 }
 
 export function useDelegatedAdminScopes(organizationId: bigint) {
-  return useQuery<QueryRows>({
+  return useQuery<DelegatedAdminScope[]>({
     queryKey: ["delegated-admin-scopes", rqBigIntKey(organizationId)],
     queryFn: async () => {
-      const list = (await stdbBrowserQuery("delegated-admin-scopes")) as QueryRows
+      const list = (await stdbBrowserQuery("delegated-admin-scopes")) as DelegatedAdminScope[]
       return Array.isArray(list) ? list : []
     },
     enabled: organizationId > 0n,

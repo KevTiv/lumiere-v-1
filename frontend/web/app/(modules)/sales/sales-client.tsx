@@ -158,6 +158,19 @@ import {
   useRecordSalesIntegrationResult,
   useApplyOmnichannelAllocation,
   useScheduleSalesSlaEscalation,
+  type SaleOrder,
+  type SaleOrderLine,
+  type ProductPricelist,
+  type ProductPricelistItem,
+  type StockPickingBatch,
+  type DeliveryCarrier,
+  type DeliveryPriceRule,
+  type ShippingMethod,
+  type PosPaymentMethod,
+  type PosLoyaltyProgram,
+  type PosLoyaltyCard,
+  type ReturnOrder,
+  type ReturnOrderLine,
 } from '@lumiere/query-hooks/hooks/sales';
 import {
   useAccountMoves,
@@ -178,7 +191,8 @@ import {
   useCancelStockPicking,
   useDoneStockMove,
 } from '@lumiere/query-hooks/hooks/inventory';
-import { useContacts, useUsers } from '@lumiere/query-hooks/hooks/crm';
+import type { Warehouse, StockPicking } from '@lumiere/stdb/types';
+import { useContacts, useUsers, type Contact } from '@lumiere/query-hooks/hooks/crm';
 import { useWarehouses, useProducts, useUoms, useProductCategories } from '@lumiere/query-hooks/hooks/inventory';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { useRuntimeListConfig } from '@lumiere/ui/forms';
@@ -277,23 +291,23 @@ function stockMovePickingId(row: Record<string, unknown>): string | null {
 }
 
 interface SalesClientProps {
-  initialOrders?: Record<string, unknown>[];
-  initialOrderLines?: Record<string, unknown>[];
-  initialPricelists?: Record<string, unknown>[];
-  initialPricelistItems?: Record<string, unknown>[];
-  initialDeliveries?: Record<string, unknown>[];
-  initialDeliveryCarriers?: Record<string, unknown>[];
-  initialDeliveryPriceRules?: Record<string, unknown>[];
-  initialShippingMethods?: Record<string, unknown>[];
-  initialPosPaymentMethods?: Record<string, unknown>[];
-  initialLoyaltyPrograms?: Record<string, unknown>[];
-  initialLoyaltyCards?: Record<string, unknown>[];
-  initialContacts?: Record<string, unknown>[];
-  initialWarehouses?: Record<string, unknown>[];
-  initialAccountMoves?: Record<string, unknown>[];
-  initialStockPickings?: Record<string, unknown>[];
-  initialReturnOrders?: Record<string, unknown>[];
-  initialReturnOrderLines?: Record<string, unknown>[];
+  initialOrders?: SaleOrder[];
+  initialOrderLines?: SaleOrderLine[];
+  initialPricelists?: ProductPricelist[];
+  initialPricelistItems?: ProductPricelistItem[];
+  initialDeliveries?: StockPickingBatch[];
+  initialDeliveryCarriers?: DeliveryCarrier[];
+  initialDeliveryPriceRules?: DeliveryPriceRule[];
+  initialShippingMethods?: ShippingMethod[];
+  initialPosPaymentMethods?: PosPaymentMethod[];
+  initialLoyaltyPrograms?: PosLoyaltyProgram[];
+  initialLoyaltyCards?: PosLoyaltyCard[];
+  initialContacts?: Contact[];
+  initialWarehouses?: Warehouse[];
+  initialAccountMoves?: AccountMove[];
+  initialStockPickings?: StockPicking[];
+  initialReturnOrders?: ReturnOrder[];
+  initialReturnOrderLines?: ReturnOrderLine[];
   organizationId?: number;
 }
 
@@ -2837,7 +2851,7 @@ function SalesClientLoaded({
             const orders = (await fetchQueryList(
               '/api/query/sale-orders',
               'Failed to fetch sale orders',
-            )) as SaleOrderLinkRow[];
+            )) as unknown as SaleOrderLinkRow[];
             return buildOrderIdMapFromSaleOrders(orders, refs);
           }}
         />

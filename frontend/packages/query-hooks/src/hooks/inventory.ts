@@ -32,7 +32,94 @@ import {
   toCreateUomConversionParams,
   toCreateUomParams,
 } from '@lumiere/erp-shared/inventory-create-params';
-import type { UpdateProductParams } from '@lumiere/stdb/types';
+import type {
+  UpdateProductParams,
+  Product,
+  ProductCategory,
+  Uom,
+  StockQuant,
+  StockPicking,
+  Warehouse,
+  InventoryAdjustment,
+  StockLocation,
+  StockProductionLot,
+  QualityCheck,
+  QualityAlert,
+  Warehouse3DZone,
+  StockCycleCount,
+  StockInventory,
+  StockMove,
+  StockRoute,
+  StockRule,
+  PickingWave,
+  WarehouseTask,
+  ReplenishmentRule,
+  BarcodeRule,
+  AdjustmentReason,
+  BarcodeNomenclature,
+  SerialLotTraceability,
+  StockTraceabilityReport,
+  InventoryValuation,
+  StockProductionSerial,
+  StockPackage,
+  InventoryException,
+  WarehouseSyncIntent,
+  CreateProductParams,
+  CreateWarehouseParams,
+  UpdateWarehouseParams,
+  CreateStockPickingParams,
+  CreateInventoryAdjustmentParams,
+  CreateCycleCountPlanParams,
+  RecordCycleCountLineParams,
+  CreateStockLocationParams,
+  UpdateStockLocationParams,
+  CreateStockMoveParams,
+  CreateStockProductionLotParams,
+  CreateStockProductionSerialParams,
+  CreateQualityCheckParams,
+  CreateQualityAlertParams,
+  CreateQualityPointParams,
+  UpdateQualityPointParams,
+  CreateQualityTeamParams,
+  UpdateQualityTeamParams,
+  CreateBarcodeRuleParams,
+  UpdateBarcodeRuleParams,
+  RecordBarcodeScanParams,
+  UpdateBarcodeNomenclatureParams,
+  CreateAdjustmentReasonParams,
+  CreateTraceabilityRecordParams,
+  CreateStockTraceabilityReportParams,
+  CreatePickingWaveParams,
+  CreateInventoryCloseParams,
+  RunInventoryCloseParams,
+  CreateInventoryIntegrationIntentParams,
+  RecordInventoryIntegrationResultParams,
+  CreatePackagingMaterialParams,
+  RunCartonizationParams,
+  ReceiveConsignmentStockParams,
+  ExecuteCrossDockParams,
+  ExecuteDirectedPutawayParams,
+  PackStockPickingParams,
+  RefreshInventoryExceptionsParams,
+  CreateWarehouseSyncIntentParams,
+  CreateProductCategoryParams,
+  UpdateProductCategoryParams,
+  CreateStockRouteParams,
+  UpdateStockRouteParams,
+  CreateStockRuleParams,
+  UpdateStockRuleParams,
+  CreateWarehouseTaskParams,
+  UpdateProductVariantParams,
+  UpdateProductInventoryDataParams,
+  UpdateProductPricingParams,
+  UpdateStockProductionLotParams,
+  UpdateStockProductionSerialParams,
+  CreateWarehouse3DZoneParams,
+  UpdateWarehouse3DZoneParams,
+  UpdateProductSupplierInfoParams,
+  UpdateProductPackagingParams,
+  CreateStockQuantParams,
+} from '@lumiere/stdb/types';
 import { finalizeUpdateProductParams } from './inventory-params-merge';
 type ScalarId = bigint | number | string;
 
@@ -154,8 +241,11 @@ function invalidateInventoryQueries(
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
-export function useProducts(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useProducts(
+  organizationId: bigint,
+  initialData?: Product[],
+) {
+  return useQuery<Product[]>({
     queryKey: ['products', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/products', 'Failed to fetch products'),
@@ -166,9 +256,9 @@ export function useProducts(organizationId: bigint, initialData?: QueryRows) {
 
 export function useProductCategories(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProductCategory[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProductCategory[]>({
     queryKey: ['product-categories', rqBigIntKey(organizationId)],
     queryFn: async () => {
       const rows = await fetchQueryList(
@@ -182,8 +272,8 @@ export function useProductCategories(
   });
 }
 
-export function useUoms(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useUoms(organizationId: bigint, initialData?: Uom[]) {
+  return useQuery<Uom[]>({
     queryKey: ['uoms', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/uoms', 'Failed to fetch units of measure'),
@@ -194,9 +284,9 @@ export function useUoms(organizationId: bigint, initialData?: QueryRows) {
 
 export function useStockQuants(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: StockQuant[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<StockQuant[]>({
     queryKey: ['stock-quants', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/stock-quants', 'Failed to fetch stock quants'),
@@ -207,9 +297,9 @@ export function useStockQuants(
 
 export function useStockPickings(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: StockPicking[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<StockPicking[]>({
     queryKey: ['stock-pickings', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -221,8 +311,11 @@ export function useStockPickings(
   });
 }
 
-export function useWarehouses(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useWarehouses(
+  organizationId: bigint,
+  initialData?: Warehouse[],
+) {
+  return useQuery<Warehouse[]>({
     queryKey: ['warehouses', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/warehouses', 'Failed to fetch warehouses'),
@@ -233,9 +326,9 @@ export function useWarehouses(organizationId: bigint, initialData?: QueryRows) {
 
 export function useInventoryAdjustments(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: InventoryAdjustment[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<InventoryAdjustment[]>({
     queryKey: ['inventory-adjustments', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -249,9 +342,9 @@ export function useInventoryAdjustments(
 
 export function useStockLocations(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: StockLocation[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<StockLocation[]>({
     queryKey: ['stock-locations', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -265,9 +358,9 @@ export function useStockLocations(
 
 export function useProductionLots(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: StockProductionLot[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<StockProductionLot[]>({
     queryKey: ['stock-production-lots', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -281,9 +374,9 @@ export function useProductionLots(
 
 export function useQualityChecks(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: QualityCheck[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<QualityCheck[]>({
     queryKey: ['quality-checks', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -297,9 +390,9 @@ export function useQualityChecks(
 
 export function useQualityAlerts(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: QualityAlert[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<QualityAlert[]>({
     queryKey: ['quality-alerts', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -333,7 +426,7 @@ export function useWarehouse3D(
   warehouseId: bigint,
 ) {
   const orgKey = rqBigIntKey(organizationId);
-  const { data: zones3D = [] } = useQuery<QueryRows>({
+  const { data: zones3D = [] } = useQuery<Warehouse3DZone[]>({
     queryKey: ['warehouse-3d-zones', orgKey],
     queryFn: () =>
       fetchQueryList(
@@ -342,7 +435,7 @@ export function useWarehouse3D(
       ),
     staleTime: 30_000,
   });
-  const { data: allLocations = [] } = useQuery<QueryRows>({
+  const { data: allLocations = [] } = useQuery<StockLocation[]>({
     queryKey: ['stock-locations', orgKey],
     queryFn: () =>
       fetchQueryList(
@@ -351,13 +444,13 @@ export function useWarehouse3D(
       ),
     staleTime: 30_000,
   });
-  const { data: allQuants = [] } = useQuery<QueryRows>({
+  const { data: allQuants = [] } = useQuery<StockQuant[]>({
     queryKey: ['stock-quants', orgKey],
     queryFn: () =>
       fetchQueryList('/api/query/stock-quants', 'Failed to fetch stock quants'),
     staleTime: 30_000,
   });
-  const { data: products = [] } = useQuery<QueryRows>({
+  const { data: products = [] } = useQuery<Product[]>({
     queryKey: ['products', orgKey],
     queryFn: () =>
       fetchQueryList('/api/query/products', 'Failed to fetch products'),
@@ -390,9 +483,9 @@ export function useWarehouse3D(
 
 export function useStockCycleCounts(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: StockCycleCount[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<StockCycleCount[]>({
     queryKey: ['stock-cycle-counts', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -406,9 +499,9 @@ export function useStockCycleCounts(
 
 export function useStockInventories(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: StockInventory[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<StockInventory[]>({
     queryKey: ['stock-inventories', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -420,8 +513,11 @@ export function useStockInventories(
   });
 }
 
-export function useStockMoves(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useStockMoves(
+  organizationId: bigint,
+  initialData?: StockMove[],
+) {
+  return useQuery<StockMove[]>({
     queryKey: ['stock-moves', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/stock-moves', 'Failed to fetch stock moves'),
@@ -432,9 +528,9 @@ export function useStockMoves(organizationId: bigint, initialData?: QueryRows) {
 
 export function useStockRoutes(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: StockRoute[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<StockRoute[]>({
     queryKey: ['stock-routes', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/stock-routes', 'Failed to fetch stock routes'),
@@ -443,8 +539,11 @@ export function useStockRoutes(
   });
 }
 
-export function useStockRules(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useStockRules(
+  organizationId: bigint,
+  initialData?: StockRule[],
+) {
+  return useQuery<StockRule[]>({
     queryKey: ['stock-rules', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/stock-rules', 'Failed to fetch stock rules'),
@@ -455,9 +554,9 @@ export function useStockRules(organizationId: bigint, initialData?: QueryRows) {
 
 export function usePickingWaves(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: PickingWave[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<PickingWave[]>({
     queryKey: ['picking-waves', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -471,9 +570,9 @@ export function usePickingWaves(
 
 export function useWarehouseTasks(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: WarehouseTask[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<WarehouseTask[]>({
     queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -487,9 +586,9 @@ export function useWarehouseTasks(
 
 export function useReplenishmentRules(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ReplenishmentRule[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ReplenishmentRule[]>({
     queryKey: ['replenishment-rules', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -503,9 +602,9 @@ export function useReplenishmentRules(
 
 export function useBarcodeRules(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: BarcodeRule[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<BarcodeRule[]>({
     queryKey: ['barcode-rules', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -519,9 +618,9 @@ export function useBarcodeRules(
 
 export function useAdjustmentReasons(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: AdjustmentReason[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<AdjustmentReason[]>({
     queryKey: ['adjustment-reasons', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -535,9 +634,9 @@ export function useAdjustmentReasons(
 
 export function useBarcodeNomenclatures(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: BarcodeNomenclature[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<BarcodeNomenclature[]>({
     queryKey: ['barcode-nomenclatures', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -551,9 +650,9 @@ export function useBarcodeNomenclatures(
 
 export function useSerialLotTraceability(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: SerialLotTraceability[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<SerialLotTraceability[]>({
     queryKey: ['serial-lot-traceability', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -567,9 +666,9 @@ export function useSerialLotTraceability(
 
 export function useStockTraceabilityReports(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: StockTraceabilityReport[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<StockTraceabilityReport[]>({
     queryKey: ['stock-traceability-reports', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -583,9 +682,9 @@ export function useStockTraceabilityReports(
 
 export function useInventoryValuations(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: InventoryValuation[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<InventoryValuation[]>({
     queryKey: ['inventory-valuations', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -599,9 +698,9 @@ export function useInventoryValuations(
 
 export function useStockProductionSerials(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: StockProductionSerial[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<StockProductionSerial[]>({
     queryKey: ['stock-production-serials', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -621,7 +720,7 @@ export function useCreateProduct(
 ) {
   const qc = useQueryClient();
   const productDefaults = options?.productDefaults ?? {};
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateProductParams>({
     mutationFn: async (params) => {
       const merged = mergeReducerParams(
         mergeReducerParams(CREATE_PRODUCT_DEFAULTS, productDefaults),
@@ -699,7 +798,7 @@ export function useCreateProductVariant(organizationId: bigint) {
 
 export function useCreateWarehouse(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateWarehouseParams>({
     mutationFn: async (params) => {
       if (companyId == null || companyId <= 0n)
         throw new Error('A selected company is required');
@@ -719,7 +818,7 @@ export function useUpdateWarehouse(organizationId: bigint, companyId?: bigint) {
   return useMutation<
     void,
     Error,
-    { warehouseId: ScalarId; params: Record<string, unknown> }
+    { warehouseId: ScalarId; params: Partial<UpdateWarehouseParams> }
   >({
     mutationFn: async ({ warehouseId, params }) => {
       if (companyId == null || companyId <= 0n)
@@ -798,7 +897,7 @@ export function useCreateStockPicking(
 ) {
   const qc = useQueryClient();
   const scopedCompanyId = options?.companyId;
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateStockPickingParams>({
     mutationFn: async (params) => {
       const base = mergeReducerParams(
         CREATE_STOCK_PICKING_DEFAULTS,
@@ -820,7 +919,7 @@ export function useCreateStockPicking(
 
 export function useCreateInventoryAdjustment(organizationId: bigint) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateInventoryAdjustmentParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_inventory_adjustment',
@@ -970,7 +1069,7 @@ export function useCreateCycleCountPlan(
   return useMutation<
     void,
     Error,
-    { locationId: number; params: Record<string, unknown> }
+    { locationId: number; params: CreateCycleCountPlanParams }
   >({
     mutationFn: async ({ locationId, params }) => {
       if (companyId == null || companyId <= 0n)
@@ -1024,7 +1123,7 @@ export function useRecordCycleCountLine(
   return useMutation<
     void,
     Error,
-    { cycleCountId: ScalarId; params: Record<string, unknown> }
+    { cycleCountId: ScalarId; params: RecordCycleCountLineParams }
   >({
     mutationFn: async ({ cycleCountId, params }) => {
       if (companyId == null || companyId <= 0n)
@@ -1096,7 +1195,7 @@ export function usePostCycleCountAdjustments(
 
 export function useCreateStockLocation(organizationId: bigint) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateStockLocationParams>({
     mutationFn: async (params) => {
       const merged = mergeReducerParams(CREATE_STOCK_LOCATION_DEFAULTS, params);
       const { urlPath, init } = stdbBffCommandPost('create_stock_location', {
@@ -1114,7 +1213,7 @@ export function useUpdateStockLocation(organizationId: bigint) {
   return useMutation<
     void,
     Error,
-    { locationId: ScalarId; params: Record<string, unknown> }
+    { locationId: ScalarId; params: Partial<UpdateStockLocationParams> }
   >({
     mutationFn: async ({ locationId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('update_stock_location', {
@@ -1147,7 +1246,7 @@ export function useCreateStockMove(
   _companyId?: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateStockMoveParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_stock_move', {
         params: stdbParamsToJson(params as object, 'CreateStockMoveParams'),
@@ -1345,7 +1444,7 @@ export function useCreateStockProductionLot(
   _companyId?: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateStockProductionLotParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_stock_production_lot',
@@ -1363,7 +1462,7 @@ export function useCreateStockProductionSerial(
   _companyId?: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateStockProductionSerialParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_stock_production_serial',
@@ -1416,7 +1515,7 @@ export function useCreateQualityCheck(
   companyId: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateQualityCheckParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_quality_check', {
         companyId: companyId,
@@ -1500,7 +1599,7 @@ export function useCreateQualityAlert(
   return useMutation<
     void,
     Error,
-    { teamId: ScalarId; params: Record<string, unknown> }
+    { teamId: ScalarId; params: CreateQualityAlertParams }
   >({
     mutationFn: async ({ teamId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('create_quality_alert', {
@@ -1564,7 +1663,7 @@ export function useCreateQualityPoint(
   companyId: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateQualityPointParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_quality_point', {
         companyId: companyId,
@@ -1585,7 +1684,7 @@ export function useUpdateQualityPoint(
   return useMutation<
     void,
     Error,
-    { pointId: ScalarId; params: Record<string, unknown> }
+    { pointId: ScalarId; params: Partial<UpdateQualityPointParams> }
   >({
     mutationFn: async ({ pointId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('update_quality_point', {
@@ -1623,7 +1722,7 @@ export function useCreateQualityTeam(
   _companyId?: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateQualityTeamParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_quality_team', {
         params: stdbParamsToJson(params as object),
@@ -1643,7 +1742,7 @@ export function useUpdateQualityTeam(
   return useMutation<
     void,
     Error,
-    { teamId: ScalarId; params: Record<string, unknown> }
+    { teamId: ScalarId; params: Partial<UpdateQualityTeamParams> }
   >({
     mutationFn: async ({ teamId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('update_quality_team', {
@@ -1681,7 +1780,7 @@ export function useCreateBarcodeRule(
   _companyId?: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateBarcodeRuleParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_barcode_rule', {
         params: stdbParamsToJson(params as object),
@@ -1704,7 +1803,7 @@ export function useUpdateBarcodeRule(
   return useMutation<
     void,
     Error,
-    { ruleId: ScalarId; params: Record<string, unknown> }
+    { ruleId: ScalarId; params: Partial<UpdateBarcodeRuleParams> }
   >({
     mutationFn: async ({ ruleId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('update_barcode_rule', {
@@ -1746,7 +1845,7 @@ export function useRecordBarcodeScan(
   _companyId?: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, RecordBarcodeScanParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('record_barcode_scan', {
         params: stdbParamsToJson(params as object),
@@ -1786,7 +1885,7 @@ export function useUpdateBarcodeNomenclature(
   return useMutation<
     void,
     Error,
-    { nomenclatureId: ScalarId; params: Record<string, unknown> }
+    { nomenclatureId: ScalarId; params: Partial<UpdateBarcodeNomenclatureParams> }
   >({
     mutationFn: async ({ nomenclatureId, params }) => {
       const { urlPath, init } = stdbBffCommandPost(
@@ -1880,7 +1979,7 @@ export function useCreateAdjustmentReason(
 ) {
   const qc = useQueryClient();
   const orgKey = rqBigIntKey(organizationId);
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateAdjustmentReasonParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_adjustment_reason', {
         params: stdbParamsToJson(params as object),
@@ -1913,7 +2012,7 @@ export function useCreateTraceabilityRecord(
 ) {
   const qc = useQueryClient();
   const orgKey = rqBigIntKey(organizationId);
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateTraceabilityRecordParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_traceability_record',
@@ -1935,7 +2034,7 @@ export function useCreateTraceabilityReport(
 ) {
   const qc = useQueryClient();
   const orgKey = rqBigIntKey(organizationId);
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateStockTraceabilityReportParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_traceability_report',
@@ -2071,7 +2170,7 @@ export function useCreatePickingWave(
   companyId: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreatePickingWaveParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_picking_wave', {
         companyId: companyId,
@@ -2139,7 +2238,7 @@ export function useCreateInventoryClose(
   companyId: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateInventoryCloseParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_inventory_close', {
         companyId: companyId,
@@ -2163,7 +2262,7 @@ export function useRunInventoryClose(
   return useMutation<
     void,
     Error,
-    { closeId: ScalarId; params?: Record<string, unknown> }
+    { closeId: ScalarId; params?: RunInventoryCloseParams }
   >({
     mutationFn: async ({ closeId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('run_inventory_close', {
@@ -2203,7 +2302,7 @@ export function useCreateInventoryIntegrationIntent(
   companyId: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateInventoryIntegrationIntentParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_inventory_integration_intent',
@@ -2231,7 +2330,7 @@ export function useRecordInventoryIntegrationResult(
   return useMutation<
     void,
     Error,
-    { intentId: ScalarId; params: Record<string, unknown> }
+    { intentId: ScalarId; params: RecordInventoryIntegrationResultParams }
   >({
     mutationFn: async ({ intentId, params }) => {
       const { urlPath, init } = stdbBffCommandPost(
@@ -2260,7 +2359,7 @@ export function useCreatePackagingMaterial(
   companyId: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreatePackagingMaterialParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_packaging_material',
@@ -2281,7 +2380,7 @@ export function useCreatePackagingMaterial(
 
 export function useRunCartonization(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, RunCartonizationParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('run_cartonization', {
         companyId: companyId,
@@ -2317,7 +2416,7 @@ export function useReceiveConsignmentStock(
   companyId: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, ReceiveConsignmentStockParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'receive_consignment_stock',
@@ -2338,7 +2437,7 @@ export function useReceiveConsignmentStock(
 
 export function useExecuteCrossDock(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, ExecuteCrossDockParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('execute_cross_dock', {
         companyId: companyId,
@@ -2356,7 +2455,7 @@ export function useExecuteDirectedPutaway(
   companyId: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, ExecuteDirectedPutawayParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('execute_directed_putaway', {
         companyId: companyId,
@@ -2376,9 +2475,9 @@ export function useExecuteDirectedPutaway(
 
 export function useStockPackages(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: StockPackage[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<StockPackage[]>({
     queryKey: ['stock-packages', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -2392,7 +2491,7 @@ export function useStockPackages(
 
 export function usePackStockPicking(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, PackStockPickingParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('pack_stock_picking', {
         companyId: companyId,
@@ -2443,9 +2542,9 @@ export function useDoneStockPackage(organizationId: bigint, companyId: bigint) {
 /** Server-bounded: open short-ATP exceptions. */
 export function useInventoryExceptionsShortAtp(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: InventoryException[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<InventoryException[]>({
     queryKey: ['inventory-exceptions-short-atp', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -2460,9 +2559,9 @@ export function useInventoryExceptionsShortAtp(
 /** Server-bounded: open expired-lot exceptions. */
 export function useInventoryExceptionsExpiredLots(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: InventoryException[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<InventoryException[]>({
     queryKey: [
       'inventory-exceptions-expired-lots',
       rqBigIntKey(organizationId),
@@ -2480,9 +2579,9 @@ export function useInventoryExceptionsExpiredLots(
 /** Server-bounded: open QC-fail exceptions. */
 export function useInventoryExceptionsOpenQc(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: InventoryException[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<InventoryException[]>({
     queryKey: ['inventory-exceptions-open-qc', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -2499,7 +2598,7 @@ export function useRefreshInventoryExceptions(
   companyId: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown> | undefined>({
+  return useMutation<void, Error, RefreshInventoryExceptionsParams | undefined>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'refresh_inventory_exceptions',
@@ -2540,9 +2639,9 @@ export function useResolveInventoryException(
 
 export function useWarehouseSyncIntentsPending(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: WarehouseSyncIntent[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<WarehouseSyncIntent[]>({
     queryKey: ['warehouse-sync-intents-pending', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -2559,7 +2658,7 @@ export function useCreateWarehouseSyncIntent(
   companyId: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateWarehouseSyncIntentParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_warehouse_sync_intent',
@@ -2628,7 +2727,7 @@ export function useCreateProductCategory(
   companyId?: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateProductCategoryParams>({
     mutationFn: async (params) => {
       const base = companyId != null ? { companyId: Number(companyId) } : {};
       const merged = mergeReducerParams(base, params);
@@ -2656,7 +2755,7 @@ export function useUpdateProductCategory(
   return useMutation<
     void,
     Error,
-    { categoryId: ScalarId; params: Record<string, unknown> }
+    { categoryId: ScalarId; params: Partial<UpdateProductCategoryParams> }
   >({
     mutationFn: async ({ categoryId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('update_product_category', {
@@ -2700,7 +2799,7 @@ export function useCreateStockRoute(
   _companyId?: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateStockRouteParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_stock_route', {
         params: stdbParamsToJson(params as object),
@@ -2723,7 +2822,7 @@ export function useUpdateStockRoute(
   return useMutation<
     void,
     Error,
-    { routeId: ScalarId; params: Record<string, unknown> }
+    { routeId: ScalarId; params: Partial<UpdateStockRouteParams> }
   >({
     mutationFn: async ({ routeId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('update_stock_route', {
@@ -2765,7 +2864,7 @@ export function useCreateStockRule(
   _companyId?: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateStockRuleParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_stock_rule', {
         params: stdbParamsToJson(params as object),
@@ -2788,7 +2887,7 @@ export function useUpdateStockRule(
   return useMutation<
     void,
     Error,
-    { ruleId: ScalarId; params: Record<string, unknown> }
+    { ruleId: ScalarId; params: Partial<UpdateStockRuleParams> }
   >({
     mutationFn: async ({ ruleId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('update_stock_rule', {
@@ -2832,7 +2931,7 @@ export function useCreateWarehouseTask(
   companyId: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateWarehouseTaskParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost('create_warehouse_task', {
         companyId: companyId,
@@ -2943,7 +3042,7 @@ export function useUpdateProductVariant(
   return useMutation<
     void,
     Error,
-    { variantId: ScalarId; params: Record<string, unknown> }
+    { variantId: ScalarId; params: Partial<UpdateProductVariantParams> }
   >({
     mutationFn: async ({ variantId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('update_product_variant', {
@@ -2965,7 +3064,7 @@ export function useUpdateProductInventoryData(
   return useMutation<
     void,
     Error,
-    { productId: ScalarId; params: Record<string, unknown> }
+    { productId: ScalarId; params: Partial<UpdateProductInventoryDataParams> }
   >({
     mutationFn: async ({ productId, params }) => {
       const { urlPath, init } = stdbBffCommandPost(
@@ -2990,7 +3089,7 @@ export function useUpdateProductPricing(
   return useMutation<
     void,
     Error,
-    { productId: ScalarId; params: Record<string, unknown> }
+    { productId: ScalarId; params: Partial<UpdateProductPricingParams> }
   >({
     mutationFn: async ({ productId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('update_product_pricing', {
@@ -3206,7 +3305,7 @@ export function useCreateStockQuant(
 ) {
   const qc = useQueryClient();
   const scopedCompanyId = options?.companyId;
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateStockQuantParams>({
     mutationFn: async (params) => {
       const base = mergeReducerParams(
         CREATE_STOCK_QUANT_DEFAULTS,
@@ -3252,7 +3351,7 @@ export function useUpdateStockProductionLot(organizationId: bigint) {
   return useMutation<
     void,
     Error,
-    { lotId: ScalarId; params: Record<string, unknown> }
+    { lotId: ScalarId; params: Partial<UpdateStockProductionLotParams> }
   >({
     mutationFn: async ({ lotId, params }) => {
       const { urlPath, init } = stdbBffCommandPost(
@@ -3289,7 +3388,7 @@ export function useUpdateStockProductionSerial(organizationId: bigint) {
   return useMutation<
     void,
     Error,
-    { serialId: ScalarId; params: Record<string, unknown> }
+    { serialId: ScalarId; params: Partial<UpdateStockProductionSerialParams> }
   >({
     mutationFn: async ({ serialId, params }) => {
       const { urlPath, init } = stdbBffCommandPost(
@@ -3329,7 +3428,7 @@ export function useCreateWarehouse3dZone(organizationId: bigint) {
     {
       warehouseId: ScalarId;
       locationId: ScalarId;
-      params: Record<string, unknown>;
+      params: CreateWarehouse3DZoneParams;
     }
   >({
     mutationFn: async ({ warehouseId, locationId, params }) => {
@@ -3357,7 +3456,7 @@ export function useUpdateWarehouse3dZone(organizationId: bigint) {
   return useMutation<
     void,
     Error,
-    { zoneId: ScalarId; params: Record<string, unknown> }
+    { zoneId: ScalarId; params: Partial<UpdateWarehouse3DZoneParams> }
   >({
     mutationFn: async ({ zoneId, params }) => {
       const { urlPath, init } = stdbBffCommandPost(
@@ -3458,7 +3557,7 @@ export function useUpdateProductSupplierInfo(organizationId: bigint) {
   return useMutation<
     void,
     Error,
-    { supplierInfoId: ScalarId; params: Record<string, unknown> }
+    { supplierInfoId: ScalarId; params: Partial<UpdateProductSupplierInfoParams> }
   >({
     mutationFn: async ({ supplierInfoId, params }) => {
       const { urlPath, init } = stdbBffCommandPost(
@@ -3507,7 +3606,7 @@ export function useUpdateProductPackaging(organizationId: bigint) {
   return useMutation<
     void,
     Error,
-    { packagingId: ScalarId; params: Record<string, unknown> }
+    { packagingId: ScalarId; params: Partial<UpdateProductPackagingParams> }
   >({
     mutationFn: async ({ packagingId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('update_product_packaging', {

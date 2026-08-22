@@ -7,8 +7,9 @@
  */
 import "server-only"
 
-import { parseQueryListResponse, type QueryRows } from "@lumiere/api-client"
+import { parseQueryListResponse } from "@lumiere/api-client"
 import type { QueryResourceKey } from "@lumiere/stdb/generated/query-registry"
+import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
 
 import type { ApiSession } from "@/lib/api-session"
 import { resolveApiServerBaseUrl } from "@/lib/api-server-forward"
@@ -29,10 +30,10 @@ function requireApiServerBase(): string {
   return base
 }
 
-async function fetchFromApiServer(
+async function fetchFromApiServer<K extends QueryResourceKey>(
   creds: ServerQueryCredentials,
-  resource: string,
-): Promise<QueryRows> {
+  resource: K,
+): Promise<QueryRowFor<K>[]> {
   const base = requireApiServerBase()
   const headers = new Headers()
   headers.set("Authorization", `Bearer ${creds.stdbToken}`)
@@ -50,7 +51,9 @@ async function fetchFromApiServer(
     const detail = typeof json.error === "string" ? json.error : res.statusText
     throw new Error(detail || `Query ${resource} failed`)
   }
-  return parseQueryListResponse(await res.json())
+  // Boundary cast: `parseQueryListResponse` only validates that rows are plain
+  // objects. `resource` pins the specific generated row shape from here on.
+  return parseQueryListResponse(await res.json()) as QueryRowFor<K>[]
 }
 
 function sessionCredentials(session: ApiSession): ServerQueryCredentials {
@@ -63,11 +66,11 @@ function sessionCredentials(session: ApiSession): ServerQueryCredentials {
 /**
  * Fetch query rows for RSC initial data via api-server `query_exec.rs`.
  */
-export async function serverFetchQueryList(
+export async function serverFetchQueryList<K extends QueryResourceKey>(
   session: ApiSession,
-  resource: QueryResourceKey,
+  resource: K,
   errorMessage: string,
-): Promise<QueryRows> {
+): Promise<QueryRowFor<K>[]> {
   try {
     return await fetchFromApiServer(sessionCredentials(session), resource)
   } catch (e) {
@@ -77,10 +80,10 @@ export async function serverFetchQueryList(
 }
 
 /** Like {@link serverFetchQueryList} but returns `[]` on failure (SSR seed pattern). */
-export async function serverFetchQueryListAllowEmpty(
+export async function serverFetchQueryListAllowEmpty<K extends QueryResourceKey>(
   session: ApiSession,
-  resource: QueryResourceKey,
-): Promise<QueryRows> {
+  resource: K,
+): Promise<QueryRowFor<K>[]> {
   try {
     return await fetchFromApiServer(sessionCredentials(session), resource)
   } catch {
@@ -92,18 +95,18 @@ export async function serverFetchQueryListAllowEmpty(
 export async function serverFetchQueryListsAllowEmpty<const T extends readonly QueryResourceKey[]>(
   session: ApiSession,
   resources: T,
-): Promise<{ [K in keyof T]: QueryRows }> {
+): Promise<{ [K in keyof T]: K extends QueryResourceKey ? QueryRowFor<K>[] : never }> {
   const rows = await Promise.all(
     resources.map((resource) => serverFetchQueryListAllowEmpty(session, resource)),
   )
-  return rows as { [K in keyof T]: QueryRows }
+  return rows as { [K in keyof T]: K extends QueryResourceKey ? QueryRowFor<K>[] : never }
 }
 
 /** Token-based fetch for session bootstrap (e.g. `user-organization` before org id is known). */
-export async function serverFetchQueryListWithCredentialsAllowEmpty(
+export async function serverFetchQueryListWithCredentialsAllowEmpty<K extends QueryResourceKey>(
   creds: ServerQueryCredentials,
-  resource: QueryResourceKey,
-): Promise<QueryRows> {
+  resource: K,
+): Promise<QueryRowFor<K>[]> {
   try {
     return await fetchFromApiServer(creds, resource)
   } catch {

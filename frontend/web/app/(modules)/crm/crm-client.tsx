@@ -99,6 +99,9 @@ import {
   useClearOpportunityPresence,
   useOpportunityPresence,
   useUpdateOpportunityPresence,
+  type Lead,
+  type Opportunity,
+  type Contact,
 } from "@lumiere/query-hooks/hooks/crm"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts, useUoms, useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
@@ -167,9 +170,9 @@ import { useModuleFilters } from "@/hooks/use-module-filters"
 export { CRM_UI_REDUCERS } from "@/lib/crm-ui-reducers"
 
 interface CrmClientProps {
-  initialLeads?: Record<string, unknown>[]
-  initialOpportunities?: Record<string, unknown>[]
-  initialContacts?: Record<string, unknown>[]
+  initialLeads?: Lead[]
+  initialOpportunities?: Opportunity[]
+  initialContacts?: Contact[]
   organizationId?: number
 }
 
@@ -1586,7 +1589,7 @@ function CrmClientLoaded({
       0,
     )
     const currentWeightedPipeline = currentOpenOpportunities.reduce((s, o) => {
-      const revenue = Number(o.expectedRevenue ?? o.expected_revenue ?? 0)
+      const revenue = Number(o.expectedRevenue ?? 0)
       const probability = Number(o.probability ?? 0)
       return s + revenue * (probability / 100)
     }, 0)

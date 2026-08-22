@@ -15,6 +15,13 @@ import { apiFetch, fetchQueryList, coalesceQueryInitialData, rqBigIntKey, type Q
 import { invalidateResourceQueries, useSubscriptionAwareQuery } from "../subscription-query"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import type {
+  Activity,
+  Contact,
+  ContactTag,
+  ContactSegment,
+  Lead,
+  Opportunity,
+  OpportunityStage,
   ConvertLeadParams,
   ConvertOpportunityParams,
   CreateActivityParams,
@@ -97,14 +104,14 @@ type OpportunityPatch<P> = {
 
 export function useLeads(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: Lead[],
 ) {
   return useSubscriptionAwareQuery('leads', organizationId, { initialData })
 }
 
 export function useOpportunities(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: Opportunity[],
 ) {
   return useSubscriptionAwareQuery('opportunities', organizationId, { initialData })
 }
@@ -124,7 +131,7 @@ export function useOpportunityLines(
 
 export function useOpportunityStages(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: OpportunityStage[],
 ) {
   return useSubscriptionAwareQuery('opportunity-stages', organizationId, {
     initialData,
@@ -134,7 +141,7 @@ export function useOpportunityStages(
 
 export function useContacts(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: Contact[],
 ) {
   return useSubscriptionAwareQuery('contacts', organizationId, { initialData })
 }
@@ -161,9 +168,9 @@ export function useContactRoleAssignments(
 
 export function useContactTags(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ContactTag[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ContactTag[]>({
     queryKey: ['contact-tags', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/contact-tags', 'Failed to fetch contact tags'),
     staleTime: 30_000,
@@ -186,9 +193,9 @@ export function useContactCategories(
 
 export function useContactSegments(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ContactSegment[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ContactSegment[]>({
     queryKey: ['contact-segments', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/contact-segments', 'Failed to fetch contact segments'),
     staleTime: 30_000,
@@ -198,7 +205,7 @@ export function useContactSegments(
 
 export function useActivities(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: Activity[],
 ) {
   return useSubscriptionAwareQuery('activities', organizationId, { initialData })
 }
@@ -1297,6 +1304,13 @@ export function useUpdateCrmConversation(organizationId: bigint) {
 
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
+  Activity,
+  Contact,
+  ContactTag,
+  ContactSegment,
+  Lead,
+  Opportunity,
+  OpportunityStage,
   ConvertLeadParams,
   ConvertOpportunityParams,
   CreateActivityParams,

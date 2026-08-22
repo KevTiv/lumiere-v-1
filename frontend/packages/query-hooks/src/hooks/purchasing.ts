@@ -16,7 +16,7 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../http"
+import { apiFetch, fetchQueryList, coalesceQueryInitialData, rqBigIntKey } from "../http"
 import { invalidateResourceQueries, useSubscriptionAwareQuery } from "../subscription-query"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import {
@@ -26,7 +26,27 @@ import {
   stdbParamsToJson,
 } from "@lumiere/erp-shared/stdb-params-json"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
-import type { CreatePurchaseOrderParams, CreatePartnerBankParams, CreatePurchaseRequisitionParams } from "@lumiere/stdb/types"
+import type {
+  CreatePurchaseOrderParams,
+  CreatePartnerBankParams,
+  CreatePurchaseRequisitionParams,
+  PurchaseBlanketOrder,
+  PurchaseBlanketOrderLine,
+  PurchaseBlanketRelease,
+  PurchaseOrder,
+  PurchaseOrderLine,
+  PurchaseRequisition,
+  StockLandedCost,
+  StockLandedCostLines,
+  ResPartnerBank,
+  SupplierIntakeRequest,
+  AddPurchaseOrderLineParams,
+  UpdatePurchaseOrderParams,
+  UpdatePurchaseOrderLineParams,
+  CreateLandedCostParams,
+  UpdateLandedCostParams,
+  AddLandedCostLineParams,
+} from "@lumiere/stdb/types"
 
 type ScalarId = bigint | number | string
 
@@ -88,9 +108,9 @@ import { responseErrorMessage as parseCallErrorPo } from "@lumiere/api-client/re
 
 export function usePurchaseOrders(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: PurchaseOrder[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<PurchaseOrder[]>({
     queryKey: ['purchase-orders', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/purchase-orders', 'Failed to fetch purchase orders'),
     staleTime: 30_000,
@@ -99,8 +119,8 @@ export function usePurchaseOrders(
 }
 
 /** Server-bounded: `purchase_order.state = ToApprove`. */
-export function usePurchaseOrdersToApprove(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function usePurchaseOrdersToApprove(organizationId: bigint, initialData?: PurchaseOrder[]) {
+  return useQuery<PurchaseOrder[]>({
     queryKey: ['purchase-orders-to-approve', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -113,8 +133,8 @@ export function usePurchaseOrdersToApprove(organizationId: bigint, initialData?:
 }
 
 /** Server-bounded: `purchase_order.receipt_status = partial`. */
-export function usePurchaseOrdersPartialReceipt(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function usePurchaseOrdersPartialReceipt(organizationId: bigint, initialData?: PurchaseOrder[]) {
+  return useQuery<PurchaseOrder[]>({
     queryKey: ['purchase-orders-partial-receipt', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -127,8 +147,8 @@ export function usePurchaseOrdersPartialReceipt(organizationId: bigint, initialD
 }
 
 /** Server-bounded: `purchase_order_line.match_state = over_billed`. */
-export function usePurchaseOrderLinesOverBilled(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function usePurchaseOrderLinesOverBilled(organizationId: bigint, initialData?: PurchaseOrderLine[]) {
+  return useQuery<PurchaseOrderLine[]>({
     queryKey: ['purchase-order-lines-over-billed', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -142,9 +162,9 @@ export function usePurchaseOrderLinesOverBilled(organizationId: bigint, initialD
 
 export function usePurchaseOrderLines(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: PurchaseOrderLine[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<PurchaseOrderLine[]>({
     queryKey: ['purchase-order-lines', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/purchase-order-lines', 'Failed to fetch purchase order lines'),
     staleTime: 5_000,
@@ -155,9 +175,9 @@ export function usePurchaseOrderLines(
 
 export function usePurchaseRequisitions(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: PurchaseRequisition[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<PurchaseRequisition[]>({
     queryKey: ['purchase-requisitions', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/purchase-requisitions', 'Failed to fetch purchase requisitions'),
     staleTime: 30_000,
@@ -165,8 +185,8 @@ export function usePurchaseRequisitions(
   })
 }
 
-export function useLandedCosts(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useLandedCosts(organizationId: bigint, initialData?: StockLandedCost[]) {
+  return useQuery<StockLandedCost[]>({
     queryKey: ['landed-costs', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/landed-costs', 'Failed to fetch landed costs'),
     staleTime: 30_000,
@@ -174,8 +194,8 @@ export function useLandedCosts(organizationId: bigint, initialData?: QueryRows) 
   })
 }
 
-export function useLandedCostLines(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useLandedCostLines(organizationId: bigint, initialData?: StockLandedCostLines[]) {
+  return useQuery<StockLandedCostLines[]>({
     queryKey: ['landed-cost-lines', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/landed-cost-lines', 'Failed to fetch landed cost lines'),
     staleTime: 30_000,
@@ -183,8 +203,8 @@ export function useLandedCostLines(organizationId: bigint, initialData?: QueryRo
   })
 }
 
-export function useSupplierIntakes(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useSupplierIntakes(organizationId: bigint, initialData?: SupplierIntakeRequest[]) {
+  return useQuery<SupplierIntakeRequest[]>({
     queryKey: ['supplier-intakes', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/supplier-intakes', 'Failed to fetch supplier intakes'),
     staleTime: 30_000,
@@ -192,8 +212,8 @@ export function useSupplierIntakes(organizationId: bigint, initialData?: QueryRo
   })
 }
 
-export function usePartnerBanks(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function usePartnerBanks(organizationId: bigint, initialData?: ResPartnerBank[]) {
+  return useQuery<ResPartnerBank[]>({
     queryKey: ['partner-banks', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/partner-banks', 'Failed to fetch partner bank accounts'),
     staleTime: 30_000,
@@ -202,17 +222,17 @@ export function usePartnerBanks(organizationId: bigint, initialData?: QueryRows)
 }
 
 /** Subscription-aware blanket order list with an HTTP fallback. */
-export function usePurchaseBlanketOrders(organizationId: bigint, initialData?: QueryRows) {
+export function usePurchaseBlanketOrders(organizationId: bigint, initialData?: PurchaseBlanketOrder[]) {
   return useSubscriptionAwareQuery("purchase-blanket-orders", organizationId, { initialData })
 }
 
 /** Subscription-aware blanket order line list with an HTTP fallback. */
-export function usePurchaseBlanketOrderLines(organizationId: bigint, initialData?: QueryRows) {
+export function usePurchaseBlanketOrderLines(organizationId: bigint, initialData?: PurchaseBlanketOrderLine[]) {
   return useSubscriptionAwareQuery("purchase-blanket-order-lines", organizationId, { initialData })
 }
 
 /** Subscription-aware blanket release list with an HTTP fallback. */
-export function usePurchaseBlanketReleases(organizationId: bigint, initialData?: QueryRows) {
+export function usePurchaseBlanketReleases(organizationId: bigint, initialData?: PurchaseBlanketRelease[]) {
   return useSubscriptionAwareQuery("purchase-blanket-releases", organizationId, { initialData })
 }
 
@@ -353,10 +373,10 @@ export function useAddPurchaseOrderLine(organizationId: bigint) {
       params,
     }: {
       orderId: bigint | number | string
-      params: Record<string, unknown>
+      params: Partial<AddPurchaseOrderLineParams>
     }) => {
       const { urlPath, init } = stdbBffCommandPost("add_purchase_order_line", { orderId: toScalarU64(orderId), params: stdbParamsToJson(
-            mergeReducerParams(ADD_PURCHASE_ORDER_LINE_DEFAULTS, params) as object,
+            mergeReducerParams(ADD_PURCHASE_ORDER_LINE_DEFAULTS, params as Record<string, unknown>) as object,
             "AddPurchaseOrderLineParams",
           ) })
 
@@ -567,10 +587,10 @@ export function useUpdatePurchaseOrder(organizationId: bigint, companyId?: bigin
   return useMutation<
     void,
     Error,
-    { orderId: ScalarId; params: Record<string, unknown> }
+    { orderId: ScalarId; params: Partial<UpdatePurchaseOrderParams> }
   >({
     mutationFn: async ({ orderId, params }) => {
-      const scoped = withCompanyScope(params, companyId)
+      const scoped = withCompanyScope(params as Record<string, unknown>, companyId)
       const cid =
         companyId != null
           ? Number(companyId)
@@ -621,7 +641,7 @@ export function useUnlockPurchaseOrder(organizationId: bigint) {
 
 export function useUpdatePurchaseOrderLine(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { lineId: ScalarId; params: Record<string, unknown> }>({
+  return useMutation<void, Error, { lineId: ScalarId; params: Partial<UpdatePurchaseOrderLineParams> }>({
     mutationFn: async ({ lineId, params }) => {
       const { urlPath, init } = stdbBffCommandPost("update_purchase_order_line", { lineId: toScalarU64(lineId), params: stdbParamsToJson(params as object, "UpdatePurchaseOrderLineParams") })
 
@@ -641,9 +661,9 @@ export function useUpdatePurchaseOrderLine(organizationId: bigint) {
 
 export function useCreateLandedCost(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateLandedCostParams & { companyId?: ScalarId }>({
     mutationFn: async (params) => {
-      const scoped = withCompanyScope(params, companyId)
+      const scoped = withCompanyScope(params as Record<string, unknown>, companyId)
       const cid =
         companyId != null
           ? Number(companyId)
@@ -665,7 +685,7 @@ export function useCreateLandedCost(organizationId: bigint, companyId?: bigint) 
 
 export function useUpdateLandedCost(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { landedCostId: ScalarId; params: Record<string, unknown> }>({
+  return useMutation<void, Error, { landedCostId: ScalarId; params: Partial<UpdateLandedCostParams> }>({
     mutationFn: async ({ landedCostId, params }) => {
       const { urlPath, init } = stdbBffCommandPost("update_landed_cost", { landedCostId: toScalarU64(landedCostId), params: stdbParamsToJson(params as object, "UpdateLandedCostParams") })
 
@@ -691,7 +711,7 @@ export function useDeleteLandedCost(organizationId: bigint) {
 
 export function useAddLandedCostLine(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { landedCostId: ScalarId; params: Record<string, unknown> }>({
+  return useMutation<void, Error, { landedCostId: ScalarId; params: AddLandedCostLineParams }>({
     mutationFn: async ({ landedCostId, params }) => {
       const { urlPath, init } = stdbBffCommandPost("add_landed_cost_line", { landedCostId: toScalarU64(landedCostId), params: stdbParamsToJson(params as object, "AddLandedCostLineParams") })
 
@@ -1625,3 +1645,14 @@ export function useRecordPurchasingIntegrationResult(
 
 // Re-export cross-domain dependency so callers import from one place
 export { useContacts } from "./crm"
+
+// ── Types (re-exported so client components import from one place) ────────────
+export type {
+  PurchaseOrder,
+  PurchaseOrderLine,
+  PurchaseRequisition,
+  StockLandedCost,
+  StockLandedCostLines,
+  ResPartnerBank,
+  SupplierIntakeRequest,
+}

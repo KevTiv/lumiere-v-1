@@ -49,7 +49,7 @@ function RBACBridge({
   const { orgPolicyRules } = usePolicySnapshot(organizationId, serverIdentity)
 
   const rbacRoles = useMemo<Role[]>(() => {
-    return mapBackendRolesToRoles(rolesData as BackendRoleRow[])
+    return mapBackendRolesToRoles(rolesData as unknown as BackendRoleRow[])
   }, [rolesData])
 
   const rbacUser = useMemo<User | null>(() => {

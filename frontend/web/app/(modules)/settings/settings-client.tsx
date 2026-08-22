@@ -53,6 +53,14 @@ import {
   useUpdateCompanyBusiness,
   useUpdateCompanyHierarchy,
 } from "@lumiere/query-hooks/hooks/organization-company"
+import type {
+  CreateDataClassificationParams,
+  CreateDataClassificationRuleParams,
+  UpdateCompanyAddressParams,
+  UpdateCompanyBusinessParams,
+  UpdateCompanyHierarchyParams,
+  UpdateCompanyParams,
+} from "@lumiere/stdb/types"
 import { GuidedImportWizard } from "@/lib/guided-import-wizard"
 import { useSettingsModuleSubscription } from "@/lib/module-subscription-hooks"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -1024,7 +1032,7 @@ function SettingsLoaded({
             : undefined
         const params = toCreateCompanyParams(formData, currencyId ? { currencyId } : undefined)
         if (!params) throw new Error(i18n.t("common.paramsMapper.invalidCompany"))
-        await createCompany.mutateAsync(params as unknown as Record<string, unknown>)
+        await createCompany.mutateAsync(params)
       } else if (activeAction === "updateCompany") {
         await updateCompany.mutateAsync({
           companyId: toBigIntId(formData.companyId, "Company ID"),
@@ -1050,7 +1058,7 @@ function SettingsLoaded({
           organizationId,
           params: {
             ...compactParams(formData, ["isParent"]),
-            parentId: parentRaw !== "" ? BigInt(parentRaw) : null,
+            parentId: parentRaw !== "" ? BigInt(parentRaw) : undefined,
           },
         })
       } else if (activeAction === "deleteCompany") {
@@ -1060,9 +1068,9 @@ function SettingsLoaded({
           organizationId,
         })
       } else if (activeAction === "createDataClassification") {
-        await createDataClassification.mutateAsync(compactParams(formData, ["name", "level", "description", "retentionDays", "encryptionRequired"]))
+        await createDataClassification.mutateAsync(compactParams(formData, ["name", "level", "description", "retentionDays", "encryptionRequired"]) as unknown as CreateDataClassificationParams)
       } else if (activeAction === "createDataClassificationRule") {
-        await createDataClassificationRule.mutateAsync(compactParams(formData, ["tableName", "columnName", "classificationId", "appliesTo"]))
+        await createDataClassificationRule.mutateAsync(compactParams(formData, ["tableName", "columnName", "classificationId", "appliesTo"]) as unknown as CreateDataClassificationRuleParams)
       } else if (activeAction === "updateOrgMemberRole") {
         await updateOrgMemberRole.mutateAsync({
           userOrgId: formData.userOrgId as string | number,

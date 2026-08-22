@@ -225,7 +225,7 @@ import {
   useImportLotCsv,
   useUpdateWhatsappQualityScore,
 } from '@lumiere/query-hooks/hooks/inventory';
-import { usePricelists } from '@lumiere/query-hooks/hooks/sales';
+import { usePricelists, type ProductPricelist } from '@lumiere/query-hooks/hooks/sales';
 import { useContacts } from '@lumiere/query-hooks/hooks/crm';
 import { useDocuments } from '@lumiere/query-hooks/hooks/documents';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
@@ -313,6 +313,35 @@ import {
 } from './cycle-count-wizard';
 import { buildEntitySelection } from '@lumiere/query-hooks/ai-ui-context';
 import { useOpenErpAiChat } from '@/lib/erp-ai-context';
+import type {
+  Product,
+  StockQuant,
+  StockPicking,
+  Warehouse,
+  InventoryAdjustment,
+  ProductCategory,
+  Uom,
+  StockLocation,
+  StockCycleCount,
+  StockMove,
+  Warehouse3DZone,
+  InventoryValuation,
+  ReplenishmentRule,
+  StockProductionSerial,
+  CreateProductParams,
+  CreateStockPickingParams,
+  CreateInventoryAdjustmentParams,
+  CreateStockLocationParams,
+  CreateWarehouseParams,
+  CreatePickingWaveParams,
+  CreateProductCategoryParams,
+  CreateBarcodeRuleParams,
+  CreateAdjustmentReasonParams,
+  CreateTraceabilityRecordParams,
+  CreateStockTraceabilityReportParams,
+  CreateStockQuantParams,
+  CreateWarehouse3DZoneParams,
+} from '@lumiere/stdb/types';
 
 // WarehouseViewer uses Three.js — must be loaded client-side only, imported directly to avoid SSR barrel evaluation
 const WarehouseViewer = dynamic(
@@ -328,21 +357,21 @@ const WarehouseViewer = dynamic(
 );
 
 interface InventoryClientProps {
-  initialProducts?: Record<string, unknown>[];
-  initialStockQuants?: Record<string, unknown>[];
-  initialTransfers?: Record<string, unknown>[];
-  initialWarehouses?: Record<string, unknown>[];
-  initialAdjustments?: Record<string, unknown>[];
-  initialPricelists?: Record<string, unknown>[];
-  initialProductCategories?: Record<string, unknown>[];
-  initialUoms?: Record<string, unknown>[];
-  initialStockLocations?: Record<string, unknown>[];
-  initialStockCycleCounts?: Record<string, unknown>[];
-  initialStockMoves?: Record<string, unknown>[];
-  initialWarehouse3dZones?: Record<string, unknown>[];
-  initialInventoryValuations?: Record<string, unknown>[];
-  initialReplenishmentRules?: Record<string, unknown>[];
-  initialStockProductionSerials?: Record<string, unknown>[];
+  initialProducts?: Product[];
+  initialStockQuants?: StockQuant[];
+  initialTransfers?: StockPicking[];
+  initialWarehouses?: Warehouse[];
+  initialAdjustments?: InventoryAdjustment[];
+  initialPricelists?: ProductPricelist[];
+  initialProductCategories?: ProductCategory[];
+  initialUoms?: Uom[];
+  initialStockLocations?: StockLocation[];
+  initialStockCycleCounts?: StockCycleCount[];
+  initialStockMoves?: StockMove[];
+  initialWarehouse3dZones?: Warehouse3DZone[];
+  initialInventoryValuations?: InventoryValuation[];
+  initialReplenishmentRules?: ReplenishmentRule[];
+  initialStockProductionSerials?: StockProductionSerial[];
   organizationId?: number;
 }
 
@@ -2077,8 +2106,8 @@ function InventoryClientLoaded({
                     void updateProductPricing.mutateAsync({
                       productId,
                       params: {
-                        standard_price: standardPrice,
-                        list_price: listPrice,
+                        standardPrice: standardPrice,
+                        listPrice: listPrice,
                       },
                     });
                   },
@@ -2102,8 +2131,8 @@ function InventoryClientLoaded({
                     void updateProductInventoryData.mutateAsync({
                       productId,
                       params: {
-                        qty_available: qtyAvailable,
-                        virtual_available: virtualAvailable,
+                        qtyAvailable: qtyAvailable,
+                        virtualAvailable: virtualAvailable,
                       },
                     });
                   },
@@ -2128,7 +2157,7 @@ function InventoryClientLoaded({
                       variantId,
                       params: {
                         name: name ?? undefined,
-                        standard_price: standardPrice,
+                        standardPrice: standardPrice,
                       },
                     });
                   },
@@ -2238,7 +2267,7 @@ function InventoryClientLoaded({
                           priceS != null && priceS.trim() !== ''
                             ? Number(priceS)
                             : undefined,
-                        min_qty:
+                        minQty:
                           minS != null && minS.trim() !== ''
                             ? Number(minS)
                             : undefined,
@@ -2771,23 +2800,23 @@ function InventoryClientLoaded({
                     )
                       return;
                     void createStockProductionLot.mutateAsync({
-                      company_id: Number(operatingCompanyId),
+                      companyId: BigInt(operatingCompanyId),
                       name,
-                      product_id: Number(productId),
-                      product_variant_id: null,
-                      ref_: null,
-                      note: null,
-                      expiration_date: null,
-                      use_date: null,
-                      removal_date: null,
-                      alert_date: null,
-                      product_qty: 0,
-                      location_id: null,
-                      package_id: null,
-                      owner_id: null,
-                      is_scrap: false,
-                      is_locked: false,
-                      metadata: null,
+                      productId: BigInt(Number(productId)),
+                      productVariantId: undefined,
+                      ref: undefined,
+                      note: undefined,
+                      expirationDate: undefined,
+                      useDate: undefined,
+                      removalDate: undefined,
+                      alertDate: undefined,
+                      productQty: 0,
+                      locationId: undefined,
+                      packageId: undefined,
+                      ownerId: undefined,
+                      isScrap: false,
+                      isLocked: false,
+                      metadata: undefined,
                     });
                   },
                 },
@@ -2806,8 +2835,8 @@ function InventoryClientLoaded({
                     void updateStockProductionLot.mutateAsync({
                       lotId: id,
                       params: {
-                        company_id: null,
-                        note: note.trim() !== '' ? note : null,
+                        companyId: undefined,
+                        note: note.trim() !== '' ? note : undefined,
                       },
                     });
                   },
@@ -2860,30 +2889,30 @@ function InventoryClientLoaded({
                     )
                       return;
                     void createStockProductionSerial.mutateAsync({
-                      company_id: Number(operatingCompanyId),
+                      companyId: BigInt(operatingCompanyId),
                       name,
-                      product_id: Number(productId),
-                      product_variant_id: null,
-                      lot_id: null,
-                      ref_: null,
-                      note: null,
-                      expiration_date: null,
-                      use_date: null,
-                      removal_date: null,
-                      alert_date: null,
-                      product_qty: 1,
-                      location_id: null,
-                      package_id: null,
-                      owner_id: null,
+                      productId: BigInt(Number(productId)),
+                      productVariantId: undefined,
+                      lotId: undefined,
+                      ref: undefined,
+                      note: undefined,
+                      expirationDate: undefined,
+                      useDate: undefined,
+                      removalDate: undefined,
+                      alertDate: undefined,
+                      productQty: 1,
+                      locationId: undefined,
+                      packageId: undefined,
+                      ownerId: undefined,
                       state: 'available',
-                      is_scrap: false,
-                      is_locked: false,
-                      warranty_expiration: null,
-                      warranty_start: null,
-                      last_maintenance: null,
-                      next_maintenance: null,
-                      maintenance_count: 0,
-                      metadata: null,
+                      isScrap: false,
+                      isLocked: false,
+                      warrantyExpiration: undefined,
+                      warrantyStart: undefined,
+                      lastMaintenance: undefined,
+                      nextMaintenance: undefined,
+                      maintenanceCount: 0,
+                      metadata: undefined,
                     });
                   },
                 },
@@ -2912,8 +2941,8 @@ function InventoryClientLoaded({
                     void updateStockProductionSerial.mutateAsync({
                       serialId: id,
                       params: {
-                        company_id: null,
-                        note: note.trim() !== '' ? note : null,
+                        companyId: undefined,
+                        note: note.trim() !== '' ? note : undefined,
                       },
                     });
                   },
@@ -3168,7 +3197,7 @@ function InventoryClientLoaded({
                       pointId,
                       params: {
                         name: name ?? undefined,
-                        test_type: testType ?? undefined,
+                        testType: testType ?? undefined,
                       },
                     });
                   },
@@ -3529,7 +3558,7 @@ function InventoryClientLoaded({
                     if (name == null) return;
                     void updateBarcodeNomenclature.mutateAsync({
                       nomenclatureId,
-                      params: { name, is_active: true },
+                      params: { name, isActive: true },
                     });
                   },
                 },
@@ -3984,11 +4013,16 @@ function InventoryClientLoaded({
         return;
       const currencyId = Number(pl.currencyId);
       const productParams = toCreateProductParamsFromForm(formData, currencyId);
-      if (productParams) await createProduct.mutateAsync(productParams);
+      if (productParams)
+        await createProduct.mutateAsync(
+          productParams as unknown as CreateProductParams,
+        );
     } else if (action === 'createTransfer' || action === 'createStockPicking') {
       const stockPickingParams = toCreateStockPickingParamsFromForm(formData);
       if (stockPickingParams)
-        await createStockPicking.mutateAsync(stockPickingParams);
+        await createStockPicking.mutateAsync(
+          stockPickingParams as unknown as CreateStockPickingParams,
+        );
     } else if (
       action === 'createAdjustment' ||
       action === 'createInventoryAdjustment'
@@ -4010,11 +4044,15 @@ function InventoryClientLoaded({
         uomFromProduct,
       );
       if (adjustmentParams)
-        await createInventoryAdjustment.mutateAsync(adjustmentParams);
+        await createInventoryAdjustment.mutateAsync(
+          adjustmentParams as unknown as CreateInventoryAdjustmentParams,
+        );
     } else if (action === 'createStockLocation') {
       const stockLocationParams = toCreateStockLocationParamsFromForm(formData);
       if (stockLocationParams)
-        await createStockLocation.mutateAsync(stockLocationParams);
+        await createStockLocation.mutateAsync(
+          stockLocationParams as unknown as CreateStockLocationParams,
+        );
     } else if (action === 'createWarehouse') {
       const templateWarehouseId = formData.templateWarehouseId;
       if (templateWarehouseId === '' || templateWarehouseId == null) return;
@@ -4031,7 +4069,7 @@ function InventoryClientLoaded({
             sequence: Number(formData.sequence ?? 0),
             // Ensures template row lookup key is visible to static form–mutation tooling
             templateWarehouseId: String(templateWarehouseId),
-          }) as Record<string, unknown>,
+          }) as unknown as CreateWarehouseParams,
         );
       } catch {
         return;
@@ -4043,11 +4081,19 @@ function InventoryClientLoaded({
       await createQualityCheck.mutateAsync({
         name: String(formData.name ?? 'Quality Check'),
         testType: String(formData.testType ?? 'measure'),
-        productId: Number(productRaw),
-        controlPointId: formData.pointId ? Number(formData.pointId) : undefined,
-        lotId: formData.lotId ? Number(formData.lotId) : undefined,
-        teamId: formData.teamId ? Number(formData.teamId) : undefined,
+        productId: BigInt(Number(productRaw)),
+        productVariantId: undefined,
+        pickingId: undefined,
+        moveLineId: undefined,
+        controlPointId: formData.pointId ? BigInt(Number(formData.pointId)) : undefined,
+        lotId: formData.lotId ? BigInt(Number(formData.lotId)) : undefined,
+        teamId: formData.teamId ? BigInt(Number(formData.teamId)) : undefined,
+        userId: undefined,
         qtyTested: Number.isFinite(qtyTested) ? qtyTested : 0,
+        toleranceMin: undefined,
+        toleranceMax: undefined,
+        normUnit: undefined,
+        metadata: undefined,
       });
     } else if (action === 'createQualityAlert') {
       const name = String(formData.name ?? '').trim();
@@ -4066,11 +4112,16 @@ function InventoryClientLoaded({
           title: name,
           priority: priorityByValue[priorityKey] ?? 'high',
           productId: formData.productId
-            ? Number(formData.productId)
+            ? BigInt(Number(formData.productId))
             : undefined,
+          productVariantId: undefined,
+          lotId: undefined,
+          reasonId: undefined,
+          workcenterId: undefined,
           description: formData.description
             ? String(formData.description)
             : undefined,
+          metadata: undefined,
         },
       });
     } else if (action === 'createReplenishmentRule') {
@@ -4108,42 +4159,48 @@ function InventoryClientLoaded({
       const name = String(formData.name ?? '').trim();
       if (!name) return;
       await createPickingWave.mutateAsync(
-        pickingWaveCreateParamsFromForm(formData),
+        pickingWaveCreateParamsFromForm(formData) as unknown as CreatePickingWaveParams,
       );
     } else if (action === 'createProductCategory') {
       const productCategoryParams =
         toCreateProductCategoryParamsFromForm(formData);
       if (productCategoryParams)
-        await createProductCategory.mutateAsync(productCategoryParams);
+        await createProductCategory.mutateAsync(
+          productCategoryParams as unknown as CreateProductCategoryParams,
+        );
     } else if (action === 'createBarcodeRule') {
       const barcodeRuleParams = toCreateBarcodeRuleParamsFromForm(formData);
       if (barcodeRuleParams)
-        await createBarcodeRule.mutateAsync(barcodeRuleParams);
+        await createBarcodeRule.mutateAsync(
+          barcodeRuleParams as unknown as CreateBarcodeRuleParams,
+        );
     } else if (action === 'createAdjustmentReason') {
       const adjustmentReasonParams =
         toCreateAdjustmentReasonParamsFromForm(formData);
       if (adjustmentReasonParams)
         await createAdjustmentReason.mutateAsync(
-          adjustmentReasonParams as Record<string, unknown>,
+          adjustmentReasonParams as unknown as CreateAdjustmentReasonParams,
         );
     } else if (action === 'createTraceabilityRecord') {
       const traceRecordParams =
         toCreateTraceabilityRecordParamsFromForm(formData);
       if (traceRecordParams)
         await createTraceabilityRecord.mutateAsync(
-          traceRecordParams as Record<string, unknown>,
+          traceRecordParams as unknown as CreateTraceabilityRecordParams,
         );
     } else if (action === 'createTraceabilityReport') {
       const traceReportParams =
         toCreateStockTraceabilityReportParamsFromForm(formData);
       if (traceReportParams)
         await createTraceabilityReport.mutateAsync(
-          traceReportParams as Record<string, unknown>,
+          traceReportParams as unknown as CreateStockTraceabilityReportParams,
         );
     } else if (action === 'createStockQuant') {
       const stockQuantParams = toCreateStockQuantParamsFromForm(formData);
       if (stockQuantParams)
-        await createStockQuant.mutateAsync(stockQuantParams);
+        await createStockQuant.mutateAsync(
+          stockQuantParams as unknown as CreateStockQuantParams,
+        );
     } else if (action === 'createWarehouse3dZone') {
       const wid = formData.warehouseId;
       const lid = formData.locationId;
@@ -4151,7 +4208,9 @@ function InventoryClientLoaded({
       await createWarehouse3dZone.mutateAsync({
         warehouseId: BigInt(String(wid)),
         locationId: BigInt(String(lid)),
-        params: warehouse3dZoneParamsFromForm(formData),
+        params: warehouse3dZoneParamsFromForm(
+          formData,
+        ) as unknown as CreateWarehouse3DZoneParams,
       });
     }
   };

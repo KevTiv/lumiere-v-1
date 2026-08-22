@@ -192,7 +192,7 @@ export async function createExpenseReceiptAndResolveId(
     "Failed to fetch expense receipts",
   )
   const match = rows.find((row) => {
-    const key = row.clientRequestId ?? row.client_request_id
+    const key = row.clientRequestId
     return key != null && String(key) === clientRequestId
   })
   if (match?.id == null) {

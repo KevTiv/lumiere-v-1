@@ -61,7 +61,7 @@ import { useExpenseSheetApprovalTimeline } from "@lumiere/query-hooks/hooks/appr
 import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hooks/accounting"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
-import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
+import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import { useEmployees } from "@lumiere/query-hooks/hooks/hr"
 import {
   newExpenseReceiptClientRequestId,
@@ -86,7 +86,7 @@ import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 interface ExpensesClientProps {
   initialExpenses?: Record<string, unknown>[]
   initialSheets?: Record<string, unknown>[]
-  initialPricelists?: Record<string, unknown>[]
+  initialPricelists?: ProductPricelist[]
   initialEmployees?: Record<string, unknown>[]
   organizationId?: number
 }

@@ -52,6 +52,7 @@ import {
   timeRangeToMs,
 } from "@lumiere/ui"
 import type { EntityViewConfig, EntityTableConfig, EntityRecordSheetConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { Product, Uom } from "@lumiere/stdb/types"
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { PurchasingOpsSod } from "./purchasing-ops-sod"
@@ -66,6 +67,10 @@ import {
   usePurchaseOrderLinesOverBilled,
   usePurchaseOrderLines,
   usePurchaseRequisitions,
+  type PurchaseOrder,
+  type PurchaseOrderLine,
+  type PurchaseRequisition,
+  type ResPartnerBank,
   useCreatePurchaseOrder,
   useCreatePurchaseRequisition,
   useSendPurchaseOrder,
@@ -137,7 +142,8 @@ import {
   useCreatePurchasingIntegrationIntent,
   useRecordPurchasingIntegrationResult,
 } from "@lumiere/query-hooks/hooks/purchasing"
-import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
+import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
+import type { Contact } from "@lumiere/query-hooks/hooks/crm"
 import { useAccountAccounts, useAccountJournals, useAccountPaymentTerms } from "@lumiere/query-hooks/hooks/accounting"
 import { useProducts, useUoms, useStockPickings } from "@lumiere/query-hooks/hooks/inventory"
 import { useDepartments } from "@lumiere/query-hooks/hooks/hr"
@@ -392,14 +398,14 @@ function poLineMatchTooltip(t: (key: string, opts?: Record<string, unknown>) => 
 }
 
 interface PurchasingClientProps {
-  initialOrders?: Record<string, unknown>[]
-  initialLines?: Record<string, unknown>[]
-  initialRequisitions?: Record<string, unknown>[]
-  initialContacts?: Record<string, unknown>[]
-  initialPricelists?: Record<string, unknown>[]
-  initialProducts?: Record<string, unknown>[]
-  initialUoms?: Record<string, unknown>[]
-  initialPartnerBanks?: Record<string, unknown>[]
+  initialOrders?: PurchaseOrder[]
+  initialLines?: PurchaseOrderLine[]
+  initialRequisitions?: PurchaseRequisition[]
+  initialContacts?: Contact[]
+  initialPricelists?: ProductPricelist[]
+  initialProducts?: Product[]
+  initialUoms?: Uom[]
+  initialPartnerBanks?: ResPartnerBank[]
   initialDepartments?: Record<string, unknown>[]
   organizationId?: number
 }
@@ -2206,7 +2212,7 @@ function PurchasingClientLoaded({
     const partialReceipt =
       ordersPartialReceipt.length > 0
         ? ordersPartialReceipt.length
-        : orders.filter((o) => String(o.receiptStatus ?? o.receipt_status) === "partial")
+        : orders.filter((o) => String(o.receiptStatus) === "partial")
             .length
     const overBilled =
       linesOverBilled.length > 0
@@ -2222,12 +2228,12 @@ function PurchasingClientLoaded({
     // MVP on-time: confirmed POs with date_planned that are fully received by planned date (or still open past planned).
     const confirmedWithPlan = orders.filter((o) => {
       if (!isConfirmedOrder(o as Record<string, unknown>)) return false
-      const planned = Number(o.datePlanned ?? o.date_planned ?? 0)
+      const planned = Number(o.datePlanned ?? 0)
       return planned > 0
     })
     const onTimeCount = confirmedWithPlan.filter((o) => {
-      const plannedMs = Number(o.datePlanned ?? o.date_planned ?? 0) / 1000
-      const receipt = String(o.receiptStatus ?? o.receipt_status ?? "")
+      const plannedMs = Number(o.datePlanned ?? 0) / 1000
+      const receipt = String(o.receiptStatus ?? "")
       if (receipt === "full" || receipt === "received") return true
       if (plannedMs > 0 && Date.now() <= plannedMs) return true
       return false
@@ -2700,7 +2706,7 @@ function PurchasingClientLoaded({
       const lineId = formData.lineId
       if (lineId === "" || lineId == null) return
       const line = landedCostLines.find((row) => String(row.id) === String(lineId))
-      const landedCostId = line?.landedCostId ?? line?.landed_cost_id
+      const landedCostId = line?.landedCostId
       if (landedCostId == null || String(landedCostId) === "") return
       await removeLandedCostLine.mutateAsync({
         landedCostId: landedCostId as string | number | bigint,

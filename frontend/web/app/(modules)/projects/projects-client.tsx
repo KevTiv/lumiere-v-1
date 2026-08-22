@@ -90,8 +90,8 @@ import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import { useUoms } from "@lumiere/query-hooks/hooks/inventory"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
-import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
-import { useContacts, useUsers } from "@lumiere/query-hooks/hooks/crm"
+import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
+import { useContacts, useUsers, type Contact } from "@lumiere/query-hooks/hooks/crm"
 import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hooks/accounting"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import {
@@ -128,8 +128,8 @@ interface ProjectsClientProps {
   initialProjects?: Record<string, unknown>[]
   initialTasks?: Record<string, unknown>[]
   initialTimesheets?: Record<string, unknown>[]
-  initialPricelists?: Record<string, unknown>[]
-  initialContacts?: Record<string, unknown>[]
+  initialPricelists?: ProductPricelist[]
+  initialContacts?: Contact[]
   organizationId?: number
 }
 

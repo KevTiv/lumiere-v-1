@@ -4,7 +4,7 @@
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../http"
+import { apiFetch, fetchQueryList, coalesceQueryInitialData, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
@@ -28,6 +28,20 @@ import type {
   CreateCreditNoteFromReturnOrderParams,
   RecordSalesIntegrationResultParams,
   UpdateSaleOrderParams,
+  SaleOrder,
+  SaleOrderLine,
+  ProductPricelist,
+  ProductPricelistItem,
+  StockPickingBatch,
+  DeliveryCarrier,
+  DeliveryPriceRule,
+  ShippingMethod,
+  PosPaymentMethod,
+  PosLoyaltyProgram,
+  PosLoyaltyCard,
+  ReturnOrder,
+  ReturnOrderLine,
+  SaleCommission,
 } from "@lumiere/stdb/types"
 
 import { finalizeUpdateSaleOrderParams } from "./sales-params-merge"
@@ -40,9 +54,9 @@ function toScalarU64(v: bigint | number | string): bigint {
 
 export function useSaleOrders(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: SaleOrder[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<SaleOrder[]>({
     queryKey: ['sale-orders', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/sale-orders', 'Failed to fetch sale orders'),
     staleTime: 30_000,
@@ -52,9 +66,9 @@ export function useSaleOrders(
 
 export function useSaleOrderLines(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: SaleOrderLine[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<SaleOrderLine[]>({
     queryKey: ['sale-order-lines', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/sale-order-lines', 'Failed to fetch sale order lines'),
     staleTime: 30_000,
@@ -64,9 +78,9 @@ export function useSaleOrderLines(
 
 export function usePricelists(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProductPricelist[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProductPricelist[]>({
     queryKey: ['pricelists', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/pricelists', 'Failed to fetch pricelists'),
     staleTime: 30_000,
@@ -76,9 +90,9 @@ export function usePricelists(
 
 export function usePricelistItems(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProductPricelistItem[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProductPricelistItem[]>({
     queryKey: ['pricelist-items', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/pricelist-items', 'Failed to fetch pricelist items'),
     staleTime: 30_000,
@@ -88,9 +102,9 @@ export function usePricelistItems(
 
 export function usePickingBatches(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: StockPickingBatch[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<StockPickingBatch[]>({
     queryKey: ['picking-batches', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/picking-batches', 'Failed to fetch picking batches'),
     staleTime: 30_000,
@@ -98,8 +112,8 @@ export function usePickingBatches(
   })
 }
 
-export function useDeliveryCarriers(companyId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useDeliveryCarriers(companyId: bigint, initialData?: DeliveryCarrier[]) {
+  return useQuery<DeliveryCarrier[]>({
     queryKey: ['delivery-carriers', rqBigIntKey(companyId)],
     queryFn: () => fetchQueryList('/api/query/delivery-carriers', 'Failed to fetch delivery carriers'),
     staleTime: 30_000,
@@ -107,8 +121,8 @@ export function useDeliveryCarriers(companyId: bigint, initialData?: QueryRows) 
   })
 }
 
-export function useDeliveryPriceRules(companyId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useDeliveryPriceRules(companyId: bigint, initialData?: DeliveryPriceRule[]) {
+  return useQuery<DeliveryPriceRule[]>({
     queryKey: ['delivery-price-rules', rqBigIntKey(companyId)],
     queryFn: () =>
       fetchQueryList('/api/query/delivery-price-rules', 'Failed to fetch delivery price rules'),
@@ -117,8 +131,8 @@ export function useDeliveryPriceRules(companyId: bigint, initialData?: QueryRows
   })
 }
 
-export function useShippingMethods(companyId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useShippingMethods(companyId: bigint, initialData?: ShippingMethod[]) {
+  return useQuery<ShippingMethod[]>({
     queryKey: ['shipping-methods', rqBigIntKey(companyId)],
     queryFn: () => fetchQueryList('/api/query/shipping-methods', 'Failed to fetch shipping methods'),
     staleTime: 30_000,
@@ -126,8 +140,8 @@ export function useShippingMethods(companyId: bigint, initialData?: QueryRows) {
   })
 }
 
-export function usePosPaymentMethods(companyId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function usePosPaymentMethods(companyId: bigint, initialData?: PosPaymentMethod[]) {
+  return useQuery<PosPaymentMethod[]>({
     queryKey: ['pos-payment-methods', rqBigIntKey(companyId)],
     queryFn: () =>
       fetchQueryList('/api/query/pos-payment-methods', 'Failed to fetch POS payment methods'),
@@ -136,8 +150,8 @@ export function usePosPaymentMethods(companyId: bigint, initialData?: QueryRows)
   })
 }
 
-export function usePosLoyaltyPrograms(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function usePosLoyaltyPrograms(organizationId: bigint, initialData?: PosLoyaltyProgram[]) {
+  return useQuery<PosLoyaltyProgram[]>({
     queryKey: ['pos-loyalty-programs', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/pos-loyalty-programs', 'Failed to fetch loyalty programs'),
@@ -146,8 +160,8 @@ export function usePosLoyaltyPrograms(organizationId: bigint, initialData?: Quer
   })
 }
 
-export function usePosLoyaltyCards(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function usePosLoyaltyCards(organizationId: bigint, initialData?: PosLoyaltyCard[]) {
+  return useQuery<PosLoyaltyCard[]>({
     queryKey: ['pos-loyalty-cards', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/pos-loyalty-cards', 'Failed to fetch loyalty cards'),
     staleTime: 30_000,
@@ -155,8 +169,8 @@ export function usePosLoyaltyCards(organizationId: bigint, initialData?: QueryRo
   })
 }
 
-export function useReturnOrders(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useReturnOrders(organizationId: bigint, initialData?: ReturnOrder[]) {
+  return useQuery<ReturnOrder[]>({
     queryKey: ['return-orders', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/return-orders', 'Failed to fetch return orders'),
     staleTime: 30_000,
@@ -164,8 +178,8 @@ export function useReturnOrders(organizationId: bigint, initialData?: QueryRows)
   })
 }
 
-export function useReturnOrderLines(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useReturnOrderLines(organizationId: bigint, initialData?: ReturnOrderLine[]) {
+  return useQuery<ReturnOrderLine[]>({
     queryKey: ['return-order-lines', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/return-order-lines', 'Failed to fetch return order lines'),
@@ -174,8 +188,8 @@ export function useReturnOrderLines(organizationId: bigint, initialData?: QueryR
   })
 }
 
-export function useSaleCommissions(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useSaleCommissions(organizationId: bigint, initialData?: SaleCommission[]) {
+  return useQuery<SaleCommission[]>({
     queryKey: ['sale-commissions', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/sale-commissions', 'Failed to fetch sale commissions'),
@@ -185,8 +199,8 @@ export function useSaleCommissions(organizationId: bigint, initialData?: QueryRo
 }
 
 /** Server-bounded: `sale_order.state = ToApprove`. */
-export function useSaleOrdersToApprove(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useSaleOrdersToApprove(organizationId: bigint, initialData?: SaleOrder[]) {
+  return useQuery<SaleOrder[]>({
     queryKey: ['sale-orders-to-approve', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -199,8 +213,8 @@ export function useSaleOrdersToApprove(organizationId: bigint, initialData?: Que
 }
 
 /** Server-bounded: `sale_commission.state = accrued` (awaiting settle). */
-export function useSaleCommissionsPending(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useSaleCommissionsPending(organizationId: bigint, initialData?: SaleCommission[]) {
+  return useQuery<SaleCommission[]>({
     queryKey: ['sale-commissions-pending', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -1151,6 +1165,20 @@ export function useScheduleSalesSlaEscalation(
 
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
+  SaleOrder,
+  SaleOrderLine,
+  ProductPricelist,
+  ProductPricelistItem,
+  StockPickingBatch,
+  DeliveryCarrier,
+  DeliveryPriceRule,
+  ShippingMethod,
+  PosPaymentMethod,
+  PosLoyaltyProgram,
+  PosLoyaltyCard,
+  ReturnOrder,
+  ReturnOrderLine,
+  SaleCommission,
   ApplyOmnichannelAllocationParams,
   CreateDeliveryCarrierParams,
   CreateDeliveryPriceRuleParams,

@@ -118,10 +118,12 @@ import {
 } from "@/lib/subscriptions-revenue-params"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
-import { useSaleOrders, usePricelists } from "@lumiere/query-hooks/hooks/sales"
+import { useSaleOrders, usePricelists, type SaleOrder, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { useAccountJournals, useAccountAccounts, useAccountMoves, useAccountMoveLines } from "@lumiere/query-hooks/hooks/accounting"
+import type { AccountAccount, AccountJournal } from "@lumiere/query-hooks/hooks/accounting"
+import type { Product } from "@lumiere/stdb/types"
 import {
   saleOrderRowsToSelectOptions,
   subscriptionPlanRowsToSelectOptions,
@@ -150,11 +152,11 @@ interface SubscriptionsClientProps {
   initialDeferredSchedules?: Record<string, unknown>[]
   initialDeferredLines?: Record<string, unknown>[]
   initialRecognitionRules?: Record<string, unknown>[]
-  initialSaleOrders?: Record<string, unknown>[]
-  initialPricelists?: Record<string, unknown>[]
-  initialProducts?: Record<string, unknown>[]
-  initialJournals?: Record<string, unknown>[]
-  initialAccounts?: Record<string, unknown>[]
+  initialSaleOrders?: SaleOrder[]
+  initialPricelists?: ProductPricelist[]
+  initialProducts?: Product[]
+  initialJournals?: AccountJournal[]
+  initialAccounts?: AccountAccount[]
   organizationId?: number
 }
 
