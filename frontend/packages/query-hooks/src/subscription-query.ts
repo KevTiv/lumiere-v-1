@@ -6,6 +6,7 @@ import { isSubscriptionReady, useSubscriptionCache } from "@lumiere/stdb/live"
 
 import { coalesceQueryInitialData, fetchQueryList, rqBigIntKey, type QueryRows } from "./http"
 import { invalidateStdbQueryResources, realtimeQueryKeysForResource } from "./hooks/stdb"
+import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
 
 /**
  * Skip React Query invalidation when the browser STDB subscription cache is active.
@@ -22,11 +23,11 @@ export function invalidateResourceQueries(
 /**
  * Resource list query that prefers subscription-seeded React Query cache, with HTTP fallback.
  */
-export function useSubscriptionAwareQuery(
-  resource: string,
+export function useSubscriptionAwareQuery<K extends string>(
+  resource: K,
   organizationId: bigint,
   options?: {
-    initialData?: QueryRows
+    initialData?: QueryRowFor<K>[]
     enabled?: boolean
     staleTime?: number
   },
@@ -34,16 +35,16 @@ export function useSubscriptionAwareQuery(
   const qc = useQueryClient()
   const { subscriptionReady } = useSubscriptionCache()
 
-  return useQuery<QueryRows>({
+  return useQuery<QueryRowFor<K>[]>({
     queryKey: [resource, rqBigIntKey(organizationId)],
-    queryFn: async () => {
+    queryFn: async (): Promise<QueryRowFor<K>[]> => {
       if (subscriptionReady) {
         for (const key of realtimeQueryKeysForResource(resource, organizationId)) {
           const cached = qc.getQueryData(key)
-          if (Array.isArray(cached)) return cached as QueryRows
+          if (Array.isArray(cached)) return cached as QueryRowFor<K>[]
         }
       }
-      return fetchQueryList(`/api/query/${resource}`, `Failed to fetch ${resource}`)
+      return fetchQueryList(`/api/query/${resource}`, `Failed to fetch ${resource}`) as Promise<QueryRowFor<K>[]>
     },
     staleTime: subscriptionReady ? Number.POSITIVE_INFINITY : (options?.staleTime ?? 30_000),
     refetchOnMount: !subscriptionReady,

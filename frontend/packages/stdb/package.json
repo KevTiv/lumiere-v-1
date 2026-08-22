@@ -10,6 +10,7 @@
     "./subscriptions": "./src/subscriptions/index.ts",
     "./read-models": "./src/read-models/index.ts",
     "./types": "./src/types/index.ts",
+    "./query-row-map": "./src/query-row-map.ts",
     "./server": "./src/server.ts",
     "./browser-http": "./src/browser-http.ts",
     "./client-ui-bridge": "./src/client-ui-bridge.ts",

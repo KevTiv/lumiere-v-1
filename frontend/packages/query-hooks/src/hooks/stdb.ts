@@ -21,6 +21,7 @@ import {
 } from "@lumiere/stdb/commands"
 import type { OperationInputMap } from "@lumiere/contracts/generated/operation-inputs"
 import { isSubscriptionReady, useSubscriptionCache } from "@lumiere/stdb/live"
+import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
 
 import { apiFetch, coalesceQueryInitialData } from "../http"
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
@@ -140,14 +141,14 @@ export function useStdbReducer<K extends NamedReducerKey>(reducerName: K) {
  * const { data } = useStdbQuery('leads', orgId)
  * const { data } = useStdbQuery('mrp-productions', orgId, { staleTime: 60_000 })
  */
-export function useStdbQuery(
-  resource: string,
+export function useStdbQuery<K extends string>(
+  resource: K,
   organizationId: bigint | number,
   options?: {
     staleTime?: number
     enabled?: boolean
     /** SSR / hydration seed until the first fetch completes */
-    initialData?: Record<string, unknown>[]
+    initialData?: QueryRowFor<K>[]
   },
 ) {
   const qc = useQueryClient()
@@ -158,11 +159,11 @@ export function useStdbQuery(
 
   return useQuery({
     queryKey,
-    queryFn: async () => {
+    queryFn: async (): Promise<QueryRowFor<K>[]> => {
       if (subscriptionReady) {
         for (const key of realtimeQueryKeysForResource(resource, organizationId)) {
           const cached = qc.getQueryData(key)
-          if (Array.isArray(cached)) return cached as Record<string, unknown>[]
+          if (Array.isArray(cached)) return cached as QueryRowFor<K>[]
         }
       }
       const companyQuery = companyId != null && companyId > 0
@@ -173,7 +174,7 @@ export function useStdbQuery(
         const json = await r.json().catch(() => ({})) as Record<string, unknown>
         throw new Error((json.error as string | undefined) ?? `Query ${resource} failed`)
       }
-      const json = await r.json() as { data: Record<string, unknown>[] }
+      const json = await r.json() as { data: QueryRowFor<K>[] }
       return json.data ?? []
     },
     staleTime: subscriptionReady ? Number.POSITIVE_INFINITY : (options?.staleTime ?? 30_000),
