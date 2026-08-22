@@ -613,6 +613,23 @@ mod tests {
     }
 
     #[test]
+    fn form_configuration_mutators_are_session_exposed_and_org_scoped() {
+        for reducer in [
+            "add_form_field",
+            "delete_form_field",
+            "initialize_default_form_configs",
+            "publish_form_configuration",
+            "set_form_role_config",
+            "update_form_field",
+        ] {
+            let contract = stdb_client::reducer_contract(reducer).expect(reducer);
+            assert_eq!(contract.exposure, Exposure::Session, "{reducer}");
+            assert_eq!(contract.organization_position, Some(0), "{reducer}");
+            assert_eq!(contract.company_position, None, "{reducer}");
+        }
+    }
+
+    #[test]
     fn reviewed_unscoped_reducer_is_explicit() {
         let contract = stdb_client::reducer_contract("create_country").expect("create_country");
         assert_eq!(contract.exposure, Exposure::Session);

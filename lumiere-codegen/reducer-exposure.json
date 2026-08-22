@@ -72,6 +72,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "add_form_field",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "add_landed_cost_line",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2003,6 +2008,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "delete_form_field",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "delete_hr_employee_document",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2649,6 +2659,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "initialize_default_form_configs",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "invoice_po_line",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2896,6 +2911,11 @@
     },
     {
       "name": "promote_ai_skill_version",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "publish_form_configuration",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
@@ -3455,6 +3475,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "set_form_role_config",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "set_intercompany_rule_active",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3954,6 +3979,11 @@
     },
     {
       "name": "update_fiscal_year",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "update_form_field",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
