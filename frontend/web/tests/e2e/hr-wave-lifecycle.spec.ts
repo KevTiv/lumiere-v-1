@@ -9,6 +9,7 @@ import { expect, test, type Page } from "@playwright/test"
 import {
   callReducerBff,
   expectNoAppError,
+  fetchCurrencyIdByCode,
   fetchSessionOrganizationId,
   gotoModule,
   openEntityCreate,
@@ -16,6 +17,7 @@ import {
   fillField,
   submitForm,
   smokeName,
+  scalarQueryId,
 } from "./helpers"
 
 const some = <T>(value: T) => ({ some: value })
@@ -256,6 +258,172 @@ test.describe("HR wave lifecycle e2e @hr", () => {
       .toMatch(/Done/i)
 
     await openHrTab(page, "payslips")
+    await expectNoAppError(page)
+  })
+})
+
+test.describe("HR-008 employee → contract → payslip lifecycle @hr @p0", () => {
+  async function fetchEmployeeIdByName(page: Page, name: string): Promise<number> {
+    const deadline = Date.now() + 30_000
+    while (Date.now() < deadline) {
+      const res = await page.request.get("/api/query/employees")
+      if (res.ok()) {
+        const json = (await res.json()) as { data?: Array<{ id?: unknown; name?: string }> }
+        const row = (json.data ?? []).find((e) => e.name === name)
+        const id = scalarQueryId(row?.id)
+        if (id != null) return id
+      }
+      await page.waitForTimeout(250)
+    }
+    throw new Error(`employee not found after create: ${name}`)
+  }
+
+  async function fetchContractIdByName(page: Page, name: string): Promise<number> {
+    const deadline = Date.now() + 30_000
+    while (Date.now() < deadline) {
+      const res = await page.request.get("/api/query/contracts")
+      if (res.ok()) {
+        const json = (await res.json()) as { data?: Array<{ id?: unknown; name?: string }> }
+        const row = (json.data ?? []).find((c) => c.name === name)
+        const id = scalarQueryId(row?.id)
+        if (id != null) return id
+      }
+      await page.waitForTimeout(250)
+    }
+    throw new Error(`contract not found after create: ${name}`)
+  }
+
+  test("create employee → contract → payslip → confirm @p0", async ({ page }) => {
+    test.setTimeout(180_000)
+    await gotoModule(page, "/hr", "hr")
+    const organizationId = await fetchSessionOrganizationId(page)
+    const companyId = await fetchFirstCompanyId(page)
+    const structId = await fetchPayrollStructureId(page)
+    const currencyId = await fetchCurrencyIdByCode(page, "USD")
+
+    const employeeName = smokeName("hr008-emp")
+    await callReducerBff(page, "create_employee", [
+      organizationId,
+      {
+        company_id: some(companyId),
+        name: employeeName,
+        job_id: none,
+        department_id: none,
+        employment_type: { tag: "FullTime" },
+        work_email: some(`${employeeName.toLowerCase().replace(/\s+/g, "-")}@example.test`),
+        employee_number: none,
+        job_title: none,
+        parent_id: none,
+        coach_id: none,
+        work_phone: none,
+        mobile_phone: none,
+        work_location: none,
+        work_contact_partner_id: none,
+        date_hired: none,
+        gender: none,
+        birthday: none,
+        marital: none,
+        emergency_contact: none,
+        emergency_phone: none,
+        barcode: none,
+        pin: none,
+        image_url: none,
+        color: none,
+        is_active: true,
+        metadata: none,
+      },
+    ])
+
+    const employeeId = await fetchEmployeeIdByName(page, employeeName)
+    expect(employeeId).toBeGreaterThan(0)
+
+    const contractName = smokeName("hr008-contract")
+    const nowMicros = Date.now() * 1000
+    await callReducerBff(page, "create_contract", [
+      organizationId,
+      {
+        company_id: some(companyId),
+        employee_id: employeeId,
+        name: contractName,
+        date_start: { __timestamp_micros_since_unix_epoch__: nowMicros },
+        wage: 5500,
+        currency_id: currencyId,
+        job_id: none,
+        department_id: none,
+        date_end: none,
+        notes: none,
+      },
+    ])
+
+    const contractId = await fetchContractIdByName(page, contractName)
+    expect(contractId).toBeGreaterThan(0)
+
+    const payslipTag = smokeName("hr008-payslip")
+    await callReducerBff(page, "create_payslip", [
+      organizationId,
+      {
+        company_id: some(companyId),
+        employee_id: employeeId,
+        struct_id: structId,
+        date_from: { __timestamp_micros_since_unix_epoch__: nowMicros },
+        date_to: { __timestamp_micros_since_unix_epoch__: (Date.now() + 30 * 86400) * 1000 },
+        basic_wage: 5500,
+        contract_id: some(contractId),
+        notes: some(payslipTag),
+      },
+    ])
+
+    let payslipId = 0
+    await expect
+      .poll(async () => {
+        const res = await page.request.get("/api/query/payslips")
+        if (!res.ok()) return 0
+        const json = (await res.json()) as {
+          data?: Array<{
+            id?: unknown
+            employeeId?: unknown
+            employee_id?: unknown
+            contractId?: unknown
+            contract_id?: unknown
+            notes?: string
+          }>
+        }
+        const row = (json.data ?? [])
+          .filter(
+            (p) =>
+              scalarQueryId(p.employeeId ?? p.employee_id) === employeeId &&
+              scalarQueryId(p.contractId ?? p.contract_id) === contractId,
+          )
+          .sort((a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0))[0]
+        payslipId = scalarQueryId(row?.id) ?? 0
+        return payslipId
+      }, { timeout: 45_000 })
+      .toBeGreaterThan(0)
+    expect(payslipId).toBeGreaterThan(0)
+
+    await callReducerBff(page, "confirm_payslip", [
+      organizationId,
+      payslipId,
+      {
+        company_id: some(companyId),
+        gross_wage: 5500,
+        net_wage: 4600,
+        calculation_source: "manual",
+      },
+    ])
+
+    await expect
+      .poll(async () => {
+        const res = await page.request.get("/api/query/payslips")
+        if (!res.ok()) return ""
+        const json = (await res.json()) as { data?: Array<{ id?: unknown; state?: unknown }> }
+        const row = (json.data ?? []).find((p) => scalarQueryId(p.id) === payslipId)
+        return payslipStateTag(row?.state)
+      }, { timeout: 45_000 })
+      .toMatch(/Verify/i)
+
+    await openHrTab(page, "payslips")
+    await expect(page.getByText(employeeName)).toBeVisible({ timeout: 45_000 })
     await expectNoAppError(page)
   })
 })

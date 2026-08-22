@@ -1,16 +1,100 @@
-import { expect, test } from "@playwright/test"
+import { expect, test, type Page } from "@playwright/test"
 
 import {
+  callReducerBff,
   chooseFirstOption,
   expectNoAppError,
   expectRecordAbsentFromQuery,
+  fetchDefaultCompanyId,
+  fetchFirstUomId,
+  fetchFirstWarehouseId,
+  fetchSessionOrganizationId,
   fillField,
   gotoModule,
   openEntityCreate,
+  scalarQueryId,
   smokeName,
   submitForm,
   waitForBffQueryMinRows,
 } from "./helpers"
+
+function stdbTimestampMicros(isoDate: string): { __timestamp_micros_since_unix_epoch__: number } {
+  const micros = BigInt(new Date(isoDate).getTime()) * 1000n
+  return { __timestamp_micros_since_unix_epoch__: Number(micros) }
+}
+
+const none = { none: [] as [] }
+const some = <T,>(value: T) => ({ some: value })
+
+function moStateTag(value: unknown): string {
+  if (value == null) return ""
+  if (typeof value === "string") return value
+  if (typeof value === "object" && !Array.isArray(value) && "tag" in value) {
+    return String((value as { tag?: string }).tag ?? "")
+  }
+  return String(value)
+}
+
+async function fetchFirstProductId(page: Page): Promise<number> {
+  const res = await page.request.get("/api/query/products")
+  if (!res.ok()) throw new Error(`products query failed: ${res.status()}`)
+  const json = (await res.json()) as { data?: Array<{ id?: unknown }> }
+  const id = scalarQueryId(json.data?.[0]?.id)
+  if (id == null) throw new Error("no products in seed data")
+  return id
+}
+
+async function fetchFirstStockPicking(page: Page): Promise<{
+  pickingTypeId: number
+  locationSrcId: number
+  locationDestId: number
+}> {
+  const res = await page.request.get("/api/query/stock-pickings")
+  if (!res.ok()) throw new Error(`stock-pickings query failed: ${res.status()}`)
+  const json = (await res.json()) as {
+    data?: Array<{ pickingTypeId?: unknown; locationId?: unknown; locationDestId?: unknown }>
+  }
+  const row = (json.data ?? []).find(
+    (r) => scalarQueryId(r.pickingTypeId) != null && scalarQueryId(r.locationId) != null,
+  )
+  const pickingTypeId = scalarQueryId(row?.pickingTypeId)
+  const locationSrcId = scalarQueryId(row?.locationId)
+  const locationDestId = scalarQueryId(row?.locationDestId ?? row?.locationId)
+  if (pickingTypeId == null || locationSrcId == null || locationDestId == null) {
+    throw new Error("no stock picking with picking type and locations in seed data")
+  }
+  return { pickingTypeId, locationSrcId, locationDestId }
+}
+
+async function fetchLatestMoIdByProduct(page: Page, productId: number): Promise<number> {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/mrp-productions")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{ id?: unknown; productId?: unknown; product_id?: unknown }>
+      }
+      const matches = (json.data ?? []).filter(
+        (r) => scalarQueryId(r.productId ?? r.product_id) === productId,
+      )
+      const newest = [...matches].sort(
+        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
+      )[0]
+      const id = scalarQueryId(newest?.id)
+      if (id != null) return id
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`no manufacturing order found for product ${productId}`)
+}
+
+async function fetchMoState(page: Page, moId: number): Promise<string> {
+  const res = await page.request.get("/api/query/mrp-productions")
+  if (!res.ok()) return ""
+  const json = (await res.json()) as { data?: Array<{ id?: unknown; state?: unknown }> }
+  const row = (json.data ?? []).find((r) => scalarQueryId(r.id) === moId)
+  return moStateTag(row?.state)
+}
 
 test.describe("Manufacturing create mutations", { tag: ["@phase-4", "@manufacturing"] }, () => {
   test("creates a work center via create_workcenter reducer", async ({ page }) => {
@@ -127,3 +211,89 @@ test.describe("Manufacturing mutation visibility", { tag: ["@phase-4", "@manufac
       .toBe(true)
   })
 })
+
+test.describe(
+  "MFG-009 manufacturing order produce and close lifecycle",
+  { tag: ["@phase-4", "@manufacturing", "@p0"] },
+  () => {
+    test("creates, confirms, produces, and closes a manufacturing order via BFF reducers", async ({
+      page,
+    }) => {
+      test.setTimeout(180_000)
+
+      const organizationId = await fetchSessionOrganizationId(page)
+      const companyId = await fetchDefaultCompanyId(page)
+      const warehouseId = await fetchFirstWarehouseId(page)
+      const uomId = await fetchFirstUomId(page)
+      const productId = await fetchFirstProductId(page)
+      const picking = await fetchFirstStockPicking(page)
+
+      const productQty = 1
+      const planned = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      const plannedTs = stdbTimestampMicros(planned)
+
+      await callReducerBff(page, "create_manufacturing_order", [
+        organizationId,
+        {
+          company_id: some(companyId),
+          product_id: productId,
+          product_qty: productQty,
+          product_uom_id: uomId,
+          date_planned_start: plannedTs,
+          date_planned_finished: plannedTs,
+          location_src_id: picking.locationSrcId,
+          location_dest_id: picking.locationDestId,
+          warehouse_id: warehouseId,
+          picking_type_id: picking.pickingTypeId,
+          consumption: none,
+          bom_id: none,
+          routing_id: none,
+          proc_group_id: none,
+          procurement_group_id: none,
+          date_deadline: none,
+          origin: some(smokeName("mfg009-origin")),
+          responsible_user_id: none,
+          metadata: none,
+        },
+      ])
+
+      const moId = await fetchLatestMoIdByProduct(page, productId)
+
+      await expect.poll(async () => fetchMoState(page, moId), { timeout: 30_000 }).toBe("Draft")
+
+      await callReducerBff(page, "confirm_manufacturing_order", [
+        organizationId,
+        companyId,
+        moId,
+      ])
+      await expect.poll(async () => fetchMoState(page, moId), { timeout: 30_000 }).toBe("Confirmed")
+
+      await callReducerBff(page, "start_manufacturing_order", [
+        organizationId,
+        companyId,
+        moId,
+      ])
+      await expect.poll(async () => fetchMoState(page, moId), { timeout: 30_000 }).toBe("Progress")
+
+      await callReducerBff(page, "produce_manufacturing_order", [
+        organizationId,
+        companyId,
+        moId,
+        productQty,
+      ])
+      await expect.poll(async () => fetchMoState(page, moId), { timeout: 30_000 }).toBe("ToClose")
+
+      await callReducerBff(page, "finish_manufacturing_order", [
+        organizationId,
+        companyId,
+        moId,
+      ])
+      await expect.poll(async () => fetchMoState(page, moId), { timeout: 30_000 }).toBe("Done")
+
+      await gotoModule(page, "/manufacturing", "manufacturing")
+      await page.getByTestId("module-tab-manufacturing-orders").click()
+      await waitForBffQueryMinRows(page, "/api/query/mrp-productions")
+      await expectNoAppError(page)
+    })
+  },
+)

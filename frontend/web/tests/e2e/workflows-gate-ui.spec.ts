@@ -9,6 +9,7 @@ import { expect, test } from "@playwright/test"
 import {
   activeTabEntityTable,
   assertModuleTabs,
+  callReducerBff,
   expectNoAppError,
   fillField,
   gotoModule,
@@ -153,3 +154,37 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
     await expectNoAppError(page)
   })
 })
+
+test.describe(
+  "WRK-009 workflow definition approve and complete lifecycle",
+  { tag: ["@gate-ui", "@p0"] },
+  () => {
+    test("creates a workflow, publishes the draft, and retires the version via BFF reducers", async ({
+      page,
+    }) => {
+      test.setTimeout(180_000)
+
+      const seeded = await seedPublishableWorkflowDraft(page, {
+        workflowKey: smokeName("wrk009").toLowerCase().replace(/-/g, "_"),
+        name: `WRK-009 ${smokeName("wf")}`,
+      })
+
+      await callReducerBff(page, "publish_workflow_version", [
+        seeded.organizationId,
+        seeded.versionId,
+        seeded.draftRevision,
+      ])
+      await waitForWorkflowVersionStatus(page, seeded.versionId, "Published")
+
+      await callReducerBff(page, "retire_workflow_version", [
+        seeded.organizationId,
+        seeded.versionId,
+        seeded.draftRevision,
+      ])
+      await waitForWorkflowVersionStatus(page, seeded.versionId, "Retired")
+
+      await openWorkflowVersionRow(page, seeded.versionId)
+      await expectNoAppError(page)
+    })
+  },
+)
