@@ -47,6 +47,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "add_account_move_line",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "add_article_member",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -292,6 +297,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "archive_payment_account",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "assign_benefit_enrollment",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -368,6 +378,11 @@
     },
     {
       "name": "block_workcenter",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "cancel_account_move",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
@@ -724,7 +739,22 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_account_account",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "create_account_account_type",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "create_account_asset",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "create_account_bank_statement",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
@@ -739,12 +769,27 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_account_journal",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "create_account_move",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "create_account_period",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
       "name": "create_account_reconciliation_widget",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "create_account_tax",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
@@ -879,6 +924,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_budget_line",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "create_budget_post",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -948,6 +998,11 @@
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site",
       "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
+    },
+    {
+      "name": "create_credit_note_from_invoice",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
       "name": "create_credit_note_from_return_order",
@@ -1853,6 +1908,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "delete_account_move_line",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "delete_account_period",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2093,7 +2153,17 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "deprecate_account_account",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "dismiss_insight",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "dispose_account_asset",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
@@ -2725,6 +2795,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "post_account_move",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "post_cycle_count_adjustments",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2736,6 +2811,11 @@
     },
     {
       "name": "post_internal_note",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "post_invoice",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
@@ -3592,7 +3672,22 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "update_account_account",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "update_account_account_type",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "update_account_asset",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "update_account_bank_statement",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
@@ -3603,6 +3698,11 @@
     },
     {
       "name": "update_account_group",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "update_account_journal",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
@@ -3618,6 +3718,11 @@
     },
     {
       "name": "update_account_reconciliation_widget",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "update_account_tax",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
@@ -3679,6 +3784,11 @@
     },
     {
       "name": "update_bom",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "update_budget_line",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
@@ -3764,6 +3874,11 @@
     },
     {
       "name": "update_crm_conversation",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "update_crossovered_budget",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
@@ -3930,12 +4045,22 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "update_payment_account",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "update_payment_term",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
       "name": "update_payment_term_line",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "update_payment_transaction",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
