@@ -64,14 +64,6 @@ function loginLocal({ forceLogout = false } = {}) {
   }
 }
 
-function cliTokenAcceptedByCurrentServer() {
-  const serverArg = isLocalHost(host) ? 'local' : host
-  const result = spawnSync('spacetime', ['list', '--server', serverArg, '--yes'], {
-    stdio: 'ignore',
-  })
-  return result.status === 0
-}
-
 async function verifyPrivateAuthSql(token, moduleName) {
   if (!moduleName) {
     console.error('[e2e-stdb-token] STDB_MODULE (or NEXT_PUBLIC_STDB_MODULE) is required for --verify')
@@ -103,18 +95,13 @@ async function main() {
   const args = new Set(process.argv.slice(2))
 
   if (args.has('--login-only')) {
-    // Keep an existing identity when the running server accepts it. A freshly
-    // started local server may reject a token signed by a prior local or cloud
-    // server, in which case replace it before publishing.
-    const forceLogout = process.env.E2E_FORCE_LOCAL_LOGIN === '1'
+    // A CI runner owns a fresh local server, so any restored/cloud CLI token
+    // must be replaced with one signed by that server. Local development keeps
+    // its existing identity because it may own an already-published database.
+    const forceLogout = process.env.CI === 'true' || process.env.E2E_FORCE_LOCAL_LOGIN === '1'
     const token = readCliToken()
-    if (!forceLogout && token && cliTokenAcceptedByCurrentServer()) return
+    if (!forceLogout && token) return
     loginLocal({ forceLogout: forceLogout || Boolean(token) })
-    const refreshedToken = readCliToken()
-    if (!refreshedToken || !cliTokenAcceptedByCurrentServer()) {
-      console.error('[e2e-stdb-token] Local login did not produce a token accepted by this server')
-      process.exit(1)
-    }
     return
   }
 
