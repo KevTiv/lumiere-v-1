@@ -8,6 +8,7 @@ import { expect, test, type Page } from "@playwright/test"
 
 import {
   callReducerBff,
+  callReducerOwner,
   expectNoAppError,
   fetchCurrencyIdByCode,
   fetchSessionOrganizationId,
@@ -234,7 +235,7 @@ test.describe("HR wave lifecycle e2e @hr", () => {
       }, { timeout: 45_000 })
       .toBeGreaterThan(0)
 
-    await callReducerBff(page, "record_payroll_export_result", [
+    await callReducerOwner("record_payroll_export_result", [
       organizationId,
       companyId,
       intentId,

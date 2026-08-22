@@ -42,8 +42,8 @@ function stdbTimestampMicros(isoDate: string): { __timestamp_micros_since_unix_e
   return { __timestamp_micros_since_unix_epoch__: Number(micros) }
 }
 
-/** Date outside seeded fiscal periods so posting is not blocked by closed periods. */
-const POSTABLE_MOVE_DATE = "2099-06-01T00:00:00.000Z"
+/** Date inside the rolling open fiscal period created by the E2E seed. */
+const POSTABLE_MOVE_DATE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
 type LimitedUser = { email: string; password: string }
 
@@ -183,6 +183,7 @@ async function adminCreatePostableDraftMiscMove(page: Page): Promise<number> {
   await callReducerBff(page, "create_account_move", [
     orgId,
     {
+      idempotency_key: `create-account-move:${moveRef}`,
       company_id: companyId,
       journal_id: journalId,
       move_type: { tag: "Entry" },

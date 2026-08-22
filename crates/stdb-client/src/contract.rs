@@ -163,12 +163,26 @@ impl ScalarKind {
                 }
                 if object.len() == 1 {
                     if let Some(inner) = object.get("some") {
-                        return self.accepts(inner).then(|| inner.clone());
+                        return self.normalize_untagged_input(inner);
                     }
                 }
             }
         }
-        self.accepts(value).then(|| value.clone())
+        self.normalize_untagged_input(value)
+    }
+
+    fn normalize_untagged_input(self, value: &Value) -> Option<Value> {
+        match self {
+            Self::SignedInteger | Self::OptionalSignedInteger => value
+                .as_i64()
+                .or_else(|| value.as_str()?.parse::<i64>().ok())
+                .map(Value::from),
+            Self::UnsignedInteger | Self::OptionalUnsignedInteger => value
+                .as_u64()
+                .or_else(|| value.as_str()?.parse::<u64>().ok())
+                .map(Value::from),
+            _ => self.accepts(value).then(|| value.clone()),
+        }
     }
 
     fn is_optional(self) -> bool {
@@ -238,7 +252,7 @@ mod tests {
                 .is_ok()
         );
         assert!(matches!(
-            ReducerCall::from_name("assign_role", json!([{}, 4, "7", {}])),
+            ReducerCall::from_name("assign_role", json!([{}, 4, "seven", {}])),
             Err(ReducerContractError::WrongScalarKind { position: 2, .. })
         ));
     }
@@ -278,5 +292,19 @@ mod tests {
             ),
             Err(ReducerContractError::WrongScalarKind { position: 1, .. })
         ));
+    }
+
+    #[test]
+    fn normalizes_decimal_string_integer_inputs_from_json_bigints() {
+        let publish = ReducerCall::from_name("publish_workflow_version", json!([7, "42", "3"]))
+            .expect("decimal string ids");
+        assert_eq!(publish.args(), &[json!(7), json!(42), json!(3)]);
+
+        let workflow = ReducerCall::from_name(
+            "create_workflow",
+            json!([7, { "some": "42" }, { "metadata": { "none": [] } }]),
+        )
+        .expect("tagged decimal string id");
+        assert_eq!(workflow.args()[1], json!(42));
     }
 }

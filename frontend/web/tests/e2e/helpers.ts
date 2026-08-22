@@ -749,6 +749,29 @@ export async function callReducerBffResult(
   return { ok: false, status: res.status(), error: error || undefined }
 }
 
+/** Trusted fixture-only reducer call using the database-owner token. */
+export async function callReducerOwner(reducer: string, args: unknown[]): Promise<void> {
+  const host = (process.env.E2E_STDB_HOST ?? process.env.STDB_HOST ?? "http://127.0.0.1:3000")
+    .replace(/\/$/, "")
+  const moduleName = process.env.STDB_MODULE?.trim()
+  const token = process.env.STDB_SERVER_TOKEN?.trim()
+  if (!moduleName || !token) {
+    throw new Error(`trusted fixture call ${reducer} requires STDB_MODULE and STDB_SERVER_TOKEN`)
+  }
+  const encodedArgs = encodeReducerCallArgs(reducer, args)
+  const response = await fetch(`${host}/v1/database/${moduleName}/call/${reducer}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: stringifyReducerCallBody(encodedArgs),
+  })
+  if (!response.ok) {
+    throw new Error(`trusted fixture reducer ${reducer} failed (${response.status}): ${await response.text()}`)
+  }
+}
+
 async function expectReducerHttpResponseOk(
   reducer: string,
   res: import("@playwright/test").Response,
@@ -2683,7 +2706,7 @@ export async function seedPublishableWorkflowDraft(
     { nodeKey: "start", name: "Start", kind: { tag: "Start" }, sequence: 1 },
     { nodeKey: "end", name: "End", kind: { tag: "End" }, sequence: 2 },
   ]) {
-    await callReducerBff(page, "upsert_workflow_node", [
+    await callReducerOwner("upsert_workflow_node", [
       organizationId,
       versionId,
       rev,
@@ -2702,7 +2725,7 @@ export async function seedPublishableWorkflowDraft(
     rev += 1
   }
 
-  await callReducerBff(page, "upsert_workflow_edge", [
+  await callReducerOwner("upsert_workflow_edge", [
     organizationId,
     versionId,
     rev,

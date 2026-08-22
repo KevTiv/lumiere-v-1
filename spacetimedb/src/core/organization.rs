@@ -10,6 +10,7 @@ use crate::core::permissions::{role, user_role_assignment, Role, UserRoleAssignm
 use crate::core::reference::require_active_currency_by_id;
 use crate::core::users::user_profile;
 use crate::core::users::{user_organization, UserOrganization};
+use crate::crm::activities::{activity_type, ActivityType};
 use crate::forms::migrations::run_seed_organization_form_configs;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
@@ -391,6 +392,24 @@ pub fn bootstrap_new_tenant(
         integration_keys: params.settings.integration_keys,
         updated_at: ctx.timestamp,
         metadata: params.settings.metadata,
+    });
+
+    ctx.db.activity_type().insert(ActivityType {
+        id: 0,
+        organization_id: org.id,
+        name: "Follow Up".to_string(),
+        category: "todo".to_string(),
+        summary: Some("Follow up".to_string()),
+        sequence: 10,
+        delay_count: None,
+        delay_unit: None,
+        delay_from: None,
+        icon: None,
+        chaining_type: "none".to_string(),
+        suggested_next_type_id: None,
+        triggered_next_type_id: None,
+        is_active: true,
+        metadata: Some(r#"{"bootstrap":true}"#.to_string()),
     });
 
     let company = ctx.db.company().insert(Company {

@@ -78,6 +78,42 @@ export const newWorkflowForm = (t: TFunction): FormConfig => ({
   ],
 })
 
+export const newWorkflowMigrationPlanForm = (t: TFunction): FormConfig => ({
+  id: "create-migration-plan",
+  title: t("workflows.forms.migrationPlan.title", { defaultValue: "New migration plan" }),
+  description: t("workflows.forms.migrationPlan.description", {
+    defaultValue: "Map a published workflow version to its replacement.",
+  }),
+  sections: [
+    {
+      id: "migration-plan-details",
+      fields: [
+        {
+          id: "workflowId",
+          name: "workflowId",
+          type: "number",
+          label: t("workflows.forms.migrationPlan.fields.workflowId", { defaultValue: "Workflow ID" }),
+          required: true,
+        },
+        {
+          id: "sourceWorkflowVersionId",
+          name: "sourceWorkflowVersionId",
+          type: "number",
+          label: t("workflows.forms.migrationPlan.fields.sourceVersionId", { defaultValue: "Source version ID" }),
+          required: true,
+        },
+        {
+          id: "targetWorkflowVersionId",
+          name: "targetWorkflowVersionId",
+          type: "number",
+          label: t("workflows.forms.migrationPlan.fields.targetVersionId", { defaultValue: "Target version ID" }),
+          required: true,
+        },
+      ],
+    },
+  ],
+})
+
 export const workflowImportCsvForm = (t: TFunction): FormConfig => ({
   id: "import-workflow-csv",
   title: t("workflows.forms.importCsv.title"),

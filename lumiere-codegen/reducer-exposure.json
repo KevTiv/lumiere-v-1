@@ -1813,6 +1813,21 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_utm_campaign",
+      "exposure": "session",
+      "reason": "invoked by the CRM browser mutation API and tenant-isolation fixtures"
+    },
+    {
+      "name": "create_utm_medium",
+      "exposure": "session",
+      "reason": "invoked by the CRM browser mutation API and tenant-isolation fixtures"
+    },
+    {
+      "name": "create_utm_source",
+      "exposure": "session",
+      "reason": "invoked by the CRM browser mutation API and tenant-isolation fixtures"
+    },
+    {
       "name": "create_user_invite",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2317,6 +2332,11 @@
       "name": "grant_field_permission",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "grant_permission",
+      "exposure": "session",
+      "reason": "settings RBAC UI action guarded by reducer-side delegated-admin and separation-of-duties checks"
     },
     {
       "name": "hold_supplier_intake",
@@ -3270,6 +3290,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "revoke_permission",
+      "exposure": "session",
+      "reason": "settings RBAC UI action guarded by reducer-side delegated-admin and separation-of-duties checks"
+    },
+    {
       "name": "revoke_role",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3398,6 +3423,11 @@
       "name": "set_consolidation_company_rate",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "set_contact_communication_preference",
+      "exposure": "session",
+      "reason": "invoked by the messaging command API and CRM tenant-isolation fixtures"
     },
     {
       "name": "set_contact_segment_rules",

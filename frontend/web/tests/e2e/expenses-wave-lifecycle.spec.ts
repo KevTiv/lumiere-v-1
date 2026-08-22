@@ -10,6 +10,7 @@ import { expect, test, type Page } from "@playwright/test"
 
 import {
   callReducerBff,
+  callReducerOwner,
   callReducerBffResult,
   chooseSelectOptionByLabel,
   expectNoAppError,
@@ -479,7 +480,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
   test("approve → post domain path (second-identity SoD) @p0", async ({ page }) => {
     test.setTimeout(300_000)
     await gotoModule(page, "/expenses", "expenses")
-    await callReducerBff(page, "run_all_domain_tests", [])
+    await callReducerOwner("run_all_domain_tests", [])
     await expectNoAppError(page)
   })
 })
