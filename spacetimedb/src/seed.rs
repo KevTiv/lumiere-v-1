@@ -10,6 +10,7 @@
 use spacetimedb::{Identity, ReducerContext, Table};
 
 // ── Core ──────────────────────────────────────────────────────────────────────
+use crate::ai::reducer_allowlist::{ai_reducer_allowlist, AiReducerAllowlist};
 use crate::core::audit::{audit_log, audit_rule, AuditLog, AuditRule};
 use crate::core::messaging::{mail_follower, mail_message, MailFollower, MailMessage};
 use crate::core::organization::{
@@ -859,6 +860,22 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     });
     let company_id = company.id;
     log::info!("[seed] company_id={}", company_id);
+
+    // The AI draft gate intentionally fails closed when an organization has no
+    // allowlist rows. Seed the low-risk task draft capability explicitly so the
+    // MVP approval workflow is usable in the dev fixture without weakening the
+    // production policy for organizations that have not opted in.
+    ctx.db.ai_reducer_allowlist().insert(AiReducerAllowlist {
+        id: 0,
+        organization_id: org_id,
+        reducer_name: "create_task".to_string(),
+        permission_resource: "project_task".to_string(),
+        permission_action: "create".to_string(),
+        enabled: true,
+        create_date: ctx.timestamp,
+        write_date: ctx.timestamp,
+        metadata: Some(r#"{"seed":true,"risk":"low"}"#.to_string()),
+    });
 
     // ── 1.8 UOM Categories & Units ────────────────────────────────────────────
     let uom_cat_unit = ctx.db.uom_cat().insert(UOMCategory {

@@ -1780,6 +1780,7 @@
     "fiscal_position_id",
     "team_id",
     "opportunity_id",
+    "proposal_id",
     "note",
     "terms_and_conditions",
     "validity_days",

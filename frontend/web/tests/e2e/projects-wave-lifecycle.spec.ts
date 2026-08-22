@@ -174,6 +174,7 @@ test.describe("Projects wave A lifecycle e2e @projects", () => {
         color: none,
         user_ids: [],
         milestone_id: none,
+        wbs_code: "",
         planned_hours: 8,
         total_hours_spent: 0,
         effective_hours: 0,

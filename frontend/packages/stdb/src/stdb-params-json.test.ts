@@ -118,6 +118,7 @@ describe("stdbParamsToJson", () => {
     ])
     const params = encoded[1] as Record<string, unknown>
     assert.deepEqual(params.company_id, { some: 28 })
+    assert.deepEqual(params.proposal_id, { none: [] })
     assert.deepEqual(params.order_lines, [])
     assert.equal("companyId" in params, false)
   })
@@ -296,6 +297,23 @@ describe("stdbParamsToJson", () => {
     assert.equal(params.name, "Prepare shipment")
     assert.deepEqual(params.project_id, { none: [] })
     assert.deepEqual(params.metadata, { none: [] })
+  })
+
+  it("encodes tagged payload enums and optional analytics/AI fields", () => {
+    const widget = encodeReducerCallArgs("create_dashboard_widget", [
+      1,
+      { name: "KPI", widgetType: { tag: "Kpi" }, model: "sale_order", fields: [] },
+    ])[1] as Record<string, unknown>
+    assert.deepEqual(widget.widget_type, { kpi: [] })
+    assert.deepEqual(widget.metadata, { none: [] })
+
+    const insight = encodeReducerCallArgs("create_ai_insight", [
+      1,
+      { tag: "High" },
+      { severity: { tag: "High" }, title: "Alert", description: "Details" },
+    ])[2] as Record<string, unknown>
+    assert.deepEqual(insight.severity, { high: [] })
+    assert.deepEqual(insight.metadata, { none: [] })
   })
 
   it("converts nested object keys recursively", () => {

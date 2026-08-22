@@ -376,6 +376,8 @@ export function stdbParamsToJson(
 
 /** Last-arg struct names for `POST /api/call/:reducer` bodies in Playwright / scripts. */
 const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & string>> = {
+  create_ai_insight: "CreateAiInsightParams",
+  create_dashboard_widget: "CreateDashboardWidgetParams",
   create_lead: "CreateLeadParams",
   create_contact: "CreateContactParams",
   merge_contacts: "MergeContactsParams",
