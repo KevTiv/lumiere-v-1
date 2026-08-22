@@ -44,7 +44,7 @@ printf '%s\n' 'error: expected identifier, found keyword `ref`' >&2
 if [[ "${FAKE_UNEXPECTED:-}" == "1" ]]; then
   printf '%s\n' 'error: module compilation failed' >&2
 fi
-exit 1
+exit "${FAKE_EXIT_STATUS:-1}"
 FAKE
 chmod +x "$FAKE_SPACETIME"
 
@@ -56,12 +56,26 @@ grep -q 'pub r#ref:' "$TMP_ROOT/out/row.rs"
 grep -q 'r#type:' "$TMP_ROOT/out/row.rs"
 grep -q 'r#ref:' "$TMP_ROOT/out/row.rs"
 
-if FAKE_UNEXPECTED=1 SPACETIME_BIN="$FAKE_SPACETIME" \
+FAKE_EXIT_STATUS=0 SPACETIME_BIN="$FAKE_SPACETIME" \
+  bash "$ROOT/scripts/generate-spacetimedb-rust-sdk.sh" "$TMP_ROOT/out-zero" "$TMP_ROOT/module"
+
+grep -q 'pub r#type:' "$TMP_ROOT/out-zero/row.rs"
+grep -q 'pub r#ref:' "$TMP_ROOT/out-zero/row.rs"
+
+if FAKE_UNEXPECTED=1 FAKE_EXIT_STATUS=0 SPACETIME_BIN="$FAKE_SPACETIME" \
   bash "$ROOT/scripts/generate-spacetimedb-rust-sdk.sh" "$TMP_ROOT/rejected" "$TMP_ROOT/module" \
   >"$TMP_ROOT/unexpected.log" 2>&1; then
-  echo "generator wrapper accepted an unrelated error" >&2
+  echo "generator wrapper accepted an unrelated error from a zero exit" >&2
   exit 1
 fi
 grep -q 'error: module compilation failed' "$TMP_ROOT/unexpected.log"
+
+if FAKE_UNEXPECTED=1 FAKE_EXIT_STATUS=1 SPACETIME_BIN="$FAKE_SPACETIME" \
+  bash "$ROOT/scripts/generate-spacetimedb-rust-sdk.sh" "$TMP_ROOT/rejected-nonzero" "$TMP_ROOT/module" \
+  >"$TMP_ROOT/unexpected-nonzero.log" 2>&1; then
+  echo "generator wrapper accepted an unrelated error from a nonzero exit" >&2
+  exit 1
+fi
+grep -q 'error: module compilation failed' "$TMP_ROOT/unexpected-nonzero.log"
 
 echo "SpacetimeDB Rust SDK wrapper recovery test passed"
