@@ -315,7 +315,24 @@ export async function chooseFirstEnabledOption(page: Page, name: string) {
       timeout: 30_000,
     })
     .toBeGreaterThan(0)
-  await listbox.getByRole("option", { disabled: false }).first().click()
+
+  // Runtime select configs may prepend an enabled empty placeholder (`—`)
+  // rather than marking it disabled. Selecting that row leaves required
+  // partner/pricelist/UoM fields empty and makes the reducer reject an
+  // otherwise valid E2E form submission. Radix exposes the option value as
+  // `data-value`; native/select fallbacks use `value`.
+  const options = listbox.getByRole("option", { disabled: false })
+  const optionCount = await options.count()
+  for (let index = 0; index < optionCount; index += 1) {
+    const option = options.nth(index)
+    const value = (await option.getAttribute("data-value")) ?? (await option.getAttribute("value"))
+    if (value?.trim() && !value.startsWith("__lumiere_empty__:")) {
+      await option.click()
+      return
+    }
+  }
+
+  throw new Error(`no non-empty enabled option available for form field ${name}`)
 }
 
 function accountInternalTypeTag(row: Record<string, unknown>): string {
