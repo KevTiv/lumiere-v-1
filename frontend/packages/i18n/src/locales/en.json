@@ -9164,6 +9164,15 @@
           "csvData": "CSV content"
         }
       },
+      "migrationPlan": {
+        "title": "New migration plan",
+        "description": "Map a published workflow version to its replacement.",
+        "fields": {
+          "workflowId": "Workflow ID",
+          "sourceVersionId": "Source version ID",
+          "targetVersionId": "Target version ID"
+        }
+      },
       "newWorkflow": {
         "title": "New Workflow",
         "description": "Create a business process workflow",
