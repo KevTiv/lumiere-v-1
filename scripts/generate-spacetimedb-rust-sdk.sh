@@ -22,16 +22,20 @@ generate_status="${PIPESTATUS[0]}"
 set -e
 
 if [[ "$generate_status" -ne 0 ]]; then
-  if ! grep -q 'Could not format generated files' "$LOG_FILE"; then
-    echo "SpacetimeDB Rust generation failed before its formatter step" >&2
-    exit "$generate_status"
-  fi
-
+  # SpacetimeDB 2.8.2 does not consistently print its historical
+  # "Could not format generated files" summary. Detect the formatter failure
+  # from rustfmt's narrowly identifiable diagnostics instead, while rejecting
+  # any other generator/compiler error.
+  expected_keyword_errors="$({ grep '^error: expected identifier, found keyword `[^`]*`$' "$LOG_FILE" || true; } | wc -l | tr -d ' ')"
   unexpected_errors="$({ grep '^error:' "$LOG_FILE" || true; } | \
     grep -Ev '^error: expected identifier, found keyword `[^`]+`$' || true)"
-  if [[ -n "$unexpected_errors" ]]; then
+  if [[ "$expected_keyword_errors" -eq 0 || -n "$unexpected_errors" ]]; then
     echo "SpacetimeDB Rust generation had unexpected errors:" >&2
-    printf '%s\n' "$unexpected_errors" >&2
+    if [[ -n "$unexpected_errors" ]]; then
+      printf '%s\n' "$unexpected_errors" >&2
+    else
+      tail -n 20 "$LOG_FILE" >&2
+    fi
     exit "$generate_status"
   fi
 

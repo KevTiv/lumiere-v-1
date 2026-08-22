@@ -428,6 +428,8 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   create_leave_type: "CreateLeaveTypeParams",
   create_payroll_structure: "CreatePayrollStructureParams",
   create_salary_rule: "CreateSalaryRuleParams",
+  create_employee: "CreateEmployeeParams",
+  create_task: "CreateTaskParams",
   create_document_folder: "CreateDocumentFolderParams",
   create_document: "CreateDocumentParams",
   add_document_version: "AddDocumentVersionParams",

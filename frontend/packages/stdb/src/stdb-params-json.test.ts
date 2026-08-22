@@ -262,6 +262,42 @@ describe("stdbParamsToJson", () => {
     )
   })
 
+  it("encodes CreateEmployeeParams enums and option fields through reducer calls", () => {
+    const encoded = encodeReducerCallArgs("create_employee", [
+      7,
+      {
+        companyId: 11,
+        employmentType: { tag: "FullTime" },
+        name: "Ada Lovelace",
+        isActive: true,
+      },
+    ])
+    const params = encoded[1] as Record<string, unknown>
+    assert.deepEqual(params.company_id, { some: 11 })
+    assert.equal(params.name, "Ada Lovelace")
+    assert.deepEqual(params.employment_type, { fullTime: [] })
+    assert.equal(params.is_active, true)
+    assert.deepEqual(params.job_id, { none: [] })
+    assert.deepEqual(params.metadata, { none: [] })
+  })
+
+  it("encodes CreateTaskParams state enums and option fields through reducer calls", () => {
+    const encoded = encodeReducerCallArgs("create_task", [
+      7,
+      {
+        companyId: 11,
+        state: { tag: "InProgress" },
+        name: "Prepare shipment",
+      },
+    ])
+    const params = encoded[1] as Record<string, unknown>
+    assert.deepEqual(params.company_id, { some: 11 })
+    assert.deepEqual(params.state, { inProgress: [] })
+    assert.equal(params.name, "Prepare shipment")
+    assert.deepEqual(params.project_id, { none: [] })
+    assert.deepEqual(params.metadata, { none: [] })
+  })
+
   it("converts nested object keys recursively", () => {
     assert.deepEqual(
       stdbParamsToJson({

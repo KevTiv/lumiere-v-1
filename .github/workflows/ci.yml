@@ -63,6 +63,9 @@ jobs:
       - name: lumiere-codegen unit tests
         run: cargo test -p lumiere-codegen
 
+      - name: SpacetimeDB Rust generator recovery test
+        run: bash scripts/test-generate-spacetimedb-rust-sdk.sh
+
       - name: Verify generated TypeScript matches Rust registry
         run: make check-codegen
 
@@ -180,6 +183,9 @@ jobs:
 
       - name: Check accounting double-cast rationales
         run: bash ../scripts/lint-accounting-as-unknown-as.sh
+
+      - name: Opaque record type-debt ratchet
+        run: pnpm type-debt:check
 
       - name: Typecheck
         run: pnpm typecheck

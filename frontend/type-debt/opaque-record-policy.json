@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "description": "Tracked frontend production TypeScript only. Existing occurrences are ratcheted per file; new production files must contain zero Record<string, unknown> occurrences.",
+  "roots": [
+    "web",
+    "packages"
+  ],
+  "exclude": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/dist/**",
+    "**/src/generated/**",
+    "**/generated/**",
+    "**/dev/**",
+    "**/tests/**",
+    "**/__tests__/**",
+    "**/__fixtures__/**",
+    "**/fixtures/**",
+    "**/mocks/**",
+    "**/scripts/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/*.stories.ts",
+    "**/*.stories.tsx"
+  ],
+  "boundaryAllowlist": [
+    "packages/api-client/src/response-error.ts",
+    "packages/api-client/src/stdb-gateway.ts",
+    "packages/stdb/src/browser-http.ts",
+    "packages/stdb/src/commands/stdb-http.ts",
+    "packages/stdb/src/http.ts",
+    "packages/stdb/src/live/cache-patch.ts",
+    "packages/stdb/src/live/projection.ts",
+    "packages/stdb/src/stdb-params-json.ts",
+    "packages/query-hooks/src/http.ts",
+    "packages/query-hooks/src/hooks/stdb.ts",
+    "web/app/api/**",
+    "web/lib/api-session.ts",
+    "web/lib/stdb-auth-server.ts",
+    "web/lib/stdb-token-identity.ts"
+  ]
+}

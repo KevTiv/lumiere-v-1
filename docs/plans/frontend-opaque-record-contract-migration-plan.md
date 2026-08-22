@@ -1,6 +1,6 @@
 # Frontend opaque record contract migration plan
 
-**Status:** Ready for implementation — 2026-08-21  
+**Status:** Ratchet foundation established; domain migration continues in the IR/API-SDK continuation PR — 2026-08-22
 **Scope:** TypeScript function inputs, outputs, query rows, mutation variables,
 form adapters, and external-data boundaries  
 **Related:**
@@ -32,18 +32,28 @@ The end state is:
 
 ## 2. Current baseline
 
-Measured with a TypeScript AST scan on 2026-08-21:
+The first ratchet slice is measured with the TypeScript compiler API on
+2026-08-22. It tracks the exact `Record<string, unknown>` type reference in
+frontend production TypeScript, per file:
 
 | Context | Occurrences |
 |---|---:|
-| Function parameters | 929 |
-| Type assertions | 801 |
-| Object properties | 417 |
-| Function returns | 88 |
-| Type aliases | 64 |
-| Local variables | 63 |
-| Other syntax positions | 196 |
-| **Total** | **2,558** |
+| Tracked production files | 271 |
+| Tracked occurrences | 2,144 |
+| Reviewed transport/boundary allowlist | 82 |
+| Excluded generated/test/dev occurrences | 71 |
+| **Repository total for this pattern** | **2,297** |
+
+The checked-in baseline is `frontend/type-debt/opaque-record-baseline.json` and
+the policy is `frontend/type-debt/opaque-record-policy.json`. CI runs
+`pnpm type-debt:check`, which fails on a new occurrence in a production file
+or on an increase to an existing file. It also fails when a file's count drops
+or a baseline file disappears until `pnpm type-debt:check -- --write-baseline`
+records the reduction, so removed debt cannot silently become future headroom.
+New production files start at zero.
+The scanner is intentionally narrower than the broader inventory used during
+planning; it does not yet cover `Record<string, any>`, `object`, unchecked JSON
+assertions, or exported-contract semantics.
 
 The largest package-level concentrations are approximately:
 
@@ -127,6 +137,10 @@ domain debt, an untrusted boundary, or legitimate arbitrary JSON.
 
 ### Phase 1 — establish repository-wide lint enforcement
 
+The current PR establishes the AST inventory and per-file ratchet portion of
+this phase. It does not claim that the complete ESLint/type-aware policy is
+implemented.
+
 - add a shared frontend ESLint flat configuration;
 - add `lint` scripts to `api-client`, `erp-shared`, `query-hooks`, `stdb`,
   `ui`, `web`, and the frontend workspace root;
@@ -160,8 +174,10 @@ Initial restricted-type policy:
 ]
 ```
 
-**Exit:** all frontend packages participate in linting, existing violations
-are baselined, and new opaque contracts fail CI.
+**Current exit:** the exact `Record<string, unknown>` pattern has a checked-in
+per-file baseline, explicit generated/test/dev and boundary policy, a root
+command, and CI enforcement. Full shared ESLint configuration, type-aware
+unsafe rules, and the broader opaque-contract rule remain continuation work.
 
 ### Phase 2 — type the query pipeline
 
@@ -293,8 +309,9 @@ before the approach is repeated across domains.
 
 ## 6. PR sequence
 
-1. **Lint foundation and baseline** — shared config, package scripts, CI, AST
-   inventory, and suppressions.
+1. **Lint foundation and baseline (this PR)** — AST inventory, checked-in
+   per-file baseline/policy, root command, and CI ratchet. This does not add
+   runtime response validation or a generated SDK.
 2. **Generated query row map** — resource-to-row contract generation and type
    tests.
 3. **Generic query APIs** — query hook, fetch, hydration, and cache typing.
@@ -306,8 +323,10 @@ before the approach is repeated across domains.
 7. **Inventory/auth/organization command migration.**
 8. **Generic static forms plus typed dynamic-form boundary.**
 9. **Domain form-adapter batches.**
-10. **Runtime response validation and structured errors.**
-11. **Final suppression removal and compiler strictness.**
+10. **IR-driven API/SDK foundation** — generated operation/resource descriptors,
+   codecs, typed api-server endpoint, and a first domain SDK slice.
+11. **Runtime response validation and structured errors.**
+12. **Final suppression removal and compiler strictness.**
 
 Each PR must be independently reviewable and must reduce or preserve the debt
 baseline. Do not combine unrelated UI behavior changes with contract migration.

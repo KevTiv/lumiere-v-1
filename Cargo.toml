@@ -18,7 +18,7 @@ version = "0.1.0"
 # Generated STDB bindings + manifests, published from lumiere-codegen's
 # staging output. Pin a tag or immutable SHA — never the default branch.
 # See docs/plans/contracts-extraction-execution-plan.md.
-lumiere-contracts = { git = "ssh://git@github.com/KevTiv/lumiere-contracts.git", rev = "5415afacd90651039daf9c1de325e09bf741de44" }
+lumiere-contracts = { git = "ssh://git@github.com/KevTiv/lumiere-contracts.git", rev = "7f7c9629b5e42253be87e603f95f252163607505" }
 anyhow = "1"
 aes-gcm = "0.10"
 axum = { version = "0.7", features = ["macros"] }

@@ -1,6 +1,6 @@
 # Typed BFF SDK and contract hardening — execution plan
 
-**Status:** Ready for implementation — 2026-08-21
+**Status:** IR handoff and type-debt ratchet foundation established; API/SDK continuation remains — 2026-08-22
 **First pickup:** `frontend/packages/query-hooks/src/hooks/accounting.ts`
 **First reducer:** `create_account_account` through `useCreateAccountAccount`
 **Companion caller:** `frontend/web/app/(modules)/accounting/accounting-client.tsx`
@@ -55,8 +55,9 @@ Measured on this branch on 2026-08-21:
 | Surface | Current state |
 |---|---:|
 | Domain `*-http.ts` command files | 32 |
-| `Record<string, unknown>` in frontend TS/TSX | 2,548 |
-| Outside generated/test/contract-test code | 2,495 |
+| `Record<string, unknown>` tracked by the AST ratchet | 2,144 across 271 files |
+| Explicit transport/boundary allowlist | 82 |
+| Excluded generated/test/dev occurrences | 71 |
 | Direct positional BFF sites | 3 |
 | Broad hidden positional adapter | accounting, about 23 hook wrappers |
 
@@ -253,10 +254,27 @@ the same file-per-reducer surface between directories.
 
 ### Phase 8 — ratchet `Record<string, unknown>` to boundary-only use
 
-Add an AST-based check using the existing TypeScript compiler API:
+The current PR establishes the first enforcement slice for this phase:
 
-- `scripts/check-record-string-unknown.ts`;
-- `scripts/record-string-unknown-policy.json`.
+- `frontend/scripts/check-opaque-record-ratchet.mjs` uses the TypeScript
+  compiler API rather than a textual search;
+- `frontend/type-debt/opaque-record-policy.json` documents production roots,
+  generated/test/dev exclusions, and the reviewed transport/boundary allowlist;
+- `frontend/type-debt/opaque-record-baseline.json` records the current
+  per-file debt; `pnpm type-debt:check` fails on new or increased counts,
+  stale reductions, and deleted baseline files, and is required by CI. Use
+  `pnpm type-debt:check -- --write-baseline` after an intentional migration.
+
+This establishes regression protection only. It does not validate network
+responses, generate codecs, or provide the business SDK. Those are immediate
+IR-driven API/SDK continuation work and must land before broad new IR-backed
+domain implementation.
+
+Extend the AST-based check using the existing TypeScript compiler API:
+
+- the checked-in ratchet command and policy above;
+- later extend the same scanner to exported-contract semantics and the other
+  opaque forms (`Record<string, any>`, `object`, and unchecked assertions).
 
 Initial CI behavior:
 
@@ -272,7 +290,10 @@ Burn down by domain. Once a domain reaches zero, remove its baseline entries so
 the prohibition becomes permanent for hooks, UI props, form parameters, query
 results, reducer inputs, and domain services.
 
-**Exit:** only the reviewed parsing/interop allowlist may contain the type.
+**Current exit:** new production debt cannot be introduced silently and
+existing debt cannot increase per file. **Final exit:** only the reviewed
+parsing/interop allowlist may contain the type after domain migration and
+runtime validation are complete.
 
 ## 6. First implementation slice
 

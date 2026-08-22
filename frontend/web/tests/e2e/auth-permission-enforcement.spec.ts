@@ -110,8 +110,6 @@ async function provisionLimitedUser(
 
   const identityHex = await signupIdentityHex(email, password)
 
-  await callReducerBff(page, "dev_promote_caller_superuser", [])
-
   await callReducerBff(page, "add_org_member", [
     identityHex,
     organizationId,

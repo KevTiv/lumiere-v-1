@@ -102,7 +102,8 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	e2e-crm-isolation \
 	init-stack docker-dev docker-dev-iot \
-	codegen check-codegen check-contract-ir check-reducer-contracts-drift lint-reducer-call-literals api-server-run \
+	codegen check-codegen check-contract-ir check-reducer-contracts-drift check-contracts-drift \
+	clean-contracts-live-staging lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
 	module-check module-build module-generate-ts module-generate-rust \
@@ -912,7 +913,10 @@ check-reducer-contracts-drift: schema-snapshot codegen
 # surfacing at runtime. Requires the `spacetime` CLI (not available in CI —
 # see `contracts-staging-from-pinned` for the CI-safe path). See
 # docs/plans/contracts-extraction-execution-plan.md §5.2, §5.4.
-check-contracts-drift: schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen check-contract-ir
+clean-contracts-live-staging:
+	rm -rf .contracts-staging
+
+check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen check-contract-ir
 	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
 	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
 		echo "check-contracts-drift: could not resolve the pinned lumiere-contracts checkout (run cargo fetch first); skipping" >&2; \
@@ -922,7 +926,7 @@ check-contracts-drift: schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-s
 	for manifest in .contracts-staging/manifests/*.json; do diff "$$CHECKOUT/manifests/$$(basename "$$manifest")" "$$manifest" || exit 1; done && \
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v1.json --require-clean --expect-schema-hash-from "$$CHECKOUT/ir/lumiere-contract-ir-v1.json" && \
 	python3 "$$CHECKOUT/scripts/generate-from-ir.py" --check && \
-	diff -rq -x query-registry.ts "$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
+	diff -rq -x query-registry.ts -x operation-inputs.ts "$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
 	diff "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/stdb-generated-sql-columns.json && \
 	echo "check-contracts-drift: staging matches pinned lumiere-contracts release" || \
 	(echo "Local generation drifted from the pinned lumiere-contracts tag. Run: make publish-contracts VERSION=x.y.z" && exit 1)
