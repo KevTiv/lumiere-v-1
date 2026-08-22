@@ -289,8 +289,8 @@ importers:
         specifier: workspace:*
         version: link:../api-client
       '@lumiere/contracts':
-        specifier: github:KevTiv/lumiere-contracts#v0.3.0&path:packages/contracts
-        version: git+https://git@github.com:KevTiv/lumiere-contracts.git#636887322df62e5c0e9b71660edd2500c385fed5&path:packages/contracts(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
+        specifier: github:KevTiv/lumiere-contracts#v0.3.1&path:packages/contracts
+        version: git+https://git@github.com:KevTiv/lumiere-contracts.git#3a08a84d98b369f77ce5f83df04d6a6aad3dc5cc&path:packages/contracts(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
       '@lumiere/erp-session':
         specifier: workspace:*
         version: link:../erp-session
@@ -329,8 +329,8 @@ importers:
         specifier: workspace:*
         version: link:../api-client
       '@lumiere/contracts':
-        specifier: github:KevTiv/lumiere-contracts#v0.3.0&path:packages/contracts
-        version: git+https://git@github.com:KevTiv/lumiere-contracts.git#636887322df62e5c0e9b71660edd2500c385fed5&path:packages/contracts(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
+        specifier: github:KevTiv/lumiere-contracts#v0.3.1&path:packages/contracts
+        version: git+https://git@github.com:KevTiv/lumiere-contracts.git#3a08a84d98b369f77ce5f83df04d6a6aad3dc5cc&path:packages/contracts(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
       react:
         specifier: '>=19'
         version: 19.2.4
@@ -2204,9 +2204,9 @@ packages:
   '@lezer/python@1.1.18':
     resolution: {integrity: sha512-31FiUrU7z9+d/ElGQLJFXl+dKOdx0jALlP3KEOsGTex8mvj+SoE1FgItcHWK/axkxCHGUSpqIHt6JAWfWu9Rhg==}
 
-  '@lumiere/contracts@git+https://git@github.com:KevTiv/lumiere-contracts.git#636887322df62e5c0e9b71660edd2500c385fed5&path:packages/contracts':
-    resolution: {commit: 636887322df62e5c0e9b71660edd2500c385fed5, path: packages/contracts, repo: git@github.com:KevTiv/lumiere-contracts.git, type: git}
-    version: 0.3.0
+  '@lumiere/contracts@git+https://git@github.com:KevTiv/lumiere-contracts.git#3a08a84d98b369f77ce5f83df04d6a6aad3dc5cc&path:packages/contracts':
+    resolution: {commit: 3a08a84d98b369f77ce5f83df04d6a6aad3dc5cc, path: packages/contracts, repo: git@github.com:KevTiv/lumiere-contracts.git, type: git}
+    version: 0.3.1
 
   '@marijn/find-cluster-break@1.0.2':
     resolution: {integrity: sha512-l0h88YhZFyKdXIFNfSWpyjStDjGHwZ/U7iobcK1cQQD8sejsONdQtTVU+1wVN1PBw40PiiHB1vA5S7VTfQiP9g==}
@@ -11043,7 +11043,7 @@ snapshots:
       '@lezer/highlight': 1.2.3
       '@lezer/lr': 1.4.8
 
-  '@lumiere/contracts@git+https://git@github.com:KevTiv/lumiere-contracts.git#636887322df62e5c0e9b71660edd2500c385fed5&path:packages/contracts(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)':
+  '@lumiere/contracts@git+https://git@github.com:KevTiv/lumiere-contracts.git#3a08a84d98b369f77ce5f83df04d6a6aad3dc5cc&path:packages/contracts(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)':
     dependencies:
       spacetimedb: 2.8.2(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
     transitivePeerDependencies:
