@@ -49,7 +49,7 @@ function moduleNameFromEnv() {
 }
 
 function loginLocal({ forceLogout = false } = {}) {
-  if (forceLogout && process.env.E2E_FORCE_LOCAL_LOGIN !== '0') {
+  if (forceLogout) {
     spawnSync('spacetime', ['logout'], { stdio: 'ignore' })
   }
 
@@ -61,6 +61,19 @@ function loginLocal({ forceLogout = false } = {}) {
   if (result.status !== 0 && !output.toLowerCase().includes('already logged in')) {
     console.error(output.trim() || 'spacetime login --server-issued-login failed')
     process.exit(1)
+  }
+}
+
+async function tokenAcceptedByCurrentServer(token) {
+  try {
+    const res = await fetch(`${host}/v1/identity`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5_000),
+    })
+    return res.ok
+  } catch {
+    return false
   }
 }
 
@@ -95,11 +108,13 @@ async function main() {
   const args = new Set(process.argv.slice(2))
 
   if (args.has('--login-only')) {
-    // Default: keep existing cli.toml identity (DB owner after first publish).
-    // Set E2E_FORCE_LOCAL_LOGIN=1 to logout + server-issued login (new identity).
+    // Keep an existing identity when the running server accepts it. A freshly
+    // started local server may reject a token signed by a prior local or cloud
+    // server, in which case replace it before publishing.
     const forceLogout = process.env.E2E_FORCE_LOCAL_LOGIN === '1'
-    if (!forceLogout && readCliToken()) return
-    loginLocal({ forceLogout })
+    const token = readCliToken()
+    if (!forceLogout && token && (await tokenAcceptedByCurrentServer(token))) return
+    loginLocal({ forceLogout: forceLogout || Boolean(token) })
     return
   }
 
