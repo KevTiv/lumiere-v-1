@@ -1,203 +1,137 @@
-# IR-driven API and SDK operation foundation — continuation PR
+# IR-owned frontend operation descriptors — continuation PR
 
-**Status:** Draft implementation scaffold — 2026-08-23  
-**Depends on:** completion of the canonical IR/contracts extraction PR  
-**First vertical slice:** `create_account_account`  
+**Status:** Draft implementation scaffold — 2026-08-23
+**Depends on:** canonical IR/contracts extraction merge
+**Companion release:** `lumiere-contracts` v0.3.3
 **Related:**
 [typed-bff-sdk-contract-hardening-execution-plan.md](./typed-bff-sdk-contract-hardening-execution-plan.md) ·
-[contracts-extraction-execution-plan.md](./contracts-extraction-execution-plan.md) ·
-[frontend-opaque-record-contract-migration-plan.md](./frontend-opaque-record-contract-migration-plan.md)
+[contracts-extraction-execution-plan.md](./contracts-extraction-execution-plan.md)
 
 ## 1. Outcome
 
-Make one normal business mutation travel through generated operation metadata
-from canonical IR to the TypeScript caller and Rust API boundary. This PR is
-the foundation for making IR central to future monorepo implementation; it is
-not a broad domain migration.
+Make canonical IR own the frontend named-command operation surface. Generate a
+compact session-operation descriptor in `lumiere-contracts`, consume it in the
+STDB command highway, and delete the duplicate application-owned reducer-name
+list and emitter.
 
-The completed slice must look like:
+This is the smallest independently mergeable step toward the generated SDK and
+typed API boundary. It changes contract ownership without changing server
+dispatch behavior or migrating legacy positional callers.
+
+## 2. Current duplication
+
+The pinned canonical IR already owns, for every operation:
+
+- exposure;
+- parameter name, position, kind, and canonical type reference;
+- client-input positions;
+- server-context source and validations;
+- ordered wire arguments;
+- scope and lifecycle;
+- invalidated resources.
+
+`lumiere-contracts/scripts/generate-from-ir.py` currently uses that metadata to
+generate `OperationInputMap` and JSON manifests. The application generator
+independently emits
+`frontend/packages/stdb/src/commands/generated-stdb-bff-reducers.ts` from the
+same exposure data. The duplicate list is about 900 lines and makes the
+application repository a second authority for which named commands exist.
+
+## 3. Contracts companion PR
+
+Extend `lumiere-contracts/scripts/generate-from-ir.py` to emit one table-driven
+target:
 
 ```text
-generated TypeScript operation input
-  -> generated TypeScript wire codec
-  -> typed api-server operation endpoint
-  -> generated Rust operation descriptor/decoder
-  -> typed ReducerCall
-  -> create_account_account
+packages/contracts/src/generated/operation-descriptors.ts
 ```
 
-The application and contracts repositories must not independently encode the
-operation name, argument order, tenant-source rules, invalidation list, or
-input shape.
+It must export:
 
-## 2. Current handoff
+- a readonly descriptor map containing only session-exposed operations;
+- `SESSION_OPERATION_NAMES`;
+- `SessionOperationName`;
+- per-operation client fields with name, parameter position, kind, and type
+  reference;
+- server-context fields and validations;
+- ordered wire-argument source and position;
+- invalidated resources.
 
-The canonical IR already publishes the useful source facts for
-`create_account_account`:
+Add the target to package exports, generated barrels, build output, package
+verification, and source-independent generation checks. Release the result as
+one immutable `lumiere-contracts` version.
 
-- session exposure;
-- `organization_id` from authenticated server context;
-- `CreateAccountAccountParams` as the client input;
-- ordered wire arguments;
-- `account-accounts` invalidation;
-- canonical algebraic type references.
+### Contracts tests
 
-The contracts package already generates `OperationInputMap`, query registry,
-invalidation metadata, and application/resource manifests from the pinned IR.
-The missing foundation is a single generated operation descriptor consumed by
-both transports, plus matching codecs and a typed API route.
+Generator fixtures must prove:
 
-## 3. In scope
+- session operations are present and denied operations are absent;
+- descriptor keys exactly equal the IR session-exposure set;
+- server-owned `organization_id` is absent from client input;
+- client-owned `company_id` remains when declared by IR;
+- wire positions are complete, unique, and ordered;
+- invalid type references, duplicate positions, and missing provenance fail
+  generation;
+- regeneration is deterministic and clean.
 
-### 3.1 Complete the operation descriptor contract
+Required commands include the existing contracts generator check, unit tests,
+TypeScript typecheck/build, and package-content verification.
 
-Add only metadata that a target cannot safely infer:
+## 4. Application consumption
 
-- stable operation ID and reducer target;
-- operation kind;
-- input and output type references;
-- exposure;
-- client-input, server-context, and ordered wire-argument provenance;
-- tenant validation requirements;
-- invalidated resources;
-- idempotency requirement;
-- versioned codec ID.
+After the contracts release is tagged:
 
-Update the IR verifier so a session-exposed operation fails generation when
-its argument provenance, referenced type, invalidation, or scope source is
-missing or inconsistent. Do not inspect generated bindings or Rust source in
-downstream generators.
+1. Atomically update Rust and TypeScript contract pins and both lockfiles.
+2. Make `frontend/packages/stdb/src/commands/stdb-http.ts` derive its public
+   reducer key/name surface from the generated descriptor package export.
+3. Keep `OperationInputMap` as the generated input-type highway.
+4. Delete
+   `frontend/packages/stdb/src/commands/generated-stdb-bff-reducers.ts`.
+5. Remove that file's emitter and path ownership from:
+   - `lumiere-codegen/src/reducer_contract.rs`;
+   - `lumiere-codegen/src/paths.rs`;
+   - the relevant Makefile generation/drift targets.
+6. Add a focused `stdb-http` contract test proving an allowed session operation
+   compiles and a denied operation is unavailable.
 
-### 3.2 Generate compact cross-language targets in `lumiere-contracts`
+Existing named command call sites must compile unchanged. Do not add a fallback
+copy of the reducer names in application code.
 
-Extend `scripts/generate-from-ir.py` to emit table-driven targets:
+## 5. Explicit non-goals
 
-- `packages/contracts/src/generated/operations.ts`;
-- `packages/contracts/src/generated/wire-codecs.ts`;
-- `crates/lumiere-contracts/src/generated/operations.rs`;
-- `crates/lumiere-contracts/src/generated/wire_codecs.rs`.
+- changing api-server dispatch behavior;
+- deleting or weakening the generated Rust `reducer_call!` allowlist;
+- generating wire codecs or the public domain SDK in this slice;
+- migrating legacy positional reducer callers;
+- broad domain or opaque-record cleanup;
+- generating one file per operation;
+- inventing business defaults or moving authorization into generated code.
 
-Export them through the existing TypeScript package and Rust crate entry
-points. Generation must work from the pinned IR in the existing
-network-disabled, source-independent contracts CI job.
+The generated Rust operation table is deliberately deferred. Removing it safely
+requires a lightweight Rust descriptor crate or feature so API, AI, and IoT
+consumers do not pull the full STDB binding surface merely to preserve
+compile-time reducer validation.
 
-The generated files must stay compact. Do not introduce a new file per
-operation.
+## 6. Application verification
 
-### 3.3 Add shared golden wire fixtures
-
-Generate or check in one language-neutral fixture corpus covering the first
-slice:
-
-- a valid `CreateAccountAccountParams` payload;
-- authenticated `organization_id` insertion at the declared wire position;
-- camelCase client input to canonical snake_case/SATS wire encoding;
-- `u64` values represented without JavaScript precision loss;
-- missing required input;
-- client attempts to supply `organization_id`;
-- unknown fields and malformed option values.
-
-Run the same fixtures through the TypeScript encoder and Rust decoder. A fixture
-must not have separate expected values per language.
-
-### 3.4 Make api-server the typed normal-operation boundary
-
-Add a typed normal-operation route backed by the generated Rust descriptor and
-decoder. For the first slice it must:
-
-- accept the generated named input envelope;
-- obtain organization scope only from the authenticated session;
-- reject client-supplied server-context fields;
-- validate any selected-company scope when an operation declares it;
-- dispatch only a generated, typed `ReducerCall`;
-- emit structured errors containing operation, stable code, HTTP status, and a
-  safe message;
-- record operation ID and outcome in existing request observability.
-
-Keep the raw reducer-array route temporarily as an explicitly named
-compatibility/admin boundary. Do not add new business callers to it.
-
-### 3.5 Add the first generated business SDK method
-
-Expose a small domain-oriented TypeScript surface:
-
-```ts
-await sdk.forCompany(selectedCompanyId).accounting.accounts.create(input)
-```
-
-For `create_account_account`, the selected company binding may be unused if the
-canonical descriptor does not declare company scope. The SDK must not invent
-business defaults, permissions, form coercion, or tenant selection.
-
-Migrate `useCreateAccountAccount` and its accounting caller to the generated
-SDK method. In the same change, delete the now-unused handwritten operation
-name, positional assembly, and reducer-specific serializer metadata for this
-one operation.
-
-## 4. Explicit non-goals
-
-- migrating a second domain or all accounting mutations;
-- deleting the compatibility/admin reducer route;
-- generating UI forms or React components;
-- moving authorization or business rules into generated code;
-- inventing company, UOM, tax, journal, warehouse, or other business defaults;
-- replacing one large handwritten registry with a generated file-per-reducer
-  tree;
-- broad strict-TypeScript or opaque-record cleanup unrelated to the first
-  operation slice.
-
-## 5. PR sequencing
-
-1. **Contracts companion PR:** verifier, compact Rust/TypeScript descriptors,
-   codecs, golden fixtures, exports, and source-independent generation tests.
-2. **Immutable contracts release:** merge, tag, and publish one coherent
-   contracts version.
-3. **This application PR:** atomically pin the Rust and TypeScript release,
-   add the typed api-server route, add the SDK facade, migrate
-   `create_account_account`, and remove its duplicate handwritten metadata.
-4. **Follow-up domain PRs:** migrate operations in visible domain batches only
-   after the first slice proves the boundary.
-
-The application PR must never point at an unmerged contracts branch.
-
-## 6. Required verification
-
-Contracts companion PR:
-
-- canonical IR validation and semantic hash verification;
-- deterministic regeneration with a clean diff;
-- network-disabled `generate-from-ir` CI;
-- TypeScript typecheck and Rust tests;
-- shared TypeScript/Rust golden fixture parity;
-- negative tests for missing provenance, unknown refs, bad wire positions, and
-  client-owned server context.
-
-Application PR:
-
-- `cargo test` for the generated API decoder/dispatch boundary;
-- frontend package and web typechecks;
-- compile-time negative tests for missing, misspelled, and server-owned input
-  fields;
-- focused hook/API integration test;
-- focused E2E proving account creation persists through the new route;
-- contracts drift/reproducibility checks;
-- opaque-record ratchet with no increase;
-- no new direct reducer-array business call site.
+- `make codegen` produces no application-owned reducer-name list;
+- frontend STDB unit tests and typecheck pass;
+- query-hooks typecheck passes;
+- every existing named command call site compiles;
+- contracts staging and drift checks pass from the immutable release;
+- the opaque-record ratchet does not increase;
+- no direct reducer-array business call site is introduced.
 
 ## 7. Definition of done
 
-- `create_account_account` is invoked through the generated SDK and typed API
-  operation route;
-- TypeScript encoding and Rust decoding pass the same golden fixtures;
-- `organization_id` cannot be supplied by the client and is inserted from the
-  authenticated session;
-- the API dispatches a typed `ReducerCall`, not an arbitrary reducer name and
-  JSON array;
-- operation name, input type, wire order, exposure, scope provenance, codec,
-  and invalidation originate from canonical IR;
-- duplicate handwritten metadata for the migrated operation is deleted;
+- canonical IR is the sole source of the frontend session-operation set;
+- descriptor keys exactly match all and only session-exposed IR operations;
+- client/server ownership and wire positions remain visible in the generated
+  descriptor;
+- `stdb-http.ts` consumes the contracts package export;
+- the duplicate generated reducer-name file and its app-side emitter are gone;
 - both repositories build from one immutable contracts release;
-- all required CI and the focused persisted-data E2E are green.
+- all contracts and application verification gates are green.
 
-Only after this gate should IR-backed implementation expand to the remaining
-accounting mutations, typed reads, and other domains.
+The next continuation slice may build generated wire codecs and a typed API
+operation endpoint on this descriptor highway.
