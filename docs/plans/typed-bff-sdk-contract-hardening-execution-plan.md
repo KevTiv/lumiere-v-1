@@ -7,6 +7,11 @@
 **Tracks:** canonical IR, contracts extraction, write-path hardening, typed reads,
 generated codecs, generated SDK, frontend type debt
 
+**Immediate continuation:**
+[ir-api-sdk-operation-foundation-continuation.md](./ir-api-sdk-operation-foundation-continuation.md)
+defines the first mergeable IR-to-SDK/API vertical slice and its cross-repository
+release gates.
+
 ## 1. Outcome
 
 Make canonical IR the only source for operation names, input/output types, scope,
