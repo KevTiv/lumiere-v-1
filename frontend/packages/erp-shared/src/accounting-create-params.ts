@@ -313,68 +313,9 @@ export function toCreateAccountTaxParams(
   }
 }
 
-const MAX_SAFE_U64_JSON = BigInt(Number.MAX_SAFE_INTEGER)
-
-function bigintToSafeJsonU64(b: bigint): number {
-  if (b < 0n) {
-    throw new Error(`u64 JSON: negative bigint ${b}`)
-  }
-  if (b > MAX_SAFE_U64_JSON) {
-    throw new Error(
-      `u64 JSON: bigint ${b} exceeds Number.MAX_SAFE_INTEGER; cannot send exact value in JSON`,
-    )
-  }
-  return Number(b)
-}
-
 /** SATS unit-variant sum JSON for SpacetimeDB HTTP (keys are camelCase, e.g. `{ "percent": [] }`). */
 function stdbTaggedUnitEnumToHttpSumJson(v: { tag: string }): Record<string, unknown> {
   return encodeTaggedUnitEnum(v)
-}
-
-function u64BigintArrayToHttpJson(ids: readonly bigint[]): number[] {
-  return ids.map(bigintToSafeJsonU64)
-}
-
-function optionalBigintU64ToHttpJson(b: bigint | undefined): number | null {
-  if (b === undefined) return null
-  return bigintToSafeJsonU64(b)
-}
-
-/**
- * `POST .../call/create_account_tax` expects JSON keys matching the Rust struct (snake_case), not
- * the generated TS client field names (camelCase). Use this instead of {@link stdbParamsToJson} for
- * {@link CreateAccountTaxParams}.
- */
-export function createAccountTaxParamsToStdbHttpJson(
-  params: CreateAccountTaxParams,
-): Record<string, unknown> {
-  const typeTaxUse = params.typeTaxUse as { tag: string }
-  const amountType = params.amountType as { tag: string }
-
-  return {
-    name: params.name,
-    description:
-      params.description === undefined
-        ? { none: [] }
-        : { some: params.description },
-    type_tax_use: stdbTaggedUnitEnumToHttpSumJson(typeTaxUse),
-    amount_type: stdbTaggedUnitEnumToHttpSumJson(amountType),
-    amount: params.amount,
-    active: params.active,
-    price_include: params.priceInclude,
-    include_base_amount: params.includeBaseAmount,
-    is_base_affected: params.isBaseAffected,
-    sequence: params.sequence,
-    tax_group_id: optionalBigintU64ToHttpJson(params.taxGroupId),
-    country_id: optionalBigintU64ToHttpJson(params.countryId),
-    country_code: params.countryCode ?? null,
-    tags: u64BigintArrayToHttpJson(params.tags),
-    has_negative_factor: params.hasNegativeFactor,
-    invoice_repartition_line_ids: u64BigintArrayToHttpJson(params.invoiceRepartitionLineIds),
-    refund_repartition_line_ids: u64BigintArrayToHttpJson(params.refundRepartitionLineIds),
-    metadata: params.metadata ?? null,
-  }
 }
 
 /** SpacetimeDB HTTP JSON for `Option<T>` (SATS `some` / `none`). */
@@ -391,37 +332,6 @@ function optionTaggedEnumToHttpJson(
 ): { some: Record<string, unknown> } | { none: [] } {
   if (v === undefined) return stdbOptionNone()
   return stdbOptionSome(stdbTaggedUnitEnumToHttpSumJson(v))
-}
-
-/**
- * `POST .../call/create_account_account` expects JSON keys matching the Rust struct (snake_case) and
- * SATS sum JSON for enums (`{"Other":[]}`), not generated TS field names (`userTypeId`, `{tag:…}`, …).
- */
-export function createAccountAccountParamsToStdbHttpJson(
-  params: CreateAccountAccountParams,
-): Record<string, unknown> {
-  const internalType = params.internalType as { tag: string } | undefined
-  const internalGroup = params.internalGroup as { tag: string } | undefined
-
-  return {
-    company_id: optionalBigintU64ToHttpJson(params.companyId),
-    code: params.code,
-    name: params.name,
-    user_type_id: bigintToSafeJsonU64(params.userTypeId),
-    currency_id: optionalBigintU64ToHttpJson(params.currencyId),
-    internal_type: optionTaggedEnumToHttpJson(internalType),
-    internal_group: optionTaggedEnumToHttpJson(internalGroup),
-    group_id: optionalBigintU64ToHttpJson(params.groupId),
-    reconcile: params.reconcile,
-    tax_ids: u64BigintArrayToHttpJson(params.taxIds),
-    note: params.note ?? null,
-    opening_debit: params.openingDebit,
-    opening_credit: params.openingCredit,
-    allowed_journal_ids: u64BigintArrayToHttpJson(params.allowedJournalIds),
-    non_trade: params.nonTrade,
-    is_off_balance: params.isOffBalance,
-    metadata: params.metadata ?? null,
-  }
 }
 
 export function toCreateCrossoveredBudgetParams(

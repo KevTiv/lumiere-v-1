@@ -10,18 +10,44 @@ import {
 } from "@lumiere/erp-shared/accounting-create-params"
 import { stdbParamsToJson, encodeOptionalU64 } from "@lumiere/erp-shared/stdb-params-json"
 import type {
+  AccountAccount,
+  AccountFiscalYear,
+  AccountJournal,
+  AccountMove,
+  AccountPeriod,
+  AddAccountMoveLineParams,
   AllocatePaymentParams,
+  CreateAccountAccountParams,
   CreateAccountAccountTypeParams,
+  CreateAccountAssetParams,
+  CreateAccountBankStatementParams,
   CreateAccountGroupParams,
+  CreateAccountJournalParams,
+  CreateAccountMoveParams,
+  CreateAccountTaxParams,
+  CreateCreditNoteParams,
+  CreateCrossoveredBudgetLineParams,
+  CreateCrossoveredBudgetParams,
   CreateCurrencyRateParams,
   CreatePaymentAccountParams,
   CreatePaymentFeeParams,
   CreatePaymentParams,
   CreatePaymentTransactionParams,
+  CrossoveredBudget,
+  DeleteAccountMoveLineParams,
+  DeprecateAccountAccountParams,
+  DisposeAccountAssetParams,
   ReversePaymentTransactionParams,
   StageBankStatementImportParams,
+  UpdateAccountAccountParams,
+  UpdateAccountAssetParams,
+  UpdateAccountBankStatementParams,
   UpdateAccountAccountTypeParams,
   UpdateAccountGroupParams,
+  UpdateAccountJournalParams,
+  UpdateAccountTaxParams,
+  UpdateCrossoveredBudgetLineParams,
+  UpdateCrossoveredBudgetParams,
 } from "@lumiere/stdb/types"
 import { accountingBffPost, type AccountingBffReducerKey } from "@lumiere/stdb/commands"
 import { invalidateStdbQueryResources, useStdbQuery } from "./stdb"
@@ -35,8 +61,10 @@ function toScalarU64(v: bigint | number | string): bigint {
 
 export type {
   AccountAccount,
+  AccountFiscalYear,
   AccountMove,
   AccountMoveLine,
+  AccountPeriod,
   AccountTax,
   CrossoveredBudget,
   AccountAnalyticAccount,
@@ -58,7 +86,7 @@ export type {
  */
 export function useAccountAccounts(
   organizationId: bigint,
-  options?: { staleTime?: number; enabled?: boolean; initialData?: Record<string, unknown>[] },
+  options?: { staleTime?: number; enabled?: boolean; initialData?: AccountAccount[] },
 ) {
   return useStdbQuery("account-accounts", organizationId, options)
 }
@@ -84,7 +112,7 @@ export function useAccountGroups(
  */
 export function useAccountMoves(
   organizationId: bigint,
-  options?: { staleTime?: number; enabled?: boolean; initialData?: Record<string, unknown>[] },
+  options?: { staleTime?: number; enabled?: boolean; initialData?: AccountMove[] },
 ) {
   return useStdbQuery("account-moves", organizationId, options)
 }
@@ -114,7 +142,7 @@ export function useAccountTaxes(
  */
 export function useCrossoveredBudgets(
   organizationId: bigint,
-  options?: { staleTime?: number; enabled?: boolean; initialData?: Record<string, unknown>[] },
+  options?: { staleTime?: number; enabled?: boolean; initialData?: CrossoveredBudget[] },
 ) {
   return useStdbQuery("budgets", organizationId, options)
 }
@@ -122,7 +150,7 @@ export function useCrossoveredBudgets(
 /** Fiscal years (TanStack scope = organization id, same key as other accounting `useStdbQuery` hooks). */
 export function useAccountFiscalYears(
   organizationId: bigint,
-  options?: { staleTime?: number; enabled?: boolean; initialData?: Record<string, unknown>[] },
+  options?: { staleTime?: number; enabled?: boolean; initialData?: AccountFiscalYear[] },
 ) {
   return useStdbQuery("fiscal-years", organizationId, options)
 }
@@ -130,7 +158,7 @@ export function useAccountFiscalYears(
 /** Accounting periods (TanStack scope = organization id). */
 export function useAccountPeriods(
   organizationId: bigint,
-  options?: { staleTime?: number; enabled?: boolean; initialData?: Record<string, unknown>[] },
+  options?: { staleTime?: number; enabled?: boolean; initialData?: AccountPeriod[] },
 ) {
   return useStdbQuery("account-periods", organizationId, options)
 }
@@ -368,7 +396,7 @@ export function useCreatePaymentFee(organizationId: bigint) {
  */
 export function useAccountJournals(
   organizationId: bigint,
-  options?: { staleTime?: number; enabled?: boolean; initialData?: Record<string, unknown>[] },
+  options?: { staleTime?: number; enabled?: boolean; initialData?: AccountJournal[] },
 ) {
   return useStdbQuery("account-journals", organizationId, options)
 }
@@ -442,128 +470,226 @@ function invalidateTaxQueries(qc: ReturnType<typeof useQueryClient>, organizatio
  * Create a new account in the chart of accounts.
  */
 export function useCreateAccountAccount(organizationId: number) {
-  return useAccountingCallMutation(
-    "create_account_account",
-    organizationId,
-    stdbInvalidationFor("create_account_account"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: CreateAccountAccountParams) => {
+      const { urlPath, init } = stdbBffCommandPost("create_account_account", {
+        params: stdbParamsToJson(params as object, "CreateAccountAccountParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("create_account_account")),
+  })
 }
 
 /**
  * Update an existing account.
  */
 export function useUpdateAccountAccount(organizationId: number) {
-  return useAccountingCallMutation(
-    "update_account_account",
-    organizationId,
-    stdbInvalidationFor("update_account_account"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { accountId: bigint; params: UpdateAccountAccountParams }) => {
+      const { urlPath, init } = stdbBffCommandPost("update_account_account", {
+        accountId: args.accountId,
+        params: stdbParamsToJson(args.params as object, "UpdateAccountAccountParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("update_account_account")),
+  })
 }
 
 /**
  * Deprecate (soft-delete) an account.
  */
 export function useDeprecateAccountAccount(organizationId: number) {
-  return useAccountingCallMutation(
-    "deprecate_account_account",
-    organizationId,
-    stdbInvalidationFor("deprecate_account_account"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { accountId: bigint; params: DeprecateAccountAccountParams }) => {
+      const { urlPath, init } = stdbBffCommandPost("deprecate_account_account", {
+        accountId: args.accountId,
+        params: stdbParamsToJson(args.params as object, "DeprecateAccountAccountParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("deprecate_account_account")),
+  })
 }
 
 /**
  * Create a new account move (journal entry).
  */
 export function useCreateAccountMove(organizationId: number) {
-  return useAccountingCallMutation(
-    "create_account_move",
-    organizationId,
-    stdbInvalidationFor("create_account_move"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: CreateAccountMoveParams) => {
+      const { urlPath, init } = stdbBffCommandPost("create_account_move", {
+        params: stdbParamsToJson(params as object, "CreateAccountMoveParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("create_account_move")),
+  })
 }
 
 /**
  * Post an account move (confirm it).
  */
 export function usePostAccountMove(organizationId: number) {
-  return useAccountingCallMutation(
-    "post_account_move",
-    organizationId,
-    stdbInvalidationFor("post_account_move"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (moveId: bigint | number | string) => {
+      const { urlPath, init } = stdbBffCommandPost("post_account_move", { moveId: toScalarU64(moveId) })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("post_account_move")),
+  })
 }
 
 /**
  * Post a customer/vendor invoice or refund (totals + optional COGS lines).
  */
 export function usePostInvoice(organizationId: number) {
-  return useAccountingCallMutation("post_invoice", organizationId, stdbInvalidationFor("post_invoice"))
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: {
+      moveId: bigint | number | string
+      cogsAccountId: bigint
+      inventoryAccountId: bigint
+    }) => {
+      const { urlPath, init } = stdbBffCommandPost("post_invoice", {
+        moveId: toScalarU64(args.moveId),
+        cogsAccountId: args.cogsAccountId,
+        inventoryAccountId: args.inventoryAccountId,
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("post_invoice")),
+  })
 }
 
 /**
  * Create a draft credit note (OutRefund) from a posted customer invoice.
  */
 export function useCreateCreditNoteFromInvoice(organizationId: number) {
-  return useAccountingCallMutation(
-    "create_credit_note_from_invoice",
-    organizationId,
-    ["account-moves", "account-move-lines"],
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { companyId: bigint; invoiceId: bigint; params: CreateCreditNoteParams }) => {
+      const { urlPath, init } = stdbBffCommandPost("create_credit_note_from_invoice", {
+        companyId: args.companyId,
+        invoiceId: args.invoiceId,
+        params: stdbParamsToJson(args.params as object, "CreateCreditNoteParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, ["account-moves", "account-move-lines"]),
+  })
 }
 
 /**
  * Cancel an account move.
  */
 export function useCancelAccountMove(organizationId: number) {
-  return useAccountingCallMutation(
-    "cancel_account_move",
-    organizationId,
-    stdbInvalidationFor("cancel_account_move"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (moveId: bigint | number | string) => {
+      const { urlPath, init } = stdbBffCommandPost("cancel_account_move", { moveId: toScalarU64(moveId) })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("cancel_account_move")),
+  })
 }
 
 /**
  * Add a line to an account move.
  */
 export function useAddAccountMoveLine(organizationId: number) {
-  return useAccountingCallMutation(
-    "add_account_move_line",
-    organizationId,
-    stdbInvalidationFor("add_account_move_line"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { moveId: bigint; params: AddAccountMoveLineParams }) => {
+      const { urlPath, init } = stdbBffCommandPost("add_account_move_line", {
+        moveId: args.moveId,
+        params: stdbParamsToJson(args.params as object, "AddAccountMoveLineParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("add_account_move_line")),
+  })
 }
 
 /**
  * Delete an account move line.
  */
 export function useDeleteAccountMoveLine(organizationId: number) {
-  return useAccountingCallMutation(
-    "delete_account_move_line",
-    organizationId,
-    stdbInvalidationFor("delete_account_move_line"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { lineId: bigint; params: DeleteAccountMoveLineParams }) => {
+      const { urlPath, init } = stdbBffCommandPost("delete_account_move_line", {
+        lineId: args.lineId,
+        params: stdbParamsToJson(args.params as object, "DeleteAccountMoveLineParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("delete_account_move_line")),
+  })
 }
 
 /**
  * Create a new tax.
  */
 export function useCreateAccountTax(organizationId: number) {
-  return useAccountingCallMutation(
-    "create_account_tax",
-    organizationId,
-    stdbInvalidationFor("create_account_tax"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { companyId: bigint; params: CreateAccountTaxParams }) => {
+      const { urlPath, init } = stdbBffCommandPost("create_account_tax", {
+        companyId: args.companyId,
+        params: stdbParamsToJson(args.params as object, "CreateAccountTaxParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("create_account_tax")),
+  })
 }
 
 /**
  * Update an existing tax.
  */
 export function useUpdateAccountTax(organizationId: number) {
-  return useAccountingCallMutation(
-    "update_account_tax",
-    organizationId,
-    stdbInvalidationFor("update_account_tax"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { companyId: bigint; taxId: bigint; params: UpdateAccountTaxParams }) => {
+      const { urlPath, init } = stdbBffCommandPost("update_account_tax", {
+        companyId: args.companyId,
+        taxId: args.taxId,
+        params: stdbParamsToJson(args.params as object, "UpdateAccountTaxParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("update_account_tax")),
+  })
 }
 
 /**
@@ -572,7 +698,7 @@ export function useUpdateAccountTax(organizationId: number) {
 export function useCreateCrossoveredBudget(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
+    mutationFn: async (params: CreateCrossoveredBudgetParams) => {
       const { urlPath, init } = stdbBffCommandPost("create_crossovered_budget", { params: stdbParamsToJson(params as object, "CreateCrossoveredBudgetParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
@@ -639,33 +765,57 @@ export function useUpdateAccountGroup(organizationId: number) {
  * Update an existing budget.
  */
 export function useUpdateCrossoveredBudget(organizationId: number) {
-  return useAccountingCallMutation(
-    "update_crossovered_budget",
-    organizationId,
-    stdbInvalidationFor("update_crossovered_budget"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { budgetId: bigint; params: ClearablePatch<UpdateCrossoveredBudgetParams> }) => {
+      const { urlPath, init } = stdbBffCommandPost("update_crossovered_budget", {
+        budgetId: args.budgetId,
+        params: stdbParamsToJson(args.params as object, "UpdateCrossoveredBudgetParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("update_crossovered_budget")),
+  })
 }
 
 /**
  * Create a new budget line.
  */
 export function useCreateBudgetLine(organizationId: number) {
-  return useAccountingCallMutation(
-    "create_budget_line",
-    organizationId,
-    stdbInvalidationFor("create_budget_line"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { budgetId: bigint; params: CreateCrossoveredBudgetLineParams }) => {
+      const { urlPath, init } = stdbBffCommandPost("create_budget_line", {
+        budgetId: args.budgetId,
+        params: stdbParamsToJson(args.params as object, "CreateCrossoveredBudgetLineParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("create_budget_line")),
+  })
 }
 
 /**
  * Update an existing budget line.
  */
 export function useUpdateBudgetLine(organizationId: number) {
-  return useAccountingCallMutation(
-    "update_budget_line",
-    organizationId,
-    stdbInvalidationFor("update_budget_line"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { lineId: bigint; params: ClearablePatch<UpdateCrossoveredBudgetLineParams> }) => {
+      const { urlPath, init } = stdbBffCommandPost("update_budget_line", {
+        lineId: args.lineId,
+        params: stdbParamsToJson(args.params as object, "UpdateCrossoveredBudgetLineParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("update_budget_line")),
+  })
 }
 
 export function useConfirmBudget(organizationId: number) {
@@ -771,22 +921,48 @@ export function useUpdateBudgetPost(organizationId: number) {
  * Create a new bank statement.
  */
 export function useCreateAccountBankStatement(organizationId: number) {
-  return useAccountingCallMutation(
-    "create_account_bank_statement",
-    organizationId,
-    stdbInvalidationFor("create_account_bank_statement"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: {
+      companyId: bigint
+      journalId: bigint
+      params: CreateAccountBankStatementParams
+    }) => {
+      const { urlPath, init } = stdbBffCommandPost("create_account_bank_statement", {
+        companyId: args.companyId,
+        journalId: args.journalId,
+        params: stdbParamsToJson(args.params as object, "CreateAccountBankStatementParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("create_account_bank_statement")),
+  })
 }
 
 /**
  * Update an existing bank statement.
  */
 export function useUpdateAccountBankStatement(organizationId: number) {
-  return useAccountingCallMutation(
-    "update_account_bank_statement",
-    organizationId,
-    stdbInvalidationFor("update_account_bank_statement"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: {
+      companyId: bigint
+      statementId: bigint
+      params: UpdateAccountBankStatementParams
+    }) => {
+      const { urlPath, init } = stdbBffCommandPost("update_account_bank_statement", {
+        companyId: args.companyId,
+        statementId: args.statementId,
+        params: stdbParamsToJson(args.params as object, "UpdateAccountBankStatementParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("update_account_bank_statement")),
+  })
 }
 
 /**
@@ -804,55 +980,104 @@ export function useUnreconcileAccountBankStatementLine(organizationId: number) {
  * Create a new fixed asset.
  */
 export function useCreateAccountAsset(organizationId: number) {
-  return useAccountingCallMutation(
-    "create_account_asset",
-    organizationId,
-    stdbInvalidationFor("create_account_asset"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { companyId: bigint; params: CreateAccountAssetParams }) => {
+      const { urlPath, init } = stdbBffCommandPost("create_account_asset", {
+        companyId: args.companyId,
+        params: stdbParamsToJson(args.params as object, "CreateAccountAssetParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("create_account_asset")),
+  })
 }
 
 /**
  * Update an existing fixed asset.
  */
 export function useUpdateAccountAsset(organizationId: number) {
-  return useAccountingCallMutation(
-    "update_account_asset",
-    organizationId,
-    stdbInvalidationFor("update_account_asset"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: {
+      companyId: bigint
+      assetId: bigint
+      params: UpdateAccountAssetParams
+    }) => {
+      const { urlPath, init } = stdbBffCommandPost("update_account_asset", {
+        companyId: args.companyId,
+        assetId: args.assetId,
+        params: stdbParamsToJson(args.params as object, "UpdateAccountAssetParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("update_account_asset")),
+  })
 }
 
 /**
  * Dispose of a fixed asset.
  */
 export function useDisposeAccountAsset(organizationId: number) {
-  return useAccountingCallMutation(
-    "dispose_account_asset",
-    organizationId,
-    stdbInvalidationFor("dispose_account_asset"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: {
+      companyId: bigint
+      assetId: bigint
+      params: DisposeAccountAssetParams
+    }) => {
+      const { urlPath, init } = stdbBffCommandPost("dispose_account_asset", {
+        companyId: args.companyId,
+        assetId: args.assetId,
+        params: stdbParamsToJson(args.params as object, "DisposeAccountAssetParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("dispose_account_asset")),
+  })
 }
 
 /**
  * Create a new account journal.
  */
 export function useCreateAccountJournal(organizationId: number) {
-  return useAccountingCallMutation(
-    "create_account_journal",
-    organizationId,
-    stdbInvalidationFor("create_account_journal"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: CreateAccountJournalParams) => {
+      const { urlPath, init } = stdbBffCommandPost("create_account_journal", {
+        params: stdbParamsToJson(params as object, "CreateAccountJournalParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("create_account_journal")),
+  })
 }
 
 /**
  * Update an existing account journal.
  */
 export function useUpdateAccountJournal(organizationId: number) {
-  return useAccountingCallMutation(
-    "update_account_journal",
-    organizationId,
-    stdbInvalidationFor("update_account_journal"),
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { journalId: bigint; params: UpdateAccountJournalParams }) => {
+      const { urlPath, init } = stdbBffCommandPost("update_account_journal", {
+        journalId: args.journalId,
+        params: stdbParamsToJson(args.params as object, "UpdateAccountJournalParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () =>
+      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("update_account_journal")),
+  })
 }
 
 // ── Analytic accounting (explicit /api/call — reducer coverage + correct [orgId, …] args) ──
