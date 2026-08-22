@@ -146,7 +146,7 @@ import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks
 import type { Contact } from "@lumiere/query-hooks/hooks/crm"
 import { useAccountAccounts, useAccountJournals, useAccountPaymentTerms } from "@lumiere/query-hooks/hooks/accounting"
 import { useProducts, useUoms, useStockPickings } from "@lumiere/query-hooks/hooks/inventory"
-import { useDepartments } from "@lumiere/query-hooks/hooks/hr"
+import { useDepartments, type HrDepartment } from "@lumiere/query-hooks/hooks/hr"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useRuntimeListConfig } from "@lumiere/ui/forms"
 import {
@@ -406,7 +406,7 @@ interface PurchasingClientProps {
   initialProducts?: Product[]
   initialUoms?: Uom[]
   initialPartnerBanks?: ResPartnerBank[]
-  initialDepartments?: Record<string, unknown>[]
+  initialDepartments?: HrDepartment[]
   organizationId?: number
 }
 

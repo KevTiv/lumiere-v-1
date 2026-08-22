@@ -24,7 +24,7 @@ import { useAccountMoves, type AccountMove } from "@lumiere/query-hooks/hooks/ac
 import { usePaymentReconciliations, usePaymentTransactions } from "@lumiere/query-hooks/hooks/accounting"
 import { useStockQuants, useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import { usePurchaseOrders, type PurchaseOrder } from "@lumiere/query-hooks/hooks/purchasing"
-import { useTasks, useProjects } from "@lumiere/query-hooks/hooks/projects"
+import { useTasks, useProjects, type ProjectTask, type ProjectProject } from "@lumiere/query-hooks/hooks/projects"
 import { useContacts, type Contact } from "@lumiere/query-hooks/hooks/crm"
 import { useAiActionDraftInboxCount } from "@lumiere/query-hooks/hooks/ai-action-drafts"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
@@ -38,8 +38,8 @@ interface OverviewClientProps {
   initialMoves?: AccountMove[]
   initialStockQuants?: StockQuant[]
   initialProducts?: Product[]
-  initialTasks?: Record<string, unknown>[]
-  initialProjects?: Record<string, unknown>[]
+  initialTasks?: ProjectTask[]
+  initialProjects?: ProjectProject[]
   initialPurchaseOrders?: PurchaseOrder[]
   initialContacts?: Contact[]
 }

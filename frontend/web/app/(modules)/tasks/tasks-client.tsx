@@ -30,6 +30,8 @@ import {
   useCreateTask,
   useUpdateTask,
   useUpdateTaskState,
+  type ProjectTask,
+  type ProjectProject,
 } from "@lumiere/query-hooks/hooks/projects"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { Button, buttonVariants } from "@lumiere/ui/components/button"
@@ -57,8 +59,8 @@ type TaskColumnId = (typeof TASK_COLUMNS)[number]
 
 interface TasksClientProps {
   organizationId?: number
-  initialTasks?: Record<string, unknown>[]
-  initialProjects?: Record<string, unknown>[]
+  initialTasks?: ProjectTask[]
+  initialProjects?: ProjectProject[]
 }
 
 type ModalState =

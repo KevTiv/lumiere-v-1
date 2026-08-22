@@ -16,6 +16,12 @@ import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
+import type {
+  HrResource,
+  ProjectProject,
+  ProjectTask,
+  ProjectTimesheet,
+} from "@lumiere/stdb/types"
 
 function toScalarU64(v: bigint | number | string): bigint {
   return typeof v === "bigint" ? v : BigInt(String(v))
@@ -37,9 +43,9 @@ function invalidateTimesheetQueues(
 
 export function useProjects(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProjectProject[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProjectProject[]>({
     queryKey: ['projects', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/projects', 'Failed to fetch projects'),
     staleTime: 30_000,
@@ -49,9 +55,9 @@ export function useProjects(
 
 export function useTasks(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProjectTask[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProjectTask[]>({
     queryKey: ['tasks', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/tasks', 'Failed to fetch tasks'),
     staleTime: 30_000,
@@ -61,9 +67,9 @@ export function useTasks(
 
 export function useTimesheets(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProjectTimesheet[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProjectTimesheet[]>({
     queryKey: ['timesheets', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/timesheets', 'Failed to fetch timesheets'),
     staleTime: 30_000,
@@ -193,8 +199,8 @@ export function useProjectMilestones(organizationId: bigint, initialData?: Query
   })
 }
 
-export function useHrResources(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useHrResources(organizationId: bigint, initialData?: HrResource[]) {
+  return useQuery<HrResource[]>({
     queryKey: ['hr-resources', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/hr-resources', 'Failed to fetch HR resources'),
     staleTime: 30_000,
@@ -848,4 +854,8 @@ export { useEmployees } from "./hr"
 export type {
   CreateProjectParams,
   CreateTaskParams,
+  HrResource,
+  ProjectProject,
+  ProjectTask,
+  ProjectTimesheet,
 } from '@lumiere/stdb/types'

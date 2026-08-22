@@ -96,6 +96,11 @@ import {
   useOnboardingTemplates,
   useCreateOnboardingTemplate,
   useApplicants,
+  type HrEmployee,
+  type HrDepartment,
+  type HrLeave,
+  type HrContract,
+  type HrPayslip,
 } from "@lumiere/query-hooks/hooks/hr"
 import { OrgChartPanel, CompensationTimelinePanel, HrOpsQueuePanel, HrAdvancedWfmPanel, LeaveApprovalTimelinePanel } from "./hr-panels"
 import { HrOnboardingPanel } from "./hr-onboarding-panel"
@@ -354,11 +359,11 @@ function attachEmptyStateAction(
 }
 
 interface HrClientProps {
-  initialEmployees?: Record<string, unknown>[]
-  initialDepartments?: Record<string, unknown>[]
-  initialLeaves?: Record<string, unknown>[]
-  initialContracts?: Record<string, unknown>[]
-  initialPayslips?: Record<string, unknown>[]
+  initialEmployees?: HrEmployee[]
+  initialDepartments?: HrDepartment[]
+  initialLeaves?: HrLeave[]
+  initialContracts?: HrContract[]
+  initialPayslips?: HrPayslip[]
   initialPricelists?: ProductPricelist[]
   organizationId?: number
 }

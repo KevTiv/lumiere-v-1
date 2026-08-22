@@ -81,6 +81,9 @@ import {
   useCreateProjectIntegrationIntent,
   useRefreshCapacityForecast,
   useRefreshProjectEarnedValue,
+  type ProjectProject,
+  type ProjectTask,
+  type ProjectTimesheet,
 } from "@lumiere/query-hooks/hooks/projects"
 import {
   useCreateExpenseProjectRebill,
@@ -125,9 +128,9 @@ import {
 export { PROJECTS_UI_REDUCERS } from "@/lib/projects-ui-reducers"
 
 interface ProjectsClientProps {
-  initialProjects?: Record<string, unknown>[]
-  initialTasks?: Record<string, unknown>[]
-  initialTimesheets?: Record<string, unknown>[]
+  initialProjects?: ProjectProject[]
+  initialTasks?: ProjectTask[]
+  initialTimesheets?: ProjectTimesheet[]
   initialPricelists?: ProductPricelist[]
   initialContacts?: Contact[]
   organizationId?: number

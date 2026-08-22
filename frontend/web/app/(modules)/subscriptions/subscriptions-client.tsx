@@ -97,6 +97,11 @@ import {
   useDeactivateRevenueRecognitionRule,
   useImportSubscriptionPlanCsv,
   useImportSubscriptionCsv,
+  type Subscription,
+  type SubscriptionPlan,
+  type DeferredRevenueSchedule,
+  type DeferredRevenueLine,
+  type RevenueRecognitionRule,
 } from "@lumiere/query-hooks/hooks/subscriptions"
 import {
   toCreateSubscriptionFromSaleOrderParams,
@@ -147,11 +152,11 @@ function isTrialSubscriptionRow(row: Record<string, unknown>): boolean {
 }
 
 interface SubscriptionsClientProps {
-  initialSubscriptions?: Record<string, unknown>[]
-  initialPlans?: Record<string, unknown>[]
-  initialDeferredSchedules?: Record<string, unknown>[]
-  initialDeferredLines?: Record<string, unknown>[]
-  initialRecognitionRules?: Record<string, unknown>[]
+  initialSubscriptions?: Subscription[]
+  initialPlans?: SubscriptionPlan[]
+  initialDeferredSchedules?: DeferredRevenueSchedule[]
+  initialDeferredLines?: DeferredRevenueLine[]
+  initialRecognitionRules?: RevenueRecognitionRule[]
   initialSaleOrders?: SaleOrder[]
   initialPricelists?: ProductPricelist[]
   initialProducts?: Product[]
@@ -467,7 +472,6 @@ function SubscriptionsClientLoaded({
           if (!r || String(r.state) !== "active") return
           void pauseSubscription.mutate({
             subscriptionId: BigInt(String(r.id)),
-            params: {},
           })
         },
       },
@@ -482,7 +486,6 @@ function SubscriptionsClientLoaded({
           if (!r || String(r.state) !== "paused") return
           void resumeSubscription.mutate({
             subscriptionId: BigInt(String(r.id)),
-            params: {},
           })
         },
       },
@@ -983,7 +986,7 @@ function SubscriptionsClientLoaded({
           const params = buildCloseSubscriptionParams(formData)
           void closeSubscription.mutate({
             subscriptionId: BigInt(closeTargetId),
-            params: params as unknown as Record<string, unknown>,
+            params,
           })
           setCloseTargetId(null)
         }}
@@ -998,7 +1001,7 @@ function SubscriptionsClientLoaded({
           const params = buildGenerateSubscriptionInvoiceParams(formData)
           void generateInvoice.mutate({
             subscriptionId: BigInt(generateTargetId),
-            params: params as unknown as Record<string, unknown>,
+            params,
           })
           setGenerateTargetId(null)
         }}
@@ -1116,7 +1119,7 @@ function SubscriptionsClientLoaded({
           const params = buildRecognizeDeferredRevenueParams({ moveId, moveLineId })
           void recognizeDeferred.mutate({
             lineId: BigInt(recognizeLineId),
-            params: params as unknown as Record<string, unknown>,
+            params,
           })
           setRecognizeLineId(null)
         }}

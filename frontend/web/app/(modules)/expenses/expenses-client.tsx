@@ -62,7 +62,7 @@ import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hoo
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
-import { useEmployees } from "@lumiere/query-hooks/hooks/hr"
+import { useEmployees, type HrEmployee } from "@lumiere/query-hooks/hooks/hr"
 import {
   newExpenseReceiptClientRequestId,
   parseAttachmentIds,
@@ -87,7 +87,7 @@ interface ExpensesClientProps {
   initialExpenses?: Record<string, unknown>[]
   initialSheets?: Record<string, unknown>[]
   initialPricelists?: ProductPricelist[]
-  initialEmployees?: Record<string, unknown>[]
+  initialEmployees?: HrEmployee[]
   organizationId?: number
 }
 

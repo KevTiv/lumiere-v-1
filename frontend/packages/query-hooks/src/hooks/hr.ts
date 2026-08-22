@@ -23,6 +23,15 @@ import type {
   CreatePayrollStructureParams,
   CreatePayslipParams,
   CreateSalaryRuleParams,
+  HrContract,
+  HrDepartment,
+  HrEmployee,
+  HrJobPosition,
+  HrLeave,
+  HrLeaveType,
+  HrPayrollStructure,
+  HrPayslip,
+  HrSalaryRule,
   UpdateContractParams,
   UpdateDepartmentParams,
   UpdateEmployeeParams,
@@ -53,9 +62,9 @@ function toScalarU64(v: ScalarId): bigint {
 
 export function useEmployees(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: HrEmployee[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<HrEmployee[]>({
     queryKey: ['hr-employees', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/employees', 'Failed to fetch employees'),
     staleTime: 30_000,
@@ -65,9 +74,9 @@ export function useEmployees(
 
 export function useDepartments(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: HrDepartment[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<HrDepartment[]>({
     queryKey: ['hr-departments', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/departments', 'Failed to fetch departments'),
     staleTime: 30_000,
@@ -77,9 +86,9 @@ export function useDepartments(
 
 export function useLeaveRequests(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: HrLeave[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<HrLeave[]>({
     queryKey: ['hr-leave-requests', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/leave-requests', 'Failed to fetch leave requests'),
     staleTime: 30_000,
@@ -103,9 +112,9 @@ export function useLeavesToApprove(
 
 export function useContracts(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: HrContract[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<HrContract[]>({
     queryKey: ['hr-contracts', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/contracts', 'Failed to fetch contracts'),
     staleTime: 30_000,
@@ -115,9 +124,9 @@ export function useContracts(
 
 export function usePayslips(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: HrPayslip[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<HrPayslip[]>({
     queryKey: ['hr-payslips', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/payslips', 'Failed to fetch payslips'),
     staleTime: 30_000,
@@ -141,9 +150,9 @@ export function usePayslipsToExport(
 
 export function useJobPositions(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: HrJobPosition[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<HrJobPosition[]>({
     queryKey: ['job-positions', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/job-positions', 'Failed to fetch job positions'),
     staleTime: 30_000,
@@ -218,9 +227,9 @@ export function useUpdateHrApplicant(organizationId: bigint, companyId?: bigint)
 
 export function useLeaveTypes(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: HrLeaveType[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<HrLeaveType[]>({
     queryKey: ['hr-leave-types', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/leave-types', 'Failed to fetch leave types'),
     staleTime: 30_000,
@@ -230,9 +239,9 @@ export function useLeaveTypes(
 
 export function usePayrollStructures(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: HrPayrollStructure[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<HrPayrollStructure[]>({
     queryKey: ['hr-payroll-structures', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/payroll-structures', 'Failed to fetch payroll structures'),
     staleTime: 30_000,
@@ -242,9 +251,9 @@ export function usePayrollStructures(
 
 export function useSalaryRules(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: HrSalaryRule[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<HrSalaryRule[]>({
     queryKey: ['hr-salary-rules', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/salary-rules', 'Failed to fetch salary rules'),
     staleTime: 30_000,
@@ -1514,4 +1523,13 @@ export type {
   CreateJobPositionParams,
   CreateLeaveRequestParams,
   CreatePayslipParams,
+  HrContract,
+  HrDepartment,
+  HrEmployee,
+  HrJobPosition,
+  HrLeave,
+  HrLeaveType,
+  HrPayrollStructure,
+  HrPayslip,
+  HrSalaryRule,
 } from '@lumiere/stdb/types'

@@ -13,11 +13,33 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from '../http';
 import { withCompanyScope } from '@lumiere/erp-shared/org-scoped';
 import { stdbParamsToJson } from '@lumiere/erp-shared/stdb-params-json';
+import { type ClearablePatch } from '@lumiere/erp-shared/accounting-create-params';
 import type {
+  AmendSubscriptionParams,
+  ApplySubscriptionInvoicePaymentParams,
+  CancelSubscriptionParams,
+  CloseSubscriptionParams,
   CreateDeferredRevenueScheduleParams,
   CreateRevenueRecognitionRuleParams,
+  CreateSubscriptionBundleParams,
   CreateSubscriptionFromSaleOrderParams,
+  CreateSubscriptionPaymentIntentParams,
   CreateSubscriptionPlanParams,
+  CreateSubscriptionPriceTierParams,
+  DeferredRevenueLine,
+  DeferredRevenueSchedule,
+  GenerateSubscriptionInvoiceParams,
+  IngestSubscriptionUsageEventParams,
+  PauseSubscriptionParams,
+  RecognizeDeferredRevenueParams,
+  RenewSubscriptionParams,
+  ResumeSubscriptionParams,
+  RevenueRecognitionRule,
+  SetSubscriptionCommitmentParams,
+  Subscription,
+  SubscriptionLine,
+  SubscriptionPlan,
+  UpdateSubscriptionPlanParams,
 } from '@lumiere/stdb/types';
 
 function requireSelectedCompany(companyId: bigint | undefined): bigint {
@@ -33,9 +55,9 @@ function requireSelectedCompany(companyId: bigint | undefined): bigint {
 
 export function useSubscriptions(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: Subscription[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<Subscription[]>({
     queryKey: ['subscriptions', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -49,9 +71,9 @@ export function useSubscriptions(
 
 export function useSubscriptionPlans(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: SubscriptionPlan[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<SubscriptionPlan[]>({
     queryKey: ['subscription-plans', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -65,9 +87,9 @@ export function useSubscriptionPlans(
 
 export function useSubscriptionLines(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: SubscriptionLine[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<SubscriptionLine[]>({
     queryKey: ['subscription-lines', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -97,9 +119,9 @@ export function useSubscriptionAmendments(
 
 export function useDeferredRevenueSchedules(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: DeferredRevenueSchedule[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<DeferredRevenueSchedule[]>({
     queryKey: ['deferred-revenue-schedules', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -113,9 +135,9 @@ export function useDeferredRevenueSchedules(
 
 export function useDeferredRevenueLines(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: DeferredRevenueLine[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<DeferredRevenueLine[]>({
     queryKey: ['deferred-revenue-lines', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -129,9 +151,9 @@ export function useDeferredRevenueLines(
 
 export function useRevenueRecognitionRules(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: RevenueRecognitionRule[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<RevenueRecognitionRule[]>({
     queryKey: ['revenue-recognition-rules', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -240,7 +262,7 @@ export function useCloseSubscription(
   return useMutation<
     void,
     Error,
-    { subscriptionId: bigint; params: Record<string, unknown> }
+    { subscriptionId: bigint; params: CloseSubscriptionParams }
   >({
     mutationFn: async ({ subscriptionId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('close_subscription', {
@@ -266,7 +288,7 @@ export function useGenerateSubscriptionInvoice(
   return useMutation<
     void,
     Error,
-    { subscriptionId: bigint; params: Record<string, unknown> }
+    { subscriptionId: bigint; params: GenerateSubscriptionInvoiceParams }
   >({
     mutationFn: async ({ subscriptionId, params }) => {
       const { urlPath, init } = stdbBffCommandPost(
@@ -316,7 +338,7 @@ export function usePaySubscriptionInvoice(
   return useMutation<
     void,
     Error,
-    { subscriptionId: bigint; params: Record<string, unknown> }
+    { subscriptionId: bigint; params: ApplySubscriptionInvoicePaymentParams }
   >({
     mutationFn: async ({ subscriptionId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('pay_subscription_invoice', {
@@ -378,7 +400,7 @@ export function useAmendSubscription(
   return useMutation<
     void,
     Error,
-    { subscriptionId: bigint; params: Record<string, unknown> }
+    { subscriptionId: bigint; params: AmendSubscriptionParams }
   >({
     mutationFn: async ({ subscriptionId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('amend_subscription', {
@@ -403,7 +425,7 @@ export function usePauseSubscription(
   return useMutation<
     void,
     Error,
-    { subscriptionId: bigint; params?: Record<string, unknown> }
+    { subscriptionId: bigint; params?: PauseSubscriptionParams }
   >({
     mutationFn: async ({ subscriptionId, params = {} }) => {
       const { urlPath, init } = stdbBffCommandPost('pause_subscription', {
@@ -428,7 +450,7 @@ export function useResumeSubscription(
   return useMutation<
     void,
     Error,
-    { subscriptionId: bigint; params?: Record<string, unknown> }
+    { subscriptionId: bigint; params?: ResumeSubscriptionParams }
   >({
     mutationFn: async ({ subscriptionId, params = {} }) => {
       const { urlPath, init } = stdbBffCommandPost('resume_subscription', {
@@ -453,7 +475,7 @@ export function useRenewSubscription(
   return useMutation<
     void,
     Error,
-    { subscriptionId: bigint; params: Record<string, unknown> }
+    { subscriptionId: bigint; params: RenewSubscriptionParams }
   >({
     mutationFn: async ({ subscriptionId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('renew_subscription', {
@@ -478,7 +500,7 @@ export function useCancelSubscription(
   return useMutation<
     void,
     Error,
-    { subscriptionId: bigint; params: Record<string, unknown> }
+    { subscriptionId: bigint; params: CancelSubscriptionParams }
   >({
     mutationFn: async ({ subscriptionId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('cancel_subscription', {
@@ -503,7 +525,7 @@ export function useUpdateSubscriptionPlan(
   return useMutation<
     void,
     Error,
-    { planId: bigint; params: Record<string, unknown> }
+    { planId: bigint; params: ClearablePatch<UpdateSubscriptionPlanParams> }
   >({
     mutationFn: async ({ planId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('update_subscription_plan', {
@@ -687,7 +709,7 @@ export function useIngestSubscriptionUsageEvent(
   return useMutation<
     void,
     Error,
-    { subscriptionId: bigint; params: Record<string, unknown> }
+    { subscriptionId: bigint; params: IngestSubscriptionUsageEventParams }
   >({
     mutationFn: async ({ subscriptionId, params }) => {
       const { urlPath, init } = stdbBffCommandPost(
@@ -753,7 +775,7 @@ export function useCreateSubscriptionPriceTier(
   companyId?: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateSubscriptionPriceTierParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_subscription_price_tier',
@@ -783,7 +805,7 @@ export function useSetSubscriptionCommitment(
   return useMutation<
     void,
     Error,
-    { subscriptionId: bigint; params: Record<string, unknown> }
+    { subscriptionId: bigint; params: SetSubscriptionCommitmentParams }
   >({
     mutationFn: async ({ subscriptionId, params }) => {
       const { urlPath, init } = stdbBffCommandPost(
@@ -812,7 +834,7 @@ export function useCreateSubscriptionBundle(
   companyId?: bigint,
 ) {
   const qc = useQueryClient();
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, CreateSubscriptionBundleParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
         'create_subscription_bundle',
@@ -875,7 +897,7 @@ export function useRecognizeDeferredRevenue(
   return useMutation<
     void,
     Error,
-    { lineId: bigint; params: Record<string, unknown> }
+    { lineId: bigint; params: RecognizeDeferredRevenueParams }
   >({
     mutationFn: async ({ lineId, params }) => {
       const { urlPath, init } = stdbBffCommandPost(
@@ -1242,7 +1264,7 @@ export function useCreateSubscriptionPaymentIntent(
   return useMutation<
     void,
     Error,
-    { subscriptionId: bigint; params: Record<string, unknown> }
+    { subscriptionId: bigint; params: CreateSubscriptionPaymentIntentParams }
   >({
     mutationFn: async ({ subscriptionId, params }) => {
       const { urlPath, init } = stdbBffCommandPost(
@@ -1268,6 +1290,27 @@ export function useCreateSubscriptionPaymentIntent(
 
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
+  AmendSubscriptionParams,
+  ApplySubscriptionInvoicePaymentParams,
+  CancelSubscriptionParams,
+  CloseSubscriptionParams,
+  CreateSubscriptionBundleParams,
   CreateSubscriptionFromSaleOrderParams,
+  CreateSubscriptionPaymentIntentParams,
   CreateSubscriptionPlanParams,
+  CreateSubscriptionPriceTierParams,
+  DeferredRevenueLine,
+  DeferredRevenueSchedule,
+  GenerateSubscriptionInvoiceParams,
+  IngestSubscriptionUsageEventParams,
+  PauseSubscriptionParams,
+  RecognizeDeferredRevenueParams,
+  RenewSubscriptionParams,
+  ResumeSubscriptionParams,
+  RevenueRecognitionRule,
+  SetSubscriptionCommitmentParams,
+  Subscription,
+  SubscriptionLine,
+  SubscriptionPlan,
+  UpdateSubscriptionPlanParams,
 } from '@lumiere/stdb/types';
