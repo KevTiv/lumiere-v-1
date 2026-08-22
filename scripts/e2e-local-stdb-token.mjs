@@ -66,12 +66,22 @@ function loginLocal({ forceLogout = false } = {}) {
 
 async function tokenAcceptedByCurrentServer(token) {
   try {
+    const [, payload] = token.split('.')
+    if (!payload) return false
+    const tokenIdentity = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')).hex_identity
+    if (typeof tokenIdentity !== 'string' || tokenIdentity.length === 0) return false
+
     const res = await fetch(`${host}/v1/identity`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(5_000),
     })
-    return res.ok
+    if (!res.ok) return false
+
+    // This endpoint issues a fresh anonymous identity when the bearer is
+    // invalid, so a 200 alone does not authenticate the token.
+    const body = await res.json()
+    return body.identity === tokenIdentity
   } catch {
     return false
   }
@@ -115,6 +125,11 @@ async function main() {
     const token = readCliToken()
     if (!forceLogout && token && (await tokenAcceptedByCurrentServer(token))) return
     loginLocal({ forceLogout: forceLogout || Boolean(token) })
+    const refreshedToken = readCliToken()
+    if (!refreshedToken || !(await tokenAcceptedByCurrentServer(refreshedToken))) {
+      console.error('[e2e-stdb-token] Local login did not produce a token accepted by this server')
+      process.exit(1)
+    }
     return
   }
 
