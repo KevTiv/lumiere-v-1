@@ -1294,7 +1294,8 @@
     "placeholder",
     "default_value",
     "category",
-    "section_id"
+    "section_id",
+    "visibility_json"
   ],
   "CreateHelpdeskStageParams": [
     "team_id",
@@ -3059,6 +3060,10 @@
   ],
   "ProposalSection": [
     "ai_suggestion"
+  ],
+  "PublishFormConfigurationParams": [
+    "description",
+    "expected_updated_at_micros"
   ],
   "PurchaseOrder": [
     "name",

@@ -2284,6 +2284,51 @@ export async function addCustomFormFieldViaSettings(
         visibility_json: null,
       },
     ])
+
+    // The runtime form intentionally hides non-system fields without an exact role overlay.
+    // Registry fixtures use semantic role ids (for example, `role-admin`), while authenticated
+    // sessions use the persisted numeric role id. Mirror the admin registry overlay for the
+    // actual session role so this direct reducer fixture establishes the same visibility state
+    // that the form configuration UI would establish.
+    const adminRoleId = await fetchAdminRoleId(page)
+    const roleConfigsRes = await page.request.get(
+      `/api/query/form-role-configs?organizationId=${orgId}`,
+    )
+    if (!roleConfigsRes.ok()) {
+      throw new Error(`form role configs query failed: ${roleConfigsRes.status()}`)
+    }
+    const roleConfigsJson = (await roleConfigsRes.json()) as {
+      data?: Array<Record<string, unknown>>
+    }
+    const adminRegistryConfig = (roleConfigsJson.data ?? []).find(
+      (row) =>
+        scalarQueryId(row.configurationId ?? row.configuration_id) === configId &&
+        String(row.roleId ?? row.role_id) === "role-admin",
+    )
+    if (!adminRegistryConfig) {
+      throw new Error(`admin registry role config not found for form config ${configId}`)
+    }
+    const stringArray = (value: unknown): string[] => {
+      const parsed = JSON.parse(String(value ?? "[]")) as unknown
+      return Array.isArray(parsed) ? parsed.map(String) : []
+    }
+    const enabledFields = stringArray(
+      adminRegistryConfig.enabledFieldsJson ?? adminRegistryConfig.enabled_fields_json,
+    )
+    await callReducerBff(page, "set_form_role_config", [
+      orgId,
+      configId,
+      {
+        role_id: String(adminRoleId),
+        enabled_fields: [...new Set([...enabledFields, fieldId])],
+        required_fields: stringArray(
+          adminRegistryConfig.requiredFieldsJson ?? adminRegistryConfig.required_fields_json,
+        ),
+        default_prompts: stringArray(
+          adminRegistryConfig.defaultPromptsJson ?? adminRegistryConfig.default_prompts_json,
+        ),
+      },
+    ])
     await openFormConfigLeadForm(page)
     await expect(page.getByTestId(`form-config-field-row-${fieldId}`)).toBeVisible({
       timeout: 30_000,

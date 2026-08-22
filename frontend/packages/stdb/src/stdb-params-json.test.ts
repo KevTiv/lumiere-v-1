@@ -316,6 +316,58 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(insight.metadata, { none: [] })
   })
 
+  it("encodes publish_form_configuration and its nested form structs", () => {
+    const encoded = encodeReducerCallArgs("publish_form_configuration", [
+      7,
+      {
+        moduleId: "crm",
+        formId: "new-lead",
+        name: "New Lead",
+        description: "Create a lead",
+        isSystemDefault: true,
+        fields: [
+          {
+            fieldId: "lead_source",
+            name: "lead_source",
+            label: "Lead Source",
+            fieldType: { tag: "Select" },
+            options: [{ value: "website", label: "Website", color: "blue" }],
+            validation: { required: true, minLength: 1 },
+            aiSuggestions: [],
+            order: 1,
+            isSystem: true,
+            isEnabled: true,
+            showInList: true,
+            width: { tag: "Half" },
+          },
+        ],
+        roleConfigs: [],
+        replaceMissingFields: false,
+      },
+    ])
+
+    const params = encoded[1] as Record<string, unknown>
+    assert.deepEqual(params.description, { some: "Create a lead" })
+    assert.deepEqual(params.expected_updated_at_micros, { none: [] })
+    const field = (params.fields as Record<string, unknown>[])[0]
+    assert.deepEqual(field.field_type, { select: [] })
+    assert.deepEqual(field.description, { none: [] })
+    assert.deepEqual(field.visibility_json, { none: [] })
+    assert.deepEqual(field.width, { half: [] })
+    assert.deepEqual(field.validation, {
+      required: true,
+      min_length: { some: 1 },
+      max_length: { none: [] },
+      min: { none: [] },
+      max: { none: [] },
+      pattern: { none: [] },
+      message: { none: [] },
+    })
+    assert.deepEqual(field.options, [
+      { value: "website", label: "Website", color: { some: "blue" }, icon: { none: [] } },
+    ])
+  })
+
   it("converts nested object keys recursively", () => {
     assert.deepEqual(
       stdbParamsToJson({

@@ -14,6 +14,13 @@ const OPTION_FIELDS = optionFieldsJson as OptionFieldMap
 const NESTED_ARRAY_STRUCTS: Partial<
   Record<string, Partial<Record<string, keyof OptionFieldMap & string>>>
 > = {
+  PublishFormConfigurationParams: {
+    fields: "CreateFormFieldParams",
+    role_configs: "CreateRoleConfigParams",
+  },
+  CreateFormFieldParams: {
+    options: "FieldOption",
+  },
   CreateReturnOrderParams: {
     lines: "CreateReturnOrderLineParams",
   },
@@ -477,6 +484,7 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   create_utm_medium: "CreateUtmMediumParams",
   create_utm_source: "CreateUtmSourceParams",
   create_form_configuration: "CreateFormConfigParams",
+  publish_form_configuration: "PublishFormConfigurationParams",
   add_form_field: "CreateFormFieldParams",
   grant_permission: "GrantOrgPermissionParams",
   grant_field_permission: "GrantFieldPermissionParams",
