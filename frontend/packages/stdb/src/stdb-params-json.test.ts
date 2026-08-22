@@ -67,6 +67,7 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(params.email, { some: "a@b.test" })
     assert.deepEqual(params.tag_ids, [])
     assert.deepEqual(params.phone, { none: [] })
+    assert.deepEqual(params.stage_id, { none: [] })
   })
 
   it("encodeReducerCallArgs SATS-encodes convert_lead_to_customer params", () => {
@@ -366,6 +367,24 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(field.options, [
       { value: "website", label: "Website", color: { some: "blue" }, icon: { none: [] } },
     ])
+  })
+
+  it("encodes set_record_custom_field_values and its nested entries", () => {
+    const encoded = encodeReducerCallArgs("set_record_custom_field_values", [
+      7,
+      19,
+      {
+        model: "lead",
+        recordId: 41n,
+        entries: [{ fieldKey: "custom:region", valueJson: '"north"' }],
+      },
+    ])
+
+    assert.deepEqual(encoded[2], {
+      model: "lead",
+      record_id: 41,
+      entries: [{ field_key: "custom:region", value_json: '"north"' }],
+    })
   })
 
   it("converts nested object keys recursively", () => {

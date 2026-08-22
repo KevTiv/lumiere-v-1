@@ -367,9 +367,14 @@ function CrmClientLoaded({
     listViewKey: `list-filters:crm:opportunities:${organizationId}`,
   })
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
+  const crmCustomFieldModel = {
+    lead: "crm_lead",
+    opportunity: "crm_lead",
+    contact: "contact",
+  } as const
 
   async function persistCrmCustomFields(args: {
-    model: "lead" | "contact" | "opportunity"
+    model: keyof typeof crmCustomFieldModel
     recordId: bigint
     metadata: unknown
   }) {
@@ -378,14 +383,14 @@ function CrmClientLoaded({
     await persistCustomFieldsToEav({
       organizationId,
       companyId: operatingCompanyId,
-      model: args.model,
+      model: crmCustomFieldModel[args.model],
       recordId: args.recordId,
       metadata: args.metadata,
     })
   }
 
   async function persistCrmCustomFieldsAfterCreate(args: {
-    model: "lead" | "contact" | "opportunity"
+    model: keyof typeof crmCustomFieldModel
     metadata: unknown
     queryPath: string
     matchField: string

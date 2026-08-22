@@ -316,17 +316,19 @@ export async function chooseFirstEnabledOption(page: Page, name: string) {
     })
     .toBeGreaterThan(0)
 
-  // Runtime select configs may prepend an enabled empty placeholder (`—`)
-  // rather than marking it disabled. Selecting that row leaves required
-  // partner/pricelist/UoM fields empty and makes the reducer reject an
-  // otherwise valid E2E form submission. Radix exposes the option value as
-  // `data-value`; native/select fallbacks use `value`.
+  // Runtime select configs may prepend an enabled empty placeholder (`—` or
+  // `Select...`) rather than marking it disabled. Radix options do not expose
+  // their value as a DOM attribute, so fall back to the accessible label when
+  // deciding whether an option is a real value.
   const options = listbox.getByRole("option", { disabled: false })
   const optionCount = await options.count()
   for (let index = 0; index < optionCount; index += 1) {
     const option = options.nth(index)
     const value = (await option.getAttribute("data-value")) ?? (await option.getAttribute("value"))
-    if (value?.trim() && !value.startsWith("__lumiere_empty__:")) {
+    const label = (await option.textContent())?.trim() ?? ""
+    const isPlaceholderLabel = /^(?:—|-|select(?:\.\.\.)?)$/i.test(label)
+    const hasConcreteValue = Boolean(value?.trim() && !value.startsWith("__lumiere_empty__:"))
+    if (hasConcreteValue || (label !== "" && !isPlaceholderLabel)) {
       await option.click()
       return
     }

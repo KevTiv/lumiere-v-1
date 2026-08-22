@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test"
+import { parseQueryListResponse } from "@lumiere/api-client"
 
 import {
   addCustomFormFieldViaSettings,
+  chooseFirstEnabledOption,
   deleteCustomFormFieldViaSettings,
   expectNoAppError,
   fetchLeadIdByName,
@@ -53,8 +55,11 @@ test.describe("Parity phase 2 — form config mutations", { tag: ["@p0", "@parit
 
     await openEntityCreate(page, "/crm", "crm", "leads", "new-lead")
     await fillField(page, "contactName", leadName)
+    await fillField(page, "last_name", "EAV")
     await fillField(page, "emailFrom", `${leadName}@example.test`)
     await fillField(page, "expectedRevenue", "250")
+    await chooseFirstEnabledOption(page, "lead_source")
+    await chooseFirstEnabledOption(page, "lead_status")
     // Custom fields use fieldId as the ModularForm name
     await fillField(page, fieldId, customValue)
 
@@ -75,14 +80,14 @@ test.describe("Parity phase 2 — form config mutations", { tag: ["@p0", "@parit
         async () => {
           const res = await page.request.get("/api/query/record-custom-field-values")
           if (!res.ok()) return false
-          const rows = (await res.json()) as Record<string, unknown>[]
+          const rows = parseQueryListResponse(await res.json())
           return rows.some((row) => {
             const model = String(row.model ?? "")
             const recordId = String(row.recordId ?? row.record_id ?? "")
             const key = String(row.fieldKey ?? row.field_key ?? "")
             const valueJson = String(row.valueJson ?? row.value_json ?? "")
             return (
-              model === "lead" &&
+              model === "crm_lead" &&
               recordId === String(leadId) &&
               key === fieldId &&
               valueJson.includes(customValue)

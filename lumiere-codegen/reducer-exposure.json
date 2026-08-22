@@ -2013,6 +2013,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "delete_record_custom_field_values",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "delete_hr_employee_document",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3476,6 +3481,11 @@
     },
     {
       "name": "set_form_role_config",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "set_record_custom_field_values",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },

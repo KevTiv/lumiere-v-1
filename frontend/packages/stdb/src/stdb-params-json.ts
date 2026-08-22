@@ -486,6 +486,7 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   create_form_configuration: "CreateFormConfigParams",
   publish_form_configuration: "PublishFormConfigurationParams",
   add_form_field: "CreateFormFieldParams",
+  set_record_custom_field_values: "SetRecordCustomFieldValuesParams",
   grant_permission: "GrantOrgPermissionParams",
   grant_field_permission: "GrantFieldPermissionParams",
   add_org_member: "AddOrgMemberParams",

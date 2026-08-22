@@ -1397,6 +1397,7 @@
     "referred_by",
     "description",
     "user_id",
+    "stage_id",
     "team_id",
     "partner_id",
     "date_deadline",

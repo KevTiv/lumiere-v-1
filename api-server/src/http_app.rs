@@ -627,6 +627,16 @@ mod tests {
             assert_eq!(contract.organization_position, Some(0), "{reducer}");
             assert_eq!(contract.company_position, None, "{reducer}");
         }
+
+        for reducer in [
+            "delete_record_custom_field_values",
+            "set_record_custom_field_values",
+        ] {
+            let contract = stdb_client::reducer_contract(reducer).expect(reducer);
+            assert_eq!(contract.exposure, Exposure::Session, "{reducer}");
+            assert_eq!(contract.organization_position, Some(0), "{reducer}");
+            assert_eq!(contract.company_position, Some(1), "{reducer}");
+        }
     }
 
     #[test]
