@@ -1624,7 +1624,9 @@
     ],
     "default_restricted": [
       "name",
-      "company_id"
+      "company_id",
+      "res_model",
+      "res_id"
     ],
     "mandatory": [
       "id",

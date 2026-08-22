@@ -54,6 +54,9 @@ test.describe("Inventory update/delete mutations", { tag: ["@p0", "@phase-2"] },
 
     await selectEntityRowByText(page, productName)
     await waitForEntityActionEnabled(page, "entity-action-edit-product")
+    // Selecting a row opens the product detail sheet. Close it before invoking
+    // the toolbar action; the sheet overlay otherwise intercepts the click.
+    await page.keyboard.press("Escape")
     await page.getByTestId("entity-action-edit-product").click()
     await expect(page.getByTestId("form-modal-edit-product")).toBeVisible()
     await fillField(page, "name", updatedName)

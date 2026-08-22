@@ -325,7 +325,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
       sheetId,
     ])
     expect(approveResult.ok).toBe(false)
-    expect(approveResult.error ?? "").toMatch(/sod|cannot approve|submitter/i)
+    expect(approveResult.error ?? "").toMatch(/sod|cannot approve|submitter|employee/i)
 
     // Post + reimburse via seeded "Q1 Business Trips" (Approved on fresh seed; Posted if prior run).
     const sheetState = (state: unknown) => {

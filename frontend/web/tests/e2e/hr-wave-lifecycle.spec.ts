@@ -424,7 +424,21 @@ test.describe("HR-008 employee → contract → payslip lifecycle @hr @p0", () =
       .toMatch(/Verify/i)
 
     await openHrTab(page, "payslips")
-    await expect(page.getByText(employeeName)).toBeVisible({ timeout: 45_000 })
+    // The payslip table exposes the payslip's own name and employee id; it does
+    // not join the employee table to render the employee display name.
+    const payslipRow = await page
+      .request
+      .get("/api/query/payslips")
+      .then(async (res) => {
+        if (!res.ok()) return null
+        const json = (await res.json()) as {
+          data?: Array<{ id?: unknown; name?: string }>
+        }
+        return (json.data ?? []).find((row) => scalarQueryId(row.id) === payslipId) ?? null
+      })
+    const payslipName = String(payslipRow?.name ?? "")
+    expect(payslipName).toBeTruthy()
+    await expect(page.getByText(payslipName, { exact: true })).toBeVisible({ timeout: 45_000 })
     await expectNoAppError(page)
   })
 })

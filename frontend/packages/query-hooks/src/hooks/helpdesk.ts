@@ -59,7 +59,8 @@ export function useHelpdeskTickets(organizationId: bigint, initialData?: Helpdes
   return useQuery({
     queryKey: helpdeskKeys(organizationId).tickets,
     queryFn: () => fetchQueryList('/api/query/helpdesk-tickets', 'Failed to fetch helpdesk tickets'),
-    staleTime: 30_000,
+    // An empty SSR response is an allowed fallback, not a cacheable result.
+    staleTime: initialData?.length ? 30_000 : 0,
     initialData,
   })
 }
@@ -68,7 +69,7 @@ export function useHelpdeskTeams(organizationId: bigint, initialData?: HelpdeskT
   return useQuery({
     queryKey: helpdeskKeys(organizationId).teams,
     queryFn: () => fetchQueryList('/api/query/helpdesk-teams', 'Failed to fetch helpdesk teams'),
-    staleTime: 30_000,
+    staleTime: initialData?.length ? 30_000 : 0,
     initialData,
   })
 }
@@ -77,7 +78,7 @@ export function useHelpdeskStages(organizationId: bigint, initialData?: Helpdesk
   return useQuery({
     queryKey: helpdeskKeys(organizationId).stages,
     queryFn: () => fetchQueryList('/api/query/helpdesk-stages', 'Failed to fetch helpdesk stages'),
-    staleTime: 30_000,
+    staleTime: initialData?.length ? 30_000 : 0,
     initialData,
   })
 }
@@ -86,7 +87,7 @@ export function useHelpdeskSlas(organizationId: bigint, initialData?: HelpdeskSl
   return useQuery({
     queryKey: helpdeskKeys(organizationId).slas,
     queryFn: () => fetchQueryList('/api/query/helpdesk-slas', 'Failed to fetch helpdesk SLAs'),
-    staleTime: 30_000,
+    staleTime: initialData?.length ? 30_000 : 0,
     initialData,
   })
 }

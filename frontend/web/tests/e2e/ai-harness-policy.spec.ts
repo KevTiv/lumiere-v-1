@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { expectNoAppError, gotoModule, signIn } from "./helpers"
+import { expectNoAppError, gotoModule, isAiGatewayAvailable, signIn } from "./helpers"
 
 /**
  * Phase 0 AI harness policy scenarios.
@@ -12,6 +12,12 @@ import { expectNoAppError, gotoModule, signIn } from "./helpers"
 test.describe("AI harness policy", { tag: "@p0" }, () => {
   test.beforeEach(async ({ page }) => {
     await signIn(page)
+    if (!(await isAiGatewayAvailable(page))) {
+      if (process.env.E2E_REQUIRE_AI === "1") {
+        throw new Error("E2E_REQUIRE_AI=1 but ai-gateway health check failed")
+      }
+      test.skip(true, "ai-gateway health check unavailable in this environment")
+    }
   })
 
   test("P3-AI-01: green report skill resolves scoped, masked summary with audit", async ({
