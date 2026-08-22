@@ -9,12 +9,16 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 import type {
   CreateHelpdeskSlaParams,
   CreateHelpdeskStageParams,
   CreateHelpdeskTeamParams,
   CreateTicketParams,
+  HelpdeskSla,
+  HelpdeskStage,
+  HelpdeskTeam,
+  HelpdeskTicket,
   UpdateTicketParams,
 } from "@lumiere/stdb/types"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
@@ -51,8 +55,8 @@ function invalidateAll(qc: ReturnType<typeof useQueryClient>, organizationId: bi
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
-export function useHelpdeskTickets(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useHelpdeskTickets(organizationId: bigint, initialData?: HelpdeskTicket[]) {
+  return useQuery({
     queryKey: helpdeskKeys(organizationId).tickets,
     queryFn: () => fetchQueryList('/api/query/helpdesk-tickets', 'Failed to fetch helpdesk tickets'),
     staleTime: 30_000,
@@ -60,8 +64,8 @@ export function useHelpdeskTickets(organizationId: bigint, initialData?: QueryRo
   })
 }
 
-export function useHelpdeskTeams(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useHelpdeskTeams(organizationId: bigint, initialData?: HelpdeskTeam[]) {
+  return useQuery({
     queryKey: helpdeskKeys(organizationId).teams,
     queryFn: () => fetchQueryList('/api/query/helpdesk-teams', 'Failed to fetch helpdesk teams'),
     staleTime: 30_000,
@@ -69,8 +73,8 @@ export function useHelpdeskTeams(organizationId: bigint, initialData?: QueryRows
   })
 }
 
-export function useHelpdeskStages(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useHelpdeskStages(organizationId: bigint, initialData?: HelpdeskStage[]) {
+  return useQuery({
     queryKey: helpdeskKeys(organizationId).stages,
     queryFn: () => fetchQueryList('/api/query/helpdesk-stages', 'Failed to fetch helpdesk stages'),
     staleTime: 30_000,
@@ -78,8 +82,8 @@ export function useHelpdeskStages(organizationId: bigint, initialData?: QueryRow
   })
 }
 
-export function useHelpdeskSlas(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useHelpdeskSlas(organizationId: bigint, initialData?: HelpdeskSla[]) {
+  return useQuery({
     queryKey: helpdeskKeys(organizationId).slas,
     queryFn: () => fetchQueryList('/api/query/helpdesk-slas', 'Failed to fetch helpdesk SLAs'),
     staleTime: 30_000,
@@ -252,4 +256,8 @@ export type {
   CreateHelpdeskTeamParams,
   CreateTicketParams,
   UpdateTicketParams,
+  HelpdeskSla,
+  HelpdeskStage,
+  HelpdeskTeam,
+  HelpdeskTicket,
 } from '@lumiere/stdb/types'

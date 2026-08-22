@@ -5,15 +5,16 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/stdb/stdb-params-json"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
-import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
+import type { FleetVehicle } from "@lumiere/stdb/types"
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 export function useFleetVehicles(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: FleetVehicle[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery({
     queryKey: ["fleet-vehicles", rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList("/api/query/fleet-vehicles", "Failed to fetch fleet vehicles"),
     staleTime: 30_000,

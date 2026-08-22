@@ -4,17 +4,17 @@
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
-import type { CreateCalendarEventParams } from '@lumiere/stdb/types'
+import type { CalendarEvent, CreateCalendarEventParams } from '@lumiere/stdb/types'
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
 export function useCalendarEvents(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: CalendarEvent[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery({
     queryKey: ['calendar-events', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/calendar-events', 'Failed to fetch calendar events'),
     staleTime: 30_000,
@@ -68,7 +68,7 @@ export function useDeleteCalendarEvent(organizationId: bigint) {
 }
 
 // ── Types (re-exported so client components import from one place) ────────────
-export type { CreateCalendarEventParams } from '@lumiere/stdb/types'
+export type { CreateCalendarEventParams, CalendarEvent } from '@lumiere/stdb/types'
 
 // Local type until callers finish moving to generated camelCase timestamp params.
 export interface UpdateCalendarEventParams {

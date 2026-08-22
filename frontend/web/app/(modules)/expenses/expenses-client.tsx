@@ -51,6 +51,8 @@ import {
   useExpensesCsvImportMutations,
   useExpenseMileageRates,
   useExpensePerDiemRates,
+  type HrExpense,
+  type HrExpenseSheet,
 } from "@lumiere/query-hooks/hooks/expenses"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { ExpensesCapturePanel } from "./expenses-capture-panel"
@@ -84,8 +86,8 @@ import {
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 interface ExpensesClientProps {
-  initialExpenses?: Record<string, unknown>[]
-  initialSheets?: Record<string, unknown>[]
+  initialExpenses?: HrExpense[]
+  initialSheets?: HrExpenseSheet[]
   initialPricelists?: ProductPricelist[]
   initialEmployees?: HrEmployee[]
   organizationId?: number

@@ -7,7 +7,7 @@ import { toCreateCalendarEventParams } from "@/lib/calendar-create-params"
 import { toCreateActivityParams } from "@/lib/crm-create-params"
 import { useTranslation } from "@lumiere/i18n"
 import { useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent } from "@lumiere/query-hooks/hooks/calendar"
-import type { UpdateCalendarEventParams } from "@lumiere/query-hooks/hooks/calendar"
+import type { UpdateCalendarEventParams, CalendarEvent as StdbCalendarEvent } from "@lumiere/query-hooks/hooks/calendar"
 import { useActivities, useCreateActivity } from "@lumiere/query-hooks/hooks/crm"
 import type { FormConfig, CalendarEvent as UICalendarEvent, ViewMode } from "@lumiere/ui"
 import { FormModal, ModuleView, newCalendarEventForm, newActivityForm, MissingOrganization } from "@lumiere/ui"
@@ -16,7 +16,7 @@ import { CalendarView } from "../../../../packages/ui/src/calendar-components/ca
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 interface CalendarClientProps {
-  initialEvents?: Record<string, unknown>[]
+  initialEvents?: StdbCalendarEvent[]
   organizationId?: number
 }
 

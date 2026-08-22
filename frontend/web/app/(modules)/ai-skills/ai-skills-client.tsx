@@ -419,8 +419,8 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           ) : (
             memberSkills.map((row) => {
               const assignmentId = Number(row.id)
-              const memberId = Number(row.teamMemberId ?? row.team_member_id)
-              const skillId = Number(row.skillId ?? row.skill_id)
+              const memberId = Number(row.teamMemberId)
+              const skillId = Number(row.skillId)
               return (
                 <div
                   key={String(row.id)}
@@ -433,7 +433,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       Assignment #{assignmentId}
-                      {row.isDefault === true || row.is_default === true ? " · default" : ""}
+                      {row.isDefault ? " · default" : ""}
                     </p>
                   </div>
                   <button

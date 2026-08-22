@@ -6,6 +6,7 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { apiFetch } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import type { AiAgent } from "@lumiere/stdb/types"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
@@ -24,7 +25,7 @@ export function useAiAgents(organizationId: number, enabled: boolean) {
     queryFn: async () => {
       const r = await apiFetch("/api/query/ai-agents")
       if (!r.ok) throw new Error(await parseCallError(r))
-      const j = (await r.json()) as { data?: Record<string, unknown>[] }
+      const j = (await r.json()) as { data?: AiAgent[] }
       return j.data ?? []
     },
     enabled: enabled && organizationId > 0,

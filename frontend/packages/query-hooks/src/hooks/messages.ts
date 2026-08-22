@@ -3,10 +3,10 @@
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
-import type { CreateInvoiceReminderBatchParams, CreateMessageBatchParams, CreateMessageTemplateParams, ReviewMessageBatchParams } from "@lumiere/stdb/types"
+import type { CreateInvoiceReminderBatchParams, CreateMessageBatchParams, CreateMessageTemplateParams, MailFollower, MailMessage, ReviewMessageBatchParams } from "@lumiere/stdb/types"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 import { useStdbQuery } from "./stdb"
 
 function toScalarU64(v: bigint | number | string): bigint {
@@ -27,9 +27,9 @@ export type PostMessageInput = {
 
 export function useMailMessages(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: MailMessage[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery({
     queryKey: ['mail-messages', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/mail-messages', 'Failed to fetch messages'),
     staleTime: 30_000,
@@ -120,9 +120,9 @@ export function usePostMessage(organizationId: bigint) {
 
 export function useMailFollowers(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: MailFollower[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery({
     queryKey: ['mail-followers', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/mail-followers', 'Failed to fetch followers'),
     staleTime: 30_000,
@@ -178,4 +178,4 @@ export function usePostInternalNote(organizationId: bigint) {
 }
 
 // ── Types (re-exported so client components import from one place) ────────────
-export type { PostMessageParams } from "@lumiere/stdb/types"
+export type { PostMessageParams, MailMessage, MailFollower } from "@lumiere/stdb/types"

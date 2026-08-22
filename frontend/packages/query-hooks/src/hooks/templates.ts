@@ -4,6 +4,7 @@
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { documentExportUrl, type DocumentExportFormat, type DocumentExportKind, type DocumentPdfKind } from "@lumiere/stdb/commands";
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import type { CreateDocumentTemplateParams, CreateMailTemplateParams } from "@lumiere/stdb/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch } from "../http"
@@ -60,7 +61,7 @@ export function useMailTemplates(organizationId: number, enabled = true) {
 export function useCreateDocumentTemplate(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
+    mutationFn: async (params: Partial<CreateDocumentTemplateParams>) => {
       const { urlPath, init } = stdbBffCommandPost("create_document_template", { companyId: null, params: stdbParamsToJson(params, "CreateDocumentTemplateParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
@@ -74,7 +75,7 @@ export function useCreateDocumentTemplate(organizationId: number) {
 export function useCreateMailTemplate(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
+    mutationFn: async (params: Partial<CreateMailTemplateParams>) => {
       const { urlPath, init } = stdbBffCommandPost("create_mail_template", { companyId: null, params: stdbParamsToJson(params, "CreateMailTemplateParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))

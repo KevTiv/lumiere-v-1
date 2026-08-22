@@ -3,10 +3,18 @@
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import type {
+  CreateExpenseAdvanceParams,
+  CreateExpenseCardStatementLineParams,
   CreateExpenseParams,
   CreateExpenseProjectRebillParams,
   CreateExpenseReimbursementParams,
   CreateExpenseSheetParams,
+  ExpenseCardStatementLine,
+  HrExpense,
+  HrExpenseAdvance,
+  HrExpensePolicyException,
+  HrExpenseReceipt,
+  HrExpenseSheet,
   PostExpenseSheetParams,
   RefuseExpenseSheetParams,
   SetExpenseAllocationsParams,
@@ -27,9 +35,9 @@ import {
 
 export function useExpenses(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: HrExpense[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery({
     queryKey: ['expenses', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/expenses', 'Failed to fetch expenses'),
     staleTime: 30_000,
@@ -39,9 +47,9 @@ export function useExpenses(
 
 export function useExpenseSheets(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: HrExpenseSheet[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery({
     queryKey: ['expense-sheets', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/expense-sheets', 'Failed to fetch expense sheets'),
     staleTime: 30_000,
@@ -80,9 +88,9 @@ export function useExpensesMissingReceipt(organizationId: bigint, initialData?: 
 /** Server-bounded: card statement lines with `status = unmatched`. */
 export function useExpenseCardStatementUnmatched(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ExpenseCardStatementLine[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery({
     queryKey: ['expense-card-statement-unmatched', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -96,8 +104,8 @@ export function useExpenseCardStatementUnmatched(
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
-export function useExpenseReceipts(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useExpenseReceipts(organizationId: bigint, initialData?: HrExpenseReceipt[]) {
+  return useQuery({
     queryKey: ['expense-receipts', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/expense-receipts', 'Failed to fetch expense receipts'),
@@ -107,8 +115,8 @@ export function useExpenseReceipts(organizationId: bigint, initialData?: QueryRo
 }
 
 /** Open / partially applied advances with residual. */
-export function useExpenseAdvances(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useExpenseAdvances(organizationId: bigint, initialData?: HrExpenseAdvance[]) {
+  return useQuery({
     queryKey: ['expense-advances', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/expense-advances', 'Failed to fetch expense advances'),
@@ -118,8 +126,8 @@ export function useExpenseAdvances(organizationId: bigint, initialData?: QueryRo
 }
 
 /** Pending policy exceptions queue. */
-export function useExpensePolicyExceptions(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useExpensePolicyExceptions(organizationId: bigint, initialData?: HrExpensePolicyException[]) {
+  return useQuery({
     queryKey: ['expense-policy-exceptions', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -660,7 +668,7 @@ export function useRejectExpensePolicyException(organizationId: bigint) {
 export function useCreateExpenseAdvance(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
+    mutationFn: async (params: Partial<CreateExpenseAdvanceParams>) => {
       const { urlPath, init } = stdbBffCommandPost("create_expense_advance", { params: stdbParamsToJson(
           { ...params, companyId: params.companyId ?? companyId },
           "CreateExpenseAdvanceParams",
@@ -711,7 +719,7 @@ export function useCreateExpenseCardStatementLine(
 ) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
+    mutationFn: async (params: Partial<CreateExpenseCardStatementLineParams>) => {
       const { urlPath, init } = stdbBffCommandPost("create_expense_card_statement_line", { params: stdbParamsToJson(
           { ...params, companyId: params.companyId ?? companyId },
           "CreateExpenseCardStatementLineParams",
@@ -826,4 +834,12 @@ export type {
   CreateExpenseReimbursementParams,
   CreateExpenseProjectRebillParams,
   SetExpenseAllocationsParams,
+  CreateExpenseAdvanceParams,
+  CreateExpenseCardStatementLineParams,
+  ExpenseCardStatementLine,
+  HrExpense,
+  HrExpenseAdvance,
+  HrExpensePolicyException,
+  HrExpenseReceipt,
+  HrExpenseSheet,
 } from '@lumiere/stdb/types'

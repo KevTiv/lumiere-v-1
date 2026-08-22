@@ -884,11 +884,11 @@ function DocumentsClientLoaded({
     } else if (action === "createDocumentTemplate") {
       const params = toCreateDocumentTemplateParams(formData)
       if (!params) throw new Error("Document template params incomplete")
-      await createDocumentTemplate.mutateAsync(params as unknown as Record<string, unknown>)
+      await createDocumentTemplate.mutateAsync(params)
     } else if (action === "createMailTemplate") {
       const params = toCreateMailTemplateParams(formData)
       if (!params) throw new Error("Mail template params incomplete")
-      await createMailTemplate.mutateAsync(params as unknown as Record<string, unknown>)
+      await createMailTemplate.mutateAsync(params)
     } else if (action === "createDocumentProcessingJob") {
       await createProcessingJob.mutateAsync(toCreateDocumentProcessingJobParams(formData))
     }
