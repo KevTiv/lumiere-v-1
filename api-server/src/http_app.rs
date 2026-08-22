@@ -30,7 +30,7 @@ use crate::routes;
 use crate::session::resolve_api_session;
 use crate::state::AppState;
 use crate::web_session::stdb_identity_hex_hint;
-use stdb_client::{Exposure, ReducerCall, ReducerContract, ScalarKind};
+use stdb_client::{Exposure, ReducerCall, ReducerContract};
 
 #[derive(Debug, Deserialize)]
 struct OrgQuery {
@@ -248,7 +248,7 @@ fn named_command_args(
                 contract.name, camel_name
             ))
         })?;
-        args.push(normalize_named_scalar(parameter.kind, value));
+        args.push(value);
     }
 
     if !fields.is_empty() {
@@ -261,39 +261,6 @@ fn named_command_args(
         )));
     }
     Ok(args)
-}
-
-/// The generated reducer contract describes top-level `Option<T>` arguments as
-/// scalar-or-null on the SpacetimeDB HTTP wire. Some older named-command
-/// callers still use SATS option objects (`{some: value}` / `{none: []}`),
-/// which are correct for fields nested inside composite params but are rejected
-/// for positional reducer arguments. Normalize only top-level optional scalars;
-/// composite params retain their generated nested encoding unchanged.
-fn normalize_named_scalar(kind: ScalarKind, value: Value) -> Value {
-    let optional = matches!(
-        kind,
-        ScalarKind::OptionalBool
-            | ScalarKind::OptionalFloat
-            | ScalarKind::OptionalSignedInteger
-            | ScalarKind::OptionalUnsignedInteger
-            | ScalarKind::OptionalString
-    );
-    if !optional {
-        return value;
-    }
-
-    let Some(object) = value.as_object() else {
-        return value;
-    };
-    if object.len() == 1 && object.contains_key("none") {
-        return Value::Null;
-    }
-    if object.len() == 1 {
-        if let Some(some) = object.get("some") {
-            return some.clone();
-        }
-    }
-    value
 }
 
 fn snake_to_lower_camel(name: &str) -> String {
@@ -703,7 +670,7 @@ mod tests {
     }
 
     #[test]
-    fn named_command_normalizes_top_level_sats_options_for_reducer_wire() {
+    fn named_command_preserves_sats_options_for_central_contract_normalization() {
         let contract = stdb_client::reducer_contract("create_workflow").expect("create_workflow");
         let args = named_command_args(
             contract,
@@ -715,7 +682,7 @@ mod tests {
         )
         .expect("valid named command");
         assert_eq!(args[0], json!(7));
-        assert_eq!(args[1], json!(42));
+        assert_eq!(args[1], json!({ "some": 42 }));
         // Composite fields must retain SATS option encoding for SpacetimeDB.
         assert_eq!(args[2]["metadata"], json!({ "none": [] }));
 
@@ -728,6 +695,6 @@ mod tests {
             7,
         )
         .expect("nullable named command");
-        assert_eq!(args[1], Value::Null);
+        assert_eq!(args[1], json!({ "none": [] }));
     }
 }

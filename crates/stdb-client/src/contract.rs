@@ -114,7 +114,7 @@ impl ReducerCall {
     pub fn from_name(name: &str, args: Value) -> Result<Self, ReducerContractError> {
         let contract = reducer_contract(name)
             .ok_or_else(|| ReducerContractError::UnknownReducer(name.to_owned()))?;
-        let args = args
+        let mut args = args
             .as_array()
             .cloned()
             .ok_or(ReducerContractError::ArgumentsNotArray {
@@ -127,15 +127,16 @@ impl ReducerCall {
                 actual: args.len(),
             });
         }
-        for (position, (value, param)) in args.iter().zip(contract.params).enumerate() {
-            if !param.kind.accepts(value) {
+        for (position, (value, param)) in args.iter_mut().zip(contract.params).enumerate() {
+            let Some(normalized) = param.kind.normalize_input(value) else {
                 return Err(ReducerContractError::WrongScalarKind {
                     reducer: contract.name,
                     position,
                     parameter: param.name,
                     expected: param.kind.description(),
                 });
-            }
+            };
+            *value = normalized;
         }
         Ok(Self { contract, args })
     }
@@ -154,6 +155,33 @@ impl ReducerCall {
 }
 
 impl ScalarKind {
+    fn normalize_input(self, value: &Value) -> Option<Value> {
+        if self.is_optional() {
+            if let Some(object) = value.as_object() {
+                if object.len() == 1 && object.contains_key("none") {
+                    return Some(Value::Null);
+                }
+                if object.len() == 1 {
+                    if let Some(inner) = object.get("some") {
+                        return self.accepts(inner).then(|| inner.clone());
+                    }
+                }
+            }
+        }
+        self.accepts(value).then(|| value.clone())
+    }
+
+    fn is_optional(self) -> bool {
+        matches!(
+            self,
+            Self::OptionalBool
+                | Self::OptionalFloat
+                | Self::OptionalSignedInteger
+                | Self::OptionalUnsignedInteger
+                | Self::OptionalString
+        )
+    }
+
     fn accepts(self, value: &Value) -> bool {
         match self {
             Self::Bool => value.is_boolean(),
@@ -224,6 +252,31 @@ mod tests {
         assert!(matches!(
             ReducerCall::from_name("create_lead", json!([1])),
             Err(ReducerContractError::WrongArity { .. })
+        ));
+    }
+
+    #[test]
+    fn normalizes_tagged_top_level_options_before_validation() {
+        let some = ReducerCall::from_name(
+            "create_workflow",
+            json!([7, { "some": 42 }, { "metadata": { "none": [] } }]),
+        )
+        .expect("tagged some");
+        assert_eq!(some.args()[1], json!(42));
+
+        let none = ReducerCall::from_name(
+            "create_workflow",
+            json!([7, { "none": [] }, { "metadata": { "none": [] } }]),
+        )
+        .expect("tagged none");
+        assert!(none.args()[1].is_null());
+
+        assert!(matches!(
+            ReducerCall::from_name(
+                "create_workflow",
+                json!([7, { "some": "wrong" }, { "metadata": { "none": [] } }])
+            ),
+            Err(ReducerContractError::WrongScalarKind { position: 1, .. })
         ));
     }
 }
