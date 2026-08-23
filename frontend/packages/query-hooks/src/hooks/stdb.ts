@@ -57,9 +57,48 @@ export function realtimeQueryKeysForResource(
     keys.push(['stdb', resource, organizationId])
   }
 
+  // HR hooks (`hooks/hr.ts`) deviate from the `[resource, org]` convention and
+  // use hand-rolled `hr-<resource>` query keys. Without this alias, realtime
+  // table updates (e.g. a payslip created/confirmed via a direct reducer call
+  // that bypasses the app's own mutation hooks) never reach `usePayslips` and
+  // similar HR reads — the row exists but silently never appears in the UI.
+  const hrAlias = HR_RESOURCE_QUERY_KEY_ALIASES[resource]
+  if (hrAlias) {
+    keys.push([hrAlias, orgString])
+  }
+
   // TODO(BFF Form Cleanup): add explicit aliases for bundle resources like
   // "auth" and "form-configuration" once their concrete query keys are settled.
   return keys
+}
+
+/** Maps `HR_WORKSPACE_RESOURCE_KEYS` resource names to the custom query key prefix used in `hooks/hr.ts`. */
+const HR_RESOURCE_QUERY_KEY_ALIASES: Record<string, string> = {
+  contracts: 'hr-contracts',
+  departments: 'hr-departments',
+  'employee-documents': 'hr-employee-documents',
+  'leave-requests': 'hr-leave-requests',
+  'leaves-to-approve': 'hr-leaves-to-approve',
+  'leave-types': 'hr-leave-types',
+  'onboarding-progress': 'hr-onboarding-progress',
+  'onboarding-template-items': 'hr-onboarding-template-items',
+  'onboarding-templates': 'hr-onboarding-templates',
+  'performance-cycles': 'hr-performance-cycles',
+  'performance-goals': 'hr-performance-goals',
+  'performance-reviews': 'hr-performance-reviews',
+  'benefit-plans': 'hr-benefit-plans',
+  'benefit-enrollments': 'hr-benefit-enrollments',
+  'payroll-structures': 'hr-payroll-structures',
+  payslips: 'hr-payslips',
+  'payslips-to-export': 'hr-payslips-to-export',
+  'salary-rules': 'hr-salary-rules',
+  attendance: 'hr-attendance',
+  'compensation-events': 'hr-compensation-events',
+  'work-schedules': 'hr-work-schedules',
+  'labor-cost-snapshots': 'hr-labor-cost-snapshots',
+  'shift-opt-jobs': 'hr-shift-opt-jobs',
+  'global-assignments': 'hr-global-assignments',
+  'hr-integration-intents': 'hr-integration-intents-pending',
 }
 
 /** Invalidate `useStdbQuery` caches for the given resource names (same `organizationId` as the query). */

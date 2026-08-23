@@ -882,6 +882,44 @@ pub async fn execute_resource_query_for_company(
             sort_rows_by_id_desc(&mut rows);
             return Ok(rows);
         }
+        // SpacetimeDB SQL cannot express a NULL/None comparison against an
+        // `Option<u64>` column: `IS NULL`/`IS NOT NULL` are rejected outright
+        // ("Unsupported expression"), and no literal (`NULL`, `'none'`, `0`,
+        // struct-literal syntax) parses as the sum type `(some: U64 | none:
+        // ())` either. The erp-org-sql extraWhere for these two resources
+        // used to include `AND timesheet_invoice_id IS NULL`, which SpacetimeDB
+        // always rejected with a 400 — build the WHERE clause without it and
+        // filter the None rows out here instead.
+        "timesheets-to-validate" | "timesheets-unbilled" => {
+            let reg = registry_get(resource).ok_or_else(|| {
+                ApiError::NotFound(format!("Unknown resource: \"{resource}\""))
+            })?;
+            let extra_where = if resource == "timesheets-to-validate" {
+                " AND validation_status = 'draft'"
+            } else {
+                " AND validation_status = 'validated' AND timesheet_invoice_type = 'billable'"
+            };
+            let sql = select_org_scoped_sql(
+                resource,
+                &reg.table,
+                organization_id,
+                fa,
+                extra_where,
+                "",
+            )
+            .map_err(ApiError::Internal)?;
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(|row| {
+                row_u64(row, "timesheetInvoiceId", "timesheet_invoice_id")
+                    .ok()
+                    .flatten()
+                    .is_none()
+            });
+            return Ok(rows);
+        }
         "queued-mail-messages" => {
             let sql = format!(
                 "SELECT id, organization_id, model, res_id, author_id, body, message_type, subtype, date, parent_id, attachment_ids, metadata FROM mail_message WHERE organization_id = {organization_id} AND message_type = 'Email'"

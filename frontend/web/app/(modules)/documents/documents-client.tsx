@@ -445,6 +445,16 @@ function DocumentsClientLoaded({
     () => ({
       ...moduleConfig,
       tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
+        if (tab.id === "documents" && tab.entityConfig) {
+          // No toolbar actions are wired for this tab, so `selectionToggleOnRowClick`
+          // (EntityTable) would otherwise default to false and a row click would
+          // never set `data-state="selected"` even though ModuleView always makes
+          // the row interactive. Force selection-on-click explicitly.
+          return {
+            ...tab,
+            entityConfig: withTableActions(tab.entityConfig, [], true),
+          }
+        }
         if (tab.id === "knowledge-base" && tab.entityConfig) {
           return {
             ...tab,

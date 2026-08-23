@@ -242,6 +242,14 @@ test.describe("PRO-007 proposal → publish → convert lifecycle @proposals @p0
       }, { timeout: 45_000 })
       .toBe(true)
 
+    // The setup above goes through the reducer BFF directly, bypassing the
+    // UI mutation hooks that call `invalidateQueries` on success — the
+    // proposals list query (plain `useQuery`, not subscription-aware) has a
+    // 30s staleTime and won't pick up the new row without a fresh fetch.
+    // Reload so the module remounts and refetches, matching the pattern in
+    // projects-wave-lifecycle.spec.ts.
+    await page.reload()
+    await gotoModule(page, "/proposals", "proposals")
     await page.getByTestId("module-tab-proposals-proposals").click()
     await selectEntityRowByText(page, proposalTitle)
     await expectNoAppError(page)

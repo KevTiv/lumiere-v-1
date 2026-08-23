@@ -10,7 +10,6 @@ import {
   fetchDefaultCompanyId,
   fetchDraftInvoiceMoveIdByPartner,
   fetchFirstPricelistId,
-  fetchFirstUomId,
   fetchFirstWarehouseId,
   fetchSalesInvoiceJournalLabel,
   fetchSessionOrganizationId,
@@ -190,13 +189,13 @@ async function createSaleTestContact(
  * order to be confirmed and invoiced on the "order" policy without fulfillment.
  * Falls back to the first available product if no service product is found.
  */
-async function fetchFirstServiceProductId(
+async function fetchFirstServiceProduct(
   page: Parameters<typeof callReducerBff>[0],
-): Promise<number> {
+): Promise<{ id: number; uomId: number }> {
   const res = await page.request.get("/api/query/products")
   if (!res.ok()) throw new Error(`products query failed: ${res.status()}`)
   const json = (await res.json()) as {
-    data?: Array<{ id?: unknown; type?: string; type_?: string }>
+    data?: Array<{ id?: unknown; type?: string; type_?: string; uomId?: unknown; uom_id?: unknown }>
   }
   const rows = json.data ?? []
   if (rows.length === 0) throw new Error("no products in seed data")
@@ -209,7 +208,12 @@ async function fetchFirstServiceProductId(
   const row = serviceRow ?? rows[0]
   const id = scalarQueryId(row?.id)
   if (id == null) throw new Error("product row missing id")
-  return id
+  // Use the product's own configured UoM — a mismatched UoM (e.g. the first
+  // UoM in seed data) can belong to a different UoM category with no
+  // conversion factor to the product's UoM, which fails at invoice time.
+  const uomId = scalarQueryId(row?.uomId ?? row?.uom_id)
+  if (uomId == null) throw new Error("product row missing uomId")
+  return { id, uomId }
 }
 
 /**
@@ -247,9 +251,8 @@ test.describe("SAL-004: Full SO → Invoice creation flow", { tag: "@p0" }, () =
       // ── Step 3: Resolve reference data ───────────────────────────────────────
       const pricelistId = await fetchFirstPricelistId(page)
       const warehouseId = await fetchFirstWarehouseId(page)
-      const uomId = await fetchFirstUomId(page)
       const currencyId = await fetchCurrencyIdByCode(page, "USD")
-      const productId = await fetchFirstServiceProductId(page)
+      const { id: productId, uomId } = await fetchFirstServiceProduct(page)
 
       // ── Step 4: Create sale order via BFF ────────────────────────────────────
       // invoice_policy = "order" makes lines billable immediately on confirm
