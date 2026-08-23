@@ -214,8 +214,16 @@ export function mergeRuntimeFormConfig(
       .filter((f): f is FormField => f != null),
   }))
 
+  // Only genuinely custom fields (`custom:` prefixed, added via the per-user custom
+  // field feature) belong in the "Additional fields" overflow section. System/default
+  // fields that failed to match a static field are legacy registry drift (the default
+  // form registry's field names have fallen out of sync with the static form configs
+  // that actually drive reducer submission) — surfacing them as brand-new *required*
+  // inputs blocks every submit, since they can never be filled in via the real form.
+  // See CLAUDE.md "Static fields remain the source of reducer field names; STDB drives
+  // visibility, labels, and custom fields" — custom fields only, not arbitrary system ones.
   const extraFields = runtime.fields
-    .filter((f) => f.isEnabled && !matchedStdbIds.has(f.fieldId))
+    .filter((f) => f.isEnabled && !matchedStdbIds.has(f.fieldId) && isCustomField(f.fieldId))
     .sort((a, b) => a.order - b.order)
     .map(parsedFieldToModularField)
 

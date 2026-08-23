@@ -3,7 +3,6 @@ import { parseQueryListResponse } from "@lumiere/api-client"
 
 import {
   addCustomFormFieldViaSettings,
-  chooseFirstEnabledOption,
   deleteCustomFormFieldViaSettings,
   expectNoAppError,
   fetchLeadIdByName,
@@ -55,11 +54,8 @@ test.describe("Parity phase 2 — form config mutations", { tag: ["@p0", "@parit
 
     await openEntityCreate(page, "/crm", "crm", "leads", "new-lead")
     await fillField(page, "contactName", leadName)
-    await fillField(page, "last_name", "EAV")
     await fillField(page, "emailFrom", `${leadName}@example.test`)
     await fillField(page, "expectedRevenue", "250")
-    await chooseFirstEnabledOption(page, "lead_source")
-    await chooseFirstEnabledOption(page, "lead_status")
     // Custom fields use fieldId as the ModularForm name
     await fillField(page, fieldId, customValue)
 

@@ -254,7 +254,8 @@ use crate::ai::skills::{
 use crate::workflow::calendar::activate_foundation_calendar_packs;
 use crate::workflow::definitions::{
     create_workflow, publish_workflow_version, upsert_workflow_edge, upsert_workflow_node,
-    workflow, workflow_version, ConditionFieldDefinition, ConditionValueType, CreateWorkflowParams,
+    workflow, workflow_version, ConditionComparison, ConditionFieldDefinition, ConditionInstruction,
+    ConditionProgram, ConditionValue, ConditionValueType, CreateWorkflowParams,
     UpsertWorkflowEdgeParams, UpsertWorkflowNodeParams, WorkflowActionReference,
     WorkflowBranchKind, WorkflowHumanTaskKind, WorkflowNodeKind, WorkflowTaskAssignment,
     WorkflowTaskPolicy, WorkflowTrigger, WorkflowVersionStatus,
@@ -295,6 +296,7 @@ fn seed_published_workflow(
     snapshot_fields: Vec<ConditionFieldDefinition>,
     action_key: &str,
     candidate_role_id: u64,
+    gate_condition: Option<ConditionProgram>,
 ) -> Result<u64, String> {
     create_workflow(
         ctx,
@@ -371,41 +373,79 @@ fn seed_published_workflow(
             },
         )?;
     }
-    for (index, edge_key, from, to, signal) in [
-        (0_u32, "start-approval", "start", "approval", None),
+    // When gated, "start" needs exactly one matching outgoing edge for every possible
+    // subject state: the conditional edge to "approval", plus a bypass edge straight to
+    // "action" with the negated condition — otherwise a non-matching state (e.g. Draft,
+    // when the gate only fires for ToApprove) leaves zero matching edges and the gate
+    // engine errors ("unsupported structured branching") instead of allowing direct
+    // execution.
+    let bypass_condition = gate_condition.clone().map(|mut program| {
+        program.instructions.push(ConditionInstruction::Not);
+        program
+    });
+    let mut edges = vec![
+        (
+            0_u32,
+            "start-approval".to_string(),
+            "start".to_string(),
+            "approval".to_string(),
+            None,
+            gate_condition.clone(),
+        ),
         (
             1_u32,
-            "approval-action",
-            "approval",
-            "action",
+            "approval-action".to_string(),
+            "approval".to_string(),
+            "action".to_string(),
             Some("approved"),
+            None,
         ),
         (
             2_u32,
-            "approval-rejected",
-            "approval",
-            "rejected",
+            "approval-rejected".to_string(),
+            "approval".to_string(),
+            "rejected".to_string(),
             Some("rejected"),
+            None,
         ),
-        (3_u32, "action-approved", "action", "approved", None),
-    ] {
+        (
+            3_u32,
+            "action-approved".to_string(),
+            "action".to_string(),
+            "approved".to_string(),
+            None,
+            None,
+        ),
+    ];
+    if let Some(bypass) = bypass_condition {
+        edges.push((
+            4_u32,
+            "start-action-bypass".to_string(),
+            "start".to_string(),
+            "action".to_string(),
+            None,
+            Some(bypass),
+        ));
+    }
+    let final_revision = edges.len() as u64 + 6;
+    for (index, edge_key, from, to, signal, condition) in edges {
         upsert_workflow_edge(
             ctx,
             organization_id,
             version.id,
             u64::from(index) + 6,
             UpsertWorkflowEdgeParams {
-                edge_key: edge_key.to_string(),
-                from_node_key: from.to_string(),
-                to_node_key: to.to_string(),
+                edge_key: edge_key.clone(),
+                from_node_key: from,
+                to_node_key: to,
                 sequence: index + 1,
                 signal_key: signal.map(str::to_string),
-                condition: None,
+                condition,
                 metadata: Some("{\"seed\":true}".to_string()),
             },
         )?;
     }
-    publish_workflow_version(ctx, organization_id, version.id, 10)?;
+    publish_workflow_version(ctx, organization_id, version.id, final_revision)?;
     Ok(workflow.id)
 }
 
@@ -8767,6 +8807,18 @@ Prioritize high-severity findings and cite related records."#,
         write_date: ctx.timestamp,
     });
 
+    // Only orders explicitly flagged `ToApprove` route through the human
+    // task; ordinary Draft/Sent confirmations (the entire e2e sales flow)
+    // proceed directly. An unconditioned edge here would gate every
+    // `confirm_sales_order` call in this org/company behind a human task
+    // that no test ever resolves.
+    let sales_gate_condition = ConditionProgram {
+        instructions: vec![
+            ConditionInstruction::LoadField("state".to_string()),
+            ConditionInstruction::PushValue(ConditionValue::Code("ToApprove".to_string())),
+            ConditionInstruction::Compare(ConditionComparison::Equal),
+        ],
+    };
     let sales_workflow_id = seed_published_workflow(
         ctx,
         org_id,
@@ -8775,9 +8827,26 @@ Prioritize high-severity findings and cite related records."#,
         "sale_order",
         "Seed Sales Approval",
         "Coverage workflow for sale orders",
-        Vec::new(),
+        vec![
+            ConditionFieldDefinition {
+                field_key: "amount_total".to_string(),
+                value_type: ConditionValueType::Money,
+                nullable: false,
+            },
+            ConditionFieldDefinition {
+                field_key: "max_discount_percent".to_string(),
+                value_type: ConditionValueType::Decimal,
+                nullable: false,
+            },
+            ConditionFieldDefinition {
+                field_key: "state".to_string(),
+                value_type: ConditionValueType::Code,
+                nullable: false,
+            },
+        ],
         "confirm_sales_order",
         owner_role.id,
+        Some(sales_gate_condition),
     )?;
     let sales_workflow_version = ctx
         .db
@@ -8839,6 +8908,7 @@ Prioritize high-severity findings and cite related records."#,
         ],
         "approve_ai_action_draft",
         owner_role.id,
+        None,
     )?;
 
     // ── 15.3 Reporting / knowledge / AI / fleet ──────────────────────────────

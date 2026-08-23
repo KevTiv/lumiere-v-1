@@ -314,21 +314,43 @@ async function fetchDefaultCompanyId(page: Page): Promise<number> {
   return id
 }
 
+async function fetchPaymentJournalId(page: Page): Promise<number> {
+  const res = await page.request.get("/api/query/account-journals")
+  if (!res.ok()) throw new Error(`account-journals query failed: ${res.status()}`)
+  const json = (await res.json()) as {
+    data?: Array<{ id?: unknown; type?: unknown; type_?: unknown }>
+  }
+  const row = (json.data ?? []).find((r) => {
+    const v = r.type_ ?? r.type
+    const tag =
+      v != null && typeof v === "object" && "tag" in (v as Record<string, unknown>)
+        ? String((v as { tag: string }).tag)
+        : String(v ?? "")
+    return ["bank", "cash", "check"].includes(tag.toLowerCase())
+  })
+  const id = scalarQueryId(row?.id)
+  if (id == null) throw new Error("no bank/cash/check journal found for payment")
+  return id
+}
+
 async function adminCreateDraftPayment(page: Page): Promise<number> {
   const companyId = await fetchDefaultCompanyId(page)
   const currencyId = await fetchCurrencyIdByCode(page, "USD")
   const partnerId = await fetchVendorPartnerIdByName(page, "Globex Corp")
+  const journalId = await fetchPaymentJournalId(page)
   const amount = 42.5
   await callReducerBff(page, "create_payment", [
     orgId,
     {
+      idempotencyKey: smokeName("perm-pay-idem"),
       companyId,
       paymentType: { tag: "OutBound" },
       partnerType: { tag: "Supplier" },
       partnerId,
       amount,
       currencyId,
-      journalId: 1,
+      date: { some: { microsSinceUnixEpoch: Date.now() * 1000 } },
+      journalId,
       ref: smokeName("perm-pay"),
     },
   ])
