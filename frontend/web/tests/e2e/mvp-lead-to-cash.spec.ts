@@ -266,9 +266,9 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await page.getByTestId("module-tab-accounting-payments").click()
     await page.getByTestId("module-create-accounting-payments").click()
     await expect(page.getByTestId("form-modal-new-account-payment")).toBeVisible()
-    await fillField(page, "partnerId", String(partnerId))
+    await chooseSelectOptionByValue(page, "partnerId", partnerId)
     await fillField(page, "amount", String(amountTotal))
-    await fillField(page, "currencyId", String(currencyId))
+    await chooseSelectOptionByValue(page, "currencyId", currencyId)
     await chooseFirstEnabledOption(page, "journalId")
     const [createPaymentRes] = await Promise.all([
       page.waitForResponse(

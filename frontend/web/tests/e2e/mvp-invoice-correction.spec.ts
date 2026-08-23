@@ -15,6 +15,7 @@ import {
   fillField,
   gotoModule,
   openEntityCreate,
+  openInvoiceDetailModalFromRecordSheet,
   postDraftCreditNoteMove,
   postDraftInvoiceViaUi,
   selectEntityRowById,
@@ -193,7 +194,7 @@ test.describe("MVP invoice correction", { tag: "@p0" }, () => {
     const invoiceRow = page.locator("table tbody tr").filter({ hasText: leadName }).first()
     await expect(invoiceRow).toBeVisible({ timeout: 30_000 })
     await invoiceRow.click()
-    await expect(page.getByTestId("invoice-detail-modal")).toBeVisible({ timeout: 15_000 })
+    await openInvoiceDetailModalFromRecordSheet(page)
     await page.getByTestId("invoice-detail-create-credit-note").click()
     await expect(page.getByTestId("form-modal-create-credit-note")).toBeVisible()
     await fillField(page, "reason", "E2E pricing correction")

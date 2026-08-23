@@ -1815,6 +1815,19 @@ export async function waitForMovePosted(page: Page, moveId: number): Promise<voi
     .toMatch(/post/)
 }
 
+/**
+ * Row clicks on the Invoices/Bills tabs open a generic record sheet, not the
+ * (legacy) InvoiceDetailModal directly. Open its "Actions" tab and click
+ * "Open document actions" to reach the modal.
+ */
+export async function openInvoiceDetailModalFromRecordSheet(page: Page): Promise<void> {
+  const sheet = page.locator('[data-slot="sheet-content"]')
+  await expect(sheet).toBeVisible({ timeout: 15_000 })
+  await sheet.getByRole("tab", { name: "Actions" }).click()
+  await sheet.getByRole("button", { name: "Open document actions" }).click()
+  await expect(page.getByTestId("invoice-detail-modal")).toBeVisible({ timeout: 15_000 })
+}
+
 /** Open invoice detail and post draft via accounting invoices tab. */
 export async function postDraftInvoiceViaUi(page: Page, partnerName: string): Promise<number> {
   const moveId = await fetchDraftInvoiceMoveIdByPartner(page, partnerName)
@@ -1824,7 +1837,7 @@ export async function postDraftInvoiceViaUi(page: Page, partnerName: string): Pr
   const invoiceRow = activeTabCustomTableRows(page).filter({ hasText: partnerName }).first()
   await expect(invoiceRow).toBeVisible({ timeout: 30_000 })
   await invoiceRow.click()
-  await expect(page.getByTestId("invoice-detail-modal")).toBeVisible({ timeout: 15_000 })
+  await openInvoiceDetailModalFromRecordSheet(page)
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
@@ -1848,7 +1861,7 @@ async function openDraftVendorBillModal(page: Page, vendorName: string): Promise
     .last()
   await expect(billRow).toBeVisible({ timeout: 30_000 })
   await billRow.click()
-  await expect(page.getByTestId("invoice-detail-modal")).toBeVisible({ timeout: 15_000 })
+  await openInvoiceDetailModalFromRecordSheet(page)
   await expect(page.getByTestId("invoice-detail-post-draft")).toBeVisible({ timeout: 15_000 })
 }
 
