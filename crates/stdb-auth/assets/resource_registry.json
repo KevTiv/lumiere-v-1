@@ -3251,7 +3251,12 @@
     ],
     "default_restricted": [
       "name",
-      "sequence"
+      "sequence",
+      "probability",
+      "fold",
+      "is_won",
+      "team_id",
+      "is_active"
     ],
     "mandatory": [
       "id",
@@ -4438,7 +4443,6 @@
       "purchase_order_line"
     ],
     "default_restricted": [
-      "order_id",
       "product_id",
       "product_qty",
       "price_unit",
@@ -4448,7 +4452,9 @@
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "company_id",
+      "order_id"
     ],
     "table": "purchase_order_line"
   },
@@ -4459,7 +4465,6 @@
       "purchase_order_line"
     ],
     "default_restricted": [
-      "order_id",
       "product_id",
       "product_qty",
       "price_unit",
@@ -4469,7 +4474,9 @@
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "company_id",
+      "order_id"
     ],
     "table": "purchase_order_line"
   },
@@ -5264,7 +5271,10 @@
       "company_id",
       "sale_id",
       "picking_code",
-      "is_return"
+      "is_return",
+      "picking_type_id",
+      "location_id",
+      "location_dest_id"
     ],
     "mandatory": [
       "id",

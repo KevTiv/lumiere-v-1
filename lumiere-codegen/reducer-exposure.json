@@ -4486,6 +4486,16 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "validate_stock_picking",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "validate_stock_picking_backorder",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "validate_timesheets",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"

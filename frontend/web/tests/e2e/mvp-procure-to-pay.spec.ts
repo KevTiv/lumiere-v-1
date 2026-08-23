@@ -116,6 +116,7 @@ async function createBillFromPo(page: import("@playwright/test").Page, orderId: 
   await chooseSelectOptionByLabel(page, "journalId", journalLabel)
   await chooseSelectOptionByLabel(page, "defaultExpenseAccountId", expenseLabel)
   await chooseSelectOptionByLabel(page, "payableAccountId", payableLabel)
+  await fillField(page, "invoiceDate", new Date().toISOString().slice(0, 10))
   const [billRes] = await Promise.all([
     page.waitForResponse(
       (res) =>

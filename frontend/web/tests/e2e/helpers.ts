@@ -234,12 +234,27 @@ export async function openSettingsSection(page: Page, sectionId: string) {
   await expectNoAppError(page)
 }
 
-/** Close dialog overlays opened by row clicks (e.g. CRM record chatter). */
+/**
+ * Close dialog/sheet overlays opened by row clicks (e.g. CRM record chatter or detail
+ * inspector). A single row click can stack more than one overlay (e.g. a tab's
+ * `recordSheet` plus a chatter dialog opened by the same click), and each only
+ * dismisses on its own focused Escape press — so press repeatedly until none remain.
+ */
 export async function dismissBlockingDialogs(page: Page) {
-  const overlay = page.locator('[data-slot="dialog-overlay"][data-open]')
+  const overlay = page.locator(
+    '[data-slot="dialog-overlay"][data-open], [data-slot="sheet-overlay"][data-open]',
+  )
   if ((await overlay.count()) === 0) return
-  await page.keyboard.press("Escape")
-  await expect(overlay).toHaveCount(0, { timeout: 5_000 })
+  await expect
+    .poll(
+      async () => {
+        if ((await overlay.count()) === 0) return true
+        await page.keyboard.press("Escape")
+        return (await overlay.count()) === 0
+      },
+      { timeout: 15_000 },
+    )
+    .toBe(true)
 }
 
 /** Wait for a BFF list query, then assert seeded fixture text is visible. */

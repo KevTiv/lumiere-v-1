@@ -173,6 +173,8 @@ impl ScalarKind {
 
     fn normalize_untagged_input(self, value: &Value) -> Option<Value> {
         match self {
+            Self::OptionalSignedInteger if value.is_null() => Some(Value::Null),
+            Self::OptionalUnsignedInteger if value.is_null() => Some(Value::Null),
             Self::SignedInteger | Self::OptionalSignedInteger => value
                 .as_i64()
                 .or_else(|| value.as_str()?.parse::<i64>().ok())

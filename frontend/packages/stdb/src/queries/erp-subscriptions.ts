@@ -491,7 +491,7 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       "sale_order",
       id,
       fa,
-      " AND state = 'ToApprove'",
+      " AND state = 'toApprove'",
     ),
   "sale-order-lines": (id, fa) =>
     selectOrgScopedSql("sale-order-lines", "sale_order_line", id, fa, ""),
@@ -1036,7 +1036,7 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       "purchase_order",
       id,
       fa,
-      " AND state = 'ToApprove'",
+      " AND state = 'toApprove'",
     ),
   "purchase-orders-partial-receipt": (id, fa) =>
     selectOrgScopedSql(
@@ -1645,7 +1645,7 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       "expense_sheet",
       id,
       fa,
-      " AND state = 'Submitted'",
+      " AND state = 'submitted'",
     ),
   "expenses-missing-receipt": (id, fa) =>
     selectOrgScopedSql(
@@ -1653,7 +1653,7 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       "hr_expense",
       id,
       fa,
-      " AND has_receipt = false AND state = 'Draft'",
+      " AND has_receipt = false AND state = 'draft'",
     ),
   "expense-receipts": (id, fa) =>
     selectOrgScopedSql("expense-receipts", "hr_expense_receipt", id, fa, ""),
@@ -1673,7 +1673,7 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       "hr_expense_policy_exception",
       id,
       fa,
-      " AND state = 'Pending'",
+      " AND state = 'pending'",
     ),
   "expense-mileage-rates": (id, fa) =>
     selectOrgScopedSql(
