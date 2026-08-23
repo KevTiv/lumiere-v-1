@@ -1744,7 +1744,8 @@
     "metadata"
   ],
   "CreateReturnOrderLineParams": [
-    "sale_order_line_id"
+    "sale_order_line_id",
+    "lot_id"
   ],
   "CreateReturnOrderParams": [
     "sale_order_id",

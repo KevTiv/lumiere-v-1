@@ -1244,6 +1244,7 @@
       "parent_id",
       "company_id",
       "is_vendor",
+      "is_customer",
       "supplier_rank"
     ],
     "mandatory": [
