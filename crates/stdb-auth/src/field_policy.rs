@@ -107,6 +107,18 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         "account-moves".to_string(),
         ["metadata"].into_iter().map(String::from).collect(),
     );
+    m.insert(
+        "dashboards".to_string(),
+        ["widget_ids"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
+        "purchase-orders".to_string(),
+        ["picking_ids"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
+        "sale-orders".to_string(),
+        ["picking_ids"].into_iter().map(String::from).collect(),
+    );
     m
 });
 

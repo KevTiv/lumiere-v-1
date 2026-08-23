@@ -1366,7 +1366,8 @@
       "name",
       "is_shared",
       "is_default",
-      "company_id"
+      "company_id",
+      "widget_ids"
     ],
     "mandatory": [
       "id",
@@ -2152,7 +2153,8 @@
     ],
     "default_restricted": [
       "name",
-      "sequence"
+      "sequence",
+      "team_id"
     ],
     "mandatory": [
       "id",
@@ -4490,7 +4492,8 @@
       "name",
       "state",
       "partner_id",
-      "company_id"
+      "company_id",
+      "picking_ids"
     ],
     "mandatory": [
       "id",

@@ -311,6 +311,15 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
     (): ModuleConfig => ({
       ...moduleConfig,
       tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
+        if (tab.id === "proposals" && tab.entityConfig) {
+          return {
+            ...tab,
+            entityConfig: proposalsTableConfig(t, {
+              formatProposalDisplayName: proposalPrimaryLabel,
+              actions: proposalRowActions,
+            }),
+          }
+        }
         return tab
       }),
     }),
