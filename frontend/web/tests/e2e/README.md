@@ -81,6 +81,22 @@ Note: `e2e-mvp-golden` passes `E2E_GREP="creates CRM"` only for `mvp-lead-to-cas
 
 That target starts local SpacetimeDB when needed, publishes the local module **without** wiping existing data by default (so repeat runs are faster and reflect real migration behavior), runs core reducer tests (continues if unavailable), runs **`seed_dev_data`** via `pnpm run e2e-seed-fixture`, then seeds the browser smoke user with `pnpm run seed-test-user`, starts `api-server`, and then installs the Playwright Chromium browser if needed and lets Playwright start Next.js.
 
+### Fast path by default
+
+`e2e-smoke-setup` and `e2e-single-test` now hash `spacetimedb/src` (+ `Cargo.toml`/`Cargo.lock`) and `api-server/src` + `crates/**` (+ their `Cargo.toml`/`Cargo.lock`) against a stamp from the last successful run (`.tmp/e2e/stdb.hash`, `.tmp/e2e/api.hash`). If nothing in the relevant tree changed since that stamp:
+
+- `spacetime publish`, the full `run_all_core_tests` + domain reducer loop, and `seed_dev_data`/`seed-test-user` are skipped — the existing local DB is reused as-is.
+- `cargo build -p api-server` and the kill/restart of the running api-server are skipped — the already-running process is reused.
+
+This means editing only frontend (`frontend/web`) code and re-running `make e2e-single E2E_SPEC=...` no longer pays for a Rust rebuild, a republish, or a fixture reseed — just the (fast, incremental) `next build` + Playwright run.
+
+Any of the following forces the full heavy path:
+
+- Touching `spacetimedb/src/**` (any `.rs` file) → forces republish + reducer tests + reseed.
+- Touching `api-server/src/**` or `crates/**` (any `.rs` file) → forces `cargo build` + api-server restart.
+- `E2E_CLEAR_DB=1` → always wipes + republishes + reseeds (existing behavior).
+- `E2E_FORCE_REBUILD=1` → forces both the STDB and api-server heavy paths regardless of hash, without wiping data.
+
 To force a clean database and full fixture re-seed (same as old behavior), set:
 
 ```bash

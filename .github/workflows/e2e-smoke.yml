@@ -35,6 +35,10 @@ env:
   STDB_HOST: http://127.0.0.1:3000
   E2E_WEB_PORT: "3100"
   E2E_API_PORT: "8082"
+  # Same pin as ci.yml's contracts-drift job — keeps the CLI version this
+  # suite publishes with identical to the one contracts drift validates
+  # against, and gives the cache step below a stable key.
+  SPACETIME_CLI_VERSION: "2.8.2"
 
 jobs:
   plan:
@@ -94,11 +98,29 @@ jobs:
           workspaces: |
             spacetimedb
             .
+          cache-on-failure: true
+
+      # The install unpacks a ~150MB binary bundle; cached by exact version,
+      # so this only actually downloads again when SPACETIME_CLI_VERSION
+      # changes. Mirrors ci.yml's contracts-drift job.
+      - name: Cache spacetime CLI
+        id: cache-spacetime
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/bin/spacetime
+            ~/.local/share/spacetime/bin
+          key: spacetime-cli-${{ env.SPACETIME_CLI_VERSION }}-${{ runner.os }}
 
       - name: Install SpacetimeDB CLI
+        if: steps.cache-spacetime.outputs.cache-hit != 'true'
         run: |
           curl -sSf https://install.spacetimedb.com | sh -s -- -y
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/spacetime" version install "$SPACETIME_CLI_VERSION"
+          "$HOME/.local/bin/spacetime" version use "$SPACETIME_CLI_VERSION"
+
+      - name: Add spacetime CLI to PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # pnpm resolves the @lumiere/contracts git-subdirectory dependency
       # over SSH — same read-only deploy key as ci.yml's frontend job.
@@ -136,6 +158,17 @@ jobs:
         run: |
           cargo fetch --locked
           make contracts-staging-from-pinned
+
+      # Caches the downloaded browser binary only (keyed on the pinned
+      # playwright version in the lockfile); system deps from --with-deps
+      # still install every run since apt state isn't persisted across
+      # runners, but that step is fast — the browser download is what's slow.
+      - name: Cache Playwright browsers
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
 
       - name: Install Playwright Chromium
         working-directory: frontend/web
