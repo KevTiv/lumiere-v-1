@@ -1,20 +1,68 @@
 # Agent IR and codegen extension plan
 
-**Status:** Proposed — contract-generation extension 2026-08-20
-**Tracks:** `application-contract-ir`, `codegen`, `capability-discovery`, `result-policy`, `analysis-shapes`, `model-hints`
-**Related:** [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md) · [agent-control-plane-model-routing-plan.md](./agent-control-plane-model-routing-plan.md) · [sliding-window-cold-tier.md](./sliding-window-cold-tier.md)
+**Status:** Proposed — contract-generation extension 2026-08-24
+**Tracks:** `application-contract-ir`, `codegen`, `capability-discovery`, `entity-discovery`, `generated-agent-tools`, `result-policy`, `analysis-shapes`, `provenance`, `model-hints`
+**Related:** [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md) · [agent-control-plane-model-routing-plan.md](./agent-control-plane-model-routing-plan.md) · [agent-generated-erp-tool-surface-plan.md](./agent-generated-erp-tool-surface-plan.md) · [sliding-window-cold-tier.md](./sliding-window-cold-tier.md)
 
 ---
 
 ## 1. Objective
 
-Extend application-contract IR/codegen so generated operations are efficient for both human clients and agent runtimes without turning IR into an orchestration language.
+Extend application-contract IR/codegen so generated operations are efficient for both human clients and reasoning-first agent runtimes without turning IR into an orchestration language.
 
-IR describes **what an operation is and how it may safely be consumed**. The Agent Control Plane decides **how to reason with operations, route models, plan, verify, remember, and delegate**.
+The target harness model is deliberately **tools + deterministic guardrails + runtime reasoning**, not a growing library of prescriptive procedural skills.
+
+IR describes:
+
+- **what operations and entities exist**;
+- **what they accept and return**;
+- **how entities are structurally related**;
+- **what risk, confirmation, traffic, idempotency, result-shaping, provenance, and analysis constraints apply**;
+- **which capabilities are semantically discoverable together**.
+
+The Agent Control Plane decides:
+
+- what the user is trying to accomplish;
+- which capabilities to inspect or use;
+- in what order to use them;
+- whether another observation is required;
+- when to replan;
+- which model/provider to use;
+- how to verify evidence and present the result.
+
+The application IR must never encode instructions such as `when asked X, call A then B then C`.
 
 ---
 
-## 2. Generated capability metadata
+## 2. Architectural boundary
+
+```text
+STDB / Rust domain truth
+        ↓
+application-contract IR
+        ↓
+@lumiere/contracts
+  ├── typed domain services
+  ├── React Query hooks/query keys/subscriptions
+  ├── capability/tool descriptors
+  ├── entity/domain descriptors
+  ├── compact discovery indexes
+  ├── JSON-schema-compatible input/output schemas
+  ├── bounded query contracts
+  ├── draft-action descriptors
+  ├── result/analysis/provenance metadata
+  └── abstract model-policy hints
+        ↓
+Agent Control Plane
+  UNDERSTAND → DISCOVER → PLAN → AUTHORIZE → EXECUTE
+  → OBSERVE → SHAPE → VERIFY → bounded REPLAN → PRESENT
+```
+
+The same generated operation boundary is consumed by frontend clients, offline clients, workflows, and agents. STDB remains the sole business-logic authority.
+
+---
+
+## 3. Generated capability metadata
 
 Evolve capability descriptors toward:
 
@@ -25,22 +73,81 @@ pub struct GeneratedCapabilityDescriptor {
     pub input: GeneratedTypeRef,
     pub output: GeneratedTypeRef,
     pub domain: DomainKey,
+    pub entities: Vec<EntityKey>,
     pub intents: Vec<IntentTag>,
+    pub keywords: Vec<String>,
+    pub kind: GeneratedToolKind,
     pub risk: GeneratedOperationRisk,
     pub confirmation: GeneratedConfirmationPolicy,
     pub traffic: GeneratedOperationTrafficPolicy,
+    pub idempotency: GeneratedIdempotencyPolicy,
     pub result_policy: GeneratedToolResultPolicy,
     pub analysis_shapes: Vec<GeneratedAnalysisShape>,
+    pub provenance: GeneratedProvenancePolicy,
+    pub related_capabilities: Vec<CapabilityKey>,
     pub model_hint: GeneratedModelPolicyHint,
     pub presentation: Option<GeneratedPresentationCapability>,
 }
+
+pub enum GeneratedToolKind {
+    Read,
+    Inspect,
+    Aggregate,
+    DraftAction,
+    ExecuteAction,
+}
 ```
 
-These fields are structural hints only. They do not grant access, choose a concrete model, assign roles, or encode business validation.
+These fields are structural metadata only. They do not grant access, choose a concrete model, assign roles, or encode business validation.
 
 ---
 
-## 3. Capability discovery index
+## 4. Entity and domain metadata
+
+Generate a compact structural graph from domain/schema/application metadata so an agent can inspect the ERP before deciding what to do.
+
+```rust
+pub struct GeneratedEntityDescriptor {
+    pub entity: EntityKey,
+    pub domain: DomainKey,
+    pub display_name: String,
+    pub keywords: Vec<String>,
+    pub relationships: Vec<GeneratedEntityRelationship>,
+    pub lifecycle: Option<GeneratedLifecycleDescriptor>,
+    pub primary_capabilities: Vec<CapabilityKey>,
+}
+
+pub struct GeneratedEntityRelationship {
+    pub relation: RelationshipKey,
+    pub target: EntityKey,
+    pub cardinality: RelationshipCardinality,
+    pub semantic: RelationshipSemantic,
+}
+```
+
+Representative metadata:
+
+```text
+sale_order
+  domain: sales
+  relationships:
+    customer -> partner
+    lines -> sale_order_line
+    invoices -> account_move
+    deliveries -> stock_picking
+  lifecycle:
+    draft -> confirmed -> delivered -> invoiced
+  primary_capabilities:
+    sales.order.get
+    sales.order.search
+    sales.order.lines.list
+```
+
+Lifecycle metadata describes valid structural states/transitions only when already represented by authoritative domain rules. It must not duplicate or replace reducer validation.
+
+---
+
+## 5. Capability discovery index
 
 Generate a compact discovery artifact separate from full tool schemas:
 
@@ -49,36 +156,172 @@ export interface CapabilityIndexEntry {
   operation: OperationName
   capability: CapabilityKey
   domain: DomainKey
+  entities: readonly EntityKey[]
   intents: readonly IntentTag[]
   keywords: readonly string[]
+  kind: ToolKind
   risk: OperationRisk
   reasoningHint: ReasoningClass
   resultPolicy: ToolResultPolicy
   compatibleAnalysisShapes: readonly AnalysisShape[]
+  relatedCapabilities: readonly CapabilityKey[]
 }
 ```
 
 Purpose:
 
 ```text
-hundreds of generated ERP operations
+hundreds/thousands of generated ERP operations
         ↓
-compact searchable index
+compact searchable capability + entity indexes
         ↓
-intent/domain/task filtering
+intent/domain/entity/task filtering
         ↓
 small Casbin-authorized candidate set
         ↓
 full schemas loaded only for selected tools
 ```
 
-This keeps model context small, especially for weaker/smaller models.
+This keeps model context small and allows the model to discover its own route instead of requiring a preselected skill.
 
 Generate deterministic stable names/tags where possible; descriptions/keywords may be explicit metadata rather than inferred from implementation names.
 
 ---
 
-## 4. Tool-result policy
+## 6. Generated introspection surface
+
+Generate deterministic read-only introspection contracts over the generated metadata itself:
+
+```text
+capabilities.search
+capabilities.describe
+entities.search
+entities.describe
+entities.relationships
+domains.list
+domains.describe
+```
+
+These are harness metadata operations, not ERP database queries.
+
+Representative behavior:
+
+```text
+User: why has order SO-481 not been invoiced?
+
+agent
+  ↓
+entities.search("sales order")
+  ↓
+entities.describe("sale_order")
+  ↓
+sees relationships to deliveries and invoices
+  ↓
+capabilities.search(domain="sales", entities=["sale_order"])
+  ↓
+loads only selected tool schemas
+```
+
+The discovery layer answers **what exists and how it connects**, not **what sequence must be followed**.
+
+---
+
+## 7. Bounded entity-query contracts
+
+Avoid generating one bespoke search tool for every possible filter combination while also avoiding raw SQL.
+
+For eligible read models/entities, codegen may produce bounded typed query contracts:
+
+```ts
+export interface EntityQuery<TFilter, TProjection, TOrderBy> {
+  filter?: TFilter
+  projection?: readonly TProjection[]
+  orderBy?: readonly TOrderBy[]
+  limit?: number
+  cursor?: string
+}
+```
+
+Generated metadata must constrain:
+
+- queryable entity/read model;
+- allowed filter fields/operators;
+- allowed projections;
+- ordering fields;
+- maximum rows/page size;
+- organization/company scope injection;
+- permission capability;
+- result policy;
+- aggregate compatibility.
+
+Example conceptual request:
+
+```text
+query entity=account_move
+filter partner_id=83 AND payment_state=not_paid
+projection id, invoice_date, amount_residual
+limit 50
+```
+
+The runtime must translate this through generated typed services/read models. It must not construct arbitrary model-provided SQL.
+
+---
+
+## 8. Generated action-draft exposure
+
+Mutation metadata should generate agent-facing **draft capabilities** where policy allows.
+
+A mutation-capable operation may expose:
+
+```text
+sales.order.create
+        ↓ generated agent adapter
+sales.order.create.draft
+```
+
+The model receives a typed draft operation, never generic reducer dispatch.
+
+The generated descriptor carries:
+
+```text
+CapabilityKey
+input schema
+risk
+confirmation policy
+permission resource/action
+idempotency semantics
+expected target/source version metadata when applicable
+diff/result presentation metadata
+correction/compensation reference when defined
+```
+
+Runtime path:
+
+```text
+model proposes typed draft
+        ↓
+plan + schema validation
+        ↓
+server-derived actor/org/company context
+        ↓
+Casbin + reducer allowlist + risk policy
+        ↓
+ActionDraft
+        ↓
+deterministic diff/preview
+        ↓
+human approval where required
+        ↓
+normal STDB reducer
+        ↓
+audit
+```
+
+Codegen must not make a risky reducer directly executable merely because it exists.
+
+---
+
+## 9. Tool-result policy
 
 Make result handling first-class:
 
@@ -117,7 +360,7 @@ Generated agent adapters must honor the policy instead of blindly serializing re
 
 ---
 
-## 5. Analysis-shape metadata
+## 10. Analysis-shape metadata
 
 Generate/declare which deterministic transformations make sense for an operation's output:
 
@@ -148,7 +391,37 @@ Codegen should preserve stable field references so the analysis DSL does not dep
 
 ---
 
-## 6. Model-policy hints
+## 11. Provenance metadata
+
+Make source provenance a generated/runtime-visible first-class contract.
+
+```ts
+export type ProvenanceKind =
+  | "erp_record"
+  | "erp_aggregate"
+  | "artifact"
+  | "user_input"
+  | "external_research"
+  | "model_generated"
+
+export interface ProvenanceDescriptor {
+  kind: ProvenanceKind
+  authoritative: boolean
+  sourceType?: EntityKey | ArtifactKind
+  versioned: boolean
+  correlationRequired: boolean
+}
+```
+
+Generated ERP operations should default to authoritative internal provenance. External-research and user/model content are explicitly separate trust classes in the runtime.
+
+Tool results and artifacts should preserve source entity/version, operation/correlation IDs, and shaping lineage where available.
+
+This metadata supports evidence verification and prompt-injection defenses without storing hidden model reasoning.
+
+---
+
+## 12. Model-policy hints
 
 IR may emit only abstract reasoning hints:
 
@@ -166,21 +439,13 @@ pub struct GeneratedModelPolicyHint {
 }
 ```
 
-Do **not** generate provider/model names such as Mistral/GLM/OpenAI model IDs.
+Do **not** generate provider/model names.
 
-Runtime deployment maps abstract classes to currently selected models:
-
-```text
-Fast → configured cheap model
-Standard → configured workhorse
-Deep → configured high-reasoning model
-```
-
-This keeps model churn outside contract versioning.
+Runtime deployment maps abstract classes to currently selected models.
 
 ---
 
-## 7. Skill-discovery metadata
+## 13. Skills become optional reviewed compositions
 
 IR may generate compatibility/discovery metadata useful to reviewed skills:
 
@@ -193,18 +458,19 @@ export interface CapabilitySkillMetadata {
 }
 ```
 
-IR must **not generate complete skills automatically**.
+IR must **not generate complete procedural skills automatically**.
 
-Skills remain reviewed compositions:
+Skills, when used, remain optional reviewed compositions over generated capabilities. The default general-purpose harness should be able to solve representative ERP tasks through capability/entity discovery and bounded reasoning without requiring a matching skill.
 
 ```text
-IR/codegen → capability primitives + discovery hints
-Skill registry → workflow/reasoning composition over those primitives
+IR/codegen → capability primitives + entity graph + discovery hints
+Control plane → reasoning/planning/tool loop
+Optional skill registry → reviewed reusable compositions
 ```
 
 ---
 
-## 8. Generated artifacts
+## 14. Generated artifacts
 
 Private generated package/crate should be able to publish:
 
@@ -213,9 +479,13 @@ Private generated package/crate should be able to publish:
   ├── services/hooks
   ├── full capability descriptors
   ├── compact capability index
+  ├── entity/domain descriptors + indexes
   ├── JSON schemas for selected tools
+  ├── bounded query schemas/adapters
+  ├── generated draft-action descriptors
   ├── result-policy metadata
   ├── analysis-shape metadata
+  ├── provenance metadata
   ├── model-policy hints
   └── stable artifact/presentation type refs
 ```
@@ -228,30 +498,37 @@ Suggested package entrypoints:
 @lumiere/contracts
 @lumiere/contracts/react-query
 @lumiere/contracts/agent
+@lumiere/contracts/agent/discovery
+@lumiere/contracts/agent/query
 @lumiere/contracts/analysis
 ```
 
 ---
 
-## 9. Codegen validation
+## 15. Codegen validation
 
 Add generation-time errors for unsafe/incomplete agent exposure.
 
 Examples:
 
 - agent-exposed operation missing `CapabilityKey`;
+- agent-visible operation missing domain/entity tags where applicable;
 - `aggregate-first` operation with no allowed analysis shape;
 - model-visible operation with unbounded opaque output;
-- mutation exposed without risk/confirmation metadata;
-- duplicate capability/operation identifiers;
+- mutation exposed without risk/confirmation/idempotency metadata;
+- draftable mutation missing input schema or permission mapping;
+- duplicate capability/operation/entity identifiers;
 - capability index references absent generated schema;
-- unsupported analysis shape for output field types.
+- relationship references unknown entity;
+- bounded query exposes unsupported filter/projection field;
+- unsupported analysis shape for output field types;
+- authoritative ERP result missing provenance contract.
 
 Generated metadata should fail closed rather than silently default to broad access/result exposure.
 
 ---
 
-## 10. Drift and compatibility
+## 16. Drift and compatibility
 
 Include new metadata in contract drift/version checks.
 
@@ -259,33 +536,64 @@ A change to any of these may be contract-significant:
 
 ```text
 CapabilityKey
+EntityKey / relationship key
 input/output schema
 operation risk
 confirmation semantics
+idempotency semantics
 result policy
+queryable/filterable/projectable fields
 analysis field compatibility
+provenance contract
 stable operation name
 ```
 
-Concrete model mappings, runtime token budgets, skill content, and provider endpoints are deployment/runtime configuration and should not trigger contract regeneration.
+Concrete model mappings, runtime token budgets, planning strategy, skill content, provider endpoints, and discovery ranking weights are deployment/runtime configuration and should not trigger contract regeneration.
 
 ---
 
-## 11. Representative proof
+## 17. Representative reasoning proofs
 
-Use one simple lookup and one analytical accounting capability.
-
-### Simple lookup
+### Proof A — simple lookup
 
 ```text
-operation: accounting.invoice.get
-result_policy: direct
-reasoning_hint: Fast
+objective: "show me invoice INV-22"
+
+DISCOVER
+→ capability index finds accounting.invoice.get
+
+PLAN
+→ one read call
+
+AUTHORIZE/EXECUTE
+→ Casbin + typed generated operation
+
+PRESENT
+→ direct bounded result
 ```
 
-Generated harness adapter can return the bounded typed result directly.
+### Proof B — cross-entity investigation without a predefined skill
 
-### Analytical operation
+```text
+objective: "why has order SO-481 not been invoiced?"
+
+DISCOVER
+→ entity sale_order
+→ relationships: deliveries + invoices
+→ relevant capabilities loaded
+
+PLAN/EXECUTE/OBSERVE
+→ get order
+→ inspect delivery state
+→ inspect linked invoices
+
+VERIFY
+→ conclusions reference returned ERP evidence
+```
+
+The test fails if the harness requires a bespoke `sales-order-not-invoiced` skill.
+
+### Proof C — analytical accounting task
 
 ```text
 operation: accounting.receivables.history
@@ -296,45 +604,83 @@ analysis_shapes:
   compare_periods
   top_n
   timeseries
-reasoning_hint: Standard
 ```
 
-Generated harness adapter returns a server-side dataset handle and analysis metadata, not the raw historical rows.
+Generated harness adapter returns a server-side dataset handle and analysis metadata, not raw historical rows.
+
+### Proof D — consequential action
+
+```text
+objective: "prepare a purchase order for the low-stock items"
+
+agent discovers inventory + purchase capabilities
+→ reads bounded stock evidence
+→ deterministically shapes candidate rows
+→ proposes purchasing.order.create.draft
+→ policy validates
+→ user receives diff/preview
+→ no ERP mutation before required approval
+```
 
 ---
 
-## 12. Phase IR-A0 — metadata model
+## 18. Phases
 
-- [ ] add `DomainKey` + `IntentTag` metadata for explicitly agent-discoverable operations;
+### Phase IR-A0 — capability + entity metadata model
+
+- [ ] add `DomainKey`, `EntityKey`, `IntentTag`, `ToolKind` metadata for explicitly agent-discoverable operations;
+- [ ] add structural entity relationships and lifecycle metadata where authoritative source exists;
 - [ ] add abstract `GeneratedModelPolicyHint`;
 - [ ] make `ToolResultPolicy` mandatory for agent-visible operations;
 - [ ] add allowed `AnalysisShape` metadata;
-- [ ] generate compact `CapabilityIndexEntry`;
+- [ ] add provenance contract metadata;
+- [ ] generate compact `CapabilityIndexEntry` and entity/domain indexes;
 - [ ] generate stable full schemas separately from compact discovery entries;
 - [ ] add generation-time validation/fail-closed errors.
 
-### Phase IR-A1 — package/runtime adapters
+### Phase IR-A1 — discovery + package/runtime adapters
 
-- [ ] emit agent/analysis package entrypoints;
-- [ ] generate capability-search index artifact;
+- [ ] emit agent/discovery/query/analysis package entrypoints;
+- [ ] generate capability/entity search index artifacts;
+- [ ] expose deterministic `capabilities.*`, `entities.*`, and `domains.*` introspection adapters;
 - [ ] generate result-policy enforcement adapters;
 - [ ] integrate stable field refs with `AnalysisPlan` validation;
+- [ ] preserve provenance through tool-result envelopes;
 - [ ] keep provider/model mapping outside generated output;
 - [ ] add drift tests for contract-significant agent metadata.
 
-### Phase IR-A2 — migration and proof
+### Phase IR-A2 — bounded read/query generation
 
-- [ ] annotate one lookup + one analytical accounting operation;
+- [ ] define safe filter/projection/order metadata for eligible read models;
+- [ ] generate bounded typed entity-query schemas;
+- [ ] enforce server-derived org/company scope independent of model input;
+- [ ] enforce maximum rows/result policy at generated/runtime boundary;
+- [ ] prove no generated query adapter can emit arbitrary SQL or arbitrary reducer dispatch.
+
+### Phase IR-A3 — generated action-draft contracts
+
+- [ ] classify draft-eligible mutations explicitly;
+- [ ] generate draft capability descriptors and input schemas;
+- [ ] bind risk/confirmation/permission/idempotency/correction metadata;
+- [ ] integrate with existing `AiActionDraft` + reducer allowlist path;
+- [ ] prove model cannot convert draft capability into direct reducer execution.
+
+### Phase IR-A4 — reasoning-first proof and migration
+
+- [ ] annotate representative sales, accounting, inventory, purchasing, and expense entities/capabilities;
 - [ ] prove discovery loads compact metadata first and full schema only after selection;
-- [ ] prove analytical result cannot bypass aggregate-first shaping through generated API;
+- [ ] prove cross-entity task completion without a bespoke procedural skill;
+- [ ] prove analytical result cannot bypass aggregate-first shaping;
 - [ ] prove Casbin still authorizes every selected capability at runtime;
-- [ ] measure tool-description/context reduction versus exposing the full registry.
+- [ ] measure tool-description/context reduction versus exposing the full registry;
+- [ ] add eval coverage comparing general reasoning + generated tools against any equivalent reviewed skill composition.
 
 ---
 
-## 13. Explicitly not part of IR
+## 19. Explicitly not part of IR
 
 - planner algorithms;
+- hard-coded task workflows (`A → B → C` instructions);
 - task recursion/replanning strategy;
 - actual model/provider selection;
 - token pricing/commercial quotas;
@@ -344,21 +690,28 @@ Generated harness adapter returns a server-side dataset handle and analysis meta
 - specialist sub-agent orchestration;
 - skill procedural content;
 - autonomous skill generation;
-- arbitrary sandboxed code execution.
+- arbitrary sandboxed code execution;
+- direct raw SQL generation;
+- generic reducer dispatch;
+- business rules duplicated from STDB reducers.
 
-These belong to the Agent Control Plane or dedicated runtime systems.
+These belong to the Agent Control Plane or authoritative ERP domain/runtime systems.
 
 ---
 
-## 14. Acceptance criteria
+## 20. Acceptance criteria
 
 The extension succeeds when:
 
-- codegen can produce a compact searchable capability catalog without loading all ERP tool schemas into model context;
-- every agent-visible operation has explicit result handling and risk metadata;
+- codegen produces a compact searchable capability **and entity** catalog without loading all ERP tool schemas into model context;
+- a general reasoning agent can discover entities, relationships, and relevant operations without a matching procedural skill;
+- every agent-visible operation has explicit result handling, provenance, risk, and scope-compatible metadata;
+- eligible read models expose bounded typed queries without granting arbitrary SQL authority;
+- eligible mutations expose generated draft contracts without granting generic reducer execution;
 - large analytical outputs are structurally forced toward dataset/aggregate-first handling;
 - analysis plans use stable generated type/field references;
 - model routing receives abstract hints without coupling contracts to concrete model providers;
-- generated packages remain useful to frontend clients without forcing agent-only payloads into ordinary bundles;
-- skills/control-plane logic can build on generated primitives without pushing orchestration behavior back into IR;
-- Casbin/STDB remain the permission/business authorities.
+- generated packages remain useful to frontend/offline clients without forcing agent-only payloads into ordinary bundles;
+- control-plane reasoning can build on generated primitives without pushing orchestration behavior back into IR;
+- Casbin/STDB remain the permission/business authorities;
+- adding a new properly annotated ERP operation updates human-client and agent contracts from the same IR/codegen source rather than requiring a handwritten AI tool implementation.
