@@ -44,10 +44,43 @@ mistake.
   `CRM_OPTIONAL_COMPANY_RESOURCES` branch already does
   `cid == null || cid === ids[0]` in JS after the rows arrive.
 
-**Still broken — not yet fixed (found via the systematic sweep, see below):**
-none currently known beyond the two above for this specific `IS NULL` pattern
-— the sweep's remaining failures are the enum-literal class (§2) and the
-`NOT IN` class (§3).
+**Update — the full 274-query sweep completed and reran clean** (via the
+Python-timeout harness described below, task `bxgyl71jo`, see
+`scratchpad/failures.txt`), confirming the `IS NULL` pattern itself is fully
+fixed (zero `IS NULL`/`IS NOT NULL` failures remain), but surfacing a
+**broader, previously-undocumented variant of the same underlying bug: plain
+`= <literal>` equality against an `Option<T>` column is ALSO rejected**, not
+just `IS NULL`/`IS NOT NULL`. This is distinct from §2 (enum literals) —
+these are `Option<U64>` and `Option<Identity>` columns being compared with a
+bare scalar literal, with no `some(...)`/unwrap syntax available at the SQL
+level:
+
+```
+Error: The literal expression `195` cannot be parsed as type `(some: U64 | none: ())`
+Error: The literal expression `c200261e19311455d03403179768a7489ab7bab5aa73f537f6ec7983079ca770`
+  cannot be parsed as type `(some: (__identity__: U256) | none: ())`
+```
+
+**Confirmed still broken, not yet fixed** (all in `erp-subscriptions.ts`,
+same "drop the SQL filter, post-filter in Rust" fix pattern applies):
+- `account_asset`, `account_fiscal_year`, `account_period`,
+  `consolidation_elimination_entry`, `consolidation_journal`,
+  `consolidation_account` — filter on `organization_id = <n>`, where
+  `organization_id` is `Option<U64>` on these tables (unlike most other
+  tables where it's a required column) — resources: whichever
+  `erp-subscriptions.ts` keys map to these tables (grep for
+  `account_asset`/`consolidation_` there to find the exact resource keys).
+- `ai_document_processing_job`, `ai_insight`, `res_partner_bank` — filter on
+  `company_id = <n>`, same `Option<U64>` issue.
+- `hr_employee` (two separate query variants) — filter on
+  `user_id = 0x<identity>`, where `user_id` is `Option<Identity>`.
+
+**Separately, a real schema/column bug** (not a dialect gap) was found in
+the same sweep: the query for `stock_landed_cost_lines` filters on
+`company_id`, but the engine returns `Error: company_id is not in scope` —
+meaning that column doesn't exist on this table/view as currently modeled.
+Needs its own fix (either drop the filter or confirm the correct column
+name) rather than the post-filter workaround.
 
 ### 2. Quoted string literal compared against an enum/sum-type column — always rejected, any casing
 
@@ -73,26 +106,40 @@ all**, in this SpacetimeDB version — this is the same class of engine gap as
 
 **Fixed this session** (via the same "drop SQL filter, add explicit Rust
 match arm with post-fetch `.retain()`" pattern as §1):
-- `purchase-orders-to-approve` (`state = 'toApprove'`)
-- `sale-orders-to-approve` (`state = 'toApprove'`)
+- `purchase-orders-to-approve` (`state = 'toApprove'`) — confirmed fixed:
+  `api-server/src/query_exec.rs` has a real match arm for this key.
 
-**Confirmed still broken** (found via the systematic sweep — same error
+**Correction (caught by the full-sweep rerun):** `sale-orders-to-approve`
+was NOT actually fixed despite an earlier version of this doc claiming it
+was — `query_exec.rs` has no match arm for it, only for
+`purchase-orders-to-approve`, and the sweep reproduces the exact same
+`state = 'toApprove'` rejection against `sale_order` (query #41 in the
+rerun). Treat it as still broken; see the confirmed list below.
+
+**Confirmed still broken** (re-verified via the full sweep rerun,
+`scratchpad/failures.txt`, queries #41/160/170/243/244/248 — same error
 shape, not yet fixed, needs the same treatment):
-- `leaves-to-approve` — `state = 'confirm'` / `'validatedOne'`
-  (`hr_leave.state`)
-- `payslips-to-export` — `state = 'verify'` (`hr_payslip.state`)
-- `expense-sheets-to-approve` — `state = 'submitted'`
-  (`expense_sheet.state`)
-- `expenses-missing-receipt` — `state = 'draft'` (`hr_expense.state`)
-- `expense-policy-exceptions` — likely affected (not yet individually
-  confirmed in the sweep output, but uses the same `state = '<literal>'`
-  pattern in `erp-subscriptions.ts`)
-- An AI-action-draft-status-shaped resource — `state = 'pending'` appeared in
-  the sweep; confirm which resource key this is (grep
-  `erp-subscriptions.ts` for `'pending'`) before fixing.
-- `inventory_exception` (`inventory-exceptions*` family) —
-  `state = 'open'` (+ `exception_type = '...'` combos), multiple resource
-  keys share this table.
+- `sale_order` — `state = 'toApprove'` (query #41; note only the
+  `purchase_order` variant, §above, was actually fixed this session — the
+  `sale_order` one was NOT, despite the earlier summary listing
+  `sale-orders-to-approve` as fixed. Re-check
+  `crates/stdb-auth/assets`/`api-server/src/query_exec.rs` before assuming
+  this one is done.)
+- `hr_leave` — `state = 'confirm'` OR `state = 'validatedOne'` (query #160,
+  `leaves-to-approve`)
+- `hr_payslip` — `state = 'verify'` (query #170, `payslips-to-export`)
+- `expense_sheet` — `state = 'submitted'` (query #243,
+  `expense-sheets-to-approve`)
+- `hr_expense` — `state = 'draft'` AND `has_receipt = false` (query #244,
+  `expenses-missing-receipt`)
+- `hr_expense_policy_exception` — `state = 'pending'` (query #248,
+  `expense-policy-exceptions`)
+
+Only these six were confirmed in the rerun. The earlier `inventory_exception`
+suspicion was NOT reproduced in this rerun's non-`ORDER BY` failures — either
+it was already fixed, doesn't use a literal-vs-enum comparison, or its query
+didn't appear as a distinct failure; re-check directly before assuming it's
+still broken.
 
 Each of these needs the same fix shape as `timesheets-to-validate` /
 `purchase-orders-to-approve`: remove the `state = '<literal>'` fragment from
@@ -108,19 +155,24 @@ out of the generic JSON `Value` row for the right helper to reuse or extend).
 
 ### 3. `NOT IN (...)` — rejected
 
-Found once in the sweep:
+Found once in the sweep, source confirmed:
 
 ```
+SELECT id, organization_id, employee_id, doc_type, attachment_id, purpose,
+       title, notes, active, company_id
+FROM hr_employee_document
+WHERE organization_id = 195 AND active = true
+  AND purpose NOT IN ('tax_id', 'identity')
+
 Error: Unsupported expression: purpose NOT IN ('tax_id', 'identity')
 ```
 
-Not yet investigated further — find the source resource
-(grep `erp-subscriptions.ts` for `NOT IN`), confirm whether `IN (...)`
-(positive form) works or is equally rejected, and whether the fix is
-"rewrite as `purpose != 'tax_id' AND purpose != 'identity'`" (if plain
-inequality against a non-enum string column works — likely, since this
-looks like a plain `String` column, not a sum type) or needs the same
-post-filter treatment.
+`purpose` is a plain `String` column (not a sum type), so unlike §2 this is
+purely a `NOT IN` grammar gap, not an enum-literal issue. Not yet fixed —
+still need to confirm whether `IN (...)` (positive form) works, and whether
+`purpose != 'tax_id' AND purpose != 'identity'` (plain inequality, which is
+very likely supported for a `String` column) is a viable rewrite before
+resorting to a Rust-side post-filter.
 
 ## Why this went undetected for so long
 
@@ -270,10 +322,31 @@ this e2e-stabilization pass.
 
 Full P0 suite: 55-56 passed / 4-5 failed, down from the original 24 failures
 at the start of this stabilization pass. The `company_id IS NULL` fix for
-`crmOptionalCompanyTables` and the `timesheets-to-validate` /
-`purchase-orders-to-approve` / `sale-orders-to-approve` enum-literal fixes
-are already committed. This doc's §2 list (leaves-to-approve,
-payslips-to-export, expense-sheets-to-approve, expenses-missing-receipt,
-expense-policy-exceptions, the `pending`-state resource, inventory
-exceptions) and §3 (`NOT IN`) are **not yet fixed** — that's the concrete
-next-session task.
+`crmOptionalCompanyTables` and the `timesheets-to-validate` enum/null-literal
+fixes are committed, and confirmed correct by a full rerun of the 274-query
+sweep (task `bxgyl71jo`, `scratchpad/failures.txt`) — zero `IS NULL`
+failures remain. That same rerun corrected an earlier claim in this doc:
+`sale-orders-to-approve` was never actually fixed (only
+`purchase-orders-to-approve` has a Rust post-filter arm) — don't trust the
+"fixed" label on any resource without checking `query_exec.rs` directly.
+
+**Confirmed still-broken, ready for the next session to fix one-for-one with
+the established pattern:**
+- §2 enum-literal class: `sale-orders-to-approve`, `leaves-to-approve`,
+  `payslips-to-export`, `expense-sheets-to-approve`,
+  `expenses-missing-receipt`, `expense-policy-exceptions` (six resources,
+  down from the earlier "~10, some unconfirmed" estimate — this list is now
+  exact, not a guess).
+- New class found in the rerun (not in the original doc): plain `=` equality
+  against `Option<u64>`/`Option<Identity>` columns, affecting
+  `account_asset`, `account_fiscal_year`, `account_period`,
+  `consolidation_elimination_entry`, `consolidation_journal`,
+  `consolidation_account`, `ai_document_processing_job`, `ai_insight`,
+  `res_partner_bank`, and both `hr_employee` query variants.
+- §3 `NOT IN`: one confirmed instance, `hr_employee_document`.
+- One unrelated schema bug: `stock_landed_cost_lines` references a
+  `company_id` column that doesn't exist in scope.
+
+The `inventory_exception` suspicion from the original draft did not
+reproduce in this rerun and should be dropped from the list unless
+independently re-confirmed.
