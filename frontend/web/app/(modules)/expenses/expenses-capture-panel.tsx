@@ -130,7 +130,7 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
 
   const buildPayload = (): ExpenseCapturePayload | null => {
     const pl = pricelists.find((p) => String(p.id) === pricelistId)
-    const currencyId = pl?.currencyId ?? pl?.currency_id
+    const currencyId = pl?.currencyId
     if (!employeeId || !currencyId || !name.trim()) return null
     if (lineKind === "Mileage" && (!mileageDistance || !mileageRateId)) return null
     if (lineKind === "PerDiem" && (!perDiemDays || !perDiemRateId)) return null

@@ -1,4 +1,3 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
 
 import type { ReducerCommandContractMeta } from "./types";
 
@@ -36,20 +35,6 @@ const HELPDESK_RESOURCE_KEYS = [
 export function helpdeskBffCallUrl(reducer: HelpdeskBffReducerKey): string {
   const base = `/api/call/${reducer}`;
   return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
-
-export function helpdeskBffPost(
-  reducer: HelpdeskBffReducerKey,
-  args: unknown[],
-): { urlPath: string; init: RequestInit } {
-  return {
-    urlPath: helpdeskBffCallUrl(reducer),
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
-    },
-  };
 }
 
 const HELPDESK_HINT_OVERRIDES: Partial<

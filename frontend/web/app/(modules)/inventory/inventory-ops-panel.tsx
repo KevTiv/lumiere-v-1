@@ -100,33 +100,29 @@ export function InventoryOpsPanel({
       for (const item of queued) {
         try {
           await createSync.mutateAsync({
-            warehouseId: item.warehouseId,
+            warehouseId: BigInt(item.warehouseId),
             opType: item.opType,
             idempotencyKey: item.idempotencyKey,
             deviceId: item.deviceId,
             payload: JSON.stringify(item.payload),
+            metadata: undefined,
           })
           const pending = pendingSync.data ?? []
           let intent = pending.find(
-            (r) =>
-              String(r.idempotencyKey ?? r.idempotency_key) ===
-              item.idempotencyKey,
+            (r) => String(r.idempotencyKey) === item.idempotencyKey,
           )
           if (!intent) {
             await pendingSync.refetch()
             intent = (pendingSync.data ?? []).find(
-              (r) =>
-                String(r.idempotencyKey ?? r.idempotency_key) ===
-                item.idempotencyKey,
+              (r) => String(r.idempotencyKey) === item.idempotencyKey,
             )
           }
           // Apply all currently pending intents for this device after create.
           const afterCreate = await pendingSync.refetch()
           const toApply = (afterCreate.data ?? []).filter(
             (r) =>
-              String(r.deviceId ?? r.device_id ?? '') === deviceId ||
-              String(r.idempotencyKey ?? r.idempotency_key) ===
-                item.idempotencyKey,
+              String(r.deviceId ?? '') === deviceId ||
+              String(r.idempotencyKey) === item.idempotencyKey,
           )
           for (const r of toApply) {
             await applySync.mutateAsync(rowId(r))
@@ -176,7 +172,7 @@ export function InventoryOpsPanel({
             onClick={async () => {
               try {
                 setActionError(null)
-                await refresh.mutateAsync({ upsertOnly: false })
+                await refresh.mutateAsync({ upsertOnly: false, metadata: undefined })
               } catch (e) {
                 setActionError(e instanceof Error ? e.message : String(e))
               }
@@ -218,10 +214,10 @@ export function InventoryOpsPanel({
                         {String(row.summary ?? '—')}
                       </td>
                       <td className="px-3 py-2">
-                        {String(row.productId ?? row.product_id ?? '—')}
+                        {String(row.productId ?? '—')}
                       </td>
                       <td className="px-3 py-2">
-                        {String(row.exceptionType ?? row.exception_type ?? '—')}
+                        {String(row.exceptionType ?? '—')}
                       </td>
                       <td className="px-3 py-2">
                         <Button
@@ -296,10 +292,10 @@ export function InventoryOpsPanel({
                   return (
                     <tr key={id} className="border-b last:border-0">
                       <td className="px-3 py-2 font-mono text-xs">
-                        {String(row.idempotencyKey ?? row.idempotency_key ?? '—')}
+                        {String(row.idempotencyKey ?? '—')}
                       </td>
                       <td className="px-3 py-2">
-                        {String(row.opType ?? row.op_type ?? '—')}
+                        {String(row.opType ?? '—')}
                       </td>
                       <td className="px-3 py-2">
                         {String(row.status ?? '—')}

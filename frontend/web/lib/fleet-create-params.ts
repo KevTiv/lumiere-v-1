@@ -2,6 +2,7 @@
 
 import type {
   CreateFleetVehicleParams,
+  CreateFleetVehicleServiceTypeParams,
 } from "@lumiere/stdb/types"
 
 import {
@@ -35,7 +36,20 @@ export function toCreateFleetVehicleParams(
     vehicleType,
     licensePlate: optionalTrimmedString(field(formData, "licensePlate", "license_plate")),
     driverName: optionalTrimmedString(field(formData, "driverName", "driver_name")),
+    driverId: optionalBigIntU64(field(formData, "driverId", "driver_id")),
+    serviceTypeId: optionalBigIntU64(field(formData, "serviceTypeId", "service_type_id")),
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
   }
 }
 
+export function toCreateFleetVehicleServiceTypeParams(
+  formData: Record<string, unknown>,
+): CreateFleetVehicleServiceTypeParams | null {
+  const name = optionalTrimmedString(field(formData, "name", "name"))
+  if (!name) return null
+
+  return {
+    name,
+    companyId: optionalBigIntU64(field(formData, "companyId", "company_id")),
+  }
+}

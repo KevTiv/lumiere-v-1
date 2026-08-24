@@ -1,4 +1,3 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
 
 import type { ReducerCommandContractMeta } from "./types";
 
@@ -26,20 +25,6 @@ export function aiActionDraftsBffCallUrl(
 ): string {
   const base = `/api/call/${reducer}`;
   return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
-
-export function aiActionDraftsBffPost(
-  reducer: AiActionDraftsBffReducerKey,
-  args: unknown[],
-): { urlPath: string; init: RequestInit } {
-  return {
-    urlPath: aiActionDraftsBffCallUrl(reducer),
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
-    },
-  };
 }
 
 export const AI_ACTION_DRAFTS_COMMAND_SUBSCRIPTION_HINTS: Record<

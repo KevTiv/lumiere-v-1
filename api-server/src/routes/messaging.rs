@@ -134,7 +134,10 @@ async fn message_templates_post(
     let params = message_template_create_params(&body)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("create_message_template", json!([org_id, params]))
+        .call_reducer(stdb_client::reducer_call!(
+            "create_message_template",
+            json!([org_id, params])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok((
@@ -156,7 +159,10 @@ async fn message_template_put(
     let org_id = require_org(&session)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("update_message_template", json!([org_id, id, body]))
+        .call_reducer(stdb_client::reducer_call!(
+            "update_message_template",
+            json!([org_id, id, body])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(
@@ -226,7 +232,10 @@ async fn operational_messages_post(
     let params = operational_message_create_params(&body)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("create_operational_message", json!([org_id, params]))
+        .call_reducer(stdb_client::reducer_call!(
+            "create_operational_message",
+            json!([org_id, params])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok((
@@ -247,7 +256,10 @@ async fn operational_message_copied(
     let org_id = require_org(&session)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("record_message_copied", json!([org_id, id]))
+        .call_reducer(stdb_client::reducer_call!(
+            "record_message_copied",
+            json!([org_id, id])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(
@@ -304,7 +316,10 @@ async fn message_batches_post(
     });
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("create_message_batch", json!([org_id, params]))
+        .call_reducer(stdb_client::reducer_call!(
+            "create_message_batch",
+            json!([org_id, params])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok((
@@ -326,7 +341,10 @@ async fn message_batch_review(
     let org_id = require_org(&session)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("review_message_batch", json!([org_id, id, body]))
+        .call_reducer(stdb_client::reducer_call!(
+            "review_message_batch",
+            json!([org_id, id, body])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(
@@ -346,7 +364,10 @@ async fn message_batch_cancel(
     let org_id = require_org(&session)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("cancel_message_batch", json!([org_id, id]))
+        .call_reducer(stdb_client::reducer_call!(
+            "cancel_message_batch",
+            json!([org_id, id])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(
@@ -399,7 +420,7 @@ async fn contact_preferences_put(
         .ok_or_else(|| ApiError::BadRequest("missing opted_in".into()))?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "set_contact_communication_preference",
             json!([
                 org_id,
@@ -408,7 +429,7 @@ async fn contact_preferences_put(
                 to_unit_enum(channel)?,
                 opted_in
             ]),
-        )
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(

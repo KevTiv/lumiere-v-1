@@ -17,6 +17,7 @@ import {
 } from "@lumiere/ui"
 import type { ManufacturingCsvImportKind } from "@lumiere/ui"
 import type { EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { Product, Warehouse, StockPicking, StockQuant } from "@lumiere/stdb/types"
 import { manufacturingModuleConfig } from "@/lib/module-dashboard-configs"
 import { useManufacturingModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -28,6 +29,14 @@ import {
   useMrpRoutingWorkcenters,
   useQualityChecks,
   useManufacturingMutations,
+} from "@lumiere/query-hooks/hooks/manufacturing"
+import type {
+  MrpBom,
+  MrpBomLine,
+  MrpProduction,
+  MrpRoutingWorkcenter,
+  MrpWorkcenter,
+  MrpWorkorder,
 } from "@lumiere/query-hooks/hooks/manufacturing"
 import { ManufacturingRowDialog } from "./manufacturing-row-dialog"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -45,6 +54,7 @@ import {
   useWarehouses,
 } from "@lumiere/query-hooks/hooks/inventory"
 import { useIotDevices } from "@lumiere/query-hooks/hooks/iot"
+import type { IoTDevice } from "@lumiere/query-hooks/hooks/iot"
 import {
   productRowsToSelectOptions,
   warehouseRowsToSelectOptions,
@@ -54,17 +64,17 @@ import {
 } from "@/lib/form-lookup"
 
 interface ManufacturingClientProps {
-  initialProductions?: Record<string, unknown>[]
-  initialBoms?: Record<string, unknown>[]
-  initialBomLines?: Record<string, unknown>[]
-  initialWorkorders?: Record<string, unknown>[]
-  initialWorkcenters?: Record<string, unknown>[]
-  initialRoutingOperations?: Record<string, unknown>[]
-  initialIotDevices?: Record<string, unknown>[]
-  initialProducts?: Record<string, unknown>[]
-  initialWarehouses?: Record<string, unknown>[]
-  initialStockPickings?: Record<string, unknown>[]
-  initialStockQuants?: Record<string, unknown>[]
+  initialProductions?: MrpProduction[]
+  initialBoms?: MrpBom[]
+  initialBomLines?: MrpBomLine[]
+  initialWorkorders?: MrpWorkorder[]
+  initialWorkcenters?: MrpWorkcenter[]
+  initialRoutingOperations?: MrpRoutingWorkcenter[]
+  initialIotDevices?: IoTDevice[]
+  initialProducts?: Product[]
+  initialWarehouses?: Warehouse[]
+  initialStockPickings?: StockPicking[]
+  initialStockQuants?: StockQuant[]
   organizationId?: number
 }
 
@@ -207,8 +217,12 @@ function ManufacturingClientLoaded({
           return product != null ? String(product.name ?? p.productId) : String(p.productId ?? "—")
         })(),
         workcenterName: (() => {
-          const workcenter = workcenters.find((wc) => String(wc.id) === String(p.workcenterId))
-          return workcenter != null ? String(workcenter.name ?? p.workcenterId) : undefined
+          // Pre-existing bug: MrpProduction has no `workcenterId` field (only workorders
+          // do); this lookup has always resolved to `undefined`. Cast preserves that
+          // behavior — flagged for a follow-up to fix the actual enrichment logic.
+          const pWorkcenterId = (p as Record<string, unknown>).workcenterId
+          const workcenter = workcenters.find((wc) => String(wc.id) === String(pWorkcenterId))
+          return workcenter != null ? String(workcenter.name ?? pWorkcenterId) : undefined
         })(),
       })) as Record<string, unknown>[],
     [productions, products, workcenters],
@@ -224,8 +238,12 @@ function ManufacturingClientLoaded({
         })(),
         productionRef: (() => {
           const production = productions.find((p) => String(p.id) === String(wo.productionId))
+          // Pre-existing bug: MrpProduction has no `name` field, so this has always
+          // fallen through to the `MO-<id suffix>` form. Cast preserves that behavior —
+          // flagged for a follow-up to fix the actual enrichment logic.
+          const productionName = (production as Record<string, unknown> | undefined)?.name
           return production != null
-            ? String(production.name ?? `MO-${String(production.id).slice(-6)}`)
+            ? String(productionName ?? `MO-${String(production.id).slice(-6)}`)
             : String(wo.productionId ?? "—")
         })(),
       })) as Record<string, unknown>[],

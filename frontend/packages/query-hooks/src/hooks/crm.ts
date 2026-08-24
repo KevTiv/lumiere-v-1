@@ -1,5 +1,6 @@
 "use client"
 
+
 /**
  * CRM hooks — Phase 4 of API Gateway Refactor
  *
@@ -12,8 +13,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, coalesceQueryInitialData, rqBigIntKey, type QueryRows } from "../http"
 import { invalidateResourceQueries, useSubscriptionAwareQuery } from "../subscription-query"
-import { crmBffPost } from "@lumiere/stdb/commands"
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import type {
+  Activity,
+  Contact,
+  ContactTag,
+  ContactSegment,
+  Lead,
+  Opportunity,
+  OpportunityStage,
   ConvertLeadParams,
   ConvertOpportunityParams,
   CreateActivityParams,
@@ -96,14 +104,14 @@ type OpportunityPatch<P> = {
 
 export function useLeads(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: Lead[],
 ) {
   return useSubscriptionAwareQuery('leads', organizationId, { initialData })
 }
 
 export function useOpportunities(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: Opportunity[],
 ) {
   return useSubscriptionAwareQuery('opportunities', organizationId, { initialData })
 }
@@ -123,7 +131,7 @@ export function useOpportunityLines(
 
 export function useOpportunityStages(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: OpportunityStage[],
 ) {
   return useSubscriptionAwareQuery('opportunity-stages', organizationId, {
     initialData,
@@ -133,7 +141,7 @@ export function useOpportunityStages(
 
 export function useContacts(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: Contact[],
 ) {
   return useSubscriptionAwareQuery('contacts', organizationId, { initialData })
 }
@@ -160,9 +168,9 @@ export function useContactRoleAssignments(
 
 export function useContactTags(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ContactTag[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ContactTag[]>({
     queryKey: ['contact-tags', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/contact-tags', 'Failed to fetch contact tags'),
     staleTime: 30_000,
@@ -185,9 +193,9 @@ export function useContactCategories(
 
 export function useContactSegments(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ContactSegment[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ContactSegment[]>({
     queryKey: ['contact-segments', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/contact-segments', 'Failed to fetch contact segments'),
     staleTime: 30_000,
@@ -197,7 +205,7 @@ export function useContactSegments(
 
 export function useActivities(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: Activity[],
 ) {
   return useSubscriptionAwareQuery('activities', organizationId, { initialData })
 }
@@ -221,10 +229,9 @@ export function useCreateLead(organizationId: bigint) {
   return useMutation<void, Error, Partial<CreateLeadParams>>({
     mutationFn: async (params) => {
       const merged = finalizeCreateLeadParams(params)
-      const { urlPath, init } = crmBffPost("create_lead", [
-        organizationId,
-        stdbParamsToJson(merged, "CreateLeadParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_lead", {
+        params: stdbParamsToJson(merged, "CreateLeadParams"),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         const json = (await r.json().catch(() => ({}))) as { error?: string }
@@ -248,12 +255,7 @@ export function useUpdateOpportunity(
       if (scopedCompanyId == null || scopedCompanyId === 0n) {
         throw new Error("Company scope required to update opportunity")
       }
-      const { urlPath, init } = crmBffPost("update_opportunity", [
-        organizationId,
-        scopedCompanyId,
-        toScalarU64(opportunityId),
-        stdbParamsToJson(finalizeUpdateOpportunityParams(params), "UpdateOpportunityParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_opportunity", { companyId: scopedCompanyId, opportunityId: toScalarU64(opportunityId), params: stdbParamsToJson(finalizeUpdateOpportunityParams(params), "UpdateOpportunityParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update opportunity")
     },
@@ -275,10 +277,9 @@ export function useCreateOpportunity(
         finalized as unknown as Record<string, unknown>,
         scopedCompanyId,
       )
-      const { urlPath, init } = crmBffPost("create_opportunity", [
-        organizationId,
-        stdbParamsToJson(scoped as object, "CreateOpportunityParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_opportunity", {
+        params: stdbParamsToJson(scoped as object, "CreateOpportunityParams"),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create opportunity')
     },
@@ -300,10 +301,9 @@ export function useCreateContact(
         finalized as unknown as Record<string, unknown>,
         scopedCompanyId,
       )
-      const { urlPath, init } = crmBffPost("create_contact", [
-        organizationId,
-        stdbParamsToJson(scoped as object, "CreateContactParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_contact", {
+        params: stdbParamsToJson(scoped as object, "CreateContactParams"),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         const json = (await r.json().catch(() => ({}))) as { error?: string }
@@ -318,10 +318,7 @@ export function useCreateContactIdentity(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateContactIdentityParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = crmBffPost("create_contact_identity", [
-        organizationId,
-        stdbParamsToJson(params, "CreateContactIdentityParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_contact_identity", { params: stdbParamsToJson(params, "CreateContactIdentityParams") })
       const response = await apiFetch(urlPath, init)
       if (!response.ok) throw new Error(await parseCallErrorCrm(response))
     },
@@ -338,11 +335,7 @@ export function useUpdateContactIdentity(organizationId: bigint) {
     { identityId: ScalarId; params: UpdateContactIdentityParams }
   >({
     mutationFn: async ({ identityId, params }) => {
-      const { urlPath, init } = crmBffPost("update_contact_identity", [
-        organizationId,
-        toScalarU64(identityId),
-        stdbParamsToJson(params, "UpdateContactIdentityParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_contact_identity", { identityId: toScalarU64(identityId), params: stdbParamsToJson(params, "UpdateContactIdentityParams") })
       const response = await apiFetch(urlPath, init)
       if (!response.ok) throw new Error(await parseCallErrorCrm(response))
     },
@@ -359,11 +352,7 @@ export function useVerifyContactIdentity(organizationId: bigint) {
     { identityId: ScalarId; state: ContactVerificationState }
   >({
     mutationFn: async ({ identityId, state }) => {
-      const { urlPath, init } = crmBffPost("verify_contact_identity", [
-        organizationId,
-        toScalarU64(identityId),
-        state,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("verify_contact_identity", { identityId: toScalarU64(identityId), requestedState: state })
       const response = await apiFetch(urlPath, init)
       if (!response.ok) throw new Error(await parseCallErrorCrm(response))
     },
@@ -376,10 +365,7 @@ export function useArchiveContactIdentity(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (identityId) => {
-      const { urlPath, init } = crmBffPost("archive_contact_identity", [
-        organizationId,
-        toScalarU64(identityId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("archive_contact_identity", { identityId: toScalarU64(identityId) })
       const response = await apiFetch(urlPath, init)
       if (!response.ok) throw new Error(await parseCallErrorCrm(response))
     },
@@ -392,10 +378,7 @@ export function useAssignContactRole(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, AssignContactRoleParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = crmBffPost("assign_contact_role", [
-        organizationId,
-        stdbParamsToJson(params, "AssignContactRoleParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("assign_contact_role", { params: stdbParamsToJson(params, "AssignContactRoleParams") })
       const response = await apiFetch(urlPath, init)
       if (!response.ok) throw new Error(await parseCallErrorCrm(response))
     },
@@ -412,11 +395,7 @@ export function useEndContactRole(organizationId: bigint) {
     { assignmentId: ScalarId; params: EndContactRoleParams }
   >({
     mutationFn: async ({ assignmentId, params }) => {
-      const { urlPath, init } = crmBffPost("end_contact_role", [
-        organizationId,
-        toScalarU64(assignmentId),
-        stdbParamsToJson(params, "EndContactRoleParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("end_contact_role", { assignmentId: toScalarU64(assignmentId), params: stdbParamsToJson(params, "EndContactRoleParams") })
       const response = await apiFetch(urlPath, init)
       if (!response.ok) throw new Error(await parseCallErrorCrm(response))
     },
@@ -430,10 +409,7 @@ export function useCreateActivity(organizationId: bigint) {
   return useMutation<void, Error, Partial<CreateActivityParams>>({
     mutationFn: async (params) => {
       const merged = finalizeCreateActivityParams(params)
-      const { urlPath, init } = crmBffPost("create_activity", [
-        organizationId,
-        stdbParamsToJson(merged, "CreateActivityParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_activity", { params: stdbParamsToJson(merged, "CreateActivityParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create activity')
     },
@@ -445,11 +421,7 @@ export function useUpdateContact(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ContactPatch<UpdateContactCoreParams>>({
     mutationFn: async ({ contactId, params }) => {
-      const { urlPath, init } = crmBffPost("update_contact", [
-        organizationId,
-        toScalarU64(contactId),
-        stdbParamsToJson(finalizeUpdateContactParams(params), "UpdateContactCoreParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_contact", { contactId: toScalarU64(contactId), params: stdbParamsToJson(finalizeUpdateContactParams(params), "UpdateContactCoreParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact')
     },
@@ -461,11 +433,7 @@ export function useUpdateContactAddress(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ContactPatch<UpdateContactAddressParams>>({
     mutationFn: async ({ contactId, params }) => {
-      const { urlPath, init } = crmBffPost("update_contact_address", [
-        organizationId,
-        toScalarU64(contactId),
-        stdbParamsToJson(finalizeUpdateContactAddressParams(params)),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_contact_address", { contactId: toScalarU64(contactId), params: stdbParamsToJson(finalizeUpdateContactAddressParams(params)) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact address')
     },
@@ -477,11 +445,7 @@ export function useUpdateContactBusiness(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ContactPatch<UpdateContactBusinessParams>>({
     mutationFn: async ({ contactId, params }) => {
-      const { urlPath, init } = crmBffPost("update_contact_business", [
-        organizationId,
-        toScalarU64(contactId),
-        stdbParamsToJson(finalizeUpdateContactBusinessParams(params)),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_contact_business", { contactId: toScalarU64(contactId), params: stdbParamsToJson(finalizeUpdateContactBusinessParams(params)) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact business')
     },
@@ -493,11 +457,7 @@ export function useUpdateContactDetails(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ContactPatch<UpdateContactDetailsParams>>({
     mutationFn: async ({ contactId, params }) => {
-      const { urlPath, init } = crmBffPost("update_contact_details", [
-        organizationId,
-        toScalarU64(contactId),
-        stdbParamsToJson(finalizeUpdateContactDetailsParams(params)),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_contact_details", { contactId: toScalarU64(contactId), params: stdbParamsToJson(finalizeUpdateContactDetailsParams(params)) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact details')
     },
@@ -520,11 +480,7 @@ export function useUpdateLead(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, LeadPatch<UpdateLeadParams>>({
     mutationFn: async ({ leadId, params }) => {
-      const { urlPath, init } = crmBffPost("update_lead", [
-        organizationId,
-        toScalarU64(leadId),
-        stdbParamsToJson(finalizeUpdateLeadParams(params)),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_lead", { leadId: toScalarU64(leadId), params: stdbParamsToJson(finalizeUpdateLeadParams(params)) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update lead')
     },
@@ -537,11 +493,7 @@ export function useUpdateLeadDetails(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, LeadPatch<UpdateLeadDetailsParams>>({
     mutationFn: async ({ leadId, params }) => {
-      const { urlPath, init } = crmBffPost("update_lead_details", [
-        organizationId,
-        toScalarU64(leadId),
-        stdbParamsToJson(finalizeUpdateLeadDetailsParams(params), "UpdateLeadDetailsParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_lead_details", { leadId: toScalarU64(leadId), params: stdbParamsToJson(finalizeUpdateLeadDetailsParams(params), "UpdateLeadDetailsParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update lead details')
     },
@@ -554,11 +506,7 @@ export function useUpdateLeadAddress(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, LeadPatch<UpdateLeadAddressParams>>({
     mutationFn: async ({ leadId, params }) => {
-      const { urlPath, init } = crmBffPost("update_lead_address", [
-        organizationId,
-        toScalarU64(leadId),
-        stdbParamsToJson(finalizeUpdateLeadAddressParams(params), "UpdateLeadAddressParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_lead_address", { leadId: toScalarU64(leadId), params: stdbParamsToJson(finalizeUpdateLeadAddressParams(params), "UpdateLeadAddressParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update lead address')
     },
@@ -571,11 +519,7 @@ export function useUpdateLeadRevenue(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, LeadPatch<UpdateLeadRevenueParams>>({
     mutationFn: async ({ leadId, params }) => {
-      const { urlPath, init } = crmBffPost("update_lead_revenue", [
-        organizationId,
-        toScalarU64(leadId),
-        stdbParamsToJson(finalizeUpdateLeadRevenueParams(params), "UpdateLeadRevenueParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_lead_revenue", { leadId: toScalarU64(leadId), params: stdbParamsToJson(finalizeUpdateLeadRevenueParams(params), "UpdateLeadRevenueParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update lead revenue')
     },
@@ -588,10 +532,7 @@ export function useCreateContactTag(organizationId: bigint) {
   return useMutation<void, Error, Partial<CreateContactTagParams>>({
     mutationFn: async (params) => {
       const merged = finalizeCreateContactTagParams(params)
-      const { urlPath, init } = crmBffPost("create_contact_tag", [
-        organizationId,
-        stdbParamsToJson(merged, "CreateContactTagParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_contact_tag", { params: stdbParamsToJson(merged, "CreateContactTagParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create contact tag')
     },
@@ -607,10 +548,7 @@ export function useCreateContactCategory(organizationId: bigint) {
   return useMutation<void, Error, Partial<CreateContactCategoryParams>>({
     mutationFn: async (params) => {
       const merged = finalizeCreateContactCategoryParams(params)
-      const { urlPath, init } = crmBffPost("create_contact_category", [
-        organizationId,
-        stdbParamsToJson(merged, "CreateContactCategoryParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_contact_category", { params: stdbParamsToJson(merged, "CreateContactCategoryParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create contact category')
     },
@@ -626,11 +564,7 @@ export function useUpdateContactCategory(organizationId: bigint) {
     { categoryId: ScalarId; params: Partial<UpdateContactCategoryParams> }
   >({
     mutationFn: async ({ categoryId, params }) => {
-      const { urlPath, init } = crmBffPost("update_contact_category", [
-        organizationId,
-        toScalarU64(categoryId),
-        stdbParamsToJson(finalizeUpdateContactCategoryParams(params)),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_contact_category", { categoryId: toScalarU64(categoryId), params: stdbParamsToJson(finalizeUpdateContactCategoryParams(params)) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact category')
     },
@@ -642,10 +576,7 @@ export function useArchiveContactCategory(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (categoryId) => {
-      const { urlPath, init } = crmBffPost("archive_contact_category", [
-        organizationId,
-        toScalarU64(categoryId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("archive_contact_category", { categoryId: toScalarU64(categoryId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to archive contact category')
     },
@@ -665,11 +596,7 @@ export function useAddContactCategories(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { contactId: ScalarId; categoryIds: ScalarId[] }>({
     mutationFn: async ({ contactId, categoryIds }) => {
-      const { urlPath, init } = crmBffPost("add_contact_categories", [
-        organizationId,
-        toScalarU64(contactId),
-        categoryIds.map(toScalarU64),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("add_contact_categories", { contactId: toScalarU64(contactId), categoryIds: categoryIds.map(toScalarU64) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add contact categories')
     },
@@ -685,11 +612,7 @@ export function useRemoveContactCategories(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { contactId: ScalarId; categoryIds: ScalarId[] }>({
     mutationFn: async ({ contactId, categoryIds }) => {
-      const { urlPath, init } = crmBffPost("remove_contact_categories", [
-        organizationId,
-        toScalarU64(contactId),
-        categoryIds.map(toScalarU64),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("remove_contact_categories", { contactId: toScalarU64(contactId), categoryIds: categoryIds.map(toScalarU64) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to remove contact categories')
     },
@@ -711,11 +634,7 @@ export function useReplaceContactCategories(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { contactId: ScalarId; categoryIds: ScalarId[] }>({
     mutationFn: async ({ contactId, categoryIds }) => {
-      const { urlPath, init } = crmBffPost("replace_contact_categories", [
-        organizationId,
-        toScalarU64(contactId),
-        categoryIds.map(toScalarU64),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("replace_contact_categories", { contactId: toScalarU64(contactId), categoryIds: categoryIds.map(toScalarU64) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to replace contact categories')
     },
@@ -731,10 +650,7 @@ export function useClearContactCategories(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (contactId) => {
-      const { urlPath, init } = crmBffPost("clear_contact_categories", [
-        organizationId,
-        toScalarU64(contactId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("clear_contact_categories", { contactId: toScalarU64(contactId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to clear contact categories')
     },
@@ -750,10 +666,7 @@ export function useCreateContactSegment(organizationId: bigint) {
   return useMutation<void, Error, Partial<CreateContactSegmentParams>>({
     mutationFn: async (params) => {
       const merged = finalizeCreateContactSegmentParams(params)
-      const { urlPath, init } = crmBffPost("create_contact_segment", [
-        organizationId,
-        stdbParamsToJson(merged, "CreateContactSegmentParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_contact_segment", { params: stdbParamsToJson(merged, "CreateContactSegmentParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create contact segment')
     },
@@ -768,11 +681,7 @@ export function useConvertLeadToCustomer(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { leadId: ScalarId; params: ConvertLeadParams }>({
     mutationFn: async ({ leadId, params }) => {
-      const { urlPath, init } = crmBffPost("convert_lead_to_customer", [
-        organizationId,
-        toScalarU64(leadId),
-        stdbParamsToJson(params, "ConvertLeadParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("convert_lead_to_customer", { leadId: toScalarU64(leadId), params: stdbParamsToJson(params, "ConvertLeadParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to convert lead')
     },
@@ -784,14 +693,28 @@ export function useConvertLeadToCustomer(organizationId: bigint) {
   })
 }
 
-export function useConvertOpportunityToSaleOrder(organizationId: bigint) {
+export function useConvertOpportunityToSaleOrder(
+  organizationId: bigint,
+  options?: { companyId?: bigint },
+) {
   const qc = useQueryClient()
-  return useMutation<void, Error, { opportunityId: ScalarId; params: ConvertOpportunityParams }>({
-    mutationFn: async ({ opportunityId, params }) => {
-      const { urlPath, init } = crmBffPost("convert_opportunity_to_sale_order", [
-        toScalarU64(opportunityId),
-        stdbParamsToJson(params, "ConvertOpportunityParams"),
-      ])
+  const defaultCompanyId = options?.companyId
+  return useMutation<
+    void,
+    Error,
+    { opportunityId: ScalarId; params: ConvertOpportunityParams; companyId?: ScalarId }
+  >({
+    mutationFn: async ({ opportunityId, params, companyId }) => {
+      const scopedCompanyId =
+        companyId != null ? toScalarU64(companyId) : defaultCompanyId
+      if (scopedCompanyId == null || scopedCompanyId === 0n) {
+        throw new Error("Company scope required to convert opportunity")
+      }
+      const { urlPath, init } = stdbBffCommandPost("convert_opportunity_to_sale_order", {
+        companyId: scopedCompanyId,
+        opportunityId: toScalarU64(opportunityId),
+        params: stdbParamsToJson(params, "ConvertOpportunityParams"),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to convert opportunity to sale order')
     },
@@ -802,18 +725,28 @@ export function useConvertOpportunityToSaleOrder(organizationId: bigint) {
   })
 }
 
-export function useCreateOpportunityLine(organizationId: bigint) {
+export function useCreateOpportunityLine(
+  organizationId: bigint,
+  options?: { companyId?: bigint },
+) {
   const qc = useQueryClient()
+  const defaultCompanyId = options?.companyId
   return useMutation<
     void,
     Error,
-    { opportunityId: ScalarId; params: CreateOpportunityLineParams }
+    { opportunityId: ScalarId; params: CreateOpportunityLineParams; companyId?: ScalarId }
   >({
-    mutationFn: async ({ opportunityId, params }) => {
-      const { urlPath, init } = crmBffPost("create_opportunity_line", [
-        toScalarU64(opportunityId),
-        stdbParamsToJson(params as object, "CreateOpportunityLineParams"),
-      ])
+    mutationFn: async ({ opportunityId, params, companyId }) => {
+      const scopedCompanyId =
+        companyId != null ? toScalarU64(companyId) : defaultCompanyId
+      if (scopedCompanyId == null || scopedCompanyId === 0n) {
+        throw new Error("Company scope required to create opportunity line")
+      }
+      const { urlPath, init } = stdbBffCommandPost("create_opportunity_line", {
+        companyId: scopedCompanyId,
+        opportunityId: toScalarU64(opportunityId),
+        params: stdbParamsToJson(params as object, "CreateOpportunityLineParams"),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create opportunity line')
     },
@@ -828,10 +761,7 @@ export function useDeleteLead(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (leadId) => {
-      const { urlPath, init } = crmBffPost("delete_lead", [
-        organizationId,
-        toScalarU64(leadId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("delete_lead", { leadId: toScalarU64(leadId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to delete lead")
     },
@@ -843,10 +773,7 @@ export function useDeleteContact(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (contactId) => {
-      const { urlPath, init } = crmBffPost("delete_contact", [
-        organizationId,
-        toScalarU64(contactId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("delete_contact", { contactId: toScalarU64(contactId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to delete contact')
     },
@@ -858,12 +785,7 @@ export function useAssignTagToContact(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { contactId: ScalarId; tagId: ScalarId; metadata?: string | null }>({
     mutationFn: async ({ contactId, tagId, metadata }) => {
-      const { urlPath, init } = crmBffPost("assign_tag_to_contact", [
-        organizationId,
-        toScalarU64(contactId),
-        toScalarU64(tagId),
-        metadata ?? null,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("assign_tag_to_contact", { contactId: toScalarU64(contactId), tagId: toScalarU64(tagId), metadata: metadata ?? null })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign tag')
     },
@@ -875,11 +797,7 @@ export function useAddContactToSegment(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { segmentId: ScalarId; contactId: ScalarId }>({
     mutationFn: async ({ segmentId, contactId }) => {
-      const { urlPath, init } = crmBffPost("add_contact_to_segment", [
-        organizationId,
-        toScalarU64(segmentId),
-        toScalarU64(contactId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("add_contact_to_segment", { segmentId: toScalarU64(segmentId), contactId: toScalarU64(contactId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to add contact to segment')
     },
@@ -891,10 +809,7 @@ export function useCompleteActivity(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (activityId) => {
-      const { urlPath, init } = crmBffPost("complete_activity", [
-        organizationId,
-        toScalarU64(activityId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("complete_activity", { activityId: toScalarU64(activityId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to complete activity')
     },
@@ -910,7 +825,7 @@ export function useImportContactCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = crmBffPost("import_contact_csv", [organizationId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_contact_csv", { csvData: csvData })
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorCrm(res))
     },
@@ -923,7 +838,7 @@ export function useImportLeadCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = crmBffPost("import_lead_csv", [organizationId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_lead_csv", { csvData: csvData })
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorCrm(res))
     },
@@ -936,7 +851,7 @@ export function useImportOpportunityCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = crmBffPost("import_opportunity_csv", [organizationId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_opportunity_csv", { csvData: csvData })
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorCrm(res))
     },
@@ -949,10 +864,7 @@ export function useFindDuplicateContacts(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (companyId) => {
-      const { urlPath, init } = crmBffPost("find_duplicate_contacts", [
-        organizationId,
-        toScalarU64(companyId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("find_duplicate_contacts", { companyId: toScalarU64(companyId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to scan for duplicate contacts")
     },
@@ -981,12 +893,7 @@ export function useMergeContacts(
       const params: MergeContactsParams = {
         targetContactId: toScalarU64(targetContactId),
       }
-      const { urlPath, init } = crmBffPost("merge_contacts", [
-        organizationId,
-        scopedCompanyId,
-        toScalarU64(sourceContactId),
-        stdbParamsToJson(params as object, "MergeContactsParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("merge_contacts", { companyId: scopedCompanyId, sourceContactId: toScalarU64(sourceContactId), params: stdbParamsToJson(params as object, "MergeContactsParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to merge contacts")
     },
@@ -1040,10 +947,7 @@ export function useCreateContactRelationship(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateContactRelationshipParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = crmBffPost("create_contact_relationship", [
-        organizationId,
-        stdbParamsToJson(params as object, "CreateContactRelationshipParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_contact_relationship", { params: stdbParamsToJson(params as object, "CreateContactRelationshipParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to create contact relationship")
     },
@@ -1056,10 +960,7 @@ export function useEndContactRelationship(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (relationshipId) => {
-      const { urlPath, init } = crmBffPost("end_contact_relationship", [
-        organizationId,
-        toScalarU64(relationshipId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("end_contact_relationship", { relationshipId: toScalarU64(relationshipId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to end contact relationship")
     },
@@ -1076,12 +977,7 @@ export function useUpdateContactParent(organizationId: bigint) {
     { companyId: ScalarId; contactId: ScalarId; parentId: ScalarId | null }
   >({
     mutationFn: async ({ companyId, contactId, parentId }) => {
-      const { urlPath, init } = crmBffPost("update_contact_parent", [
-        organizationId,
-        toScalarU64(companyId),
-        toScalarU64(contactId),
-        parentId == null ? null : toScalarU64(parentId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_contact_parent", { companyId: toScalarU64(companyId), contactId: toScalarU64(contactId), parentId: parentId == null ? null : toScalarU64(parentId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update contact parent")
     },
@@ -1093,10 +989,7 @@ export function useCreateOpportunityStage(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateOpportunityStageParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = crmBffPost("create_opportunity_stage", [
-        organizationId,
-        stdbParamsToJson(params as object, "CreateOpportunityStageParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_opportunity_stage", { params: stdbParamsToJson(params as object, "CreateOpportunityStageParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to create opportunity stage")
     },
@@ -1123,10 +1016,7 @@ export function useCreateLeadSource(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateLeadSourceParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = crmBffPost("create_lead_source", [
-        organizationId,
-        stdbParamsToJson(params as object, "CreateLeadSourceParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_lead_source", { params: stdbParamsToJson(params as object, "CreateLeadSourceParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to create lead source")
     },
@@ -1143,11 +1033,7 @@ export function useUpdateOpportunityStage(organizationId: bigint) {
     { stageId: ScalarId; params: UpdateOpportunityStageParams }
   >({
     mutationFn: async ({ stageId, params }) => {
-      const { urlPath, init } = crmBffPost("update_opportunity_stage", [
-        organizationId,
-        toScalarU64(stageId),
-        stdbParamsToJson(params as object, "UpdateOpportunityStageParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_opportunity_stage", { stageId: toScalarU64(stageId), params: stdbParamsToJson(params as object, "UpdateOpportunityStageParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update opportunity stage")
     },
@@ -1164,11 +1050,7 @@ export function useUpdateLeadSource(organizationId: bigint) {
     { sourceId: ScalarId; params: UpdateLeadSourceParams }
   >({
     mutationFn: async ({ sourceId, params }) => {
-      const { urlPath, init } = crmBffPost("update_lead_source", [
-        organizationId,
-        toScalarU64(sourceId),
-        stdbParamsToJson(params as object, "UpdateLeadSourceParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_lead_source", { sourceId: toScalarU64(sourceId), params: stdbParamsToJson(params as object, "UpdateLeadSourceParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update lead source")
     },
@@ -1181,10 +1063,7 @@ export function useCreateLeadLostReason(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateLeadLostReasonParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = crmBffPost("create_lead_lost_reason", [
-        organizationId,
-        stdbParamsToJson(params as object, "CreateLeadLostReasonParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_lead_lost_reason", { params: stdbParamsToJson(params as object, "CreateLeadLostReasonParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to create lead lost reason")
     },
@@ -1201,11 +1080,7 @@ export function useUpdateLeadLostReason(organizationId: bigint) {
     { lostReasonId: ScalarId; params: UpdateLeadLostReasonParams }
   >({
     mutationFn: async ({ lostReasonId, params }) => {
-      const { urlPath, init } = crmBffPost("update_lead_lost_reason", [
-        organizationId,
-        toScalarU64(lostReasonId),
-        stdbParamsToJson(params as object, "UpdateLeadLostReasonParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_lead_lost_reason", { lostReasonId: toScalarU64(lostReasonId), params: stdbParamsToJson(params as object, "UpdateLeadLostReasonParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update lead lost reason")
     },
@@ -1222,11 +1097,7 @@ export function useUpdateAssignmentRule(organizationId: bigint) {
     { ruleId: ScalarId; params: UpdateAssignmentRuleParams }
   >({
     mutationFn: async ({ ruleId, params }) => {
-      const { urlPath, init } = crmBffPost("update_assignment_rule", [
-        organizationId,
-        toScalarU64(ruleId),
-        stdbParamsToJson(params as object, "UpdateAssignmentRuleParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_assignment_rule", { ruleId: toScalarU64(ruleId), params: stdbParamsToJson(params as object, "UpdateAssignmentRuleParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update assignment rule")
     },
@@ -1239,10 +1110,7 @@ export function useCreateAssignmentRule(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateAssignmentRuleParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = crmBffPost("create_assignment_rule", [
-        organizationId,
-        stdbParamsToJson(params as object, "CreateAssignmentRuleParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_assignment_rule", { params: stdbParamsToJson(params as object, "CreateAssignmentRuleParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to create assignment rule")
     },
@@ -1251,18 +1119,17 @@ export function useCreateAssignmentRule(organizationId: bigint) {
   })
 }
 
-export function useUpdateOpportunityPresence(organizationId: bigint) {
+export function useUpdateOpportunityPresence() {
   return useMutation<
     void,
     Error,
-    { opportunityId: ScalarId; userName: string }
+    // userName remains accepted for callers while identity is now derived by api-server.
+    { opportunityId: ScalarId; userName?: string }
   >({
-    mutationFn: async ({ opportunityId, userName }) => {
-      const { urlPath, init } = crmBffPost("update_opportunity_presence", [
-        organizationId,
-        toScalarU64(opportunityId),
-        userName,
-      ])
+    mutationFn: async ({ opportunityId }) => {
+      const { urlPath, init } = stdbBffCommandPost("update_opportunity_presence", {
+        opportunityId: toScalarU64(opportunityId),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update opportunity presence")
     },
@@ -1272,9 +1139,7 @@ export function useUpdateOpportunityPresence(organizationId: bigint) {
 export function useClearOpportunityPresence(organizationId: bigint) {
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (opportunityId) => {
-      const { urlPath, init } = crmBffPost("clear_opportunity_presence", [
-        toScalarU64(opportunityId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("clear_opportunity_presence", { opportunityId: toScalarU64(opportunityId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to clear opportunity presence")
     },
@@ -1289,11 +1154,7 @@ export function useCreateForecastSnapshot(organizationId: bigint) {
     { companyId: ScalarId; params: CreateCrmForecastSnapshotParams }
   >({
     mutationFn: async ({ companyId, params }) => {
-      const { urlPath, init } = crmBffPost("create_forecast_snapshot", [
-        organizationId,
-        toScalarU64(companyId),
-        stdbParamsToJson(params as object, "CreateCrmForecastSnapshotParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_forecast_snapshot", { companyId: toScalarU64(companyId), params: stdbParamsToJson(params as object, "CreateCrmForecastSnapshotParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to create forecast snapshot")
     },
@@ -1336,10 +1197,7 @@ export function useRecomputeLeadScore(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (leadId) => {
-      const { urlPath, init } = crmBffPost("recompute_lead_score", [
-        organizationId,
-        toScalarU64(leadId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("recompute_lead_score", { leadId: toScalarU64(leadId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to recompute lead score")
     },
@@ -1358,11 +1216,7 @@ export function useSetContactSegmentRules(organizationId: bigint) {
     { segmentId: ScalarId; params: SetContactSegmentRulesParams }
   >({
     mutationFn: async ({ segmentId, params }) => {
-      const { urlPath, init } = crmBffPost("set_contact_segment_rules", [
-        organizationId,
-        toScalarU64(segmentId),
-        stdbParamsToJson(params as object, "SetContactSegmentRulesParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("set_contact_segment_rules", { segmentId: toScalarU64(segmentId), params: stdbParamsToJson(params as object, "SetContactSegmentRulesParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to set segment rules")
     },
@@ -1375,10 +1229,7 @@ export function useEvaluateDynamicSegment(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (segmentId) => {
-      const { urlPath, init } = crmBffPost("evaluate_dynamic_segment", [
-        organizationId,
-        toScalarU64(segmentId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("evaluate_dynamic_segment", { segmentId: toScalarU64(segmentId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to evaluate dynamic segment")
     },
@@ -1393,10 +1244,7 @@ export function useRecomputeRelationshipInsights(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (contactId) => {
-      const { urlPath, init } = crmBffPost("recompute_relationship_insights", [
-        organizationId,
-        toScalarU64(contactId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("recompute_relationship_insights", { contactId: toScalarU64(contactId) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to recompute relationship insights")
     },
@@ -1409,10 +1257,7 @@ export function useOpenCrmConversation(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, OpenCrmConversationParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = crmBffPost("open_crm_conversation", [
-        organizationId,
-        stdbParamsToJson(params as object, "OpenCrmConversationParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("open_crm_conversation", { params: stdbParamsToJson(params as object, "OpenCrmConversationParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to open CRM conversation")
     },
@@ -1429,11 +1274,7 @@ export function useAppendCrmConversationMessage(organizationId: bigint) {
     { conversationId: ScalarId; params: AppendCrmConversationMessageParams }
   >({
     mutationFn: async ({ conversationId, params }) => {
-      const { urlPath, init } = crmBffPost("append_crm_conversation_message", [
-        organizationId,
-        toScalarU64(conversationId),
-        stdbParamsToJson(params as object, "AppendCrmConversationMessageParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("append_crm_conversation_message", { conversationId: toScalarU64(conversationId), params: stdbParamsToJson(params as object, "AppendCrmConversationMessageParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to append conversation message")
     },
@@ -1452,11 +1293,7 @@ export function useUpdateCrmConversation(organizationId: bigint) {
     { conversationId: ScalarId; params: UpdateCrmConversationParams }
   >({
     mutationFn: async ({ conversationId, params }) => {
-      const { urlPath, init } = crmBffPost("update_crm_conversation", [
-        organizationId,
-        toScalarU64(conversationId),
-        stdbParamsToJson(params as object, "UpdateCrmConversationParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_crm_conversation", { conversationId: toScalarU64(conversationId), params: stdbParamsToJson(params as object, "UpdateCrmConversationParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update CRM conversation")
     },
@@ -1467,6 +1304,13 @@ export function useUpdateCrmConversation(organizationId: bigint) {
 
 // ── Types (re-exported so client components import from one place) ────────────
 export type {
+  Activity,
+  Contact,
+  ContactTag,
+  ContactSegment,
+  Lead,
+  Opportunity,
+  OpportunityStage,
   ConvertLeadParams,
   ConvertOpportunityParams,
   CreateActivityParams,

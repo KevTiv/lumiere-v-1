@@ -99,6 +99,9 @@ import {
   useClearOpportunityPresence,
   useOpportunityPresence,
   useUpdateOpportunityPresence,
+  type Lead,
+  type Opportunity,
+  type Contact,
 } from "@lumiere/query-hooks/hooks/crm"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts, useUoms, useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
@@ -167,9 +170,9 @@ import { useModuleFilters } from "@/hooks/use-module-filters"
 export { CRM_UI_REDUCERS } from "@/lib/crm-ui-reducers"
 
 interface CrmClientProps {
-  initialLeads?: Record<string, unknown>[]
-  initialOpportunities?: Record<string, unknown>[]
-  initialContacts?: Record<string, unknown>[]
+  initialLeads?: Lead[]
+  initialOpportunities?: Opportunity[]
+  initialContacts?: Contact[]
   organizationId?: number
 }
 
@@ -363,10 +366,15 @@ function CrmClientLoaded({
     roleId: runtimeRoleId,
     listViewKey: `list-filters:crm:opportunities:${organizationId}`,
   })
-  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
+  const crmCustomFieldModel = {
+    lead: "crm_lead",
+    opportunity: "crm_lead",
+    contact: "contact",
+  } as const
 
   async function persistCrmCustomFields(args: {
-    model: "lead" | "contact" | "opportunity"
+    model: keyof typeof crmCustomFieldModel
     recordId: bigint
     metadata: unknown
   }) {
@@ -375,14 +383,14 @@ function CrmClientLoaded({
     await persistCustomFieldsToEav({
       organizationId,
       companyId: operatingCompanyId,
-      model: args.model,
+      model: crmCustomFieldModel[args.model],
       recordId: args.recordId,
       metadata: args.metadata,
     })
   }
 
   async function persistCrmCustomFieldsAfterCreate(args: {
-    model: "lead" | "contact" | "opportunity"
+    model: keyof typeof crmCustomFieldModel
     metadata: unknown
     queryPath: string
     matchField: string
@@ -599,12 +607,12 @@ function CrmClientLoaded({
 
   const createLead = useCreateLead(orgId)
   const createOpportunity = useCreateOpportunity(orgId, { companyId: operatingCompanyId ?? undefined })
-  const createOpportunityLine = useCreateOpportunityLine(orgId)
+  const createOpportunityLine = useCreateOpportunityLine(orgId, { companyId: operatingCompanyId ?? undefined })
   const updateOpportunity = useUpdateOpportunity(orgId, { companyId: operatingCompanyId ?? undefined })
   const createContact = useCreateContact(orgId, { companyId: operatingCompanyId ?? undefined })
   const createActivity = useCreateActivity(orgId)
   const convertLead = useConvertLeadToCustomer(orgId)
-  const convertOppToOrder = useConvertOpportunityToSaleOrder(orgId)
+  const convertOppToOrder = useConvertOpportunityToSaleOrder(orgId, { companyId: operatingCompanyId ?? undefined })
   const deleteContact = useDeleteContact(orgId)
   const deleteLead = useDeleteLead(orgId)
   const assignTag = useAssignTagToContact(orgId)
@@ -1586,7 +1594,7 @@ function CrmClientLoaded({
       0,
     )
     const currentWeightedPipeline = currentOpenOpportunities.reduce((s, o) => {
-      const revenue = Number(o.expectedRevenue ?? o.expected_revenue ?? 0)
+      const revenue = Number(o.expectedRevenue ?? 0)
       const probability = Number(o.probability ?? 0)
       return s + revenue * (probability / 100)
     }, 0)
@@ -1892,6 +1900,7 @@ function CrmClientLoaded({
       await createOpportunityLine.mutateAsync({
         opportunityId: String(opportunityId),
         params,
+        companyId: operatingCompanyId ?? undefined,
       })
     }
   }
@@ -1940,6 +1949,7 @@ function CrmClientLoaded({
         await convertOppToOrder.mutateAsync({
           opportunityId: workflowModal.opportunityId,
           params: p,
+          companyId: operatingCompanyId ?? undefined,
         })
         phCapture("opportunity_converted_to_order", { organization_id: organizationId })
       } else if (workflowModal.kind === "assignTag") {

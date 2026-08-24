@@ -1,4 +1,3 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
 
 import type { ReducerCommandContractMeta } from "./types";
 
@@ -20,20 +19,6 @@ const WITH_COMPANY_QUERY = new Set<CalendarBffReducerKey>();
 export function calendarBffCallUrl(reducer: CalendarBffReducerKey): string {
   const base = `/api/call/${reducer}`;
   return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
-
-export function calendarBffPost(
-  reducer: CalendarBffReducerKey,
-  args: unknown[],
-): { urlPath: string; init: RequestInit } {
-  return {
-    urlPath: calendarBffCallUrl(reducer),
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
-    },
-  };
 }
 
 /** Subscription resource keys whose mirrors should reflect calendar reducer effects. */

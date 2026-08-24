@@ -1,25 +1,20 @@
 "use client"
 
-/**
- * Fleet hooks — Vehicle and fleet management
- *
- * Wraps REST API calls with React Query for the Fleet module.
- * All hooks accept organizationId: bigint matching the stdb hooks interface.
- */
 
-import { fleetBffPost } from "@lumiere/stdb/commands"
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/stdb/stdb-params-json"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
-import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
+import type { FleetVehicle } from "@lumiere/stdb/types"
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 export function useFleetVehicles(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: FleetVehicle[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery({
     queryKey: ["fleet-vehicles", rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList("/api/query/fleet-vehicles", "Failed to fetch fleet vehicles"),
     staleTime: 30_000,
@@ -49,10 +44,7 @@ export function useCreateFleetVehicle(organizationId: bigint, companyId?: bigint
       if (companyId == null || companyId <= 0n) {
         throw new Error("Operating company is required to create a fleet vehicle")
       }
-      const { urlPath, init } = fleetBffPost("create_fleet_vehicle", [
-        organizationId,
-        companyId,
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("create_fleet_vehicle", { companyId: companyId, params: stdbParamsToJson(
           {
             name: name.trim(),
             vehicleType: vehicleType.trim(),
@@ -63,8 +55,7 @@ export function useCreateFleetVehicle(organizationId: bigint, companyId?: bigint
             metadata: null,
           },
           "CreateFleetVehicleParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to create fleet vehicle")
     },
@@ -88,11 +79,7 @@ export function useUpdateVehiclePosition(organizationId: bigint, companyId?: big
       if (companyId == null || companyId <= 0n) {
         throw new Error("Operating company is required to update vehicle position")
       }
-      const { urlPath, init } = fleetBffPost("update_vehicle_position", [
-        organizationId,
-        companyId,
-        vehicleId,
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("update_vehicle_position", { companyId: companyId, vehicleId: vehicleId, params: stdbParamsToJson(
           {
             latitude,
             longitude,
@@ -101,8 +88,7 @@ export function useUpdateVehiclePosition(organizationId: bigint, companyId?: big
             status,
           },
           "UpdateVehiclePositionParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update vehicle position")
     },

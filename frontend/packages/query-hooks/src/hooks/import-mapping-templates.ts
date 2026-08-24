@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { stdbBffPost } from "@lumiere/stdb/commands"
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 
@@ -84,15 +84,14 @@ export function useSaveImportMappingTemplate(organizationId: bigint) {
       tableName: string
       mapping: Record<string, string>
     }) => {
-      const { urlPath, init } = stdbBffPost("save_import_mapping_template", [
-        organizationId,
-        args.templateId != null ? BigInt(args.templateId) : null,
-        {
+      const { urlPath, init } = stdbBffCommandPost("save_import_mapping_template", {
+        templateId: args.templateId != null ? BigInt(args.templateId) : null,
+        params: {
           name: args.name,
           table_name: args.tableName,
           mapping_json: mappingJsonForTemplate(args.mapping),
         },
-      ])
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         const json = (await r.json().catch(() => ({}))) as { error?: string }
@@ -110,10 +109,9 @@ export function useDeleteImportMappingTemplate(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (templateId: bigint | number) => {
-      const { urlPath, init } = stdbBffPost("delete_import_mapping_template", [
-        organizationId,
-        BigInt(templateId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("delete_import_mapping_template", {
+        templateId: BigInt(templateId),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         const json = (await r.json().catch(() => ({}))) as { error?: string }
@@ -135,14 +133,13 @@ export function useFinalizeImportAssistantJob(organizationId: bigint) {
       metadata: Record<string, unknown>
       templateId?: bigint | number | null
     }) => {
-      const { urlPath, init } = stdbBffPost("finalize_import_assistant_job", [
-        organizationId,
-        BigInt(args.jobId),
-        {
+      const { urlPath, init } = stdbBffCommandPost("finalize_import_assistant_job", {
+        jobId: BigInt(args.jobId),
+        params: {
           metadata_json: JSON.stringify(args.metadata),
           template_id: args.templateId != null ? BigInt(args.templateId) : null,
         },
-      ])
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         const json = (await r.json().catch(() => ({}))) as { error?: string }

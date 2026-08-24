@@ -110,10 +110,10 @@ async fn process_batch(state: &AppState, org_ids: &[u64], batch: u32) -> anyhow:
     for organization_id in org_ids {
         state
             .stdb
-            .call_reducer(
+            .call_reducer(stdb_client::reducer_call!(
                 "apply_pending_expense_integration_intents",
                 json!([organization_id, batch]),
-            )
+            ))
             .await?;
     }
     Ok(())

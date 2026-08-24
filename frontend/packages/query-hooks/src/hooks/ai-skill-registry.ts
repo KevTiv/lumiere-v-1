@@ -1,8 +1,8 @@
 "use client"
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { aiSkillsBffPost } from "@lumiere/stdb/commands"
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   CreateAiSkillFixtureParams,
@@ -256,10 +256,7 @@ export function useCreateAiSkillVersion(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: CreateAiSkillVersionParams) => {
-      const { urlPath, init } = aiSkillsBffPost("create_ai_skill_version", [
-        organizationId,
-        stdbParamsToJson(params as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_ai_skill_version", { params: stdbParamsToJson(params as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -271,10 +268,7 @@ export function useCreateAiSkillFixture(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: CreateAiSkillFixtureParams) => {
-      const { urlPath, init } = aiSkillsBffPost("create_ai_skill_fixture", [
-        organizationId,
-        stdbParamsToJson(params as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_ai_skill_fixture", { params: stdbParamsToJson(params as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -306,11 +300,7 @@ export function usePromoteAiSkillVersion(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { skillVersionId: number; reason?: string }) => {
-      const { urlPath, init } = aiSkillsBffPost("promote_ai_skill_version", [
-        organizationId,
-        args.skillVersionId,
-        args.reason ?? null,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("promote_ai_skill_version", { skillVersionId: args.skillVersionId, reason: args.reason ?? null })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -322,12 +312,7 @@ export function useRollbackAiSkillRelease(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { skillId: number; targetReleaseId: number; reason: string }) => {
-      const { urlPath, init } = aiSkillsBffPost("rollback_ai_skill_release", [
-        organizationId,
-        args.skillId,
-        args.targetReleaseId,
-        args.reason,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("rollback_ai_skill_release", { skillId: args.skillId, targetReleaseId: args.targetReleaseId, reason: args.reason })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },

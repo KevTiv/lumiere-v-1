@@ -1,38 +1,52 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
+import { stringifyReducerCommandBody } from "@lumiere/api-client";
+import type { OperationInputMap } from "@lumiere/contracts/generated/operation-inputs";
 
 import type { ReducerCommandContractMeta } from "./types";
+import {
+  STDB_BFF_REDUCERS,
+  type StdbBffReducerKey,
+} from "./generated-stdb-bff-reducers";
 
-/**
- * Generic SpacetimeDB reducer calls via Next.js BFF `POST /api/call/:reducer`.
- * Used by `@lumiere/query-hooks/hooks/stdb` (`useStdbReducer`, `useStdbCallMutation`).
- *
- * Typed domains should prefer their own `*BffPost` wrappers; this module accepts any reducer name at runtime.
- */
-export const STDB_BFF_REDUCERS = [] as const;
+export { STDB_BFF_REDUCERS, type StdbBffReducerKey };
 
-export type StdbBffReducerKey = string;
+type NamedReducerKey = Extract<StdbBffReducerKey, keyof OperationInputMap>;
+type WireField<T> =
+  | T
+  | null
+  | (T extends bigint ? number | string : never)
+  | (T extends object ? Record<string, unknown> : never)
+  | { some: unknown }
+  | { none: [] };
+
+export type StdbBffCommandInput<K extends NamedReducerKey> = {
+  [P in keyof OperationInputMap[K]]: WireField<OperationInputMap[K][P]>;
+};
 
 /** Same-origin path used by `apiFetch` in the web app. */
-export function stdbBffCallUrl(reducer: string): string {
+export function stdbBffCallUrl(reducer: StdbBffReducerKey): string {
   return `/api/call/${encodeURIComponent(reducer)}`;
 }
 
-export function stdbBffPost(
-  reducer: string,
-  args: unknown[],
+/**
+ * Named command transport. The input deliberately omits `organization_id`;
+ * api-server injects it from the authenticated session using contract metadata.
+ */
+export function stdbBffCommandPost<K extends NamedReducerKey>(
+  reducer: K,
+  input: StdbBffCommandInput<K>,
 ): { urlPath: string; init: RequestInit } {
   return {
     urlPath: stdbBffCallUrl(reducer),
     init: {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
+      body: stringifyReducerCommandBody(input),
     },
   };
 }
 
 export function stdbCommandContract(
-  reducer: string,
+  reducer: StdbBffReducerKey,
 ): ReducerCommandContractMeta {
   return {
     reducerName: reducer,
@@ -40,6 +54,6 @@ export function stdbCommandContract(
     requiredSubscriptionResources: [],
     affectedTables: [],
     expectations:
-      "Authenticated api-server session; prefer typed domain *BffPost when available.",
+      "Authenticated api-server session; send generated named command inputs.",
   };
 }

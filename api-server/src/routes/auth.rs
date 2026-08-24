@@ -160,7 +160,7 @@ async fn signup(
         .ok_or_else(|| ApiError::Internal("STDB_SERVER_TOKEN is not configured".into()))?;
     let client = state.client_with_token(admin);
     client
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "store_user_credential",
             json!([
                 identity_json_for_reducer_call(&identity),
@@ -168,7 +168,7 @@ async fn signup(
                 password_hash,
                 token_enc
             ]),
-        )
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
@@ -241,14 +241,14 @@ async fn forgot_password(
             .ok_or_else(|| ApiError::Internal("STDB_SERVER_TOKEN is not configured".into()))?;
         let client = state.client_with_token(admin);
         let _ = client
-            .call_reducer(
+            .call_reducer(stdb_client::reducer_call!(
                 "create_password_reset_token",
                 json!([
                     identity_json_for_reducer_call(&cred.identity_hex),
                     token_hash,
                     expires_at.to_string()
                 ]),
-            )
+            ))
             .await;
 
         if let Some(ref api_key) = state.config.resend_api_key {
@@ -342,17 +342,20 @@ async fn reset_password(
         .ok_or_else(|| ApiError::Internal("STDB_SERVER_TOKEN is not configured".into()))?;
     let client = state.client_with_token(admin);
     client
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "update_user_password",
             json!([
                 identity_json_for_reducer_call(&reset_token.identity_hex),
                 new_hash
             ]),
-        )
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     client
-        .call_reducer("mark_reset_token_used", json!([reset_token.id]))
+        .call_reducer(stdb_client::reducer_call!(
+            "mark_reset_token_used",
+            json!([reset_token.id])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
@@ -466,7 +469,7 @@ async fn invite(
     let expires_at = now_micros() + (7_i128 * 24 * 60 * 60 * 1_000_000);
 
     client
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "create_user_invite",
             json!([
                 body.organization_id,
@@ -476,7 +479,7 @@ async fn invite(
                 identity_json_for_reducer_call(&identity_hex),
                 expires_at.to_string()
             ]),
-        )
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
@@ -602,7 +605,7 @@ async fn accept_invite(
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
             let token_enc = encrypt_token(key, &token)?;
             client
-                .call_reducer(
+                .call_reducer(stdb_client::reducer_call!(
                     "store_user_credential",
                     json!([
                         identity_json_for_reducer_call(&identity),
@@ -610,7 +613,7 @@ async fn accept_invite(
                         password_hash,
                         token_enc
                     ]),
-                )
+                ))
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
             (identity, token)
@@ -621,7 +624,7 @@ async fn accept_invite(
         .ok_or_else(|| ApiError::BadRequest("Invite role not found".into()))?;
 
     client
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "add_org_member",
             json!([
                 identity_json_for_reducer_call(&member_identity),
@@ -637,12 +640,15 @@ async fn accept_invite(
                     "metadata": Value::Null,
                 }
             ]),
-        )
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     client
-        .call_reducer("mark_invite_accepted", json!([invite.id]))
+        .call_reducer(stdb_client::reducer_call!(
+            "mark_invite_accepted",
+            json!([invite.id])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 

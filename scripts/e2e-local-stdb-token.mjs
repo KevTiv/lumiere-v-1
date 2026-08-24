@@ -49,7 +49,7 @@ function moduleNameFromEnv() {
 }
 
 function loginLocal({ forceLogout = false } = {}) {
-  if (forceLogout && process.env.E2E_FORCE_LOCAL_LOGIN !== '0') {
+  if (forceLogout) {
     spawnSync('spacetime', ['logout'], { stdio: 'ignore' })
   }
 
@@ -95,9 +95,13 @@ async function main() {
   const args = new Set(process.argv.slice(2))
 
   if (args.has('--login-only')) {
-    // Default: keep existing cli.toml identity (DB owner after first publish).
-    // Set E2E_FORCE_LOCAL_LOGIN=1 to logout + server-issued login (new identity).
-    loginLocal({ forceLogout: process.env.E2E_FORCE_LOCAL_LOGIN === '1' })
+    // A CI runner owns a fresh local server, so any restored/cloud CLI token
+    // must be replaced with one signed by that server. Local development keeps
+    // its existing identity because it may own an already-published database.
+    const forceLogout = process.env.CI === 'true' || process.env.E2E_FORCE_LOCAL_LOGIN === '1'
+    const token = readCliToken()
+    if (!forceLogout && token) return
+    loginLocal({ forceLogout: forceLogout || Boolean(token) })
     return
   }
 

@@ -29,7 +29,7 @@ export function OpportunityPresenceBanner({
   const { t } = useTranslation()
   const organization = BigInt(organizationId)
   const { data: rows = [] } = useOpportunityPresence(organization)
-  const updatePresence = useUpdateOpportunityPresence(organization)
+  const updatePresence = useUpdateOpportunityPresence()
   const clearPresence = useClearOpportunityPresence(organization)
 
   useEffect(() => {

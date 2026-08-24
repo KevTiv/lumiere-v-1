@@ -343,6 +343,7 @@
     "account_analytic_id",
     "date_planned",
     "propagate_cancel",
+    "lot_id",
     "metadata"
   ],
   "AddPurchaseRfqLineParams": [
@@ -1294,7 +1295,8 @@
     "placeholder",
     "default_value",
     "category",
-    "section_id"
+    "section_id",
+    "visibility_json"
   ],
   "CreateHelpdeskStageParams": [
     "team_id",
@@ -1396,6 +1398,7 @@
     "referred_by",
     "description",
     "user_id",
+    "stage_id",
     "team_id",
     "partner_id",
     "date_deadline",
@@ -1741,7 +1744,8 @@
     "metadata"
   ],
   "CreateReturnOrderLineParams": [
-    "sale_order_line_id"
+    "sale_order_line_id",
+    "lot_id"
   ],
   "CreateReturnOrderParams": [
     "sale_order_id",
@@ -1780,16 +1784,19 @@
     "fiscal_position_id",
     "team_id",
     "opportunity_id",
+    "proposal_id",
     "note",
     "terms_and_conditions",
     "validity_days",
     "shipping_policy",
     "picking_policy",
+    "invoice_policy",
     "campaign_id",
     "medium_id",
     "source_id",
     "commitment_date",
     "expected_date",
+    "incoterm_id",
     "incoterm",
     "incoterm_location",
     "carrier_id",
@@ -3058,6 +3065,10 @@
   ],
   "ProposalSection": [
     "ai_suggestion"
+  ],
+  "PublishFormConfigurationParams": [
+    "description",
+    "expected_updated_at_micros"
   ],
   "PurchaseOrder": [
     "name",
@@ -4334,8 +4345,7 @@
     "probability",
     "stage_id",
     "priority",
-    "is_won",
-    "is_lost",
+    "desired_state",
     "partner_id",
     "contact_id",
     "date_deadline",
@@ -4626,11 +4636,13 @@
     "picking_policy",
     "validity_date",
     "carrier_id",
+    "incoterm_id",
     "incoterm",
     "incoterm_location",
     "customer_lead",
     "analytic_account_id",
     "user_id",
+    "is_dropship",
     "metadata"
   ],
   "UpdateStockLocationParams": [

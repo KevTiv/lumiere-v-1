@@ -33,6 +33,7 @@ import {
   useCancelWorkflowTimer,
   useCancelWorkflowOutbox,
 } from "@lumiere/query-hooks/hooks/workflows"
+import type { Workflow, WorkflowInstance } from "@lumiere/query-hooks/hooks/workflows"
 import { toCreateWorkflowParams } from "@lumiere/erp-shared/workflows-create-params"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -43,9 +44,9 @@ import {
 } from "./workflows-row-dialog"
 
 interface WorkflowsClientProps {
-  initialWorkflows?: Record<string, unknown>[]
+  initialWorkflows?: Workflow[]
   initialVersions?: Record<string, unknown>[]
-  initialInstances?: Record<string, unknown>[]
+  initialInstances?: WorkflowInstance[]
   initialActivities?: Record<string, unknown>[]
   initialWorkitems?: Record<string, unknown>[]
   organizationId?: number
@@ -119,11 +120,11 @@ function WorkflowsClientLoaded({
       instancesRaw.map((row) => ({
         ...row,
         stateTag: instanceStateTag(row.state),
-        subjectModel: row.subjectModel ?? row.subject_model,
-        subjectId: row.subjectId ?? row.subject_id,
-        workflowVersionId: row.workflowVersionId ?? row.workflow_version_id,
-        startedAt: row.startedAt ?? row.started_at,
-        companyId: row.companyId ?? row.company_id,
+        subjectModel: row.subjectModel,
+        subjectId: row.subjectId,
+        workflowVersionId: row.workflowVersionId,
+        startedAt: row.startedAt,
+        companyId: row.companyId,
       })) as Record<string, unknown>[],
     [instancesRaw],
   )

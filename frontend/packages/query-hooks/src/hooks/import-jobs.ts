@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { stdbBffPost } from "@lumiere/stdb/commands"
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 
@@ -50,7 +50,7 @@ export function useImportJobs(organizationId: bigint, enabled = true) {
     queryFn: () => fetchQueryList("/api/query/import-jobs", "Failed to fetch import jobs"),
     enabled: organizationId > 0n && enabled,
     refetchInterval: (query) => {
-      const rows = (query.state.data ?? []) as ImportJobRow[]
+      const rows = (query.state.data ?? []) as unknown as ImportJobRow[]
       const pending = rows.some((row) => {
         const status = String(row.status ?? "")
         return status === "pending" || status === ""
@@ -130,10 +130,9 @@ export function useRollbackImportJob(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (jobId: bigint | number) => {
-      const { urlPath, init } = stdbBffPost("rollback_import_job", [
-        organizationId,
-        BigInt(jobId),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("rollback_import_job", {
+        jobId: BigInt(jobId),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         const json = (await r.json().catch(() => ({}))) as { error?: string }

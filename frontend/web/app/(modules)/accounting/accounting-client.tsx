@@ -84,7 +84,6 @@ import { Label } from "@lumiere/ui/components/label"
 import type { BadgeVariant, EntityRecordSheetConfig, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
   accountingParamsToJson,
-  createAccountAccountParamsToStdbHttpJson,
   analyticParamsToJson,
   toCreateAccountAccountParams,
   toCreateAccountMoveFromInvoiceModal,
@@ -92,7 +91,6 @@ import {
   toCreateAccountJournalParams,
   toCreateCrossoveredBudgetLineParams,
   toCreateCreditNoteParams,
-  createAccountTaxParamsToStdbHttpJson,
   toCreateAccountTaxParams,
   toCreateCrossoveredBudgetParams,
   toCreateAnalyticAccountParams,
@@ -144,6 +142,7 @@ import {
   toCreateBadDebtWriteOffParamsFromForm,
   toCreateAmortizationScheduleParamsFromForm,
 } from "@/lib/accounting-create-params"
+import type { ClearablePatch } from "@/lib/accounting-create-params"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { stdbParamsToJson } from "@/lib/stdb-params-json"
 import {
@@ -158,6 +157,8 @@ import {
 import type {
   AddAccountMoveLineParams,
   UpdateAccountJournalParams,
+  UpdateCrossoveredBudgetLineParams,
+  UpdateCrossoveredBudgetParams,
 } from "@lumiere/stdb/types"
 import { accountingModuleConfig } from "@/lib/module-dashboard-configs"
 import { PaymentOperationsPanel } from "./payment-operations-panel"
@@ -320,7 +321,16 @@ import {
 } from "@/lib/form-lookup"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { useToast } from "@/hooks/use-toast"
-import type { AccountMove } from "@lumiere/query-hooks/hooks/accounting"
+import type {
+  AccountAccount as AccountAccountRow,
+  AccountAnalyticAccount,
+  AccountFiscalYear,
+  AccountJournal,
+  AccountMove,
+  AccountPeriod,
+  AccountTax,
+  CrossoveredBudget,
+} from "@lumiere/query-hooks/hooks/accounting"
 import {
   InvoiceListView,
   InvoiceDetailModal,
@@ -424,6 +434,7 @@ function toAddAccountMoveLineParamsFromForm(
       expectedPayDateCurrencyId: undefined,
       expectedPayDateAmount: 0,
       expectedPayDateResidual: 0,
+      metadata: undefined,
     },
   }
 }
@@ -478,7 +489,9 @@ function optionalText(value: unknown): string | undefined {
   return text === "" ? undefined : text
 }
 
-function toUpdateBudgetParams(formData: Record<string, unknown>): Record<string, unknown> {
+function toUpdateBudgetParams(
+  formData: Record<string, unknown>,
+): ClearablePatch<UpdateCrossoveredBudgetParams> {
   return {
     companyId: undefined,
     name: optionalText(formData.name),
@@ -488,7 +501,9 @@ function toUpdateBudgetParams(formData: Record<string, unknown>): Record<string,
   }
 }
 
-function toUpdateBudgetLineParams(formData: Record<string, unknown>): Record<string, unknown> {
+function toUpdateBudgetLineParams(
+  formData: Record<string, unknown>,
+): ClearablePatch<UpdateCrossoveredBudgetLineParams> {
   return {
     plannedAmount:
       formData.plannedAmount === "" || formData.plannedAmount == null
@@ -585,14 +600,14 @@ type AccountingCsvImportKind =
   | "analytic"
 
 interface AccountingClientProps {
-  initialAccounts?: Record<string, unknown>[]
-  initialMoves?: Record<string, unknown>[]
-  initialTaxes?: Record<string, unknown>[]
-  initialBudgets?: Record<string, unknown>[]
-  initialAnalytic?: Record<string, unknown>[]
-  initialJournals?: Record<string, unknown>[]
-  initialFiscalYears?: Record<string, unknown>[]
-  initialAccountPeriods?: Record<string, unknown>[]
+  initialAccounts?: AccountAccountRow[]
+  initialMoves?: AccountMove[]
+  initialTaxes?: AccountTax[]
+  initialBudgets?: CrossoveredBudget[]
+  initialAnalytic?: AccountAnalyticAccount[]
+  initialJournals?: AccountJournal[]
+  initialFiscalYears?: AccountFiscalYear[]
+  initialAccountPeriods?: AccountPeriod[]
   organizationId?: number
 }
 
@@ -1585,18 +1600,18 @@ function AccountingClientReady({
   const deleteAnalyticLine = useDeleteAnalyticLine(organizationId)
   const createAnalyticDistributionModel = useCreateAnalyticDistributionModel(organizationId)
   const updateAnalyticDistributionModel = useUpdateAnalyticDistributionModel(organizationId)
-  const postBankStatement = usePostAccountBankStatement(organizationId)
-  const deleteBankStatement = useDeleteAccountBankStatement(organizationId)
-  const createBankStatementLine = useCreateAccountBankStatementLine(organizationId)
-  const updateBankStatementLine = useUpdateAccountBankStatementLine(organizationId)
-  const deleteBankStatementLine = useDeleteAccountBankStatementLine(organizationId)
+  const postBankStatement = usePostAccountBankStatement(organizationId, operatingCompanyId)
+  const deleteBankStatement = useDeleteAccountBankStatement(organizationId, operatingCompanyId)
+  const createBankStatementLine = useCreateAccountBankStatementLine(organizationId, operatingCompanyId)
+  const updateBankStatementLine = useUpdateAccountBankStatementLine(organizationId, operatingCompanyId)
+  const deleteBankStatementLine = useDeleteAccountBankStatementLine(organizationId, operatingCompanyId)
   const matchBankLine = useMatchBankLine(organizationId)
   const applyReconciliationRules = useApplyReconciliationRules(organizationId)
-  const reconcileBankLine = useReconcileAccountBankStatementLine(organizationId)
-  const unreconcileBankLine = useUnreconciledAccountBankStatementLine(organizationId)
-  const createReconciliationWidget = useCreateAccountReconciliationWidget(organizationId)
-  const updateReconciliationWidget = useUpdateAccountReconciliationWidget(organizationId)
-  const deleteReconciliationWidget = useDeleteAccountReconciliationWidget(organizationId)
+  const reconcileBankLine = useReconcileAccountBankStatementLine(organizationId, operatingCompanyId)
+  const unreconcileBankLine = useUnreconciledAccountBankStatementLine(organizationId, operatingCompanyId)
+  const createReconciliationWidget = useCreateAccountReconciliationWidget(organizationId, operatingCompanyId)
+  const updateReconciliationWidget = useUpdateAccountReconciliationWidget(organizationId, operatingCompanyId)
+  const deleteReconciliationWidget = useDeleteAccountReconciliationWidget(organizationId, operatingCompanyId)
   const createConsolidationAccount = useCreateConsolidationAccount(organizationId)
   const updateConsolidationAccount = useUpdateConsolidationAccount(organizationId)
   const createConsolidationJournal = useCreateConsolidationJournal(organizationId)
@@ -2407,11 +2422,10 @@ function AccountingClientReady({
             variant: "destructive",
             onClick: (rows) => {
               for (const r of rows) {
-                void deleteAccountMoveLine.mutateAsync([
-                  organizationId,
-                  BigInt(String((r as Record<string, unknown>).id)),
-                  stdbParamsToJson({ companyId: operatingCompanyId }),
-                ])
+                void deleteAccountMoveLine.mutateAsync({
+                  lineId: BigInt(String((r as Record<string, unknown>).id)),
+                  params: { companyId: operatingCompanyId },
+                })
               }
             },
           },
@@ -2613,14 +2627,13 @@ function AccountingClientReady({
           })
           return
         }
-        postInvoice.mutate([
-          organizationId,
-          id,
-          resolved.cogsAccountId,
-          resolved.inventoryAccountId,
-        ])
+        postInvoice.mutate({
+          moveId: id,
+          cogsAccountId: BigInt(resolved.cogsAccountId),
+          inventoryAccountId: BigInt(resolved.inventoryAccountId),
+        })
       } else {
-        postMove.mutate([organizationId, id])
+        postMove.mutate(id)
       }
     },
     [postMove, postInvoice, organizationId, accounts, toast, t],
@@ -2981,18 +2994,17 @@ function AccountingClientReady({
         companyId: operatingCompanyId,
         accountTypes: accountTypes as Record<string, unknown>[],
       })
-      if (p) await createAccount.mutateAsync([organizationId, createAccountAccountParamsToStdbHttpJson(p)])
+      if (p) await createAccount.mutateAsync(p)
     } else if (action === "createMove") {
       const p = toCreateAccountMoveParams(formData, operatingCompanyId)
-      if (p) await createMove.mutateAsync([organizationId, accountingParamsToJson(p, "CreateAccountMoveParams")])
+      if (p) await createMove.mutateAsync(p)
     } else if (action === "createTax") {
-      await createTax.mutateAsync([
-        organizationId,
-        operatingCompanyId,
-        createAccountTaxParamsToStdbHttpJson(toCreateAccountTaxParams(formData)),
-      ])
+      await createTax.mutateAsync({
+        companyId: operatingCompanyId,
+        params: toCreateAccountTaxParams(formData),
+      })
     } else if (action === "createBudget") {
-      await createBudget.mutateAsync(accountingParamsToJson(toCreateCrossoveredBudgetParams(formData, operatingCompanyId), "CreateCrossoveredBudgetParams"))
+      await createBudget.mutateAsync(toCreateCrossoveredBudgetParams(formData, operatingCompanyId))
     } else if (action === "createAnalyticAccount") {
       const fd = { ...formData }
       if (fd.currencyId === "" || fd.currencyId == null) {
@@ -3029,18 +3041,11 @@ function AccountingClientReady({
       if (p) await createPaymentTermLine.mutateAsync(stdbParamsToJson(p, "CreatePaymentTermLineParams"))
     } else if (action === "createAccountJournal") {
       const params = toCreateAccountJournalParams(formData, operatingCompanyId)
-      await createAccountJournal.mutateAsync([
-        organizationId,
-        accountingParamsToJson(params, "CreateAccountJournalParams"),
-      ])
+      await createAccountJournal.mutateAsync(params)
     } else if (action === "addAccountMoveLine") {
       const parsed = toAddAccountMoveLineParamsFromForm(formData)
       if (parsed) {
-        await addAccountMoveLine.mutateAsync([
-          organizationId,
-          parsed.moveId,
-          accountingParamsToJson(parsed.params, "AddAccountMoveLineParams"),
-        ])
+        await addAccountMoveLine.mutateAsync({ moveId: parsed.moveId, params: parsed.params })
       }
     } else if (action === "createCurrencyRate") {
       const p = toCreateCurrencyRateParamsFromForm(formData)
@@ -3186,7 +3191,7 @@ function AccountingClientReady({
                         companyId: operatingCompanyId,
                         accountTypes: accountTypes as Record<string, unknown>[],
                       })
-                      if (p) await createAccount.mutateAsync([organizationId, createAccountAccountParamsToStdbHttpJson(p)])
+                      if (p) await createAccount.mutateAsync(p)
                     }}
                   />
                 ),
@@ -3209,7 +3214,7 @@ function AccountingClientReady({
                     onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
                     onPostMove={(move) => postDraft(move)}
                     onCancelMove={(move) =>
-                      cancelMove.mutate([organizationId, move.id as string | number | bigint])
+                      cancelMove.mutate(move.id as string | number | bigint)
                     }
                     onComputeInvoiceTotals={(move) =>
                       void computeInvoiceTotals.mutateAsync(move.id as string | number | bigint)
@@ -3240,28 +3245,25 @@ function AccountingClientReady({
                       budgetLines={budgetLines}
                       budgetPosts={budgetPosts}
                       onCreateBudget={(params) =>
-                        createBudget.mutateAsync(accountingParamsToJson(toCreateCrossoveredBudgetParams(params, operatingCompanyId), "CreateCrossoveredBudgetParams"))
+                        createBudget.mutateAsync(toCreateCrossoveredBudgetParams(params, operatingCompanyId))
                       }
                       onUpdateBudget={(budgetId, params) =>
-                        updateBudget.mutateAsync([
-                          organizationId,
+                        updateBudget.mutateAsync({
                           budgetId,
-                          stdbParamsToJson(toUpdateBudgetParams(params)),
-                        ])
+                          params: toUpdateBudgetParams(params),
+                        })
                       }
                       onCreateBudgetLine={(budgetId, params) =>
-                        createBudgetLine.mutateAsync([
-                          organizationId,
+                        createBudgetLine.mutateAsync({
                           budgetId,
-                          accountingParamsToJson(toCreateCrossoveredBudgetLineParams(params), "CreateCrossoveredBudgetLineParams"),
-                        ])
+                          params: toCreateCrossoveredBudgetLineParams(params),
+                        })
                       }
                       onUpdateBudgetLine={(lineId, params) =>
-                        updateBudgetLine.mutateAsync([
-                          organizationId,
+                        updateBudgetLine.mutateAsync({
                           lineId,
-                          stdbParamsToJson(toUpdateBudgetLineParams(params)),
-                        ])
+                          params: toUpdateBudgetLineParams(params),
+                        })
                       }
                       onConfirmBudget={(budgetId) => confirmBudget.mutateAsync(budgetId)}
                       onValidateBudget={(budgetId) => validateBudget.mutateAsync(budgetId)}
@@ -4088,12 +4090,11 @@ function AccountingClientReady({
           })}
           isPending={createCreditNote.isPending}
           onSubmit={async (data) => {
-            await createCreditNote.mutateAsync([
-              organizationId,
-              Number(operatingCompanyId),
-              Number(creditNoteSource.id),
-              accountingParamsToJson(toCreateCreditNoteParams(data), "CreateCreditNoteParams"),
-            ])
+            await createCreditNote.mutateAsync({
+              companyId: operatingCompanyId,
+              invoiceId: BigInt(String(creditNoteSource.id)),
+              params: toCreateCreditNoteParams(data),
+            })
             toast({
               title: t("accounting.forms.createCreditNote.title"),
               description: t("accounting.forms.createCreditNote.description"),
@@ -4134,10 +4135,7 @@ function AccountingClientReady({
             "Customer Invoice",
             operatingCompanyId,
           )
-          await createMove.mutateAsync([
-            organizationId,
-            accountingParamsToJson(p, "CreateAccountMoveParams"),
-          ])
+          await createMove.mutateAsync(p)
           if (p.metadata && p.invoicePartnerDisplayName) {
             await persistAccountMoveCustomFieldsAfterCreate(
               p.metadata,
@@ -4178,10 +4176,7 @@ function AccountingClientReady({
             "Vendor Bill",
             operatingCompanyId,
           )
-          await createMove.mutateAsync([
-            organizationId,
-            accountingParamsToJson(p, "CreateAccountMoveParams"),
-          ])
+          await createMove.mutateAsync(p)
           if (p.metadata && p.invoicePartnerDisplayName) {
             await persistAccountMoveCustomFieldsAfterCreate(
               p.metadata,
@@ -4251,11 +4246,10 @@ function AccountingClientReady({
           if (code) params.code = code
           if (formData.active !== undefined) params.active = Boolean(formData.active)
           if (Object.keys(params).length === 0) return
-          await updateAccountJournal.mutateAsync([
-            organizationId,
-            BigInt(String(journalEdit.id)),
-            stdbParamsToJson(params as UpdateAccountJournalParams),
-          ])
+          await updateAccountJournal.mutateAsync({
+            journalId: BigInt(String(journalEdit.id)),
+            params: params as UpdateAccountJournalParams,
+          })
           setJournalEdit(null)
         }}
       />

@@ -1,18 +1,20 @@
 "use client"
 
-/**
- * Expenses hooks — Phase 4 of API Gateway Refactor
- *
- * Wraps REST API calls with React Query for the Expenses module.
- */
 
-
-import { expensesBffPost } from "@lumiere/stdb/commands"
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import type {
+  CreateExpenseAdvanceParams,
+  CreateExpenseCardStatementLineParams,
   CreateExpenseParams,
   CreateExpenseProjectRebillParams,
   CreateExpenseReimbursementParams,
   CreateExpenseSheetParams,
+  ExpenseCardStatementLine,
+  HrExpense,
+  HrExpenseAdvance,
+  HrExpensePolicyException,
+  HrExpenseReceipt,
+  HrExpenseSheet,
   PostExpenseSheetParams,
   RefuseExpenseSheetParams,
   SetExpenseAllocationsParams,
@@ -33,9 +35,9 @@ import {
 
 export function useExpenses(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: HrExpense[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery({
     queryKey: ['expenses', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/expenses', 'Failed to fetch expenses'),
     staleTime: 30_000,
@@ -45,9 +47,9 @@ export function useExpenses(
 
 export function useExpenseSheets(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: HrExpenseSheet[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery({
     queryKey: ['expense-sheets', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/expense-sheets', 'Failed to fetch expense sheets'),
     staleTime: 30_000,
@@ -86,9 +88,9 @@ export function useExpensesMissingReceipt(organizationId: bigint, initialData?: 
 /** Server-bounded: card statement lines with `status = unmatched`. */
 export function useExpenseCardStatementUnmatched(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ExpenseCardStatementLine[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery({
     queryKey: ['expense-card-statement-unmatched', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -102,8 +104,8 @@ export function useExpenseCardStatementUnmatched(
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
-export function useExpenseReceipts(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useExpenseReceipts(organizationId: bigint, initialData?: HrExpenseReceipt[]) {
+  return useQuery({
     queryKey: ['expense-receipts', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/expense-receipts', 'Failed to fetch expense receipts'),
@@ -113,8 +115,8 @@ export function useExpenseReceipts(organizationId: bigint, initialData?: QueryRo
 }
 
 /** Open / partially applied advances with residual. */
-export function useExpenseAdvances(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useExpenseAdvances(organizationId: bigint, initialData?: HrExpenseAdvance[]) {
+  return useQuery({
     queryKey: ['expense-advances', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/expense-advances', 'Failed to fetch expense advances'),
@@ -124,8 +126,8 @@ export function useExpenseAdvances(organizationId: bigint, initialData?: QueryRo
 }
 
 /** Pending policy exceptions queue. */
-export function useExpensePolicyExceptions(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useExpensePolicyExceptions(organizationId: bigint, initialData?: HrExpensePolicyException[]) {
+  return useQuery({
     queryKey: ['expense-policy-exceptions', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -179,9 +181,7 @@ export async function createExpenseReceiptAndResolveId(
     (typeof crypto !== "undefined" && "randomUUID" in crypto
       ? `rcpt-${crypto.randomUUID()}`
       : `rcpt-${Date.now()}`)
-  const { urlPath, init } = expensesBffPost("create_expense_receipt", [
-    organizationId,
-    stdbParamsToJson(
+  const { urlPath, init } = stdbBffCommandPost("create_expense_receipt", { params: stdbParamsToJson(
       {
         companyId: params.companyId,
         employeeId: params.employeeId,
@@ -192,8 +192,7 @@ export async function createExpenseReceiptAndResolveId(
         clientRequestId,
       },
       "CreateExpenseReceiptParams",
-    ),
-  ])
+    ) })
   const r = await apiFetch(urlPath, init)
   if (!r.ok) throw new Error(await parseCallErrorExpenses(r, "Failed to create expense receipt"))
   const rows = await fetchQueryList(
@@ -201,7 +200,7 @@ export async function createExpenseReceiptAndResolveId(
     "Failed to fetch expense receipts",
   )
   const match = rows.find((row) => {
-    const key = row.clientRequestId ?? row.client_request_id
+    const key = row.clientRequestId
     return key != null && String(key) === clientRequestId
   })
   if (match?.id == null) {
@@ -235,10 +234,7 @@ export function useCreateExpense(organizationId: bigint, companyId?: bigint) {
         ...params,
         companyId: params.companyId ?? companyId,
       })
-      const { urlPath, init } = expensesBffPost("create_expense", [
-        organizationId,
-        stdbParamsToJson(finalized, "CreateExpenseParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_expense", { params: stdbParamsToJson(finalized, "CreateExpenseParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create expense')
     },
@@ -255,10 +251,7 @@ export function useCreateExpenseSheet(organizationId: bigint, companyId?: bigint
         ...params,
         companyId: params.companyId ?? companyId,
       })
-      const { urlPath, init } = expensesBffPost("create_expense_sheet", [
-        organizationId,
-        stdbParamsToJson(finalized, "CreateExpenseSheetParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_expense_sheet", { params: stdbParamsToJson(finalized, "CreateExpenseSheetParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create expense sheet')
     },
@@ -278,11 +271,7 @@ export function useUpdateExpense(organizationId: bigint, companyId?: bigint) {
       params: Partial<UpdateExpenseParams>
     }) => {
       const patch = { ...params, companyId: params.companyId ?? companyId }
-      const { urlPath, init } = expensesBffPost("update_expense", [
-        organizationId,
-        expenseId,
-        stdbParamsToJson(patch, "UpdateExpenseParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("update_expense", { expenseId: expenseId, params: stdbParamsToJson(patch, "UpdateExpenseParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update expense')
     },
@@ -301,11 +290,7 @@ export function useSubmitExpense(organizationId: bigint) {
       expenseId: string | number | bigint
       sheetId: string | number | bigint
     }) => {
-      const { urlPath, init } = expensesBffPost("submit_expense", [
-        organizationId,
-        expenseId,
-        sheetId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("submit_expense", { expenseId: expenseId, sheetId: sheetId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to submit expense')
     },
@@ -322,10 +307,7 @@ export function useSubmitExpenseSheet(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (sheetId: string | number | bigint) => {
-      const { urlPath, init } = expensesBffPost("submit_expense_sheet", [
-        organizationId,
-        sheetId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("submit_expense_sheet", { sheetId: sheetId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to submit expense sheet'))
     },
@@ -345,10 +327,7 @@ export function useApproveExpenseSheet(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (sheetId: string | number | bigint) => {
-      const { urlPath, init } = expensesBffPost("approve_expense_sheet", [
-        organizationId,
-        sheetId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("approve_expense_sheet", { sheetId: sheetId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to approve expense sheet'))
     },
@@ -373,11 +352,7 @@ export function useRefuseExpenseSheet(organizationId: bigint) {
       sheetId: string | number | bigint
       params?: Partial<RefuseExpenseSheetParams>
     }) => {
-      const { urlPath, init } = expensesBffPost("refuse_expense_sheet", [
-        organizationId,
-        sheetId,
-        stdbParamsToJson(params ?? {}, "RefuseExpenseSheetParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("refuse_expense_sheet", { sheetId: sheetId, params: stdbParamsToJson(params ?? {}, "RefuseExpenseSheetParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to refuse expense sheet'))
     },
@@ -402,11 +377,7 @@ export function usePostExpenseSheet(organizationId: bigint) {
       sheetId: string | number | bigint
       params: Partial<PostExpenseSheetParams>
     }) => {
-      const { urlPath, init } = expensesBffPost("post_expense_sheet", [
-        organizationId,
-        sheetId,
-        stdbParamsToJson(params, "PostExpenseSheetParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("post_expense_sheet", { sheetId: sheetId, params: stdbParamsToJson(params, "PostExpenseSheetParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to post expense sheet'))
     },
@@ -429,11 +400,7 @@ export function useCreateExpenseReimbursementPayment(organizationId: bigint) {
       sheetId: string | number | bigint
       params: Partial<CreateExpenseReimbursementParams>
     }) => {
-      const { urlPath, init } = expensesBffPost("create_expense_reimbursement_payment", [
-        organizationId,
-        sheetId,
-        stdbParamsToJson(params, "CreateExpenseReimbursementParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_expense_reimbursement_payment", { sheetId: sheetId, params: stdbParamsToJson(params, "CreateExpenseReimbursementParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to reimburse expense sheet'))
     },
@@ -458,14 +425,10 @@ export function useUpsertExpenseMileageRate(organizationId: bigint, companyId?: 
       rateId?: string | number | bigint | null
       params: Partial<UpsertExpenseMileageRateParams>
     }) => {
-      const { urlPath, init } = expensesBffPost("upsert_expense_mileage_rate", [
-        organizationId,
-        rateId ?? null,
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("upsert_expense_mileage_rate", { rateId: rateId ?? null, params: stdbParamsToJson(
           { ...params, companyId: params.companyId ?? companyId },
           "UpsertExpenseMileageRateParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to upsert mileage rate'))
     },
@@ -484,16 +447,13 @@ export function useSeedStatutoryExpenseMileageRates(
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: { currencyId: bigint; companyId?: bigint }) => {
-      const { urlPath, init } = expensesBffPost("seed_statutory_expense_mileage_rates", [
-        organizationId,
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("seed_statutory_expense_mileage_rates", { params: stdbParamsToJson(
           {
             companyId: params.companyId ?? companyId,
             currencyId: params.currencyId,
           },
           "SeedStatutoryExpenseMileageRatesParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         throw new Error(
@@ -519,14 +479,10 @@ export function useUpsertExpensePerDiemRate(organizationId: bigint, companyId?: 
       rateId?: string | number | bigint | null
       params: Partial<UpsertExpensePerDiemRateParams>
     }) => {
-      const { urlPath, init } = expensesBffPost("upsert_expense_per_diem_rate", [
-        organizationId,
-        rateId ?? null,
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("upsert_expense_per_diem_rate", { rateId: rateId ?? null, params: stdbParamsToJson(
           { ...params, companyId: params.companyId ?? companyId },
           "UpsertExpensePerDiemRateParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to upsert per diem rate'))
     },
@@ -548,11 +504,7 @@ export function useSetExpenseAllocations(organizationId: bigint) {
       expenseId: string | number | bigint
       params: SetExpenseAllocationsParams
     }) => {
-      const { urlPath, init } = expensesBffPost("set_expense_allocations", [
-        organizationId,
-        expenseId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("set_expense_allocations", { expenseId: expenseId, params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to set expense allocations'))
     },
@@ -571,11 +523,7 @@ export function useCreateExpenseProjectRebill(organizationId: bigint) {
       sheetId: string | number | bigint
       params: Partial<CreateExpenseProjectRebillParams>
     }) => {
-      const { urlPath, init } = expensesBffPost("create_expense_project_rebill", [
-        organizationId,
-        sheetId,
-        stdbParamsToJson(params, "CreateExpenseProjectRebillParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_expense_project_rebill", { sheetId: sheetId, params: stdbParamsToJson(params, "CreateExpenseProjectRebillParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to create project rebill'))
     },
@@ -598,9 +546,7 @@ export function useCreateExpenseIntegrationIntent(organizationId: bigint, compan
       payload: string
       metadata?: string
     }) => {
-      const { urlPath, init } = expensesBffPost("create_expense_integration_intent", [
-        organizationId,
-        stdbParamsToJson(
+      const { urlPath, init } = stdbBffCommandPost("create_expense_integration_intent", { params: stdbParamsToJson(
           {
             companyId,
             intentType: params.intentType,
@@ -610,8 +556,7 @@ export function useCreateExpenseIntegrationIntent(organizationId: bigint, compan
             metadata: params.metadata,
           },
           "CreateExpenseIntegrationIntentParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to create integration intent'))
     },
@@ -624,10 +569,7 @@ export function useApplyExpenseIntegrationIntent(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (intentId: string | number | bigint) => {
-      const { urlPath, init } = expensesBffPost("apply_expense_integration_intent", [
-        organizationId,
-        intentId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("apply_expense_integration_intent", { intentId: intentId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to apply integration intent'))
     },
@@ -648,11 +590,7 @@ export function useSetExpenseFraudHold(organizationId: bigint) {
       fraudHold: boolean
       fraudReason?: string
     }) => {
-      const { urlPath, init } = expensesBffPost("set_expense_fraud_hold", [
-        organizationId,
-        expenseId,
-        stdbParamsToJson({ fraudHold, fraudReason }, "SetExpenseFraudHoldParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("set_expense_fraud_hold", { expenseId: expenseId, params: stdbParamsToJson({ fraudHold, fraudReason }, "SetExpenseFraudHoldParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to set fraud hold'))
     },
@@ -671,11 +609,7 @@ export function useRequestExpensePolicyException(organizationId: bigint) {
       expenseId: string | number | bigint
       reason: string
     }) => {
-      const { urlPath, init } = expensesBffPost("request_expense_policy_exception", [
-        organizationId,
-        expenseId,
-        stdbParamsToJson({ reason }, "RequestExpensePolicyExceptionParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("request_expense_policy_exception", { expenseId: expenseId, params: stdbParamsToJson({ reason }, "RequestExpensePolicyExceptionParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to request policy exception'))
     },
@@ -693,10 +627,7 @@ export function useApproveExpensePolicyException(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (exceptionId: string | number | bigint) => {
-      const { urlPath, init } = expensesBffPost("approve_expense_policy_exception", [
-        organizationId,
-        exceptionId,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("approve_expense_policy_exception", { exceptionId: exceptionId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to approve policy exception'))
     },
@@ -720,11 +651,7 @@ export function useRejectExpensePolicyException(organizationId: bigint) {
       exceptionId: string | number | bigint
       reason: string
     }) => {
-      const { urlPath, init } = expensesBffPost("reject_expense_policy_exception", [
-        organizationId,
-        exceptionId,
-        stdbParamsToJson({ reason }, "RejectExpensePolicyExceptionParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("reject_expense_policy_exception", { exceptionId: exceptionId, params: stdbParamsToJson({ reason }, "RejectExpensePolicyExceptionParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to reject policy exception'))
     },
@@ -741,14 +668,11 @@ export function useRejectExpensePolicyException(organizationId: bigint) {
 export function useCreateExpenseAdvance(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = expensesBffPost("create_expense_advance", [
-        organizationId,
-        stdbParamsToJson(
+    mutationFn: async (params: Partial<CreateExpenseAdvanceParams>) => {
+      const { urlPath, init } = stdbBffCommandPost("create_expense_advance", { params: stdbParamsToJson(
           { ...params, companyId: params.companyId ?? companyId },
           "CreateExpenseAdvanceParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to create advance'))
     },
@@ -774,12 +698,7 @@ export function useApplyExpenseAdvanceToSheet(organizationId: bigint) {
       sheetId: string | number | bigint
       amount: number
     }) => {
-      const { urlPath, init } = expensesBffPost("apply_expense_advance_to_sheet", [
-        organizationId,
-        advanceId,
-        sheetId,
-        stdbParamsToJson({ amount }, "ApplyExpenseAdvanceParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("apply_expense_advance_to_sheet", { advanceId: advanceId, sheetId: sheetId, params: stdbParamsToJson({ amount }, "ApplyExpenseAdvanceParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to apply advance'))
     },
@@ -800,14 +719,11 @@ export function useCreateExpenseCardStatementLine(
 ) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = expensesBffPost("create_expense_card_statement_line", [
-        organizationId,
-        stdbParamsToJson(
+    mutationFn: async (params: Partial<CreateExpenseCardStatementLineParams>) => {
+      const { urlPath, init } = stdbBffCommandPost("create_expense_card_statement_line", { params: stdbParamsToJson(
           { ...params, companyId: params.companyId ?? companyId },
           "CreateExpenseCardStatementLineParams",
-        ),
-      ])
+        ) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to create card statement line'))
     },
@@ -829,11 +745,7 @@ export function useMatchExpenseCardStatementLine(organizationId: bigint) {
       statementLineId: string | number | bigint
       expenseId: string | number | bigint
     }) => {
-      const { urlPath, init } = expensesBffPost("match_expense_card_statement_line", [
-        organizationId,
-        statementLineId,
-        stdbParamsToJson({ expenseId, metadata: null }, "MatchExpenseCardStatementLineParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("match_expense_card_statement_line", { statementLineId: statementLineId, params: stdbParamsToJson({ expenseId, metadata: null }, "MatchExpenseCardStatementLineParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to match statement line'))
     },
@@ -853,11 +765,7 @@ export function useUnmatchExpenseCardStatementLine(organizationId: bigint) {
     }: {
       statementLineId: string | number | bigint
     }) => {
-      const { urlPath, init } = expensesBffPost("unmatch_expense_card_statement_line", [
-        organizationId,
-        statementLineId,
-        stdbParamsToJson({ metadata: null }, "UnmatchExpenseCardStatementLineParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("unmatch_expense_card_statement_line", { statementLineId: statementLineId, params: stdbParamsToJson({ metadata: null }, "UnmatchExpenseCardStatementLineParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to unmatch statement line'))
     },
@@ -873,10 +781,7 @@ export function useApplyPendingExpenseIntegrationIntents(organizationId: bigint)
   const qc = useQueryClient()
   return useMutation<void, Error, number | undefined>({
     mutationFn: async (limit = 20) => {
-      const { urlPath, init } = expensesBffPost("apply_pending_expense_integration_intents", [
-        organizationId,
-        limit,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("apply_pending_expense_integration_intents", { limit: limit })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to apply pending intents'))
     },
@@ -893,7 +798,7 @@ export function useImportExpenseCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = expensesBffPost("import_expense_csv", [organizationId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_expense_csv", { csvData: csvData })
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorExpenses(res))
     },
@@ -905,10 +810,7 @@ export function useImportExpenseSheetCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = expensesBffPost("import_expense_sheet_csv", [
-        organizationId,
-        csvData,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("import_expense_sheet_csv", { csvData: csvData })
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorExpenses(res))
     },
@@ -932,4 +834,12 @@ export type {
   CreateExpenseReimbursementParams,
   CreateExpenseProjectRebillParams,
   SetExpenseAllocationsParams,
+  CreateExpenseAdvanceParams,
+  CreateExpenseCardStatementLineParams,
+  ExpenseCardStatementLine,
+  HrExpense,
+  HrExpenseAdvance,
+  HrExpensePolicyException,
+  HrExpenseReceipt,
+  HrExpenseSheet,
 } from '@lumiere/stdb/types'

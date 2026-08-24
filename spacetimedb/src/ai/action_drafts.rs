@@ -18,12 +18,6 @@ use crate::sales::sales_core::{
     create_sale_order, sale_order, CreateSaleOrderLineParams, CreateSaleOrderParams,
 };
 use crate::types::TaskState;
-use crate::workflow::action_registry::{
-    GuardedActionInput, GuardedActionKey, GUARDED_ACTION_SCHEMA_VERSION,
-};
-use crate::workflow::approval_gate::{
-    request_guarded_action, GuardedActionGateOutcome, RequestGuardedActionParams,
-};
 
 const DRAFT_TTL_SECS: u64 = 86_400;
 const ELEVATED_GOVERNANCE_FIELDS: [&str; 8] = [
@@ -159,19 +153,13 @@ pub fn create_ai_action_draft(
 
     on_draft_created(ctx, &row);
 
-    request_guarded_action(
-        ctx,
-        organization_id,
-        RequestGuardedActionParams {
-            company_id,
-            action: GuardedActionKey::ApproveAiActionDraft,
-            action_version: GUARDED_ACTION_SCHEMA_VERSION,
-            input: GuardedActionInput::ApproveAiActionDraft { draft_id: row.id },
-            idempotency_key: format!("approve-ai-action-draft:{}", row.id),
-            correlation_id: format!("ai-action-draft:{}:approve", row.id),
-            causation_id: None,
-        },
-    )?;
+    // Note: the guarded-action gate is checked inside `approve_ai_action_draft`
+    // (like every other guarded action — confirm_sales_order, approve_leave,
+    // approve_expense_sheet, etc.), not here at creation time. Requesting it
+    // here as well would pre-create the human task, causing the later check
+    // inside `approve_ai_action_draft` to always find that existing task and
+    // short-circuit with `Ok(())` — leaving the draft stuck at "pending"
+    // forever even when the approve call itself reports success.
 
     write_audit_log_v2(
         ctx,
@@ -269,24 +257,13 @@ pub fn approve_ai_action_draft(
     draft_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_action_draft", "write")?;
-    if matches!(
-        request_guarded_action(
-            ctx,
-            organization_id,
-            RequestGuardedActionParams {
-                company_id,
-                action: GuardedActionKey::ApproveAiActionDraft,
-                action_version: GUARDED_ACTION_SCHEMA_VERSION,
-                input: GuardedActionInput::ApproveAiActionDraft { draft_id },
-                idempotency_key: format!("approve-ai-action-draft:{draft_id}"),
-                correlation_id: format!("ai-action-draft:{draft_id}:approve"),
-                causation_id: None,
-            },
-        )?,
-        GuardedActionGateOutcome::HumanTaskCreated { .. }
-    ) {
-        return Ok(());
-    }
+    // `approve_ai_action_draft` IS the human-approval action for an AI action
+    // draft — wrapping it in another guarded-action approval gate (as it
+    // previously did) was circular: the seeded "ai-action-approval" workflow
+    // gates this exact action unconditionally, so every call short-circuited
+    // on `HumanTaskCreated` and `approve_ai_action_draft_core` was never
+    // reached, leaving drafts stuck at "pending" forever. No other guarded
+    // action gates its own approval step this way.
     approve_ai_action_draft_core(ctx, organization_id, company_id, draft_id)
 }
 

@@ -19,15 +19,44 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      # Generated STDB bindings + manifests live in the private
+      # KevTiv/lumiere-contracts repo, consumed as a tag-pinned git
+      # dependency. This runner needs read-only SSH access to fetch it. The
+      # deploy key on lumiere-contracts is read-only, so a compromised
+      # secret here cannot write to that repo. github.com's SSH host key is
+      # pinned to the value GitHub publishes rather than trusted on first
+      # use. See docs/plans/contracts-extraction-execution-plan.md.
+      - name: Configure SSH for private lumiere-contracts dependency
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_ed25519
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
             spacetimedb
             .
+          cache-on-failure: true
 
       - name: SpacetimeDB module (cargo check --tests)
         working-directory: spacetimedb
         run: cargo check --tests
+
+      # No `spacetime` CLI in this runner, so bindings can't be regenerated
+      # from the live module here — populate .contracts-staging/ from the
+      # currently pinned lumiere-contracts release instead. Schema-affecting
+      # changes are verified locally via `make check-contracts-drift`
+      # (requires the spacetime CLI) before publishing a new contracts tag.
+      - name: Populate .contracts-staging from pinned lumiere-contracts
+        run: make contracts-staging-from-pinned
 
       - name: Workspace members (api-server, ai-gateway, lumiere-codegen, stdb-auth)
         run: cargo check -p api-server -p ai-gateway -p lumiere-codegen -p stdb-auth
@@ -35,14 +64,85 @@ jobs:
       - name: lumiere-codegen unit tests
         run: cargo test -p lumiere-codegen
 
+      - name: SpacetimeDB Rust generator recovery test
+        run: bash scripts/test-generate-spacetimedb-rust-sdk.sh
+
       - name: Verify generated TypeScript matches Rust registry
         run: make check-codegen
 
-      - name: api-server unit tests
-        run: cargo test -p api-server reducer_allowlist
+      - name: api-server reducer contract tests
+        run: cargo test -p api-server http_app::tests
 
       - name: ai-gateway unit tests
         run: cargo test -p ai-gateway health_returns
+
+  contracts-drift:
+    name: Contracts drift
+    runs-on: ubuntu-latest
+    env:
+      # Must match the module crate used for authoritative schema extraction.
+      # Rust/TS client pins move atomically with the next contracts release.
+      SPACETIME_CLI_VERSION: "2.8.2"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      # Same read-only deploy key as the Rust job — see the comment there.
+      - name: Configure SSH for private lumiere-contracts dependency
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_ed25519
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            spacetimedb
+            .
+          cache-on-failure: true
+
+      # Pinned to the same SpacetimeDB CLI version the generated bindings
+      # were produced with so this job's `spacetime generate` output is
+      # directly comparable to what's published. The install unpacks a
+      # ~150MB binary bundle; cached by exact version, so this only
+      # actually downloads again when SPACETIME_CLI_VERSION changes.
+      - name: Cache spacetime CLI
+        id: cache-spacetime
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/bin/spacetime
+            ~/.local/share/spacetime/bin
+          key: spacetime-cli-${{ env.SPACETIME_CLI_VERSION }}-${{ runner.os }}
+
+      - name: Install spacetime CLI
+        if: steps.cache-spacetime.outputs.cache-hit != 'true'
+        run: |
+          curl -sSf https://install.spacetimedb.com | sh -s -- -y
+          "$HOME/.local/bin/spacetime" version install "$SPACETIME_CLI_VERSION"
+          "$HOME/.local/bin/spacetime" version use "$SPACETIME_CLI_VERSION"
+
+      - name: Add spacetime CLI to PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # Fails when the live SpacetimeDB module schema has changed but nobody
+      # ran `make publish-contracts` to release the corresponding
+      # lumiere-contracts tag — the drift check make check-codegen alone
+      # can't catch, since check-codegen only compares against whatever
+      # bindings are already in .contracts-staging/. See
+      # docs/plans/contracts-extraction-execution-plan.md.
+      - name: Verify STDB module matches pinned lumiere-contracts release
+        run: make check-contracts-drift
 
   frontend:
     name: Frontend
@@ -52,6 +152,23 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+
+      # pnpm resolves the @lumiere/contracts git-subdirectory dependency
+      # (packages/stdb, packages/query-hooks) over SSH — same read-only
+      # deploy key as the Rust jobs. See the comment on the Rust job's
+      # equivalent step.
+      - name: Configure SSH for private lumiere-contracts dependency
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_ed25519
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
 
       - uses: pnpm/action-setup@v4
         with:
@@ -68,6 +185,9 @@ jobs:
 
       - name: Check accounting double-cast rationales
         run: bash ../scripts/lint-accounting-as-unknown-as.sh
+
+      - name: Opaque record type-debt ratchet
+        run: pnpm type-debt:check
 
       - name: Typecheck
         run: pnpm typecheck
@@ -93,6 +213,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Same read-only deploy key as the frontend job — see its comment.
+      - name: Configure SSH for private lumiere-contracts dependency
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_ed25519
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10.31.0
@@ -115,8 +249,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build Chromium renderer image (GHA layer cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./chromium-worker
+          tags: lumiere-chromium-worker
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Start trusted Chromium renderer
-        run: docker build -t lumiere-chromium-worker ./chromium-worker && docker run -d --name chromium-worker -p 8090:8090 lumiere-chromium-worker
+        run: docker run -d --name chromium-worker -p 8090:8090 lumiere-chromium-worker
       - name: Install PDF text extractor
         run: sudo apt-get update && sudo apt-get install -y poppler-utils
       - name: Validate deterministic report fixtures

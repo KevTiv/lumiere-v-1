@@ -118,7 +118,7 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "stage_bank_statement_import",
   "set_intercompany_rule_active",
   "unmatch_elimination_entry",
-  "unreconcile_account_bank_statement_line",
+  "unreconciled_account_bank_statement_line",
   "unreconciled_account_bank_statement_line",
   "update_account_account",
   "update_account_account_type",
@@ -265,7 +265,7 @@ const ACCOUNTING_HINT_OVERRIDES: Partial<
   ],
   run_fx_revaluation: ["fx-revaluation-runs", "account-moves", "account-move-lines"],
   run_fx_revaluation_batch: ["fx-revaluation-runs", "account-moves", "account-move-lines"],
-  unreconcile_account_bank_statement_line: [
+  unreconciled_account_bank_statement_line: [
     "bank-statements",
     "bank-statement-lines",
     "bank-match-candidates",

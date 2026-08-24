@@ -117,12 +117,17 @@ pub struct PosSession {
     accessor = pos_order,
     public,
     index(accessor = pos_order_by_session, btree(columns = [session_id])),
-    index(accessor = pos_order_by_partner, btree(columns = [partner_id]))
+    index(accessor = pos_order_by_partner, btree(columns = [partner_id])),
+    index(accessor = pos_order_by_org, btree(columns = [organization_id]))
 )]
 pub struct PosOrder {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Direct org scope (cold-tier read plans and every other archive-candidate
+    /// table assume this is a plain column, not derivable only via
+    /// `session_id` → `PosSession.organization_id`).
+    pub organization_id: u64,
     pub uid: String,
     pub ticket_number: Option<String>,
     pub session_id: u64,
@@ -171,6 +176,22 @@ pub struct PosOrder {
     pub write_uid: Identity,
     pub write_date: Timestamp,
     pub metadata: Option<String>,
+    /// Cold-tier: when this row became archive-eligible (docs/plans/sliding-
+    /// window-cold-tier.md §5). `PosOrder` is created directly in a terminal
+    /// state (`Paid`) with no reducer ever mutating it afterward, so this is
+    /// stamped at creation time — unlike resources with a separate
+    /// "finalize the transaction" transition, there's no later event to wait
+    /// for. `None` is reserved for a possible future non-terminal creation
+    /// path (e.g. an unpaid/held order); no such path exists today.
+    pub cold_eligible_at: Option<Timestamp>,
+    /// Cold-tier: generation counter for the archived representation.
+    /// Starts at 1 (matches `conventions::ARCHIVE_VERSION_INITIAL` in
+    /// `api-server/src/cold_tier/conventions.rs` — this crate can't import
+    /// that one, it's a native/wasm split, so the constant is duplicated
+    /// here as a literal). No reducer increments it today because nothing
+    /// mutates a `PosOrder` after creation; a future mutator would need to
+    /// bump it, matching the version-checked finalize/rehydration protocol.
+    pub archive_version: u64,
 }
 
 #[table(
@@ -687,6 +708,7 @@ pub fn create_pos_order(
 
     let order = ctx.db.pos_order().insert(PosOrder {
         id: 0,
+        organization_id,
         uid: uid.clone(),
         ticket_number: Some(format!("TICKET-{}", uid)),
         session_id: params.session_id,
@@ -735,6 +757,8 @@ pub fn create_pos_order(
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         metadata: None,
+        cold_eligible_at: Some(ctx.timestamp),
+        archive_version: 1,
     });
 
     for line_id in &line_ids {
@@ -861,6 +885,97 @@ pub fn create_pos_order(
         },
     );
 
+    Ok(())
+}
+
+// ============================================================================
+// COLD-TIER ARCHIVE FINALIZE
+// ============================================================================
+//
+// Version-checked finalize, per the general (mutable-resource) protocol in
+// docs/plans/sliding-window-cold-tier.md §6.1 — unlike audit_log's checksum-
+// based finalize (audit_log is append-only with no archive_version/
+// cold_eligible_at concept), this is the "real" protocol every future
+// mutable archive candidate follows:
+//
+//   1. worker reads (id, archive_version, cold_eligible_at, full payload);
+//   2. worker UPSERTs into PG, verifies the write;
+//   3. worker calls this reducer with the values it read in step 1;
+//   4. this reducer re-reads the row and deletes only if archive_version and
+//      cold_eligible_at are BOTH still exactly what the worker saw — proving
+//      no business mutation (or rehydration) happened in between.
+//
+// `PosOrder` has no reducer that mutates a row after `create_pos_order`
+// today (confirmed by audit — see the Phase 2 planning notes), so in
+// practice `archive_version` never changes and this rarely rejects. The
+// check exists anyway because a future mutator could change that, and the
+// finalize reducer must not silently stop protecting the row.
+
+/// Internal: delete a `pos_order` row once the pos-order cold drainer has
+/// durably UPSERTed and verified the exact same version in `cold_pos_order`.
+///
+/// Called only by the registered pos-order drainer identity (see
+/// `core::cold_tier_identity`), never by frontend clients.
+#[spacetimedb::reducer]
+pub fn finalize_pos_order_archive(
+    ctx: &ReducerContext,
+    id: u64,
+    expected_archive_version: u64,
+    expected_cold_eligible_at_micros: i64,
+) -> Result<(), String> {
+    if !crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
+        ctx,
+        crate::core::cold_tier_identity::POS_ORDER_COLD_DRAINER_SERVICE,
+    ) {
+        return Err(
+            "finalize_pos_order_archive: caller is not the registered pos-order cold-drainer identity"
+                .to_string(),
+        );
+    }
+
+    finalize_pos_order_archive_checked(
+        ctx,
+        id,
+        expected_archive_version,
+        expected_cold_eligible_at_micros,
+    )
+}
+
+/// The version-check/deletion logic, split out so tests can exercise it
+/// directly — same reasoning as `audit::finalize_audit_log_archive_checked`:
+/// a single reducer invocation can't fake `ctx.sender()` as the registered
+/// drainer identity, so the identity gate is tested separately.
+pub(crate) fn finalize_pos_order_archive_checked(
+    ctx: &ReducerContext,
+    id: u64,
+    expected_archive_version: u64,
+    expected_cold_eligible_at_micros: i64,
+) -> Result<(), String> {
+    let Some(row) = ctx.db.pos_order().id().find(id) else {
+        // Already finalized by a prior/racing call.
+        return Ok(());
+    };
+
+    if row.archive_version != expected_archive_version {
+        return Err(format!(
+            "pos_order {id}: archive_version changed (expected {expected_archive_version}, now {}); refusing to delete",
+            row.archive_version
+        ));
+    }
+
+    // Comparing the full Option (not just unwrapping) also covers "row
+    // remains eligible": if a future rehydration path clears
+    // cold_eligible_at back to None, this becomes `None != Some(expected)`
+    // and fails closed, same as any other value drift.
+    let actual = row.cold_eligible_at.map(|t| t.to_micros_since_unix_epoch());
+    if actual != Some(expected_cold_eligible_at_micros) {
+        return Err(format!(
+            "pos_order {id}: cold_eligible_at changed or row is no longer eligible \
+             (expected {expected_cold_eligible_at_micros}, now {actual:?}); refusing to delete"
+        ));
+    }
+
+    ctx.db.pos_order().id().delete(&id);
     Ok(())
 }
 

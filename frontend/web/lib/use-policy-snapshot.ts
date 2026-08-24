@@ -78,6 +78,6 @@ export function usePolicySnapshot(
     snapshot,
     versionHash,
     isLoading: orgPermsLoading || snapshotLoading,
-    refreshSnapshot: () => refreshSnapshot.mutate([organizationId]),
+    refreshSnapshot: () => refreshSnapshot.mutate({}),
   }
 }

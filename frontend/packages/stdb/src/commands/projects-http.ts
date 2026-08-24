@@ -1,4 +1,3 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
 
 import type { ReducerCommandContractMeta } from "./types";
 
@@ -64,20 +63,6 @@ const WITH_COMPANY_QUERY = new Set<ProjectsBffReducerKey>();
 export function projectsBffCallUrl(reducer: ProjectsBffReducerKey): string {
   const base = `/api/call/${reducer}`;
   return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
-
-export function projectsBffPost(
-  reducer: ProjectsBffReducerKey,
-  args: unknown[],
-): { urlPath: string; init: RequestInit } {
-  return {
-    urlPath: projectsBffCallUrl(reducer),
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
-    },
-  };
 }
 
 const PROJECTS_HINT_OVERRIDES: Partial<

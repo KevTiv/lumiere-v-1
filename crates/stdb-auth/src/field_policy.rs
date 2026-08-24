@@ -46,7 +46,7 @@ pub struct FieldPermissionLike {
 }
 
 static STDB_GENERATED_SQL_COLUMNS: Lazy<HashMap<String, Vec<String>>> = Lazy::new(|| {
-    serde_json::from_str(include_str!("../assets/stdb-generated-sql-columns.json"))
+    serde_json::from_str(lumiere_contracts::manifests::STDB_GENERATED_SQL_COLUMNS)
         .expect("stdb-generated-sql-columns.json")
 });
 
@@ -106,6 +106,18 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
     m.insert(
         "account-moves".to_string(),
         ["metadata"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
+        "dashboards".to_string(),
+        ["widget_ids"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
+        "purchase-orders".to_string(),
+        ["picking_ids"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
+        "sale-orders".to_string(),
+        ["picking_ids"].into_iter().map(String::from).collect(),
     );
     m
 });

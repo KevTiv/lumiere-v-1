@@ -5,6 +5,8 @@
 
 import type { QueryRows } from "@lumiere/api-client"
 import { getLumiereApiClientOrThrow } from "@lumiere/api-client"
+import type { QueryResourceKey } from "@lumiere/stdb/generated/query-registry"
+import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
 
 export type { QueryRow, QueryRows } from "@lumiere/api-client"
 
@@ -16,10 +18,24 @@ export function parseQueryListResponse(json: unknown) {
   return getLumiereApiClientOrThrow().parseQueryListResponse(json)
 }
 
+/**
+ * Literal `/api/query/<resource>` paths infer the generated row type for that
+ * resource; dynamic (non-literal) paths fall back to the opaque `QueryRows`
+ * shape, same as before.
+ */
+export async function fetchQueryList<K extends QueryResourceKey>(
+  path: `/api/query/${K}`,
+  errorMessage: string,
+): Promise<QueryRowFor<K>[]>
+export async function fetchQueryList(path: string, errorMessage: string): Promise<QueryRows>
 export async function fetchQueryList(path: string, errorMessage: string): Promise<QueryRows> {
   return getLumiereApiClientOrThrow().fetchQueryList(path, errorMessage)
 }
 
+export async function fetchQueryListAllowEmpty<K extends QueryResourceKey>(
+  path: `/api/query/${K}`,
+): Promise<QueryRowFor<K>[]>
+export async function fetchQueryListAllowEmpty(path: string): Promise<QueryRows>
 export async function fetchQueryListAllowEmpty(path: string): Promise<QueryRows> {
   return getLumiereApiClientOrThrow().fetchQueryListAllowEmpty(path)
 }

@@ -234,12 +234,27 @@ export async function openSettingsSection(page: Page, sectionId: string) {
   await expectNoAppError(page)
 }
 
-/** Close dialog overlays opened by row clicks (e.g. CRM record chatter). */
+/**
+ * Close dialog/sheet overlays opened by row clicks (e.g. CRM record chatter or detail
+ * inspector). A single row click can stack more than one overlay (e.g. a tab's
+ * `recordSheet` plus a chatter dialog opened by the same click), and each only
+ * dismisses on its own focused Escape press — so press repeatedly until none remain.
+ */
 export async function dismissBlockingDialogs(page: Page) {
-  const overlay = page.locator('[data-slot="dialog-overlay"][data-open]')
+  const overlay = page.locator(
+    '[data-slot="dialog-overlay"][data-open], [data-slot="sheet-overlay"][data-open]',
+  )
   if ((await overlay.count()) === 0) return
-  await page.keyboard.press("Escape")
-  await expect(overlay).toHaveCount(0, { timeout: 5_000 })
+  await expect
+    .poll(
+      async () => {
+        if ((await overlay.count()) === 0) return true
+        await page.keyboard.press("Escape")
+        return (await overlay.count()) === 0
+      },
+      { timeout: 15_000 },
+    )
+    .toBe(true)
 }
 
 /** Wait for a BFF list query, then assert seeded fixture text is visible. */
@@ -315,7 +330,26 @@ export async function chooseFirstEnabledOption(page: Page, name: string) {
       timeout: 30_000,
     })
     .toBeGreaterThan(0)
-  await listbox.getByRole("option", { disabled: false }).first().click()
+
+  // Runtime select configs may prepend an enabled empty placeholder (`—` or
+  // `Select...`) rather than marking it disabled. Radix options do not expose
+  // their value as a DOM attribute, so fall back to the accessible label when
+  // deciding whether an option is a real value.
+  const options = listbox.getByRole("option", { disabled: false })
+  const optionCount = await options.count()
+  for (let index = 0; index < optionCount; index += 1) {
+    const option = options.nth(index)
+    const value = (await option.getAttribute("data-value")) ?? (await option.getAttribute("value"))
+    const label = (await option.textContent())?.trim() ?? ""
+    const isPlaceholderLabel = /^(?:—|-|select(?:\.\.\.)?)$/i.test(label)
+    const hasConcreteValue = Boolean(value?.trim() && !value.startsWith("__lumiere_empty__:"))
+    if (hasConcreteValue || (label !== "" && !isPlaceholderLabel)) {
+      await option.click()
+      return
+    }
+  }
+
+  throw new Error(`no non-empty enabled option available for form field ${name}`)
 }
 
 function accountInternalTypeTag(row: Record<string, unknown>): string {
@@ -747,6 +781,29 @@ export async function callReducerBffResult(
   const json = (await res.json().catch(() => ({}))) as { error?: string }
   const error = json.error ?? (await res.text().catch(() => ""))
   return { ok: false, status: res.status(), error: error || undefined }
+}
+
+/** Trusted fixture-only reducer call using the database-owner token. */
+export async function callReducerOwner(reducer: string, args: unknown[]): Promise<void> {
+  const host = (process.env.E2E_STDB_HOST ?? process.env.STDB_HOST ?? "http://127.0.0.1:3000")
+    .replace(/\/$/, "")
+  const moduleName = process.env.STDB_MODULE?.trim()
+  const token = process.env.STDB_SERVER_TOKEN?.trim()
+  if (!moduleName || !token) {
+    throw new Error(`trusted fixture call ${reducer} requires STDB_MODULE and STDB_SERVER_TOKEN`)
+  }
+  const encodedArgs = encodeReducerCallArgs(reducer, args)
+  const response = await fetch(`${host}/v1/database/${moduleName}/call/${reducer}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: stringifyReducerCallBody(encodedArgs),
+  })
+  if (!response.ok) {
+    throw new Error(`trusted fixture reducer ${reducer} failed (${response.status}): ${await response.text()}`)
+  }
 }
 
 async function expectReducerHttpResponseOk(
@@ -1758,6 +1815,19 @@ export async function waitForMovePosted(page: Page, moveId: number): Promise<voi
     .toMatch(/post/)
 }
 
+/**
+ * Row clicks on the Invoices/Bills tabs open a generic record sheet, not the
+ * (legacy) InvoiceDetailModal directly. Open its "Actions" tab and click
+ * "Open document actions" to reach the modal.
+ */
+export async function openInvoiceDetailModalFromRecordSheet(page: Page): Promise<void> {
+  const sheet = page.locator('[data-slot="sheet-content"]')
+  await expect(sheet).toBeVisible({ timeout: 15_000 })
+  await sheet.getByRole("tab", { name: "Actions" }).click()
+  await sheet.getByRole("button", { name: "Open document actions" }).click()
+  await expect(page.getByTestId("invoice-detail-modal")).toBeVisible({ timeout: 15_000 })
+}
+
 /** Open invoice detail and post draft via accounting invoices tab. */
 export async function postDraftInvoiceViaUi(page: Page, partnerName: string): Promise<number> {
   const moveId = await fetchDraftInvoiceMoveIdByPartner(page, partnerName)
@@ -1767,7 +1837,7 @@ export async function postDraftInvoiceViaUi(page: Page, partnerName: string): Pr
   const invoiceRow = activeTabCustomTableRows(page).filter({ hasText: partnerName }).first()
   await expect(invoiceRow).toBeVisible({ timeout: 30_000 })
   await invoiceRow.click()
-  await expect(page.getByTestId("invoice-detail-modal")).toBeVisible({ timeout: 15_000 })
+  await openInvoiceDetailModalFromRecordSheet(page)
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
@@ -1791,7 +1861,7 @@ async function openDraftVendorBillModal(page: Page, vendorName: string): Promise
     .last()
   await expect(billRow).toBeVisible({ timeout: 30_000 })
   await billRow.click()
-  await expect(page.getByTestId("invoice-detail-modal")).toBeVisible({ timeout: 15_000 })
+  await openInvoiceDetailModalFromRecordSheet(page)
   await expect(page.getByTestId("invoice-detail-post-draft")).toBeVisible({ timeout: 15_000 })
 }
 
@@ -2244,6 +2314,51 @@ export async function addCustomFormFieldViaSettings(
         visibility_json: null,
       },
     ])
+
+    // The runtime form intentionally hides non-system fields without an exact role overlay.
+    // Registry fixtures use semantic role ids (for example, `role-admin`), while authenticated
+    // sessions use the persisted numeric role id. Mirror the admin registry overlay for the
+    // actual session role so this direct reducer fixture establishes the same visibility state
+    // that the form configuration UI would establish.
+    const adminRoleId = await fetchAdminRoleId(page)
+    const roleConfigsRes = await page.request.get(
+      `/api/query/form-role-configs?organizationId=${orgId}`,
+    )
+    if (!roleConfigsRes.ok()) {
+      throw new Error(`form role configs query failed: ${roleConfigsRes.status()}`)
+    }
+    const roleConfigsJson = (await roleConfigsRes.json()) as {
+      data?: Array<Record<string, unknown>>
+    }
+    const adminRegistryConfig = (roleConfigsJson.data ?? []).find(
+      (row) =>
+        scalarQueryId(row.configurationId ?? row.configuration_id) === configId &&
+        String(row.roleId ?? row.role_id) === "role-admin",
+    )
+    if (!adminRegistryConfig) {
+      throw new Error(`admin registry role config not found for form config ${configId}`)
+    }
+    const stringArray = (value: unknown): string[] => {
+      const parsed = JSON.parse(String(value ?? "[]")) as unknown
+      return Array.isArray(parsed) ? parsed.map(String) : []
+    }
+    const enabledFields = stringArray(
+      adminRegistryConfig.enabledFieldsJson ?? adminRegistryConfig.enabled_fields_json,
+    )
+    await callReducerBff(page, "set_form_role_config", [
+      orgId,
+      configId,
+      {
+        role_id: String(adminRoleId),
+        enabled_fields: [...new Set([...enabledFields, fieldId])],
+        required_fields: stringArray(
+          adminRegistryConfig.requiredFieldsJson ?? adminRegistryConfig.required_fields_json,
+        ),
+        default_prompts: stringArray(
+          adminRegistryConfig.defaultPromptsJson ?? adminRegistryConfig.default_prompts_json,
+        ),
+      },
+    ])
     await openFormConfigLeadForm(page)
     await expect(page.getByTestId(`form-config-field-row-${fieldId}`)).toBeVisible({
       timeout: 30_000,
@@ -2683,7 +2798,7 @@ export async function seedPublishableWorkflowDraft(
     { nodeKey: "start", name: "Start", kind: { tag: "Start" }, sequence: 1 },
     { nodeKey: "end", name: "End", kind: { tag: "End" }, sequence: 2 },
   ]) {
-    await callReducerBff(page, "upsert_workflow_node", [
+    await callReducerOwner("upsert_workflow_node", [
       organizationId,
       versionId,
       rev,
@@ -2702,7 +2817,7 @@ export async function seedPublishableWorkflowDraft(
     rev += 1
   }
 
-  await callReducerBff(page, "upsert_workflow_edge", [
+  await callReducerOwner("upsert_workflow_edge", [
     organizationId,
     versionId,
     rev,

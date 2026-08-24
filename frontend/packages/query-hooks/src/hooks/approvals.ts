@@ -1,6 +1,7 @@
 "use client"
 
-import { approvalsBffPost } from "@lumiere/stdb/commands"
+
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type { WorkflowHumanTaskDecision } from "@lumiere/stdb/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -172,10 +173,7 @@ export function useClaimHumanTask(organizationId: number) {
         idempotencyKey: newIdempotencyKey("claim"),
         correlationId: input.correlationId ?? newIdempotencyKey("corr"),
       }
-      const { urlPath, init } = approvalsBffPost("claim_workflow_human_task", [
-        organizationId,
-        stdbParamsToJson(params, "ClaimWorkflowHumanTaskParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("claim_workflow_human_task", { params: stdbParamsToJson(params, "ClaimWorkflowHumanTaskParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -214,10 +212,7 @@ export function useDecideHumanTask(organizationId: number) {
         correlationId: input.correlationId ?? newIdempotencyKey("corr"),
         causationId: null,
       }
-      const { urlPath, init } = approvalsBffPost("decide_workflow_human_task", [
-        organizationId,
-        stdbParamsToJson(params, "DecideWorkflowHumanTaskParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("decide_workflow_human_task", { params: stdbParamsToJson(params, "DecideWorkflowHumanTaskParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -245,10 +240,7 @@ export function useCommentHumanTask(organizationId: number) {
         idempotencyKey: newIdempotencyKey("comment"),
         correlationId: input.correlationId ?? newIdempotencyKey("corr"),
       }
-      const { urlPath, init } = approvalsBffPost("add_workflow_human_task_comment", [
-        organizationId,
-        stdbParamsToJson(params, "AddWorkflowHumanTaskCommentParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("add_workflow_human_task_comment", { params: stdbParamsToJson(params, "AddWorkflowHumanTaskCommentParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },

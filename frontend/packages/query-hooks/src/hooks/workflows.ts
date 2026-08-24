@@ -1,5 +1,7 @@
 "use client"
 
+
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 /**
  * Workflows hooks — versioned definitions + runtime (Wave 5 cutover).
  */
@@ -7,7 +9,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch, fetchQueryList, rqBigIntKey, type QueryRows } from "../http"
-import { workflowsBffPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   CancelWorkflowParams,
@@ -21,6 +22,8 @@ import type {
   SignalWorkflowParams,
   SimulateWorkflowParams,
   StartWorkflowParams,
+  Workflow,
+  WorkflowInstance,
 } from "@lumiere/stdb/types"
 
 const wfKeys = (organizationId: bigint) => rqBigIntKey(organizationId)
@@ -46,8 +49,8 @@ function invalidateAllWorkflowQueries(
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
-export function useWorkflows(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useWorkflows(organizationId: bigint, initialData?: Workflow[]) {
+  return useQuery<Workflow[]>({
     queryKey: ["workflows", wfKeys(organizationId)],
     queryFn: () => fetchQueryList("/api/query/workflows", "Failed to fetch workflows"),
     staleTime: 30_000,
@@ -83,8 +86,8 @@ export function useWorkflowEdges(organizationId: bigint, initialData?: QueryRows
   })
 }
 
-export function useWorkflowInstances(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useWorkflowInstances(organizationId: bigint, initialData?: WorkflowInstance[]) {
+  return useQuery<WorkflowInstance[]>({
     queryKey: ["workflow-instances", wfKeys(organizationId)],
     queryFn: () =>
       fetchQueryList("/api/query/workflow-instances", "Failed to fetch workflow instances"),
@@ -202,11 +205,7 @@ export function useCreateWorkflow(organizationId: bigint, companyId?: number | n
   const qc = useQueryClient()
   return useMutation<void, Error, CreateWorkflowParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = workflowsBffPost("create_workflow", [
-        organizationId,
-        optionalCompanyArg(companyId),
-        stdbParamsToJson(params as object, "CreateWorkflowParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_workflow", { companyId: optionalCompanyArg(companyId), params: stdbParamsToJson(params as object, "CreateWorkflowParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to create workflow")
     },
@@ -221,11 +220,7 @@ export function usePublishWorkflowVersion(organizationId: bigint, _companyId?: n
       workflowVersionId: bigint | number | string
       expectedDraftRevision: number
     }) => {
-      const { urlPath, init } = workflowsBffPost("publish_workflow_version", [
-        organizationId,
-        input.workflowVersionId,
-        input.expectedDraftRevision,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("publish_workflow_version", { workflowVersionId: input.workflowVersionId, expectedRevision: input.expectedDraftRevision })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to publish workflow version")
     },
@@ -243,11 +238,7 @@ export function useCloneWorkflowVersionToDraft(
       workflowVersionId: bigint | number | string
       expectedDraftRevision: number
     }) => {
-      const { urlPath, init } = workflowsBffPost("clone_workflow_version_to_draft", [
-        organizationId,
-        input.workflowVersionId,
-        input.expectedDraftRevision,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("clone_workflow_version_to_draft", { sourceWorkflowVersionId: input.workflowVersionId, expectedRevision: input.expectedDraftRevision })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to clone workflow version")
     },
@@ -262,11 +253,7 @@ export function useRetireWorkflowVersion(organizationId: bigint, _companyId?: nu
       workflowVersionId: bigint | number | string
       expectedDraftRevision: number
     }) => {
-      const { urlPath, init } = workflowsBffPost("retire_workflow_version", [
-        organizationId,
-        input.workflowVersionId,
-        input.expectedDraftRevision,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("retire_workflow_version", { workflowVersionId: input.workflowVersionId, expectedRevision: input.expectedDraftRevision })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to retire workflow version")
     },
@@ -278,10 +265,7 @@ export function useImportWorkflowCsv(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = workflowsBffPost("import_workflow_csv", [
-        organizationId,
-        csvData,
-      ])
+      const { urlPath, init } = stdbBffCommandPost("import_workflow_csv", { csvData: csvData })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to import workflows")
     },
@@ -293,10 +277,7 @@ export function useStartWorkflow(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: StartWorkflowParams) => {
-      const { urlPath, init } = workflowsBffPost("start_workflow", [
-        organizationId,
-        stdbParamsToJson(params as object, "StartWorkflowParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("start_workflow", { params: stdbParamsToJson(params as object, "StartWorkflowParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to start workflow")
     },
@@ -310,10 +291,7 @@ export function useSignalWorkflow(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: SignalWorkflowParams) => {
-      const { urlPath, init } = workflowsBffPost("signal_workflow", [
-        organizationId,
-        stdbParamsToJson(params as object, "SignalWorkflowParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("signal_workflow", { params: stdbParamsToJson(params as object, "SignalWorkflowParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to signal workflow")
     },
@@ -327,10 +305,7 @@ export function useCancelWorkflow(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: CancelWorkflowParams) => {
-      const { urlPath, init } = workflowsBffPost("cancel_workflow", [
-        organizationId,
-        stdbParamsToJson(params as object, "CancelWorkflowParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("cancel_workflow", { params: stdbParamsToJson(params as object, "CancelWorkflowParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to cancel workflow")
     },
@@ -347,11 +322,7 @@ export function useSimulateWorkflow(organizationId: bigint) {
       workflowVersionId: bigint | number | string
       params: SimulateWorkflowParams
     }) => {
-      const { urlPath, init } = workflowsBffPost("simulate_workflow", [
-        organizationId,
-        input.workflowVersionId,
-        stdbParamsToJson(input.params as object, "SimulateWorkflowParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("simulate_workflow", { workflowVersionId: input.workflowVersionId, params: stdbParamsToJson(input.params as object, "SimulateWorkflowParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to simulate workflow")
     },
@@ -363,10 +334,7 @@ export function useCreateWorkflowMigrationPlan(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: CreateWorkflowMigrationPlanParams) => {
-      const { urlPath, init } = workflowsBffPost("create_workflow_migration_plan", [
-        organizationId,
-        stdbParamsToJson(params as object, "CreateWorkflowMigrationPlanParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_workflow_migration_plan", { params: stdbParamsToJson(params as object, "CreateWorkflowMigrationPlanParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to create migration plan")
     },
@@ -381,13 +349,12 @@ export function useSetWorkflowMigrationPlanActive(
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: { planId: bigint | number | string; active: boolean }) => {
-      // `?withCompany=true` prepends org + company; body is planId + active only.
-      void organizationId
-      void companyId
-      const { urlPath, init } = workflowsBffPost("set_workflow_migration_plan_active", [
-        input.planId,
-        input.active,
-      ])
+      if (companyId == null) throw new Error("companyId is required")
+      const { urlPath, init } = stdbBffCommandPost("set_workflow_migration_plan_active", {
+        companyId,
+        planId: input.planId,
+        active: input.active,
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to update migration plan")
     },
@@ -399,10 +366,7 @@ export function usePreflightWorkflowMigration(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: PreflightWorkflowMigrationParams) => {
-      const { urlPath, init } = workflowsBffPost("preflight_workflow_migration", [
-        organizationId,
-        stdbParamsToJson(params as object, "PreflightWorkflowMigrationParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("preflight_workflow_migration", { params: stdbParamsToJson(params as object, "PreflightWorkflowMigrationParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to preflight migration")
     },
@@ -414,10 +378,7 @@ export function useMigrateWorkflowInstance(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: MigrateWorkflowInstanceParams) => {
-      const { urlPath, init } = workflowsBffPost("migrate_workflow_instance", [
-        organizationId,
-        stdbParamsToJson(params as object, "MigrateWorkflowInstanceParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("migrate_workflow_instance", { params: stdbParamsToJson(params as object, "MigrateWorkflowInstanceParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to migrate workflow instance")
     },
@@ -429,10 +390,7 @@ export function useFireWorkflowTimer(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: FireWorkflowTimerParams) => {
-      const { urlPath, init } = workflowsBffPost("fire_workflow_timer", [
-        organizationId,
-        stdbParamsToJson(params as object, "FireWorkflowTimerParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("fire_workflow_timer", { params: stdbParamsToJson(params as object, "FireWorkflowTimerParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to fire workflow timer")
     },
@@ -444,10 +402,7 @@ export function useCancelWorkflowTimer(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: CancelWorkflowTimerParams) => {
-      const { urlPath, init } = workflowsBffPost("cancel_workflow_timer", [
-        organizationId,
-        stdbParamsToJson(params as object, "CancelWorkflowTimerParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("cancel_workflow_timer", { params: stdbParamsToJson(params as object, "CancelWorkflowTimerParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to cancel workflow timer")
     },
@@ -459,10 +414,7 @@ export function useCancelWorkflowOutbox(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: CancelWorkflowOutboxParams) => {
-      const { urlPath, init } = workflowsBffPost("cancel_workflow_outbox", [
-        organizationId,
-        stdbParamsToJson(params as object, "CancelWorkflowOutboxParams"),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("cancel_workflow_outbox", { params: stdbParamsToJson(params as object, "CancelWorkflowOutboxParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to cancel workflow outbox")
     },
@@ -524,4 +476,6 @@ export type {
   FireWorkflowTimerParams,
   CancelWorkflowTimerParams,
   CancelWorkflowOutboxParams,
+  Workflow,
+  WorkflowInstance,
 } from "@lumiere/stdb/types"

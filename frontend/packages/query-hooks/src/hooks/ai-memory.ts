@@ -1,6 +1,7 @@
 "use client"
 
-import { aiChatBffPost } from "@lumiere/stdb/commands"
+
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { toCreateAiChatSessionParams } from "@lumiere/erp-shared/ai-create-params"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { i18n } from "@lumiere/i18n"
@@ -210,11 +211,7 @@ export function useCreateAiChatSession(organizationId: number, companyId: number
         metadata: params.metadata,
       })
       if (!mapped) throw new Error(i18n.t("common.paramsMapper.invalidAiChatSession"))
-      const { urlPath, init } = aiChatBffPost("create_ai_chat_session", [
-        organizationId,
-        companyId,
-        stdbParamsToJson(mapped as object),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_ai_chat_session", { companyId: companyId, params: stdbParamsToJson(mapped as object) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseAiError(r))
     },
@@ -241,10 +238,7 @@ export function useAppendAiChatMessage(organizationId: number, companyId: number
       if (companyId == null || companyId <= 0) {
         throw new Error("companyId is required")
       }
-      const { urlPath, init } = aiChatBffPost("append_ai_chat_message", [
-        organizationId,
-        companyId,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("append_ai_chat_message", { companyId: companyId, params: stdbParamsToJson({
           ...params,
           sources_json: params.sources_json ?? null,
           ui_context_json: params.ui_context_json ?? null,
@@ -252,8 +246,7 @@ export function useAppendAiChatMessage(organizationId: number, companyId: number
           duration_ms: params.duration_ms ?? null,
           status: params.status ?? "completed",
           metadata: params.metadata ?? null,
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseAiError(r))
     },

@@ -31,9 +31,12 @@ impl AppState {
     }
 
     /// Call a SpacetimeDB reducer via HTTP (`/v1/database/.../call/...`).
-    pub async fn call_reducer(&self, reducer: &str, args: serde_json::Value) -> anyhow::Result<()> {
+    pub async fn call_reducer(
+        &self,
+        call: impl stdb_client::IntoReducerCall,
+    ) -> anyhow::Result<()> {
         self.stdb
-            .call_reducer(reducer, args)
+            .call_reducer(call)
             .await
             .map_err(|e| anyhow::anyhow!("{e}"))
     }

@@ -7,6 +7,13 @@
  * - `@lumiere/stdb/read-models` — pure UI projections
  * - `@lumiere/stdb/types` — re-exports of generated params (avoid `@lumiere/stdb/generated/*` outside this package)
  *
+ * `./generated/**` here is a handful of thin proxy files, not the real
+ * generated content — that lives in the private `@lumiere/contracts`
+ * package (`packages/contracts` in `KevTiv/lumiere-contracts`), published
+ * from `lumiere-v-1` by `make publish-contracts`. The proxies exist only so
+ * existing `@lumiere/stdb/generated/*` import specifiers keep working; new
+ * code should import from `@lumiere/contracts/generated/*` directly instead.
+ *
  * For the HTTP gateway stack (Next.js, cookies, `/api/query/*`, `/api/call/*`):
  * - `@lumiere/query-hooks/hooks/*` — React Query hooks (api-server via `LumiereApiProvider`)
  * - `@lumiere/stdb/server` — `stdbSql` + entity types for Next.js API routes (not RSC reads)

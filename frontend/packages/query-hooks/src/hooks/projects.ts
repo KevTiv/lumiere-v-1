@@ -1,5 +1,7 @@
 "use client"
 
+
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 /**
  * Projects hooks — Phase 4 of API Gateway Refactor
  *
@@ -11,10 +13,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
-import { projectsBffPost } from "@lumiere/stdb/commands"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
+import type {
+  HrResource,
+  ProjectProject,
+  ProjectTask,
+  ProjectTimesheet,
+} from "@lumiere/stdb/types"
 
 function toScalarU64(v: bigint | number | string): bigint {
   return typeof v === "bigint" ? v : BigInt(String(v))
@@ -36,9 +43,9 @@ function invalidateTimesheetQueues(
 
 export function useProjects(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProjectProject[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProjectProject[]>({
     queryKey: ['projects', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/projects', 'Failed to fetch projects'),
     staleTime: 30_000,
@@ -48,9 +55,9 @@ export function useProjects(
 
 export function useTasks(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProjectTask[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProjectTask[]>({
     queryKey: ['tasks', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/tasks', 'Failed to fetch tasks'),
     staleTime: 30_000,
@@ -60,9 +67,9 @@ export function useTasks(
 
 export function useTimesheets(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: ProjectTimesheet[],
 ) {
-  return useQuery<QueryRows>({
+  return useQuery<ProjectTimesheet[]>({
     queryKey: ['timesheets', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/timesheets', 'Failed to fetch timesheets'),
     staleTime: 30_000,
@@ -192,8 +199,8 @@ export function useProjectMilestones(organizationId: bigint, initialData?: Query
   })
 }
 
-export function useHrResources(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
+export function useHrResources(organizationId: bigint, initialData?: HrResource[]) {
+  return useQuery<HrResource[]>({
     queryKey: ['hr-resources', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/hr-resources', 'Failed to fetch HR resources'),
     staleTime: 30_000,
@@ -225,11 +232,7 @@ export function useCreateResourceAllocation(organizationId: bigint, companyId?: 
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       if (companyId == null) throw new Error('companyId is required for allocations')
-      const { urlPath, init } = projectsBffPost('create_resource_allocation', [
-        organizationId,
-        companyId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_resource_allocation", { companyId: companyId, params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         const body = await r.text().catch(() => '')
@@ -249,11 +252,7 @@ export function useCreateProjectMilestone(organizationId: bigint, companyId?: bi
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       if (companyId == null) throw new Error('companyId is required for milestones')
-      const { urlPath, init } = projectsBffPost('create_project_milestone', [
-        organizationId,
-        companyId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_project_milestone", { companyId: companyId, params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create project milestone')
     },
@@ -269,11 +268,7 @@ export function useCreateProjectRateCard(organizationId: bigint, companyId?: big
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       if (companyId == null) throw new Error('companyId is required for rate cards')
-      const { urlPath, init } = projectsBffPost("create_project_rate_card", [
-        organizationId,
-        companyId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_project_rate_card", { companyId: companyId, params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create project rate card')
     },
@@ -289,11 +284,7 @@ export function useCreateProjectRateCardLine(organizationId: bigint, companyId?:
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       if (companyId == null) throw new Error('companyId is required for rate card lines')
-      const { urlPath, init } = projectsBffPost("create_project_rate_card_line", [
-        organizationId,
-        companyId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_project_rate_card_line", { companyId: companyId, params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create project rate card line')
     },
@@ -310,10 +301,7 @@ export function useCreateProject(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = projectsBffPost("create_project", [
-        organizationId,
-        stdbParamsToJson(withCompanyScope(params, companyId)),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_project", { params: stdbParamsToJson(withCompanyScope(params, companyId)) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create project')
@@ -326,10 +314,7 @@ export function useCreateTask(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = projectsBffPost("create_task", [
-        organizationId,
-        stdbParamsToJson(withCompanyScope(params, companyId)),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_task", { params: stdbParamsToJson(withCompanyScope(params, companyId)) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create task')
@@ -342,10 +327,7 @@ export function useCreateTimesheet(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = projectsBffPost("log_timesheet", [
-        organizationId,
-        stdbParamsToJson(withCompanyScope(params, companyId)),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("log_timesheet", { params: stdbParamsToJson(withCompanyScope(params, companyId)) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create timesheet')
@@ -364,11 +346,7 @@ export function useUpdateProject(organizationId: bigint, companyId?: bigint) {
       projectId: string | number | bigint
       params: Record<string, unknown>
     }) => {
-      const { urlPath, init } = projectsBffPost("update_project", [
-          organizationId,
-          projectId,
-          stdbParamsToJson(withCompanyScope(params, companyId)),
-        ])
+      const { urlPath, init } = stdbBffCommandPost("update_project", { projectId: projectId, params: stdbParamsToJson(withCompanyScope(params, companyId)) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update project')
@@ -387,11 +365,7 @@ export function useUpdateTask(organizationId: bigint, companyId?: bigint) {
       taskId: string | number | bigint
       params: Record<string, unknown>
     }) => {
-      const { urlPath, init } = projectsBffPost("update_task", [
-          organizationId,
-          taskId,
-          stdbParamsToJson(withCompanyScope(params, companyId)),
-        ])
+      const { urlPath, init } = stdbBffCommandPost("update_task", { taskId: taskId, params: stdbParamsToJson(withCompanyScope(params, companyId)) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update task')
@@ -410,7 +384,21 @@ export function useUpdateTaskState(organizationId: bigint) {
       taskId: string | number | bigint
       state: unknown
     }) => {
-      const { urlPath, init } = projectsBffPost("update_task_state", [organizationId, taskId, state])
+      const tag =
+        typeof state === "string"
+          ? state
+          : state && typeof state === "object" && "tag" in state
+            ? String((state as { tag: unknown }).tag)
+            : ""
+      if (!["Cancelled", "InProgress", "Done", "Approved", "ChangesRequested"].includes(tag)) {
+        throw new Error("Invalid task state")
+      }
+      const { urlPath, init } = stdbBffCommandPost("update_task_state", {
+        taskId,
+        state: { tag } as {
+          tag: "Cancelled" | "InProgress" | "Done" | "Approved" | "ChangesRequested"
+        },
+      })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update task state')
@@ -423,10 +411,7 @@ export function useStartTimesheetTimer(organizationId: bigint, companyId?: bigin
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = projectsBffPost("start_timesheet_timer", [
-        organizationId,
-        stdbParamsToJson(withCompanyScope(params, companyId)),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("start_timesheet_timer", { params: stdbParamsToJson(withCompanyScope(params, companyId)) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to start timesheet timer')
@@ -439,7 +424,7 @@ export function useStopTimesheetTimer(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (timesheetId: string | number | bigint) => {
-      const { urlPath, init } = projectsBffPost("stop_timesheet_timer", [organizationId, timesheetId])
+      const { urlPath, init } = stdbBffCommandPost("stop_timesheet_timer", { timesheetId: timesheetId })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to stop timesheet timer')
@@ -460,7 +445,7 @@ export function useSetProjectActive(organizationId: bigint) {
       projectId: string | number | bigint
       active: boolean
     }) => {
-      const { urlPath, init } = projectsBffPost("set_project_active", [organizationId, projectId, active])
+      const { urlPath, init } = stdbBffCommandPost("set_project_active", { projectId: projectId, active: active })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to set project active state')
@@ -473,7 +458,7 @@ export function useToggleProjectFavorite(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (projectId: string | number | bigint) => {
-      const { urlPath, init } = projectsBffPost("toggle_project_favorite", [organizationId, projectId])
+      const { urlPath, init } = stdbBffCommandPost("toggle_project_favorite", { projectId: projectId })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to toggle project favorite')
@@ -492,7 +477,7 @@ export function useSetTaskParent(organizationId: bigint) {
       taskId: string | number | bigint
       parentId: string | number | bigint | null
     }) => {
-      const { urlPath, init } = projectsBffPost("set_task_parent", [organizationId, taskId, parentId ?? null])
+      const { urlPath, init } = stdbBffCommandPost("set_task_parent", { taskId: taskId, parentId: parentId ?? null })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to set task parent')
@@ -511,7 +496,7 @@ export function useAssignTaskUsers(organizationId: bigint) {
       taskId: string | number | bigint
       userIds: (string | number | bigint)[]
     }) => {
-      const { urlPath, init } = projectsBffPost("assign_task_users", [organizationId, taskId, userIds.map((id) => id)])
+      const { urlPath, init } = stdbBffCommandPost("assign_task_users", { taskId: taskId, userIds: userIds.map((id) => id) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign task users')
@@ -539,9 +524,7 @@ export function useValidateTimesheets(organizationId: bigint) {
       wipAccountId,
       wipLaborAccountId,
     }) => {
-      const { urlPath, init } = projectsBffPost("validate_timesheets", [
-        organizationId,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("validate_timesheets", { params: stdbParamsToJson({
           companyId: companyId != null ? toScalarU64(companyId) : null,
           timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
           wipJournalId:
@@ -556,8 +539,7 @@ export function useValidateTimesheets(organizationId: bigint) {
             wipLaborAccountId != null && wipLaborAccountId !== ""
               ? toScalarU64(wipLaborAccountId)
               : null,
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to validate timesheets')
     },
@@ -575,14 +557,11 @@ export function useRejectTimesheets(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, RejectTimesheetsInput>({
     mutationFn: async ({ timesheetIds, companyId, reason }) => {
-      const { urlPath, init } = projectsBffPost("reject_timesheets", [
-        organizationId,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("reject_timesheets", { params: stdbParamsToJson({
           companyId: companyId != null ? toScalarU64(companyId) : null,
           timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
           reason,
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to reject timesheets')
     },
@@ -600,14 +579,11 @@ export function useReopenTimesheets(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ReopenTimesheetsInput>({
     mutationFn: async ({ timesheetIds, companyId, reason }) => {
-      const { urlPath, init } = projectsBffPost("reopen_timesheets", [
-        organizationId,
-        stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("reopen_timesheets", { params: stdbParamsToJson({
           companyId: companyId != null ? toScalarU64(companyId) : null,
           timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
           reason: reason ?? null,
-        }),
-      ])
+        }) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to reopen timesheets')
     },
@@ -640,9 +616,7 @@ export function useBillTimesheets(organizationId: bigint) {
       taxIds,
       fiscalPositionId,
     }) => {
-      const { urlPath, init } = projectsBffPost("bill_timesheets", [
-          organizationId,
-          stdbParamsToJson({
+      const { urlPath, init } = stdbBffCommandPost("bill_timesheets", { params: stdbParamsToJson({
             companyId: toScalarU64(companyId),
             timesheetIds: timesheetIds.map((id) => toScalarU64(id)),
             journalId: toScalarU64(journalId),
@@ -656,8 +630,7 @@ export function useBillTimesheets(organizationId: bigint) {
               fiscalPositionId != null && String(fiscalPositionId).trim() !== ""
                 ? toScalarU64(fiscalPositionId)
                 : null,
-          }),
-        ])
+          }) })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to bill timesheets')
@@ -678,7 +651,7 @@ export function useImportProjectCsv(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = projectsBffPost("import_project_csv", [organizationId, companyId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_project_csv", { companyId: companyId, csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorProjects(res))
@@ -692,7 +665,7 @@ export function useImportTaskCsv(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = projectsBffPost("import_task_csv", [organizationId, companyId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_task_csv", { companyId: companyId, csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorProjects(res))
@@ -706,7 +679,7 @@ export function useImportTimesheetCsv(organizationId: bigint, companyId: bigint)
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (csvData: string) => {
-      const { urlPath, init } = projectsBffPost("import_timesheet_csv", [organizationId, companyId, csvData])
+      const { urlPath, init } = stdbBffCommandPost("import_timesheet_csv", { companyId: companyId, csvData: csvData })
 
       const res = await apiFetch(urlPath, init)
       if (!res.ok) throw new Error(await parseCallErrorProjects(res))
@@ -791,11 +764,7 @@ export function useCreateProjectChangeOrder(organizationId: bigint, companyId?: 
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       if (companyId == null) throw new Error('companyId is required for change orders')
-      const { urlPath, init } = projectsBffPost('create_project_change_order', [
-        organizationId,
-        companyId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_project_change_order", { companyId: companyId, params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error((await r.text().catch(() => '')) || 'Failed to create change order')
     },
@@ -811,11 +780,7 @@ export function useLinkSubcontractorCost(organizationId: bigint, companyId?: big
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       if (companyId == null) throw new Error('companyId is required for subcontractor link')
-      const { urlPath, init } = projectsBffPost('link_subcontractor_cost_to_project', [
-        organizationId,
-        companyId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("link_subcontractor_cost_to_project", { companyId: companyId, params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         throw new Error((await r.text().catch(() => '')) || 'Failed to link subcontractor cost')
@@ -834,10 +799,7 @@ export function useCreateProjectIntegrationIntent(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = projectsBffPost('create_project_integration_intent', [
-        organizationId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("create_project_integration_intent", { params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         throw new Error((await r.text().catch(() => '')) || 'Failed to create integration intent')
@@ -856,11 +818,7 @@ export function useRefreshCapacityForecast(organizationId: bigint, companyId?: b
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       if (companyId == null) throw new Error('companyId is required for forecast refresh')
-      const { urlPath, init } = projectsBffPost('refresh_capacity_forecast', [
-        organizationId,
-        companyId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("refresh_capacity_forecast", { companyId: companyId, params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error((await r.text().catch(() => '')) || 'Failed to refresh forecast')
     },
@@ -877,11 +835,7 @@ export function useRefreshProjectEarnedValue(organizationId: bigint, companyId?:
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
       if (companyId == null) throw new Error('companyId is required for EVM refresh')
-      const { urlPath, init } = projectsBffPost('refresh_project_earned_value', [
-        organizationId,
-        companyId,
-        stdbParamsToJson(params),
-      ])
+      const { urlPath, init } = stdbBffCommandPost("refresh_project_earned_value", { companyId: companyId, params: stdbParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error((await r.text().catch(() => '')) || 'Failed to refresh EVM')
     },
@@ -900,4 +854,8 @@ export { useEmployees } from "./hr"
 export type {
   CreateProjectParams,
   CreateTaskParams,
+  HrResource,
+  ProjectProject,
+  ProjectTask,
+  ProjectTimesheet,
 } from '@lumiere/stdb/types'

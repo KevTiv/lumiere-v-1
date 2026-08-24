@@ -222,7 +222,7 @@ pub async fn create_run(
     inputs_json: &str,
     triggered_by_hex: &str,
 ) -> Result<u64> {
-    stdb.call_reducer(
+    stdb.call_reducer(stdb_client::reducer_call!(
         "create_ai_agent_run",
         serde_json::json!([
             org_id,
@@ -238,7 +238,7 @@ pub async fn create_run(
                 "metadata": serde_json::Value::Null,
             }
         ]),
-    )
+    ))
     .await
     .context("create_ai_agent_run")?;
 
@@ -258,7 +258,7 @@ pub async fn complete_run(
     tokens_used: u32,
     error_message: Option<String>,
 ) -> Result<()> {
-    stdb.call_reducer(
+    stdb.call_reducer(stdb_client::reducer_call!(
         "complete_ai_agent_run",
         serde_json::json!([
             org_id,
@@ -275,7 +275,7 @@ pub async fn complete_run(
                 "error_message": error_message,
             }
         ]),
-    )
+    ))
     .await
     .context("complete_ai_agent_run")?;
     Ok(())
@@ -327,9 +327,7 @@ pub async fn sync_bundled_skills(stdb: &StdbClient, organization_id: u64) -> Res
 
     for md in bundled {
         let payload = crate::skills::bundled_to_sync_payload(&md);
-        stdb.call_reducer(
-            "upsert_ai_skill",
-            serde_json::json!([
+        stdb.call_reducer(stdb_client::reducer_call!("upsert_ai_skill", serde_json::json!([
                 organization_id,
                 {
                     "skill_key": payload.skill_key,
@@ -349,8 +347,7 @@ pub async fn sync_bundled_skills(stdb: &StdbClient, organization_id: u64) -> Res
                     "is_system": organization_id == 0,
                     "metadata": payload.metadata,
                 }
-            ]),
-        )
+            ]),))
         .await
         .with_context(|| format!("upsert bundled skill {}", md.skill_key))?;
         synced.push(md.skill_key);

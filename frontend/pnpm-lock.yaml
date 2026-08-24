@@ -255,8 +255,8 @@ importers:
         version: link:../stdb
     devDependencies:
       spacetimedb:
-        specifier: ^2.0.3
-        version: 2.0.3(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
+        specifier: 2.8.2
+        version: 2.8.2(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
       tsx:
         specifier: ^4.20.5
         version: 4.21.0
@@ -288,6 +288,9 @@ importers:
       '@lumiere/api-client':
         specifier: workspace:*
         version: link:../api-client
+      '@lumiere/contracts':
+        specifier: github:KevTiv/lumiere-contracts#v0.3.2&path:packages/contracts
+        version: git+https://git@github.com:KevTiv/lumiere-contracts.git#d10abd96d31701627ce57218cdfcbfda3adce962&path:packages/contracts(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
       '@lumiere/erp-session':
         specifier: workspace:*
         version: link:../erp-session
@@ -325,12 +328,15 @@ importers:
       '@lumiere/api-client':
         specifier: workspace:*
         version: link:../api-client
+      '@lumiere/contracts':
+        specifier: github:KevTiv/lumiere-contracts#v0.3.2&path:packages/contracts
+        version: git+https://git@github.com:KevTiv/lumiere-contracts.git#d10abd96d31701627ce57218cdfcbfda3adce962&path:packages/contracts(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
       react:
         specifier: '>=19'
         version: 19.2.4
       spacetimedb:
-        specifier: ^2.0.3
-        version: 2.0.3(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
+        specifier: 2.8.2
+        version: 2.8.2(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
     devDependencies:
       '@tanstack/react-query':
         specifier: 5.96.2
@@ -821,8 +827,8 @@ importers:
         specifier: ^8.5
         version: 8.5.8
       spacetimedb:
-        specifier: ^2.0.3
-        version: 2.0.3(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
+        specifier: 2.8.2
+        version: 2.8.2(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
       tailwindcss:
         specifier: ^4.2.0
         version: 4.2.1
@@ -2197,6 +2203,10 @@ packages:
 
   '@lezer/python@1.1.18':
     resolution: {integrity: sha512-31FiUrU7z9+d/ElGQLJFXl+dKOdx0jALlP3KEOsGTex8mvj+SoE1FgItcHWK/axkxCHGUSpqIHt6JAWfWu9Rhg==}
+
+  '@lumiere/contracts@git+https://git@github.com:KevTiv/lumiere-contracts.git#d10abd96d31701627ce57218cdfcbfda3adce962&path:packages/contracts':
+    resolution: {commit: d10abd96d31701627ce57218cdfcbfda3adce962, path: packages/contracts, repo: git@github.com:KevTiv/lumiere-contracts.git, type: git}
+    version: 0.3.2
 
   '@marijn/find-cluster-break@1.0.2':
     resolution: {integrity: sha512-l0h88YhZFyKdXIFNfSWpyjStDjGHwZ/U7iobcK1cQQD8sejsONdQtTVU+1wVN1PBw40PiiHB1vA5S7VTfQiP9g==}
@@ -8368,12 +8378,13 @@ packages:
     resolution: {integrity: sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==}
     engines: {node: '>=0.10.0'}
 
-  spacetimedb@2.0.3:
-    resolution: {integrity: sha512-ksW+A7CIHgfC7VBmvLwoCd0bqxHbPOX0gZmNt7LXVw0vsjnfRJWcLOSE8AbJCcw5eUOcI3MvuA/XH8monUG1OA==}
+  spacetimedb@2.8.2:
+    resolution: {integrity: sha512-Q4HqyrYBFN/lUvC1rUMkv6dfrnJJUrVLqtBo3S43ND94/5cnDoheV/shVFHJ42X77jFXWRsK26CVCBQH3ZxsMQ==}
     peerDependencies:
       '@angular/core': '>=17.0.0'
       '@tanstack/react-query': 5.96.2
       react: ^18.0.0 || ^19.0.0-0 || ^19.0.0
+      solid-js: ^1.6.0
       svelte: ^4.0.0 || ^5.0.0
       undici: ^6.19.2
       vue: ^3.3.0
@@ -8383,6 +8394,8 @@ packages:
       '@tanstack/react-query':
         optional: true
       react:
+        optional: true
+      solid-js:
         optional: true
       svelte:
         optional: true
@@ -11029,6 +11042,18 @@ snapshots:
       '@lezer/common': 1.5.1
       '@lezer/highlight': 1.2.3
       '@lezer/lr': 1.4.8
+
+  '@lumiere/contracts@git+https://git@github.com:KevTiv/lumiere-contracts.git#d10abd96d31701627ce57218cdfcbfda3adce962&path:packages/contracts(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)':
+    dependencies:
+      spacetimedb: 2.8.2(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0)
+    transitivePeerDependencies:
+      - '@angular/core'
+      - '@tanstack/react-query'
+      - react
+      - solid-js
+      - svelte
+      - undici
+      - vue
 
   '@marijn/find-cluster-break@1.0.2': {}
 
@@ -18544,7 +18569,7 @@ snapshots:
 
   source-map@0.6.1: {}
 
-  spacetimedb@2.0.3(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0):
+  spacetimedb@2.8.2(@tanstack/react-query@5.96.2(react@19.2.4))(react@19.2.4)(undici@6.23.0):
     dependencies:
       base64-js: 1.5.1
       headers-polyfill: 4.0.3

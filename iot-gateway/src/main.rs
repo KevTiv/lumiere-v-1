@@ -184,7 +184,10 @@ async fn handle_mqtt_message(state: &AppState, topic: &str, payload: &[u8]) {
                 }
             ]);
 
-            if let Err(e) = state.call_reducer("record_telemetry", args).await {
+            if let Err(e) = state
+                .call_reducer(stdb_client::reducer_call!("record_telemetry", args))
+                .await
+            {
                 tracing::error!("record_telemetry failed for device {}: {}", device_id, e);
             }
         }
@@ -197,7 +200,10 @@ async fn handle_mqtt_message(state: &AppState, topic: &str, payload: &[u8]) {
 
             let args = serde_json::json!([org_id, device_id, status]);
 
-            if let Err(e) = state.call_reducer("update_device_status", args).await {
+            if let Err(e) = state
+                .call_reducer(stdb_client::reducer_call!("update_device_status", args))
+                .await
+            {
                 tracing::error!(
                     "update_device_status failed for device {}: {}",
                     device_id,
@@ -292,7 +298,10 @@ async fn dispatch_pending_actions(state: &AppState) {
         if delivered_via_ws {
             // Action pushed to the hub's WebSocket channel — mark as Sent.
             let args = serde_json::json!([org_id, action_id]);
-            if let Err(e) = state.call_reducer("mark_action_sent", args).await {
+            if let Err(e) = state
+                .call_reducer(stdb_client::reducer_call!("mark_action_sent", args))
+                .await
+            {
                 tracing::error!(
                     "mark_action_sent failed for action {} (WS path): {}",
                     action_id,
@@ -374,7 +383,10 @@ async fn deliver_via_mqtt(
         Ok(_) => {
             // Mark action as Sent in SpacetimeDB
             let args = serde_json::json!([org_id, action_id]);
-            if let Err(e) = state.call_reducer("mark_action_sent", args).await {
+            if let Err(e) = state
+                .call_reducer(stdb_client::reducer_call!("mark_action_sent", args))
+                .await
+            {
                 tracing::error!(
                     "mark_action_sent failed for action {} (MQTT path): {}",
                     action_id,

@@ -29,12 +29,13 @@ import {
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePosLoyaltyPrograms } from "@lumiere/query-hooks/hooks/sales"
 import { usePOS } from "./use-pos"
+import type { PosConfig, PosSession, PosTerminal, Product } from "@lumiere/stdb/types"
 
 interface PosClientProps {
-  initialProducts?: Record<string, unknown>[]
-  initialTerminals?: Record<string, unknown>[]
-  initialConfigs?: Record<string, unknown>[]
-  initialSessions?: Record<string, unknown>[]
+  initialProducts?: Product[]
+  initialTerminals?: PosTerminal[]
+  initialConfigs?: PosConfig[]
+  initialSessions?: PosSession[]
   organizationId?: number
 }
 

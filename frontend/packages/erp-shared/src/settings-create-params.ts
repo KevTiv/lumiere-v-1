@@ -317,6 +317,7 @@ export function toCreateWhatsAppBusinessAccountParams(
   }
 
   return {
+    companyId: undefined,
     name,
     phoneNumber,
     phoneNumberId,

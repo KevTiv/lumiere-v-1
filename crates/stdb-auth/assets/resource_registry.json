@@ -1244,6 +1244,7 @@
       "parent_id",
       "company_id",
       "is_vendor",
+      "is_customer",
       "supplier_rank"
     ],
     "mandatory": [
@@ -1365,7 +1366,8 @@
       "name",
       "is_shared",
       "is_default",
-      "company_id"
+      "company_id",
+      "widget_ids"
     ],
     "mandatory": [
       "id",
@@ -1624,7 +1626,9 @@
     ],
     "default_restricted": [
       "name",
-      "company_id"
+      "company_id",
+      "res_model",
+      "res_id"
     ],
     "mandatory": [
       "id",
@@ -2149,7 +2153,8 @@
     ],
     "default_restricted": [
       "name",
-      "sequence"
+      "sequence",
+      "team_id"
     ],
     "mandatory": [
       "id",
@@ -3249,7 +3254,12 @@
     ],
     "default_restricted": [
       "name",
-      "sequence"
+      "sequence",
+      "probability",
+      "fold",
+      "is_won",
+      "team_id",
+      "is_active"
     ],
     "mandatory": [
       "id",
@@ -4436,7 +4446,6 @@
       "purchase_order_line"
     ],
     "default_restricted": [
-      "order_id",
       "product_id",
       "product_qty",
       "price_unit",
@@ -4446,7 +4455,9 @@
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "company_id",
+      "order_id"
     ],
     "table": "purchase_order_line"
   },
@@ -4457,7 +4468,6 @@
       "purchase_order_line"
     ],
     "default_restricted": [
-      "order_id",
       "product_id",
       "product_qty",
       "price_unit",
@@ -4467,7 +4477,9 @@
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "company_id",
+      "order_id"
     ],
     "table": "purchase_order_line"
   },
@@ -4480,7 +4492,8 @@
       "name",
       "state",
       "partner_id",
-      "company_id"
+      "company_id",
+      "picking_ids"
     ],
     "mandatory": [
       "id",
@@ -5262,7 +5275,10 @@
       "company_id",
       "sale_id",
       "picking_code",
-      "is_return"
+      "is_return",
+      "picking_type_id",
+      "location_id",
+      "location_dest_id"
     ],
     "mandatory": [
       "id",

@@ -67,6 +67,7 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(params.email, { some: "a@b.test" })
     assert.deepEqual(params.tag_ids, [])
     assert.deepEqual(params.phone, { none: [] })
+    assert.deepEqual(params.stage_id, { none: [] })
   })
 
   it("encodeReducerCallArgs SATS-encodes convert_lead_to_customer params", () => {
@@ -118,6 +119,7 @@ describe("stdbParamsToJson", () => {
     ])
     const params = encoded[1] as Record<string, unknown>
     assert.deepEqual(params.company_id, { some: 28 })
+    assert.deepEqual(params.proposal_id, { none: [] })
     assert.deepEqual(params.order_lines, [])
     assert.equal("companyId" in params, false)
   })
@@ -260,6 +262,129 @@ describe("stdbParamsToJson", () => {
       stdbParamsToJson({ discountPolicy: { tag: "WithDiscount" } }),
       { discount_policy: { withDiscount: [] } },
     )
+  })
+
+  it("encodes CreateEmployeeParams enums and option fields through reducer calls", () => {
+    const encoded = encodeReducerCallArgs("create_employee", [
+      7,
+      {
+        companyId: 11,
+        employmentType: { tag: "FullTime" },
+        name: "Ada Lovelace",
+        isActive: true,
+      },
+    ])
+    const params = encoded[1] as Record<string, unknown>
+    assert.deepEqual(params.company_id, { some: 11 })
+    assert.equal(params.name, "Ada Lovelace")
+    assert.deepEqual(params.employment_type, { fullTime: [] })
+    assert.equal(params.is_active, true)
+    assert.deepEqual(params.job_id, { none: [] })
+    assert.deepEqual(params.metadata, { none: [] })
+  })
+
+  it("encodes CreateTaskParams state enums and option fields through reducer calls", () => {
+    const encoded = encodeReducerCallArgs("create_task", [
+      7,
+      {
+        companyId: 11,
+        state: { tag: "InProgress" },
+        name: "Prepare shipment",
+      },
+    ])
+    const params = encoded[1] as Record<string, unknown>
+    assert.deepEqual(params.company_id, { some: 11 })
+    assert.deepEqual(params.state, { inProgress: [] })
+    assert.equal(params.name, "Prepare shipment")
+    assert.deepEqual(params.project_id, { none: [] })
+    assert.deepEqual(params.metadata, { none: [] })
+  })
+
+  it("encodes tagged payload enums and optional analytics/AI fields", () => {
+    const widget = encodeReducerCallArgs("create_dashboard_widget", [
+      1,
+      { name: "KPI", widgetType: { tag: "Kpi" }, model: "sale_order", fields: [] },
+    ])[1] as Record<string, unknown>
+    assert.deepEqual(widget.widget_type, { kpi: [] })
+    assert.deepEqual(widget.metadata, { none: [] })
+
+    const insight = encodeReducerCallArgs("create_ai_insight", [
+      1,
+      { tag: "High" },
+      { severity: { tag: "High" }, title: "Alert", description: "Details" },
+    ])[2] as Record<string, unknown>
+    assert.deepEqual(insight.severity, { high: [] })
+    assert.deepEqual(insight.metadata, { none: [] })
+  })
+
+  it("encodes publish_form_configuration and its nested form structs", () => {
+    const encoded = encodeReducerCallArgs("publish_form_configuration", [
+      7,
+      {
+        moduleId: "crm",
+        formId: "new-lead",
+        name: "New Lead",
+        description: "Create a lead",
+        isSystemDefault: true,
+        fields: [
+          {
+            fieldId: "lead_source",
+            name: "lead_source",
+            label: "Lead Source",
+            fieldType: { tag: "Select" },
+            options: [{ value: "website", label: "Website", color: "blue" }],
+            validation: { required: true, minLength: 1 },
+            aiSuggestions: [],
+            order: 1,
+            isSystem: true,
+            isEnabled: true,
+            showInList: true,
+            width: { tag: "Half" },
+          },
+        ],
+        roleConfigs: [],
+        replaceMissingFields: false,
+      },
+    ])
+
+    const params = encoded[1] as Record<string, unknown>
+    assert.deepEqual(params.description, { some: "Create a lead" })
+    assert.deepEqual(params.expected_updated_at_micros, { none: [] })
+    const field = (params.fields as Record<string, unknown>[])[0]
+    assert.deepEqual(field.field_type, { select: [] })
+    assert.deepEqual(field.description, { none: [] })
+    assert.deepEqual(field.visibility_json, { none: [] })
+    assert.deepEqual(field.width, { half: [] })
+    assert.deepEqual(field.validation, {
+      required: true,
+      min_length: { some: 1 },
+      max_length: { none: [] },
+      min: { none: [] },
+      max: { none: [] },
+      pattern: { none: [] },
+      message: { none: [] },
+    })
+    assert.deepEqual(field.options, [
+      { value: "website", label: "Website", color: { some: "blue" }, icon: { none: [] } },
+    ])
+  })
+
+  it("encodes set_record_custom_field_values and its nested entries", () => {
+    const encoded = encodeReducerCallArgs("set_record_custom_field_values", [
+      7,
+      19,
+      {
+        model: "lead",
+        recordId: 41n,
+        entries: [{ fieldKey: "custom:region", valueJson: '"north"' }],
+      },
+    ])
+
+    assert.deepEqual(encoded[2], {
+      model: "lead",
+      record_id: 41,
+      entries: [{ field_key: "custom:region", value_json: '"north"' }],
+    })
   })
 
   it("converts nested object keys recursively", () => {

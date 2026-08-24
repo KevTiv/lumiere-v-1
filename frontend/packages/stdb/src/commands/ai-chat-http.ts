@@ -1,4 +1,3 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
 
 import type { ReducerCommandContractMeta } from "./types";
 
@@ -13,20 +12,6 @@ export type AiChatBffReducerKey = (typeof AI_CHAT_BFF_REDUCERS)[number];
 
 export function aiChatBffCallUrl(reducer: AiChatBffReducerKey): string {
   return `/api/call/${reducer}`;
-}
-
-export function aiChatBffPost(
-  reducer: AiChatBffReducerKey,
-  args: unknown[],
-): { urlPath: string; init: RequestInit } {
-  return {
-    urlPath: aiChatBffCallUrl(reducer),
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
-    },
-  };
 }
 
 export const AI_CHAT_COMMAND_SUBSCRIPTION_HINTS: Record<

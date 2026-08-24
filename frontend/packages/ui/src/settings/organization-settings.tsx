@@ -570,7 +570,7 @@ export function OrganizationSettings() {
                           { currencyId: cur },
                         )
                         if (!params) return
-                        await createCompany.mutateAsync(params as unknown as Record<string, unknown>)
+                        await createCompany.mutateAsync(params)
                         toast({ title: t("settings.organization.company.createSuccess") })
                       }}
                     />
@@ -833,6 +833,7 @@ export function OrganizationSettings() {
                     description: String(data.description ?? "").trim() || undefined,
                     retentionDays,
                     encryptionRequired: Boolean(data.encryptionRequired),
+                    metadata: undefined,
                   })
                   setPrivacyDcFormKey((k) => k + 1)
                   toast({ title: t("settings.organization.privacy.classificationSuccess") })
@@ -879,6 +880,7 @@ export function OrganizationSettings() {
                         columnName: String(data.columnName ?? "").trim() || undefined,
                         classificationId: BigInt(String(data.classificationId)),
                         appliesTo: String(data.appliesTo ?? "all"),
+                        metadata: undefined,
                       })
                       setPrivacyRuleFormKey((k) => k + 1)
                       toast({ title: t("settings.organization.privacy.ruleSuccess") })
@@ -982,11 +984,11 @@ export function OrganizationSettings() {
                   <ul className="space-y-2 text-sm">
                     {delegatedAdminScopes.map((row) => {
                       const scopeId = String(row.id ?? "")
-                      const companyId = String(row.company_id ?? row.companyId ?? "")
+                      const companyId = String(row.companyId ?? "")
                       const companyName =
                         companies.find((c) => String(c.id) === companyId)?.name ?? companyId
-                      const identity = String(row.user_identity ?? row.userIdentity ?? "")
-                      const active = row.is_active !== false && row.isActive !== false
+                      const identity = String(row.userIdentity ?? "")
+                      const active = row.isActive !== false
                       return (
                         <li
                           key={scopeId}

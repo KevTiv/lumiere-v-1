@@ -97,6 +97,11 @@ import {
   useDeactivateRevenueRecognitionRule,
   useImportSubscriptionPlanCsv,
   useImportSubscriptionCsv,
+  type Subscription,
+  type SubscriptionPlan,
+  type DeferredRevenueSchedule,
+  type DeferredRevenueLine,
+  type RevenueRecognitionRule,
 } from "@lumiere/query-hooks/hooks/subscriptions"
 import {
   toCreateSubscriptionFromSaleOrderParams,
@@ -118,10 +123,12 @@ import {
 } from "@/lib/subscriptions-revenue-params"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
-import { useSaleOrders, usePricelists } from "@lumiere/query-hooks/hooks/sales"
+import { useSaleOrders, usePricelists, type SaleOrder, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { useAccountJournals, useAccountAccounts, useAccountMoves, useAccountMoveLines } from "@lumiere/query-hooks/hooks/accounting"
+import type { AccountAccount, AccountJournal } from "@lumiere/query-hooks/hooks/accounting"
+import type { Product } from "@lumiere/stdb/types"
 import {
   saleOrderRowsToSelectOptions,
   subscriptionPlanRowsToSelectOptions,
@@ -145,16 +152,16 @@ function isTrialSubscriptionRow(row: Record<string, unknown>): boolean {
 }
 
 interface SubscriptionsClientProps {
-  initialSubscriptions?: Record<string, unknown>[]
-  initialPlans?: Record<string, unknown>[]
-  initialDeferredSchedules?: Record<string, unknown>[]
-  initialDeferredLines?: Record<string, unknown>[]
-  initialRecognitionRules?: Record<string, unknown>[]
-  initialSaleOrders?: Record<string, unknown>[]
-  initialPricelists?: Record<string, unknown>[]
-  initialProducts?: Record<string, unknown>[]
-  initialJournals?: Record<string, unknown>[]
-  initialAccounts?: Record<string, unknown>[]
+  initialSubscriptions?: Subscription[]
+  initialPlans?: SubscriptionPlan[]
+  initialDeferredSchedules?: DeferredRevenueSchedule[]
+  initialDeferredLines?: DeferredRevenueLine[]
+  initialRecognitionRules?: RevenueRecognitionRule[]
+  initialSaleOrders?: SaleOrder[]
+  initialPricelists?: ProductPricelist[]
+  initialProducts?: Product[]
+  initialJournals?: AccountJournal[]
+  initialAccounts?: AccountAccount[]
   organizationId?: number
 }
 
@@ -465,7 +472,6 @@ function SubscriptionsClientLoaded({
           if (!r || String(r.state) !== "active") return
           void pauseSubscription.mutate({
             subscriptionId: BigInt(String(r.id)),
-            params: {},
           })
         },
       },
@@ -480,7 +486,6 @@ function SubscriptionsClientLoaded({
           if (!r || String(r.state) !== "paused") return
           void resumeSubscription.mutate({
             subscriptionId: BigInt(String(r.id)),
-            params: {},
           })
         },
       },
@@ -981,7 +986,7 @@ function SubscriptionsClientLoaded({
           const params = buildCloseSubscriptionParams(formData)
           void closeSubscription.mutate({
             subscriptionId: BigInt(closeTargetId),
-            params: params as unknown as Record<string, unknown>,
+            params,
           })
           setCloseTargetId(null)
         }}
@@ -996,7 +1001,7 @@ function SubscriptionsClientLoaded({
           const params = buildGenerateSubscriptionInvoiceParams(formData)
           void generateInvoice.mutate({
             subscriptionId: BigInt(generateTargetId),
-            params: params as unknown as Record<string, unknown>,
+            params,
           })
           setGenerateTargetId(null)
         }}
@@ -1114,7 +1119,7 @@ function SubscriptionsClientLoaded({
           const params = buildRecognizeDeferredRevenueParams({ moveId, moveLineId })
           void recognizeDeferred.mutate({
             lineId: BigInt(recognizeLineId),
-            params: params as unknown as Record<string, unknown>,
+            params,
           })
           setRecognizeLineId(null)
         }}

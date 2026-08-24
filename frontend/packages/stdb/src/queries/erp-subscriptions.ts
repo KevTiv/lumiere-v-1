@@ -491,7 +491,7 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       "sale_order",
       id,
       fa,
-      " AND state = 'ToApprove'",
+      " AND state = 'toApprove'",
     ),
   "sale-order-lines": (id, fa) =>
     selectOrgScopedSql("sale-order-lines", "sale_order_line", id, fa, ""),
@@ -708,13 +708,19 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
   tasks: (id, fa) => selectOrgScopedSql("tasks", "project_task", id, fa, ""),
   timesheets: (id, fa) =>
     selectOrgScopedSql("timesheets", "project_timesheet", id, fa, ""),
+  // SpacetimeDB SQL cannot express a NULL/None comparison against an
+  // `Option<u64>` column at all (no literal syntax parses as
+  // `(some: U64 | none: ())`, and `IS NULL`/`IS NOT NULL` are rejected
+  // outright with "Unsupported expression"). The `timesheet_invoice_id IS
+  // NULL` filter is applied post-fetch in Rust (api-server/src/query_exec.rs)
+  // instead.
   "timesheets-to-validate": (id, fa) =>
     selectOrgScopedSql(
       "timesheets-to-validate",
       "project_timesheet",
       id,
       fa,
-      " AND validation_status = 'draft' AND timesheet_invoice_id IS NULL",
+      " AND validation_status = 'draft'",
     ),
   "timesheets-unbilled": (id, fa) =>
     selectOrgScopedSql(
@@ -722,7 +728,7 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       "project_timesheet",
       id,
       fa,
-      " AND validation_status = 'validated' AND timesheet_invoice_type = 'billable' AND timesheet_invoice_id IS NULL",
+      " AND validation_status = 'validated' AND timesheet_invoice_type = 'billable'",
     ),
   "project-rate-cards": (id, fa) =>
     selectOrgScopedSql("project-rate-cards", "project_rate_card", id, fa, ""),
@@ -1036,7 +1042,7 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       "purchase_order",
       id,
       fa,
-      " AND state = 'ToApprove'",
+      " AND state = 'toApprove'",
     ),
   "purchase-orders-partial-receipt": (id, fa) =>
     selectOrgScopedSql(
@@ -1645,7 +1651,7 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       "expense_sheet",
       id,
       fa,
-      " AND state = 'Submitted'",
+      " AND state = 'submitted'",
     ),
   "expenses-missing-receipt": (id, fa) =>
     selectOrgScopedSql(
@@ -1653,7 +1659,7 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       "hr_expense",
       id,
       fa,
-      " AND has_receipt = false AND state = 'Draft'",
+      " AND has_receipt = false AND state = 'draft'",
     ),
   "expense-receipts": (id, fa) =>
     selectOrgScopedSql("expense-receipts", "hr_expense_receipt", id, fa, ""),
@@ -1673,7 +1679,7 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       "hr_expense_policy_exception",
       id,
       fa,
-      " AND state = 'Pending'",
+      " AND state = 'pending'",
     ),
   "expense-mileage-rates": (id, fa) =>
     selectOrgScopedSql(
@@ -1790,10 +1796,18 @@ function subscriptionSqlForCompanyScopedResource(
   const crmOptionalTable = crmOptionalCompanyTables[resource]
   if (crmOptionalTable) {
     if (ctx.organizationId == null || ids?.length !== 1) return null
-    const companyId = ids[0]
+    // SpacetimeDB SQL cannot express `company_id IS NULL` against an
+    // `Option<u64>` column (rejected outright — see the `timesheets-to-validate`
+    // fix above for the same class of engine limitation). A broken query in
+    // this initial multi-table subscribe batch fails the whole subscription
+    // (see `onError` in `stdb/src/context.tsx`), so this was silently
+    // breaking every subscribed table's live updates, not just this one.
+    // Subscribe org-wide instead; `projection.ts`'s `CRM_OPTIONAL_COMPANY_RESOURCES`
+    // filter already narrows to `company_id === ids[0] || company_id == null`
+    // client-side, so this preserves the exact same effective row set.
     const columns = resolveHttpSqlColumns(resource as QueryResourceKey, fa).join(", ")
     return [
-      `SELECT ${columns} FROM ${crmOptionalTable} WHERE organization_id = ${ctx.organizationId} AND (company_id = ${companyId} OR company_id IS NULL)`,
+      `SELECT ${columns} FROM ${crmOptionalTable} WHERE organization_id = ${ctx.organizationId}`,
     ]
   }
 

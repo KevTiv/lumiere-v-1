@@ -33,7 +33,13 @@ import {
   useReopenTicket,
   useImportHelpdeskTicketCsv,
 } from "@lumiere/query-hooks/hooks/helpdesk"
-import type { UpdateTicketParams } from "@lumiere/query-hooks/hooks/helpdesk"
+import type {
+  UpdateTicketParams,
+  HelpdeskTicket,
+  HelpdeskTeam,
+  HelpdeskStage,
+  HelpdeskSla,
+} from "@lumiere/query-hooks/hooks/helpdesk"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
   toCreateHelpdeskSlaParams,
@@ -52,10 +58,10 @@ import { HelpdeskTicketDialog } from "./helpdesk-ticket-dialog"
 import { XCircle, RotateCcw, Pencil } from "lucide-react"
 
 interface HelpdeskClientProps {
-  initialTickets?: Record<string, unknown>[]
-  initialTeams?: Record<string, unknown>[]
-  initialStages?: Record<string, unknown>[]
-  initialSlas?: Record<string, unknown>[]
+  initialTickets?: HelpdeskTicket[]
+  initialTeams?: HelpdeskTeam[]
+  initialStages?: HelpdeskStage[]
+  initialSlas?: HelpdeskSla[]
   organizationId?: number
 }
 

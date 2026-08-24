@@ -174,6 +174,8 @@ test.describe("Projects wave A lifecycle e2e @projects", () => {
         color: none,
         user_ids: [],
         milestone_id: none,
+        wbs_code: "",
+        wbs_level: 0,
         planned_hours: 8,
         total_hours_spent: 0,
         effective_hours: 0,
@@ -225,7 +227,7 @@ test.describe("Projects wave A lifecycle e2e @projects", () => {
         date: { __timestamp_micros_since_unix_epoch__: Date.now() * 1000 },
         unit_amount: 2,
         currency_id: currencyId,
-        employee_cost: 50,
+        employee_cost: some(50),
         sell_rate: some(150),
         timesheet_invoice_type: some("billable"),
         product_id: none,
@@ -248,6 +250,9 @@ test.describe("Projects wave A lifecycle e2e @projects", () => {
       {
         company_id: some(companyId),
         timesheet_ids: [timesheetId],
+        wip_journal_id: none,
+        wip_account_id: none,
+        wip_labor_account_id: none,
       },
     ])
     expect(sod.ok).toBe(false)

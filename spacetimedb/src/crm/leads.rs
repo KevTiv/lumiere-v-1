@@ -6,7 +6,9 @@
 ///   - LeadLostReason
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::{company_id_from_scope, default_company_id_for_organization};
+use crate::core::organization::{
+    company, company_id_from_scope, default_company_id_for_organization,
+};
 use crate::core::utm::{utm_campaign, utm_medium};
 use crate::crm::contacts::{contact, contact_tag, Contact};
 use crate::crm::lead_scoring::mark_lead_score_stale;
@@ -902,6 +904,13 @@ pub fn convert_lead_to_customer(
             .ok_or("opportunity_stage_id is required when create_opportunity is true")?;
         validate_lead_opportunity_stage(ctx, organization_id, stage_id)?;
 
+        // The opportunity's currency must be populated from its company so that
+        // downstream flows (e.g. convert_opportunity_to_sale_order) that require
+        // company_currency_id don't fail on leads converted with create_opportunity=true.
+        let opportunity_company_currency_id = opportunity_company_id
+            .and_then(|cid| ctx.db.company().id().find(&cid))
+            .map(|c| c.currency_id);
+
         ctx.db.opportunity().insert(Opportunity {
             id: 0,
             organization_id,
@@ -919,7 +928,7 @@ pub fn convert_lead_to_customer(
             source_id: lead.source_id,
             user_id: lead.user_id,
             team_id: lead.team_id,
-            company_currency_id: None,
+            company_currency_id: opportunity_company_currency_id,
             company_id: opportunity_company_id,
             date_open: Some(ctx.timestamp),
             date_closed: None,

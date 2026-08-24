@@ -114,10 +114,10 @@ async fn request_certification(
     });
     state
         .client_with_token(&session.stdb_token)
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "request_ai_skill_certification",
             json!([organization_id, params]),
-        )
+        ))
         .await
         .map_err(|error| {
             ApiError::Unprocessable(format!("request AI skill certification: {error}"))

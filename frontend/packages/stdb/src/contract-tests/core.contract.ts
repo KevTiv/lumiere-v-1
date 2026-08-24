@@ -3,7 +3,7 @@
  * No runtime assertions; safe to import nowhere from production bundles.
  */
 import type { DbConnection } from "../generated";
-import type { EnsureDevAdminParams } from "../generated/types/reducers";
+import type { OperationInputMap } from "@lumiere/contracts/generated/operation-inputs";
 import {
   callEnsureDevAdmin,
   ensureDevAdminContract,
@@ -13,7 +13,7 @@ import {
 declare const __mockConn: DbConnection;
 
 const _inputMatchesGenerated: EnsureDevAdminInput = {};
-const _: EnsureDevAdminParams = _inputMatchesGenerated;
+const _: OperationInputMap["ensure_dev_admin"] = _inputMatchesGenerated;
 
 void ensureDevAdminContract.reducerName;
 void ensureDevAdminContract.requiredSubscriptionResources;

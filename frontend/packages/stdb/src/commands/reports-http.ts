@@ -1,9 +1,7 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
-
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Reports mutations via Next.js BFF `POST /api/call/:reducer`.
+ * Reports mutations via the api-server BFF `POST /api/call/:reducer`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` reports hooks.
  */
 export const REPORTS_BFF_REDUCERS = [
@@ -35,38 +33,9 @@ export const REPORTS_BFF_REDUCERS = [
 
 export type ReportsBffReducerKey = (typeof REPORTS_BFF_REDUCERS)[number];
 
-const WITH_COMPANY_QUERY = new Set<ReportsBffReducerKey>([
-  "archive_financial_report",
-  "create_financial_report",
-  "create_saved_report",
-  "create_trial_balance_entry",
-  "delete_financial_report",
-  "delete_saved_report",
-  "export_financial_report",
-  "generate_eu_vat_report",
-  "generate_financial_report",
-  "update_financial_report",
-  "update_saved_report",
-]);
-
 /** Same-origin path used by `apiFetch` in the web app. */
 export function reportsBffCallUrl(reducer: ReportsBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
-
-export function reportsBffPost(
-  reducer: ReportsBffReducerKey,
-  args: unknown[],
-): { urlPath: string; init: RequestInit } {
-  return {
-    urlPath: reportsBffCallUrl(reducer),
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
-    },
-  };
+  return `/api/call/${reducer}`;
 }
 
 const REPORTS_MODULE_RESOURCES = [

@@ -1,6 +1,7 @@
 //! Lumiere Axum API server — library surface for the `api-server` binary.
 
 mod auth_password;
+pub mod cold_tier;
 pub mod config;
 pub mod document_blobs;
 pub mod domain_queries;
@@ -13,7 +14,6 @@ pub mod owner_report_worker;
 pub mod project_integration_worker;
 pub mod query_exec;
 pub mod realtime;
-pub mod reducer_allowlist;
 pub mod reports;
 pub mod routes;
 pub mod session;
@@ -23,7 +23,6 @@ pub mod workflow_reads;
 pub mod workflow_worker;
 
 mod http_app;
-mod stdb_sdk_bindings;
 
 /// Run the HTTP server (env, tracing, bind, serve).
 pub async fn run() -> anyhow::Result<()> {
@@ -38,6 +37,16 @@ pub async fn run_owner_report_worker() -> anyhow::Result<()> {
 /// Run the standalone expense OCR/email/card intent worker service.
 pub async fn run_expense_integration_worker() -> anyhow::Result<()> {
     expense_integration_worker::serve().await
+}
+
+/// Run the standalone audit-log cold-tier drainer service.
+pub async fn run_audit_cold_drainer() -> anyhow::Result<()> {
+    cold_tier::audit_drainer::serve().await
+}
+
+/// Run the standalone pos-order cold-tier drainer service.
+pub async fn run_pos_order_cold_drainer() -> anyhow::Result<()> {
+    cold_tier::pos_order_drainer::serve().await
 }
 
 /// Run the standalone project payroll/calendar/e-invoice intent worker service.

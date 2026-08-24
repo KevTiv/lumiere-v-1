@@ -94,7 +94,7 @@ pub async fn heartbeat(
     ]);
 
     state
-        .call_reducer("update_hub_heartbeat", args)
+        .call_reducer(stdb_client::reducer_call!("update_hub_heartbeat", args))
         .await
         .map_err(|e| {
             tracing::error!("Heartbeat reducer failed: {}", e);
@@ -131,7 +131,7 @@ pub async fn telemetry(
     ]);
 
     state
-        .call_reducer("record_telemetry", args)
+        .call_reducer(stdb_client::reducer_call!("record_telemetry", args))
         .await
         .map_err(|e| {
             tracing::error!("record_telemetry reducer failed: {}", e);
@@ -168,7 +168,7 @@ pub async fn pair(
     ]);
 
     state
-        .call_reducer("claim_hub_with_token", args)
+        .call_reducer(stdb_client::reducer_call!("claim_hub_with_token", args))
         .await
         .map_err(|e| {
             tracing::error!("claim_hub_with_token failed: {}", e);
@@ -203,7 +203,7 @@ pub async fn sync_devices(
     let args = json!([req.organization_id, req.hub_id, req.devices]);
 
     state
-        .call_reducer("sync_hub_devices", args)
+        .call_reducer(stdb_client::reducer_call!("sync_hub_devices", args))
         .await
         .map_err(|e| {
             tracing::error!("sync_hub_devices failed: {}", e);
@@ -230,7 +230,7 @@ pub async fn device_status(
     let args = json!([req.organization_id, req.device_id, req.status]);
 
     state
-        .call_reducer("update_device_status", args)
+        .call_reducer(stdb_client::reducer_call!("update_device_status", args))
         .await
         .map_err(|e| {
             tracing::error!("update_device_status reducer failed: {}", e);

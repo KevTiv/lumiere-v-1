@@ -34,6 +34,24 @@ services:
       timeout: 3s
       retries: 10
 
+  # Cold-tier storage (docs/plans/sliding-window-cold-tier.md). NoTls locally —
+  # api-server/src/cold_tier/pg_pool.rs enforces PG_TLS_MODE=require in production.
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${PG_DATABASE:-lumiere}
+      POSTGRES_USER: ${PG_USER:-lumiere}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-lumiere}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-lumiere} -d ${PG_DATABASE:-lumiere}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   qdrant:
     build:
       context: .
@@ -148,6 +166,12 @@ services:
       CORS_ORIGINS: http://localhost:3001,http://127.0.0.1:3001
       NEXT_PUBLIC_APP_URL: http://localhost:3001
       DEV_MOCK_ORG_ID: ${DEV_MOCK_ORG_ID:-}
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${PG_DATABASE:-lumiere}
+      PG_USER: ${PG_USER:-lumiere}
+      PG_PASSWORD: ${PG_PASSWORD:-lumiere}
+      PG_TLS_MODE: disable
     ports:
       - "8082:8082"
     volumes:
@@ -158,6 +182,8 @@ services:
       ai-gateway:
         condition: service_healthy
       chromium-worker:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     healthcheck:
       test:
@@ -223,6 +249,72 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8093/health/ready >/dev/null"]
+      interval: 10s
+      timeout: 4s
+      retries: 12
+      start_period: 20s
+
+  audit-cold-drainer:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server --bin audit-cold-drainer'
+    environment:
+      STDB_HOST: http://spacetimedb:3000
+      STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
+      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN in .env.docker}
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${PG_DATABASE:-lumiere}
+      PG_USER: ${PG_USER:-lumiere}
+      PG_PASSWORD: ${PG_PASSWORD:-lumiere}
+      PG_TLS_MODE: disable
+      LUMIERE_AUDIT_DRAINER_POLL_SECS: ${LUMIERE_AUDIT_DRAINER_POLL_SECS:-5}
+      LUMIERE_AUDIT_DRAINER_BATCH: ${LUMIERE_AUDIT_DRAINER_BATCH:-200}
+      LUMIERE_AUDIT_DRAINER_PORT: 8094
+    volumes:
+      - .:/workspace
+      - cargo-target:/cargo-target
+    depends_on:
+      spacetimedb:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8094/health/ready >/dev/null"]
+      interval: 10s
+      timeout: 4s
+      retries: 12
+      start_period: 20s
+
+  pos-order-cold-drainer:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server --bin pos-order-cold-drainer'
+    environment:
+      STDB_HOST: http://spacetimedb:3000
+      STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
+      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN in .env.docker}
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${PG_DATABASE:-lumiere}
+      PG_USER: ${PG_USER:-lumiere}
+      PG_PASSWORD: ${PG_PASSWORD:-lumiere}
+      PG_TLS_MODE: disable
+      LUMIERE_POS_ORDER_DRAINER_POLL_SECS: ${LUMIERE_POS_ORDER_DRAINER_POLL_SECS:-5}
+      LUMIERE_POS_ORDER_DRAINER_BATCH: ${LUMIERE_POS_ORDER_DRAINER_BATCH:-200}
+      LUMIERE_POS_ORDER_DRAINER_PORT: 8095
+    volumes:
+      - .:/workspace
+      - cargo-target:/cargo-target
+    depends_on:
+      spacetimedb:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8095/health/ready >/dev/null"]
       interval: 10s
       timeout: 4s
       retries: 12
@@ -309,4 +401,5 @@ volumes:
   web-node-modules:
   spacetimedb-data:
   qdrant-data:
+  postgres-data:
   owner-report-artifacts:

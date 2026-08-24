@@ -87,19 +87,51 @@ async function fetchTicketIdByName(
 }
 
 /**
- * Returns the first team id from the seeded helpdesk teams for this org.
- * The create-ticket UI already validated that at least one team exists, so
- * by the time this is called the query is guaranteed to return rows.
+ * Returns a helpdesk team (id + name) that has at least one associated
+ * stage. This org's `helpdesk_team` table is shared across the whole
+ * authenticated e2e project (a single storageState / organization is reused
+ * by every spec, run fully parallel — see playwright.config.ts), so by the
+ * time this spec runs it may contain team fixtures created by other specs
+ * (e.g. module-smoke.spec.ts's "new-helpdesk-team" test) that have zero
+ * stages. The new-ticket form's Stage select is NOT filtered by the chosen
+ * Team — it always lists every stage in the org — so an empty-stage team
+ * doesn't itself break stage selection. It does matter for the caller,
+ * which needs the *same* team id the ticket was created under so a
+ * subsequent `add_helpdesk_team_member` targets the right team for
+ * `assign_ticket`'s HLP-006 guard. Resolving a team with stages up front
+ * and driving the UI to pick it by name (rather than blindly taking
+ * whichever team option renders first) keeps both in sync.
  */
-async function fetchFirstHelpdeskTeamId(
+async function fetchHelpdeskTeamWithStages(
   page: import("@playwright/test").Page,
-): Promise<number> {
-  const res = await page.request.get("/api/query/helpdesk-teams")
-  if (!res.ok()) throw new Error(`helpdesk-teams query failed: ${res.status()}`)
-  const json = (await res.json()) as { data?: Array<{ id?: unknown }> }
-  const id = scalarQueryId(json.data?.[0]?.id)
-  if (id == null) throw new Error("no helpdesk teams in seed data")
-  return id
+): Promise<{ id: number; name: string }> {
+  const teamsRes = await page.request.get("/api/query/helpdesk-teams")
+  if (!teamsRes.ok()) throw new Error(`helpdesk-teams query failed: ${teamsRes.status()}`)
+  const teamsJson = (await teamsRes.json()) as {
+    data?: Array<{ id?: unknown; name?: unknown }>
+  }
+  const teams = teamsJson.data ?? []
+
+  const stagesRes = await page.request.get("/api/query/helpdesk-stages")
+  if (!stagesRes.ok()) throw new Error(`helpdesk-stages query failed: ${stagesRes.status()}`)
+  const stagesJson = (await stagesRes.json()) as {
+    data?: Array<{ teamId?: unknown; team_id?: unknown }>
+  }
+  const stages = stagesJson.data ?? []
+  const teamIdsWithStages = new Set(
+    stages
+      .map((s) => scalarQueryId(s.teamId ?? s.team_id))
+      .filter((id): id is number => id != null),
+  )
+
+  const match = teams.find((t) => {
+    const id = scalarQueryId(t.id)
+    return id != null && teamIdsWithStages.has(id)
+  })
+  if (!match) throw new Error("no helpdesk team with at least one stage found in seed data")
+  const id = scalarQueryId(match.id)
+  if (id == null) throw new Error("matched helpdesk team is missing an id")
+  return { id, name: String(match.name ?? "") }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -118,7 +150,8 @@ test.describe("Helpdesk update mutations", { tag: "@phase-6" }, () => {
     await page.getByTestId("module-create-helpdesk-tickets").click()
     await expect(page.getByTestId("form-modal-new-helpdesk-ticket")).toBeVisible()
     await fillField(page, "name", ticketName)
-    await chooseFirstEnabledOption(page, "teamId")
+    const team = await fetchHelpdeskTeamWithStages(page)
+    await chooseSelectOptionByLabel(page, "teamId", team.name)
     await chooseFirstEnabledOption(page, "stageId")
     const [createTicketRes] = await Promise.all([
       page.waitForResponse(
@@ -179,7 +212,8 @@ test.describe("Helpdesk ticket assign and close", { tag: "@p0" }, () => {
     await page.getByTestId("module-create-helpdesk-tickets").click()
     await expect(page.getByTestId("form-modal-new-helpdesk-ticket")).toBeVisible()
     await fillField(page, "name", ticketName)
-    await chooseFirstEnabledOption(page, "teamId")
+    const team = await fetchHelpdeskTeamWithStages(page)
+    await chooseSelectOptionByLabel(page, "teamId", team.name)
     await chooseFirstEnabledOption(page, "stageId")
 
     const [createTicketRes] = await Promise.all([
@@ -194,7 +228,7 @@ test.describe("Helpdesk ticket assign and close", { tag: "@p0" }, () => {
 
     // ── Step 2: resolve test-run context values via BFF queries ───────────
     const organizationId = await fetchSessionOrganizationId(page)
-    const teamId = await fetchFirstHelpdeskTeamId(page)
+    const teamId = team.id
     const ticketId = await fetchTicketIdByName(page, ticketName)
 
     // The session user's SpacetimeDB identity is written to the

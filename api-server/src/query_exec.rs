@@ -603,7 +603,10 @@ async fn maybe_log_hr_pii_read(
             "row_count": row_count,
         }
     ]);
-    if let Err(e) = client.call_reducer("log_hr_pii_read", args).await {
+    if let Err(e) = client
+        .call_reducer(stdb_client::reducer_call!("log_hr_pii_read", args))
+        .await
+    {
         tracing::warn!(resource, error = %e, "hr pii read audit failed");
     }
 }
@@ -877,6 +880,44 @@ pub async fn execute_resource_query_for_company(
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
             sort_rows_by_id_desc(&mut rows);
+            return Ok(rows);
+        }
+        // SpacetimeDB SQL cannot express a NULL/None comparison against an
+        // `Option<u64>` column: `IS NULL`/`IS NOT NULL` are rejected outright
+        // ("Unsupported expression"), and no literal (`NULL`, `'none'`, `0`,
+        // struct-literal syntax) parses as the sum type `(some: U64 | none:
+        // ())` either. The erp-org-sql extraWhere for these two resources
+        // used to include `AND timesheet_invoice_id IS NULL`, which SpacetimeDB
+        // always rejected with a 400 — build the WHERE clause without it and
+        // filter the None rows out here instead.
+        "timesheets-to-validate" | "timesheets-unbilled" => {
+            let reg = registry_get(resource).ok_or_else(|| {
+                ApiError::NotFound(format!("Unknown resource: \"{resource}\""))
+            })?;
+            let extra_where = if resource == "timesheets-to-validate" {
+                " AND validation_status = 'draft'"
+            } else {
+                " AND validation_status = 'validated' AND timesheet_invoice_type = 'billable'"
+            };
+            let sql = select_org_scoped_sql(
+                resource,
+                &reg.table,
+                organization_id,
+                fa,
+                extra_where,
+                "",
+            )
+            .map_err(ApiError::Internal)?;
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(|row| {
+                row_u64(row, "timesheetInvoiceId", "timesheet_invoice_id")
+                    .ok()
+                    .flatten()
+                    .is_none()
+            });
             return Ok(rows);
         }
         "queued-mail-messages" => {
@@ -1454,16 +1495,7 @@ pub async fn execute_resource_query_for_company(
                 .map_err(|e| ApiError::Internal(e.to_string()));
         }
         "audit-log" => {
-            let sql = format!(
-                "SELECT id, organization_id, company_id, table_name, record_id, action, old_values, new_values, session_id, ip_address, user_agent, timestamp FROM audit_log WHERE organization_id = {organization_id}"
-            );
-            let mut rows = client
-                .query_sql(&sql)
-                .await
-                .map_err(|e| ApiError::Internal(e.to_string()))?;
-            sort_rows_by_id_desc(&mut rows);
-            rows.truncate(500);
-            return Ok(rows);
+            return crate::cold_tier::audit_read::merged_rows(client, organization_id).await;
         }
         "audit-rules" => {
             let sql = format!(

@@ -14,6 +14,13 @@ const OPTION_FIELDS = optionFieldsJson as OptionFieldMap
 const NESTED_ARRAY_STRUCTS: Partial<
   Record<string, Partial<Record<string, keyof OptionFieldMap & string>>>
 > = {
+  PublishFormConfigurationParams: {
+    fields: "CreateFormFieldParams",
+    role_configs: "CreateRoleConfigParams",
+  },
+  CreateFormFieldParams: {
+    options: "FieldOption",
+  },
   CreateReturnOrderParams: {
     lines: "CreateReturnOrderLineParams",
   },
@@ -376,6 +383,8 @@ export function stdbParamsToJson(
 
 /** Last-arg struct names for `POST /api/call/:reducer` bodies in Playwright / scripts. */
 const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & string>> = {
+  create_ai_insight: "CreateAiInsightParams",
+  create_dashboard_widget: "CreateDashboardWidgetParams",
   create_lead: "CreateLeadParams",
   create_contact: "CreateContactParams",
   merge_contacts: "MergeContactsParams",
@@ -428,6 +437,8 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   create_leave_type: "CreateLeaveTypeParams",
   create_payroll_structure: "CreatePayrollStructureParams",
   create_salary_rule: "CreateSalaryRuleParams",
+  create_employee: "CreateEmployeeParams",
+  create_task: "CreateTaskParams",
   create_document_folder: "CreateDocumentFolderParams",
   create_document: "CreateDocumentParams",
   add_document_version: "AddDocumentVersionParams",
@@ -473,7 +484,9 @@ const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & strin
   create_utm_medium: "CreateUtmMediumParams",
   create_utm_source: "CreateUtmSourceParams",
   create_form_configuration: "CreateFormConfigParams",
+  publish_form_configuration: "PublishFormConfigurationParams",
   add_form_field: "CreateFormFieldParams",
+  set_record_custom_field_values: "SetRecordCustomFieldValuesParams",
   grant_permission: "GrantOrgPermissionParams",
   grant_field_permission: "GrantFieldPermissionParams",
   add_org_member: "AddOrgMemberParams",

@@ -296,7 +296,7 @@ async fn persist_step(
     duration_ms: u64,
     error_message: Option<&str>,
 ) -> Result<()> {
-    stdb.call_reducer(
+    stdb.call_reducer(stdb_client::reducer_call!(
         "append_ai_agent_run_step",
         serde_json::json!([
             org_id,
@@ -313,7 +313,7 @@ async fn persist_step(
                 "error_message": error_message,
             }
         ]),
-    )
+    ))
     .await?;
     Ok(())
 }

@@ -1,0 +1,60 @@
+{
+  "_comment": "Archive-candidate tables for the sliding-window cold tier. Each entry drives PG DDL generation, archive-manifest output, and CI validation. Ordered by planned implementation phase.",
+  "version": 1,
+  "candidates": [
+    {
+      "_comment": "Phase 1 — append-only, immutable after creation. First workload; proves the full pipeline.",
+      "table": "audit_log",
+      "cold_table": "cold_audit_log",
+      "mode": "append_only",
+      "scope": {
+        "organization_id": "organization_id",
+        "company_id": "company_id"
+      },
+      "finalize_reducer": "finalize_audit_log_archive",
+      "order_by": [{ "column": "id", "direction": "ASC" }]
+    },
+    {
+      "_comment": "Phase 2 — first mutable transactional resource. cold_eligible_at is stamped at creation (no separate 'finalize the transaction' reducer exists — PosOrder is created directly in a terminal Paid state); archive_version is checked, not incremented, since no reducer mutates a row after creation today.",
+      "table": "pos_order",
+      "cold_table": "cold_pos_order",
+      "mode": "versioned",
+      "scope": {
+        "organization_id": "organization_id",
+        "company_id": "company_id"
+      },
+      "finalize_reducer": "finalize_pos_order_archive",
+      "order_by": [{ "column": "id", "direction": "ASC" }]
+    }
+  ],
+  "planned": [
+    {
+      "table": "pos_order_line",
+      "note": "Child of pos_order; eligible when parent is eligible."
+    },
+    {
+      "table": "pos_payment",
+      "note": "Child of pos_order; eligible when parent is eligible."
+    },
+    {
+      "table": "sale_order",
+      "note": "Requires cold_eligible_at + archive_version; pagination audit pending."
+    },
+    {
+      "table": "sale_order_line",
+      "note": "Child of sale_order."
+    },
+    {
+      "table": "stock_move",
+      "note": "Eligible when state = done and otherwise safe to archive."
+    },
+    {
+      "table": "account_move",
+      "note": "Eligible for closed fiscal periods only."
+    },
+    {
+      "table": "account_move_line",
+      "note": "Child of account_move."
+    }
+  ]
+}

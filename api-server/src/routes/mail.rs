@@ -108,7 +108,10 @@ async fn dispatch_queued_mail(
             Ok(()) => {
                 let mark_args = json!([org_id, message_id, null]);
                 if let Err(e) = client
-                    .call_reducer("mark_mail_message_delivered", mark_args)
+                    .call_reducer(stdb_client::reducer_call!(
+                        "mark_mail_message_delivered",
+                        mark_args
+                    ))
                     .await
                 {
                     errors.push(format!("message {message_id} sent but mark failed: {e}"));

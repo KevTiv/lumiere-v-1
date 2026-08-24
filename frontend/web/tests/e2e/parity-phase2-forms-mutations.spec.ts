@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { parseQueryListResponse } from "@lumiere/api-client"
 
 import {
   addCustomFormFieldViaSettings,
@@ -75,14 +76,14 @@ test.describe("Parity phase 2 — form config mutations", { tag: ["@p0", "@parit
         async () => {
           const res = await page.request.get("/api/query/record-custom-field-values")
           if (!res.ok()) return false
-          const rows = (await res.json()) as Record<string, unknown>[]
+          const rows = parseQueryListResponse(await res.json())
           return rows.some((row) => {
             const model = String(row.model ?? "")
             const recordId = String(row.recordId ?? row.record_id ?? "")
             const key = String(row.fieldKey ?? row.field_key ?? "")
             const valueJson = String(row.valueJson ?? row.value_json ?? "")
             return (
-              model === "lead" &&
+              model === "crm_lead" &&
               recordId === String(leadId) &&
               key === fieldId &&
               valueJson.includes(customValue)

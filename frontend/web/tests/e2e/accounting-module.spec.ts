@@ -108,7 +108,7 @@ async function assertAccountingTabRenders(page: Page, tabId: string) {
       await expect(page.getByText("Foreign exchange revaluation")).toBeVisible()
       break
     case "credit-control":
-      await expect(page.getByText("Partner credit control")).toBeVisible()
+      await expect(page.getByText("Partner credit control", { exact: true })).toBeVisible()
       break
     case "amortization":
       await expect(page.getByText("Accrual & prepaid amortization")).toBeVisible()

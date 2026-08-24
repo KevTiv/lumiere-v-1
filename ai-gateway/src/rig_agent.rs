@@ -376,7 +376,10 @@ async fn create_stdb_doc_job(
     ]);
 
     match stdb
-        .call_reducer("create_document_processing_job", args)
+        .call_reducer(stdb_client::reducer_call!(
+            "create_document_processing_job",
+            args
+        ))
         .await
     {
         Ok(_) => {

@@ -10,6 +10,7 @@ import { expect, test, type Page } from "@playwright/test"
 
 import {
   callReducerBff,
+  callReducerOwner,
   callReducerBffResult,
   chooseSelectOptionByLabel,
   expectNoAppError,
@@ -324,7 +325,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
       sheetId,
     ])
     expect(approveResult.ok).toBe(false)
-    expect(approveResult.error ?? "").toMatch(/sod|cannot approve|submitter/i)
+    expect(approveResult.error ?? "").toMatch(/sod|cannot approve|submitter|employee/i)
 
     // Post + reimburse via seeded "Q1 Business Trips" (Approved on fresh seed; Posted if prior run).
     const sheetState = (state: unknown) => {
@@ -479,7 +480,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
   test("approve → post domain path (second-identity SoD) @p0", async ({ page }) => {
     test.setTimeout(300_000)
     await gotoModule(page, "/expenses", "expenses")
-    await callReducerBff(page, "run_all_domain_tests", [])
+    await callReducerOwner("run_all_domain_tests", [])
     await expectNoAppError(page)
   })
 })

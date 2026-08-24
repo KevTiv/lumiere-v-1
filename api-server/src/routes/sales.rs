@@ -77,10 +77,10 @@ async fn sale_order_put(
         .ok_or_else(|| ApiError::Unprocessable("No company found for organization".into()))?;
 
     client
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "update_sale_order",
             json!([org_id, company_id, order_id, params]),
-        )
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
@@ -123,7 +123,10 @@ async fn sale_order_delete(
 
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("cancel_sale_order", json!([org_id, order_id, reason]))
+        .call_reducer(stdb_client::reducer_call!(
+            "cancel_sale_order",
+            json!([org_id, order_id, reason])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 

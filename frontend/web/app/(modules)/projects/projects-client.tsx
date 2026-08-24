@@ -81,6 +81,9 @@ import {
   useCreateProjectIntegrationIntent,
   useRefreshCapacityForecast,
   useRefreshProjectEarnedValue,
+  type ProjectProject,
+  type ProjectTask,
+  type ProjectTimesheet,
 } from "@lumiere/query-hooks/hooks/projects"
 import {
   useCreateExpenseProjectRebill,
@@ -90,8 +93,8 @@ import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import { useUoms } from "@lumiere/query-hooks/hooks/inventory"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
-import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
-import { useContacts, useUsers } from "@lumiere/query-hooks/hooks/crm"
+import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
+import { useContacts, useUsers, type Contact } from "@lumiere/query-hooks/hooks/crm"
 import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hooks/accounting"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import {
@@ -125,11 +128,11 @@ import {
 export { PROJECTS_UI_REDUCERS } from "@/lib/projects-ui-reducers"
 
 interface ProjectsClientProps {
-  initialProjects?: Record<string, unknown>[]
-  initialTasks?: Record<string, unknown>[]
-  initialTimesheets?: Record<string, unknown>[]
-  initialPricelists?: Record<string, unknown>[]
-  initialContacts?: Record<string, unknown>[]
+  initialProjects?: ProjectProject[]
+  initialTasks?: ProjectTask[]
+  initialTimesheets?: ProjectTimesheet[]
+  initialPricelists?: ProductPricelist[]
+  initialContacts?: Contact[]
   organizationId?: number
 }
 
@@ -295,7 +298,7 @@ function ProjectsClientLoaded({
   useProjectsModuleSubscription()
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
-  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [modal, setModal] = useState<ModalState>({ type: null })
   const [lifecycleModal, setLifecycleModal] = useState<LifecycleModalState>({ type: null })
   const [lifecycleError, setLifecycleError] = useState<string | null>(null)

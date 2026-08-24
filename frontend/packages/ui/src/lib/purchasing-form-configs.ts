@@ -1026,6 +1026,7 @@ export const createBillFromPurchaseOrderForm = (t: TFunction): FormConfig => ({
           name: "invoiceDate",
           type: "date",
           label: t("purchasing.forms.createBillFromOrder.fields.invoiceDate"),
+          required: true,
           width: "1/2",
         },
         {

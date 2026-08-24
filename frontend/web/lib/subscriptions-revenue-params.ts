@@ -3,11 +3,18 @@
  */
 
 import type {
+  AmendSubscriptionParams,
+  ApplySubscriptionInvoicePaymentParams,
+  CancelSubscriptionParams,
   CloseSubscriptionParams,
   CreateDeferredRevenueScheduleParams,
   CreateRevenueRecognitionRuleParams,
+  CreateSubscriptionPriceTierParams,
   GenerateSubscriptionInvoiceParams,
+  IngestSubscriptionUsageEventParams,
   RecognizeDeferredRevenueParams,
+  RenewSubscriptionParams,
+  SetSubscriptionCommitmentParams,
 } from '@lumiere/stdb/types'
 import type { Timestamp } from "spacetimedb"
 
@@ -141,7 +148,7 @@ export function buildGenerateSubscriptionInvoiceParams(
 
 export function buildPaySubscriptionInvoiceParams(
   formData: Record<string, unknown>,
-): Record<string, unknown> {
+): ApplySubscriptionInvoicePaymentParams {
   const amountRaw = formData.amount
   return stdbParamsToJson({
     invoiceMoveId: BigInt(String(formData.invoiceMoveId ?? 0)),
@@ -168,12 +175,12 @@ export function buildPaySubscriptionInvoiceParams(
       formData.memo != null && String(formData.memo).trim() !== ''
         ? String(formData.memo).trim()
         : undefined,
-  }, "ApplySubscriptionInvoicePaymentParams") as unknown as Record<string, unknown>
+  }, "ApplySubscriptionInvoicePaymentParams") as unknown as ApplySubscriptionInvoicePaymentParams
 }
 
 export function buildAmendSubscriptionParams(
   formData: Record<string, unknown>,
-): Record<string, unknown> {
+): AmendSubscriptionParams {
   const prorate =
     formData.prorate === true ||
     formData.prorate === 'true' ||
@@ -220,24 +227,24 @@ export function buildAmendSubscriptionParams(
       formData.notes != null && String(formData.notes).trim() !== ''
         ? String(formData.notes).trim()
         : undefined,
-  }, "AmendSubscriptionParams") as unknown as Record<string, unknown>
+  }, "AmendSubscriptionParams") as unknown as AmendSubscriptionParams
 }
 
 export function buildRenewSubscriptionParams(
   formData: Record<string, unknown>,
-): Record<string, unknown> {
+): RenewSubscriptionParams {
   return stdbParamsToJson({
     intervals: Math.max(1, Number(formData.intervals ?? 1)),
     notes:
       formData.notes != null && String(formData.notes).trim() !== ''
         ? String(formData.notes).trim()
         : undefined,
-  }, "RenewSubscriptionParams") as unknown as Record<string, unknown>
+  }, "RenewSubscriptionParams") as unknown as RenewSubscriptionParams
 }
 
 export function buildCancelSubscriptionParams(
   formData: Record<string, unknown>,
-): Record<string, unknown> {
+): CancelSubscriptionParams {
   return stdbParamsToJson({
     closeReasonId:
       formData.closeReasonId != null && String(formData.closeReasonId).trim() !== ''
@@ -273,12 +280,12 @@ export function buildCancelSubscriptionParams(
       formData.receivableAccountId != null && String(formData.receivableAccountId).trim() !== ''
         ? BigInt(String(formData.receivableAccountId))
         : undefined,
-  }, "CancelSubscriptionParams") as unknown as Record<string, unknown>
+  }, "CancelSubscriptionParams") as unknown as CancelSubscriptionParams
 }
 
 export function buildIngestSubscriptionUsageEventParams(
   formData: Record<string, unknown>,
-): Record<string, unknown> {
+): IngestSubscriptionUsageEventParams {
   return stdbParamsToJson({
     source: String(formData.source ?? 'meter').trim() || 'meter',
     eventId: String(formData.eventId ?? '').trim(),
@@ -293,12 +300,12 @@ export function buildIngestSubscriptionUsageEventParams(
       formData.metadata != null && String(formData.metadata).trim() !== ''
         ? String(formData.metadata).trim()
         : undefined,
-  }, "IngestSubscriptionUsageEventParams") as unknown as Record<string, unknown>
+  }, "IngestSubscriptionUsageEventParams") as unknown as IngestSubscriptionUsageEventParams
 }
 
 export function buildCreateSubscriptionPriceTierParams(
   formData: Record<string, unknown>,
-): Record<string, unknown> {
+): CreateSubscriptionPriceTierParams {
   return stdbParamsToJson({
     planId: BigInt(String(formData.planId ?? 0)),
     productId:
@@ -314,12 +321,12 @@ export function buildCreateSubscriptionPriceTierParams(
     unitPrice: Number(formData.unitPrice ?? 0),
     active: formData.active !== false && formData.active !== 'false',
     metadata: undefined,
-  }, "CreateSubscriptionPriceTierParams") as unknown as Record<string, unknown>
+  }, "CreateSubscriptionPriceTierParams") as unknown as CreateSubscriptionPriceTierParams
 }
 
 export function buildSetSubscriptionCommitmentParams(
   formData: Record<string, unknown>,
-): Record<string, unknown> {
+): SetSubscriptionCommitmentParams {
   return stdbParamsToJson({
     minAmount: Number(formData.minAmount ?? 0),
     productId:
@@ -328,5 +335,5 @@ export function buildSetSubscriptionCommitmentParams(
         : undefined,
     active: formData.active !== false && formData.active !== 'false',
     metadata: undefined,
-  }, "SetSubscriptionCommitmentParams") as unknown as Record<string, unknown>
+  }, "SetSubscriptionCommitmentParams") as unknown as SetSubscriptionCommitmentParams
 }

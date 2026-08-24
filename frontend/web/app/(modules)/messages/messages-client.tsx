@@ -23,6 +23,8 @@ import {
   usePostMessage,
   useSubscribeToRecord,
   useUnsubscribeFromRecord,
+  type MailFollower,
+  type MailMessage,
 } from "@lumiere/query-hooks/hooks/messages"
 import { useContacts } from "@lumiere/query-hooks/hooks/crm"
 import { useAccountMoves } from "@lumiere/query-hooks/hooks/accounting"
@@ -31,8 +33,8 @@ import { mailMessageRowsToSelectOptions } from "@/lib/form-lookup"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 
 interface MessagesClientProps {
-  initialMessages?: Record<string, unknown>[]
-  initialFollowers?: Record<string, unknown>[]
+  initialMessages?: MailMessage[]
+  initialFollowers?: MailFollower[]
   organizationId?: number
 }
 
@@ -70,8 +72,10 @@ function parseMetadataRecipient(metadata: unknown): string | null {
   return null
 }
 
-function isNotificationMessage(row: Record<string, unknown>): boolean {
-  const type = String(row.messageType ?? row.message_type ?? "").toLowerCase()
+function isNotificationMessage(row: MailMessage): boolean {
+  // NOTE: messageType is a generated tagged-union ({ tag: "Notification" | ... }), not a
+  // string, so this string comparison never matches — pre-existing bug, preserved as-is.
+  const type = String(row.messageType ?? "").toLowerCase()
   return type === "notification" || type === "user_notification"
 }
 
@@ -115,15 +119,15 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
     const me = identity.toLowerCase()
     const followedKeys = new Set(
       followers
-        .filter((f) => identityHex(f.partnerId ?? f.partner_id) === me)
-        .map((f) => `${String(f.resModel ?? f.res_model)}:${String(f.resId ?? f.res_id)}`),
+        .filter((f) => identityHex(f.partnerId) === me)
+        .map((f) => `${String(f.resModel)}:${String(f.resId)}`),
     )
 
-    return (messages as Record<string, unknown>[]).filter((m) => {
+    return messages.filter((m) => {
       if (!isNotificationMessage(m)) return false
       const recipient = parseMetadataRecipient(m.metadata)
       if (recipient === me) return true
-      const key = `${String(m.model)}:${String(m.resId ?? m.res_id)}`
+      const key = `${String(m.model)}:${String(m.resId)}`
       return followedKeys.has(key)
     })
   }, [messages, followers, identity])

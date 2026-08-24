@@ -1,4 +1,3 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
 
 import type { ReducerCommandContractMeta } from "./types";
 
@@ -19,20 +18,6 @@ const WITH_COMPANY_QUERY = new Set<TemplatesBffReducerKey>([
 export function templatesBffCallUrl(reducer: TemplatesBffReducerKey): string {
   const base = `/api/call/${reducer}`;
   return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
-
-export function templatesBffPost(
-  reducer: TemplatesBffReducerKey,
-  args: unknown[],
-): { urlPath: string; init: RequestInit } {
-  return {
-    urlPath: templatesBffCallUrl(reducer),
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
-    },
-  };
 }
 
 export function templatesCommandContract(

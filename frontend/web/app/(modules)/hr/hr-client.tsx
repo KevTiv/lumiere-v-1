@@ -96,6 +96,11 @@ import {
   useOnboardingTemplates,
   useCreateOnboardingTemplate,
   useApplicants,
+  type HrEmployee,
+  type HrDepartment,
+  type HrLeave,
+  type HrContract,
+  type HrPayslip,
 } from "@lumiere/query-hooks/hooks/hr"
 import { OrgChartPanel, CompensationTimelinePanel, HrOpsQueuePanel, HrAdvancedWfmPanel, LeaveApprovalTimelinePanel } from "./hr-panels"
 import { HrOnboardingPanel } from "./hr-onboarding-panel"
@@ -105,7 +110,7 @@ import { HrBenefitsPanel } from "./hr-benefits-panel"
 import { HrRecruitmentPanel } from "./hr-recruitment-panel"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
-import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
+import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import {
   toCreateContractParams,
   toCreateDepartmentParams,
@@ -354,12 +359,12 @@ function attachEmptyStateAction(
 }
 
 interface HrClientProps {
-  initialEmployees?: Record<string, unknown>[]
-  initialDepartments?: Record<string, unknown>[]
-  initialLeaves?: Record<string, unknown>[]
-  initialContracts?: Record<string, unknown>[]
-  initialPayslips?: Record<string, unknown>[]
-  initialPricelists?: Record<string, unknown>[]
+  initialEmployees?: HrEmployee[]
+  initialDepartments?: HrDepartment[]
+  initialLeaves?: HrLeave[]
+  initialContracts?: HrContract[]
+  initialPayslips?: HrPayslip[]
+  initialPricelists?: ProductPricelist[]
   organizationId?: number
 }
 
@@ -386,7 +391,7 @@ function HrClientLoaded({
   useHrModuleSubscription()
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
-  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [csvKind, setCsvKind] = useState<HrCsvImportKind | null>(null)
   const [toolbarError, setToolbarError] = useState<string | null>(null)

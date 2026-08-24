@@ -70,7 +70,7 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
         .map(str::to_string);
 
     ctx.stdb
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "create_ai_action_draft",
             json!([
                 ctx.org_id,
@@ -102,7 +102,7 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
                     ),
                 }
             ]),
-        )
+        ))
         .await
         .map_err(|e| anyhow::anyhow!("create_ai_action_draft failed: {e}"))?;
 

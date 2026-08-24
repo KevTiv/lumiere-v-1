@@ -20,7 +20,7 @@ use crate::error::ApiError;
 use crate::query_exec::{company_ids_for_organization, crm_resource, resolve_crm_company_id};
 use crate::session::{resolve_api_session, ApiSession};
 use crate::state::AppState;
-use crate::stdb_sdk_bindings::DbConnection;
+use lumiere_contracts::bindings::DbConnection;
 use crate::web_session::stdb_identity_hex_hint;
 use spacetimedb_sdk::DbContext;
 use stdb_auth::{

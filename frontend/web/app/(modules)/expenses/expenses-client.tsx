@@ -51,6 +51,8 @@ import {
   useExpensesCsvImportMutations,
   useExpenseMileageRates,
   useExpensePerDiemRates,
+  type HrExpense,
+  type HrExpenseSheet,
 } from "@lumiere/query-hooks/hooks/expenses"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { ExpensesCapturePanel } from "./expenses-capture-panel"
@@ -61,8 +63,8 @@ import { useExpenseSheetApprovalTimeline } from "@lumiere/query-hooks/hooks/appr
 import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hooks/accounting"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
-import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
-import { useEmployees } from "@lumiere/query-hooks/hooks/hr"
+import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
+import { useEmployees, type HrEmployee } from "@lumiere/query-hooks/hooks/hr"
 import {
   newExpenseReceiptClientRequestId,
   parseAttachmentIds,
@@ -84,10 +86,10 @@ import {
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 interface ExpensesClientProps {
-  initialExpenses?: Record<string, unknown>[]
-  initialSheets?: Record<string, unknown>[]
-  initialPricelists?: Record<string, unknown>[]
-  initialEmployees?: Record<string, unknown>[]
+  initialExpenses?: HrExpense[]
+  initialSheets?: HrExpenseSheet[]
+  initialPricelists?: ProductPricelist[]
+  initialEmployees?: HrEmployee[]
   organizationId?: number
 }
 

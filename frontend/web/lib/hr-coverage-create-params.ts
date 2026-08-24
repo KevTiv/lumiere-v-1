@@ -162,16 +162,16 @@ export function toCreateHrIntegrationIntentParams(
 export function toCreateHrLaborCostSnapshotParams(
   formData: Record<string, unknown>,
 ): CreateHrLaborCostSnapshotParams | null {
-  const currencyCode = optionalTrimmedString(field(formData, "currencyCode", "currency_code"))
+  const currencyId = optionalBigIntU64(field(formData, "currencyId", "currency_id"))
   const status = optionalTrimmedString(field(formData, "status", "status"))
-  if (!currencyCode || !status) return null
+  if (currencyId == null || !status) return null
 
   return {
     employeeId: optionalBigIntU64(field(formData, "employeeId", "employee_id")),
     periodStart: requiredTimestampFromForm(field(formData, "periodStart", "period_start")) ?? stbTimestampFromDate(new Date()),
     periodEnd: requiredTimestampFromForm(field(formData, "periodEnd", "period_end")) ?? stbTimestampFromDate(new Date()),
     totalLaborCost: num(field(formData, "totalLaborCost", "total_labor_cost"), 0),
-    currencyCode,
+    currencyId,
     status,
     metadata: optionalTrimmedString(field(formData, "metadata", "metadata")),
   }
@@ -290,4 +290,3 @@ export function toCreateWorkScheduleParams(
     isActive: field(formData, "isActive", "is_active") !== false,
   }
 }
-

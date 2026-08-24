@@ -1,9 +1,8 @@
 /**
- * Compile-only — CRM BFF reducer keys stay aligned with `crmBffCallUrl`.
+ * Compile-only — CRM metadata stays aligned with the generated named command transport.
  */
-import { CRM_BFF_REDUCERS, crmBffCallUrl, crmCommandContract } from "../commands/crm-http";
+import { CRM_BFF_REDUCERS, crmCommandContract } from "../commands/crm-http";
 
 for (const k of CRM_BFF_REDUCERS) {
-  void crmBffCallUrl(k);
   void crmCommandContract(k);
 }

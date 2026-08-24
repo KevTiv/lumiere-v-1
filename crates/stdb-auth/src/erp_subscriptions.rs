@@ -35,7 +35,7 @@ struct ErpOrgRow {
 }
 
 static ERP_ORG_ROWS: Lazy<Vec<ErpOrgRow>> = Lazy::new(|| {
-    serde_json::from_str(include_str!("../assets/erp-org-sql.json")).expect("erp-org-sql.json")
+    serde_json::from_str(lumiere_contracts::manifests::ERP_ORG_SQL).expect("erp-org-sql.json")
 });
 
 static ERP_ORG_INDEX: Lazy<HashMap<String, usize>> = Lazy::new(|| {

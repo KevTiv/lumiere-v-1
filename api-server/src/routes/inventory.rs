@@ -44,7 +44,10 @@ async fn pickings_post(
     let org_id = require_org(&session)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer("create_stock_picking", json!([org_id, body]))
+        .call_reducer(stdb_client::reducer_call!(
+            "create_stock_picking",
+            json!([org_id, body])
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok((

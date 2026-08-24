@@ -85,10 +85,10 @@ async fn patch_billing_account(
         "metadata": null,
     });
     client
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "update_billing_account",
             json!([org_id, billing_id, params]),
-        )
+        ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(json!({ "ok": true })))

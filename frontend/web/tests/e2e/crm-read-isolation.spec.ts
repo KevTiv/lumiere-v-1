@@ -511,10 +511,15 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
       },
     ])
     const nowMicros = Date.now() * 1_000
+    const activityTypes = await ownerSql(
+      `SELECT id FROM activity_type WHERE organization_id = ${organizationId}`,
+    )
+    const activityTypeId = valueAsId(activityTypes[0] ?? {}, "id")
+    if (activityTypeId == null) throw new Error(`${label} activity type has no id`)
     await callReducerBff(page, "create_activity", [
       organizationId,
       {
-        activity_type: "call",
+        activity_type_id: activityTypeId,
         summary: sharedNames.activities,
         priority: "1",
         state: "planned",
@@ -525,8 +530,7 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
         date_deadline: none,
         date_done: none,
         assigned_to: none,
-        res_model: none,
-        res_id: none,
+        target: none,
         duration: some(15),
         location: none,
         video_url: none,
@@ -636,6 +640,7 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
         referred_by: none,
         description: some("organization-shared CRM-RI-007 fixture"),
         user_id: none,
+        stage_id: none,
         team_id: none,
         partner_id: none,
         date_deadline: none,
@@ -694,7 +699,7 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
           role: "customer",
           active_from: none,
           active_until: none,
-          metadata: some(JSON.stringify({ fixture: "CRM-RI-007-live-isolation", scope })),
+          metadata: some(some(JSON.stringify({ fixture: "CRM-RI-007-live-isolation", scope }))),
         },
       ])
       await callReducerBff(page, "record_privacy_consent", [

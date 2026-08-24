@@ -6,6 +6,13 @@
 use anyhow::{Context, Result};
 use serde_json::Value;
 
+mod contract;
+pub use contract::{
+    company_scope_paths, reducer_contract, reducer_names, CompanyScopePath, Exposure,
+    IntoReducerCall, ReducerCall, ReducerContract, ReducerContractError, ReducerName, ReducerParam,
+    ScalarKind,
+};
+
 #[derive(Debug, thiserror::Error)]
 pub enum StdbClientError {
     #[error("SpacetimeDB HTTP {0}: {1}")]
@@ -110,8 +117,18 @@ impl StdbClient {
         self.query_sql(&format!("SELECT * FROM {table}")).await
     }
 
-    /// Call reducer; body is a JSON array of args (no `ReducerContext`).
-    pub async fn call_reducer(&self, reducer: &str, args: Value) -> Result<()> {
+    /// Call a reducer whose name and arguments were validated against the module manifest.
+    pub async fn call_reducer(&self, call: impl IntoReducerCall) -> Result<()> {
+        let call = call.into_reducer_call()?;
+        let (contract, args) = call.into_parts();
+        self.call_reducer_unchecked(
+            contract.name,
+            Value::Array(encode_reducer_wire_args(contract, args)),
+        )
+        .await
+    }
+
+    async fn call_reducer_unchecked(&self, reducer: &str, args: Value) -> Result<()> {
         let url = format!(
             "{}/v1/database/{}/call/{}",
             self.base_url, self.module, reducer
@@ -133,6 +150,35 @@ impl StdbClient {
         }
         Ok(())
     }
+}
+
+/// The public reducer contract accepts ergonomic JSON scalars/null for
+/// top-level `Option<T>` parameters. SpacetimeDB's reducer HTTP endpoint uses
+/// SATS sum encoding on the wire, so encode those values only after contract
+/// validation. Composite arguments already contain their generated SATS
+/// representation and must remain untouched.
+fn encode_reducer_wire_args(contract: &ReducerContract, args: Vec<Value>) -> Vec<Value> {
+    args.into_iter()
+        .zip(contract.params)
+        .map(|(value, parameter)| {
+            if matches!(
+                parameter.kind,
+                ScalarKind::OptionalBool
+                    | ScalarKind::OptionalFloat
+                    | ScalarKind::OptionalSignedInteger
+                    | ScalarKind::OptionalUnsignedInteger
+                    | ScalarKind::OptionalString
+            ) {
+                if value.is_null() {
+                    serde_json::json!({ "none": [] })
+                } else {
+                    serde_json::json!({ "some": value })
+                }
+            } else {
+                value
+            }
+        })
+        .collect()
 }
 
 fn extract_identity_string(v: &Value, key: &str) -> Option<String> {
@@ -355,8 +401,26 @@ pub fn parse_sats_sql_response(body: &str) -> Result<Vec<Value>> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_sats_sql_response;
+    use super::{encode_reducer_wire_args, parse_sats_sql_response, reducer_contract};
     use serde_json::json;
+
+    #[test]
+    fn encodes_top_level_optional_scalars_as_sats_sums_for_reducer_http() {
+        let contract = reducer_contract("create_workflow").expect("create_workflow contract");
+        let args = encode_reducer_wire_args(
+            contract,
+            vec![json!(7), json!(42), json!({ "metadata": { "none": [] } })],
+        );
+        assert_eq!(args[0], json!(7));
+        assert_eq!(args[1], json!({ "some": 42 }));
+        assert_eq!(args[2], json!({ "metadata": { "none": [] } }));
+
+        let args = encode_reducer_wire_args(
+            contract,
+            vec![json!(7), json!(null), json!({ "metadata": { "none": [] } })],
+        );
+        assert_eq!(args[1], json!({ "none": [] }));
+    }
 
     #[test]
     fn unwraps_option_some_string_and_enum_unit_variants() {

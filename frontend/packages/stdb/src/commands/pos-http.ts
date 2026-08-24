@@ -1,4 +1,3 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
 
 import type { ReducerCommandContractMeta } from "./types";
 
@@ -26,20 +25,6 @@ const WITH_COMPANY_QUERY = new Set<PosBffReducerKey>();
 export function posBffCallUrl(reducer: PosBffReducerKey): string {
   const base = `/api/call/${reducer}`;
   return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
-
-export function posBffPost(
-  reducer: PosBffReducerKey,
-  args: unknown[],
-): { urlPath: string; init: RequestInit } {
-  return {
-    urlPath: posBffCallUrl(reducer),
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
-    },
-  };
 }
 
 const POS_HINT_OVERRIDES: Partial<Record<PosBffReducerKey, readonly string[]>> =

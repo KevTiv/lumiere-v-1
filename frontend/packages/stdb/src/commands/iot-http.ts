@@ -1,9 +1,7 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
-
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * IoT mutations via Next.js BFF `POST /api/call/:reducer`.
+ * IoT mutations via the api-server BFF `POST /api/call/:reducer`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` IoT hooks.
  */
 export const IOT_BFF_REDUCERS = [
@@ -34,12 +32,6 @@ export const IOT_BFF_REDUCERS = [
 
 export type IotBffReducerKey = (typeof IOT_BFF_REDUCERS)[number];
 
-const WITH_COMPANY_QUERY = new Set<IotBffReducerKey>([
-  "generate_hub_pairing_token",
-  "register_iot_device",
-  "register_iot_hub",
-]);
-
 const IOT_MODULE_RESOURCES = [
   "iot-devices",
   "iot-hubs",
@@ -52,22 +44,7 @@ const IOT_MODULE_RESOURCES = [
 
 /** Same-origin path used by `apiFetch` in the web app. */
 export function iotBffCallUrl(reducer: IotBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
-
-export function iotBffPost(
-  reducer: IotBffReducerKey,
-  args: unknown[],
-): { urlPath: string; init: RequestInit } {
-  return {
-    urlPath: iotBffCallUrl(reducer),
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
-    },
-  };
+  return `/api/call/${reducer}`;
 }
 
 function iotReducerHints(): Record<IotBffReducerKey, readonly string[]> {

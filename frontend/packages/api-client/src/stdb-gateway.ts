@@ -45,6 +45,11 @@ export function stringifyReducerCallBody(args: unknown[]): string {
   return JSON.stringify(args.map(coerceTopLevelU64Like), reducerArgsReplacer)
 }
 
+/** Named JSON body for the contract-aware `/api/call/:reducer` endpoint. */
+export function stringifyReducerCommandBody(input: Record<string, unknown>): string {
+  return JSON.stringify(input, reducerArgsReplacer)
+}
+
 /** GET `/api/query/:resource` → parsed `data` rows. */
 export async function queryStdbList(
   apiFetch: LumiereHttpFetch,

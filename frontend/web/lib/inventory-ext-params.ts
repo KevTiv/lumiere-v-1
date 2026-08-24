@@ -410,7 +410,7 @@ export function zoneDisplayTypeForReducer(tag: string): Record<string, unknown> 
   return { Rack: [] }
 }
 
-/** `params` object for `create_warehouse_3d_zone` from quick-action / dashboard form values. */
+/** `params` object for `create_warehouse_3_d_zone` from quick-action / dashboard form values. */
 export function warehouse3dZoneParamsFromForm(formData: Record<string, unknown>): Record<string, unknown> {
   const dt = String(formData.displayType ?? "Rack")
   return {

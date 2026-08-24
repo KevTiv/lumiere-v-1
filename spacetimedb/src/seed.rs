@@ -10,6 +10,7 @@
 use spacetimedb::{Identity, ReducerContext, Table};
 
 // ── Core ──────────────────────────────────────────────────────────────────────
+use crate::ai::reducer_allowlist::{ai_reducer_allowlist, AiReducerAllowlist};
 use crate::core::audit::{audit_log, audit_rule, AuditLog, AuditRule};
 use crate::core::messaging::{mail_follower, mail_message, MailFollower, MailMessage};
 use crate::core::organization::{
@@ -253,7 +254,8 @@ use crate::ai::skills::{
 use crate::workflow::calendar::activate_foundation_calendar_packs;
 use crate::workflow::definitions::{
     create_workflow, publish_workflow_version, upsert_workflow_edge, upsert_workflow_node,
-    workflow, workflow_version, ConditionFieldDefinition, ConditionValueType, CreateWorkflowParams,
+    workflow, workflow_version, ConditionComparison, ConditionFieldDefinition, ConditionInstruction,
+    ConditionProgram, ConditionValue, ConditionValueType, CreateWorkflowParams,
     UpsertWorkflowEdgeParams, UpsertWorkflowNodeParams, WorkflowActionReference,
     WorkflowBranchKind, WorkflowHumanTaskKind, WorkflowNodeKind, WorkflowTaskAssignment,
     WorkflowTaskPolicy, WorkflowTrigger, WorkflowVersionStatus,
@@ -294,6 +296,7 @@ fn seed_published_workflow(
     snapshot_fields: Vec<ConditionFieldDefinition>,
     action_key: &str,
     candidate_role_id: u64,
+    gate_condition: Option<ConditionProgram>,
 ) -> Result<u64, String> {
     create_workflow(
         ctx,
@@ -370,41 +373,79 @@ fn seed_published_workflow(
             },
         )?;
     }
-    for (index, edge_key, from, to, signal) in [
-        (0_u32, "start-approval", "start", "approval", None),
+    // When gated, "start" needs exactly one matching outgoing edge for every possible
+    // subject state: the conditional edge to "approval", plus a bypass edge straight to
+    // "action" with the negated condition — otherwise a non-matching state (e.g. Draft,
+    // when the gate only fires for ToApprove) leaves zero matching edges and the gate
+    // engine errors ("unsupported structured branching") instead of allowing direct
+    // execution.
+    let bypass_condition = gate_condition.clone().map(|mut program| {
+        program.instructions.push(ConditionInstruction::Not);
+        program
+    });
+    let mut edges = vec![
+        (
+            0_u32,
+            "start-approval".to_string(),
+            "start".to_string(),
+            "approval".to_string(),
+            None,
+            gate_condition.clone(),
+        ),
         (
             1_u32,
-            "approval-action",
-            "approval",
-            "action",
+            "approval-action".to_string(),
+            "approval".to_string(),
+            "action".to_string(),
             Some("approved"),
+            None,
         ),
         (
             2_u32,
-            "approval-rejected",
-            "approval",
-            "rejected",
+            "approval-rejected".to_string(),
+            "approval".to_string(),
+            "rejected".to_string(),
             Some("rejected"),
+            None,
         ),
-        (3_u32, "action-approved", "action", "approved", None),
-    ] {
+        (
+            3_u32,
+            "action-approved".to_string(),
+            "action".to_string(),
+            "approved".to_string(),
+            None,
+            None,
+        ),
+    ];
+    if let Some(bypass) = bypass_condition {
+        edges.push((
+            4_u32,
+            "start-action-bypass".to_string(),
+            "start".to_string(),
+            "action".to_string(),
+            None,
+            Some(bypass),
+        ));
+    }
+    let final_revision = edges.len() as u64 + 6;
+    for (index, edge_key, from, to, signal, condition) in edges {
         upsert_workflow_edge(
             ctx,
             organization_id,
             version.id,
             u64::from(index) + 6,
             UpsertWorkflowEdgeParams {
-                edge_key: edge_key.to_string(),
-                from_node_key: from.to_string(),
-                to_node_key: to.to_string(),
+                edge_key: edge_key.clone(),
+                from_node_key: from,
+                to_node_key: to,
                 sequence: index + 1,
                 signal_key: signal.map(str::to_string),
-                condition: None,
+                condition,
                 metadata: Some("{\"seed\":true}".to_string()),
             },
         )?;
     }
-    publish_workflow_version(ctx, organization_id, version.id, 10)?;
+    publish_workflow_version(ctx, organization_id, version.id, final_revision)?;
     Ok(workflow.id)
 }
 
@@ -658,18 +699,279 @@ fn seed_ai_skill_certification_environment(
         });
 }
 
+/// Repairs only the stable browser-fixture rows when a local database was
+/// seeded by an older revision. The main seed is intentionally idempotent, so
+/// this keeps rerunning the E2E setup safe without duplicating the full demo.
+fn ensure_canonical_e2e_seed_rows(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+    let seeder = ctx.sender();
+    let company_id = ctx
+        .db
+        .company()
+        .iter()
+        .find(|company| company.organization_id == organization_id)
+        .map(|company| company.id)
+        .ok_or_else(|| format!("seed organization {organization_id} has no company"))?;
+
+    if !ctx
+        .db
+        .opp_stage()
+        .iter()
+        .any(|stage| stage.organization_id == organization_id && stage.is_won)
+    {
+        ctx.db.opp_stage().insert(OpportunityStage {
+            id: 0,
+            organization_id,
+            name: "Won".to_string(),
+            sequence: 10,
+            probability: 100.0,
+            requirements: None,
+            fold: true,
+            is_won: true,
+            team_id: None,
+            is_active: true,
+            metadata: Some("{\"seed\":true,\"canonical\":\"crm-e2e\"}".to_string()),
+        });
+    }
+
+    let usd_currency_id = ctx
+        .db
+        .currency()
+        .code()
+        .find(&"USD".to_string())
+        .map(|currency| currency.id)
+        .ok_or_else(|| "canonical seed requires USD currency".to_string())?;
+    let template_product = ctx
+        .db
+        .product()
+        .iter()
+        .find(|product| product.organization_id == organization_id)
+        .ok_or_else(|| format!("seed organization {organization_id} has no product template"))?;
+
+    let canonical_product_id = if let Some(product) = ctx
+        .db
+        .product()
+        .iter()
+        .find(|product| product.organization_id == organization_id && product.name == "Seeded Product")
+    {
+        product.id
+    } else {
+        ctx.db
+            .product()
+            .insert(Product {
+                id: 0,
+                organization_id,
+                name: "Seeded Product".to_string(),
+                display_name: Some("Seeded Product".to_string()),
+                code: Some("SEEDED-001".to_string()),
+                default_code: Some("SEEDED-001".to_string()),
+                barcode: Some("8901000000003".to_string()),
+                categ_id: template_product.categ_id,
+                type_: "storable".to_string(),
+                uom_id: template_product.uom_id,
+                uom_po_id: template_product.uom_po_id,
+                description: Some("Canonical proposal lifecycle coverage product".to_string()),
+                description_purchase: None,
+                description_sale: Some("Seeded product for proposal conversion coverage".to_string()),
+                cost_method: "standard".to_string(),
+                valuation: "manual_periodic".to_string(),
+                standard_price: 500.0,
+                volume: 0.001,
+                weight: 0.5,
+                sale_ok: true,
+                purchase_ok: true,
+                can_be_expensed: false,
+                available_in_pos: false,
+                invoicing_policy: "order".to_string(),
+                expense_policy: "no".to_string(),
+                service_type: None,
+                service_tracking: None,
+                image_1920_url: None,
+                image_128_url: None,
+                color: None,
+                priority: "normal".to_string(),
+                is_published: false,
+                active: true,
+                responsible_id: Some(seeder),
+                seller_ids: vec![],
+                variant_count: 1,
+                variant_attribute_ids: vec![],
+                attribute_line_ids: vec![],
+                value_extra_price_ids: vec![],
+                product_variant_count: 1,
+                product_variant_ids: vec![],
+                currency_id: usd_currency_id,
+                public_price: 750.0,
+                list_price: 750.0,
+                lst_price: 750.0,
+                price: 750.0,
+                pricelist_id: None,
+                taxes_id: vec![],
+                supplier_taxes_id: vec![],
+                route_from_categ_ids: vec![],
+                route_ids: vec![],
+                tracking: "none".to_string(),
+                description_picking: None,
+                description_pickingout: None,
+                description_pickingin: None,
+                qty_available: 10.0,
+                virtual_available: 10.0,
+                incoming_qty: 0.0,
+                outgoing_qty: 0.0,
+                location_id: None,
+                warehouse_id: None,
+                has_configurable_attributes: false,
+                property_account_income_id: None,
+                property_account_expense_id: None,
+                create_uid: seeder,
+                create_date: ctx.timestamp,
+                write_uid: seeder,
+                write_date: ctx.timestamp,
+                metadata: Some("{\"seed\":true,\"canonical\":\"proposal-e2e\"}".to_string()),
+            })
+            .id
+    };
+
+    let mut locations = ctx
+        .db
+        .stock_location()
+        .iter()
+        .filter(|location| location.organization_id == organization_id)
+        .collect::<Vec<_>>();
+    if locations.is_empty() {
+        locations.push(ctx.db.stock_location().insert(StockLocation {
+            id: 0,
+            organization_id,
+            name: "Stock".to_string(),
+            complete_name: Some("WH/Stock".to_string()),
+            location_id: None,
+            parent_path: "".to_string(),
+            child_ids: vec![],
+            child_left: 0,
+            child_right: 0,
+            usage: "internal".to_string(),
+            company_id: Some(company_id),
+            scrap_location: false,
+            return_location: false,
+            valuation_in_account_id: None,
+            valuation_out_account_id: None,
+            active: true,
+            comment: Some("Canonical manufacturing destination".to_string()),
+            posx: 0.0,
+            posy: 0.0,
+            posz: 0.0,
+            barcode: Some("LOC-STOCK-SEED".to_string()),
+            cyclic_inventory_frequency: 0,
+            last_inventory_date: None,
+            next_inventory_date: None,
+            location_category: "internal".to_string(),
+            is_active: true,
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+            metadata: Some("{\"seed\":true,\"canonical\":\"manufacturing-e2e\"}".to_string()),
+        }));
+    }
+    let source_location_id = locations
+        .iter()
+        .find(|location| location.usage == "supplier")
+        .map(|location| location.id)
+        .unwrap_or(locations[0].id);
+    let destination_location_id = locations
+        .iter()
+        .find(|location| location.usage == "internal")
+        .map(|location| location.id)
+        .unwrap_or(locations[0].id);
+
+    if !ctx.db.stock_picking().iter().any(|picking| {
+        picking.organization_id == organization_id
+            && picking.picking_type_id != 0
+            && picking.location_id != 0
+            && picking.location_dest_id != 0
+    }) {
+        ctx.db.stock_picking().insert(StockPicking {
+            id: 0,
+            organization_id,
+            name: "WH/IN/SEED-0001".to_string(),
+            origin: Some("E2E-CANONICAL".to_string()),
+            note: Some("Canonical manufacturing fixture picking".to_string()),
+            state: "done".to_string(),
+            priority: "1".to_string(),
+            scheduled_date: Some(ctx.timestamp),
+            date: Some(ctx.timestamp),
+            date_done: Some(ctx.timestamp),
+            move_type: "direct".to_string(),
+            company_id,
+            user_id: Some(seeder),
+            partner_id: None,
+            contact_id: None,
+            picking_type_id: 1,
+            location_id: source_location_id,
+            location_dest_id: destination_location_id,
+            sale_id: None,
+            purchase_id: None,
+            backorder_id: None,
+            group_id: None,
+            backorder_ids: vec![],
+            is_locked: true,
+            is_printed: false,
+            is_return: false,
+            has_scrap_move: false,
+            has_tracking: false,
+            immediate_transfer: true,
+            show_operations: true,
+            show_lots_text: false,
+            show_reserved: false,
+            show_check_availability: false,
+            show_validate: false,
+            show_mark_as_todo: false,
+            show_set_qty_button: false,
+            show_clear_qty_button: false,
+            show_lots_m2o: false,
+            product_id: Some(canonical_product_id),
+            lot_id: None,
+            package_id: None,
+            result_package_id: None,
+            owner_id: None,
+            display_lot_id: None,
+            location_id_name: Some("Partners/Vendors".to_string()),
+            location_dest_id_name: Some("WH/Stock".to_string()),
+            picking_code: Some("incoming".to_string()),
+            product_tracking: Some("none".to_string()),
+            product_barcode: None,
+            move_line_exist: false,
+            has_packages: false,
+            has_move_lines: false,
+            has_package: false,
+            has_lot: false,
+            has_owner: false,
+            has_entire_package_src: false,
+            has_entire_package_dest: false,
+            package_level_ids: vec![],
+            batch_id: None,
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+            metadata: Some("{\"seed\":true,\"canonical\":\"manufacturing-e2e\"}".to_string()),
+        });
+    }
+    Ok(())
+}
+
 #[spacetimedb::reducer]
 pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     require_dev_reducers_enabled()?;
 
     // ── Idempotency guard ─────────────────────────────────────────────────────
-    if ctx
+    if let Some(existing_org) = ctx
         .db
         .organization()
         .iter()
-        .any(|o| o.name == "Lumiere Demo Corp")
+        .find(|o| o.name == "Lumiere Demo Corp")
     {
-        log::info!("[seed] Already seeded — skipping.");
+        // Older local databases can contain the original demo organization
+        // without the later proposal/manufacturing coverage rows. Backfill
+        // only those canonical rows instead of rerunning the full seed (which
+        // would duplicate every ERP fixture).
+        ensure_canonical_e2e_seed_rows(ctx, existing_org.id)?;
+        log::info!("[seed] Already seeded — canonical coverage verified.");
         return Ok(());
     }
     log::info!("[seed] Starting seed_dev_data…");
@@ -859,6 +1161,22 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     });
     let company_id = company.id;
     log::info!("[seed] company_id={}", company_id);
+
+    // The AI draft gate intentionally fails closed when an organization has no
+    // allowlist rows. Seed the low-risk task draft capability explicitly so the
+    // MVP approval workflow is usable in the dev fixture without weakening the
+    // production policy for organizations that have not opted in.
+    ctx.db.ai_reducer_allowlist().insert(AiReducerAllowlist {
+        id: 0,
+        organization_id: org_id,
+        reducer_name: "create_task".to_string(),
+        permission_resource: "project_task".to_string(),
+        permission_action: "create".to_string(),
+        enabled: true,
+        create_date: ctx.timestamp,
+        write_date: ctx.timestamp,
+        metadata: Some(r#"{"seed":true,"risk":"low"}"#.to_string()),
+    });
 
     // ── 1.8 UOM Categories & Units ────────────────────────────────────────────
     let uom_cat_unit = ctx.db.uom_cat().insert(UOMCategory {
@@ -1515,6 +1833,82 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         write_uid: seeder,
         write_date: ctx.timestamp,
         metadata: Some("{\"seed\":true}".to_string()),
+    });
+
+    // Proposal lifecycle coverage resolves this stable product name from the
+    // organization-scoped product query. Keep it as a real storable product
+    // (rather than teaching the test to fall back to an arbitrary row) so the
+    // later proposal-to-order conversion can validate its UoM and price.
+    let _seeded_product = ctx.db.product().insert(Product {
+        id: 0,
+        organization_id: org_id,
+        name: "Seeded Product".to_string(),
+        display_name: Some("Seeded Product".to_string()),
+        code: Some("SEEDED-001".to_string()),
+        default_code: Some("SEEDED-001".to_string()),
+        barcode: Some("8901000000003".to_string()),
+        categ_id: cat_electronics.id,
+        type_: "storable".to_string(),
+        uom_id: uom_units.id,
+        uom_po_id: uom_units.id,
+        description: Some("Canonical proposal lifecycle coverage product".to_string()),
+        description_purchase: None,
+        description_sale: Some("Seeded product for proposal conversion coverage".to_string()),
+        cost_method: "standard".to_string(),
+        valuation: "manual_periodic".to_string(),
+        standard_price: 500.0,
+        volume: 0.001,
+        weight: 0.5,
+        sale_ok: true,
+        purchase_ok: true,
+        can_be_expensed: false,
+        available_in_pos: false,
+        invoicing_policy: "order".to_string(),
+        expense_policy: "no".to_string(),
+        service_type: None,
+        service_tracking: None,
+        image_1920_url: None,
+        image_128_url: None,
+        color: None,
+        priority: "normal".to_string(),
+        is_published: false,
+        active: true,
+        responsible_id: Some(seeder),
+        seller_ids: vec![],
+        variant_count: 1,
+        variant_attribute_ids: vec![],
+        attribute_line_ids: vec![],
+        value_extra_price_ids: vec![],
+        product_variant_count: 1,
+        product_variant_ids: vec![],
+        currency_id: usd_currency_id,
+        public_price: 750.0,
+        list_price: 750.0,
+        lst_price: 750.0,
+        price: 750.0,
+        pricelist_id: None,
+        taxes_id: vec![],
+        supplier_taxes_id: vec![],
+        route_from_categ_ids: vec![],
+        route_ids: vec![],
+        tracking: "none".to_string(),
+        description_picking: None,
+        description_pickingout: None,
+        description_pickingin: None,
+        qty_available: 10.0,
+        virtual_available: 10.0,
+        incoming_qty: 0.0,
+        outgoing_qty: 0.0,
+        location_id: None,
+        warehouse_id: None,
+        has_configurable_attributes: false,
+        property_account_income_id: None,
+        property_account_expense_id: None,
+        create_uid: seeder,
+        create_date: ctx.timestamp,
+        write_uid: seeder,
+        write_date: ctx.timestamp,
+        metadata: Some("{\"seed\":true,\"canonical\":\"proposal-e2e\"}".to_string()),
     });
 
     let product_mouse = ctx.db.product().insert(Product {
@@ -8413,6 +8807,18 @@ Prioritize high-severity findings and cite related records."#,
         write_date: ctx.timestamp,
     });
 
+    // Only orders explicitly flagged `ToApprove` route through the human
+    // task; ordinary Draft/Sent confirmations (the entire e2e sales flow)
+    // proceed directly. An unconditioned edge here would gate every
+    // `confirm_sales_order` call in this org/company behind a human task
+    // that no test ever resolves.
+    let sales_gate_condition = ConditionProgram {
+        instructions: vec![
+            ConditionInstruction::LoadField("state".to_string()),
+            ConditionInstruction::PushValue(ConditionValue::Code("ToApprove".to_string())),
+            ConditionInstruction::Compare(ConditionComparison::Equal),
+        ],
+    };
     let sales_workflow_id = seed_published_workflow(
         ctx,
         org_id,
@@ -8421,9 +8827,26 @@ Prioritize high-severity findings and cite related records."#,
         "sale_order",
         "Seed Sales Approval",
         "Coverage workflow for sale orders",
-        Vec::new(),
+        vec![
+            ConditionFieldDefinition {
+                field_key: "amount_total".to_string(),
+                value_type: ConditionValueType::Money,
+                nullable: false,
+            },
+            ConditionFieldDefinition {
+                field_key: "max_discount_percent".to_string(),
+                value_type: ConditionValueType::Decimal,
+                nullable: false,
+            },
+            ConditionFieldDefinition {
+                field_key: "state".to_string(),
+                value_type: ConditionValueType::Code,
+                nullable: false,
+            },
+        ],
         "confirm_sales_order",
         owner_role.id,
+        Some(sales_gate_condition),
     )?;
     let sales_workflow_version = ctx
         .db
@@ -8485,6 +8908,7 @@ Prioritize high-severity findings and cite related records."#,
         ],
         "approve_ai_action_draft",
         owner_role.id,
+        None,
     )?;
 
     // ── 15.3 Reporting / knowledge / AI / fleet ──────────────────────────────
@@ -9061,6 +9485,7 @@ Prioritize high-severity findings and cite related records."#,
     let pos_order_uid = format!("{}-{}-1", pos_config_frontdesk.id, pos_session_history.id);
     let pos_order_demo = ctx.db.pos_order().insert(PosOrder {
         id: 0,
+        organization_id: org_id,
         uid: pos_order_uid.clone(),
         ticket_number: Some(format!("TICKET-{}", pos_order_uid)),
         session_id: pos_session_history.id,
@@ -9109,6 +9534,8 @@ Prioritize high-severity findings and cite related records."#,
         write_uid: seeder,
         write_date: ctx.timestamp,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
+        cold_eligible_at: Some(ctx.timestamp),
+        archive_version: 1,
     });
     ctx.db.pos_order_line().id().update(PosOrderLine {
         order_id: pos_order_demo.id,
@@ -9245,7 +9672,9 @@ Prioritize high-severity findings and cite related records."#,
         user_id: Some(seeder),
         partner_id: Some(contact_globex.id),
         contact_id: Some(contact_globex.id),
-        picking_type_id: 0,
+        // Picking types are represented as scalar IDs in the current module;
+        // reserve a non-zero canonical ID for manufacturing E2E setup.
+        picking_type_id: 1,
         location_id: loc_vendor.id,
         location_dest_id: loc_stock.id,
         sale_id: None,

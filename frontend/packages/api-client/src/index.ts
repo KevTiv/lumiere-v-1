@@ -9,6 +9,7 @@ export {
   queryStdbList,
   callStdbReducer,
   stringifyReducerCallBody,
+  stringifyReducerCommandBody,
   type LumiereHttpFetch,
 } from "./stdb-gateway"
 export {

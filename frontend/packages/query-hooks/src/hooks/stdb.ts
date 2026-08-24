@@ -14,11 +14,17 @@ import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useErpSession } from '@lumiere/erp-session'
 
-import { stdbBffPost } from "@lumiere/stdb/commands"
+import {
+  stdbBffCommandPost,
+  type StdbBffCommandInput,
+  type StdbBffReducerKey,
+} from "@lumiere/stdb/commands"
+import type { OperationInputMap } from "@lumiere/contracts/generated/operation-inputs"
 import { isSubscriptionReady, useSubscriptionCache } from "@lumiere/stdb/live"
+import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
 
 import { apiFetch, coalesceQueryInitialData } from "../http"
-import { stdbInvalidationFor } from "../generated/stdb-reducer-invalidation"
+import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
 
 export function stdbQueryKey(
   resource: string,
@@ -51,9 +57,48 @@ export function realtimeQueryKeysForResource(
     keys.push(['stdb', resource, organizationId])
   }
 
+  // HR hooks (`hooks/hr.ts`) deviate from the `[resource, org]` convention and
+  // use hand-rolled `hr-<resource>` query keys. Without this alias, realtime
+  // table updates (e.g. a payslip created/confirmed via a direct reducer call
+  // that bypasses the app's own mutation hooks) never reach `usePayslips` and
+  // similar HR reads — the row exists but silently never appears in the UI.
+  const hrAlias = HR_RESOURCE_QUERY_KEY_ALIASES[resource]
+  if (hrAlias) {
+    keys.push([hrAlias, orgString])
+  }
+
   // TODO(BFF Form Cleanup): add explicit aliases for bundle resources like
   // "auth" and "form-configuration" once their concrete query keys are settled.
   return keys
+}
+
+/** Maps `HR_WORKSPACE_RESOURCE_KEYS` resource names to the custom query key prefix used in `hooks/hr.ts`. */
+const HR_RESOURCE_QUERY_KEY_ALIASES: Record<string, string> = {
+  contracts: 'hr-contracts',
+  departments: 'hr-departments',
+  'employee-documents': 'hr-employee-documents',
+  'leave-requests': 'hr-leave-requests',
+  'leaves-to-approve': 'hr-leaves-to-approve',
+  'leave-types': 'hr-leave-types',
+  'onboarding-progress': 'hr-onboarding-progress',
+  'onboarding-template-items': 'hr-onboarding-template-items',
+  'onboarding-templates': 'hr-onboarding-templates',
+  'performance-cycles': 'hr-performance-cycles',
+  'performance-goals': 'hr-performance-goals',
+  'performance-reviews': 'hr-performance-reviews',
+  'benefit-plans': 'hr-benefit-plans',
+  'benefit-enrollments': 'hr-benefit-enrollments',
+  'payroll-structures': 'hr-payroll-structures',
+  payslips: 'hr-payslips',
+  'payslips-to-export': 'hr-payslips-to-export',
+  'salary-rules': 'hr-salary-rules',
+  attendance: 'hr-attendance',
+  'compensation-events': 'hr-compensation-events',
+  'work-schedules': 'hr-work-schedules',
+  'labor-cost-snapshots': 'hr-labor-cost-snapshots',
+  'shift-opt-jobs': 'hr-shift-opt-jobs',
+  'global-assignments': 'hr-global-assignments',
+  'hr-integration-intents': 'hr-integration-intents-pending',
 }
 
 /** Invalidate `useStdbQuery` caches for the given resource names (same `organizationId` as the query). */
@@ -74,8 +119,10 @@ export function invalidateStdbQueryResources(
  * POST `/api/call/:reducer` and invalidate listed `stdb` query resources on success.
  * When `invalidateResources` is omitted or empty, uses `STDB_REDUCER_INVALIDATION` from codegen manifest.
  */
-export function useStdbCallMutation(
-  reducerName: string,
+type NamedReducerKey = Extract<StdbBffReducerKey, keyof OperationInputMap>
+
+export function useStdbCallMutation<K extends NamedReducerKey>(
+  reducerName: K,
   organizationId: bigint | number,
   invalidateResources?: readonly string[],
 ) {
@@ -84,9 +131,9 @@ export function useStdbCallMutation(
     invalidateResources != null && invalidateResources.length > 0
       ? invalidateResources
       : stdbInvalidationFor(reducerName)
-  return useMutation({
-    mutationFn: async (args: unknown[]) => {
-      const { urlPath, init } = stdbBffPost(reducerName, args)
+  return useMutation<void, Error, StdbBffCommandInput<K>>({
+    mutationFn: async (input) => {
+      const { urlPath, init } = stdbBffCommandPost(reducerName, input)
       const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         const json = await r.json().catch(() => ({})) as Record<string, unknown>
@@ -105,13 +152,13 @@ export function useStdbCallMutation(
  * Call any SpacetimeDB reducer by name.
  *
  * @example
- * const confirm = useStdbReducer('confirm_sale_order')
- * confirm.mutate([orgId, orderId])
+ * const confirm = useStdbReducer('confirm_sales_order')
+ * confirm.mutate({ companyId, orderId })
  */
-export function useStdbReducer(reducerName: string) {
-  return useMutation({
-    mutationFn: async (args: unknown[]) => {
-      const { urlPath, init } = stdbBffPost(reducerName, args)
+export function useStdbReducer<K extends NamedReducerKey>(reducerName: K) {
+  return useMutation<void, Error, StdbBffCommandInput<K>>({
+    mutationFn: async (input) => {
+      const { urlPath, init } = stdbBffCommandPost(reducerName, input)
       const r = await apiFetch(urlPath, init)
       if (!r.ok) {
         const json = await r.json().catch(() => ({})) as Record<string, unknown>
@@ -133,14 +180,14 @@ export function useStdbReducer(reducerName: string) {
  * const { data } = useStdbQuery('leads', orgId)
  * const { data } = useStdbQuery('mrp-productions', orgId, { staleTime: 60_000 })
  */
-export function useStdbQuery(
-  resource: string,
+export function useStdbQuery<K extends string>(
+  resource: K,
   organizationId: bigint | number,
   options?: {
     staleTime?: number
     enabled?: boolean
     /** SSR / hydration seed until the first fetch completes */
-    initialData?: Record<string, unknown>[]
+    initialData?: QueryRowFor<K>[]
   },
 ) {
   const qc = useQueryClient()
@@ -151,11 +198,11 @@ export function useStdbQuery(
 
   return useQuery({
     queryKey,
-    queryFn: async () => {
+    queryFn: async (): Promise<QueryRowFor<K>[]> => {
       if (subscriptionReady) {
         for (const key of realtimeQueryKeysForResource(resource, organizationId)) {
           const cached = qc.getQueryData(key)
-          if (Array.isArray(cached)) return cached as Record<string, unknown>[]
+          if (Array.isArray(cached)) return cached as QueryRowFor<K>[]
         }
       }
       const companyQuery = companyId != null && companyId > 0
@@ -166,7 +213,7 @@ export function useStdbQuery(
         const json = await r.json().catch(() => ({})) as Record<string, unknown>
         throw new Error((json.error as string | undefined) ?? `Query ${resource} failed`)
       }
-      const json = await r.json() as { data: Record<string, unknown>[] }
+      const json = await r.json() as { data: QueryRowFor<K>[] }
       return json.data ?? []
     },
     staleTime: subscriptionReady ? Number.POSITIVE_INFINITY : (options?.staleTime ?? 30_000),
@@ -184,8 +231,8 @@ export function useStdbQuery(
  * const create = useStdbReducerWithInvalidation('create_lead', 'leads', orgId)
  * create.mutate([orgId, { name: 'New Lead' }])
  */
-export function useStdbReducerWithInvalidation(
-  reducerName: string,
+export function useStdbReducerWithInvalidation<K extends NamedReducerKey>(
+  reducerName: K,
   invalidateResource: string,
   organizationId: bigint | number,
 ) {

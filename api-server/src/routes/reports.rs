@@ -226,7 +226,7 @@ async fn owner_schedule_create(
     let next_run = parse_schedule_timestamp(&input.next_run)?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "create_scheduled_report",
             json!([organization_id, input.company_id, {
                 "name": input.name,
@@ -250,7 +250,7 @@ async fn owner_schedule_create(
                 "body": null,
                 "metadata": null,
             }]),
-        )
+        ))
         .await
         .map_err(|error| ApiError::BadRequest(format!("create owner-report schedule: {error}")))?;
     Ok(StatusCode::CREATED)
@@ -275,7 +275,7 @@ async fn owner_schedule_update(
         .transpose()?;
     let client = state.client_with_token(&session.stdb_token);
     client
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "update_owner_report_schedule",
             json!([organization_id, report_id, {
                 "name": input.name,
@@ -287,7 +287,7 @@ async fn owner_schedule_update(
                 "is_active": input.is_active,
                 "next_run": next_run.map(timestamp_json),
             }]),
-        )
+        ))
         .await
         .map_err(|error| ApiError::BadRequest(format!("update owner-report schedule: {error}")))?;
     Ok(StatusCode::NO_CONTENT)
@@ -306,10 +306,10 @@ async fn owner_schedule_run_now(
     ensure_report_history_access(session.field_access.as_ref())?;
     state
         .client_with_token(&session.stdb_token)
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "run_owner_report_schedule",
             json!([organization_id, report_id]),
-        )
+        ))
         .await
         .map_err(|error| ApiError::BadRequest(format!("run owner-report schedule: {error}")))?;
     Ok(StatusCode::ACCEPTED)
@@ -434,10 +434,10 @@ pub(crate) async fn record_generated_report(
         "metadata": json!({ "watermark": value["watermark"] }).to_string(),
     });
     let result = client
-        .call_reducer(
+        .call_reducer(stdb_client::reducer_call!(
             "record_generated_owner_report",
             json!([organization_id, company_id, params]),
-        )
+        ))
         .await
         .map_err(|error| ApiError::Internal(format!("record generated owner report: {error}")));
     if result.is_err() {

@@ -74,6 +74,15 @@ import {
   useDashboards,
   useDashboardWidgets,
 } from "@lumiere/query-hooks/hooks/reports"
+import type {
+  AnalyticsMetric,
+  Dashboard,
+  DashboardWidget,
+  FinancialReport,
+  ReportTemplate,
+  ScheduledReport,
+  TrialBalance,
+} from "@lumiere/query-hooks/hooks/reports"
 import { reportStateTag } from "@/lib/reports-create-params"
 import { toCreateTrialBalanceEntryParams } from "@lumiere/erp-shared/reports-create-params"
 import {
@@ -124,13 +133,13 @@ import { QueryBuilder } from "./query-builder"
 export { REPORTS_UI_REDUCERS } from "@/lib/reports-ui-reducers"
 
 interface ReportsClientProps {
-  initialReports?: Record<string, unknown>[]
-  initialBalances?: Record<string, unknown>[]
-  initialReportTemplates?: Record<string, unknown>[]
-  initialScheduledReports?: Record<string, unknown>[]
-  initialAnalyticsMetrics?: Record<string, unknown>[]
-  initialDashboards?: Record<string, unknown>[]
-  initialDashboardWidgets?: Record<string, unknown>[]
+  initialReports?: FinancialReport[]
+  initialBalances?: TrialBalance[]
+  initialReportTemplates?: ReportTemplate[]
+  initialScheduledReports?: ScheduledReport[]
+  initialAnalyticsMetrics?: AnalyticsMetric[]
+  initialDashboards?: Dashboard[]
+  initialDashboardWidgets?: DashboardWidget[]
   organizationId?: number
 }
 
@@ -160,7 +169,7 @@ function ReportsClientLoaded({
   const moduleConfig = useMemo(() => reportsModuleConfig(t), [t])
   /** BigInt organization id for React Query keys (matches `@lumiere/query-hooks` `organizationId` param). */
   const { orgId } = orgBigInts(organizationId)
-  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [editTemplateOpen, setEditTemplateOpen] = useState(false)
@@ -206,28 +215,28 @@ function ReportsClientLoaded({
     [reportsRaw],
   )
 
-  const createTrialBalanceEntry = useCreateTrialBalanceEntry(orgId)
-  const createFinancialReportFlow = useCreateFinancialReportFlow(orgId)
-  const generateFinancialReport = useGenerateFinancialReport(orgId)
-  const exportFinancialReport = useExportFinancialReport(orgId)
-  const archiveFinancialReport = useArchiveFinancialReport(orgId)
-  const deleteFinancialReport = useDeleteFinancialReport(orgId)
+  const createTrialBalanceEntry = useCreateTrialBalanceEntry(orgId, operatingCompanyId)
+  const createFinancialReportFlow = useCreateFinancialReportFlow(orgId, operatingCompanyId)
+  const generateFinancialReport = useGenerateFinancialReport(orgId, operatingCompanyId)
+  const exportFinancialReport = useExportFinancialReport(orgId, operatingCompanyId)
+  const archiveFinancialReport = useArchiveFinancialReport(orgId, operatingCompanyId)
+  const deleteFinancialReport = useDeleteFinancialReport(orgId, operatingCompanyId)
   const createReportTemplate = useCreateReportTemplate(orgId)
   const createScheduledReport = useCreateScheduledReport(orgId)
   const createAnalyticsMetric = useCreateAnalyticsMetric(orgId)
-  const updateReportTemplate = useUpdateReportTemplate(orgId)
-  const updateMetricValues = useUpdateMetricValues(orgId)
+  const updateReportTemplate = useUpdateReportTemplate(orgId, operatingCompanyId)
+  const updateMetricValues = useUpdateMetricValues(orgId, operatingCompanyId)
   const recordReportRun = useRecordReportRun(orgId)
   const csvImports = useReportsCsvImportMutations(orgId)
   const importReportTemplateCsv = csvImports.importReportTemplate
   const importAnalyticsMetricCsv = csvImports.importAnalyticsMetric
 
   // Dashboard hooks (6 missing reducers)
-  const updateFinancialReport = useUpdateFinancialReport(orgId)
+  const updateFinancialReport = useUpdateFinancialReport(orgId, operatingCompanyId)
   const createDashboard = useCreateDashboard(orgId)
   const createDashboardWidget = useCreateDashboardWidget(orgId)
   const addWidgetToDashboard = useAddWidgetToDashboard(orgId)
-  const updateWidgetLayout = useUpdateWidgetLayout(orgId)
+  const updateWidgetLayout = useUpdateWidgetLayout(orgId, operatingCompanyId)
   const shareDashboard = useShareDashboard(orgId)
 
   const templateSelectOptions = useMemo(
@@ -320,7 +329,7 @@ function ReportsClientLoaded({
           reportTemplateId: templateSelectOptions,
           companyId: companySelectOptions,
         }),
-        { companyId: String(operatingCompanyId) },
+        { companyId: operatingCompanyId != null ? String(operatingCompanyId) : "" },
       ),
     [t, templateSelectOptions, companySelectOptions, operatingCompanyId],
   )
@@ -339,7 +348,7 @@ function ReportsClientLoaded({
         mergeSelectOptionsForFields(newReportTemplateForm(t), {
           companyId: companySelectOptions,
         }),
-        { companyId: String(operatingCompanyId) },
+        { companyId: operatingCompanyId != null ? String(operatingCompanyId) : "" },
       ),
     [t, companySelectOptions, operatingCompanyId],
   )
@@ -350,7 +359,7 @@ function ReportsClientLoaded({
         mergeSelectOptionsForFields(newAnalyticsMetricForm(t), {
           companyId: companySelectOptions,
         }),
-        { companyId: String(operatingCompanyId) },
+        { companyId: operatingCompanyId != null ? String(operatingCompanyId) : "" },
       ),
     [t, companySelectOptions, operatingCompanyId],
   )
@@ -361,7 +370,7 @@ function ReportsClientLoaded({
         mergeSelectOptionsForFields(newDashboardForm(t), {
           companyId: companySelectOptions,
         }),
-        { companyId: String(operatingCompanyId) },
+        { companyId: operatingCompanyId != null ? String(operatingCompanyId) : "" },
       ),
     [t, companySelectOptions, operatingCompanyId],
   )
@@ -372,7 +381,7 @@ function ReportsClientLoaded({
         mergeSelectOptionsForFields(newDashboardWidgetForm(t), {
           companyId: companySelectOptions,
         }),
-        { companyId: String(operatingCompanyId) },
+        { companyId: operatingCompanyId != null ? String(operatingCompanyId) : "" },
       ),
     [t, companySelectOptions, operatingCompanyId],
   )
@@ -826,6 +835,7 @@ function ReportsClientLoaded({
             customContent: (
               <PivotExplorer
                 organizationId={orgId}
+                companyId={operatingCompanyId}
                 financialReports={reports as Record<string, unknown>[]}
                 trialBalances={trialBalances as Record<string, unknown>[]}
               />
@@ -839,6 +849,7 @@ function ReportsClientLoaded({
             customContent: (
               <VatReportPanel
                 organizationId={orgId}
+                companyId={operatingCompanyId}
                 financialReports={reports as Record<string, unknown>[]}
               />
             ),

@@ -1,8 +1,15 @@
 /**
- * Compile-only — generic stdb BFF helpers accept arbitrary reducer names.
+ * Compile-only — generic stdb BFF helpers use generated named inputs.
  */
-import { stdbBffCallUrl, stdbBffPost, stdbCommandContract } from "../commands/stdb-http";
+import {
+  stdbBffCallUrl,
+  stdbBffCommandPost,
+  stdbCommandContract,
+} from "../commands/stdb-http";
 
-void stdbBffCallUrl("confirm_sale_order");
-void stdbBffPost("confirm_sale_order", [1n, 2n]);
-void stdbCommandContract("confirm_sale_order");
+void stdbBffCallUrl("confirm_sales_order");
+void stdbBffCommandPost("confirm_sales_order", { companyId: 1n, orderId: 2n });
+void stdbCommandContract("confirm_sales_order");
+
+// @ts-expect-error reducer names absent from the exposure manifest are rejected.
+void stdbBffCommandPost("confirm_sale_order", { companyId: 1n, orderId: 2n });
