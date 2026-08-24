@@ -1,30 +1,36 @@
-# Agent control plane and model-routing plan
+# Agent control plane, model routing, and sandbox orchestration plan
 
-**Status:** Proposed — future runtime plan 2026-08-20
-**Tracks:** `agent-control-plane`, `model-routing`, `planner-executor`, `verification`, `artifacts`, `skills`, `small-model-ux`, `plugin-seams`, `execution-tracing`
-**Related:** [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md) · [agent-ir-codegen-extension-plan.md](./agent-ir-codegen-extension-plan.md) · [scaleway-cloudflare-bootstrap-deployment-plan.md](./scaleway-cloudflare-bootstrap-deployment-plan.md)
+**Status:** Proposed — future runtime plan 2026-08-24
+**Tracks:** `agent-control-plane`, `model-routing`, `planner-executor`, `sandbox-orchestration`, `verification`, `artifacts`, `recipes`, `skills`, `small-model-ux`, `execution-tracing`
+**Related:** [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md) · [agent-ir-codegen-extension-plan.md](./agent-ir-codegen-extension-plan.md) · [agent-generated-erp-tool-surface-plan.md](./agent-generated-erp-tool-surface-plan.md) · [agent-sandbox-data-analysis-plan.md](./agent-sandbox-data-analysis-plan.md) · [scaleway-cloudflare-bootstrap-deployment-plan.md](./scaleway-cloudflare-bootstrap-deployment-plan.md)
 
 ---
 
 ## 1. Objective
 
-Define the runtime architecture that turns generated ERP capabilities into a reliable, provider-neutral assistant experience, with particular emphasis on making smaller/cheaper models useful through strong orchestration rather than relying on one frontier model and a large prompt.
+Define the runtime architecture that turns generated ERP capabilities into a reliable provider-neutral assistant where:
 
-The control plane owns reasoning workflow; the application-contract IR owns stable operations and structural safety metadata.
+- the model owns hypothesis formation and reasoning;
+- generated capabilities own discovery/acquisition contracts;
+- Python sandboxes own flexible analytical/document execution;
+- the harness owns policy, budgets, provenance and verification;
+- STDB/Casbin remain business/authorization authority;
+- successful user work can be reused as recipes and later promoted into reviewed skills.
+
+Target architecture:
 
 ```text
 User
   ↓
 Agent Control Plane
-  ├── session/objective state
-  ├── intent router
-  ├── capability + skill discovery
+  ├── objective/session state
+  ├── capability/entity discovery
   ├── model router
-  ├── planner
-  ├── executor
-  ├── deterministic analysis engine
+  ├── planner/hypothesis loop
+  ├── ERP acquisition executor
+  ├── SandboxProvider / Daytona scheduler
   ├── verifier
-  ├── artifact store
+  ├── artifact + recipe store
   ├── execution event log
   └── presentation composer
         ↓
@@ -33,32 +39,40 @@ Generated capability registry
 server auth + Casbin
         ↓
 STDB / bounded durable contracts
+
+Sandbox side path:
+DatasetHandle(s)
+   ↓
+Python program
+   ↓
+Daytona sandbox
+   ↓
+EvidenceArtifact / report / workbook / chart
 ```
 
 ---
 
 ## 2. Non-negotiable invariants
 
-1. **The control plane never becomes an authorization source.** Every capability invocation is re-authorized server-side through Casbin with trusted actor/org context.
-2. **Models never receive raw database credentials, arbitrary SQL, reducer dispatch, Object Storage credentials, or unrestricted network/filesystem access.**
-3. **Planner and executor are separate concerns.** Plans are typed/validated before execution where practical.
-4. **Bulk computation is deterministic by default.** Models choose goals/plans; trusted code performs filtering, aggregation, joins, statistics, and shaping.
-5. **The model sees the smallest useful tool set.** Capability discovery narrows hundreds of generated operations to a task-specific subset.
-6. **Model/provider choice is deployment policy, not ERP contract semantics.**
-7. **Every task has bounded model/tool/token/time/data budgets.**
-8. **Analytical claims are verified against structured results before presentation where practical.**
-9. **Conversation transcript is not the long-term memory model.** Sessions reference compact state and durable artifacts.
-10. **Specialist sub-agents are narrowly scoped workers, not unrestricted clones.**
-11. **AI/provider outage degrades AI only; ordinary ERP continues operating.**
-12. **Replaceable provider seams are allowed only where replacement cannot redefine ERP authority.**
-13. **Agent execution is append-only traceable.** Durable task/tool/model/artifact events can reconstruct what the harness did without exposing hidden chain-of-thought.
-14. **ERP history and agent execution history remain distinct.** They correlate through `operation_id`, `correlation_id`, and artifact references rather than sharing one authority log.
+1. **Control plane is not authorization authority.** Every ERP capability invocation is re-authorized server-side.
+2. **Models do not receive raw database/storage credentials or unrestricted infrastructure access.**
+3. **Multi-row analytical data does not enter model context by default.** It becomes scoped dataset handles.
+4. **Python executes in isolated sandboxes, not in the control-plane process.**
+5. **Sandbox code cannot mutate ERP state.** Consequential changes stay in typed action-draft/approval/reducer paths.
+6. **Planner/model and executor/sandbox are separate concerns.** Model-authored programs are proposals executed under policy.
+7. **Models see the smallest useful capability set.** Discovery narrows generated operations before schema loading.
+8. **Every task has bounded model/tool/sandbox/token/time/data/artifact budgets.**
+9. **Material claims are tied to evidence/provenance and verified where practical.**
+10. **Conversation transcript and sandbox filesystem are not canonical memory.**
+11. **Durable programs/artifacts/recipes outlive sandboxes.**
+12. **Sandbox snapshots/warm pools are runtime optimization, not skill/user state.**
+13. **Provider seams are replaceable only where they cannot redefine ERP authority.**
+14. **Execution is append-only traceable without persisting hidden chain-of-thought.**
+15. **AI/sandbox outage degrades AI only; ordinary ERP usage continues.**
 
 ---
 
-## 3. Agent control-plane primitives
-
-Introduce provider-neutral runtime concepts:
+## 3. Core runtime primitives
 
 ```ts
 interface AgentTask {
@@ -68,12 +82,13 @@ interface AgentTask {
   budget: AgentBudget
   status: AgentTaskStatus
   activeArtifacts: readonly ArtifactRef[]
+  activeEvidence: readonly EvidenceRef[]
 }
 
 interface AgentPlan {
   taskId: AgentTaskId
-  steps: readonly AgentPlanStep[]
   requiredCapabilities: readonly CapabilityKey[]
+  requiredRuntimeProfile?: RuntimeProfileKey
   reasoningClass: ReasoningClass
 }
 
@@ -83,71 +98,179 @@ interface AgentBudget {
   maxInputTokens: number
   maxOutputTokens: number
   maxDatasetRows: number
+  maxSandboxPrograms: number
+  maxSandboxRuntimeMs: number
+  maxEvidenceBytes: number
+  maxArtifactBytes: number
+  maxExternalCalls: number
   maxDurationMs: number
 }
 ```
 
-The effective budget is runtime policy. IR may provide hints but must not hard-code commercial/model-provider limits.
+Effective budget is runtime policy. IR may provide hints but never commercial/provider quotas.
 
 ---
 
-## 4. Capability discovery instead of giant tool prompts
+## 4. Model capability profiles
 
-Do not expose the complete generated ERP tool registry to each model call.
+Model routing should account for measured ability, not vendor labels in ERP contracts.
+
+```ts
+interface ModelCapabilityProfile {
+  reasoning: "low" | "medium" | "high"
+  toolSelection: "low" | "medium" | "high"
+  structuredOutputReliability: number
+  maxRecommendedTools: number
+  maxRecommendedProgramIterations: number
+  maxRecommendedEvidenceItems: number
+}
+```
+
+Use eval-derived values.
+
+Medium models may receive:
+
+```text
+fewer candidate capabilities
+shorter hypothesis cycles
+smaller evidence batches
+more verifier checkpoints
+```
+
+Deep models may receive broader discovery/deeper hypothesis chains. Authorization, dataset isolation, sandbox rules and ERP semantics remain identical.
+
+---
+
+## 5. Capability discovery instead of giant tool prompts
 
 ```text
 user objective
    ↓
-intent/domain classification
+intent/domain/entity classification
    ↓
 generated CapabilityIndex search
    ↓
-Casbin-filtered candidates
+Casbin-filtered candidate set
    ↓
-3–10 task-relevant tools
+3–10 relevant operations
    ↓
-planner/model context
+full schemas loaded lazily
 ```
 
-Discovery may combine deterministic tags, lexical search, embeddings, and skill metadata. Security remains invocation-time authorization, not discovery filtering.
+Discovery may combine deterministic tags, lexical search and semantic retrieval. Discovery filtering is not authorization proof.
 
-Measure tool count per call, discovery precision/recall, tool-description tokens, and failed tool-selection rate.
+Measure:
+
+```text
+candidate count
+discovery precision/recall
+tool-description tokens
+hallucinated tool attempts
+failed selection rate
+```
 
 ---
 
-## 5. Model router
+## 6. Primary reasoning/execution loop
 
-```ts
-interface ModelRouter {
-  resolve(policy: ModelExecutionPolicy): ModelProviderRef
-}
+Replace a generic tool-result loop with a data-isolated analytical loop:
 
-interface ModelExecutionPolicy {
-  reasoningClass: ReasoningClass
-  contextClass: ContextClass
-  requiresTools: boolean
-  latencyClass: LatencyClass
-  taskRisk: OperationRisk
-}
+```text
+UNDERSTAND
+    ↓
+DISCOVER
+    ↓
+PLAN ACQUISITION
+    ↓
+AUTHORIZE / ACQUIRE
+    ↓
+small direct fact? ── yes → VERIFY/PRESENT
+    ↓ no
+DatasetHandle(s)
+    ↓
+HYPOTHESIZE
+    ↓
+SCRIPT PYTHON
+    ↓
+VALIDATE / SCHEDULE SANDBOX
+    ↓
+EXECUTE
+    ↓
+OBSERVE EVIDENCE/ARTIFACTS
+    ↓
+VERIFY
+    ↓
+insufficient? ── yes → bounded HYPOTHESIZE/SCRIPT again
+    ↓ no
+PRESENT
 ```
 
-Logical classes remain `Fast`, `Standard`, and `Deep`. Deployment config maps those classes to Scaleway-hosted models initially. Provider/model names stay outside IR.
-
-Escalation should happen only after objective failures such as plan validation failure, unresolved ambiguity, or verifier failure.
+Hard iteration/budget limits prevent wandering.
 
 ---
 
-## 6. Replaceable seams / plugin architecture
+## 7. ERP acquisition execution pipeline
 
-Borrow the useful seam discipline from plugin-oriented harnesses, but do not make ERP authority pluggable.
+```text
+CapabilityRequested
+      ↓
+input/schema validation
+      ↓
+trusted actor/org/company resolution
+      ↓
+Casbin authorization
+      ↓
+risk/confirmation
+      ↓
+admission/budget
+      ↓
+STDB/read-model operation
+      ↓
+ToolResultPolicy
+      ├── direct → bounded evidence
+      ├── sandbox-dataset → DatasetHandle
+      └── aggregate-only → bounded aggregate artifact
+      ↓
+provenance
+```
 
-### Safe replacement seams
+No generic model-provided SQL or reducer dispatch.
+
+---
+
+## 8. SandboxProvider seam
+
+Safe replacement seam:
+
+```rust
+trait SandboxProvider {
+    async fn create(&self, spec: SandboxSpec) -> Result<SandboxHandle>;
+    async fn execute(
+        &self,
+        sandbox: &SandboxHandle,
+        program: &AnalysisProgramRef,
+    ) -> Result<SandboxExecutionResult>;
+    async fn snapshot(&self, sandbox: &SandboxHandle) -> Result<SandboxSnapshotRef>;
+    async fn destroy(&self, sandbox: &SandboxHandle) -> Result<()>;
+}
+```
+
+Initial implementation:
+
+```text
+SandboxProvider
+      ↓
+DaytonaSandboxProvider
+```
+
+Keep Daytona-specific identifiers/configuration outside application-contract IR, skill definitions, recipes and durable artifacts.
+
+Other safe provider seams remain:
 
 ```text
 ModelProvider
 EmbeddingProvider
 SemanticIndexProvider
-SandboxProvider
 ResearchProvider
 DocumentProcessor
 OCRProvider
@@ -157,127 +280,112 @@ TelemetrySink
 PresentationRenderer
 ```
 
-Each seam follows a narrow contract:
-
-```text
-definition
-   ↓
-provider implementation
-   ↓
-consumer
-```
-
-Providers must not receive broader credentials/capabilities than their contract requires.
-
-### Intentionally non-pluggable authority
+Intentionally non-pluggable authority remains:
 
 ```text
 Casbin authorization semantics
 STDB reducer/business invariants
 OrganizationPlacement ownership
-ordered durable sequencing
 ERP application-contract semantics
 confirmation/risk enforcement
 ```
 
-A plugin/provider may help execute, retrieve, render, index, or infer. It may not redefine whether an ERP action is allowed or valid.
+---
 
-### Provider registration requirements
+## 9. Sandbox scheduling and runtime profiles
+
+The control plane chooses a versioned runtime profile based on the task/artifact requirement:
+
+```text
+lumiere-analysis-python
+lumiere-documents-python
+lumiere-spreadsheet-python
+lumiere-research-python
+```
+
+Scheduling flow:
+
+```text
+AgentTask
+  ↓
+resolve RuntimeProfile + SandboxBudget
+  ↓
+admission
+  ↓
+claim Daytona warm sandbox if available
+  └── otherwise create from approved snapshot/image
+  ↓
+bind task-scoped datasets/workspace
+  ↓
+execute Python
+  ↓
+persist outputs
+  ↓
+revoke grants
+  ↓
+destroy sandbox
+```
+
+Persistent/pause-resume sandboxes are exceptional runtime behavior for interactive/long-running tasks, not default user state.
+
+---
+
+## 10. Python program lifecycle
+
+Model-authored Python should be persisted when useful:
 
 ```ts
-interface AgentProviderDescriptor {
-  id: ProviderId
-  kind: ProviderKind
-  version: string
-  capabilities: readonly ProviderCapability[]
-  healthCheck: HealthCheckPolicy
+interface AnalysisProgramArtifact {
+  id: AnalysisProgramId
+  contentHash: string
+  runtimeProfile: RuntimeProfileRef
+  entrypoint: string
+  inputContract: AnalysisInputContract
+  outputContract: AnalysisOutputContract
+  sourceTaskId: AgentTaskId
+  provenanceRef: ProvenanceRef
 }
 ```
 
-Runtime registration is deployment configuration, not generated ERP contract metadata.
-
----
-
-## 7. Planner → executor → verifier loop
+Programs may produce:
 
 ```text
-UNDERSTAND
-    ↓
-DISCOVER
-    ↓
-PLAN
-    ↓
-AUTHORIZE
-    ↓
-EXECUTE
-    ↓
-SHAPE
-    ↓
-VERIFY
-    ↓
-insufficient? ──→ bounded REPLAN
-    ↓
-PRESENT
+EvidenceArtifact
+ChartArtifact
+SpreadsheetArtifact
+DocumentArtifact
+PdfArtifact
+PresentationArtifact
+TemplateArtifact
 ```
 
-Hard iteration limits prevent agent wandering. Planner output should prefer typed plans over prose.
-
-Execution validates schemas, capability availability, risk/confirmation requirements, admission policy, budget, and trusted actor/org context before invocation.
+The sandbox filesystem is scratch; durable outputs go to artifact storage.
 
 ---
 
-## 8. Guarded capability execution pipeline
-
-Use one common execution lifecycle for generated ERP capabilities:
-
-```text
-CapabilityRequested
-      ↓
-input/schema validation
-      ↓
-trusted actor/org resolution
-      ↓
-Casbin authorization
-      ↓
-risk / confirmation
-      ↓
-admission / budget
-      ↓
-STDB operation
-      ↓
-result shaping
-      ↓
-verification / provenance
-      ↓
-CapabilityResult
-```
-
-Support explicit pre/post execution middleware for timeout, retry policy where safe, metrics, redaction, and tracing. Middleware cannot bypass authorization or change business semantics.
-
-Mutations never gain transparent retry unless the generated operation explicitly declares idempotency semantics.
-
----
-
-## 9. Append-only agent execution event model
-
-Persist a typed append-only event stream for agent execution. This is the source for replay/debugging/session reconstruction, but **not** canonical ERP history.
+## 11. Append-only agent execution event model
 
 Candidate events:
 
 ```ts
 type AgentExecutionEvent =
   | TaskStarted
-  | PlanCreated
-  | ModelRequestStarted
-  | ModelResponseReceived
   | CapabilitySelected
   | CapabilityRequested
   | CapabilityAuthorized
   | CapabilityDenied
-  | CapabilityStarted
-  | CapabilityCompleted
+  | DatasetAcquired
+  | HypothesisCycleStarted
+  | ProgramCreated
+  | SandboxRequested
+  | SandboxClaimed
+  | SandboxStarted
+  | ProgramStarted
+  | ProgramCompleted
+  | EvidenceCreated
   | ArtifactCreated
   | VerificationCompleted
+  | RecipeReused
   | ReplanRequested
   | TaskCompleted
   | TaskFailed
@@ -298,248 +406,304 @@ interface AgentEventEnvelope<T> {
 }
 ```
 
-Requirements:
+Persist observable decisions/actions/evidence references, not hidden reasoning traces.
 
-- monotonically ordered per task/session;
-- append-only durable persistence;
-- enough information to reconstruct user-visible task state and tool/action lineage;
-- model-visible context must be reconstructable from durable refs/events plus authoritative artifacts;
-- no hidden chain-of-thought storage requirement;
-- sensitive prompt/result content may be redacted or referenced by artifact/hash according to policy.
+---
 
-### Traceability model
+## 12. Artifact-first memory
+
+Persist useful outputs as typed durable artifacts. Session state references them rather than replaying raw transcripts or preserving sandbox disks.
 
 ```text
-Task
- ├─ Plan
- ├─ Capability call
- │   ├─ authorization
- │   ├─ execution
- │   ├─ shaping
- │   └─ artifact
- ├─ Verification
- └─ Presentation
-```
-
-This provides a stack-trace-like explanation of **actions and evidence**, not private reasoning.
-
----
-
-## 10. Replay, resume, and fork semantics
-
-Plan for replayable agent sessions from stable event boundaries.
-
-Support later:
-
-```text
-resume task
-replay trace without re-executing side effects
-fork from stable step
-retry a failed model step with another provider
-compare alternative interpretation/presentation
-```
-
-Rules:
-
-- historical business mutations are never replayed merely because an agent trace is replayed;
-- read-only capability results may reuse versioned artifacts when still valid;
-- re-execution of live capabilities requires current authorization/admission checks;
-- forks get new task IDs/correlation roots while retaining parent trace references;
-- expired/stale artifacts must be detected rather than silently reused.
-
----
-
-## 11. Deterministic analytical execution
-
-Use the existing `AnalysisPlan`/`AnalysisResult` foundation as the default data-analysis substrate. The model should not calculate financial totals from raw rows when deterministic code can do so.
-
----
-
-## 12. Verification layer
-
-Start deterministic: schema validity, numeric evidence matching, entity existence, authorized provenance, disclosure/cardinality limits, and normal reducer/confirmation enforcement for mutations. A cheap semantic verifier may later check prose-to-evidence consistency.
-
----
-
-## 13. Artifact-first memory
-
-Persist useful outputs as typed artifacts:
-
-```text
-AnalysisArtifact
-DatasetArtifact
-PresentationArtifact
-DraftDocumentArtifact
+AnalysisProgramArtifact
+EvidenceArtifact
+DatasetArtifact/manifest
+ChartArtifact
+SpreadsheetArtifact
+DocumentArtifact
 ResearchArtifact
-ImportProposal
 ReportArtifact
+TemplateArtifact
 ```
 
-Each artifact carries task/operation/source provenance. Session context references artifact IDs and concise summaries; large raw data remains server-side.
+Canonical content lives in the authoritative artifact/file system (Scaleway Object Storage once bucket-ready); STDB/PG retain ownership/version/provenance/task/skill metadata.
+
+Qdrant remains a derived semantic index over artifact/recipe/skill descriptions and references.
 
 ---
 
-## 14. Session/context compiler
-
-Maintain structured session state:
+## 13. Context compiler
 
 ```ts
 interface AgentSessionState {
   objective?: string
   activeArtifacts: readonly ArtifactRef[]
-  workingFacts: readonly FactRef[]
+  activeEvidence: readonly EvidenceRef[]
   completedSteps: readonly CompletedStepRef[]
   summary: string
 }
 ```
 
-Compile model context from current objective, selected skill, small tool set, compact artifact summaries, evidence excerpts, and approval state rather than replaying full transcript history.
-
----
-
-## 15. Skills
-
-Skills remain reviewed workflow/reasoning compositions over generated capabilities. They never retain permissions and every capability step re-authorizes at runtime.
-
----
-
-## 16. Specialist sub-agents
-
-Prefer narrowly scoped specialists such as accounting analysis, research, document, import mapping, presentation, and verification agents. Specialists receive only the capabilities/artifacts/budget needed for their delegated task.
-
----
-
-## 17. Durable vs runtime vs telemetry events
-
-Keep three event concerns separate:
+Compile model context from:
 
 ```text
-Durable AgentExecutionEvent
-→ what happened / replay / trace
-
-Runtime progress event
-→ what is happening now / SSE UI
-
-Telemetry span/metric/log
-→ operational performance/cost
+current objective
+small capability set
+dataset schemas/metadata
+prior bounded evidence
+artifact summaries
+recipe/skill summaries when retrieved
+approval state
 ```
 
-OpenTelemetry/PostHog projections must not become canonical agent memory. Durable agent events can carry trace/span IDs for correlation.
-
-ERP audit/change history remains separate and links through operation/correlation IDs.
+Do not inject raw sandbox datasets or full sandbox filesystem contents into model context.
 
 ---
 
-## 18. User experience
+## 14. Verification layer
 
-The system may use several small model calls internally but present one coherent assistant. SSE may expose useful statuses such as checking receivables, comparing periods, verifying findings, or preparing visualization.
+Start deterministic:
 
-The UI should also support an inspectable action trace showing tools/capabilities, authorization result, artifacts, evidence, verification, and outcomes without exposing low-level chain-of-thought.
+- schema validity;
+- evidence provenance completeness;
+- dataset/task/scope binding;
+- numeric claim/evidence matching;
+- disclosure/cardinality limits;
+- artifact hash/version registration;
+- entity existence/reference validity;
+- action risk/confirmation enforcement;
+- sandbox produced no ERP mutation side effect.
+
+A semantic verifier may later check prose-to-evidence consistency.
 
 ---
 
-## 19. Initial Scaleway implementation
+## 15. Recipe and skill lifecycle
 
-Deploy the control-plane runtime near the trusted backend in Paris.
+The default learning mechanism is not immediate skill creation.
+
+```text
+ad-hoc successful run
+   ↓
+persist program/artifacts/evidence
+   ↓
+reusable AnalysisRecipe
+   ↓
+repeated successful reuse + low correction
+   ↓
+SkillDraft
+   ↓
+fixtures/evals/review
+   ↓
+SkillVersion
+```
+
+Recipes/skills contain:
+
+```text
+objective/intent metadata
+runtime profile/version
+AnalysisProgramArtifact ref
+required CapabilityKeys
+input schema
+output artifact kinds
+templates/assets
+evals/fixtures
+```
+
+They never contain persistent permission grants or live sandbox IDs.
+
+Every reuse acquires fresh current datasets under fresh authorization.
+
+---
+
+## 16. User-driven product feedback
+
+Use privacy-safe metadata from real work to identify:
+
+```text
+frequently combined capabilities
+repeated objective clusters
+high-reuse recipes/programs
+common corrections
+missing tools causing workarounds
+common document/report/spreadsheet outputs
+```
+
+Possible progression:
+
+```text
+sandbox improvisation
+→ repeated user value
+→ recipe
+→ reviewed skill
+→ native deterministic capability/ERP feature
+```
+
+This should guide product investment before manually building speculative user workflows.
+
+---
+
+## 17. Replay/resume/fork semantics
+
+Support later:
+
+```text
+resume task from durable artifacts/events
+re-run Python program on fresh/current datasets
+fork an AnalysisProgram/Recipe
+retry failed model/program step with another model/provider
+compare alternative presentations
+```
+
+Rules:
+
+- historical business mutations are never replayed through sandbox replay;
+- re-execution requires current authorization;
+- stale dataset handles cannot silently be reused;
+- forks get new task/correlation roots;
+- sandbox snapshot reuse is runtime implementation detail, not semantic replay.
+
+---
+
+## 18. Initial Scaleway/Daytona topology
 
 ```text
 Cloudflare
    ↓ HTTPS/SSE
-Agent API / control plane — Scaleway Paris
+Agent API / Control Plane — Scaleway Paris
    ↓
-Capability + skill discovery
+Capability discovery + Casbin/STDB
    ↓
-Casbin / STDB / analysis engine
+Dataset broker
    ↓
-ModelRouter
+Sandbox Scheduler
    ↓
-Scaleway Generative APIs
+Daytona SandboxProvider
+   ↓
+Python runtimes
+   ↘
+    Scaleway Object Storage — programs/artifacts/templates
 ```
 
-Prefer serverless/pay-per-use inference initially. Instrument model calls/tokens/class/provider, capability calls, shaping cardinality, phase latency, retries/replans, verifier failures, estimated inference cost, and event-log persistence health.
+Keep Daytona deployment/data-residency assumptions behind the provider seam until validated.
+
+AI/sandbox traffic must have separate admission so sandbox spikes cannot starve normal ERP/STDB traffic.
 
 ---
 
-## 20. Phases
+## 19. Phases
 
 ### ACP0 — control-plane skeleton
 
-- [ ] define `AgentTask`, `AgentPlan`, `AgentBudget`, session state, and artifact refs;
-- [ ] implement generated capability-index search + Casbin filtering;
-- [ ] implement provider-neutral model router interface;
-- [ ] define safe provider/plugin seam registry and mark ERP authority surfaces non-pluggable;
-- [ ] separate planner and executor interfaces;
-- [ ] enforce task/tool/model budgets;
-- [ ] use deterministic analysis engine for large tabular results;
-- [ ] add guarded capability execution middleware;
-- [ ] add structured SSE task-status events.
+- [ ] define `AgentTask`, `AgentPlan`, `AgentBudget`, session/evidence/artifact refs;
+- [ ] implement generated capability/entity discovery + Casbin candidate filtering;
+- [ ] implement provider-neutral model router + `ModelCapabilityProfile`;
+- [ ] implement `SandboxProvider` seam;
+- [ ] separate acquisition executor from sandbox executor;
+- [ ] enforce model/tool/data/sandbox/time budgets;
+- [ ] add structured SSE status events.
 
-### ACP1 — execution trace + artifact + verification foundation
+### ACP1 — Daytona + Python orchestration
 
-- [ ] persist typed append-only `AgentExecutionEvent` records;
-- [ ] correlate agent events with ERP `operation_id` / `correlation_id`;
-- [ ] persist analysis/presentation/draft/research artifact metadata;
-- [ ] build context compiler from objective + artifacts + selected tools/skills;
+- [ ] integrate Daytona behind `SandboxProvider`;
+- [ ] implement runtime-profile resolution;
+- [ ] schedule ephemeral sandboxes and cleanup/TTL;
+- [ ] connect task-scoped DatasetHandles to sandbox runtime;
+- [ ] persist `AnalysisProgramArtifact` before/after execution as appropriate;
+- [ ] return only bounded evidence/artifact refs to the model.
+
+### ACP2 — execution trace + verification + artifact foundation
+
+- [ ] persist typed append-only execution events;
+- [ ] correlate agent/sandbox events with ERP operation/correlation IDs;
+- [ ] persist evidence/program/document/chart/spreadsheet metadata;
+- [ ] build context compiler from objective + schemas + evidence + artifacts;
 - [ ] add deterministic claim/evidence verification;
-- [ ] add action-trace/debug view sourced from durable events;
-- [ ] measure context/token reduction against transcript/raw-result baseline;
-- [ ] add bounded replan after verifier/plan failure.
+- [ ] add action-trace/debug UI sourced from durable events;
+- [ ] measure model-context reduction against raw-result baseline.
 
-### ACP2 — replay/fork + skills + specialists
+### ACP3 — recipe reuse and skill promotion
 
-- [ ] define stable replay boundaries and no-side-effect replay semantics;
-- [ ] support resume/fork metadata without re-executing historical mutations;
-- [ ] define reviewed skill format and registry;
-- [ ] add capability/skill discovery integration;
-- [ ] add one accounting specialist and one document/research specialist;
-- [ ] prove delegated agents receive narrower capability sets and budgets.
+- [ ] define `AnalysisRecipe` + personal/team/org scope;
+- [ ] retrieve/fork reusable programs for similar objectives;
+- [ ] record reuse success/correction metrics;
+- [ ] define reviewed SkillDraft/SkillVersion format over program/runtime/capability refs;
+- [ ] require fresh authorization/dataset acquisition per reuse;
+- [ ] prove sandbox state/snapshots are not required for skill execution.
 
-### ACP3 — model-quality/economics tuning
+### ACP4 — scaling and model economics
 
-- [ ] evaluate Fast/Standard/Deep routing against representative task corpus;
-- [ ] record quality, latency, token and cost metrics per class;
-- [ ] add escalation rules based on objective failures rather than user-tier hardcoding;
-- [ ] choose Scaleway model mapping from measured results;
-- [ ] validate provider swaps through the seam contracts without ERP code changes.
-
----
-
-## 21. Required evaluation corpus
-
-Maintain representative tasks for invoice/order lookup, receivables analysis, audit-history summarization, uploaded dataset mapping, document drafting, research synthesis, and consequential mutation proposals. Add harness tests for trace reconstruction, denied capability calls, provider failure, replay without duplicate side effects, and provider replacement.
+- [ ] evaluate Fast/Standard/Deep routing on representative corpus;
+- [ ] tune `ModelCapabilityProfile` from measured performance;
+- [ ] add Daytona snapshots/warm pools for common runtime profiles;
+- [ ] measure cold/warm startup, sandbox cost and task success;
+- [ ] add escalation based on objective/verifier/program failures;
+- [ ] validate SandboxProvider/ModelProvider replacement without ERP contract changes.
 
 ---
 
-## 22. Explicitly deferred
+## 20. Required evaluation corpus
+
+Maintain representative tasks for:
+
+```text
+invoice/order lookup
+receivables/margin analysis
+audit-history summarization
+uploaded dataset mapping
+DOCX/PDF report creation
+spreadsheet creation
+research synthesis
+consequential mutation proposals
+reused recurring management reports
+```
+
+Include tests for:
+
+```text
+raw-row exposure
+sandbox egress/credential denial
+trace reconstruction
+provider failure
+sandbox cancellation/TTL cleanup
+recipe reuse with fresh authorization
+replay without duplicate side effects
+medium vs deep model routing
+Daytona warm-pool behavior
+```
+
+---
+
+## 21. Explicitly deferred
 
 - unrestricted autonomous agents;
-- arbitrary model-generated code execution;
-- persistent permissions inside skills;
+- permanent sandbox per user by default;
+- sandbox filesystem as canonical memory;
+- direct LLM access to PG/STDB/Object Storage;
+- static infrastructure credentials in sandboxes;
+- ERP mutations from Python sandbox;
 - provider/model names in application-contract IR;
 - raw transcript as canonical memory;
-- direct LLM access to PG/STDB/Object Storage;
-- automatic execution of financial mutations;
-- autonomous skill publication from observed behavior;
-- making Casbin/STDB/business authority replaceable plugins;
-- full event-sourced ERP state inside the agent log.
+- autonomous skill publication from one successful run;
+- making Casbin/STDB/business authority pluggable;
+- skill definitions tied to Daytona sandbox/snapshot IDs.
 
 ---
 
-## 23. Acceptance criteria
+## 22. Acceptance criteria
 
 The control plane is successful when:
 
-- smaller models can complete representative ERP tasks reliably because discovery, execution, analysis, verification, and memory are handled structurally;
-- the model sees a bounded relevant capability set rather than the entire ERP API;
-- model/provider changes require deployment configuration, not application-contract regeneration;
-- provider/plugin seams can be replaced without changing ERP authority semantics;
-- task budgets prevent unbounded recursive/tool/token usage;
-- large data stays server-side and reaches models through compact evidence/artifacts;
-- analytical claims are tied to structured provenance/evidence;
-- sessions can continue from artifacts without replaying full historical transcripts;
-- durable append-only execution events can reconstruct the user-visible action trace;
-- replay/fork never duplicates historical business mutations;
-- agent events correlate cleanly with ERP audit/change operations;
-- specialists receive narrower capabilities than their parent task;
-- Casbin/STDB remain authorization/business authorities;
-- the UX presents one coherent assistant despite multi-model/sub-agent execution internally.
+- smaller and stronger models can complete representative ERP tasks through the same generated capabilities/dataset/sandbox contracts;
+- raw multi-row organization data remains outside normal model context;
+- models can write Python inside isolated sandboxes and receive bounded verified evidence;
+- Daytona is replaceable behind `SandboxProvider`;
+- task sandboxes are ephemeral by default while programs/artifacts/recipes are durable;
+- model/provider/runtime changes require deployment configuration, not ERP contract regeneration;
+- sessions continue from artifacts/evidence without preserving sandbox filesystems or replaying raw transcripts;
+- repeated successful user work can become reusable recipes and reviewed skills under explicit promotion/review;
+- product telemetry can identify repeated sandbox workarounds that deserve native deterministic capabilities;
+- durable execution events reconstruct the user-visible action/evidence trace;
+- sandbox overload/provider failure cannot block ordinary ERP use;
+- Casbin/STDB remain authorization/business authorities.
