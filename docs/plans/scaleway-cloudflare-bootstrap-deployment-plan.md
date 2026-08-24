@@ -1,8 +1,8 @@
 # Scaleway + Cloudflare bootstrap deployment plan
 
 **Status:** Proposed — near-term deployment target 2026-08-20
-**Tracks:** `deployment`, `scaleway`, `cloudflare`, `managed-postgres`, `stdb`, `ai-harness`, `bootstrap-cost`
-**Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [regional-stdb-scaleway-durable-foundation.md](./regional-stdb-scaleway-durable-foundation.md) · [traffic-resilience-admission-control-plan.md](./traffic-resilience-admission-control-plan.md) · [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md) · [production-readiness-release-hardening-plan.md](./production-readiness-release-hardening-plan.md)
+**Tracks:** `deployment`, `scaleway`, `cloudflare`, `managed-postgres`, `stdb`, `ai-harness`, `bootstrap-cost`, `execution-cell`, `module-release`, `runtime-contract`
+**Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [execution-cell-runtime-foundation-plan.md](./execution-cell-runtime-foundation-plan.md) · [regional-stdb-scaleway-durable-foundation.md](./regional-stdb-scaleway-durable-foundation.md) · [traffic-resilience-admission-control-plan.md](./traffic-resilience-admission-control-plan.md) · [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md) · [production-readiness-release-hardening-plan.md](./production-readiness-release-hardening-plan.md)
 
 ---
 
@@ -24,7 +24,9 @@ server auth + Casbin + admission control
    ↓
 OrganizationPlacementResolver
    ↓
-STDB Paris execution cell
+ExecutionCell: cell-paris-01
+   ├── STDB host
+   └── compatible Lumière ModuleRelease / RuntimeContract
    ↓
 async durable convergence
    ↓
@@ -33,7 +35,7 @@ Scaleway Managed PostgreSQL Paris
 
 Scaleway Paris is the initial home region. Cloudflare is the global ingress/security layer. Initial production may route every organization to the same logical STDB cell and the same managed PG placement while preserving the canonical organization-placement abstraction.
 
-The deployment must remain a small physical instance of the final architecture rather than a one-off single-tenant topology.
+The deployment must remain a small physical instance of the final architecture rather than a one-off singleton topology. **Treat the first deployment as one complete execution-cell implementation, not as a permanent globally-known STDB server.**
 
 ---
 
@@ -44,13 +46,17 @@ The deployment must remain a small physical instance of the final architecture r
 3. **Kong remains the application ingress/admission boundary behind Cloudflare.**
 4. **Postgres uses Scaleway Managed PostgreSQL for the initial production deployment.**
 5. **Postgres is private/internal infrastructure and is never exposed directly to frontend or agent clients.**
-6. **One authoritative STDB execution cell owns an organization at a time.** Initial placement maps all orgs to Paris.
+6. **One authoritative STDB execution cell owns an organization at a time.** Initial placement maps all orgs to `cell-paris-01`.
 7. **Normal reducer completion must not wait for AI or external document-processing services.**
 8. **AI/provider failure must not prevent ordinary ERP operation.**
 9. **Provider-specific endpoints/regions stay in deployment/runtime configuration, not application-contract IR.**
 10. **Cost/usage telemetry is collected per organization and capability class so infrastructure upgrades follow measured demand.**
 11. **A deployment is a compatible release set.** IR/codegen, STDB module, PG schema, web/mobile contract, and runtime configuration versions must be observable and checked rather than deployed as unrelated artifacts.
 12. **Production dependence on backups starts only after restore/reconstruction has been exercised.**
+13. **Every supported STDB caller resolves organization placement instead of treating one endpoint as permanent.** This includes frontend bootstrap, API forwarding, workers/imports, agent capability calls, and reconnect flows.
+14. **The STDB module is deployed as an immutable/versioned `ModuleRelease` with an explicit `RuntimeContractVersion`.** Physical cell identity and module release identity remain separate.
+15. **Postgres durable records remain independent of source-cell identity.** Organization/generation/commit/version metadata, not a permanent host, establishes durable continuity.
+16. **Automatic scheduling is not required for bootstrap.** Manual cell placement is sufficient until measured operational need justifies automation.
 
 ---
 
@@ -68,7 +74,12 @@ Cloudflare
 Scaleway Paris
   ├── Kong
   ├── api/control boundary
-  ├── STDB execution cell
+  │     ├── OrganizationPlacementResolver
+  │     ├── ExecutionCell registry (initially one cell)
+  │     └── release/contract compatibility checks
+  ├── cell-paris-01
+  │     ├── STDB host
+  │     └── Lumière ModuleRelease
   ├── durable gateway/workers
   ├── AI harness
   └── Managed PostgreSQL
@@ -78,6 +89,8 @@ External managed APIs
 ```
 
 The first deployment may co-locate low-duty API/control/harness workers where operationally sensible, but STDB resource requirements and PG managed-service boundaries should remain explicit.
+
+Do not build a dynamic scheduler in this phase. The `ExecutionCell` registry may contain one static/operator-managed row while still being the canonical routing target.
 
 ---
 
@@ -99,7 +112,7 @@ Do not put authorization/business decisions in Cloudflare Workers.
 
 ---
 
-## 5. Placement-aware client bootstrap
+## 5. Placement-aware client and caller bootstrap
 
 Clients must not embed Paris or future regional endpoints.
 
@@ -114,14 +127,31 @@ server resolves actor + organization
       ↓
 OrganizationPlacementResolver
       ↓
+resolve compatible ExecutionCell
+      ↓
 returns allowed connection/bootstrap descriptor
+  endpoint
+  placement_generation
+  runtime_contract compatibility metadata
       ↓
 client connects to assigned STDB endpoint
 ```
 
-The descriptor may include endpoint and generation information but must not let the client choose cell/store placement.
+The descriptor may include endpoint, generation, and compatibility information but must not let the client choose cell/store placement.
 
-This is the seam later used to move an organization from Paris to another execution cell without changing frontend contracts.
+This is the seam later used to move an organization from one execution cell to another without changing frontend contracts.
+
+The same rule applies to trusted server callers:
+
+```text
+API reducer/query forwarding
+background workers
+imports/onboarding jobs
+AI/agent ERP capability calls
+maintenance/recovery tooling
+```
+
+These carry logical organization/operation identity and resolve the authoritative cell at execution time or through a short generation-aware cache. Jobs must not persist a permanent STDB endpoint as business state.
 
 ---
 
@@ -134,9 +164,9 @@ PG responsibilities:
 - durable per-organization projection/history;
 - canonical change-record convergence;
 - durability watermark state;
-- snapshot/reactivation manifests;
+- snapshot/reactivation/working-set source manifests;
 - historical reads reached through STDB-owned bounded durable contracts;
-- recovery/backfill source;
+- recovery/backfill and organization-activation source;
 - managed backup/PITR capabilities according to selected service configuration.
 
 Required deployment work:
@@ -147,36 +177,94 @@ Required deployment work:
 - migration automation and drift checks;
 - backup/PITR verification procedure;
 - restore drill before treating backups as production-ready;
-- PG capacity/connection metrics associated with organization/capability usage.
+- PG capacity/connection metrics associated with organization/capability usage;
+- compatibility checks between durable schema/codec version and the active `ModuleRelease`/`RuntimeContractVersion`.
 
 The durable schema version, migration state, backup restore target, and reconstructed STDB watermark must participate in the production-readiness evidence defined in the release-hardening plan.
 
+Durable history must not rely on a permanent source-cell identifier for correctness. Organization id + placement generation + commit sequence + contract/schema version establish continuity when the source cell changes later.
+
 ---
 
-## 7. STDB Paris execution cell
+## 7. `cell-paris-01` execution cell
 
 Initial logical placement:
 
 ```text
 org A ─┐
-org B ─┼──→ cell-primary-paris → pg-primary-paris
+org B ─┼──→ cell-paris-01 → pg-primary-paris
 org C ─┘
 ```
 
-The cell must already emit/track the primitives required by the regional foundation:
+The cell must already emit/track the primitives required by the regional/fleet foundation:
 
+- explicit `CellId` / region / status / capacity class;
 - placement generation;
+- assigned immutable `ModuleReleaseId`;
+- `RuntimeContractVersion`;
 - per-org commit sequence;
 - durable convergence watermark;
 - trusted operation/correlation context;
 - canonical change/audit metadata;
 - generation fencing for later move/reactivation.
 
+### 7.1 Module release artifact
+
+The deployed Lumière STDB workload should have one immutable release identity covering, directly or by digest/reference:
+
+```text
+module.wasm
+schema manifest/version
+reducer/operation manifests
+read/write-set + access-path manifests
+subscription descriptors
+projection descriptors
+hot-retention / working-set descriptors
+durable codec/schema compatibility metadata
+```
+
+This does not require inventing a new artifact registry if the current build/container/private-contract distribution already provides immutable references. The requirement is reproducible identity and compatibility checking.
+
 Do not implement active-active STDB replication in this deployment phase.
 
 ---
 
-## 8. AI connectivity and isolation
+## 8. Organization working-set reconstruction
+
+The deployment/recovery path must avoid equating “activate organization” with “load all durable history into STDB.”
+
+Use the structural working-set contract defined by the execution-cell/cold-tier plans to distinguish:
+
+```text
+canonical hot state      → hydrate when required
+rebuildable projection   → rebuild on destination
+runtime/connection state → discard/recreate
+historical durable state → remain PG-only
+```
+
+Representative activation flow:
+
+```text
+resolve placement + compatible module
+        ↓
+read verified snapshot/durable head
+        ↓
+resolve WorkingSetDescriptor graph
+        ↓
+hydrate required canonical state
+        ↓
+rebuild projections
+        ↓
+verify counts/hashes/invariants/watermark
+        ↓
+cell/org ready
+```
+
+This same hydration contract should support cold-row activation, reactivation, recovery, and the later second-cell movement proof.
+
+---
+
+## 9. AI connectivity and isolation
 
 Keep the AI harness close to the trusted backend in Paris initially.
 
@@ -188,8 +276,8 @@ Cloudflare
 AI harness Paris
     ↓ typed capability/tool calls
 server auth + Casbin
-    ↓
-STDB / bounded durable queries
+    ↓ resolve organization placement
+current STDB cell / bounded durable queries
     ↓
 Scaleway Generative API
 ```
@@ -200,7 +288,7 @@ AI is never on the reducer commit path. A model/provider outage must degrade AI 
 
 ---
 
-## 9. Token-aware AI execution principle
+## 10. Token-aware AI execution principle
 
 The harness should not routinely send raw API/database result payloads into an LLM.
 
@@ -213,7 +301,7 @@ model chooses approved analytical capability
    ↓
 server/Casbin authorization
    ↓
-STDB query / bounded durable contract
+placement-resolved STDB query / bounded durable contract
    ↓
 typed raw result kept server-side
    ↓
@@ -245,7 +333,7 @@ See the harness capability plan for the generated IR/tooling implications.
 
 ---
 
-## 10. Sandbox requirements for analysis shaping
+## 11. Sandbox requirements for analysis shaping
 
 Investigate a constrained analysis runtime for deterministic transformations.
 
@@ -281,15 +369,18 @@ Raw SQL remains unavailable to the model.
 
 ---
 
-## 11. Cost-aware bootstrap operation
+## 12. Cost-aware bootstrap operation
 
 The deployment should support a low fixed baseline while keeping expensive features usage-based.
 
-Instrument at minimum per organization:
+Instrument at minimum per organization/cell:
 
 - STDB resident working-set size;
 - reducer/query/subscription volume;
+- initial subscription hydration/reconnect load;
+- cell CPU/RAM and organization working-set contribution;
 - durable PG storage/query volume;
+- organization activation/hydration/rebuild duration;
 - AI input/output tokens by model/task class;
 - analysis-sandbox CPU/time/data volume;
 - OCR/document processing usage when enabled;
@@ -311,17 +402,20 @@ Do not hard-code commercial pricing tiers into IR. Collect the measurements need
 
 ---
 
-## 12. Deployment phases
+## 13. Deployment phases
 
-### D0 — provision home region
+### D0 — provision home region + first execution cell
 
 - [ ] provision Scaleway Managed PostgreSQL in Paris;
-- [ ] provision initial STDB Paris runtime;
+- [ ] provision initial STDB Paris runtime as explicit `cell-paris-01`;
+- [ ] define static/operator-managed `ExecutionCell` record;
+- [ ] build/identify immutable Lumière `ModuleRelease` + `RuntimeContractVersion`;
+- [ ] bind `cell-paris-01` to that compatible release;
 - [ ] establish private/internal network paths where practical;
 - [ ] configure TLS/secrets/service identities using the provider-neutral lifecycle defined by the production-readiness plan;
 - [ ] configure durable gateway connectivity;
 - [ ] test PG migrations, backups and restore;
-- [ ] record deployed release/contract/schema versions.
+- [ ] record deployed release/contract/schema versions in operator/health diagnostics.
 
 ### D1 — put Cloudflare in front
 
@@ -332,11 +426,23 @@ Do not hard-code commercial pricing tiers into IR. Collect the measurements need
 - [ ] verify AI SSE streaming;
 - [ ] validate DDoS/WAF/Kong/admission responsibilities.
 
-### D2 — placement-aware bootstrap
+### D2 — placement-aware bootstrap + callers
 
 - [ ] all organizations resolve through `OrganizationPlacementResolver`;
-- [ ] bootstrap returns assigned endpoint/generation rather than clients knowing Paris;
-- [ ] prove a synthetic second endpoint can be introduced without frontend contract changes.
+- [ ] placement resolves a compatible `ExecutionCell`, not a hard-coded STDB server;
+- [ ] bootstrap returns assigned endpoint/generation/contract compatibility metadata rather than clients knowing Paris;
+- [ ] API forwarding, workers/imports, and AI/agent capability calls resolve placement;
+- [ ] prohibit supported jobs/application state from persisting a permanent STDB endpoint;
+- [ ] prove a synthetic second endpoint can be introduced without frontend/application-contract changes.
+
+### D2.5 — working-set/reconstruction proof
+
+- [ ] consume `WorkingSetDescriptor`/hot-retention metadata from the runtime contract;
+- [ ] reconstruct one representative organization from verified durable state without loading irrelevant PG-only history;
+- [ ] hydrate canonical hot state;
+- [ ] rebuild approved projections;
+- [ ] verify counts/hashes/generation/schema/runtime-contract compatibility;
+- [ ] measure activation/hydration/projection-rebuild time.
 
 ### D3 — AI harness bootstrap
 
@@ -357,7 +463,7 @@ Do not hard-code commercial pricing tiers into IR. Collect the measurements need
 
 ### D5 — production-readiness rehearsal
 
-- [ ] validate release manifest/version compatibility across IR, generated contracts, STDB, PG, and clients;
+- [ ] validate release manifest/version compatibility across runtime contract, generated contracts, STDB module, PG, and clients;
 - [ ] exercise a forward release and safe application rollback;
 - [ ] perform managed-PG restore into a disposable target;
 - [ ] reconstruct representative STDB organization state and verify watermarks/integrity;
@@ -365,32 +471,57 @@ Do not hard-code commercial pricing tiers into IR. Collect the measurements need
 - [ ] run deployed tenant-isolation tests through the real ingress/auth/data paths;
 - [ ] enable initial synthetic checks and operator diagnostics before broad paid rollout.
 
+### D6 — manual second-cell correctness proof (after current performance/cold-tier tracks are green)
+
+- [ ] provision/configure a synthetic `cell-paris-02` with a compatible `ModuleRelease`;
+- [ ] select one test organization on `cell-paris-01`;
+- [ ] reach and verify durable checkpoint/watermark;
+- [ ] reconstruct only the target working set on `cell-paris-02`;
+- [ ] rebuild projections rather than blindly copying rebuildable state;
+- [ ] verify target state/invariants;
+- [ ] increment placement generation and flip placement;
+- [ ] prove frontend reconnect resolves the new cell and reuses the same logical generated subscription contracts;
+- [ ] prove workers/agents follow the new placement;
+- [ ] prove old generation is fenced from authoritative writes;
+- [ ] prove durable PG history remains continuous across the move.
+
+**D6 is a horizontal-scaling correctness proof, not autoscheduling, active-active HA, or a production SLO claim.**
+
 ---
 
-## 13. Exit criteria
+## 14. Exit criteria
 
 The first production topology is ready when:
 
 - Cloudflare is the public edge and Kong/origin cannot be trivially bypassed;
 - all tenant routing flows through canonical organization placement;
-- all current organizations may share the Paris cell without single-org code paths;
-- Scaleway Managed PostgreSQL is the tested durable convergence/recovery store;
+- `cell-paris-01` is represented as an explicit execution cell rather than a permanent unnamed singleton;
+- all current organizations may share `cell-paris-01` without single-org code paths;
+- the active cell exposes immutable module/runtime-contract identity and incompatible release combinations fail closed;
+- supported frontend/API/worker/import/agent callers resolve placement rather than permanent STDB endpoints;
+- Scaleway Managed PostgreSQL is the tested durable convergence/recovery store independent of source-cell identity;
+- working-set reconstruction can activate representative org state without loading full durable history;
 - STDB websocket and AI SSE behavior are verified behind the production ingress;
 - AI uses generated, Casbin-authorized capabilities rather than raw ERP APIs;
 - at least one analytical AI workflow uses deterministic server-side shaping before model interpretation;
 - provider/model failure does not block normal ERP workflows;
-- per-org infrastructure and AI cost signals are measurable;
-- release/contract/schema versions are observable and incompatible combinations fail closed;
+- per-org/cell infrastructure and AI cost signals are measurable;
 - managed-PG restore plus representative STDB reconstruction has been exercised;
 - tenant-isolation tests pass across every enabled production surface;
-- adding a future regional STDB cell is a placement/deployment change rather than an application-contract rewrite.
+- adding `cell-paris-02` or a future regional cell is a placement/deployment change rather than an application-contract rewrite.
+
+The later D6 proof closes the additional assertion that one organization can actually move between two compatible cells through checkpoint → working-set reconstruction → generation flip → reconnect without changing ERP contracts.
 
 ---
 
-## 14. Explicitly deferred
+## 15. Explicitly deferred
 
 - multi-region active-active STDB;
+- automatic cell bin-packing/scheduling;
+- automatic STDB tenant sharding;
 - African cell provisioning before latency/demand justifies it;
+- automatic live cell migration before manual correctness proof exists;
+- fleet autoscaling / scale-to-zero;
 - dedicated GPU inference;
 - self-hosted model serving;
 - Cloudflare as a business-logic runtime;
