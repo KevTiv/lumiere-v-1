@@ -86,6 +86,9 @@ Initial production remains one logical execution cell + one STDB deployment + on
 25. **Saved skills/workflows never retain authorization; capability checks are re-evaluated at execution time.**
 26. **Content-safety/prompt-safety models may filter/classify but never authorize ERP operations.**
 27. **Cloudflare is edge/security/routing infrastructure, not a business-logic authority.**
+28. **Hot retention is determined by resource semantics and operational state, never by commercial subscription tier.**
+29. **Cooling is eligibility-based, not age-only: active/open/dependency-required rows remain hot even after their normal time horizon.**
+30. **A row may be removed from STDB only after its durable PG version is confirmed and any required hot dependencies/projections can remain correct or be rebuilt.**
 
 ---
 
@@ -113,6 +116,7 @@ tables / columns / keys
 organization scope
 wire + durable codecs
 PG projection metadata
+hot-retention class / cooling eligibility metadata
 
 Application-contract IR
 ────────────────────────────
@@ -159,6 +163,7 @@ SpacetimeDB execution cell
 ────────────────────────────
 reducers / views / procedures
 business rules and authorization
+hot operational working set
 ordered org commit/change stream
 
               │ asynchronous durable convergence
@@ -166,7 +171,8 @@ ordered org commit/change stream
 
 Durable gateway → Scaleway Managed PG
 ────────────────────────────
-history / snapshots
+full durable history
+partitioned cold data / snapshots
 migration + reactivation source
 recovery manifests
 managed backup / PITR / replication options
@@ -327,7 +333,179 @@ Suspension/archival never means destructive deletion. Reactivation uses durable 
 
 ---
 
-## 9. IR, codegen, private packages, harness tooling, and analysis shaping
+## 9. Semantic hot-retention and cooling policy
+
+The sliding-window model should not use one universal time window and should not be attached to product pricing. The hot/cold boundary is a **resource-class and state-aware storage policy** driven by how data participates in active ERP work.
+
+Conceptually:
+
+```text
+resource semantics + row state + durable watermark + dependencies
+                           ↓
+                  cooling eligibility
+                           ↓
+             ┌─────────────┴─────────────┐
+             │                           │
+        remain hot                  cool from STDB
+          in STDB                         │
+             │                            ▼
+             └────────────────→ partitioned durable PG
+                                          │
+                                          ▼
+                                query / hydrate on demand
+```
+
+A resource may declare a structural policy similar to:
+
+```ts
+interface HotRetentionDescriptor {
+  resource: ResourceKey
+  strategy:
+    | "always-hot"
+    | "terminal-window"
+    | "time-window"
+    | "projection-only"
+    | "pg-first"
+
+  timeField?: FieldKey
+  defaultHotWindow?: DurationClass
+  terminalStates?: readonly StateKey[]
+  blocksCoolingWhile?: readonly StateKey[]
+
+  dependencyPolicy:
+    | "block-cooling"
+    | "hydrate-on-demand"
+    | "projection-preserves-hot-read"
+
+  durableSource: "postgres"
+  rebuildableProjection?: ProjectionKey
+}
+```
+
+This metadata is structural. Business logic still determines valid state transitions and domain invariants. Codegen may use the descriptor to generate archive eligibility plumbing, manifests, indexes, durable query paths, hydration wiring, and validation; it must not generate accounting/inventory/workflow business rules.
+
+### 9.1 Resource-class examples
+
+Representative defaults should be based on data nature rather than table-by-table arbitrary values:
+
+```text
+active transactional state
+  draft/open/reserved/pending/assigned
+  → remain hot regardless of age
+
+closed transactional history
+  completed/settled/cancelled/posted-and-closed
+  → eligible after resource-defined time window
+
+financial obligations
+  unpaid/open/reconciling/legally active
+  → remain hot
+
+append-heavy audit / telemetry / usage / execution history
+  → short hot tail or PG-first, subject to active consumers
+
+reference/configuration/master data
+  → usually always hot while active
+
+maintained operational projections
+  → hot when they materially reduce interactive cost and are rebuildable
+
+large historical/reporting datasets
+  → PG-first / partitioned durable history
+```
+
+Example behavior:
+
+```text
+SaleOrder
+  draft / confirmed / fulfillment-active → hot
+  completed / cancelled                 → terminal-window
+
+AccountMove
+  unpaid / unreconciled / open obligation → hot
+  settled historical posting              → terminal-window
+
+StockMove
+  reserved / assigned / in-progress → hot
+  done / cancelled                  → terminal-window
+
+Workflow / approval
+  active token/task → hot
+  completed history → terminal-window
+
+Audit / usage event
+  recent operational tail → bounded hot window when needed
+  full history            → partitioned PG
+```
+
+The exact domain classifications require explicit review; these examples do not authorize automatic cooling by themselves.
+
+### 9.2 Cooling eligibility
+
+Age alone is never sufficient. A row can cool only when all required conditions hold:
+
+```text
+eligible_for_cooling =
+    resource_policy_allows_cooling
+    AND time/state threshold satisfied
+    AND exact durable version confirmed in PG
+    AND durable watermark covers the row/change
+    AND no hot dependency requires the canonical row resident
+    AND no active workflow/obligation references it in a way that requires hot access
+    AND projection/rebuild contracts remain valid
+```
+
+This prevents an old but still-open invoice, active contract, stock lot, unresolved approval, or long-running order from being evicted merely because its creation timestamp is old.
+
+### 9.3 PG partitioning and retention work together
+
+PG partitioning remains a baseline part of the durable design. Cooling policy determines **when a row leaves the STDB working set**; PG partitioning determines **how its durable history is physically organized and pruned**.
+
+```text
+STDB semantic hot window
+        ↓ durable convergence
+PG partition routing
+        ↓
+partition-aware composite indexes
+        ↓
+bounded historical reads / analytics / hydration
+```
+
+Retention/codegen should therefore be able to validate that a cooled resource has:
+
+- a durable table/partition strategy;
+- a stable durable identity/version mapping;
+- appropriate tenant-leading access paths;
+- bounded historical pagination/query support;
+- an explicit hydration policy if cooled rows can become mutable again;
+- rebuild instructions for any hot projection derived from cooled history.
+
+### 9.4 No silent memory-pressure policy changes
+
+Runtime memory pressure must not silently shorten semantic hot-retention guarantees or cool active business state. Memory pressure can trigger bounded maintenance, backpressure, or earlier processing of **already eligible** rows, but eligibility remains contract-driven.
+
+Conversely, STDB may temporarily retain eligible rows longer when capacity permits; the retention descriptor describes when rows become safe to cool, not a requirement to delete them at an exact timestamp.
+
+### 9.5 Observability
+
+Track at least:
+
+```text
+hot rows / bytes by resource class
+eligible-for-cooling rows / bytes
+cooling throughput and lag
+durable watermark lag
+hydration requests and latency
+rows prevented from cooling by state/dependency
+projection rebuild/drift status
+PG partition distribution / historical query latency
+```
+
+This makes the hot-window policy measurable and allows actual workload evidence to tune resource-class horizons later.
+
+---
+
+## 10. IR, codegen, private packages, harness tooling, and analysis shaping
 
 The schema IR/application-contract IR split remains. IR identifies organization scope and operation semantics, but physical Cloudflare/Scaleway/cell/PG topology remains runtime placement/deployment state.
 
@@ -381,7 +559,7 @@ See `agent-harness-capability-ir-foundation.md` for harness/result-shaping detai
 
 ---
 
-## 10. Near-term deployment target
+## 11. Near-term deployment target
 
 The current deployment work should converge on:
 
@@ -413,7 +591,7 @@ Required deployment properties:
 
 ---
 
-## 11. Implementation phases
+## 12. Implementation phases
 
 ### Phase 0 — organization placement, lifecycle, and recovery foundation
 
@@ -489,6 +667,22 @@ Use `audit_log` first:
 - [ ] expose through generated SDK;
 - [ ] enforce pagination/time/result/admission bounds.
 
+### Phase 4.5 — semantic hot-retention proof
+
+Use a mixed set of resource classes rather than only append-only audit data:
+
+- [ ] define `HotRetentionDescriptor` / equivalent structural metadata;
+- [ ] classify one always-hot/reference resource, one terminal-window transactional resource, and one PG-first/append-heavy resource;
+- [ ] generate or manifest cooling eligibility inputs without moving domain business rules into codegen;
+- [ ] require exact PG durability/watermark confirmation before removal from STDB;
+- [ ] prove active/open rows remain hot regardless of age;
+- [ ] prove terminal eligible rows can cool without query/subscription correctness regressions;
+- [ ] prove historical reads use partition-aware PG access paths;
+- [ ] expose metrics for hot bytes, eligible bytes, cooling lag, and hydration count;
+- [ ] add drift validation so a coolable resource cannot lack durable identity/query/hydration metadata.
+
+**Exit gate:** at least one real transactional resource safely transitions from hot STDB state to partitioned durable PG under state-aware eligibility, remains historically queryable, and can be rehydrated when a later authorized mutation requires it.
+
 ### Phase 5 — prove mutable rehydration
 
 - [ ] determine hydration need in STDB;
@@ -509,7 +703,7 @@ This is a correctness proof, not an autoscaling or active-active project.
 
 ---
 
-## 12. Explicitly out of scope
+## 13. Explicitly out of scope
 
 - active-active STDB across regions;
 - automatic STDB tenant sharding;
@@ -527,11 +721,14 @@ This is a correctness proof, not an autoscaling or active-active project.
 - unrestricted code execution or filesystem access;
 - direct model access to Object Storage;
 - general-purpose model-generated sandbox code before typed analysis shaping is proven;
-- moving business logic into Postgres, Cloudflare, the api-server, Kong, generated packages, or the AI harness.
+- moving business logic into Postgres, Cloudflare, the api-server, Kong, generated packages, or the AI harness;
+- commercial-plan-driven hot-retention windows or degrading data availability by pricing tier;
+- age-only eviction of operational ERP state;
+- runtime memory-pressure logic that silently overrides semantic cooling eligibility.
 
 ---
 
-## 13. Required tests
+## 14. Required tests
 
 At minimum:
 
@@ -561,11 +758,17 @@ At minimum:
 24. Cloudflare/Kong trusted-proxy behavior preserves correct source/admission identity;
 25. STDB websocket and AI SSE flows work through production ingress;
 26. loss of Scaleway Generative API does not prevent normal ERP reads/mutations;
-27. Scaleway Managed PG backup/PITR restore is exercised before production acceptance.
+27. Scaleway Managed PG backup/PITR restore is exercised before production acceptance;
+28. age alone cannot cool a row whose operational state/dependencies require it to remain hot;
+29. a row cannot cool before its exact durable version and watermark are confirmed in PG;
+30. terminal-window resources remain queryable through partition-aware PG reads after cooling;
+31. hydration restores an eligible cooled row idempotently before a later mutation;
+32. hot projections derived from cooled history remain rebuildable and drift-tested;
+33. retention/codegen drift fails when a resource is marked coolable without required durable identity, query, or hydration metadata.
 
 ---
 
-## 14. Acceptance criteria
+## 15. Acceptance criteria
 
 This branch is complete when:
 
@@ -574,6 +777,8 @@ This branch is complete when:
 - initial production runs Cloudflare ingress + one logical Paris STDB cell + Scaleway Managed PostgreSQL;
 - future regional STDB placement is a routing/runtime concern rather than an application rewrite;
 - Scaleway Managed PG serves as the durable convergence/history/recovery layer;
+- hot STDB residency is explicitly driven by resource semantics and operational state rather than a universal or pricing-derived window;
+- coolable resources have durable PG partition/access-path, identity/version, and hydration/rebuild contracts before cooling is enabled;
 - application callers use stable generated operation contracts;
 - frontend and AI harness share the same generated operation/capability source;
 - Casbin-backed authorization remains the sole capability permission source;
