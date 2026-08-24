@@ -53,6 +53,7 @@ PostgreSQL provides enough functionality for the expected initial scale:
 - `pgvector` for vector similarity;
 - PostgreSQL full-text search for lexical retrieval;
 - `pg_trgm` for fuzzy matching when useful;
+- optional `unaccent` for accent-insensitive lexical normalization where product requirements justify it;
 - relational predicates for organization/resource/version filtering;
 - ordinary transactions for index lifecycle bookkeeping;
 - one existing durable operational surface rather than a separate vector service.
@@ -91,26 +92,71 @@ Loss or rebuild of semantic-index rows must not prevent ordinary ERP workflows, 
 
 ---
 
-## 4. Canonical schema direction
+## 4. Scaleway managed-Postgres compatibility contract
+
+The production target for this plan is **Scaleway Managed Database for PostgreSQL**, not a generic assumption that every upstream PostgreSQL extension is available.
+
+As of this plan update, the required search features are compatible with Scaleway's managed PostgreSQL offering:
+
+- `pgvector` / extension name `vector` — supported;
+- `pg_trgm` — supported;
+- `unaccent` — supported when accent-insensitive text normalization is useful;
+- PostgreSQL full-text search — built into PostgreSQL and requires no separate extension.
+
+Provisioning/migration code may therefore use:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+-- Optional; enable only when product/search requirements need it.
+CREATE EXTENSION IF NOT EXISTS unaccent;
+```
+
+Do not add a new PostgreSQL extension to the production architecture without first verifying that it is supported by the targeted Scaleway Managed PostgreSQL engine/version.
+
+### Embedding-dimension constraint
+
+Lumière must not blindly adopt an embedding model whose vector size is incompatible with the indexed pgvector strategy available on Scaleway.
+
+For indexed semantic vectors, enforce this architecture-level constraint:
+
+```text
+indexed embedding dimension <= 2000
+```
+
+Model/provider selection must expose and validate embedding dimensionality before an embedding model can be promoted for production semantic indexing. Prefer deliberate dimensions such as `768`, `1024`, or `1536` when retrieval quality is sufficient.
+
+Required safeguards:
+
+- persist `embedding_model`, provider-neutral model identity/version, and `embedding_dimension` with index metadata;
+- reject or explicitly route models above the supported indexed dimension rather than silently creating an unindexable production corpus;
+- validate dimension consistency before insert/upsert;
+- include dimension compatibility in model certification/promotion tests;
+- require an explicit migration/re-embedding plan when changing vector dimensions;
+- benchmark retrieval quality/latency before changing the chosen production dimension.
+
+The semantic-index repository must not assume every provider emits the same dimension.
+
+---
+
+## 5. Canonical schema direction
 
 Prefer one shared semantic-reference model rather than separate ad-hoc vector tables per feature.
 
 Illustrative shape:
 
 ```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
 CREATE TABLE semantic_index (
-  id                 uuid PRIMARY KEY,
-  organization_id    uuid NOT NULL,
-  resource_kind      text NOT NULL,
-  resource_id        text NOT NULL,
-  resource_version   text NOT NULL,
-  source_fingerprint text NOT NULL,
-  embedding_model    text NOT NULL,
-  embedding          vector(/* model dimension */),
-  searchable_text    text,
+  id                  uuid PRIMARY KEY,
+  organization_id     uuid NOT NULL,
+  resource_kind       text NOT NULL,
+  resource_id         text NOT NULL,
+  resource_version    text NOT NULL,
+  source_fingerprint  text NOT NULL,
+  embedding_model     text NOT NULL,
+  embedding_dimension integer NOT NULL CHECK (embedding_dimension > 0 AND embedding_dimension <= 2000),
+  embedding           vector(/* pinned production dimension */),
+  searchable_text     text,
   metadata            jsonb NOT NULL DEFAULT '{}'::jsonb,
   indexed_at          timestamptz NOT NULL DEFAULT now(),
   UNIQUE (organization_id, resource_kind, resource_id, resource_version, embedding_model)
@@ -119,11 +165,13 @@ CREATE TABLE semantic_index (
 
 Exact IDs/types must follow generated contract and durable-schema conventions rather than introducing duplicate handwritten domain types.
 
+Because a pgvector column has a concrete dimensionality when dimension-constrained, do not treat arbitrary per-row provider dimensions as interchangeable. A production embedding model/dimension should be pinned per active index generation, or separate versioned index storage should be used during migrations.
+
 Indexes should be selected from measured workload. Do not prematurely lock the design to one ANN index type.
 
 ---
 
-## 5. Retrieval contract
+## 6. Retrieval contract
 
 Semantic retrieval must return candidate references, never trusted business objects.
 
@@ -155,7 +203,7 @@ Required properties:
 
 ---
 
-## 6. Hybrid search
+## 7. Hybrid search
 
 Prefer hybrid retrieval rather than vector-only search.
 
@@ -173,7 +221,7 @@ Deterministic IR/tag discovery remains primary for tools/capabilities. Embedding
 
 ---
 
-## 7. Index lifecycle
+## 8. Index lifecycle
 
 Indexing is asynchronous, idempotent and rebuildable.
 
@@ -186,6 +234,8 @@ index job / durable work item
       |
 embed normalized summary/chunk
       |
+validate model + dimension
+      |
 UPSERT semantic_index
       |
 old version retained or retired according to resource lifecycle
@@ -195,14 +245,14 @@ Requirements:
 
 - bounded worker concurrency;
 - retry-safe indexing;
-- explicit embedding-model/version metadata;
+- explicit embedding-model/version/dimension metadata;
 - deterministic delete/re-index by resource version;
 - health/degraded state surfaced without blocking ERP traffic;
 - background indexing shed before interactive ERP work under pressure.
 
 ---
 
-## 8. File/document indexing — bucket-ready gate
+## 9. File/document indexing — bucket-ready gate
 
 Production document-vector ingestion remains blocked until Scaleway Object Storage and the file-management lifecycle are ready.
 
@@ -229,20 +279,23 @@ Each indexed chunk must retain provenance such as:
 - content/source fingerprint;
 - page/sheet/row/chunk provenance;
 - extraction/parser/OCR version;
-- embedding model/version;
+- embedding model/version/dimension;
 - authoritative resource version.
 
 Do not store raw arbitrary file paths or canonical file contents in `semantic_index`.
 
 ---
 
-## 9. Qdrant migration/removal tasks
+## 10. Qdrant migration/removal tasks
 
 ### P0 — define Postgres semantic-index foundation
 
+- [ ] pin the production target to Scaleway Managed PostgreSQL and record the supported engine/version;
 - [ ] enable `pgvector` in development and planned Scaleway Postgres deployment;
-- [ ] evaluate whether `pg_trgm` is needed for fuzzy retrieval and enable only if useful;
-- [ ] define generated/typed `SemanticIndexRecord` / `AuthoritativeResourceRef` contracts;
+- [ ] evaluate whether `pg_trgm` and `unaccent` are needed and enable only when useful;
+- [ ] enforce `indexed embedding dimension <= 2000` in model certification/configuration;
+- [ ] select and pin the initial production embedding model + dimension from measured retrieval quality;
+- [ ] define generated/typed `SemanticIndexRecord` / `AuthoritativeResourceRef` contracts including model/version/dimension;
 - [ ] implement organization-scoped semantic repository abstraction;
 - [ ] add vector + lexical retrieval contract;
 - [ ] define index-job lifecycle and idempotency keys;
@@ -255,7 +308,7 @@ Do not store raw arbitrary file paths or canonical file contents in `semantic_in
 - [ ] migrate artifact-summary retrieval;
 - [ ] migrate skill-discovery retrieval where embeddings remain useful;
 - [ ] migrate context/RAG routes to return authoritative refs and re-authorize fetched resources;
-- [ ] preserve provider-neutral embedding generation;
+- [ ] preserve provider-neutral embedding generation while validating provider/model dimensionality;
 - [ ] add deterministic non-semantic fallback.
 
 ### P2 — remove Qdrant infrastructure
@@ -279,13 +332,13 @@ Do not store raw arbitrary file paths or canonical file contents in `semantic_in
 
 ---
 
-## 10. Scaleway deployment direction
+## 11. Scaleway deployment direction
 
 Baseline production dependencies should become:
 
 ```text
 SpacetimeDB
-PostgreSQL + pgvector
+Scaleway Managed PostgreSQL + pgvector
 Object Storage
 application/API services
 agent sandbox compute when enabled
@@ -302,11 +355,13 @@ Postgres semantic-index traffic is a derived workload. Protect the durable/ERP p
 - pausing background indexing under database pressure;
 - maintaining deterministic retrieval fallback.
 
+Deployment validation must include a migration/bootstrap test against the actual targeted Scaleway PostgreSQL version proving that all required extensions can be enabled before release.
+
 If semantic retrieval eventually dominates Postgres resource usage, first evaluate a dedicated read/search Postgres topology before introducing another database product.
 
 ---
 
-## 11. Criteria for reconsidering a dedicated vector database
+## 12. Criteria for reconsidering a dedicated vector database
 
 Do not reintroduce Qdrant or another vector service based on anticipated scale alone.
 
@@ -322,9 +377,14 @@ Any future vector datastore remains derived and rebuildable; it must not change 
 
 ---
 
-## 12. Acceptance criteria
+## 13. Acceptance criteria
 
 - Qdrant is absent from the baseline deployment topology;
+- Scaleway Managed PostgreSQL is the explicitly validated production target;
+- `vector`/pgvector and any enabled optional extensions are proven available on the targeted Scaleway engine version during deployment validation;
+- indexed production embeddings are constrained to `<= 2000` dimensions;
+- embedding model/version/dimension are explicit metadata and validated before indexing;
+- changing embedding dimension requires an intentional versioned migration/re-embedding path;
 - Postgres owns the rebuildable semantic index through `pgvector`;
 - vector/lexical retrieval is organization-scoped and returns authoritative refs;
 - authorization occurs against authoritative resources, not index payloads;
