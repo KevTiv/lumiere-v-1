@@ -1,8 +1,8 @@
 # Agent IR and codegen extension plan
 
 **Status:** Proposed — contract-generation extension 2026-08-24
-**Tracks:** `application-contract-ir`, `codegen`, `capability-discovery`, `entity-discovery`, `generated-agent-tools`, `result-policy`, `analysis-shapes`, `provenance`, `model-hints`
-**Related:** [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md) · [agent-control-plane-model-routing-plan.md](./agent-control-plane-model-routing-plan.md) · [agent-generated-erp-tool-surface-plan.md](./agent-generated-erp-tool-surface-plan.md) · [sliding-window-cold-tier.md](./sliding-window-cold-tier.md)
+**Tracks:** `application-contract-ir`, `codegen`, `capability-discovery`, `entity-discovery`, `generated-agent-tools`, `result-policy`, `sandbox-datasets`, `analysis-shapes`, `provenance`, `model-hints`
+**Related:** [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md) · [agent-control-plane-model-routing-plan.md](./agent-control-plane-model-routing-plan.md) · [agent-generated-erp-tool-surface-plan.md](./agent-generated-erp-tool-surface-plan.md) · [agent-sandbox-data-analysis-plan.md](./agent-sandbox-data-analysis-plan.md) · [sliding-window-cold-tier.md](./sliding-window-cold-tier.md)
 
 ---
 
@@ -12,11 +12,14 @@ Extend application-contract IR/codegen so generated operations are efficient for
 
 The target harness model is deliberately **tools + deterministic guardrails + runtime reasoning**, not a growing library of prescriptive procedural skills.
 
+For analytical ERP work, generated operations should also support the stricter rule that **models reason about organization data without ingesting raw organization rows by default**. Multi-row/analytical capabilities produce server-side dataset handles; model-authored bounded analysis runs against those handles; only derived evidence crosses back into model context.
+
 IR describes:
 
 - **what operations and entities exist**;
 - **what they accept and return**;
 - **how entities are structurally related**;
+- **whether a result is direct, sandbox-dataset, or aggregate-only**;
 - **what risk, confirmation, traffic, idempotency, result-shaping, provenance, and analysis constraints apply**;
 - **which capabilities are semantically discoverable together**.
 
@@ -25,6 +28,8 @@ The Agent Control Plane decides:
 - what the user is trying to accomplish;
 - which capabilities to inspect or use;
 - in what order to use them;
+- which hypotheses to test;
+- what bounded analysis program to author against acquired datasets;
 - whether another observation is required;
 - when to replan;
 - which model/provider to use;
@@ -50,12 +55,14 @@ application-contract IR
   ├── JSON-schema-compatible input/output schemas
   ├── bounded query contracts
   ├── draft-action descriptors
-  ├── result/analysis/provenance metadata
+  ├── dataset/evidence result policies
+  ├── analysis/provenance metadata
   └── abstract model-policy hints
         ↓
 Agent Control Plane
-  UNDERSTAND → DISCOVER → PLAN → AUTHORIZE → EXECUTE
-  → OBSERVE → SHAPE → VERIFY → bounded REPLAN → PRESENT
+  UNDERSTAND → DISCOVER → ACQUIRE → HYPOTHESIZE → SCRIPT
+  → AUTHORIZE → EXECUTE SANDBOX → OBSERVE EVIDENCE
+  → VERIFY → bounded REPLAN → PRESENT
 ```
 
 The same generated operation boundary is consumed by frontend clients, offline clients, workflows, and agents. STDB remains the sole business-logic authority.
@@ -252,7 +259,7 @@ Generated metadata must constrain:
 - organization/company scope injection;
 - permission capability;
 - result policy;
-- aggregate compatibility.
+- sandbox/aggregate compatibility.
 
 Example conceptual request:
 
@@ -260,10 +267,12 @@ Example conceptual request:
 query entity=account_move
 filter partner_id=83 AND payment_state=not_paid
 projection id, invoice_date, amount_residual
-limit 50
+limit 5000
 ```
 
 The runtime must translate this through generated typed services/read models. It must not construct arbitrary model-provided SQL.
+
+If the result policy is `sandbox-dataset`, the runtime returns an opaque `DatasetHandle` + schema/provenance rather than serializing 5,000 rows into model context.
 
 ---
 
@@ -323,7 +332,7 @@ Codegen must not make a risky reducer directly executable merely because it exis
 
 ## 9. Tool-result policy
 
-Make result handling first-class:
+Make raw-data visibility/result handling first-class:
 
 ```ts
 type ToolResultPolicy =
@@ -332,12 +341,15 @@ type ToolResultPolicy =
       maxBytes: number
     }
   | {
-      kind: "dataset"
+      kind: "sandbox-dataset"
+      schema: DatasetSchemaRef
+      allowedOperations: readonly AnalysisOperation[]
       maxRows: number
       maxBytes: number
+      evidencePolicy: EvidencePolicyRef
     }
   | {
-      kind: "aggregate-first"
+      kind: "aggregate-only"
       allowedShapes: readonly AnalysisShape[]
       maxOutputRows: number
     }
@@ -346,17 +358,19 @@ type ToolResultPolicy =
 Examples:
 
 ```text
-customer.get
+invoice.get_status
 → direct
 
 invoice.search
-→ dataset
+→ sandbox-dataset
 
 accounting.transactions.history
-→ aggregate-first
+→ sandbox-dataset / aggregate-only
 ```
 
 Generated agent adapters must honor the policy instead of blindly serializing returned data into model context.
+
+For `sandbox-dataset`, generated/runtime contracts expose only opaque dataset identity, schema, allowed analysis operations, watermark/provenance, expiry and budgets. Storage paths, credentials, raw-row download URLs and arbitrary query channels are not part of the model-facing contract.
 
 ---
 
@@ -370,6 +384,7 @@ pub enum GeneratedAnalysisShape {
     Project,
     GroupBy,
     Aggregate,
+    Join,
     ComparePeriods,
     TopN,
     Histogram,
@@ -377,7 +392,7 @@ pub enum GeneratedAnalysisShape {
 }
 ```
 
-IR may describe structural compatibility such as numeric/date/groupable fields, but must not encode business conclusions.
+IR may describe structural compatibility such as numeric/date/groupable fields and explicitly compatible joins, but must not encode business conclusions.
 
 For example, schema/type metadata can derive:
 
@@ -389,6 +404,8 @@ customer_id: entity key → group_by
 
 Codegen should preserve stable field references so the analysis DSL does not depend on display labels.
 
+The actual hypothesis and analysis-program sequence remain runtime/model concerns.
+
 ---
 
 ## 11. Provenance metadata
@@ -398,7 +415,9 @@ Make source provenance a generated/runtime-visible first-class contract.
 ```ts
 export type ProvenanceKind =
   | "erp_record"
+  | "erp_dataset"
   | "erp_aggregate"
+  | "evidence"
   | "artifact"
   | "user_input"
   | "external_research"
@@ -415,7 +434,7 @@ export interface ProvenanceDescriptor {
 
 Generated ERP operations should default to authoritative internal provenance. External-research and user/model content are explicitly separate trust classes in the runtime.
 
-Tool results and artifacts should preserve source entity/version, operation/correlation IDs, and shaping lineage where available.
+Dataset/evidence artifacts should preserve source capability, entity/version or source watermark, operation/correlation IDs, analysis-program lineage and shaping lineage where available.
 
 This metadata supports evidence verification and prompt-injection defenses without storing hidden model reasoning.
 
@@ -460,11 +479,11 @@ export interface CapabilitySkillMetadata {
 
 IR must **not generate complete procedural skills automatically**.
 
-Skills, when used, remain optional reviewed compositions over generated capabilities. The default general-purpose harness should be able to solve representative ERP tasks through capability/entity discovery and bounded reasoning without requiring a matching skill.
+Skills, when used, remain optional reviewed compositions over generated capabilities. The default general-purpose harness should be able to solve representative ERP tasks through capability/entity discovery, dataset acquisition, bounded sandbox analysis and evidence reasoning without requiring a matching skill.
 
 ```text
-IR/codegen → capability primitives + entity graph + discovery hints
-Control plane → reasoning/planning/tool loop
+IR/codegen → capability primitives + entity graph + dataset/evidence contracts
+Control plane → reasoning/hypothesis/program loop
 Optional skill registry → reviewed reusable compositions
 ```
 
@@ -484,6 +503,8 @@ Private generated package/crate should be able to publish:
   ├── bounded query schemas/adapters
   ├── generated draft-action descriptors
   ├── result-policy metadata
+  ├── dataset schema/analysis compatibility metadata
+  ├── evidence-policy refs
   ├── analysis-shape metadata
   ├── provenance metadata
   ├── model-policy hints
@@ -500,6 +521,7 @@ Suggested package entrypoints:
 @lumiere/contracts/agent
 @lumiere/contracts/agent/discovery
 @lumiere/contracts/agent/query
+@lumiere/contracts/agent/dataset
 @lumiere/contracts/analysis
 ```
 
@@ -513,8 +535,10 @@ Examples:
 
 - agent-exposed operation missing `CapabilityKey`;
 - agent-visible operation missing domain/entity tags where applicable;
-- `aggregate-first` operation with no allowed analysis shape;
-- model-visible operation with unbounded opaque output;
+- analytical operation missing explicit `direct | sandbox-dataset | aggregate-only` policy;
+- `aggregate-only` operation with no allowed analysis shape;
+- `sandbox-dataset` operation with no dataset schema/evidence policy/allowed analysis operations;
+- model-visible direct operation with unbounded opaque output;
 - mutation exposed without risk/confirmation/idempotency metadata;
 - draftable mutation missing input schema or permission mapping;
 - duplicate capability/operation/entity identifiers;
@@ -522,6 +546,7 @@ Examples:
 - relationship references unknown entity;
 - bounded query exposes unsupported filter/projection field;
 - unsupported analysis shape for output field types;
+- sandbox join references undeclared compatibility;
 - authoritative ERP result missing provenance contract.
 
 Generated metadata should fail closed rather than silently default to broad access/result exposure.
@@ -541,14 +566,16 @@ input/output schema
 operation risk
 confirmation semantics
 idempotency semantics
-result policy
+result policy / direct-vs-sandbox classification
+dataset schema / allowed analysis operations / join compatibility
+evidence policy reference
 queryable/filterable/projectable fields
 analysis field compatibility
 provenance contract
 stable operation name
 ```
 
-Concrete model mappings, runtime token budgets, planning strategy, skill content, provider endpoints, and discovery ranking weights are deployment/runtime configuration and should not trigger contract regeneration.
+Concrete model mappings, runtime token/sandbox budgets, planning strategy, skill content, provider endpoints, and discovery ranking weights are deployment/runtime configuration and should not trigger contract regeneration.
 
 ---
 
@@ -557,13 +584,10 @@ Concrete model mappings, runtime token budgets, planning strategy, skill content
 ### Proof A — simple lookup
 
 ```text
-objective: "show me invoice INV-22"
+objective: "show me invoice INV-22 status"
 
 DISCOVER
-→ capability index finds accounting.invoice.get
-
-PLAN
-→ one read call
+→ capability index finds accounting.invoice.get_status
 
 AUTHORIZE/EXECUTE
 → Casbin + typed generated operation
@@ -582,13 +606,14 @@ DISCOVER
 → relationships: deliveries + invoices
 → relevant capabilities loaded
 
-PLAN/EXECUTE/OBSERVE
-→ get order
-→ inspect delivery state
-→ inspect linked invoices
+ACQUIRE
+→ bounded direct facts and/or dataset handles
+
+HYPOTHESIZE / SCRIPT / OBSERVE
+→ inspect delivery and invoice evidence without dumping raw histories into model context
 
 VERIFY
-→ conclusions reference returned ERP evidence
+→ conclusions reference authoritative evidence
 ```
 
 The test fails if the harness requires a bespoke `sales-order-not-invoiced` skill.
@@ -597,7 +622,7 @@ The test fails if the harness requires a bespoke `sales-order-not-invoiced` skil
 
 ```text
 operation: accounting.receivables.history
-result_policy: aggregate-first
+result_policy: sandbox-dataset
 analysis_shapes:
   group_by
   aggregate
@@ -606,7 +631,7 @@ analysis_shapes:
   timeseries
 ```
 
-Generated harness adapter returns a server-side dataset handle and analysis metadata, not raw historical rows.
+Generated harness adapter returns a server-side dataset handle + schema/provenance. The model authors bounded analysis programs and receives only derived evidence.
 
 ### Proof D — consequential action
 
@@ -614,11 +639,11 @@ Generated harness adapter returns a server-side dataset handle and analysis meta
 objective: "prepare a purchase order for the low-stock items"
 
 agent discovers inventory + purchase capabilities
-→ reads bounded stock evidence
-→ deterministically shapes candidate rows
+→ acquires stock dataset
+→ sandbox derives candidate evidence
 → proposes purchasing.order.create.draft
 → policy validates
-→ user receives diff/preview
+→ user receives diff/preview + evidence refs
 → no ERP mutation before required approval
 ```
 
@@ -632,7 +657,8 @@ agent discovers inventory + purchase capabilities
 - [ ] add structural entity relationships and lifecycle metadata where authoritative source exists;
 - [ ] add abstract `GeneratedModelPolicyHint`;
 - [ ] make `ToolResultPolicy` mandatory for agent-visible operations;
-- [ ] add allowed `AnalysisShape` metadata;
+- [ ] add `direct | sandbox-dataset | aggregate-only` variants;
+- [ ] add allowed `AnalysisShape` + dataset/evidence-policy metadata;
 - [ ] add provenance contract metadata;
 - [ ] generate compact `CapabilityIndexEntry` and entity/domain indexes;
 - [ ] generate stable full schemas separately from compact discovery entries;
@@ -640,12 +666,13 @@ agent discovers inventory + purchase capabilities
 
 ### Phase IR-A1 — discovery + package/runtime adapters
 
-- [ ] emit agent/discovery/query/analysis package entrypoints;
+- [ ] emit agent/discovery/query/dataset/analysis package entrypoints;
 - [ ] generate capability/entity search index artifacts;
 - [ ] expose deterministic `capabilities.*`, `entities.*`, and `domains.*` introspection adapters;
 - [ ] generate result-policy enforcement adapters;
+- [ ] generate opaque dataset-handle/schema contracts for sandbox-class results;
 - [ ] integrate stable field refs with `AnalysisPlan` validation;
-- [ ] preserve provenance through tool-result envelopes;
+- [ ] preserve provenance through dataset/evidence envelopes;
 - [ ] keep provider/model mapping outside generated output;
 - [ ] add drift tests for contract-significant agent metadata.
 
@@ -655,6 +682,7 @@ agent discovers inventory + purchase capabilities
 - [ ] generate bounded typed entity-query schemas;
 - [ ] enforce server-derived org/company scope independent of model input;
 - [ ] enforce maximum rows/result policy at generated/runtime boundary;
+- [ ] prevent sandbox-class reads from serializing raw rows into model context;
 - [ ] prove no generated query adapter can emit arbitrary SQL or arbitrary reducer dispatch.
 
 ### Phase IR-A3 — generated action-draft contracts
@@ -663,17 +691,19 @@ agent discovers inventory + purchase capabilities
 - [ ] generate draft capability descriptors and input schemas;
 - [ ] bind risk/confirmation/permission/idempotency/correction metadata;
 - [ ] integrate with existing `AiActionDraft` + reducer allowlist path;
-- [ ] prove model cannot convert draft capability into direct reducer execution.
+- [ ] allow action drafts to reference verified evidence/watermarks where relevant;
+- [ ] prove model/sandbox cannot convert draft capability into direct reducer execution.
 
-### Phase IR-A4 — reasoning-first proof and migration
+### Phase IR-A4 — reasoning-first + sandbox proof
 
 - [ ] annotate representative sales, accounting, inventory, purchasing, and expense entities/capabilities;
 - [ ] prove discovery loads compact metadata first and full schema only after selection;
 - [ ] prove cross-entity task completion without a bespoke procedural skill;
-- [ ] prove analytical result cannot bypass aggregate-first shaping;
-- [ ] prove Casbin still authorizes every selected capability at runtime;
-- [ ] measure tool-description/context reduction versus exposing the full registry;
-- [ ] add eval coverage comparing general reasoning + generated tools against any equivalent reviewed skill composition.
+- [ ] prove analytical raw rows remain outside model context for sandbox-class capabilities;
+- [ ] prove model can author bounded analysis over generated dataset schemas and receive derived evidence;
+- [ ] prove Casbin still authorizes every selected acquisition capability at runtime;
+- [ ] measure tool-description/context/raw-data reduction versus exposing the full registry/raw rows;
+- [ ] add eval coverage comparing sandbox reasoning against direct-row context and any equivalent reviewed skill composition.
 
 ---
 
@@ -681,21 +711,23 @@ agent discovers inventory + purchase capabilities
 
 - planner algorithms;
 - hard-coded task workflows (`A → B → C` instructions);
-- task recursion/replanning strategy;
+- hypothesis selection/replanning strategy;
+- sandbox runtime implementation;
 - actual model/provider selection;
 - token pricing/commercial quotas;
+- runtime CPU/memory/time budgets;
 - session summaries/memory policy;
 - artifact-retention policy;
 - verifier implementation;
 - specialist sub-agent orchestration;
 - skill procedural content;
 - autonomous skill generation;
-- arbitrary sandboxed code execution;
+- unrestricted sandboxed code execution;
 - direct raw SQL generation;
 - generic reducer dispatch;
 - business rules duplicated from STDB reducers.
 
-These belong to the Agent Control Plane or authoritative ERP domain/runtime systems.
+These belong to the Agent Control Plane, sandbox runtime, or authoritative ERP domain/runtime systems.
 
 ---
 
@@ -706,12 +738,13 @@ The extension succeeds when:
 - codegen produces a compact searchable capability **and entity** catalog without loading all ERP tool schemas into model context;
 - a general reasoning agent can discover entities, relationships, and relevant operations without a matching procedural skill;
 - every agent-visible operation has explicit result handling, provenance, risk, and scope-compatible metadata;
+- analytical operations explicitly classify direct vs sandbox-dataset vs aggregate-only behavior;
+- sandbox-class generated adapters return opaque dataset handles/schema/provenance rather than raw model-visible rows;
 - eligible read models expose bounded typed queries without granting arbitrary SQL authority;
 - eligible mutations expose generated draft contracts without granting generic reducer execution;
-- large analytical outputs are structurally forced toward dataset/aggregate-first handling;
 - analysis plans use stable generated type/field references;
 - model routing receives abstract hints without coupling contracts to concrete model providers;
 - generated packages remain useful to frontend/offline clients without forcing agent-only payloads into ordinary bundles;
-- control-plane reasoning can build on generated primitives without pushing orchestration behavior back into IR;
+- control-plane reasoning/sandbox execution can build on generated primitives without pushing orchestration behavior back into IR;
 - Casbin/STDB remain the permission/business authorities;
-- adding a new properly annotated ERP operation updates human-client and agent contracts from the same IR/codegen source rather than requiring a handwritten AI tool implementation.
+- adding a new properly annotated ERP operation updates human-client and agent acquisition/dataset contracts from the same IR/codegen source rather than requiring a handwritten AI tool implementation.
