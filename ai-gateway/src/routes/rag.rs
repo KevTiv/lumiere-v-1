@@ -22,15 +22,12 @@ use crate::{
         SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
     },
     providers::llm::LlmMessage,
-    qdrant_client::SearchResult,
-    rig_agent::ContextHit,
     state::AppState,
     stdb_embed::company_belongs_to_organization,
 };
 
 const RAG_MAX_CONTEXT_CHUNKS: u64 = 20;
 const RAG_ORG_ACTIVITY_TOP_K: usize = 8;
-const RAG_ENTITY_MATCH_BOOST: f32 = 0.15;
 const RAG_MAX_INCLUDE_TYPES: usize = 8;
 
 #[derive(Clone, Deserialize, Default)]
@@ -199,98 +196,6 @@ struct RankedSource {
     rag_source: RagSource,
 }
 
-fn parse_entity_id(entity_id: &str) -> u64 {
-    entity_id.parse().unwrap_or(0)
-}
-
-fn company_hit_to_ranked(hit: SearchResult) -> RankedSource {
-    let label = hit.record.resource_kind.clone();
-    let text = String::new();
-    RankedSource {
-        label: label.clone(),
-        text: text.clone(),
-        score: hit.score,
-        rag_source: RagSource {
-            kind: "memory".to_string(),
-            trust: "retrieved".to_string(),
-            content_type: hit.record.resource_kind,
-            content_id: parse_entity_id(&hit.record.resource_id),
-            entity_type: None,
-            entity_id: None,
-            score: hit.score,
-            text_snippet: text,
-            label: None,
-            field: None,
-            snapshot_at: None,
-        },
-    }
-}
-
-fn org_hit_to_ranked(hit: ContextHit) -> RankedSource {
-    let label = format!("org_activity:{}", hit.entity_type);
-    let text = hit.text.clone();
-    RankedSource {
-        label: label.clone(),
-        text: text.clone(),
-        score: hit.score,
-        rag_source: RagSource {
-            kind: "activity".to_string(),
-            trust: "retrieved".to_string(),
-            content_type: "org_activity".to_string(),
-            content_id: parse_entity_id(&hit.entity_id),
-            entity_type: Some(hit.entity_type),
-            entity_id: Some(hit.entity_id),
-            score: hit.score,
-            text_snippet: text,
-            label: None,
-            field: None,
-            snapshot_at: None,
-        },
-    }
-}
-
-fn entity_match_boost(ui: Option<&UiContext>, entity_type: &str, entity_id: &str) -> f32 {
-    let Some(ctx) = ui else {
-        return 0.0;
-    };
-    let Some(focus_type) = ctx.entity_type.as_deref().filter(|s| !s.is_empty()) else {
-        return 0.0;
-    };
-    if !focus_type.eq_ignore_ascii_case(entity_type) {
-        return 0.0;
-    }
-    match ctx.entity_id.as_deref().filter(|s| !s.is_empty()) {
-        Some(focus_id) if focus_id == entity_id => RAG_ENTITY_MATCH_BOOST,
-        None => RAG_ENTITY_MATCH_BOOST * 0.5,
-        _ => 0.0,
-    }
-}
-
-fn merge_retrieval_hits(
-    company_hits: Vec<SearchResult>,
-    org_hits: Vec<ContextHit>,
-    ui_context: Option<&UiContext>,
-) -> Vec<RankedSource> {
-    let mut merged: Vec<RankedSource> = company_hits
-        .into_iter()
-        .map(company_hit_to_ranked)
-        .chain(org_hits.into_iter().map(|hit| {
-            let boost = entity_match_boost(ui_context, &hit.entity_type, &hit.entity_id);
-            let mut ranked = org_hit_to_ranked(hit);
-            ranked.score += boost;
-            ranked.rag_source.score = ranked.score;
-            ranked
-        }))
-        .collect();
-
-    merged.sort_by(|a, b| {
-        b.score
-            .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    merged
-}
-
 fn snapshot_ui_from(ctx: Option<&UiContext>) -> Option<SnapshotUiContext> {
     ctx.map(|c| SnapshotUiContext {
         entity_type: c.entity_type.clone(),
@@ -417,7 +322,7 @@ pub async fn post_rag(
     let org_top_k = req.limit.clamp(1, RAG_ORG_ACTIVITY_TOP_K as u64) as usize;
     let org_hits = match state
         .rig
-        .search_org(org_id, req.query.trim(), org_top_k)
+        .search_scope(org_id, req.company_id, req.query.trim(), org_top_k)
         .await
     {
         Ok(hits) => hits,
@@ -656,63 +561,6 @@ mod tests {
         assert!(!prompt.contains("Live ERP snapshots"));
         assert!(!prompt.contains("Current ERP UI context"));
         assert!(prompt.contains("Question: What is this?"));
-    }
-
-    #[test]
-    fn merge_retrieval_orders_by_score_and_boosts_entity_match() {
-        let company = vec![SearchResult {
-            score: 0.7,
-            record: crate::qdrant_client::SemanticIndexRecord {
-                organization_id: 1,
-                company_id: 1,
-                resource_kind: "invoice".into(),
-                resource_id: "10".into(),
-                resource_version: "v1".into(),
-                source_fingerprint: "hash".into(),
-                embedding_model: "test".into(),
-                indexed_at: "2026-08-25T00:00:00Z".into(),
-                tags: Vec::new(),
-            },
-        }];
-        let org = vec![ContextHit {
-            score: 0.68,
-            entity_type: "sale_order".into(),
-            entity_id: "42".into(),
-            text: "Order shipped".into(),
-            timestamp: 0,
-            source: "erp_activity".into(),
-        }];
-        let ui = UiContext {
-            entity_type: Some("sale_order".into()),
-            entity_id: Some("42".into()),
-            ..Default::default()
-        };
-        let merged = merge_retrieval_hits(company, org, Some(&ui));
-        assert_eq!(merged.len(), 2);
-        assert_eq!(
-            merged[0].rag_source.entity_type.as_deref(),
-            Some("sale_order")
-        );
-        assert!(merged[0].score >= 0.83);
-    }
-
-    #[test]
-    fn org_hit_maps_to_rag_source_with_parsed_entity_id() {
-        let ranked = org_hit_to_ranked(ContextHit {
-            score: 0.9,
-            entity_type: "sale_order".into(),
-            entity_id: "42".into(),
-            text: "Delayed picking".into(),
-            timestamp: 0,
-            source: "erp_activity".into(),
-        });
-        assert_eq!(ranked.rag_source.content_type, "org_activity");
-        assert_eq!(ranked.rag_source.entity_type.as_deref(), Some("sale_order"));
-        assert_eq!(ranked.rag_source.entity_id.as_deref(), Some("42"));
-        assert_eq!(ranked.rag_source.content_id, 42);
-        assert_eq!(ranked.rag_source.kind, "activity");
-        assert_eq!(ranked.rag_source.trust, "retrieved");
-        assert!(ranked.label.contains("org_activity"));
     }
 
     #[test]

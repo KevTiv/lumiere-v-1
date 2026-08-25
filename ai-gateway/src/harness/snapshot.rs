@@ -105,14 +105,22 @@ pub fn resolve_snapshot_candidates(
     }
 
     for hit in org_hits {
-        if lookup_entity_spec(&hit.entity_type).is_none() {
+        let entity_type = &hit.record.semantic.resource_kind;
+        if lookup_entity_spec(entity_type).is_none() {
             continue;
         }
-        let Some(id) = hit.entity_id.parse::<u64>().ok().filter(|id| *id > 0) else {
+        let Some(id) = hit
+            .record
+            .semantic
+            .resource_id
+            .parse::<u64>()
+            .ok()
+            .filter(|id| *id > 0)
+        else {
             continue;
         };
         candidates.push(EntityRef {
-            entity_type: hit.entity_type.clone(),
+            entity_type: entity_type.clone(),
             entity_id: id,
             priority: hit.score,
         });
@@ -587,6 +595,26 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
 mod tests {
     use super::*;
 
+    fn context_hit(entity_type: &str, entity_id: &str, score: f32) -> ContextHit {
+        ContextHit {
+            score,
+            record: crate::rig_agent::ActivityIndexRecord {
+                semantic: crate::qdrant_client::SemanticIndexRecord {
+                    organization_id: 1,
+                    company_id: 10,
+                    resource_kind: entity_type.into(),
+                    resource_id: entity_id.into(),
+                    resource_version: "1".into(),
+                    source_fingerprint: "sha256:test".into(),
+                    embedding_model: "test".into(),
+                    indexed_at: "2026-08-25T00:00:00Z".into(),
+                    tags: vec!["activity".into()],
+                },
+                activity_timestamp: 1,
+            },
+        }
+    }
+
     #[test]
     fn actor_credentials_are_trimmed_and_reject_placeholder_identity() {
         let actor = ActorCredentials::new(" token ", " abc123 ").expect("valid actor");
@@ -603,14 +631,7 @@ mod tests {
             entity_id: Some("42".into()),
             ..Default::default()
         };
-        let org = vec![ContextHit {
-            score: 0.95,
-            entity_type: "product".into(),
-            entity_id: "7".into(),
-            text: String::new(),
-            timestamp: 0,
-            source: String::new(),
-        }];
+        let org = vec![context_hit("product", "7", 0.95)];
         let refs = resolve_snapshot_candidates(Some(&ui), &[], &org, 3);
         assert_eq!(refs[0].entity_type, "sale_order");
         assert_eq!(refs[0].entity_id, 42);
@@ -623,14 +644,7 @@ mod tests {
             entity_id: Some("5".into()),
             ..Default::default()
         };
-        let org = vec![ContextHit {
-            score: 0.8,
-            entity_type: "contact".into(),
-            entity_id: "5".into(),
-            text: String::new(),
-            timestamp: 0,
-            source: String::new(),
-        }];
+        let org = vec![context_hit("contact", "5", 0.8)];
         let refs = resolve_snapshot_candidates(Some(&ui), &[], &org, 3);
         assert_eq!(refs.len(), 1);
     }

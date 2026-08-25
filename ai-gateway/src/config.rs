@@ -59,7 +59,7 @@ pub struct Config {
     pub document_parser: String,
     pub unstructured_url: String,
     pub unstructured_api_key: Option<String>,
-    pub activities_collection: String,
+    pub activity_refs_collection: String,
     pub activity_ingest_interval_secs: u64,
     pub max_upload_bytes: usize,
 
@@ -179,8 +179,8 @@ impl Config {
             unstructured_url: std::env::var("UNSTRUCTURED_URL")
                 .unwrap_or_else(|_| "http://localhost:8000".to_string()),
             unstructured_api_key: std::env::var("UNSTRUCTURED_API_KEY").ok(),
-            activities_collection: std::env::var("QDRANT_ACTIVITIES_COLLECTION")
-                .unwrap_or_else(|_| "lumiere_erp_activities".to_string()),
+            activity_refs_collection: std::env::var("QDRANT_ACTIVITY_REFS_COLLECTION")
+                .unwrap_or_else(|_| "lumiere_erp_activity_refs_v1".to_string()),
             activity_ingest_interval_secs: std::env::var("ACTIVITY_INGEST_INTERVAL_SECS")
                 .unwrap_or_else(|_| "30".to_string())
                 .parse()

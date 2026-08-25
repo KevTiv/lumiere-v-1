@@ -48,7 +48,7 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
 
     let org_hits = if ctx.org_id > 0 {
         ctx.rig()
-            .search_org(ctx.org_id, query, limit as usize)
+            .search_scope(ctx.org_id, ctx.company_id, query, limit as usize)
             .await
             .unwrap_or_default()
     } else {
