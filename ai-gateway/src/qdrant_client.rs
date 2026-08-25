@@ -200,7 +200,7 @@ impl VectorStore {
             .upsert_points(
                 UpsertPointsBuilder::new(
                     self.collection.clone(),
-                    vec![PointStruct::new(point.id, point.vector, payload.into())],
+                    vec![PointStruct::new(point.id, point.vector, payload)],
                 )
                 .wait(true)
                 .build(),
@@ -478,7 +478,7 @@ mod tests {
                     vec![PointStruct::new(
                         99,
                         vec![1.0, 0.0, 0.0],
-                        contaminated.into(),
+                        contaminated,
                     )],
                 )
                 .wait(true),
