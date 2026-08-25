@@ -65,17 +65,32 @@ fn payload_string(payload: &Payload, key: &str) -> Option<String> {
     payload.get(key)?.as_str().cloned().filter(|value| !value.is_empty())
 }
 
+fn payload_u64(payload: &Payload, key: &str) -> Option<u64> {
+    u64::try_from(payload.get(key)?.as_integer()?).ok()
+}
+
+fn payload_strings(payload: &Payload, key: &str) -> Option<Vec<String>> {
+    payload
+        .get(key)?
+        .clone()
+        .into_json()
+        .as_array()?
+        .iter()
+        .map(|value| value.as_str().map(str::to_string))
+        .collect()
+}
+
 fn semantic_record_from_payload(payload: &Payload) -> Option<SemanticIndexRecord> {
     Some(SemanticIndexRecord {
-        organization_id: payload.get("organization_id")?.as_integer()? as u64,
-        company_id: payload.get("company_id")?.as_integer()? as u64,
+        organization_id: payload_u64(payload, "organization_id")?,
+        company_id: payload_u64(payload, "company_id")?,
         resource_kind: payload_string(payload, "resource_kind")?,
         resource_id: payload_string(payload, "resource_id")?,
         resource_version: payload_string(payload, "resource_version")?,
         source_fingerprint: payload_string(payload, "source_fingerprint")?,
         embedding_model: payload_string(payload, "embedding_model")?,
         indexed_at: payload_string(payload, "indexed_at")?,
-        tags: Vec::new(),
+        tags: payload_strings(payload, "tags")?,
     })
 }
 
@@ -317,7 +332,25 @@ mod tests {
         assert!(payload.contains_key("resource_kind"));
         assert!(!payload.contains_key("text"));
         assert!(!payload.contains_key("text_snippet"));
-        assert!(semantic_record_from_payload(&payload).is_some());
+        assert_eq!(semantic_record_from_payload(&payload), Some(record));
+    }
+
+    #[test]
+    fn semantic_payload_rejects_negative_scope_ids() {
+        let payload = Payload::try_from(serde_json::json!({
+            "organization_id": -1,
+            "company_id": 7,
+            "resource_kind": "sale_order",
+            "resource_id": "11",
+            "resource_version": "hash",
+            "source_fingerprint": "hash",
+            "embedding_model": "test",
+            "indexed_at": "2026-08-25T00:00:00Z",
+            "tags": []
+        }))
+        .unwrap();
+
+        assert!(semantic_record_from_payload(&payload).is_none());
     }
 
 }

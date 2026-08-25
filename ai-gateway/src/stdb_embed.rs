@@ -17,6 +17,7 @@ pub struct PendingEmbedJob {
 pub struct AuthoritativeEmbedding {
     pub id: u64,
     pub embedding_hash: Option<String>,
+    pub text: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -190,11 +191,12 @@ pub async fn authoritative_embedding_for_resource(
         anyhow::bail!("invalid semantic resource kind");
     }
     let sql = format!(
-        "SELECT id, embedding_hash FROM search_embedding WHERE organization_id = {organization_id} AND company_id = {company_id} AND content_type = '{resource_kind}' AND content_id = {resource_id} LIMIT 1"
+        "SELECT id, embedding_hash, text FROM search_embedding WHERE organization_id = {organization_id} AND company_id = {company_id} AND content_type = '{resource_kind}' AND content_id = {resource_id} AND sync_status = 'pending' LIMIT 1"
     );
     let rows = stdb.query_sql(&sql).await.map_err(|error| anyhow::anyhow!("{error}"))?;
     Ok(rows.into_iter().next().and_then(|row| Some(AuthoritativeEmbedding {
         id: u64_field(&row, "id", "id")?,
         embedding_hash: string_field(&row, "embeddingHash", "embedding_hash"),
+        text: string_field(&row, "text", "text")?,
     })))
 }

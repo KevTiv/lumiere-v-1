@@ -80,8 +80,27 @@ async fn process_batch(
                 stdb, org_id, payload.company_id, &payload.content_type, payload.content_id,
             ).await {
                 Ok(Some(embedding)) => {
-                    let fingerprint = embedding.embedding_hash.unwrap_or_else(|| job.input_hash.clone());
-                    process_job(embedder, vector_store, org_id, embedding.id, &fingerprint, &model, &payload).await
+                    if embedding.text != payload.text {
+                        Err(anyhow::anyhow!(
+                            "queued embedding source is stale for {} #{}",
+                            payload.content_type,
+                            payload.content_id
+                        ))
+                    } else {
+                        let fingerprint = embedding
+                            .embedding_hash
+                            .unwrap_or_else(|| job.input_hash.clone());
+                        process_job(
+                            embedder,
+                            vector_store,
+                            org_id,
+                            embedding.id,
+                            &fingerprint,
+                            &model,
+                            &payload,
+                        )
+                        .await
+                    }
                 }
                 Ok(None) => Err(anyhow::anyhow!(
                     "authoritative SearchEmbedding is missing for {} #{}",
