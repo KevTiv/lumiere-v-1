@@ -22,6 +22,7 @@ use crate::{
         SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
     },
     providers::llm::LlmMessage,
+    retrieval_policy::optional_retrieval,
     state::AppState,
     stdb_embed::company_belongs_to_organization,
 };
@@ -102,12 +103,28 @@ pub struct RagSource {
 pub struct RagResponse {
     pub answer: String,
     pub sources: Vec<RagSource>,
+    pub retrieval_degraded: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agent_id: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+}
+
+fn no_relevant_information_response(retrieval_degraded: bool) -> RagResponse {
+    RagResponse {
+        answer: "No relevant information found for your query.".to_string(),
+        sources: Vec::new(),
+        retrieval_degraded,
+        agent_id: None,
+        provider: None,
+        model: None,
+    }
+}
+
+fn has_grounded_context(ranked: &[RankedSource], snapshots: &[LiveSnapshot]) -> bool {
+    !ranked.is_empty() || !snapshots.is_empty()
 }
 
 fn format_ui_context_block(ctx: &UiContext) -> Option<String> {
@@ -295,47 +312,52 @@ pub async fn post_rag(
         .and_then(|c| c.module.as_deref())
         .unwrap_or("-");
 
-    // Embed the query (unified EmbedProvider)
-    let query_vector = state
-        .providers
-        .embedder
-        .embed(&req.query)
-        .await
-        .map_err(|e| AppError::Embedding(e.to_string()))?;
-
     // Retrieve relevant company-scoped chunks (optionally filtered by content type)
     let include_types = normalized_include_types(req.include_types.as_deref());
     let content_type_filter = (!include_types.is_empty()).then_some(include_types.as_slice());
-    let company_hits = state
-        .vector_store
-        .search_content_types(
-            query_vector,
+    let mut retrieval_degraded = false;
+    let company_result = match state.providers.embedder.embed(&req.query).await {
+        Ok(query_vector) => state
+            .vector_store
+            .search_content_types(
+                query_vector,
+                org_id,
+                req.company_id,
+                content_type_filter,
+                req.limit,
+                Some(0.65),
+            )
+            .await,
+        Err(error) => Err(error),
+    };
+    if let Err(error) = &company_result {
+        tracing::warn!(
             org_id,
-            req.company_id,
-            content_type_filter,
-            req.limit,
-            Some(0.65),
-        )
-        .await
-        .map_err(AppError::Qdrant)?;
+            company_id = req.company_id,
+            error = %error,
+            "Primary semantic retrieval unavailable; continuing without vector candidates"
+        );
+    }
+    let company_outcome = optional_retrieval(company_result);
+    retrieval_degraded |= company_outcome.degraded;
+    let company_hits = company_outcome.value;
 
     let org_top_k = req.limit.clamp(1, RAG_ORG_ACTIVITY_TOP_K as u64) as usize;
-    let org_hits = match state
+    let org_result = state
         .rig
         .search_scope(org_id, req.company_id, req.query.trim(), org_top_k)
-        .await
-    {
-        Ok(hits) => hits,
-        Err(err) => {
-            tracing::warn!(
-                org_id,
-                company_id = req.company_id,
-                error = %err,
-                "Org activity retrieval failed; continuing with company hits only"
-            );
-            Vec::new()
-        }
-    };
+        .await;
+    if let Err(error) = &org_result {
+        tracing::warn!(
+            org_id,
+            company_id = req.company_id,
+            error = %error,
+            "Org activity retrieval unavailable; continuing with company hits only"
+        );
+    }
+    let org_outcome = optional_retrieval(org_result);
+    retrieval_degraded |= org_outcome.degraded;
+    let org_hits = org_outcome.value;
 
     let company_hit_count = company_hits.len();
     let org_hit_count = org_hits.len();
@@ -357,15 +379,25 @@ pub async fn post_rag(
     );
 
     let live_snapshots = if agent_allows_live_read(&agent) {
-        fetch_authorized_live_snapshots(
+        let snapshot_result = fetch_authorized_live_snapshots(
             &state,
             &actor,
             org_id,
             req.company_id,
             &snapshot_candidates,
         )
-            .await
-            .map_err(|error| AppError::Internal(error.to_string()))?
+        .await;
+        if let Err(error) = &snapshot_result {
+            tracing::warn!(
+                org_id,
+                company_id = req.company_id,
+                error = %error,
+                "Authoritative semantic candidates unavailable; continuing without them"
+            );
+        }
+        let snapshot_outcome = optional_retrieval(snapshot_result);
+        retrieval_degraded |= snapshot_outcome.degraded;
+        snapshot_outcome.value
     } else {
         tracing::debug!(
             agent_id = agent.agent_id,
@@ -379,7 +411,7 @@ pub async fn post_rag(
     // scoped authoritative snapshots.
     let ranked: Vec<RankedSource> = Vec::new();
 
-    if ranked.is_empty() && live_snapshots.is_empty() {
+    if !has_grounded_context(&ranked, &live_snapshots) {
         tracing::info!(
             company_id = req.company_id,
             org_id,
@@ -392,13 +424,7 @@ pub async fn post_rag(
             duration_ms = started.elapsed().as_millis() as u64,
             "RAG query answered (no hits)"
         );
-        return Ok(Json(RagResponse {
-            answer: "No relevant information found for your query.".to_string(),
-            sources: vec![],
-            agent_id: None,
-            provider: None,
-            model: None,
-        }));
+        return Ok(Json(no_relevant_information_response(retrieval_degraded)));
     }
 
     ensure_allowed_action(&agent, "chat").map_err(|e| AppError::Forbidden(e.to_string()))?;
@@ -482,6 +508,7 @@ pub async fn post_rag(
     Ok(Json(RagResponse {
         answer,
         sources,
+        retrieval_degraded,
         agent_id,
         provider,
         model,
@@ -508,6 +535,7 @@ pub async fn post_rag_stream(
                 "agent_id": response.agent_id,
                 "provider": response.provider,
                 "model": response.model,
+                "retrieval_degraded": response.retrieval_degraded,
             })
             .to_string(),
         ),
@@ -523,6 +551,16 @@ pub async fn post_rag_stream(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn degraded_empty_retrieval_returns_no_unverified_sources() {
+        let response = no_relevant_information_response(true);
+        assert!(response.retrieval_degraded);
+        assert!(response.sources.is_empty());
+        assert!(response.provider.is_none());
+        assert!(response.model.is_none());
+        assert!(!has_grounded_context(&[], &[]));
+    }
 
     #[test]
     fn ui_context_block_includes_route_and_module() {

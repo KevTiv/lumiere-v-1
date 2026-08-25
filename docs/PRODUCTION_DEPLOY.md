@@ -83,7 +83,7 @@ Realtime WebSocket: Kong/same-origin deployments use `wss://<host>/v1/realtime/w
 | `AI_CERTIFICATION_STDB_TOKEN` | yes | Dedicated token matching the active organization certification runtime profile |
 | `AI_CERTIFICATION_RUNTIME_HASH` | yes | Exact digest registered in that runtime profile |
 | `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | yes | |
-| `QDRANT_URL` | in compose | `http://qdrant:6333` |
+| `QDRANT_URL` | in compose | `http://qdrant:6334` (gRPC) |
 | `STDB_HOST` | recommended | Defaults in gateway dev config only |
 
 Provider keys (`MISTRAL_API_KEY`, `GOOGLE_API_KEY`, etc.) depend on tenant `AiAgent` rows and `EMBEDDING_PROVIDER`.

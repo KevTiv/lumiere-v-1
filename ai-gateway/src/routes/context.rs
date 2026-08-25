@@ -41,7 +41,15 @@ pub async fn post_search(
         .rig
         .search_scope(req.org_id, req.company_id, req.query.trim(), top_k)
         .await
-        .map_err(AppError::Qdrant)?;
+        .map_err(|error| {
+            tracing::warn!(
+                org_id = req.org_id,
+                company_id = req.company_id,
+                error = %error,
+                "Context semantic retrieval unavailable"
+            );
+            AppError::Unavailable("semantic retrieval unavailable".into())
+        })?;
     let candidates = resolve_snapshot_candidates(None, &[], &candidate_hits, top_k);
     let snapshots = fetch_authorized_live_snapshots(
         &state,
@@ -51,7 +59,7 @@ pub async fn post_search(
         &candidates,
     )
     .await
-    .map_err(|err| AppError::Forbidden(err.to_string()))?;
+    .map_err(|_| AppError::Unavailable("authoritative resolver unavailable".into()))?;
     let authorized = snapshots
         .iter()
         .map(|snapshot| (snapshot.entity_type.as_str(), snapshot.entity_id))
@@ -92,4 +100,15 @@ pub async fn post_document() -> AppResult<StatusCode> {
         "Document indexing is deferred until the authoritative bucket/FileVersion lifecycle is available"
             .into(),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn activity_and_document_ingestion_are_unavailable() {
+        assert!(matches!(post_ingest().await, Err(AppError::Unavailable(_))));
+        assert!(matches!(post_document().await, Err(AppError::Unavailable(_))));
+    }
 }

@@ -77,6 +77,7 @@ pub fn manifest() -> SkillManifest {
             "sources",
             "activity_query",
             "source_count",
+            "retrieval_degraded",
         ]),
     }
 }
@@ -172,5 +173,19 @@ fn empty_briefing() -> BriefingContext {
         sources: Vec::new(),
         activity_query: String::new(),
         source_count: 0,
+        retrieval_degraded: false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn manifest_allows_degraded_status_in_output_contract() {
+        assert!(manifest()
+            .privacy
+            .allowed_fields
+            .contains(&"retrieval_degraded".to_string()));
     }
 }

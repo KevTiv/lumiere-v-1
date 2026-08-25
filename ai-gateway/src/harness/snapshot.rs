@@ -45,6 +45,20 @@ pub struct SnapshotUiContext {
 
 pub const RAG_MAX_LIVE_SNAPSHOTS: usize = 3;
 pub const HARNESS_MAX_LIVE_SNAPSHOTS: usize = 5;
+const AUTHORITATIVE_RESOLVER_UNAVAILABLE: &str = "authoritative resolver unavailable";
+
+fn resolver_unavailable_error() -> anyhow::Error {
+    anyhow::anyhow!(AUTHORITATIVE_RESOLVER_UNAVAILABLE)
+}
+
+fn resolver_status_hides_candidate(status: reqwest::StatusCode) -> bool {
+    matches!(
+        status,
+        reqwest::StatusCode::UNAUTHORIZED
+            | reqwest::StatusCode::FORBIDDEN
+            | reqwest::StatusCode::NOT_FOUND
+    )
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct EntityRef {
@@ -169,6 +183,10 @@ pub async fn fetch_authorized_live_snapshots(
     company_id: u64,
     candidates: &[EntityRef],
 ) -> Result<Vec<LiveSnapshot>> {
+    if candidates.is_empty() {
+        return Ok(Vec::new());
+    }
+
     let api_base = state
         .config
         .api_server_url
@@ -198,27 +216,44 @@ pub async fn fetch_authorized_live_snapshots(
             .query(&[("companyId", company_id)])
             .send()
             .await
-            .with_context(|| {
-                format!(
-                    "authoritative resolver request for {} #{}",
-                    spec.entity_type, candidate.entity_id
-                )
+            .map_err(|error| {
+                tracing::warn!(
+                    entity_type = spec.entity_type,
+                    entity_id = candidate.entity_id,
+                    error = %error,
+                    "Authoritative resolver request failed"
+                );
+                resolver_unavailable_error()
             })?;
 
-        if response.status() == reqwest::StatusCode::NOT_FOUND {
+        if resolver_status_hides_candidate(response.status()) {
             continue;
         }
         if !response.status().is_success() {
-            anyhow::bail!(
-                "authoritative resolver rejected {} #{} with status {}",
-                spec.entity_type,
-                candidate.entity_id,
-                response.status()
+            tracing::warn!(
+                entity_type = spec.entity_type,
+                entity_id = candidate.entity_id,
+                status = %response.status(),
+                "Authoritative resolver returned an unavailable response"
             );
+            return Err(resolver_unavailable_error());
         }
-        let envelope: Value = response.json().await.context("invalid authoritative response")?;
+        let envelope: Value = response.json().await.map_err(|error| {
+            tracing::warn!(
+                entity_type = spec.entity_type,
+                entity_id = candidate.entity_id,
+                error = %error,
+                "Authoritative resolver returned invalid JSON"
+            );
+            resolver_unavailable_error()
+        })?;
         let Some(row) = envelope.get("data") else {
-            anyhow::bail!("authoritative resolver response is missing data");
+            tracing::warn!(
+                entity_type = spec.entity_type,
+                entity_id = candidate.entity_id,
+                "Authoritative resolver response is missing data"
+            );
+            return Err(resolver_unavailable_error());
         };
         let row_id = json_u64(row.get(spec.id_column).or_else(|| row.get("id")));
         let row_org = spec.org_column.and_then(|column| {
@@ -226,7 +261,14 @@ pub async fn fetch_authorized_live_snapshots(
             json_u64(row.get(column).or_else(|| row.get(&camel)))
         });
         if row_id != Some(candidate.entity_id) || row_org != Some(org_id) {
-            anyhow::bail!("authoritative resolver returned mismatched resource scope");
+            tracing::warn!(
+                entity_type = spec.entity_type,
+                entity_id = candidate.entity_id,
+                org_id,
+                company_id,
+                "Authoritative resolver returned mismatched resource scope"
+            );
+            return Err(resolver_unavailable_error());
         }
         if !row_matches_scope(spec, row, org_id, company_id) {
             continue;
@@ -594,6 +636,25 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unauthorized_resolver_statuses_hide_candidates() {
+        assert!(resolver_status_hides_candidate(reqwest::StatusCode::UNAUTHORIZED));
+        assert!(resolver_status_hides_candidate(reqwest::StatusCode::FORBIDDEN));
+        assert!(resolver_status_hides_candidate(reqwest::StatusCode::NOT_FOUND));
+        assert!(!resolver_status_hides_candidate(
+            reqwest::StatusCode::INTERNAL_SERVER_ERROR
+        ));
+    }
+
+    #[test]
+    fn public_resolver_error_does_not_expose_candidate_metadata() {
+        let error = resolver_unavailable_error().to_string();
+        assert_eq!(error, AUTHORITATIVE_RESOLVER_UNAVAILABLE);
+        assert!(!error.contains("sale_order"));
+        assert!(!error.contains("42"));
+        assert!(!error.contains("token"));
+    }
 
     fn context_hit(entity_type: &str, entity_id: &str, score: f32) -> ContextHit {
         ContextHit {

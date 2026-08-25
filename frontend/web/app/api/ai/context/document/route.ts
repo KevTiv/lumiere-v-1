@@ -3,16 +3,12 @@
  */
 import { type NextRequest, NextResponse } from 'next/server'
 
+import { deferredIndexingResponse } from '../../_lib/indexing-gates'
 import { requireAiRouteContext } from '../../_lib/route-helpers'
 
 export async function POST(request: NextRequest) {
   const contextResult = await requireAiRouteContext(request)
   if (!contextResult.ok) return contextResult.response
-  return NextResponse.json(
-    {
-      error:
-        'Document indexing is deferred until the authoritative bucket/FileVersion lifecycle is available',
-    },
-    { status: 503 },
-  )
+  const gate = deferredIndexingResponse('document')
+  return NextResponse.json(gate.body, { status: gate.status })
 }

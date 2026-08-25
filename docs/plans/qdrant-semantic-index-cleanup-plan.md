@@ -1,6 +1,6 @@
 # Qdrant semantic-index cleanup and bucket-ready activation plan
 
-**Status:** Proposed — 2026-08-20
+**Status:** Q0 implemented — 2026-08-25; Q1–Q3 remain planned
 **Tracks:** `qdrant`, `agent-memory`, `semantic-index`, `rag`, `artifact-retrieval`, `bucket-ready`
 **Related:** [agent-control-plane-model-routing-plan.md](./agent-control-plane-model-routing-plan.md) · [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md) · [scaleway-file-management-ingestion-investigation.md](./scaleway-file-management-ingestion-investigation.md)
 
@@ -202,14 +202,37 @@ Re-upload/version change must enqueue bounded re-indexing rather than mutating c
 
 ### Q0 — inventory and authority cleanup
 
-- [ ] inventory current `qdrant_client`, embed/search/context/RAG routes and config;
-- [ ] classify each path as keep/refactor/remove;
-- [ ] prohibit vector records as canonical session/artifact memory;
-- [ ] define `SemanticIndexRecord` / authoritative-reference payload;
-- [ ] ensure every search is organization-scoped;
-- [ ] require post-search authorization before authoritative fetch;
-- [ ] preserve provider-neutral embedding abstraction where useful;
-- [ ] remove any raw ERP payload embedding path that bypasses generated capabilities/result policies.
+- [x] inventory current `qdrant_client`, embed/search/context/RAG routes and config;
+- [x] classify each path as keep/refactor/remove;
+- [x] prohibit vector records as canonical session/artifact memory;
+- [x] define `SemanticIndexRecord` / authoritative-reference payload;
+- [x] ensure every search is organization-scoped;
+- [x] require post-search authorization before authoritative fetch;
+- [x] preserve provider-neutral embedding abstraction where useful;
+- [x] remove any raw ERP payload embedding path that bypasses generated capabilities/result policies.
+
+Q0 verification is owned by `.github/workflows/semantic-index-q0.yml`. It runs
+reference-only and fail-closed unit tests plus a live Qdrant 2×2 organization /
+company isolation matrix. Semantic retrieval failures are reported as degraded
+and never fall back to vector payload content. Activity and document writers
+remain gated until their authoritative projection and bucket lifecycles exist.
+
+### Q0 collection rollout
+
+- use `lumiere_embeddings_org_v3` and `lumiere_erp_activity_refs_v1`; never
+  repoint the new readers at a legacy collection containing text payloads;
+- configure Rust clients against Qdrant gRPC port `6334`; reserve REST port
+  `6333` for health checks and administration;
+- create the collection and mandatory organization/company payload indexes
+  before backfill or read cutover;
+- backfill only from authoritative, policy-filtered projections carrying stable
+  versions and fingerprints;
+- cut readers over only after reference-only, authorization, and 2×2 tenant
+  isolation verification passes;
+- roll back by restoring the previous reader configuration, never by copying
+  legacy payloads into the new collection;
+- delete legacy collections only after the cutover observation window and an
+  explicit rollback decision.
 
 ### Q1 — artifact retrieval
 

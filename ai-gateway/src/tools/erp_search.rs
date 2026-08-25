@@ -5,8 +5,32 @@ use crate::{
         fetch_authorized_live_snapshots, resolve_snapshot_candidates,
         HARNESS_MAX_LIVE_SNAPSHOTS,
     },
+    retrieval_policy::optional_retrieval,
     tools::types::{live_snapshot_citation, ToolContext, ToolOutput, ToolResult},
 };
+
+fn authorized_result_summary(snapshot_count: usize, retrieval_degraded: bool) -> String {
+    format!(
+        "Resolved {snapshot_count} authorized scoped snapshot(s){}",
+        if retrieval_degraded { " (degraded)" } else { "" }
+    )
+}
+
+fn build_authorized_output(snapshots: Vec<crate::harness::LiveSnapshot>, retrieval_degraded: bool) -> ToolOutput {
+    let citations = snapshots.iter().map(live_snapshot_citation).collect::<Vec<_>>();
+    let summary = authorized_result_summary(snapshots.len(), retrieval_degraded);
+    let row_count = snapshots.len() as u32;
+
+    ToolOutput {
+        summary,
+        data: json!({
+            "snapshots": snapshots,
+            "retrieval_degraded": retrieval_degraded
+        }),
+        citations,
+        row_count: Some(row_count),
+    }
+}
 
 pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
     let actor = ctx
@@ -32,28 +56,41 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
         .map(|v| v as f32)
         .or(Some(0.65));
 
-    let query_vector = ctx.providers().embedder.embed(query).await?;
+    let mut retrieval_degraded = false;
+    let company_result = match ctx.providers().embedder.embed(query).await {
+        Ok(query_vector) => ctx
+            .vector_store()
+            .search(
+                query_vector,
+                ctx.org_id,
+                ctx.company_id,
+                None,
+                limit,
+                score_threshold,
+            )
+            .await,
+        Err(error) => Err(error),
+    };
+    if let Err(error) = &company_result {
+        tracing::warn!(error = %error, "ERP semantic retrieval unavailable");
+    }
+    let company_outcome = optional_retrieval(company_result);
+    retrieval_degraded |= company_outcome.degraded;
+    let company_hits = company_outcome.value;
 
-    let company_hits = ctx
-        .vector_store()
-        .search(
-            query_vector,
-            ctx.org_id,
-            ctx.company_id,
-            None,
-            limit,
-            score_threshold,
-        )
-        .await?;
-
-    let org_hits = if ctx.org_id > 0 {
+    let org_result = if ctx.org_id > 0 {
         ctx.rig()
             .search_scope(ctx.org_id, ctx.company_id, query, limit as usize)
             .await
-            .unwrap_or_default()
     } else {
-        Vec::new()
+        Ok(Vec::new())
     };
+    if let Err(error) = &org_result {
+        tracing::warn!(error = %error, "ERP activity retrieval unavailable");
+    }
+    let org_outcome = optional_retrieval(org_result);
+    retrieval_degraded |= org_outcome.degraded;
+    let org_hits = org_outcome.value;
 
     let candidates = resolve_snapshot_candidates(
         None,
@@ -61,25 +98,39 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
         &org_hits,
         HARNESS_MAX_LIVE_SNAPSHOTS,
     );
-    let snapshots = fetch_authorized_live_snapshots(
+    let snapshot_result = fetch_authorized_live_snapshots(
         &ctx.state,
         actor,
         ctx.org_id,
         ctx.company_id,
         &candidates,
     )
-    .await?;
-    let citations = snapshots.iter().map(live_snapshot_citation).collect::<Vec<_>>();
-    let summary = format!(
-        "Semantic retrieval resolved {} scoped snapshot(s) from {} candidate(s)",
-        snapshots.len(),
-        candidates.len()
-    );
+    .await;
+    if let Err(error) = &snapshot_result {
+        tracing::warn!(error = %error, "ERP authoritative retrieval unavailable");
+    }
+    let snapshot_outcome = optional_retrieval(snapshot_result);
+    retrieval_degraded |= snapshot_outcome.degraded;
+    let snapshots = snapshot_outcome.value;
+    Ok(build_authorized_output(snapshots, retrieval_degraded))
+}
 
-    Ok(ToolOutput {
-        summary,
-        data: json!({ "snapshots": snapshots }),
-        citations,
-        row_count: Some(snapshots.len() as u32),
-    })
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn degraded_summary_exposes_only_authorized_result_count() {
+        let output = build_authorized_output(Vec::new(), true);
+        assert_eq!(
+            output.summary,
+            "Resolved 0 authorized scoped snapshot(s) (degraded)"
+        );
+        assert!(!output.summary.contains("candidate"));
+        assert!(!output.summary.contains("sale_order"));
+        assert!(output.citations.is_empty());
+        assert_eq!(output.row_count, Some(0));
+        assert_eq!(output.data["retrieval_degraded"], true);
+        assert_eq!(output.data["snapshots"], serde_json::json!([]));
+    }
 }

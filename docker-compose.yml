@@ -216,7 +216,7 @@ services:
     environment:
       PORT: 8080
       LUMIERE_AI_GATEWAY_INTERNAL_SECRET: ${LUMIERE_AI_GATEWAY_INTERNAL_SECRET:?set LUMIERE_AI_GATEWAY_INTERNAL_SECRET}
-      QDRANT_URL: http://qdrant:6333
+      QDRANT_URL: http://qdrant:6334
       QDRANT_ACTIVITY_REFS_COLLECTION: ${QDRANT_ACTIVITY_REFS_COLLECTION:-lumiere_erp_activity_refs_v1}
       STDB_HOST: ${STDB_HOST:-https://maincloud.spacetimedb.com}
       LUMIERE_API_SERVER_URL: http://api-server:8082
@@ -243,6 +243,7 @@ services:
     image: qdrant/qdrant:v1.12.6
     ports:
       - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
     volumes:
       - qdrant-data:/qdrant/storage
     restart: unless-stopped

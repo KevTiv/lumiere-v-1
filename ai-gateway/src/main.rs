@@ -8,6 +8,7 @@ mod orchestrator;
 mod providers;
 mod qdrant_client;
 mod rate_limit;
+mod retrieval_policy;
 mod rig_agent;
 mod routes;
 mod skills;
@@ -40,6 +41,20 @@ use qdrant_client::VectorStore;
 use rig_agent::RigContext;
 use state::AppState;
 use stdb_client::StdbClient;
+
+fn accept_optional_semantic_init(dependency: &str, result: anyhow::Result<()>) -> bool {
+    match result {
+        Ok(()) => true,
+        Err(error) => {
+            tracing::warn!(
+                dependency,
+                error = %error,
+                "Semantic index unavailable at startup; continuing in degraded mode"
+            );
+            false
+        }
+    }
+}
 
 async fn require_gateway_secret(
     State(state): State<AppState>,
@@ -97,10 +112,16 @@ async fn main() -> anyhow::Result<()> {
     let providers = build_providers(&config, http.clone())?;
     let embed_dim = providers.embedder.dimensions();
 
-    vector_store.ensure_collection(embed_dim).await?;
+    accept_optional_semantic_init(
+        "primary semantic collection",
+        vector_store.ensure_collection(embed_dim).await,
+    );
 
     let rig = RigContext::new(&config, providers.clone()).await?;
-    rig.ensure_collection().await?;
+    accept_optional_semantic_init(
+        "activity reference collection",
+        rig.ensure_collection().await,
+    );
 
     let config = Arc::new(config);
     let certification_stdb = config.ai_certification_stdb_token.as_ref().map(|token| {
@@ -239,4 +260,18 @@ async fn main() -> anyhow::Result<()> {
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn semantic_index_startup_failure_is_non_fatal() {
+        assert!(accept_optional_semantic_init("qdrant", Ok(())));
+        assert!(!accept_optional_semantic_init(
+            "qdrant",
+            Err(anyhow::anyhow!("unavailable")),
+        ));
+    }
 }

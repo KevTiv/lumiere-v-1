@@ -84,6 +84,13 @@ fn payload_strings(payload: &HashMap<String, Value>, key: &str) -> Option<Vec<St
 }
 
 fn semantic_record_from_payload(payload: &HashMap<String, Value>) -> Option<SemanticIndexRecord> {
+    if ["text", "text_snippet", "content", "filename", "source"]
+        .iter()
+        .any(|key| payload.contains_key(*key))
+    {
+        return None;
+    }
+
     Some(SemanticIndexRecord {
         organization_id: payload_u64(payload, "organization_id")?,
         company_id: payload_u64(payload, "company_id")?,
@@ -95,6 +102,16 @@ fn semantic_record_from_payload(payload: &HashMap<String, Value>) -> Option<Sema
         indexed_at: payload_string(payload, "indexed_at")?,
         tags: payload_strings(payload, "tags")?,
     })
+}
+
+fn scoped_semantic_record_from_payload(
+    payload: &HashMap<String, Value>,
+    organization_id: u64,
+    company_id: u64,
+) -> Option<SemanticIndexRecord> {
+    let record = semantic_record_from_payload(payload)?;
+    (record.organization_id == organization_id && record.company_id == company_id)
+        .then_some(record)
 }
 
 impl VectorStore {
@@ -286,7 +303,11 @@ impl VectorStore {
                 let payload = p.payload;
                 let score = p.score;
 
-                let record = semantic_record_from_payload(&payload)?;
+                let record = scoped_semantic_record_from_payload(
+                    &payload,
+                    organization_id,
+                    company_id,
+                )?;
                 Some(SearchResult { score, record })
             })
             .collect();
@@ -298,6 +319,22 @@ impl VectorStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn payload(organization_id: u64, company_id: u64) -> HashMap<String, Value> {
+        Payload::try_from(serde_json::json!({
+            "organization_id": organization_id,
+            "company_id": company_id,
+            "resource_kind": "sale_order",
+            "resource_id": "11",
+            "resource_version": "hash",
+            "source_fingerprint": "hash",
+            "embedding_model": "test",
+            "indexed_at": "2026-08-25T00:00:00Z",
+            "tags": ["sales"]
+        }))
+        .expect("payload")
+        .into()
+    }
 
     #[test]
     fn search_limit_is_bounded() {
@@ -317,7 +354,7 @@ mod tests {
         assert!(rendered.contains("42"));
         assert!(rendered.contains('7'));
     }
- 
+
     #[test]
     fn semantic_payload_is_reference_only() {
         let record = SemanticIndexRecord {
@@ -355,6 +392,128 @@ mod tests {
         .into();
 
         assert!(semantic_record_from_payload(&payload).is_none());
+    }
+
+    #[test]
+    fn semantic_scope_rejects_other_organizations_and_companies() {
+        let scopes = [(42, 7), (42, 8), (43, 7), (43, 8)];
+        let accepted = scopes
+            .into_iter()
+            .filter(|(organization_id, company_id)| {
+                scoped_semantic_record_from_payload(
+                    &payload(*organization_id, *company_id),
+                    42,
+                    7,
+                )
+                .is_some()
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(accepted, vec![(42, 7)]);
+    }
+
+    #[test]
+    fn semantic_payload_with_raw_content_fails_closed() {
+        let mut contaminated = payload(42, 7);
+        contaminated.insert("text_snippet".into(), "secret".into());
+        assert!(semantic_record_from_payload(&contaminated).is_none());
+    }
+
+    #[tokio::test]
+    #[ignore = "requires QDRANT_TEST_URL"]
+    async fn qdrant_enforces_two_organization_company_isolation() {
+        let url = std::env::var("QDRANT_TEST_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:6334".into());
+        let collection = format!("lumiere_q0_isolation_{}", uuid::Uuid::new_v4().simple());
+        let store = VectorStore::new(&url, None, collection.clone())
+            .await
+            .expect("test vector store");
+        store.ensure_collection(3).await.expect("test collection");
+
+        for (id, organization_id, company_id) in [
+            (1, 42, 7),
+            (2, 42, 8),
+            (3, 43, 7),
+            (4, 43, 8),
+        ] {
+            store
+                .upsert(EmbedPoint {
+                    id,
+                    vector: vec![1.0, 0.0, 0.0],
+                    record: SemanticIndexRecord {
+                        organization_id,
+                        company_id,
+                        resource_kind: "sale_order".into(),
+                        resource_id: id.to_string(),
+                        resource_version: "1".into(),
+                        source_fingerprint: format!("sha256:{id}"),
+                        embedding_model: "integration-test".into(),
+                        indexed_at: "2026-08-25T00:00:00Z".into(),
+                        tags: vec!["test".into()],
+                    },
+                })
+                .await
+                .expect("scoped point");
+        }
+
+        let contaminated: HashMap<String, Value> = Payload::try_from(serde_json::json!({
+            "organization_id": 42,
+            "company_id": 7,
+            "resource_kind": "sale_order",
+            "resource_id": "99",
+            "resource_version": "1",
+            "source_fingerprint": "sha256:legacy",
+            "embedding_model": "integration-test",
+            "indexed_at": "2026-08-25T00:00:00Z",
+            "tags": ["test"],
+            "text": "must not be returned"
+        }))
+        .expect("contaminated payload")
+        .into();
+        store
+            .client
+            .upsert_points(
+                UpsertPointsBuilder::new(
+                    collection.clone(),
+                    vec![PointStruct::new(
+                        99,
+                        vec![1.0, 0.0, 0.0],
+                        contaminated.into(),
+                    )],
+                )
+                .wait(true),
+            )
+            .await
+            .expect("contaminated point");
+
+        for (organization_id, company_id, expected_resource_id) in [
+            (42, 7, "1"),
+            (42, 8, "2"),
+            (43, 7, "3"),
+            (43, 8, "4"),
+        ] {
+            let hits = store
+                .search(
+                    vec![1.0, 0.0, 0.0],
+                    organization_id,
+                    company_id,
+                    None,
+                    10,
+                    None,
+                )
+                .await
+                .expect("scoped search");
+            assert_eq!(hits.len(), 1);
+            assert_eq!(hits[0].record.organization_id, organization_id);
+            assert_eq!(hits[0].record.company_id, company_id);
+            assert_eq!(hits[0].record.resource_id, expected_resource_id);
+        }
+
+        store
+            .client
+            .delete_collection(collection)
+            .await
+            .expect("delete test collection");
     }
 
 }

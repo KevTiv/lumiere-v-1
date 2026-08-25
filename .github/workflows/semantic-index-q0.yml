@@ -1,0 +1,139 @@
+name: Semantic index Q0
+
+on:
+  pull_request:
+    paths:
+      - "ai-gateway/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "frontend/packages/erp-shared/src/ai-skill-harness-schemas.ts"
+      - "frontend/web/app/api/ai/_lib/indexing-gates*"
+      - "frontend/web/app/api/ai/context/document/**"
+      - "frontend/web/app/api/ai/context/ingest/**"
+      - "frontend/web/app/api/ai/context/search/**"
+      - "frontend/packages/query-hooks/src/hooks/ai-memory.ts"
+      - "frontend/packages/ui/src/settings/ai-settings.tsx"
+      - "frontend/web/package.json"
+      - "frontend/pnpm-lock.yaml"
+      - ".github/workflows/semantic-index-q0.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ai-gateway/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "frontend/packages/erp-shared/src/ai-skill-harness-schemas.ts"
+      - "frontend/web/app/api/ai/_lib/indexing-gates*"
+      - "frontend/web/app/api/ai/context/document/**"
+      - "frontend/web/app/api/ai/context/ingest/**"
+      - "frontend/web/app/api/ai/context/search/**"
+      - "frontend/packages/query-hooks/src/hooks/ai-memory.ts"
+      - "frontend/packages/ui/src/settings/ai-settings.tsx"
+      - "frontend/web/package.json"
+      - "frontend/pnpm-lock.yaml"
+      - ".github/workflows/semantic-index-q0.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: semantic-index-q0-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semantic-index-q0:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      qdrant:
+        image: qdrant/qdrant:v1.12.6
+        ports:
+          - 6333:6333
+          - 6334:6334
+    env:
+      QDRANT_TEST_URL: http://127.0.0.1:6334
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Configure SSH for private lumiere-contracts dependency
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_ed25519
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+
+      - name: Wait for Qdrant
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:6333/healthz >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+
+      - name: Semantic index unit tests
+        run: |
+          cargo test -p ai-gateway rig_agent::tests
+          cargo test -p ai-gateway tests::semantic_index_startup_failure_is_non_fatal
+          cargo test -p ai-gateway retrieval_policy::tests
+          cargo test -p ai-gateway harness::snapshot::tests
+          cargo test -p ai-gateway harness::daily_briefing::tests
+          cargo test -p ai-gateway routes::context::tests
+          cargo test -p ai-gateway routes::rag::tests
+          cargo test -p ai-gateway skills::briefing::tests
+          cargo test -p ai-gateway tools::erp_search::tests
+
+      - name: Two-organization Qdrant isolation
+        run: cargo test -p ai-gateway qdrant_client::tests -- --include-ignored
+
+  frontend-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH for private lumiere-contracts dependency
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_ed25519
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.31.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Indexing gate unit test
+        run: pnpm --dir web test:unit
+
+      - name: Frontend typecheck
+        run: pnpm --filter ./web exec tsc --noEmit

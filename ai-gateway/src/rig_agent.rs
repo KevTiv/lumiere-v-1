@@ -196,7 +196,11 @@ impl RigContext {
             .result
             .into_iter()
             .filter_map(|hit| {
-                let record = activity_record_from_payload(&hit.payload)?;
+                let record = scoped_activity_record_from_payload(
+                    &hit.payload,
+                    org_id,
+                    company_id,
+                )?;
                 Some(ContextHit {
                     score: hit.score,
                     record,
@@ -234,6 +238,13 @@ fn payload_strings(
 fn activity_record_from_payload(
     payload: &HashMap<String, qdrant_client::qdrant::Value>,
 ) -> Option<ActivityIndexRecord> {
+    if ["text", "text_snippet", "content", "filename", "source"]
+        .iter()
+        .any(|key| payload.contains_key(*key))
+    {
+        return None;
+    }
+
     Some(ActivityIndexRecord {
         semantic: SemanticIndexRecord {
             organization_id: payload_u64(payload, "organization_id")?,
@@ -248,6 +259,17 @@ fn activity_record_from_payload(
         },
         activity_timestamp: payload.get("activity_timestamp")?.as_integer()?,
     })
+}
+
+fn scoped_activity_record_from_payload(
+    payload: &HashMap<String, qdrant_client::qdrant::Value>,
+    organization_id: u64,
+    company_id: u64,
+) -> Option<ActivityIndexRecord> {
+    let record = activity_record_from_payload(payload)?;
+    (record.semantic.organization_id == organization_id
+        && record.semantic.company_id == company_id)
+        .then_some(record)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -319,6 +341,23 @@ fn activity_scope_filter(org_id: u64, company_id: u64) -> Filter {
 mod tests {
     use super::*;
 
+    fn payload(organization_id: u64, company_id: u64) -> HashMap<String, qdrant_client::qdrant::Value> {
+        Payload::try_from(serde_json::json!({
+            "organization_id": organization_id,
+            "company_id": company_id,
+            "resource_kind": "sale_order",
+            "resource_id": "42",
+            "resource_version": "123",
+            "source_fingerprint": "sha256:test",
+            "embedding_model": "test-model",
+            "indexed_at": "2026-08-25T00:00:00Z",
+            "tags": ["activity"],
+            "activity_timestamp": 123
+        }))
+        .expect("payload")
+        .into()
+    }
+
     fn activity() -> Activity {
         Activity {
             org_id: 7,
@@ -350,21 +389,66 @@ mod tests {
         let a = deterministic_id("7", "11", "sale_order", "42");
         assert_eq!(a, deterministic_id("7", "11", "sale_order", "42"));
         assert_ne!(a, deterministic_id("7", "12", "sale_order", "42"));
+        assert_ne!(a, deterministic_id("8", "11", "sale_order", "42"));
     }
 
     #[test]
     fn activity_search_filter_binds_organization_and_company() {
         let filter = activity_scope_filter(7, 11);
         assert_eq!(filter.must.len(), 2);
-        let keys = filter
+        let values = filter
             .must
             .into_iter()
             .filter_map(|condition| match condition.condition_one_of? {
-                qdrant_client::qdrant::condition::ConditionOneOf::Field(field) => Some(field.key),
+                qdrant_client::qdrant::condition::ConditionOneOf::Field(field) => {
+                    match field.r#match?.match_value? {
+                        MatchValue::Integer(value) => Some((field.key, value)),
+                        _ => None,
+                    }
+                }
                 _ => None,
             })
             .collect::<Vec<_>>();
-        assert!(keys.contains(&"organization_id".to_string()));
-        assert!(keys.contains(&"company_id".to_string()));
+        assert!(values.contains(&("organization_id".to_string(), 7)));
+        assert!(values.contains(&("company_id".to_string(), 11)));
+    }
+
+    #[test]
+    fn activity_scope_rejects_other_organizations_and_companies() {
+        let scopes = [(7, 11), (7, 12), (8, 11), (8, 12)];
+        let accepted = scopes
+            .into_iter()
+            .filter(|(organization_id, company_id)| {
+                scoped_activity_record_from_payload(
+                    &payload(*organization_id, *company_id),
+                    7,
+                    11,
+                )
+                .is_some()
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(accepted, vec![(7, 11)]);
+    }
+
+    #[test]
+    fn legacy_and_raw_content_payloads_fail_closed() {
+        let legacy: HashMap<String, qdrant_client::qdrant::Value> = Payload::try_from(
+            serde_json::json!({
+                "org_id": 7,
+                "entity_type": "sale_order",
+                "entity_id": "42",
+                "text": "secret",
+                "timestamp": 123,
+                "source": "sale_order"
+            }),
+        )
+        .expect("legacy payload")
+        .into();
+        assert!(activity_record_from_payload(&legacy).is_none());
+
+        let mut contaminated = payload(7, 11);
+        contaminated.insert("text".into(), "secret".into());
+        assert!(activity_record_from_payload(&contaminated).is_none());
     }
 }

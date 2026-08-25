@@ -109,7 +109,7 @@ impl Config {
                 .ok()
                 .filter(|value| !value.trim().is_empty()),
             qdrant_url: std::env::var("QDRANT_URL")
-                .unwrap_or_else(|_| "http://localhost:6333".to_string()),
+                .unwrap_or_else(|_| "http://localhost:6334".to_string()),
             qdrant_api_key: std::env::var("QDRANT_API_KEY").ok(),
             qdrant_collection: std::env::var("QDRANT_COLLECTION")
                 .unwrap_or_else(|_| "lumiere_embeddings_org_v3".to_string()),

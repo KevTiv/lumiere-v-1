@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     harness::{fetch_authorized_live_snapshots, ActorCredentials, EntityRef, LiveSnapshot},
+    retrieval_policy::optional_retrieval,
     rig_agent::ContextHit,
     state::AppState,
 };
@@ -49,6 +50,7 @@ pub struct BriefingContext {
     pub sources: Vec<BriefingSource>,
     pub activity_query: String,
     pub source_count: usize,
+    pub retrieval_degraded: bool,
 }
 
 fn module_allowed(entity_type: &str, allowed_modules: &[String]) -> bool {
@@ -128,8 +130,11 @@ fn build_sections(activities: &[ResolvedActivity]) -> Vec<BriefingSection> {
         .collect()
 }
 
-fn build_summary_md(sections: &[BriefingSection]) -> String {
+fn build_summary_md(sections: &[BriefingSection], retrieval_degraded: bool) -> String {
     if sections.is_empty() {
+        if retrieval_degraded {
+            return "Semantic activity retrieval is temporarily unavailable. No unverified activity content was included.".to_string();
+        }
         return "No recent activity was found for the requested scope. Nothing needs attention from the available read-only context.".to_string();
     }
 
@@ -172,11 +177,21 @@ pub async fn collect_briefing_context(
         .to_string();
     let top_k = req.top_k.unwrap_or(DEFAULT_TOP_K).clamp(1, MAX_TOP_K);
 
-    let hits = state
+    let search_result = state
         .rig
         .search_scope(req.org_id, req.company_id, &query, top_k)
-        .await
-        .map_err(|error| format!("briefing activity search failed: {error}"))?;
+        .await;
+    if let Err(error) = &search_result {
+        tracing::warn!(
+            org_id = req.org_id,
+            company_id = req.company_id,
+            error = %error,
+            "Briefing activity retrieval unavailable"
+        );
+    }
+    let search_outcome = optional_retrieval(search_result);
+    let mut retrieval_degraded = search_outcome.degraded;
+    let hits = search_outcome.value;
     let hits = filter_hits(&req, hits);
     let candidates = hits
         .iter()
@@ -189,15 +204,25 @@ pub async fn collect_briefing_context(
             })
         })
         .collect::<Vec<_>>();
-    let snapshots = fetch_authorized_live_snapshots(
+    let snapshot_result = fetch_authorized_live_snapshots(
         state,
         actor,
         req.org_id,
         req.company_id,
         &candidates,
     )
-    .await
-    .map_err(|error| format!("briefing authoritative resolution failed: {error}"))?;
+    .await;
+    if let Err(error) = &snapshot_result {
+        tracing::warn!(
+            org_id = req.org_id,
+            company_id = req.company_id,
+            error = %error,
+            "Briefing authoritative retrieval unavailable"
+        );
+    }
+    let snapshot_outcome = optional_retrieval(snapshot_result);
+    retrieval_degraded |= snapshot_outcome.degraded;
+    let snapshots = snapshot_outcome.value;
     let snapshots = snapshots
         .into_iter()
         .map(|snapshot| ((snapshot.entity_type.clone(), snapshot.entity_id), snapshot))
@@ -215,7 +240,7 @@ pub async fn collect_briefing_context(
         .collect::<Vec<_>>();
 
     let sections = build_sections(&activities);
-    let summary_md = build_summary_md(&sections);
+    let summary_md = build_summary_md(&sections, retrieval_degraded);
     let sources = activities
         .into_iter()
         .map(activity_to_source)
@@ -228,5 +253,24 @@ pub async fn collect_briefing_context(
         sources,
         activity_query: query,
         source_count,
+        retrieval_degraded,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn degraded_briefing_does_not_claim_there_was_no_activity() {
+        let summary = build_summary_md(&[], true);
+        assert!(summary.contains("temporarily unavailable"));
+        assert!(!summary.contains("No recent activity was found"));
+    }
+
+    #[test]
+    fn healthy_empty_briefing_reports_no_activity() {
+        let summary = build_summary_md(&[], false);
+        assert!(summary.contains("No recent activity was found"));
+    }
 }
