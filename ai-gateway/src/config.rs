@@ -112,7 +112,7 @@ impl Config {
                 .unwrap_or_else(|_| "http://localhost:6333".to_string()),
             qdrant_api_key: std::env::var("QDRANT_API_KEY").ok(),
             qdrant_collection: std::env::var("QDRANT_COLLECTION")
-                .unwrap_or_else(|_| "lumiere_embeddings".to_string()),
+                .unwrap_or_else(|_| "lumiere_embeddings_org_v2".to_string()),
             stdb_host: normalize_stdb_http_host(
                 &env_stdb_host_or_next_public()
                     .unwrap_or_else(|| "http://127.0.0.1:3000".to_string()),

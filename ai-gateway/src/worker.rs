@@ -10,9 +10,11 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use anyhow::Context;
+
 use crate::{
     config::Config, providers::EmbedProvider, qdrant_client::VectorStore,
-    stdb_embed::LumiereStdbExt,
+    stdb_embed::{company_belongs_to_organization, LumiereStdbExt},
 };
 use stdb_client::StdbClient;
 
@@ -71,7 +73,15 @@ async fn process_batch(
             continue;
         }
 
-        let result = process_job(embedder, vector_store, &payload).await;
+        let result = match company_belongs_to_organization(stdb, org_id, payload.company_id).await {
+            Ok(true) => process_job(embedder, vector_store, org_id, &payload).await,
+            Ok(false) => Err(anyhow::anyhow!(
+                "embedding job company {} does not belong to organization {}",
+                payload.company_id,
+                org_id
+            )),
+            Err(error) => Err(error.context("failed to validate embedding job scope")),
+        };
 
         match result {
             Ok((embedding_id, dim)) => {
@@ -111,6 +121,7 @@ async fn process_batch(
 async fn process_job(
     embedder: &dyn EmbedProvider,
     vector_store: &VectorStore,
+    organization_id: u64,
     payload: &crate::stdb_embed::EmbedJobPayload,
 ) -> anyhow::Result<(u64, u32)> {
     if payload.text.trim().is_empty() {
@@ -126,6 +137,7 @@ async fn process_job(
         .upsert(crate::qdrant_client::EmbedPoint {
             id: payload.content_id,
             vector,
+            organization_id,
             company_id: payload.company_id,
             content_type: payload.content_type.clone(),
             content_id: payload.content_id,

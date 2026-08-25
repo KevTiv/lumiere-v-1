@@ -26,7 +26,14 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
 
     let company_hits = ctx
         .vector_store()
-        .search(query_vector, ctx.company_id, None, limit, score_threshold)
+        .search(
+            query_vector,
+            ctx.org_id,
+            ctx.company_id,
+            None,
+            limit,
+            score_threshold,
+        )
         .await?;
 
     let org_hits = if ctx.org_id > 0 {

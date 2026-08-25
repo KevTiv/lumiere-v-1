@@ -2,7 +2,6 @@ pub mod action_draft_bridge;
 pub mod actions;
 pub mod context;
 pub mod distributor;
-pub mod embed;
 pub mod forms;
 pub mod harness_skills;
 pub mod health;

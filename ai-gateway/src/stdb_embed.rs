@@ -154,3 +154,12 @@ impl LumiereStdbExt for StdbClient {
         Ok(row.and_then(|r| u64_field(&r, "organizationId", "organization_id")))
     }
 }
+
+/// Verify a company belongs to the trusted organization scope before Qdrant I/O.
+pub async fn company_belongs_to_organization(
+    stdb: &StdbClient,
+    organization_id: u64,
+    company_id: u64,
+) -> anyhow::Result<bool> {
+    Ok(stdb.organization_id_for_company(company_id).await? == Some(organization_id))
+}

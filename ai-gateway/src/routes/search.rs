@@ -5,10 +5,12 @@ use serde::{Deserialize, Serialize};
 use crate::{
     error::{AppError, AppResult},
     state::AppState,
+    stdb_embed::company_belongs_to_organization,
 };
 
 #[derive(Deserialize)]
 pub struct SearchRequest {
+    pub org_id: u64,
     pub company_id: u64,
     pub query: String,
     /// Optional: filter to a specific content type (product, contact, document, etc.)
@@ -36,6 +38,7 @@ pub struct SearchHit {
 #[derive(Serialize)]
 pub struct SearchResponse {
     pub query: String,
+    pub org_id: u64,
     pub company_id: u64,
     pub results: Vec<SearchHit>,
 }
@@ -46,6 +49,19 @@ pub async fn post_search(
 ) -> AppResult<Json<SearchResponse>> {
     if req.query.trim().is_empty() {
         return Err(AppError::BadRequest("query must not be empty".into()));
+    }
+
+    let company_is_in_scope = company_belongs_to_organization(
+        state.stdb.as_ref(),
+        req.org_id,
+        req.company_id,
+    )
+    .await
+    .map_err(|error| AppError::Internal(error.to_string()))?;
+    if !company_is_in_scope {
+        return Err(AppError::Forbidden(
+            "company does not belong to organization".into(),
+        ));
     }
 
     // Embed the query text
@@ -61,6 +77,7 @@ pub async fn post_search(
         .vector_store
         .search(
             query_vector,
+            req.org_id,
             req.company_id,
             req.content_type.as_deref(),
             req.limit,
@@ -82,6 +99,7 @@ pub async fn post_search(
         .collect();
 
     tracing::info!(
+        org_id = req.org_id,
         company_id = req.company_id,
         result_count = results.len(),
         "Semantic search completed"
@@ -89,6 +107,7 @@ pub async fn post_search(
 
     Ok(Json(SearchResponse {
         query: req.query,
+        org_id: req.org_id,
         company_id: req.company_id,
         results,
     }))

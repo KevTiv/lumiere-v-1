@@ -24,6 +24,7 @@ use crate::{
     qdrant_client::SearchResult,
     rig_agent::ContextHit,
     state::AppState,
+    stdb_embed::company_belongs_to_organization,
 };
 
 const RAG_MAX_CONTEXT_CHUNKS: u64 = 20;
@@ -357,6 +358,18 @@ pub async fn post_rag(
         return Err(AppError::BadRequest("query must not be empty".into()));
     }
 
+    let org_id = req
+        .org_id
+        .ok_or_else(|| AppError::BadRequest("org_id is required for RAG generation".into()))?;
+    let company_is_in_scope = company_belongs_to_organization(state.stdb.as_ref(), org_id, req.company_id)
+        .await
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+    if !company_is_in_scope {
+        return Err(AppError::Forbidden(
+            "company does not belong to organization".into(),
+        ));
+    }
+
     let ui_block = req
         .ui_context
         .as_ref()
@@ -387,6 +400,7 @@ pub async fn post_rag(
         .vector_store
         .search_content_types(
             query_vector,
+            org_id,
             req.company_id,
             content_type_filter,
             req.limit,
@@ -396,33 +410,25 @@ pub async fn post_rag(
         .map_err(AppError::Qdrant)?;
 
     let org_top_k = req.limit.clamp(1, RAG_ORG_ACTIVITY_TOP_K as u64) as usize;
-    let org_hits = if let Some(org_id) = req.org_id {
-        match state
-            .rig
-            .search_org(org_id, req.query.trim(), org_top_k)
-            .await
-        {
-            Ok(hits) => hits,
-            Err(err) => {
-                tracing::warn!(
-                    org_id,
-                    company_id = req.company_id,
-                    error = %err,
-                    "Org activity retrieval failed; continuing with company hits only"
-                );
-                Vec::new()
-            }
+    let org_hits = match state
+        .rig
+        .search_org(org_id, req.query.trim(), org_top_k)
+        .await
+    {
+        Ok(hits) => hits,
+        Err(err) => {
+            tracing::warn!(
+                org_id,
+                company_id = req.company_id,
+                error = %err,
+                "Org activity retrieval failed; continuing with company hits only"
+            );
+            Vec::new()
         }
-    } else {
-        Vec::new()
     };
 
     let company_hit_count = company_hits.len();
     let org_hit_count = org_hits.len();
-
-    let org_id = req
-        .org_id
-        .ok_or_else(|| AppError::BadRequest("org_id is required for RAG generation".into()))?;
 
     let agent = resolve_agent(&state.stdb, org_id, req.agent_id, req.team_member_id)
         .await

@@ -24,7 +24,7 @@ use axum::{
     http::{Request, StatusCode},
     middleware::{self, Next},
     response::Response,
-    routing::{delete, get, post},
+    routing::{get, post},
     Router,
 };
 use dashmap::DashMap;
@@ -154,8 +154,6 @@ async fn main() -> anyhow::Result<()> {
         .allow_headers(Any);
 
     let v1_routes = Router::new()
-        .route("/v1/embed", post(routes::embed::post_embed))
-        .route("/v1/embed", delete(routes::embed::delete_embed))
         .route("/v1/search", post(routes::search::post_search))
         .route("/v1/rag", post(routes::rag::post_rag))
         .route("/v1/rag/stream", post(routes::rag::post_rag_stream))

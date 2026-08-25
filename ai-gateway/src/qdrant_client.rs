@@ -12,6 +12,19 @@ use qdrant_client::{
 };
 use std::collections::HashMap;
 
+const MAX_SEARCH_LIMIT: u64 = 50;
+
+fn bounded_search_limit(limit: u64) -> u64 {
+    limit.clamp(1, MAX_SEARCH_LIMIT)
+}
+
+fn scope_conditions(organization_id: u64, company_id: u64) -> Vec<Condition> {
+    vec![
+        Condition::matches("organization_id", organization_id as i64),
+        Condition::matches("company_id", company_id as i64),
+    ]
+}
+
 #[derive(Clone)]
 pub struct VectorStore {
     client: Qdrant,
@@ -23,6 +36,7 @@ pub struct EmbedPoint {
     /// Maps to SearchEmbedding.id from SpacetimeDB
     pub id: u64,
     pub vector: Vec<f32>,
+    pub organization_id: u64,
     pub company_id: u64,
     pub content_type: String,
     pub content_id: u64,
@@ -77,7 +91,17 @@ impl VectorStore {
                 .context("Failed to create Qdrant collection")?;
 
             // Create payload indexes for fast tenant-filtered queries.
-            // Each call takes a single CreateFieldIndexCollectionBuilder.
+            // The collection is versioned when this schema changes so every
+            // point is guaranteed to carry both scope keys.
+            self.client
+                .create_field_index(CreateFieldIndexCollectionBuilder::new(
+                    self.collection.clone(),
+                    "organization_id",
+                    FieldType::Integer,
+                ))
+                .await
+                .context("Failed to create organization_id index")?;
+
             self.client
                 .create_field_index(CreateFieldIndexCollectionBuilder::new(
                     self.collection.clone(),
@@ -109,6 +133,10 @@ impl VectorStore {
     /// Upsert a vector point into the collection.
     pub async fn upsert(&self, point: EmbedPoint) -> Result<()> {
         let payload: HashMap<String, Value> = [
+            (
+                "organization_id".to_string(),
+                Value::from(point.organization_id as i64),
+            ),
             (
                 "company_id".to_string(),
                 Value::from(point.company_id as i64),
@@ -157,10 +185,11 @@ impl VectorStore {
         Ok(())
     }
 
-    /// ANN search with mandatory company_id filter (tenant isolation).
+    /// ANN search with mandatory organization and company filters.
     pub async fn search(
         &self,
         query_vector: Vec<f32>,
+        organization_id: u64,
         company_id: u64,
         content_type: Option<&str>,
         limit: u64,
@@ -169,6 +198,7 @@ impl VectorStore {
         let content_types = content_type.map(|ct| vec![ct.to_string()]);
         self.search_content_types(
             query_vector,
+            organization_id,
             company_id,
             content_types.as_deref(),
             limit,
@@ -177,16 +207,17 @@ impl VectorStore {
         .await
     }
 
-    /// ANN search with mandatory company_id and optional multi-content-type filter.
+    /// ANN search with mandatory organization/company and optional content-type filters.
     pub async fn search_content_types(
         &self,
         query_vector: Vec<f32>,
+        organization_id: u64,
         company_id: u64,
         content_types: Option<&[String]>,
         limit: u64,
         score_threshold: Option<f32>,
     ) -> Result<Vec<SearchResult>> {
-        let mut conditions = vec![Condition::matches("company_id", company_id as i64)];
+        let mut conditions = scope_conditions(organization_id, company_id);
 
         let content_types = content_types
             .unwrap_or(&[])
@@ -201,8 +232,12 @@ impl VectorStore {
             conditions.push(Condition::matches("content_type", content_types));
         }
 
-        let mut builder = SearchPointsBuilder::new(self.collection.clone(), query_vector, limit)
-            .filter(Filter {
+        let mut builder = SearchPointsBuilder::new(
+            self.collection.clone(),
+            query_vector,
+            bounded_search_limit(limit),
+        )
+        .filter(Filter {
                 must: conditions,
                 ..Default::default()
             })
@@ -248,5 +283,29 @@ impl VectorStore {
             .collect();
 
         Ok(results)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn search_limit_is_bounded() {
+        assert_eq!(bounded_search_limit(0), 1);
+        assert_eq!(bounded_search_limit(20), 20);
+        assert_eq!(bounded_search_limit(500), MAX_SEARCH_LIMIT);
+    }
+
+    #[test]
+    fn scope_filter_contains_organization_and_company() {
+        let conditions = scope_conditions(42, 7);
+        let rendered = format!("{conditions:?}");
+
+        assert_eq!(conditions.len(), 2);
+        assert!(rendered.contains("organization_id"));
+        assert!(rendered.contains("company_id"));
+        assert!(rendered.contains("42"));
+        assert!(rendered.contains('7'));
     }
 }
