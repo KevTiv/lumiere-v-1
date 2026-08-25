@@ -6,11 +6,11 @@ use qdrant_client::{
         vectors_config::Config as VectorConfig, Condition, CreateCollectionBuilder,
         CreateFieldIndexCollectionBuilder, DeletePointsBuilder, Distance, FieldType, Filter,
         PointStruct, PointsIdsList, SearchParamsBuilder, SearchPointsBuilder, UpsertPointsBuilder,
-        Value, VectorParamsBuilder, VectorsConfig,
+        VectorParamsBuilder, VectorsConfig,
     },
-    Qdrant,
+    Payload, Qdrant,
 };
-use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
 
 const MAX_SEARCH_LIMIT: u64 = 50;
 
@@ -31,26 +31,52 @@ pub struct VectorStore {
     collection: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct EmbedPoint {
-    /// Maps to SearchEmbedding.id from SpacetimeDB
-    pub id: u64,
-    pub vector: Vec<f32>,
+#[derive(Debug, Clone, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SemanticIndexRecord {
     pub organization_id: u64,
     pub company_id: u64,
-    pub content_type: String,
-    pub content_id: u64,
-    pub text_snippet: String,
+    pub resource_kind: String,
+    pub resource_id: String,
+    pub resource_version: String,
+    pub source_fingerprint: String,
+    pub embedding_model: String,
+    pub indexed_at: String,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct EmbedPoint {
+    pub id: u64,
+    pub vector: Vec<f32>,
+    pub record: SemanticIndexRecord,
 }
 
 #[derive(Debug)]
 pub struct SearchResult {
     pub score: f32,
-    pub company_id: u64,
-    pub content_type: String,
-    pub content_id: u64,
-    pub stdb_embedding_id: u64,
-    pub text_snippet: String,
+    pub record: SemanticIndexRecord,
+}
+
+fn semantic_payload(record: &SemanticIndexRecord) -> Result<Payload> {
+    Payload::try_from(serde_json::to_value(record)?).context("Failed to build semantic payload")
+}
+
+fn payload_string(payload: &Payload, key: &str) -> Option<String> {
+    payload.get(key)?.as_str().cloned().filter(|value| !value.is_empty())
+}
+
+fn semantic_record_from_payload(payload: &Payload) -> Option<SemanticIndexRecord> {
+    Some(SemanticIndexRecord {
+        organization_id: payload.get("organization_id")?.as_integer()? as u64,
+        company_id: payload.get("company_id")?.as_integer()? as u64,
+        resource_kind: payload_string(payload, "resource_kind")?,
+        resource_id: payload_string(payload, "resource_id")?,
+        resource_version: payload_string(payload, "resource_version")?,
+        source_fingerprint: payload_string(payload, "source_fingerprint")?,
+        embedding_model: payload_string(payload, "embedding_model")?,
+        indexed_at: payload_string(payload, "indexed_at")?,
+        tags: Vec::new(),
+    })
 }
 
 impl VectorStore {
@@ -103,11 +129,11 @@ impl VectorStore {
             self.client
                 .create_field_index(CreateFieldIndexCollectionBuilder::new(
                     self.collection.clone(),
-                    "content_type",
+                    "resource_kind",
                     FieldType::Keyword,
                 ))
                 .await
-                .context("Failed to create content_type index")?;
+                .context("Failed to create resource_kind index")?;
 
             tracing::info!(
                 "Qdrant collection '{}' created (dim={})",
@@ -133,27 +159,7 @@ impl VectorStore {
 
     /// Upsert a vector point into the collection.
     pub async fn upsert(&self, point: EmbedPoint) -> Result<()> {
-        let payload: HashMap<String, Value> = [
-            (
-                "organization_id".to_string(),
-                Value::from(point.organization_id as i64),
-            ),
-            (
-                "company_id".to_string(),
-                Value::from(point.company_id as i64),
-            ),
-            ("content_type".to_string(), Value::from(point.content_type)),
-            (
-                "content_id".to_string(),
-                Value::from(point.content_id as i64),
-            ),
-            (
-                "stdb_embedding_id".to_string(),
-                Value::from(point.id as i64),
-            ),
-            ("text_snippet".to_string(), Value::from(point.text_snippet)),
-        ]
-        .into();
+        let payload = semantic_payload(&point.record)?;
 
         self.client
             .upsert_points(
@@ -230,7 +236,7 @@ impl VectorStore {
             .collect::<Vec<_>>();
 
         if !content_types.is_empty() {
-            conditions.push(Condition::matches("content_type", content_types));
+            conditions.push(Condition::matches("resource_kind", content_types));
         }
 
         let mut builder = SearchPointsBuilder::new(
@@ -262,24 +268,8 @@ impl VectorStore {
                 let payload = p.payload;
                 let score = p.score;
 
-                let company_id = payload.get("company_id")?.as_integer()? as u64;
-                let content_type = payload.get("content_type")?.as_str()?.to_string();
-                let content_id = payload.get("content_id")?.as_integer()? as u64;
-                let stdb_embedding_id = payload.get("stdb_embedding_id")?.as_integer()? as u64;
-                let text_snippet = payload
-                    .get("text_snippet")
-                    .and_then(|v| v.as_str())
-                    .cloned()
-                    .unwrap_or_default();
-
-                Some(SearchResult {
-                    score,
-                    company_id,
-                    content_type,
-                    content_id,
-                    stdb_embedding_id,
-                    text_snippet,
-                })
+                let record = semantic_record_from_payload(&payload)?;
+                Some(SearchResult { score, record })
             })
             .collect();
 
@@ -309,4 +299,25 @@ mod tests {
         assert!(rendered.contains("42"));
         assert!(rendered.contains('7'));
     }
+ 
+    #[test]
+    fn semantic_payload_is_reference_only() {
+        let record = SemanticIndexRecord {
+            organization_id: 42,
+            company_id: 7,
+            resource_kind: "sale_order".into(),
+            resource_id: "11".into(),
+            resource_version: "hash".into(),
+            source_fingerprint: "hash".into(),
+            embedding_model: "test".into(),
+            indexed_at: "2026-08-25T00:00:00Z".into(),
+            tags: vec!["sales".into()],
+        };
+        let payload = semantic_payload(&record).unwrap();
+        assert!(payload.contains_key("resource_kind"));
+        assert!(!payload.contains_key("text"));
+        assert!(!payload.contains_key("text_snippet"));
+        assert!(semantic_record_from_payload(&payload).is_some());
+    }
+
 }

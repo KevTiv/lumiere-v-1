@@ -1,6 +1,9 @@
 use serde_json::{json, Value};
 
-use crate::tools::types::{SkillCitation, ToolContext, ToolOutput, ToolResult};
+use crate::{
+    harness::{fetch_live_snapshots, resolve_snapshot_candidates, HARNESS_MAX_LIVE_SNAPSHOTS},
+    tools::types::{live_snapshot_citation, ToolContext, ToolOutput, ToolResult},
+};
 
 pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
     let query = input
@@ -45,55 +48,30 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
         Vec::new()
     };
 
-    let citations: Vec<SkillCitation> = company_hits
-        .iter()
-        .map(|hit| SkillCitation {
-            kind: "memory".to_string(),
-            trust: "retrieved".to_string(),
-            content_type: Some(hit.content_type.clone()),
-            entity_id: Some(hit.content_id.to_string()),
-            score: Some(hit.score),
-            text_snippet: Some(hit.text_snippet.clone()),
-            label: None,
-            snapshot_at: None,
-            url: None,
-            title: None,
-            fetched_at: None,
-        })
-        .chain(org_hits.iter().map(|hit| SkillCitation {
-            kind: "activity".to_string(),
-            trust: "retrieved".to_string(),
-            content_type: Some(hit.entity_type.clone()),
-            entity_id: Some(hit.entity_id.clone()),
-            score: Some(hit.score),
-            text_snippet: Some(hit.text.clone()),
-            label: None,
-            snapshot_at: None,
-            url: None,
-            title: None,
-            fetched_at: None,
-        }))
-        .collect();
-
+    let candidates = resolve_snapshot_candidates(
+        None,
+        &company_hits,
+        &org_hits,
+        HARNESS_MAX_LIVE_SNAPSHOTS,
+    );
+    let snapshots = fetch_live_snapshots(
+        ctx.stdb.as_ref(),
+        ctx.org_id,
+        ctx.company_id,
+        &candidates,
+    )
+    .await?;
+    let citations = snapshots.iter().map(live_snapshot_citation).collect::<Vec<_>>();
     let summary = format!(
-        "Semantic search returned {} company hits and {} activity hits",
-        company_hits.len(),
-        org_hits.len()
+        "Semantic retrieval resolved {} scoped snapshot(s) from {} candidate(s)",
+        snapshots.len(),
+        candidates.len()
     );
 
     Ok(ToolOutput {
         summary,
-        data: json!({
-            "company_hits": company_hits.iter().map(|hit| json!({
-                "score": hit.score,
-                "company_id": hit.company_id,
-                "content_type": hit.content_type,
-                "content_id": hit.content_id,
-                "text_snippet": hit.text_snippet,
-            })).collect::<Vec<_>>(),
-            "activity_hits": org_hits,
-        }),
+        data: json!({ "snapshots": snapshots }),
         citations,
-        row_count: Some((company_hits.len() + org_hits.len()) as u32),
+        row_count: Some(snapshots.len() as u32),
     })
 }

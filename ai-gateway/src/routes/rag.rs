@@ -201,8 +201,8 @@ fn parse_entity_id(entity_id: &str) -> u64 {
 }
 
 fn company_hit_to_ranked(hit: SearchResult) -> RankedSource {
-    let label = hit.content_type.clone();
-    let text = hit.text_snippet.clone();
+    let label = hit.record.resource_kind.clone();
+    let text = String::new();
     RankedSource {
         label: label.clone(),
         text: text.clone(),
@@ -210,8 +210,8 @@ fn company_hit_to_ranked(hit: SearchResult) -> RankedSource {
         rag_source: RagSource {
             kind: "memory".to_string(),
             trust: "retrieved".to_string(),
-            content_type: hit.content_type,
-            content_id: hit.content_id,
+            content_type: hit.record.resource_kind,
+            content_id: parse_entity_id(&hit.record.resource_id),
             entity_type: None,
             entity_id: None,
             score: hit.score,
@@ -467,7 +467,9 @@ pub async fn post_rag(
     };
 
     let live_snapshot_count = live_snapshots.len();
-    let ranked = merge_retrieval_hits(company_hits, org_hits, req.ui_context.as_ref());
+    // Qdrant hits rank candidates only; prompt text and citations come from
+    // scoped authoritative snapshots.
+    let ranked: Vec<RankedSource> = Vec::new();
 
     if ranked.is_empty() && live_snapshots.is_empty() {
         tracing::info!(
@@ -657,11 +659,17 @@ mod tests {
     fn merge_retrieval_orders_by_score_and_boosts_entity_match() {
         let company = vec![SearchResult {
             score: 0.7,
-            company_id: 1,
-            content_type: "invoice".into(),
-            content_id: 10,
-            stdb_embedding_id: 1,
-            text_snippet: "Company invoice".into(),
+            record: crate::qdrant_client::SemanticIndexRecord {
+                organization_id: 1,
+                company_id: 1,
+                resource_kind: "invoice".into(),
+                resource_id: "10".into(),
+                resource_version: "v1".into(),
+                source_fingerprint: "hash".into(),
+                embedding_model: "test".into(),
+                indexed_at: "2026-08-25T00:00:00Z".into(),
+                tags: Vec::new(),
+            },
         }];
         let org = vec![ContextHit {
             score: 0.68,

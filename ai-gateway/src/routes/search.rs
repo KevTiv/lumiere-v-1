@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::{AppError, AppResult},
+    qdrant_client::SemanticIndexRecord,
     state::AppState,
     stdb_embed::company_belongs_to_organization,
 };
@@ -28,11 +29,8 @@ fn default_limit() -> u64 {
 #[derive(Serialize)]
 pub struct SearchHit {
     pub score: f32,
-    pub company_id: u64,
-    pub content_type: String,
-    pub content_id: u64,
-    pub stdb_embedding_id: u64,
-    pub text_snippet: String,
+    #[serde(flatten)]
+    pub record: SemanticIndexRecord,
 }
 
 #[derive(Serialize)]
@@ -88,13 +86,9 @@ pub async fn post_search(
 
     let results: Vec<SearchHit> = hits
         .into_iter()
-        .map(|h| SearchHit {
-            score: h.score,
-            company_id: h.company_id,
-            content_type: h.content_type,
-            content_id: h.content_id,
-            stdb_embedding_id: h.stdb_embedding_id,
-            text_snippet: h.text_snippet,
+        .map(|hit| SearchHit {
+            score: hit.score,
+            record: hit.record,
         })
         .collect();
 

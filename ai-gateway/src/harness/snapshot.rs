@@ -98,15 +98,16 @@ pub fn resolve_snapshot_candidates(
     }
 
     for hit in company_hits {
-        let Some(entity_type) = content_type_to_entity(&hit.content_type) else {
+        let Some(entity_type) = content_type_to_entity(&hit.record.resource_kind) else {
             continue;
         };
-        if hit.content_id == 0 {
+        let Some(entity_id) = hit.record.resource_id.parse::<u64>().ok().filter(|id| *id > 0)
+        else {
             continue;
-        }
+        };
         candidates.push(EntityRef {
             entity_type: entity_type.to_string(),
-            entity_id: hit.content_id,
+            entity_id,
             priority: hit.score * 0.9,
         });
     }

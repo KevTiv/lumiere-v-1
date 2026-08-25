@@ -9,7 +9,14 @@ use stdb_client::StdbClient;
 pub struct PendingEmbedJob {
     pub job_id: u64,
     pub organization_id: u64,
+    pub input_hash: String,
     pub payload: EmbedJobPayload,
+}
+
+#[derive(Debug)]
+pub struct AuthoritativeEmbedding {
+    pub id: u64,
+    pub embedding_hash: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -44,6 +51,10 @@ pub trait LumiereStdbExt {
     async fn organization_id_for_company(&self, company_id: u64) -> anyhow::Result<Option<u64>>;
 }
 
+fn string_field(row: &serde_json::Value, camel: &str, snake: &str) -> Option<String> {
+    row.get(camel).or_else(|| row.get(snake)).and_then(|value| value.as_str()).map(str::to_string)
+}
+
 fn u64_field(row: &serde_json::Value, camel: &str, snake: &str) -> Option<u64> {
     row.get(camel)
         .and_then(|v| v.as_u64())
@@ -67,7 +78,7 @@ impl LumiereStdbExt for StdbClient {
         limit: u32,
     ) -> anyhow::Result<Vec<PendingEmbedJob>> {
         let sql = format!(
-            "SELECT id, organization_id, payload FROM queue_job \
+            "SELECT id, organization_id, input_hash, payload FROM queue_job \
              WHERE queue_name = 'embedding' AND status = 'Pending' \
              LIMIT {limit}"
         );
@@ -85,6 +96,7 @@ impl LumiereStdbExt for StdbClient {
                 Some(v) => v,
                 None => continue,
             };
+            let input_hash = string_field(&row, "inputHash", "input_hash").unwrap_or_default();
             let payload_str = match row.get("payload").and_then(|v| v.as_str()) {
                 Some(s) => s,
                 None => continue,
@@ -99,6 +111,7 @@ impl LumiereStdbExt for StdbClient {
             jobs.push(PendingEmbedJob {
                 job_id,
                 organization_id,
+                input_hash,
                 payload,
             });
         }
@@ -162,4 +175,26 @@ pub async fn company_belongs_to_organization(
     company_id: u64,
 ) -> anyhow::Result<bool> {
     Ok(stdb.organization_id_for_company(company_id).await? == Some(organization_id))
+}
+
+pub async fn authoritative_embedding_for_resource(
+    stdb: &StdbClient,
+    organization_id: u64,
+    company_id: u64,
+    resource_kind: &str,
+    resource_id: u64,
+) -> anyhow::Result<Option<AuthoritativeEmbedding>> {
+    if resource_kind.is_empty()
+        || !resource_kind.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
+    {
+        anyhow::bail!("invalid semantic resource kind");
+    }
+    let sql = format!(
+        "SELECT id, embedding_hash FROM search_embedding WHERE organization_id = {organization_id} AND company_id = {company_id} AND content_type = '{resource_kind}' AND content_id = {resource_id} LIMIT 1"
+    );
+    let rows = stdb.query_sql(&sql).await.map_err(|error| anyhow::anyhow!("{error}"))?;
+    Ok(rows.into_iter().next().and_then(|row| Some(AuthoritativeEmbedding {
+        id: u64_field(&row, "id", "id")?,
+        embedding_hash: string_field(&row, "embeddingHash", "embedding_hash"),
+    })))
 }
