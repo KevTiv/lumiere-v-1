@@ -10,7 +10,8 @@ use crate::{
     },
     error::{AppError, AppResult},
     harness::snapshot::{
-        fetch_live_snapshots, filter_entity_refs_by_allowed_types, EntityRef, LiveSnapshot,
+        fetch_authorized_live_snapshots, filter_entity_refs_by_allowed_types, ActorCredentials,
+        EntityRef, LiveSnapshot,
     },
     providers::llm::LlmMessage,
     state::AppState,
@@ -56,6 +57,8 @@ pub struct ActionDraftRequest {
     pub allowed_entity_types: Vec<String>,
     pub agent_id: Option<u64>,
     pub team_member_id: Option<u64>,
+    pub stdb_token: String,
+    pub identity_hex: String,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -554,8 +557,10 @@ fn snapshot_candidates_from_ui_context(ui_context: Option<&ActionUiContext>) -> 
 async fn fetch_grounding_snapshots(
     state: &AppState,
     req: &ActionDraftRequest,
-) -> Option<Vec<LiveSnapshot>> {
-    let org_id = req.org_id.filter(|id| *id > 0)?;
+) -> AppResult<Option<Vec<LiveSnapshot>>> {
+    let Some(org_id) = req.org_id.filter(|id| *id > 0) else {
+        return Ok(None);
+    };
     let allowed =
         (!req.allowed_entity_types.is_empty()).then_some(req.allowed_entity_types.as_slice());
     let candidates = filter_entity_refs_by_allowed_types(
@@ -563,13 +568,20 @@ async fn fetch_grounding_snapshots(
         allowed,
     );
     if candidates.is_empty() {
-        return None;
+        return Ok(None);
     }
-
-    fetch_live_snapshots(&state.stdb, org_id, req.company_id, &candidates)
+    let actor = ActorCredentials::new(req.stdb_token.clone(), req.identity_hex.clone())
+        .map_err(|error| AppError::Forbidden(error.to_string()))?;
+    let snapshots = fetch_authorized_live_snapshots(
+        state,
+        &actor,
+        org_id,
+        req.company_id,
+        &candidates,
+    )
         .await
-        .ok()
-        .filter(|snapshots| !snapshots.is_empty())
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+    Ok((!snapshots.is_empty()).then_some(snapshots))
 }
 
 fn enrich_drafts_with_grounding(drafts: &mut [ActionDraft], snapshots: &[LiveSnapshot]) {
@@ -631,8 +643,10 @@ pub async fn post_draft(
     if !non_empty(&req.query) {
         return Err(AppError::BadRequest("query must not be empty".into()));
     }
+    ActorCredentials::new(req.stdb_token.clone(), req.identity_hex.clone())
+        .map_err(|error| AppError::Forbidden(error.to_string()))?;
 
-    let grounding_snapshots = fetch_grounding_snapshots(&state, &req).await;
+    let grounding_snapshots = fetch_grounding_snapshots(&state, &req).await?;
 
     let mut drafts = match draft_actions_llm(&state, &req, grounding_snapshots.as_deref()).await {
         Ok(llm_drafts) if !llm_drafts.is_empty() => llm_drafts,
@@ -682,6 +696,8 @@ mod tests {
             allowed_entity_types: Vec::new(),
             agent_id: None,
             team_member_id: None,
+            stdb_token: "token".into(),
+            identity_hex: "actor".into(),
         };
 
         let drafts = draft_actions_stub(&req).expect("drafts");
@@ -723,6 +739,8 @@ mod tests {
             allowed_entity_types: Vec::new(),
             agent_id: None,
             team_member_id: None,
+            stdb_token: "token".into(),
+            identity_hex: "actor".into(),
         };
         let entries = allowed_catalog_entries(&req.allowed_reducers).expect("entries");
         let drafts = parse_llm_drafts(

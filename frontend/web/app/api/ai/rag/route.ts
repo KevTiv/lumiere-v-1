@@ -89,6 +89,8 @@ export async function POST(request: NextRequest) {
     org_id: orgId,
     query,
     limit,
+    stdb_token: session.stdbToken,
+    identity_hex: session.identityHex,
   }
   if (include_types?.length) gwPayload.include_types = include_types
   if (ui_context) gwPayload.ui_context = ui_context

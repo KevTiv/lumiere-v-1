@@ -41,6 +41,8 @@ export async function POST(request: NextRequest) {
     org_id: orgId,
     company_id: companyId,
     query,
+    stdb_token: session.stdbToken,
+    identity_hex: session.identityHex,
     ...(uiContext ? { ui_context: uiContext } : {}),
     ...(allowedReducers?.length ? { allowed_reducers: allowedReducers } : {}),
     ...(agentId != null ? { agent_id: agentId } : {}),

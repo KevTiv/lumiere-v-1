@@ -25,7 +25,10 @@ use crate::config::Config;
 use crate::error::ApiError;
 use crate::metrics;
 use crate::middleware::metrics::track_http_metrics;
-use crate::query_exec::{default_company_id, execute_resource_query_for_company};
+use crate::query_exec::{
+    default_company_id, execute_authorized_resource_record, execute_resource_query_for_company,
+    resolve_crm_company_id,
+};
 use crate::routes;
 use crate::session::resolve_api_session;
 use crate::state::AppState;
@@ -49,6 +52,12 @@ struct OrgQuery {
 struct CallQuery {
     #[serde(default, rename = "withCompany")]
     with_company: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct AuthoritativeQuery {
+    #[serde(rename = "companyId")]
+    company_id: u64,
 }
 
 async fn health() -> StatusCode {
@@ -148,6 +157,57 @@ async fn get_query(
     .await?;
 
     Ok(Json(json!({ "data": data })))
+}
+
+async fn get_authoritative_resource(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: tower_cookies::Cookies,
+    Path((resource, record_id)): Path<(String, u64)>,
+    Query(query): Query<AuthoritativeQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let auth = headers.get(AUTHORIZATION).and_then(|value| value.to_str().ok());
+    let identity_hint = stdb_identity_hex_hint(&headers, &cookies);
+    let cookie_token = cookies.get("stdb_token").map(|cookie| cookie.value().to_string());
+    let session = resolve_api_session(
+        &state,
+        auth,
+        cookie_token.as_deref(),
+        identity_hint.as_deref(),
+    )
+    .await?
+    .ok_or(ApiError::Unauthorized)?;
+    let organization_id = session
+        .organization_id
+        .ok_or_else(|| ApiError::Forbidden("No organization assigned".into()))?;
+
+    // The requested company is only actor intent. Resolve it against the active
+    // membership so a company-bound actor cannot pivot within the organization.
+    let company_id = resolve_crm_company_id(
+        &state.stdb,
+        organization_id,
+        &session.identity_hex,
+        Some(query.company_id),
+    )
+    .await?;
+
+    let client = if crate::query_exec::crm_resource(&resource) {
+        state.stdb.clone()
+    } else {
+        state.client_with_token(&session.stdb_token)
+    };
+    let row = execute_authorized_resource_record(
+        &client,
+        &resource,
+        organization_id,
+        company_id,
+        record_id,
+        session.field_access.as_ref(),
+    )
+    .await?
+    .ok_or_else(|| ApiError::NotFound("Authoritative resource not found".into()))?;
+
+    Ok(Json(json!({ "data": row })))
 }
 
 async fn post_call(
@@ -526,6 +586,10 @@ pub async fn serve() -> anyhow::Result<()> {
 
     let v1 = Router::new()
         .route("/query/:resource", get(get_query))
+        .route(
+            "/authoritative/:resource/:id",
+            get(get_authoritative_resource),
+        )
         .route("/call/:reducer", post(post_call))
         .route("/realtime/ws", get(realtime::realtime_ws_upgrade))
         .route("/realtime/info", get(realtime::realtime_info))

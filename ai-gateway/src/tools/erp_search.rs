@@ -1,11 +1,18 @@
 use serde_json::{json, Value};
 
 use crate::{
-    harness::{fetch_live_snapshots, resolve_snapshot_candidates, HARNESS_MAX_LIVE_SNAPSHOTS},
+    harness::{
+        fetch_authorized_live_snapshots, resolve_snapshot_candidates,
+        HARNESS_MAX_LIVE_SNAPSHOTS,
+    },
     tools::types::{live_snapshot_citation, ToolContext, ToolOutput, ToolResult},
 };
 
 pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
+    let actor = ctx
+        .actor
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("authenticated actor credentials are required"))?;
     let query = input
         .get("query")
         .and_then(|v| v.as_str())
@@ -54,8 +61,9 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
         &org_hits,
         HARNESS_MAX_LIVE_SNAPSHOTS,
     );
-    let snapshots = fetch_live_snapshots(
-        ctx.stdb.as_ref(),
+    let snapshots = fetch_authorized_live_snapshots(
+        &ctx.state,
+        actor,
         ctx.org_id,
         ctx.company_id,
         &candidates,

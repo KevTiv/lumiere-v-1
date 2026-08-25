@@ -198,6 +198,35 @@ fn field_permission_applies(rule: &FieldPermissionLike, ctx: &FieldAccessContext
     rule.role_id == Some(ctx.role_id)
 }
 
+pub fn has_resource_read_permission(
+    field_access: Option<&FieldAccessContext>,
+    resource_key: &str,
+) -> bool {
+    let Some(access) = field_access else {
+        return false;
+    };
+    if access.is_superuser || access.role_permissions.iter().any(|permission| permission == "*:*") {
+        return true;
+    }
+    let Some(resource) = registry_get(resource_key) else {
+        return false;
+    };
+
+    access.role_permissions.iter().any(|permission| {
+        let Some((configured_resource, action)) = permission.rsplit_once(':') else {
+            return false;
+        };
+        if action != "read" && action != "*" {
+            return false;
+        }
+        field_resource_matches(configured_resource, resource_key)
+            || resource.aliases.iter().any(|alias| {
+                alias == configured_resource
+                    || alias.replace('-', "_") == configured_resource.replace('-', "_")
+            })
+    })
+}
+
 /// `None` = full row access; `Some(cols)` = explicit snake_case columns.
 pub(crate) fn resolve_read_columns(
     resource_key: &str,
@@ -551,6 +580,47 @@ pub fn sql_column_list_for_generated_type(type_name: &str) -> Result<Vec<String>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn field_access(permissions: &[&str]) -> FieldAccessContext {
+        FieldAccessContext {
+            organization_id: 7,
+            role_id: 9,
+            role_name: "member".into(),
+            is_superuser: false,
+            role_permissions: permissions.iter().map(|value| (*value).to_string()).collect(),
+            identity_hex: "actor".into(),
+            field_permissions: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn resource_read_permission_accepts_alias_and_wildcards() {
+        assert!(has_resource_read_permission(
+            Some(&field_access(&["sale_order:read"])),
+            "sale-orders"
+        ));
+        assert!(has_resource_read_permission(
+            Some(&field_access(&["contacts:*"])),
+            "contacts"
+        ));
+        assert!(has_resource_read_permission(
+            Some(&field_access(&["*:*"])),
+            "products"
+        ));
+    }
+
+    #[test]
+    fn resource_read_permission_fails_closed() {
+        assert!(!has_resource_read_permission(None, "contacts"));
+        assert!(!has_resource_read_permission(
+            Some(&field_access(&["contacts:write"])),
+            "contacts"
+        ));
+        assert!(!has_resource_read_permission(
+            Some(&field_access(&["contacts:read"])),
+            "unknown-resource"
+        ));
+    }
 
     #[test]
     fn resolve_http_sql_columns_includes_deleted_at_for_leads() {

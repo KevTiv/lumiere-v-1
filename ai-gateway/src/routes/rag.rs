@@ -17,8 +17,9 @@ use crate::{
     },
     error::{AppError, AppResult},
     harness::{
-        fetch_live_snapshots, filter_entity_refs_by_allowed_types, format_live_context_block,
-        resolve_snapshot_candidates, LiveSnapshot, SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
+        fetch_authorized_live_snapshots, filter_entity_refs_by_allowed_types,
+        format_live_context_block, resolve_snapshot_candidates, ActorCredentials, LiveSnapshot,
+        SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
     },
     providers::llm::LlmMessage,
     qdrant_client::SearchResult,
@@ -59,6 +60,8 @@ pub struct RagRequest {
     pub ui_context: Option<UiContext>,
     pub agent_id: Option<u64>,
     pub team_member_id: Option<u64>,
+    pub stdb_token: String,
+    pub identity_hex: String,
     /// Optional BFF-provided entity allowlist for live snapshot reads.
     #[serde(default)]
     pub allowed_entity_types: Vec<String>,
@@ -357,6 +360,8 @@ pub async fn post_rag(
     if req.query.trim().is_empty() {
         return Err(AppError::BadRequest("query must not be empty".into()));
     }
+    let actor = ActorCredentials::new(req.stdb_token.clone(), req.identity_hex.clone())
+        .map_err(|error| AppError::Forbidden(error.to_string()))?;
 
     let org_id = req
         .org_id
@@ -447,17 +452,15 @@ pub async fn post_rag(
     );
 
     let live_snapshots = if agent_allows_live_read(&agent) {
-        fetch_live_snapshots(&state.stdb, org_id, req.company_id, &snapshot_candidates)
+        fetch_authorized_live_snapshots(
+            &state,
+            &actor,
+            org_id,
+            req.company_id,
+            &snapshot_candidates,
+        )
             .await
-            .unwrap_or_else(|err| {
-                tracing::warn!(
-                    company_id = req.company_id,
-                    org_id,
-                    error = %err,
-                    "Live snapshot fetch failed; continuing with memory retrieval only"
-                );
-                Vec::new()
-            })
+            .map_err(|error| AppError::Internal(error.to_string()))?
     } else {
         tracing::debug!(
             agent_id = agent.agent_id,

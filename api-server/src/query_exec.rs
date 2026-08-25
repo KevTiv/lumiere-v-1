@@ -8,9 +8,11 @@ use serde_json::Value;
 
 use crate::error::ApiError;
 use stdb_auth::{
-    erp_org_extra_where, has_hr_permission, hr_fields_require_read_audit, identity_sql_literal,
-    is_hr_pii_resource, purpose_for_hr_resource, registry_get, resolve_http_sql_columns,
-    select_company_scoped_sql, select_org_scoped_sql, FieldAccessContext,
+    erp_org_extra_where, has_hr_permission, has_resource_read_permission,
+    hr_fields_require_read_audit, identity_sql_literal, is_hr_pii_resource,
+    purpose_for_hr_resource, registry_get, resolve_http_sql_columns,
+    select_company_scoped_sql, select_org_and_company_scoped_sql, select_org_scoped_sql,
+    FieldAccessContext,
 };
 use stdb_client::StdbClient;
 use stdb_config::runtime_is_production;
@@ -137,6 +139,17 @@ fn sort_rows_by_id_desc(rows: &mut [Value]) {
     rows.sort_by(|a, b| row_id_u64(b).cmp(&row_id_u64(a)));
 }
 
+fn enforce_requested_company(
+    allowed_company_id: u64,
+    requested_company_id: Option<u64>,
+    denied_message: &str,
+) -> Result<u64, ApiError> {
+    if requested_company_id.is_some_and(|requested| requested != allowed_company_id) {
+        return Err(ApiError::Forbidden(denied_message.into()));
+    }
+    Ok(allowed_company_id)
+}
+
 pub(crate) async fn company_ids_for_organization(
     client: &StdbClient,
     org_id: u64,
@@ -242,12 +255,11 @@ pub async fn resolve_crm_company_id(
             .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
     };
 
-    if requested_company_id.is_some_and(|requested| requested != allowed) {
-        return Err(ApiError::Forbidden(
-            "Cannot query another company's CRM data".into(),
-        ));
-    }
-    Ok(allowed)
+    enforce_requested_company(
+        allowed,
+        requested_company_id,
+        "Cannot query another company's CRM data",
+    )
 }
 
 /// Resolve the inventory company for the authenticated membership.
@@ -282,12 +294,11 @@ pub async fn resolve_inventory_company_id(
             .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
     };
 
-    if requested_company_id.is_some_and(|requested| requested != allowed) {
-        return Err(ApiError::Forbidden(
-            "Cannot query another company's inventory data".into(),
-        ));
-    }
-    Ok(allowed)
+    enforce_requested_company(
+        allowed,
+        requested_company_id,
+        "Cannot query another company's inventory data",
+    )
 }
 
 /// Resolve the only Purchasing company visible to the authenticated membership.
@@ -316,12 +327,11 @@ pub async fn resolve_purchasing_company_id(
             .await?
             .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
     };
-    if requested_company_id.is_some_and(|requested| requested != allowed) {
-        return Err(ApiError::Forbidden(
-            "Cannot query another company's Purchasing data".into(),
-        ));
-    }
-    Ok(allowed)
+    enforce_requested_company(
+        allowed,
+        requested_company_id,
+        "Cannot query another company's Purchasing data",
+    )
 }
 
 /// Resolve the only Accounting company visible to the authenticated membership.
@@ -356,12 +366,11 @@ pub async fn resolve_accounting_company_id(
             .await?
             .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
     };
-    if requested_company_id.is_some_and(|requested| requested != allowed) {
-        return Err(ApiError::Forbidden(
-            "Cannot query another company's accounting data".into(),
-        ));
-    }
-    Ok(allowed)
+    enforce_requested_company(
+        allowed,
+        requested_company_id,
+        "Cannot query another company's accounting data",
+    )
 }
 
 pub(crate) fn crm_resource(resource: &str) -> bool {
@@ -627,6 +636,96 @@ pub async fn execute_resource_query(
         None,
     )
     .await
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AuthoritativeResourceScope {
+    Organization,
+    OrganizationAndCompany,
+    OrganizationOptionalCompany,
+}
+
+fn authoritative_resource_scope(resource: &str) -> Option<AuthoritativeResourceScope> {
+    match resource {
+        "products" => Some(AuthoritativeResourceScope::Organization),
+        "contacts" => Some(AuthoritativeResourceScope::OrganizationOptionalCompany),
+        "sale-orders" | "purchase-orders" | "tasks" | "account-moves"
+        | "mrp-productions" => Some(AuthoritativeResourceScope::OrganizationAndCompany),
+        _ => None,
+    }
+}
+
+fn authoritative_record_sql(
+    resource: &str,
+    organization_id: u64,
+    company_id: u64,
+    record_id: u64,
+    field_access: Option<&FieldAccessContext>,
+) -> Result<(String, AuthoritativeResourceScope), ApiError> {
+    if record_id == 0 || organization_id == 0 || company_id == 0 {
+        return Err(ApiError::Unprocessable(
+            "organization, company, and record IDs must be positive".into(),
+        ));
+    }
+    if !has_resource_read_permission(field_access, resource) {
+        return Err(ApiError::NotFound("Authoritative resource not found".into()));
+    }
+    let scope = authoritative_resource_scope(resource)
+        .ok_or_else(|| ApiError::NotFound("Authoritative resource not found".into()))?;
+    let registry = registry_get(resource)
+        .ok_or_else(|| ApiError::NotFound("Authoritative resource not found".into()))?;
+    let id_filter = format!(" AND id = {record_id}");
+    let sql = match scope {
+        AuthoritativeResourceScope::OrganizationAndCompany => select_org_and_company_scoped_sql(
+            resource,
+            &registry.table,
+            organization_id,
+            company_id,
+            field_access,
+            &id_filter,
+            " LIMIT 1",
+        ),
+        AuthoritativeResourceScope::Organization
+        | AuthoritativeResourceScope::OrganizationOptionalCompany => select_org_scoped_sql(
+            resource,
+            &registry.table,
+            organization_id,
+            field_access,
+            &id_filter,
+            " LIMIT 1",
+        ),
+    }
+    .map_err(ApiError::Internal)?;
+    Ok((sql, scope))
+}
+
+pub async fn execute_authorized_resource_record(
+    client: &StdbClient,
+    resource: &str,
+    organization_id: u64,
+    company_id: u64,
+    record_id: u64,
+    field_access: Option<&FieldAccessContext>,
+) -> Result<Option<Value>, ApiError> {
+    let (sql, scope) = authoritative_record_sql(
+        resource,
+        organization_id,
+        company_id,
+        record_id,
+        field_access,
+    )?;
+    let mut rows = client
+        .query_sql(&sql)
+        .await
+        .map_err(|error| ApiError::Internal(error.to_string()))?;
+
+    if scope == AuthoritativeResourceScope::OrganizationOptionalCompany {
+        rows.retain(|row| row_company_matches(row, company_id, true));
+    }
+    if resource == "contacts" {
+        filter_and_strip_soft_deleted(&mut rows);
+    }
+    Ok(rows.into_iter().next())
 }
 
 pub async fn execute_resource_query_for_company(
@@ -1816,6 +1915,47 @@ pub async fn execute_resource_query_for_company(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    fn authoritative_access(permission: &str) -> FieldAccessContext {
+        FieldAccessContext {
+            organization_id: 42,
+            role_id: 7,
+            role_name: "member".into(),
+            is_superuser: false,
+            role_permissions: vec![permission.into()],
+            identity_hex: "actor".into(),
+            field_permissions: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn authoritative_company_sql_is_bounded_by_scope_and_id() {
+        let access = authoritative_access("sale_order:read");
+        let (sql, scope) = authoritative_record_sql("sale-orders", 42, 7, 99, Some(&access))
+            .expect("authorized SQL");
+        assert_eq!(scope, AuthoritativeResourceScope::OrganizationAndCompany);
+        assert!(sql.contains("organization_id = 42"));
+        assert!(sql.contains("company_id = 7"));
+        assert!(sql.contains("id = 99"));
+        assert!(sql.ends_with("LIMIT 1"));
+    }
+
+    #[test]
+    fn authoritative_sql_fails_closed_without_read_permission() {
+        let access = authoritative_access("sale_order:write");
+        assert!(authoritative_record_sql("sale-orders", 42, 7, 99, Some(&access)).is_err());
+        assert!(authoritative_record_sql("sale-orders", 42, 7, 99, None).is_err());
+        assert!(authoritative_record_sql("unknown", 42, 7, 99, Some(&access)).is_err());
+    }
+
+    #[test]
+    fn company_bound_actor_cannot_request_another_company() {
+        assert!(enforce_requested_company(7, Some(8), "cross-company").is_err());
+        assert_eq!(
+            enforce_requested_company(7, Some(7), "cross-company").expect("same company"),
+            7
+        );
+    }
 
     #[test]
     fn row_not_soft_deleted_treats_missing_and_null_as_live() {

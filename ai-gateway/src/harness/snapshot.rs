@@ -13,7 +13,28 @@ use crate::{
     },
     qdrant_client::SearchResult,
     rig_agent::ContextHit,
+    state::AppState,
 };
+
+#[derive(Clone, Debug)]
+pub struct ActorCredentials {
+    pub stdb_token: String,
+    pub identity_hex: String,
+}
+
+impl ActorCredentials {
+    pub fn new(stdb_token: impl Into<String>, identity_hex: impl Into<String>) -> Result<Self> {
+        let stdb_token = stdb_token.into().trim().to_string();
+        let identity_hex = identity_hex.into().trim().to_string();
+        if stdb_token.is_empty() || identity_hex.is_empty() || identity_hex == "unknown" {
+            anyhow::bail!("authenticated actor credentials are required");
+        }
+        Ok(Self {
+            stdb_token,
+            identity_hex,
+        })
+    }
+}
 
 /// UI focus metadata forwarded from the BFF (mirrors `routes/rag::UiContext`).
 #[derive(Clone, Deserialize, Default)]
@@ -131,6 +152,91 @@ pub fn resolve_snapshot_candidates(
     }
 
     deduped
+}
+
+pub async fn fetch_authorized_live_snapshots(
+    state: &AppState,
+    actor: &ActorCredentials,
+    org_id: u64,
+    company_id: u64,
+    candidates: &[EntityRef],
+) -> Result<Vec<LiveSnapshot>> {
+    let api_base = state
+        .config
+        .api_server_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            anyhow::anyhow!("LUMIERE_API_SERVER_URL is required for authoritative snapshots")
+        })?
+        .trim_end_matches('/');
+    let snapshot_at = utc_now_rfc3339();
+    let mut snapshots = Vec::new();
+
+    for candidate in candidates {
+        let Some(spec) = lookup_entity_spec(&candidate.entity_type) else {
+            continue;
+        };
+        let url = format!(
+            "{api_base}/v1/authoritative/{}/{}",
+            spec.api_resource, candidate.entity_id
+        );
+        let response = state
+            .http
+            .get(url)
+            .bearer_auth(actor.stdb_token.trim())
+            .header("x-stdb-identity", actor.identity_hex.trim())
+            .query(&[("companyId", company_id)])
+            .send()
+            .await
+            .with_context(|| {
+                format!(
+                    "authoritative resolver request for {} #{}",
+                    spec.entity_type, candidate.entity_id
+                )
+            })?;
+
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            continue;
+        }
+        if !response.status().is_success() {
+            anyhow::bail!(
+                "authoritative resolver rejected {} #{} with status {}",
+                spec.entity_type,
+                candidate.entity_id,
+                response.status()
+            );
+        }
+        let envelope: Value = response.json().await.context("invalid authoritative response")?;
+        let Some(row) = envelope.get("data") else {
+            anyhow::bail!("authoritative resolver response is missing data");
+        };
+        let row_id = json_u64(row.get(spec.id_column).or_else(|| row.get("id")));
+        let row_org = spec.org_column.and_then(|column| {
+            let camel = snake_to_camel(column);
+            json_u64(row.get(column).or_else(|| row.get(&camel)))
+        });
+        if row_id != Some(candidate.entity_id) || row_org != Some(org_id) {
+            anyhow::bail!("authoritative resolver returned mismatched resource scope");
+        }
+        if !row_matches_scope(spec, row, org_id, company_id) {
+            continue;
+        }
+
+        snapshots.push(LiveSnapshot {
+            entity_type: spec.entity_type.to_string(),
+            entity_id: candidate.entity_id,
+            label: format_snapshot_label(spec.label_template, candidate.entity_id),
+            snapshot_at: snapshot_at.clone(),
+            row: filter_prompt_fields(row, spec.prompt_fields),
+            // Relation policies are resource-specific; omit them until each relation
+            // has an actor-authorized resolver contract.
+            relations: Vec::new(),
+        });
+    }
+
+    Ok(snapshots)
 }
 
 pub async fn fetch_live_snapshots(
@@ -480,6 +586,15 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn actor_credentials_are_trimmed_and_reject_placeholder_identity() {
+        let actor = ActorCredentials::new(" token ", " abc123 ").expect("valid actor");
+        assert_eq!(actor.stdb_token, "token");
+        assert_eq!(actor.identity_hex, "abc123");
+        assert!(ActorCredentials::new("", "abc123").is_err());
+        assert!(ActorCredentials::new("token", " unknown ").is_err());
+    }
 
     #[test]
     fn candidates_prioritize_ui_focus() {
