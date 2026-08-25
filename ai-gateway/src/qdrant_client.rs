@@ -91,17 +91,6 @@ impl VectorStore {
                 .context("Failed to create Qdrant collection")?;
 
             // Create payload indexes for fast tenant-filtered queries.
-            // The collection is versioned when this schema changes so every
-            // point is guaranteed to carry both scope keys.
-            self.client
-                .create_field_index(CreateFieldIndexCollectionBuilder::new(
-                    self.collection.clone(),
-                    "organization_id",
-                    FieldType::Integer,
-                ))
-                .await
-                .context("Failed to create organization_id index")?;
-
             self.client
                 .create_field_index(CreateFieldIndexCollectionBuilder::new(
                     self.collection.clone(),
@@ -126,6 +115,18 @@ impl VectorStore {
                 dim
             );
         }
+
+        // Reconcile the mandatory organization index even when an operator
+        // explicitly points at an existing collection. Legacy points without
+        // organization_id remain fail-closed until they are reindexed.
+        self.client
+            .create_field_index(CreateFieldIndexCollectionBuilder::new(
+                self.collection.clone(),
+                "organization_id",
+                FieldType::Integer,
+            ))
+            .await
+            .context("Failed to create organization_id index")?;
 
         Ok(())
     }
