@@ -6,11 +6,12 @@ use qdrant_client::{
         vectors_config::Config as VectorConfig, Condition, CreateCollectionBuilder,
         CreateFieldIndexCollectionBuilder, DeletePointsBuilder, Distance, FieldType, Filter,
         PointStruct, PointsIdsList, SearchParamsBuilder, SearchPointsBuilder, UpsertPointsBuilder,
-        VectorParamsBuilder, VectorsConfig,
+        Value, VectorParamsBuilder, VectorsConfig,
     },
     Payload, Qdrant,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 const MAX_SEARCH_LIMIT: u64 = 50;
 
@@ -57,19 +58,21 @@ pub struct SearchResult {
     pub record: SemanticIndexRecord,
 }
 
-fn semantic_payload(record: &SemanticIndexRecord) -> Result<Payload> {
-    Payload::try_from(serde_json::to_value(record)?).context("Failed to build semantic payload")
+fn semantic_payload(record: &SemanticIndexRecord) -> Result<HashMap<String, Value>> {
+    let payload = Payload::try_from(serde_json::to_value(record)?)
+        .context("Failed to build semantic payload")?;
+    Ok(payload.into())
 }
 
-fn payload_string(payload: &Payload, key: &str) -> Option<String> {
+fn payload_string(payload: &HashMap<String, Value>, key: &str) -> Option<String> {
     payload.get(key)?.as_str().cloned().filter(|value| !value.is_empty())
 }
 
-fn payload_u64(payload: &Payload, key: &str) -> Option<u64> {
+fn payload_u64(payload: &HashMap<String, Value>, key: &str) -> Option<u64> {
     u64::try_from(payload.get(key)?.as_integer()?).ok()
 }
 
-fn payload_strings(payload: &Payload, key: &str) -> Option<Vec<String>> {
+fn payload_strings(payload: &HashMap<String, Value>, key: &str) -> Option<Vec<String>> {
     payload
         .get(key)?
         .clone()
@@ -80,7 +83,7 @@ fn payload_strings(payload: &Payload, key: &str) -> Option<Vec<String>> {
         .collect()
 }
 
-fn semantic_record_from_payload(payload: &Payload) -> Option<SemanticIndexRecord> {
+fn semantic_record_from_payload(payload: &HashMap<String, Value>) -> Option<SemanticIndexRecord> {
     Some(SemanticIndexRecord {
         organization_id: payload_u64(payload, "organization_id")?,
         company_id: payload_u64(payload, "company_id")?,
@@ -180,7 +183,7 @@ impl VectorStore {
             .upsert_points(
                 UpsertPointsBuilder::new(
                     self.collection.clone(),
-                    vec![PointStruct::new(point.id, point.vector, payload)],
+                    vec![PointStruct::new(point.id, point.vector, payload.into())],
                 )
                 .wait(true)
                 .build(),
@@ -337,7 +340,7 @@ mod tests {
 
     #[test]
     fn semantic_payload_rejects_negative_scope_ids() {
-        let payload = Payload::try_from(serde_json::json!({
+        let payload: HashMap<String, Value> = Payload::try_from(serde_json::json!({
             "organization_id": -1,
             "company_id": 7,
             "resource_kind": "sale_order",
@@ -348,7 +351,8 @@ mod tests {
             "indexed_at": "2026-08-25T00:00:00Z",
             "tags": []
         }))
-        .unwrap();
+        .unwrap()
+        .into();
 
         assert!(semantic_record_from_payload(&payload).is_none());
     }
