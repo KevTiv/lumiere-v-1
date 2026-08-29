@@ -574,24 +574,31 @@ export async function chooseSelectOptionByValue(
   value: string | number | bigint,
 ) {
   const v = String(value)
-  await page.getByTestId(`form-field-${name}`).click()
-  const listbox = page.locator('[role="listbox"]')
-  await expect(listbox).toBeVisible({ timeout: 15_000 })
-  const byData = listbox.locator(`[role="option"][data-value="${v}"]`).first()
+  const field = page.getByTestId(`form-field-${name}`)
+  const nativeOptions = field.locator(
+    'xpath=following-sibling::select[@aria-hidden="true"][1]/option',
+  )
+  let optionLabel = ""
+
   await expect
-    .poll(async () => {
-      if ((await byData.count()) > 0) return "data-value"
-      if ((await listbox.getByRole("option", { name: new RegExp(`\\b${v}\\b`) }).count()) > 0) {
-        return "label"
-      }
-      return ""
-    }, { timeout: 30_000 })
+    .poll(
+      async () => {
+        optionLabel = await nativeOptions.evaluateAll((options, expectedValue) => {
+          const match = options.find(
+            (option) => (option as HTMLOptionElement).value === expectedValue,
+          )
+          return match?.textContent?.trim() ?? ""
+        }, v)
+        return optionLabel
+      },
+      { timeout: 30_000 },
+    )
     .not.toBe("")
-  if ((await byData.count()) > 0) {
-    await byData.click()
-    return
-  }
-  await listbox.getByRole("option", { name: new RegExp(`\\b${v}\\b`) }).first().click()
+
+  await field.click()
+  const listbox = page.locator('[role="listbox"]:visible')
+  await expect(listbox).toBeVisible({ timeout: 15_000 })
+  await listbox.getByRole("option", { name: optionLabel, exact: true }).click()
 }
 
 /** Pick a select option by visible label text (Radix Select shows labels, not raw ids). */
