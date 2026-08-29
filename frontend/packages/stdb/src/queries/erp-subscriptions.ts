@@ -2006,46 +2006,29 @@ export function subscriptionQueriesForResource(
   }
 
   if (r === "my-employee") {
-    if (!ctx.identityHex || ctx.identityHex === "unknown") return null;
-    const org = ctx.organizationId;
-    if (org === undefined || org === null || Number.isNaN(Number(org))) return null;
-    const idLit = identitySqlLiteral(ctx.identityHex);
-    const cols = resolveHttpSqlColumns("my-employee", ctx.fieldAccess).join(", ");
-    return [
-      `SELECT ${cols} FROM hr_employee WHERE organization_id = ${Number(org)} AND user_id = ${idLit} AND is_active = true`,
-    ];
+    // `user_id` is Option<Identity>, which the live subscription dialect cannot
+    // compare. A self-only authorization predicate must never be broadened.
+    return null;
   }
 
   if (r === "direct-reports") {
-    const managerId = ctx.managerEmployeeId;
-    if (managerId === undefined || managerId === null || managerId <= 0) return null;
-    const org = ctx.organizationId;
-    if (org === undefined || org === null || Number.isNaN(Number(org))) return null;
-    const cols = resolveHttpSqlColumns("direct-reports", ctx.fieldAccess).join(", ");
-    return [
-      `SELECT ${cols} FROM hr_employee WHERE organization_id = ${Number(org)} AND parent_id = ${Number(managerId)} AND is_active = true`,
-    ];
+    // `parent_id` is optional and cannot be compared in subscription SQL.
+    return null;
   }
 
   // H1: org-wide employees only for HR roles; others get self (same as my-employee).
   if (r === "employees") {
-    if (!ctx.identityHex || ctx.identityHex === "unknown") return null;
     const org = ctx.organizationId;
     if (org === undefined || org === null || Number.isNaN(Number(org))) return null;
-    const idLit = identitySqlLiteral(ctx.identityHex);
     const cols = resolveHttpSqlColumns("employees", ctx.fieldAccess).join(", ");
     const canListAll =
       hasHrPermission(ctx.fieldAccess, "hr_employee", "read") ||
       hasHrPermission(ctx.fieldAccess, "hr_employee", "create") ||
       hasHrPermission(ctx.fieldAccess, "hr_employee", "update") ||
       hasHrPermission(ctx.fieldAccess, "hr_employee", "view_pii");
-    if (canListAll) {
-      return [
-        `SELECT ${cols} FROM hr_employee WHERE organization_id = ${Number(org)} AND is_active = true`,
-      ];
-    }
+    if (!canListAll) return null;
     return [
-      `SELECT ${cols} FROM hr_employee WHERE organization_id = ${Number(org)} AND user_id = ${idLit} AND is_active = true`,
+      `SELECT ${cols} FROM hr_employee WHERE organization_id = ${Number(org)} AND is_active = true`,
     ];
   }
 

@@ -31,7 +31,6 @@ struct ErpOrgRow {
     resource_key: String,
     table: String,
     extra_where: String,
-    order_by: String,
 }
 
 static ERP_ORG_ROWS: Lazy<Vec<ErpOrgRow>> = Lazy::new(|| {
@@ -73,10 +72,6 @@ static AUTH_SINGLE: Lazy<HashMap<String, String>> = Lazy::new(|| {
     m
 });
 
-fn sql_quote_str(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "''"))
-}
-
 fn is_narrow_identity_hex(s: &str) -> bool {
     let s = s.trim();
     s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit())
@@ -85,22 +80,13 @@ fn is_narrow_identity_hex(s: &str) -> bool {
 /// Port of `authSubscriptions` from `queries/auth.ts` (uses `SELECT *`).
 pub fn auth_subscriptions(
     identity_hex: Option<&str>,
-    role_names: Option<&[String]>,
+    _role_names: Option<&[String]>,
     organization_id: Option<u64>,
 ) -> Vec<String> {
     let id = identity_hex
         .map(str::trim)
         .filter(|s| is_narrow_identity_hex(s))
         .map(|s| s.to_ascii_lowercase());
-
-    let roles: Vec<&str> = role_names
-        .map(|v| {
-            v.iter()
-                .map(|s| s.as_str())
-                .filter(|r| !r.is_empty() && r.len() < 256)
-                .collect()
-        })
-        .unwrap_or_default();
 
     let user_profile_sql = if let Some(ref hex) = id {
         format!("SELECT * FROM user_profile WHERE identity = 0x{hex}")
@@ -233,13 +219,18 @@ fn erp_org_line(
         return Ok(None);
     };
     let ent = &ERP_ORG_ROWS[idx];
+    // Realtime subscriptions only drive cache invalidation. Queue/view predicates
+    // (enum state, status, receipt flags, and ordering) are reapplied by the
+    // authorized HTTP read after invalidation, while SpacetimeDB subscriptions do
+    // not support those predicates or ORDER BY. Keep the authenticated tenant
+    // predicate here and deliberately broaden only the invalidation signal.
     Ok(Some(select_org_scoped_sql(
         &ent.resource_key,
         &ent.table,
         org,
         fa,
-        &ent.extra_where,
-        &ent.order_by,
+        "",
+        "",
     )?))
 }
 
@@ -311,30 +302,16 @@ pub fn subscription_queries_for_resource(
     }
 
     if r == "my-employee" {
-        let Some(org) = ctx.organization_id else {
-            return Ok(None);
-        };
-        let Some(id) = ctx.identity_hex.filter(|s| *s != "unknown") else {
-            return Ok(None);
-        };
-        let id_lit = crate::field_policy::identity_sql_literal(id)?;
-        let cols = resolve_http_sql_columns("my-employee", ctx.field_access)?.join(", ");
-        return Ok(Some(vec![format!(
-            "SELECT {cols} FROM hr_employee WHERE organization_id = {org} AND user_id = {id_lit} AND is_active = true"
-        )]));
+        // `hr_employee.user_id` is Option<Identity>; the live subscription
+        // dialect rejects equality against an identity literal. Do not broaden a
+        // self-only authorization predicate to organization scope.
+        return Ok(None);
     }
 
     if r == "direct-reports" {
-        let Some(org) = ctx.organization_id else {
-            return Ok(None);
-        };
-        let Some(manager_id) = ctx.manager_employee_id.filter(|&id| id > 0) else {
-            return Ok(None);
-        };
-        let cols = resolve_http_sql_columns("direct-reports", ctx.field_access)?.join(", ");
-        return Ok(Some(vec![format!(
-            "SELECT {cols} FROM hr_employee WHERE organization_id = {org} AND parent_id = {manager_id} AND is_active = true"
-        )]));
+        // `parent_id` is optional and cannot be compared by the live
+        // subscription dialect. Direct-report ownership is security-sensitive.
+        return Ok(None);
     }
 
     // H1: org-wide employees only for HR roles; others get self (same SQL as my-employee).
@@ -342,10 +319,6 @@ pub fn subscription_queries_for_resource(
         let Some(org) = ctx.organization_id else {
             return Ok(None);
         };
-        let Some(id) = ctx.identity_hex.filter(|s| *s != "unknown") else {
-            return Ok(None);
-        };
-        let id_lit = crate::field_policy::identity_sql_literal(id)?;
         let cols = resolve_http_sql_columns("employees", ctx.field_access)?.join(", ");
         let can_list_all =
             crate::field_policy::has_hr_permission(ctx.field_access, "hr_employee", "read")
@@ -364,16 +337,14 @@ pub fn subscription_queries_for_resource(
                     "hr_employee",
                     "view_pii",
                 );
-        let sql = if can_list_all {
-            format!(
-                "SELECT {cols} FROM hr_employee WHERE organization_id = {org} AND is_active = true"
-            )
-        } else {
-            format!(
-                "SELECT {cols} FROM hr_employee WHERE organization_id = {org} AND user_id = {id_lit} AND is_active = true"
-            )
-        };
-        return Ok(Some(vec![sql]));
+        if !can_list_all {
+            // Non-HR users are self-only, which requires the unsupported
+            // Option<Identity> predicate above. Keep them on authorized HTTP.
+            return Ok(None);
+        }
+        return Ok(Some(vec![format!(
+            "SELECT {cols} FROM hr_employee WHERE organization_id = {org} AND is_active = true"
+        )]));
     }
 
     if r == "employee-documents" {
@@ -594,5 +565,50 @@ mod tests {
         assert!(!queries[0].contains("NOT IN"));
         assert!(queries[0].contains("purpose != 'tax_id'"));
         assert!(queries[0].contains("purpose != 'identity'"));
+    }
+
+    #[test]
+    fn generated_invalidation_queries_omit_view_filters_and_ordering() {
+        let context = SubscriptionQueryContext {
+            organization_id: Some(42),
+            ..SubscriptionQueryContext::default()
+        };
+
+        for resource in [
+            "sale-orders-to-approve",
+            "inventory-exceptions-open-qc",
+            "purchase-orders-to-approve",
+            "payslips-to-export",
+            "expense-policy-exceptions",
+        ] {
+            let queries = subscription_queries_for_resource(resource, &context)
+                .expect("subscription SQL generation should not fail")
+                .unwrap_or_else(|| panic!("{resource} should resolve"));
+            assert_eq!(queries.len(), 1);
+            assert!(queries[0].contains("organization_id = 42"), "{queries:?}");
+            assert!(!queries[0].contains(" ORDER BY "), "{queries:?}");
+            assert!(!queries[0].contains("state = '"), "{queries:?}");
+            assert!(!queries[0].contains("status = '"), "{queries:?}");
+            assert!(!queries[0].contains("exception_type = '"), "{queries:?}");
+        }
+    }
+
+    #[test]
+    fn option_scoped_employee_subscriptions_fail_closed() {
+        let context = SubscriptionQueryContext {
+            organization_id: Some(42),
+            identity_hex: Some("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+            manager_employee_id: Some(7),
+            ..SubscriptionQueryContext::default()
+        };
+
+        for resource in ["my-employee", "direct-reports", "employees"] {
+            assert_eq!(
+                subscription_queries_for_resource(resource, &context)
+                    .expect("subscription SQL generation should not fail"),
+                None,
+                "{resource} must stay on authorized HTTP when optional predicates are required"
+            );
+        }
     }
 }

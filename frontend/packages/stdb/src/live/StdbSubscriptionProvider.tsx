@@ -13,6 +13,10 @@ import { SubscriptionCacheProvider } from "./context"
 import { SubscriptionCacheBridge } from "./subscription-bridge"
 import { LiveSubscriptionProvider } from "./subscription-registry"
 import { createLiveSubscriptionManager } from "./subscription-manager"
+import {
+  directRowCacheEnabled,
+  type DirectSubscriptionMode,
+} from "./direct-subscription-mode"
 import { setSubscriptionReady } from "./state"
 
 export type SubscriptionQueryKeyFactory = QueryKeyFactory
@@ -28,6 +32,12 @@ export interface StdbSubscriptionProviderProps {
   keysFor: SubscriptionQueryKeyFactory
   host?: string
   moduleName?: string
+  /**
+   * Complete SDK rows bypass HTTP field projection. The web app therefore
+   * defaults to API-server invalidations and must opt in explicitly to the
+   * legacy direct row cache.
+   */
+  directSubscriptionMode?: DirectSubscriptionMode
 }
 
 export function StdbSubscriptionProvider({
@@ -41,6 +51,7 @@ export function StdbSubscriptionProvider({
   keysFor,
   host,
   moduleName,
+  directSubscriptionMode = "disabled",
 }: StdbSubscriptionProviderProps) {
   const qc = useQueryClient()
   const bridgeRef = useRef<SubscriptionCacheBridge | null>(null)
@@ -63,8 +74,11 @@ export function StdbSubscriptionProvider({
     })
   }
 
-  const enabled =
-    Boolean(stdbToken) && organizationId != null && organizationId > 0
+  const enabled = directRowCacheEnabled({
+    mode: directSubscriptionMode,
+    token: stdbToken,
+    organizationId,
+  })
 
   useEffect(() => {
     if (!enabled) {

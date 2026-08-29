@@ -133,7 +133,6 @@ export function Providers({
   serverRoleNames,
   organizationId,
   companyIds,
-  stdbToken,
   fieldAccess,
 }: {
   children: React.ReactNode
@@ -141,7 +140,6 @@ export function Providers({
   serverRoleNames?: string[]
   organizationId?: number
   companyIds?: readonly number[]
-  stdbToken?: string
   fieldAccess?: FieldAccessContext
 }) {
   const [queryClient] = useState(() => new QueryClient())
@@ -156,7 +154,6 @@ export function Providers({
         <LumiereApiProvider client={webApi}>
           <QueryClientProvider client={queryClient}>
             <StdbSubscriptionProvider
-              stdbToken={stdbToken}
               fieldAccess={fieldAccess}
               organizationId={organizationId}
               companyIds={companyIds}

@@ -8,6 +8,25 @@ import {
 } from "./projection.ts"
 import { RESOURCE_REGISTRY } from "../generated/query-registry.ts"
 import { PURCHASING_WORKSPACE_RESOURCE_KEYS } from "../subscriptions/purchasing-workspace.ts"
+import { directRowCacheEnabled } from "./direct-subscription-mode.ts"
+
+describe("direct subscription cache boundary", () => {
+  it("remains disabled unless legacy full-row caching is explicitly requested", () => {
+    assert.equal(directRowCacheEnabled({ token: "token", organizationId: 42 }), false)
+    assert.equal(
+      directRowCacheEnabled({
+        mode: "legacy-row-cache",
+        token: "token",
+        organizationId: 42,
+      }),
+      true,
+    )
+    assert.equal(
+      directRowCacheEnabled({ mode: "legacy-row-cache", organizationId: 42 }),
+      false,
+    )
+  })
+})
 
 describe("live/projection", () => {
   it("rowNotSoftDeleted treats missing deletedAt as live", () => {

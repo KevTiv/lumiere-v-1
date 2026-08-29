@@ -154,6 +154,21 @@ describe("PUR-RI-017: company-scoped Purchasing subscriptions", () => {
 })
 
 describe("HR subscription SQL dialect", () => {
+  it("fails closed when employee authorization needs optional-field comparisons", () => {
+    const context = {
+      organizationId: 42,
+      identityHex: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      managerEmployeeId: 7,
+    }
+    for (const resource of ["my-employee", "direct-reports", "employees"]) {
+      assert.equal(
+        subscriptionQueriesForResource(resource, context),
+        null,
+        `${resource} must use authorized HTTP`,
+      )
+    }
+  })
+
   it("rewrites unsupported NOT IN for employee document purpose", () => {
     const sql = subscriptionQueriesForResource("employee-documents", {
       organizationId: 42,
