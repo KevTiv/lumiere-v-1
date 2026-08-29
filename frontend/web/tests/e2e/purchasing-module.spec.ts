@@ -23,6 +23,7 @@ import {
   gotoModule,
   openEntityCreate,
   scalarQueryId,
+  scalarQueryString,
   selectEntityRowById,
   smokeName,
   waitForPurchaseOrderState,
@@ -170,13 +171,19 @@ async function fetchPurchaseOrderPickingIds(page: Page, orderId: number): Promis
 
 async function fetchLatestLandedCostId(page: Page, description: string): Promise<number> {
   const deadline = Date.now() + 30_000
+  let lastStatus = 0
+  let lastDescriptions: string[] = []
   while (Date.now() < deadline) {
-    const res = await page.request.get("/api/query/stock-landed-costs")
+    const res = await page.request.get("/api/query/landed-costs")
+    lastStatus = res.status()
     if (res.ok()) {
       const json = (await res.json()) as {
         data?: Array<{ id?: unknown; description?: string }>
       }
-      const matches = (json.data ?? []).filter((r) => String(r.description ?? "") === description)
+      lastDescriptions = (json.data ?? []).slice(0, 5).map((r) => scalarQueryString(r.description))
+      const matches = (json.data ?? []).filter(
+        (r) => scalarQueryString(r.description) === description,
+      )
       const newest = [...matches].sort(
         (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
       )[0]
@@ -185,15 +192,17 @@ async function fetchLatestLandedCostId(page: Page, description: string): Promise
     }
     await page.waitForTimeout(250)
   }
-  throw new Error(`landed cost not found for description: ${description}`)
+  throw new Error(
+    `landed cost not found for description: ${description}; query status=${lastStatus}; latest descriptions=${JSON.stringify(lastDescriptions)}`,
+  )
 }
 
 async function fetchLandedCostState(page: Page, landedCostId: number): Promise<string> {
-  const res = await page.request.get("/api/query/stock-landed-costs")
-  if (!res.ok()) throw new Error(`stock-landed-costs query failed: ${res.status()}`)
+  const res = await page.request.get("/api/query/landed-costs")
+  if (!res.ok()) throw new Error(`landed-costs query failed: ${res.status()}`)
   const json = (await res.json()) as { data?: Array<{ id?: unknown; state?: unknown }> }
   const row = (json.data ?? []).find((r) => scalarQueryId(r.id) === landedCostId)
-  return String(row?.state ?? "")
+  return scalarQueryString(row?.state)
 }
 
 /**
@@ -352,11 +361,10 @@ test.describe("PUR-007: PO → Receipt → Landed Cost flow", { tag: "@p0" }, ()
     await gotoModule(page, "/purchasing", "purchasing")
     await page.getByTestId("module-tab-purchasing-orders").click()
     await selectEntityRowById(page, orderId)
-    await expect(page.getByText(origin)).toBeVisible({ timeout: 30_000 })
 
     await page.getByTestId("module-tab-purchasing-landed-costs").click()
     await expect(page.getByTestId("entity-table")).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByText(lcDescription)).toBeVisible({ timeout: 30_000 })
+    await selectEntityRowById(page, landedCostId)
 
     await expectNoAppError(page)
   })

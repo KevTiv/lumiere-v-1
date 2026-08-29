@@ -68,6 +68,16 @@ describe("CRM-RI-007: company-scoped live subscriptions", () => {
 })
 
 describe("PUR-RI-017: company-scoped Purchasing subscriptions", () => {
+  it("projects landed-cost lifecycle state without server-side ordering", () => {
+    const sql = subscriptionQueriesForResource("landed-costs", {
+      organizationId: 42,
+      companyIds: [7],
+    })
+    assert.ok(sql)
+    assert.match(sql![0], /\bstate\b/)
+    assert.doesNotMatch(sql![0], /\bORDER BY\b/i)
+  })
+
   it("filters every direct Purchasing table to the single allowed company", () => {
     for (const resource of [
       "purchase-orders",

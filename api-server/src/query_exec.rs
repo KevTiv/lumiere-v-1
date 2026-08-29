@@ -1790,7 +1790,8 @@ pub async fn execute_resource_query_for_company(
         "pricelist-items" => "",
         "pos-loyalty-programs" => " ORDER BY id DESC",
         "sale-commissions" | "sale-commissions-pending" => " ORDER BY id DESC",
-        "landed-costs" => " ORDER BY id DESC",
+        // SpacetimeDB HTTP SQL rejects ORDER BY for this table; sort below.
+        "landed-costs" => "",
         "landed-cost-lines" => " ORDER BY landed_cost_id ASC, id ASC",
         "contact-tags" => "",
         "contact-categories" => "",
@@ -1912,7 +1913,7 @@ pub async fn execute_resource_query_for_company(
                 asq.cmp(&bsq)
             });
         }
-        "activities" => {
+        "activities" | "landed-costs" => {
             rows.sort_by(|a, b| {
                 let ai = a.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
                 let bi = b.get("id").and_then(|v| v.as_u64()).unwrap_or(0);

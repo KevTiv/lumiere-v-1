@@ -429,7 +429,13 @@ pub fn resolve_http_sql_columns(
         merged.extend_from_slice(&reg.default_restricted);
         assert_safe_sql_identifiers(&unique_preserve_order(&merged))?
     };
-    let cols = apply_hr_field_policy(resource_key, cols, field_access)?;
+    let mut cols = apply_hr_field_policy(resource_key, cols, field_access)?;
+    // The v0.3.4 registry projection predates the landed-cost lifecycle UI.
+    // State is a non-sensitive operational field required for action gating
+    // and authoritative lifecycle reads.
+    if resource_key == "landed-costs" && !cols.iter().any(|column| column == "state") {
+        cols.push("state".to_string());
+    }
     assert_safe_sql_identifiers(&filter_http_sql_unsafe_columns(&cols, Some(resource_key)))
 }
 
@@ -690,6 +696,15 @@ mod tests {
                 "{field} must remain excluded from the default helpdesk projection: {cols:?}"
             );
         }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_exposes_landed_cost_state() {
+        let cols = resolve_http_sql_columns("landed-costs", None).expect("landed-costs columns");
+        assert!(
+            cols.iter().any(|column| column == "state"),
+            "expected state in landed-costs projection, got: {cols:?}"
+        );
     }
 
     #[test]

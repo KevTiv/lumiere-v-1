@@ -1034,7 +1034,7 @@ export function scalarQueryId(value: unknown): number | null {
   return null
 }
 
-function scalarQueryString(value: unknown): string {
+export function scalarQueryString(value: unknown): string {
   if (value == null) return ""
   if (typeof value === "string") return value
   if (typeof value === "number" || typeof value === "bigint") return String(value)
