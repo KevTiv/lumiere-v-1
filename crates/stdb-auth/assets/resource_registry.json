@@ -2185,7 +2185,9 @@
     "default_restricted": [
       "name",
       "partner_id",
-      "stage_id"
+      "stage_id",
+      "priority",
+      "state"
     ],
     "mandatory": [
       "id",

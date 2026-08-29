@@ -19,6 +19,7 @@ type WireField<T> =
   | null
   | (T extends bigint ? number | string : never)
   | (T extends object ? Record<string, unknown> : never)
+  | { __identity__: string }
   | { some: unknown }
   | { none: [] };
 

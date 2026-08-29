@@ -21,7 +21,7 @@ import type {
   HelpdeskTicket,
   UpdateTicketParams,
 } from "@lumiere/stdb/types"
-import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { encodeIdentity, stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 
 import {
   finalizeCreateHelpdeskSlaParams,
@@ -128,7 +128,10 @@ export function useAssignTicket(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, { ticketId: bigint | number | string; agentIdentityHex: string }>({
     mutationFn: async ({ ticketId, agentIdentityHex }) => {
-      const { urlPath, init } = stdbBffCommandPost("assign_ticket", { ticketId: toScalarU64(ticketId), agentId: agentIdentityHex })
+      const { urlPath, init } = stdbBffCommandPost("assign_ticket", {
+        ticketId: toScalarU64(ticketId),
+        agentId: encodeIdentity(agentIdentityHex),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to assign helpdesk ticket')
     },

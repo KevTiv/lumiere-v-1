@@ -675,6 +675,24 @@ mod tests {
     }
 
     #[test]
+    fn resolve_http_sql_columns_exposes_helpdesk_lifecycle_without_customer_pii() {
+        let cols = resolve_http_sql_columns("helpdesk-tickets", None)
+            .expect("helpdesk-tickets columns");
+        for field in ["state", "priority"] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in helpdesk-tickets projection, got: {cols:?}"
+            );
+        }
+        for field in ["description", "partner_name", "partner_email", "user_id"] {
+            assert!(
+                !cols.iter().any(|column| column == field),
+                "{field} must remain excluded from the default helpdesk projection: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
     fn resolve_http_sql_columns_excludes_requirements_for_opportunity_stages() {
         let cols = resolve_http_sql_columns("opportunity-stages", None)
             .expect("opportunity-stages columns");

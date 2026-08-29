@@ -77,6 +77,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "add_helpdesk_team_member",
+      "exposure": "session",
+      "reason": "required by the session-exposed ticket assignment workflow"
+    },
+    {
       "name": "add_landed_cost_line",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"

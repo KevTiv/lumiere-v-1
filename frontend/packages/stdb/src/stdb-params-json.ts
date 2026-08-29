@@ -293,7 +293,7 @@ export function encodeOptionalBool(
 }
 
 /** SpacetimeDB HTTP Identity (U256) JSON for flat reducer args. */
-export function encodeIdentity(value: unknown): Record<string, string> {
+export function encodeIdentity(value: unknown): { __identity__: string } {
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
     const obj = value as Record<string, unknown>
     if ("__identity__" in obj && typeof obj.__identity__ === "string") {

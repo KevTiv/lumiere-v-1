@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { encodeIdentity } from "@lumiere/stdb/stdb-params-json"
 
 import {
   callReducerBff,
@@ -29,6 +30,43 @@ async function fetchSessionIdentityHex(page: import("@playwright/test").Page): P
   const raw = identityCookie?.value
   if (!raw) throw new Error("stdb_identity cookie not found — is the session authenticated?")
   return raw.replace(/^0x/i, "")
+}
+
+async function ensureSessionAgentContact(
+  page: import("@playwright/test").Page,
+  organizationId: number,
+  identityHex: string,
+): Promise<void> {
+  const normalizedIdentity = identityHex.replace(/^0x/i, "").toLowerCase()
+  const agentName = `E2E Helpdesk Agent ${normalizedIdentity.slice(0, 8)}`
+  const hasContact = async () => {
+    const response = await page.request.get("/api/query/contacts")
+    if (!response.ok()) return false
+    const json = (await response.json()) as {
+      data?: Array<{ name?: unknown }>
+    }
+    return (json.data ?? []).some((contact) => contact.name === agentName)
+  }
+
+  if (await hasContact()) return
+
+  await callReducerBff(page, "create_contact", [
+    organizationId,
+    {
+      name: agentName,
+      type: "contact",
+      isCustomer: false,
+      isVendor: false,
+      isEmployee: true,
+      isProspect: false,
+      isPartner: false,
+      customerRank: 0,
+      supplierRank: 0,
+      userId: { some: encodeIdentity(identityHex) },
+    },
+  ])
+
+  await expect.poll(hasContact, { timeout: 30_000 }).toBe(true)
 }
 
 /**
@@ -234,6 +272,8 @@ test.describe("Helpdesk ticket assign and close", { tag: "@p0" }, () => {
     // The session user's SpacetimeDB identity is written to the
     // `stdb_identity` cookie by the BFF sign-in flow.
     const identityHex = await fetchSessionIdentityHex(page)
+    const identity = encodeIdentity(identityHex)
+    await ensureSessionAgentContact(page, organizationId, identityHex)
 
     // ── Step 3: add session user as team member (idempotent) ──────────────
     // assign_ticket enforces HLP-006: the agent must appear in
@@ -241,7 +281,7 @@ test.describe("Helpdesk ticket assign and close", { tag: "@p0" }, () => {
     await callReducerBff(page, "add_helpdesk_team_member", [
       organizationId,
       teamId,
-      identityHex,
+      identity,
     ])
 
     // ── Step 4: assign ticket to the session user via BFF ─────────────────
@@ -249,7 +289,7 @@ test.describe("Helpdesk ticket assign and close", { tag: "@p0" }, () => {
     await callReducerBff(page, "assign_ticket", [
       organizationId,
       ticketId,
-      identityHex,
+      identity,
     ])
 
     await waitForTicketState(page, ticketId, "InProgress")

@@ -5742,7 +5742,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "add_contact_to_segment", params: PARAMS_12, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "add_document_version", params: PARAMS_13, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "add_form_field", params: PARAMS_14, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "add_helpdesk_team_member", params: PARAMS_15, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "add_helpdesk_team_member", params: PARAMS_15, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "add_landed_cost_line", params: PARAMS_16, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "add_member_to_quality_team", params: PARAMS_17, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "add_org_member", params: PARAMS_18, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(1), company_position: None, unscoped_reason: None },
