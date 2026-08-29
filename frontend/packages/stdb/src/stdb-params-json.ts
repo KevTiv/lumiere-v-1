@@ -187,7 +187,11 @@ function encodeValue(
   if (value === undefined) return undefined
 
   if (isTimestampLike(value)) {
-    return encodeTimestamp(value)
+    const encoded = encodeTimestamp(value)
+    if (fieldKey && optionFields?.has(fieldKey)) {
+      return { some: encoded }
+    }
+    return encoded
   }
 
   if (isTaggedPayloadEnum(value)) {

@@ -311,6 +311,7 @@ import {
 import { useFinancialReports } from "@lumiere/query-hooks/hooks/reports"
 import {
   accountJournalRowsToSelectOptions,
+  paymentJournalRowsToSelectOptions,
   accountMoveRowsToSelectOptions,
   saleOrderRowsToSelectOptions,
   contactRowsToPartnerSelectOptions,
@@ -928,6 +929,12 @@ function AccountingClientReady({
     return [{ value: "", label: t("common.lookup.noJournals"), disabled: true }]
   }, [journalRowsAsSelectOptions, t])
 
+  const paymentJournalFieldOptions = useMemo(() => {
+    const options = paymentJournalRowsToSelectOptions(journals)
+    if (options.length > 0) return options
+    return [{ value: "", label: t("common.lookup.noJournals"), disabled: true }]
+  }, [journals, t])
+
   const glAccountSelectOptions = useMemo(
     () =>
       accounts.map((a) => ({
@@ -1011,10 +1018,10 @@ function AccountingClientReady({
     const merged = mergeSelectOptionsForFields(newAccountPaymentForm(t), {
       partnerId: partnerSelectOptions,
       currencyId: currencySelectOptions,
-      journalId: journalFieldOptionsForModularForm,
+      journalId: paymentJournalFieldOptions,
     })
     return mergeFieldDefaultValues(merged, { currencyId: String(defaultCurrencyId) })
-  }, [t, partnerSelectOptions, currencySelectOptions, journalFieldOptionsForModularForm, defaultCurrencyId])
+  }, [t, partnerSelectOptions, currencySelectOptions, paymentJournalFieldOptions, defaultCurrencyId])
 
   // Relation-aware labels: build Maps once from subscribed rows (ACC-RI-016).
   // Invoice partner display keeps `invoicePartnerDisplayName` snapshots on moves;

@@ -20,6 +20,7 @@ import {
   fetchFulfillmentPickingIdBySaleOrderId,
   fillField,
   gotoModule,
+  isoDate,
   openEntityCreate,
   openSettingsSection,
   postDraftInvoiceViaUi,
@@ -270,6 +271,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await fillField(page, "amount", String(amountTotal))
     await chooseSelectOptionByValue(page, "currencyId", currencyId)
     await chooseFirstEnabledOption(page, "journalId")
+    await fillField(page, "date", isoDate(0))
     const [createPaymentRes] = await Promise.all([
       page.waitForResponse(
         (res) => res.url().includes("/api/call/create_payment") && res.ok(),

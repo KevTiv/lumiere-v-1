@@ -30,6 +30,18 @@ export function accountJournalRowsToSelectOptions(
   })
 }
 
+/** Journals accepted by `create_payment`; keep invalid journal types out of the picker. */
+export function paymentJournalRowsToSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  const allowedTypes = new Set(["bank", "cash", "check"])
+  return accountJournalRowsToSelectOptions(
+    rows.filter((row) =>
+      allowedTypes.has(expenseVariantTag(row.type ?? row.type_).toLowerCase()),
+    ),
+  )
+}
+
 function isTruthyFlag(v: unknown): boolean {
   if (v === true || v === 1) return true
   if (v === false || v === 0 || v == null) return false

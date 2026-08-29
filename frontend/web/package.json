@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:unit": "node --import tsx --test lib/api-server-forward.test.ts lib/server-query.test.ts lib/crm-update-params.test.ts lib/expenses-coverage-create-params.test.ts lib/purchasing-coverage-create-params.test.ts app/api/ai/_lib/ai-privacy-policy.test.ts app/api/ai/_lib/indexing-gates.test.ts",
+    "test:unit": "node --import tsx --test lib/api-server-forward.test.ts lib/server-query.test.ts lib/form-lookup.test.ts lib/crm-update-params.test.ts lib/expenses-coverage-create-params.test.ts lib/purchasing-coverage-create-params.test.ts app/api/ai/_lib/ai-privacy-policy.test.ts app/api/ai/_lib/indexing-gates.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:p0": "playwright test --grep @p0 --grep-invert @dev-fixture",
     "test:e2e:full": "playwright test",
