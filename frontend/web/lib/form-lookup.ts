@@ -32,7 +32,7 @@ export function accountJournalRowsToSelectOptions(
 
 /** Journals accepted by `create_payment`; keep invalid journal types out of the picker. */
 export function paymentJournalRowsToSelectOptions(
-  rows: Record<string, unknown>[],
+  rows: Parameters<typeof accountJournalRowsToSelectOptions>[0],
 ): Array<{ value: string; label: string }> {
   const allowedTypes = new Set(["bank", "cash", "check"])
   return accountJournalRowsToSelectOptions(
