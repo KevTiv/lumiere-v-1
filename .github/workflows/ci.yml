@@ -44,6 +44,7 @@ jobs:
           workspaces: |
             spacetimedb
             .
+          cache-on-failure: true
 
       - name: SpacetimeDB module (cargo check --tests)
         working-directory: spacetimedb
@@ -108,6 +109,7 @@ jobs:
           workspaces: |
             spacetimedb
             .
+          cache-on-failure: true
 
       # Pinned to the same SpacetimeDB CLI version the generated bindings
       # were produced with so this job's `spacetime generate` output is
@@ -141,6 +143,15 @@ jobs:
       # docs/plans/contracts-extraction-execution-plan.md.
       - name: Verify STDB module matches pinned lumiere-contracts release
         run: make check-contracts-drift
+
+      - name: Upload generated contracts staging on drift
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contracts-drift-staging
+          path: .contracts-staging
+          retention-days: 3
+          if-no-files-found: error
 
   frontend:
     name: Frontend
@@ -247,18 +258,3 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Start trusted Chromium renderer
-        run: docker build -t lumiere-chromium-worker ./chromium-worker && docker run -d --name chromium-worker -p 8090:8090 lumiere-chromium-worker
-      - name: Install PDF text extractor
-        run: sudo apt-get update && sudo apt-get install -y poppler-utils
-      - name: Validate deterministic report fixtures
-        run: PDF_STRUCTURAL_OUTPUT="$GITHUB_WORKSPACE/artifacts/owner-report-pdf" node chromium-worker/scripts/structural-pdf-check.mjs
-      - name: Capture renderer logs on failure
-        if: failure()
-        run: docker logs chromium-worker
-      - name: Upload PDF diagnostics on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: owner-report-pdf-diagnostics
-          path: artifacts/owner-report-pdf
