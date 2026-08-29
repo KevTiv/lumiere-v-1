@@ -206,6 +206,56 @@ fn subscription_sql_for_company_scoped(
             )]))
         }
         "depreciation-lines" => Ok(CompanyScoped::MissingContext),
+        // `organization_id` is `Option<u64>` on account_fiscal_year, account_period,
+        // and consolidation_elimination_entry — SpacetimeDB SQL rejects `=` against
+        // it in every casing. `company.id` is a single global auto-increment
+        // primary key, so the company filter alone is equally precise (see the
+        // matching fix in `frontend/packages/stdb/src/queries/erp-subscriptions.ts`).
+        "fiscal-years" => {
+            let Some(list_ids) = ids else {
+                return Ok(CompanyScoped::MissingContext);
+            };
+            let c = resolve_http_sql_columns("fiscal-years", fa)?.join(", ");
+            let filter = company_ids_equality_or_clause("company_id", list_ids)?;
+            Ok(CompanyScoped::Queries(vec![format!(
+                "SELECT {c} FROM account_fiscal_year WHERE {filter}"
+            )]))
+        }
+        "account-periods" => {
+            let Some(list_ids) = ids else {
+                return Ok(CompanyScoped::MissingContext);
+            };
+            let c = resolve_http_sql_columns("account-periods", fa)?.join(", ");
+            let filter = company_ids_equality_or_clause("company_id", list_ids)?;
+            Ok(CompanyScoped::Queries(vec![format!(
+                "SELECT {c} FROM account_period WHERE {filter}"
+            )]))
+        }
+        "consolidation-elimination-entries" => {
+            let Some(list_ids) = ids else {
+                return Ok(CompanyScoped::MissingContext);
+            };
+            let c = resolve_http_sql_columns("consolidation-elimination-entries", fa)?.join(", ");
+            let filter = company_ids_equality_or_clause("company_id", list_ids)?;
+            Ok(CompanyScoped::Queries(vec![format!(
+                "SELECT {c} FROM consolidation_elimination_entry WHERE {filter}"
+            )]))
+        }
+        // These tables expose only unfilterable optional/vector tenant fields.
+        // Keep them on the authorized HTTP path rather than subscribing across
+        // organizations.
+        "consolidation-journals" | "consolidation-accounts" => Ok(CompanyScoped::MissingContext),
+        // `res_partner_bank.company_id` is `Option<u64>`; only `organization_id`
+        // (required here) can be filtered at the SQL level.
+        "partner-banks" => {
+            let Some(org) = ctx.organization_id else {
+                return Ok(CompanyScoped::MissingContext);
+            };
+            let c = resolve_http_sql_columns("partner-banks", fa)?.join(", ");
+            Ok(CompanyScoped::Queries(vec![format!(
+                "SELECT {c} FROM res_partner_bank WHERE organization_id = {org}"
+            )]))
+        }
         _ => Ok(CompanyScoped::NotApplicable),
     }
 }
@@ -314,7 +364,7 @@ pub fn subscription_queries_for_resource(
         return Ok(None);
     }
 
-    // H1: org-wide employees only for HR roles; others get self (same SQL as my-employee).
+    // H1: org-wide employees only for HR roles; others stay on authorized HTTP.
     if r == "employees" {
         let Some(org) = ctx.organization_id else {
             return Ok(None);
@@ -542,7 +592,13 @@ mod tests {
             ..SubscriptionQueryContext::default()
         };
 
-        for resource in ["partner-banks", "landed-cost-lines"] {
+        for resource in [
+            "partner-banks",
+            "landed-cost-lines",
+            "depreciation-lines",
+            "consolidation-journals",
+            "consolidation-accounts",
+        ] {
             assert_eq!(
                 subscription_queries_for_resource(resource, &context)
                     .expect("subscription SQL generation should not fail"),
