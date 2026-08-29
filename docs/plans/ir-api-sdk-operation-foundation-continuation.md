@@ -1,6 +1,6 @@
 # IR-owned frontend operation descriptors — continuation PR
 
-**Status:** Phase 1 implementation in progress — 2026-08-29
+**Status:** Phase 1 release published; application readiness blocked by P0 — 2026-08-29
 **Depends on:** canonical IR/contracts extraction merge
 **Companion release:** `lumiere-contracts` v0.3.4
 
@@ -11,7 +11,8 @@ application commit `7a876a18d3c74ae48f3f21d405c1fdd0f7f5556c`. v0.3.3 is not a u
 its checked-in IR pin and generated package contents are inconsistent.
 **Related:**
 [typed-bff-sdk-contract-hardening-execution-plan.md](./typed-bff-sdk-contract-hardening-execution-plan.md) ·
-[contracts-extraction-execution-plan.md](./contracts-extraction-execution-plan.md)
+[contracts-extraction-execution-plan.md](./contracts-extraction-execution-plan.md) ·
+[Phase 2 P0 release-gate recovery](./phase-2-p0-release-gate-recovery.md)
 
 ## 1. Outcome
 
@@ -139,5 +140,6 @@ compile-time reducer validation.
 - both repositories build from one immutable contracts release;
 - all contracts and application verification gates are green.
 
-The next continuation slice may build generated wire codecs and a typed API
-operation endpoint on this descriptor highway.
+The P0 recovery milestone must complete before the next continuation slice
+builds generated wire codecs and a typed API operation endpoint on this
+descriptor highway.
