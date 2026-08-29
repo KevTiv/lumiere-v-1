@@ -35,6 +35,27 @@ fi
 python3 "$ROOT/scripts/verify-contract-ir.py" \
   "$STAGING/ir/lumiere-contract-ir-v1.json" --require-clean
 
+SOURCE_REPO="$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)"
+if [[ -z "$SOURCE_REPO" ]]; then
+  SOURCE_REPO="$(git -C "$ROOT" rev-parse --show-toplevel)"
+fi
+readarray -t IR_METADATA < <(python3 - "$STAGING/ir/lumiere-contract-ir-v1.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    ir = json.load(source)
+print(ir["source_commit"])
+print(ir["ir_version"])
+print(ir["schema_hash"])
+print(__import__("hashlib").sha256(open(sys.argv[1], "rb").read()).hexdigest())
+PY
+)
+SOURCE_COMMIT="${IR_METADATA[0]}"
+IR_VERSION="${IR_METADATA[1]}"
+SCHEMA_HASH="${IR_METADATA[2]}"
+IR_SHA256="${IR_METADATA[3]}"
+
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -47,6 +68,31 @@ mkdir -p ir
 cp "$STAGING/ir/lumiere-contract-ir-v1.json" ir/
 cp "$STAGING/ir/lumiere-contract-ir-v1.json.sha256" ir/
 
+# Keep the provenance pin in sync with the verified handoff. The source commit
+# comes from the IR itself so the pin cannot accidentally describe a different
+# checkout than the one that produced the artifact.
+python3 - "$SOURCE_REPO" "$SOURCE_COMMIT" "$IR_SHA256" "$IR_VERSION" "$SCHEMA_HASH" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+Path("ir/PIN.json").write_text(
+    json.dumps(
+        {
+            "artifact_sha256": sys.argv[3],
+            "ir_version": int(sys.argv[4]),
+            "path": "ir/lumiere-contract-ir-v1.json",
+            "schema_hash": sys.argv[5],
+            "source_commit": sys.argv[2],
+            "source_repository": sys.argv[1],
+        },
+        indent=2,
+    )
+    + "\n",
+    encoding="utf-8",
+)
+PY
+
 rm -rf crates/lumiere-contracts/src/bindings
 mkdir -p crates/lumiere-contracts/src/bindings
 cp -R "$STAGING/bindings/." crates/lumiere-contracts/src/bindings/
@@ -54,6 +100,9 @@ rm -rf manifests
 mkdir -p manifests
 cp "$STAGING/manifests/"*.json manifests/
 echo "$VERSION" > CONTRACT_VERSION
+
+# Restore contracts-owned manifests before the Rust crate enumerates them.
+python3 scripts/generate-from-ir.py
 
 # lib.rs re-exports the generated bindings module tree and exposes each
 # manifest as a &'static str const via include_str!.
@@ -90,11 +139,24 @@ cargo build --manifest-path crates/lumiere-contracts/Cargo.toml
 # TS/JSON artifacts. Kept at the exact same relative paths as they had in
 # frontend/packages/stdb/src/generated, so nothing inside them needs an
 # import rewrite — only consumers outside the tree change their specifier.
-rm -rf packages/contracts/src
-mkdir -p packages/contracts/src
+# Keep the contracts-owned package entrypoints, tests, and generator support
+# files intact; only refresh the generated subtree and generated sidecars.
+rm -rf packages/contracts/src/generated
 cp -R "$STAGING/ts/generated" packages/contracts/src/generated
 cp "$STAGING/ts/stdb-generated-sql-columns.json" packages/contracts/src/
 cp "$STAGING/ts/stdb-reducer-invalidation.ts" packages/contracts/src/
+
+# The contracts repository owns IR-derived targets. Run its generator after
+# the immutable input has been copied so these targets are present even when
+# the application staging directory was produced by an older codegen pass.
+python3 scripts/generate-from-ir.py
+
+for generated in query-registry.ts operation-inputs.ts operation-descriptors.ts; do
+  if [[ ! -f "packages/contracts/src/generated/$generated" ]]; then
+    echo "error: contracts generator did not emit packages/contracts/src/generated/$generated" >&2
+    exit 1
+  fi
+done
 
 node -e '
   const fs = require("fs");
@@ -109,42 +171,9 @@ node -e '
   npm install --no-save --silent
   ./node_modules/.bin/tsc --noEmit -p tsconfig.json
 
-  # Type-checking above reads the raw .ts source directly (package.json's
-  # "types" export condition) — no build needed for that. But a real
-  # installed dependency (unlike a pnpm workspace symlink, which resolves
-  # outside node_modules) sits physically inside node_modules, and several
-  # real consumers refuse to execute raw .ts there: Node's own native
-  # type-stripping explicitly excludes node_modules, and bundlers that
-  # don't have this package in their transpile allowlist expect valid JS.
-  # esbuild bundles each entry point into self-contained ESM, inlining the
-  # ~1700 extensionless-relative-import generated files so Node ESM's
-  # stricter resolution rules never see them. `spacetimedb` stays external
-  # since it's a real runtime dependency, not generated content.
-  rm -rf dist
-  node -e '
-    const esbuild = require("esbuild");
-    const entries = [
-      "generated/index.ts",
-      "generated/types.ts",
-      "generated/types/procedures.ts",
-      "generated/query-registry.ts",
-      "generated/role_table.ts",
-      "generated/user_organization_table.ts",
-      "generated/user_profile_table.ts",
-      "generated/user_role_assignment_table.ts",
-      "stdb-reducer-invalidation.ts",
-    ];
-    esbuild.buildSync({
-      entryPoints: entries.map((e) => `src/${e}`),
-      outbase: "src",
-      outdir: "dist",
-      bundle: true,
-      format: "esm",
-      platform: "neutral",
-      external: ["spacetimedb"],
-      logLevel: "warning",
-    });
-  '
+  # Let the package own its build graph and entrypoints; keeping this here
+  # avoids a stale publisher-side list as generated targets are added.
+  npm run build
 )
 
 git add -A

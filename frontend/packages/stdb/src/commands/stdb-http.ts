@@ -1,11 +1,15 @@
 import { stringifyReducerCommandBody } from "@lumiere/api-client";
 import type { OperationInputMap } from "@lumiere/contracts/generated/operation-inputs";
+import {
+  SESSION_OPERATION_NAMES,
+  type SessionOperationName,
+} from "@lumiere/contracts/generated/operation-descriptors";
 
 import type { ReducerCommandContractMeta } from "./types";
-import {
-  STDB_BFF_REDUCERS,
-  type StdbBffReducerKey,
-} from "./generated-stdb-bff-reducers";
+
+/** Backward-compatible names for the canonical session-operation surface. */
+const STDB_BFF_REDUCERS = SESSION_OPERATION_NAMES;
+type StdbBffReducerKey = SessionOperationName;
 
 export { STDB_BFF_REDUCERS, type StdbBffReducerKey };
 

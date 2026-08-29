@@ -314,29 +314,40 @@ e2e-smoke-setup:
 		fi; \
 		echo "[e2e] Logging in to local SpacetimeDB (database owner for private-table SQL)..."; \
 		E2E_STDB_HOST="$$E2E_STDB_HOST" node "$$ROOT/scripts/e2e-local-stdb-token.mjs" --login-only; \
-		echo "[e2e] Publishing local database $(E2E_DB) (--no-config)..."; \
-		if [ "$${E2E_CLEAR_DB:-0}" = "1" ]; then \
-			echo "[e2e] E2E_CLEAR_DB=1: clearing module data (--clear-database)"; \
-			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --module-path "$(MODULE)" --server local --clear-database -y --no-config; \
-		else \
-			echo "[e2e] Preserving existing DB (set E2E_CLEAR_DB=1 to wipe + full re-seed)."; \
-			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --module-path "$(MODULE)" --server local -y --no-config; \
+		STDB_HASH_FILE="$$LOG_DIR/stdb.hash"; \
+		CUR_STDB_HASH="$$( { find "$$ROOT/spacetimedb/src" -type f -name "*.rs" 2>/dev/null; ls "$$ROOT/spacetimedb/Cargo.toml" "$$ROOT/spacetimedb/Cargo.lock" 2>/dev/null; } | sort | xargs -I{} shasum -a 256 {} 2>/dev/null | shasum -a 256 | cut -d" " -f1 )"; \
+		STDB_FAST_PATH=0; \
+		if [ "$${E2E_CLEAR_DB:-0}" != "1" ] && [ "$${E2E_FORCE_REBUILD:-0}" != "1" ] && [ -f "$$STDB_HASH_FILE" ] && [ "$$(cat "$$STDB_HASH_FILE")" = "$$CUR_STDB_HASH" ] && spacetime describe "$(E2E_DB)" --server local --no-config >/dev/null 2>&1; then \
+			STDB_FAST_PATH=1; \
 		fi; \
-		if spacetime call "$(E2E_DB)" run_all_core_tests --server local --no-config; then \
-			echo "[e2e] Core reducer tests passed."; \
+		if [ "$$STDB_FAST_PATH" = "1" ]; then \
+			echo "[e2e] spacetimedb/ unchanged since last publish — skipping publish + reducer tests + fixture reseed (set E2E_FORCE_REBUILD=1 or E2E_CLEAR_DB=1 to force)."; \
 		else \
-			echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
-		fi; \
-		echo "[e2e] Running domain test reducers (one case per call)..."; \
-		for _domain_reducer in $(E2E_DOMAIN_TEST_REDUCERS); do \
-			echo "[e2e] Calling $$_domain_reducer..."; \
-			if ! spacetime call "$(E2E_DB)" "$$_domain_reducer" --server local --no-config; then \
-				echo "[e2e] $$_domain_reducer failed — tail of SpacetimeDB logs:"; \
-				spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -40 || true; \
-				exit 1; \
+			echo "[e2e] Publishing local database $(E2E_DB) (--no-config)..."; \
+			if [ "$${E2E_CLEAR_DB:-0}" = "1" ]; then \
+				echo "[e2e] E2E_CLEAR_DB=1: clearing module data (--clear-database)"; \
+				LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --module-path "$(MODULE)" --server local --clear-database -y --no-config; \
+			else \
+				echo "[e2e] Preserving existing DB (set E2E_CLEAR_DB=1 to wipe + full re-seed)."; \
+				LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --module-path "$(MODULE)" --server local -y --no-config; \
 			fi; \
-		done; \
-		echo "[e2e] Domain reducer tests passed."; \
+			if spacetime call "$(E2E_DB)" run_all_core_tests --server local --no-config; then \
+				echo "[e2e] Core reducer tests passed."; \
+			else \
+				echo "[e2e] run_all_core_tests is unavailable or failed; continuing with browser smoke tests."; \
+			fi; \
+			echo "[e2e] Running domain test reducers (one case per call)..."; \
+			for _domain_reducer in $(E2E_DOMAIN_TEST_REDUCERS); do \
+				echo "[e2e] Calling $$_domain_reducer..."; \
+				if ! spacetime call "$(E2E_DB)" "$$_domain_reducer" --server local --no-config; then \
+					echo "[e2e] $$_domain_reducer failed — tail of SpacetimeDB logs:"; \
+					spacetime logs "$(E2E_DB)" --server local --no-config 2>/dev/null | tail -40 || true; \
+					exit 1; \
+				fi; \
+			done; \
+			echo "[e2e] Domain reducer tests passed."; \
+			echo "$$CUR_STDB_HASH" >"$$STDB_HASH_FILE"; \
+		fi; \
 		echo "[e2e] Obtaining local SpacetimeDB owner token (with private-table SQL preflight)..."; \
 		STDB_SERVER_TOKEN="$$(E2E_STDB_HOST="$$E2E_STDB_HOST" STDB_MODULE="$(E2E_DB)" node "$$ROOT/scripts/e2e-local-stdb-token.mjs")"; \
 		if [ -z "$$STDB_SERVER_TOKEN" ]; then \
@@ -344,41 +355,55 @@ e2e-smoke-setup:
 			exit 1; \
 		fi; \
 		E2E_STDB_TOKEN="$$STDB_SERVER_TOKEN"; \
-		echo "[e2e] Seeding smoke fixture (seed_dev_data) and browser test user..."; \
-		cd "$$ROOT/frontend/web"; \
-		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
-		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
-		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
-		cd "$$ROOT"; \
-		if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then \
-			echo "[e2e] Stopping existing api-server on :$(E2E_API_PORT) for e2e env..."; \
-			lsof -ti:"$(E2E_API_PORT)" | xargs kill >/dev/null 2>&1 || true; \
-			sleep 1; \
+		if [ "$$STDB_FAST_PATH" = "1" ]; then \
+			echo "[e2e] Skipping fixture reseed (spacetimedb/ unchanged; reusing existing DB data)."; \
+		else \
+			echo "[e2e] Seeding smoke fixture (seed_dev_data) and browser test user..."; \
+			cd "$$ROOT/frontend/web"; \
+			STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
+			set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
+			STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
+			cd "$$ROOT"; \
 		fi; \
-		echo "[e2e] Building api-server (first run may take a few minutes)..."; \
-		cargo build -p api-server -q; \
-		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
-		echo "[e2e] Starting api-server on :$(E2E_API_PORT)..."; \
-		LUMIERE_E2E=1 \
-		PORT="$(E2E_API_PORT)" \
-		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
-		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
-		STDB_MODULE="$(E2E_DB)" \
-		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
-		STDB_HOST="$$E2E_STDB_HOST" \
-		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
-		CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
-		nohup cargo run -p api-server -q >>"$$LOG_DIR/api-server.log" 2>&1 & \
-		API_PID="$$!"; \
-		disown "$$API_PID" 2>/dev/null || true; \
-		for i in {1..180}; do \
-			if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then break; fi; \
-			sleep 1; \
-			if [ "$$i" = "180" ]; then \
-				echo "[e2e] api-server did not become ready. See $$LOG_DIR/api-server.log"; \
-				exit 1; \
+		API_HASH_FILE="$$LOG_DIR/api.hash"; \
+		CUR_API_HASH="$$( { find "$$ROOT/api-server/src" "$$ROOT/crates" -type f -name "*.rs" 2>/dev/null; ls "$$ROOT/api-server/Cargo.toml" "$$ROOT/Cargo.lock" 2>/dev/null; } | sort | xargs -I{} shasum -a 256 {} 2>/dev/null | shasum -a 256 | cut -d" " -f1 )"; \
+		API_HEALTHY=0; \
+		curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1 && API_HEALTHY=1; \
+		if [ "$${E2E_FORCE_REBUILD:-0}" != "1" ] && [ "$$API_HEALTHY" = "1" ] && [ -f "$$API_HASH_FILE" ] && [ "$$(cat "$$API_HASH_FILE")" = "$$CUR_API_HASH" ]; then \
+			echo "[e2e] api-server unchanged and already running on :$(E2E_API_PORT) — reusing it (set E2E_FORCE_REBUILD=1 to force a rebuild)."; \
+			API_PID="$$(cat "$$LOG_DIR/api-server.pid" 2>/dev/null || true)"; \
+		else \
+			if [ "$$API_HEALTHY" = "1" ]; then \
+				echo "[e2e] Stopping existing api-server on :$(E2E_API_PORT) for e2e env..."; \
+				lsof -ti:"$(E2E_API_PORT)" | xargs kill >/dev/null 2>&1 || true; \
+				sleep 1; \
 			fi; \
-		done; \
+			echo "[e2e] Building api-server (first run may take a few minutes)..."; \
+			cargo build -p api-server -q; \
+			set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
+			echo "[e2e] Starting api-server on :$(E2E_API_PORT)..."; \
+			LUMIERE_E2E=1 \
+			PORT="$(E2E_API_PORT)" \
+			STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
+			STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
+			STDB_MODULE="$(E2E_DB)" \
+			NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
+			STDB_HOST="$$E2E_STDB_HOST" \
+			NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+			CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
+			nohup cargo run -p api-server -q >>"$$LOG_DIR/api-server.log" 2>&1 & \
+			API_PID="$$!"; \
+			disown "$$API_PID" 2>/dev/null || true; \
+			for i in {1..180}; do \
+				if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then break; fi; \
+				sleep 1; \
+				if [ "$$i" = "180" ]; then \
+					echo "[e2e] api-server did not become ready. See $$LOG_DIR/api-server.log"; \
+					exit 1; \
+				fi; \
+			done; \
+			echo "$$CUR_API_HASH" >"$$API_HASH_FILE"; \
+		fi; \
 		{ \
 			printf "export E2E_STDB_TOKEN=%q\n" "$$E2E_STDB_TOKEN"; \
 			printf "export STDB_CREDENTIAL_ENCRYPTION_KEY=%q\n" "$$STDB_CREDENTIAL_ENCRYPTION_KEY"; \
@@ -537,34 +562,43 @@ e2e-single-test:
 			echo "[e2e] SpacetimeDB is down — run make e2e-smoke-setup or make e2e-single first."; \
 			exit 1; \
 		fi; \
-		echo "[e2e] Building api-server..."; \
 		cd "$$ROOT"; \
-		cargo build -p api-server -q; \
-		if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then \
-			echo "[e2e] Restarting api-server on :$(E2E_API_PORT)..."; \
-			lsof -ti:"$(E2E_API_PORT)" | xargs kill >/dev/null 2>&1 || true; \
-			sleep 1; \
-		fi; \
-		echo "[e2e] Starting api-server on :$(E2E_API_PORT)..."; \
-		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
-		LUMIERE_E2E=1 \
-		PORT="$(E2E_API_PORT)" \
-		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
-		STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
-		STDB_MODULE="$(E2E_DB)" \
-		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
-		STDB_HOST="$$E2E_STDB_HOST" \
-		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
-		CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
-		cargo run -p api-server -q >"$$LOG_DIR/api-server.log" 2>&1 & \
-		for i in {1..60}; do \
-			if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then break; fi; \
-			sleep 1; \
-			if [ "$$i" = "60" ]; then \
-				echo "[e2e] api-server did not become ready. See $$LOG_DIR/api-server.log"; \
-				exit 1; \
+		API_HASH_FILE="$$LOG_DIR/api.hash"; \
+		CUR_API_HASH="$$( { find "$$ROOT/api-server/src" "$$ROOT/crates" -type f -name "*.rs" 2>/dev/null; ls "$$ROOT/api-server/Cargo.toml" "$$ROOT/Cargo.lock" 2>/dev/null; } | sort | xargs -I{} shasum -a 256 {} 2>/dev/null | shasum -a 256 | cut -d" " -f1 )"; \
+		API_HEALTHY=0; \
+		curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1 && API_HEALTHY=1; \
+		if [ "$${E2E_FORCE_REBUILD:-0}" != "1" ] && [ "$$API_HEALTHY" = "1" ] && [ -f "$$API_HASH_FILE" ] && [ "$$(cat "$$API_HASH_FILE")" = "$$CUR_API_HASH" ]; then \
+			echo "[e2e] api-server unchanged and already running on :$(E2E_API_PORT) — reusing it (set E2E_FORCE_REBUILD=1 to force a rebuild)."; \
+		else \
+			echo "[e2e] Building api-server..."; \
+			cargo build -p api-server -q; \
+			if [ "$$API_HEALTHY" = "1" ]; then \
+				echo "[e2e] Restarting api-server on :$(E2E_API_PORT)..."; \
+				lsof -ti:"$(E2E_API_PORT)" | xargs kill >/dev/null 2>&1 || true; \
+				sleep 1; \
 			fi; \
-		done; \
+			echo "[e2e] Starting api-server on :$(E2E_API_PORT)..."; \
+			set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
+			LUMIERE_E2E=1 \
+			PORT="$(E2E_API_PORT)" \
+			STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" \
+			STDB_CREDENTIAL_ENCRYPTION_KEY="$$STDB_CREDENTIAL_ENCRYPTION_KEY" \
+			STDB_MODULE="$(E2E_DB)" \
+			NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" \
+			STDB_HOST="$$E2E_STDB_HOST" \
+			NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
+			CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
+			cargo run -p api-server -q >"$$LOG_DIR/api-server.log" 2>&1 & \
+			for i in {1..60}; do \
+				if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then break; fi; \
+				sleep 1; \
+				if [ "$$i" = "60" ]; then \
+					echo "[e2e] api-server did not become ready. See $$LOG_DIR/api-server.log"; \
+					exit 1; \
+				fi; \
+			done; \
+			echo "$$CUR_API_HASH" >"$$API_HASH_FILE"; \
+		fi; \
 		cd "$$ROOT/frontend/web"; \
 		if curl -fsS "http://127.0.0.1:$(E2E_WEB_PORT)" >/dev/null 2>&1; then \
 			echo "[e2e] Stopping existing Next.js on :$(E2E_WEB_PORT)..."; \
@@ -852,7 +886,6 @@ check-contract-ir: codegen
 check-codegen: codegen check-contract-ir lint-reducer-call-literals
 	@git add -N \
 		frontend/packages/stdb/src/query-resource-row-type.json \
-		frontend/packages/stdb/src/commands/generated-stdb-bff-reducers.ts \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
 		crates/stdb-auth/assets/query_exec_non_registry.json \
@@ -860,7 +893,6 @@ check-codegen: codegen check-contract-ir lint-reducer-call-literals
 		2>/dev/null || true
 	@git diff --exit-code -- \
 		frontend/packages/stdb/src/query-resource-row-type.json \
-		frontend/packages/stdb/src/commands/generated-stdb-bff-reducers.ts \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
 		crates/stdb-auth/assets/query_exec_non_registry.json \
@@ -884,6 +916,12 @@ contracts-staging-from-pinned:
 		echo "contracts-staging-from-pinned: $$CHECKOUT/packages/contracts/src/generated missing — pinned tag predates the TS package" >&2; \
 		exit 1; \
 	fi; \
+	for generated in query-registry.ts operation-inputs.ts operation-descriptors.ts; do \
+		if [ ! -f "$$CHECKOUT/packages/contracts/src/generated/$$generated" ]; then \
+			echo "contracts-staging-from-pinned: $$generated missing from pinned contracts package" >&2; \
+			exit 1; \
+		fi; \
+	done; \
 	rm -rf .contracts-staging; \
 	mkdir -p .contracts-staging/bindings .contracts-staging/manifests .contracts-staging/ts/generated .contracts-staging/ir; \
 	cp -R "$$CHECKOUT/crates/lumiere-contracts/src/bindings/." .contracts-staging/bindings/; \
@@ -926,7 +964,7 @@ check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-std
 	for manifest in .contracts-staging/manifests/*.json; do diff "$$CHECKOUT/manifests/$$(basename "$$manifest")" "$$manifest" || exit 1; done && \
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v1.json --require-clean --expect-schema-hash-from "$$CHECKOUT/ir/lumiere-contract-ir-v1.json" && \
 	python3 "$$CHECKOUT/scripts/generate-from-ir.py" --check && \
-	diff -rq -x query-registry.ts -x operation-inputs.ts "$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
+	diff -rq -x query-registry.ts -x operation-inputs.ts -x operation-descriptors.ts "$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
 	diff "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/stdb-generated-sql-columns.json && \
 	echo "check-contracts-drift: staging matches pinned lumiere-contracts release" || \
 	(echo "Local generation drifted from the pinned lumiere-contracts tag. Run: make publish-contracts VERSION=x.y.z" && exit 1)
