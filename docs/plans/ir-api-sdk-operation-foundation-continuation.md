@@ -4,11 +4,11 @@
 **Depends on:** canonical IR/contracts extraction merge
 **Companion release:** `lumiere-contracts` v0.3.4
 
-The application currently pins the immutable v0.3.4 release-candidate commit
-`e013dd2ce3be101863acc696a1e87b2486fa95bb`. Replace that SHA with the
-`v0.3.4` tag only after the companion branch passes verification and is
-published. v0.3.3 is not a usable base: its checked-in IR pin and generated
-package contents are inconsistent.
+The application pins the immutable `v0.3.4` tag at companion release commit
+`a4baae1ddd67c5027a25c8e85f0c760e363f133a`. The release was rebuilt from the
+authoritative Phase 1 staging artifact with provenance normalized to durable
+application commit `7a876a18d3c74ae48f3f21d405c1fdd0f7f5556c`. v0.3.3 is not a usable base:
+its checked-in IR pin and generated package contents are inconsistent.
 **Related:**
 [typed-bff-sdk-contract-hardening-execution-plan.md](./typed-bff-sdk-contract-hardening-execution-plan.md) ·
 [contracts-extraction-execution-plan.md](./contracts-extraction-execution-plan.md)

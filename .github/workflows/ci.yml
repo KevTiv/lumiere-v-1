@@ -144,16 +144,6 @@ jobs:
       - name: Verify STDB module matches pinned lumiere-contracts release
         run: make check-contracts-drift
 
-      - name: Upload generated contracts staging on drift
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: contracts-drift-staging
-          path: .contracts-staging
-          retention-days: 3
-          if-no-files-found: error
-          include-hidden-files: true
-
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
