@@ -268,3 +268,22 @@ jobs:
           context: ./chromium-worker
           tags: lumiere-chromium-worker
           load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start trusted Chromium renderer
+        run: docker run -d --name chromium-worker -p 8090:8090 lumiere-chromium-worker
+      - name: Install PDF text extractor
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+      - name: Validate deterministic report fixtures
+        run: PDF_STRUCTURAL_OUTPUT="$GITHUB_WORKSPACE/artifacts/owner-report-pdf" node chromium-worker/scripts/structural-pdf-check.mjs
+      - name: Capture renderer logs on failure
+        if: failure()
+        run: docker logs chromium-worker
+      - name: Upload PDF diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          context: ./chromium-worker
+          tags: lumiere-chromium-worker
+          load: true
