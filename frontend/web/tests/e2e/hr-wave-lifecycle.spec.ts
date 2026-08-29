@@ -423,6 +423,10 @@ test.describe("HR-008 employee → contract → payslip lifecycle @hr @p0", () =
       }, { timeout: 45_000 })
       .toMatch(/Verify/i)
 
+    // Reducers invoked through the BFF helper bypass the UI mutation hooks that
+    // invalidate React Query. Reload so the table hydrates from the confirmed
+    // server state instead of the route's still-fresh initial cache.
+    await page.reload({ waitUntil: "domcontentloaded" })
     await openHrTab(page, "payslips")
     // The payslip table exposes the payslip's own name and employee id; it does
     // not join the employee table to render the employee display name.
