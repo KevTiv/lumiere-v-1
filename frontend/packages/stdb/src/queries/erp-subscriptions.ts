@@ -485,14 +485,13 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     ),
   "sale-orders": (id, fa) =>
     selectOrgScopedSql("sale-orders", "sale_order", id, fa, ""),
+  // SpacetimeDB SQL rejects a quoted string literal compared against a
+  // sum-type column in every casing (see
+  // docs/plans/spacetimedb-sql-dialect-subscription-gaps-plan.md §2) — drop
+  // the `state = 'toApprove'` filter here; the HTTP path
+  // (api-server/src/query_exec.rs) post-filters by the SATS-unwrapped tag.
   "sale-orders-to-approve": (id, fa) =>
-    selectOrgScopedSql(
-      "sale-orders-to-approve",
-      "sale_order",
-      id,
-      fa,
-      " AND state = 'toApprove'",
-    ),
+    selectOrgScopedSql("sale-orders-to-approve", "sale_order", id, fa, ""),
   "sale-order-lines": (id, fa) =>
     selectOrgScopedSql("sale-order-lines", "sale_order_line", id, fa, ""),
   "sale-commissions": (id, fa) =>
@@ -1036,14 +1035,12 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     ),
   "purchase-orders": (id, fa) =>
     selectOrgScopedSql("purchase-orders", "purchase_order", id, fa, ""),
+  // Unreachable for WS subscriptions (shadowed by `purchasingCompanyTables`
+  // below), but `erp_org_extra_where` (Rust, `crates/stdb-auth`) reads this
+  // entry directly for the HTTP path, so the enum-literal filter must not
+  // live here either — see `sale-orders-to-approve` for the same class of bug.
   "purchase-orders-to-approve": (id, fa) =>
-    selectOrgScopedSql(
-      "purchase-orders-to-approve",
-      "purchase_order",
-      id,
-      fa,
-      " AND state = 'toApprove'",
-    ),
+    selectOrgScopedSql("purchase-orders-to-approve", "purchase_order", id, fa, ""),
   "purchase-orders-partial-receipt": (id, fa) =>
     selectOrgScopedSql(
       "purchase-orders-partial-receipt",
@@ -1189,14 +1186,10 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     selectOrgScopedSql("salary-rules", "hr_salary_rule", id, fa, ""),
   "leave-requests": (id, fa) =>
     selectOrgScopedSql("leave-requests", "hr_leave", id, fa, ""),
+  // Enum-literal comparison rejected by SpacetimeDB SQL — dropped here; the
+  // HTTP path post-filters by the SATS-unwrapped tag (see sale-orders-to-approve).
   "leaves-to-approve": (id, fa) =>
-    selectOrgScopedSql(
-      "leaves-to-approve",
-      "hr_leave",
-      id,
-      fa,
-      " AND (state = 'confirm' OR state = 'validatedOne')",
-    ),
+    selectOrgScopedSql("leaves-to-approve", "hr_leave", id, fa, ""),
   contracts: (id, fa) =>
     selectOrgScopedSql("contracts", "hr_contract", id, fa, ""),
   attendance: (id, fa) =>
@@ -1249,14 +1242,10 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
       " ORDER BY period_start DESC, id DESC",
     ),
   payslips: (id, fa) => selectOrgScopedSql("payslips", "hr_payslip", id, fa, ""),
+  // Enum-literal comparison rejected by SpacetimeDB SQL — dropped here; the
+  // HTTP path post-filters by the SATS-unwrapped tag (see sale-orders-to-approve).
   "payslips-to-export": (id, fa) =>
-    selectOrgScopedSql(
-      "payslips-to-export",
-      "hr_payslip",
-      id,
-      fa,
-      " AND state = 'verify'",
-    ),
+    selectOrgScopedSql("payslips-to-export", "hr_payslip", id, fa, ""),
   "hr-integration-intents": (id, fa) =>
     selectOrgScopedSql(
       "hr-integration-intents",
@@ -1645,21 +1634,17 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
   expenses: (id, fa) => selectOrgScopedSql("expenses", "hr_expense", id, fa, ""),
   "expense-sheets": (id, fa) =>
     selectOrgScopedSql("expense-sheets", "expense_sheet", id, fa, ""),
+  // Enum-literal comparison rejected by SpacetimeDB SQL — dropped here; the
+  // HTTP path post-filters by the SATS-unwrapped tag (see sale-orders-to-approve).
   "expense-sheets-to-approve": (id, fa) =>
-    selectOrgScopedSql(
-      "expense-sheets-to-approve",
-      "expense_sheet",
-      id,
-      fa,
-      " AND state = 'submitted'",
-    ),
+    selectOrgScopedSql("expense-sheets-to-approve", "expense_sheet", id, fa, ""),
   "expenses-missing-receipt": (id, fa) =>
     selectOrgScopedSql(
       "expenses-missing-receipt",
       "hr_expense",
       id,
       fa,
-      " AND has_receipt = false AND state = 'draft'",
+      " AND has_receipt = false",
     ),
   "expense-receipts": (id, fa) =>
     selectOrgScopedSql("expense-receipts", "hr_expense_receipt", id, fa, ""),
@@ -1673,13 +1658,15 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
     ),
   "expense-advances": (id, fa) =>
     selectOrgScopedSql("expense-advances", "hr_expense_advance", id, fa, ""),
+  // Enum-literal comparison rejected by SpacetimeDB SQL — dropped here; the
+  // HTTP path post-filters by the SATS-unwrapped tag (see sale-orders-to-approve).
   "expense-policy-exceptions": (id, fa) =>
     selectOrgScopedSql(
       "expense-policy-exceptions",
       "hr_expense_policy_exception",
       id,
       fa,
-      " AND state = 'pending'",
+      "",
     ),
   "expense-mileage-rates": (id, fa) =>
     selectOrgScopedSql(
@@ -1762,8 +1749,16 @@ function subscriptionSqlForCompanyScopedResource(
     "purchase-order-lines": "purchase_order_line",
     "purchase-order-lines-over-billed": "purchase_order_line",
     "landed-costs": "stock_landed_cost",
-    "landed-cost-lines": "stock_landed_cost_lines",
-    "partner-banks": "res_partner_bank",
+    // "landed-cost-lines" deliberately excluded: `stock_landed_cost_lines`
+    // has no `company_id` column at all (only `organization_id` and
+    // `landed_cost_id` — company is inherited via the parent
+    // `stock_landed_cost` row). This map's `company_id = <n>` filter was a
+    // real "column not in scope" SQL error, not an enum/Option dialect gap.
+    // Falls through to the org-only `ERP_ORG_SQL["landed-cost-lines"]` entry.
+    // "partner-banks" deliberately excluded: `res_partner_bank.company_id` is
+    // `Option<u64>`, and this map's `company_id = <n>` filter rejects it the
+    // same way an enum-literal comparison is rejected. It falls through to
+    // the org-only `ERP_ORG_SQL["partner-banks"]` entry instead (see below).
     "purchase-requisitions": "purchase_requisition",
     "purchase-requisition-lines": "purchase_requisition_line",
     "purchase-rfqs": "purchase_rfq",
@@ -1826,37 +1821,36 @@ function subscriptionSqlForCompanyScopedResource(
   // cross-company rows before projection. Use the authorized HTTP read path instead.
   if (crmIndirectCompanyResources.has(resource)) return null
 
+  // `organization_id` is `Option<u64>` on account_asset, intercompany_rule,
+  // intercompany_transaction, and account_asset_depreciation_line —
+  // SpacetimeDB SQL rejects `=` against an `Option<T>` column in every
+  // casing (same engine gap as sale-orders-to-approve). `company.id` is a
+  // single global auto-increment primary key, so filtering by the org's
+  // company IDs alone (dropping the org filter) is equally precise, not
+  // just a workaround. `ctx.organizationId == null` guards are kept because
+  // company-ID resolution above still needs an org context.
   if (resource === "fixed-assets") {
     if (ctx.organizationId == null || !ids?.length) return null
     const c = resolveHttpSqlColumns("fixed-assets", fa).join(", ")
     const filter = companyIdsEqualityOr("company_id", ids)
-    return [
-      `SELECT ${c} FROM account_asset WHERE organization_id = ${ctx.organizationId} AND (${filter})`,
-    ]
+    return [`SELECT ${c} FROM account_asset WHERE ${filter}`]
   }
   if (resource === "intercompany-rules") {
     if (ctx.organizationId == null || !ids?.length) return null
     const c = resolveHttpSqlColumns("intercompany-rules", fa).join(", ")
     const filter = companyIdsDualFieldOr("source_company_id", "destination_company_id", ids)
-    return [
-      `SELECT ${c} FROM intercompany_rule WHERE organization_id = ${ctx.organizationId} AND (${filter}) ORDER BY sequence ASC`,
-    ]
+    return [`SELECT ${c} FROM intercompany_rule WHERE ${filter} ORDER BY sequence ASC`]
   }
   if (resource === "intercompany-transactions") {
     if (ctx.organizationId == null || !ids?.length) return null
     const c = resolveHttpSqlColumns("intercompany-transactions", fa).join(", ")
     const filter = companyIdsDualFieldOr("origin_company_id", "destination_company_id", ids)
-    return [
-      `SELECT ${c} FROM intercompany_transaction WHERE organization_id = ${ctx.organizationId} AND (${filter}) ORDER BY id DESC`,
-    ]
+    return [`SELECT ${c} FROM intercompany_transaction WHERE ${filter} ORDER BY id DESC`]
   }
   if (resource === "depreciation-lines") {
-    if (ctx.organizationId == null || !ids?.length) return null
-    const c = resolveHttpSqlColumns("depreciation-lines", fa).join(", ")
-    const filter = companyIdsEqualityOr("company_id", ids)
-    return [
-      `SELECT ${c} FROM account_asset_depreciation_line WHERE organization_id = ${ctx.organizationId} AND (${filter})`,
-    ]
+    // Both tenant fields are optional and unfilterable in subscription SQL.
+    // Keep the resource on the authorized HTTP path.
+    return null
   }
   if (resource === "pos-configs") {
     if (!ids?.length) return null
@@ -1910,43 +1904,32 @@ function subscriptionSqlForCompanyScopedResource(
     // Child of pos_config — no SQL subqueries; load pos-sessions via api-server query instead.
     return null
   }
+  // Same `organization_id: Option<u64>` gap as the fixed-assets block above.
   if (resource === "fiscal-years") {
     if (ctx.organizationId == null || !ids?.length) return null
     const c = resolveHttpSqlColumns("fiscal-years", fa).join(", ")
     const filter = companyIdsEqualityOr("company_id", ids)
-    return [
-      `SELECT ${c} FROM account_fiscal_year WHERE organization_id = ${ctx.organizationId} AND (${filter})`,
-    ]
+    return [`SELECT ${c} FROM account_fiscal_year WHERE ${filter}`]
   }
   if (resource === "account-periods") {
     if (ctx.organizationId == null || !ids?.length) return null
     const c = resolveHttpSqlColumns("account-periods", fa).join(", ")
     const filter = companyIdsEqualityOr("company_id", ids)
-    return [
-      `SELECT ${c} FROM account_period WHERE organization_id = ${ctx.organizationId} AND (${filter})`,
-    ]
+    return [`SELECT ${c} FROM account_period WHERE ${filter}`]
   }
   if (resource === "consolidation-elimination-entries") {
     if (ctx.organizationId == null || !ids?.length) return null
     const c = resolveHttpSqlColumns("consolidation-elimination-entries", fa).join(", ")
     const filter = companyIdsEqualityOr("company_id", ids)
-    return [
-      `SELECT ${c} FROM consolidation_elimination_entry WHERE organization_id = ${ctx.organizationId} AND (${filter})`,
-    ]
+    return [`SELECT ${c} FROM consolidation_elimination_entry WHERE ${filter}`]
   }
+  // These resources expose only unfilterable optional/vector tenant fields.
+  // Do not widen a subscription across organizations.
   if (resource === "consolidation-journals") {
-    if (ctx.organizationId == null) return null
-    const c = resolveHttpSqlColumns("consolidation-journals", fa).join(", ")
-    return [
-      `SELECT ${c} FROM consolidation_journal WHERE organization_id = ${ctx.organizationId}`,
-    ]
+    return null
   }
   if (resource === "consolidation-accounts") {
-    if (ctx.organizationId == null) return null
-    const c = resolveHttpSqlColumns("consolidation-accounts", fa).join(", ")
-    return [
-      `SELECT ${c} FROM consolidation_account WHERE organization_id = ${ctx.organizationId}`,
-    ]
+    return null
   }
   return undefined
 }

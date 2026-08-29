@@ -102,7 +102,13 @@ describe("PUR-RI-017: company-scoped Purchasing subscriptions", () => {
   })
 
   it("keeps inherited and optional company ownership behind the BFF", () => {
-    for (const resource of ["landed-cost-lines", "partner-banks"]) {
+    for (const resource of [
+      "landed-cost-lines",
+      "partner-banks",
+      "depreciation-lines",
+      "consolidation-journals",
+      "consolidation-accounts",
+    ]) {
       assert.equal(
         subscriptionQueriesForResource(resource, {
           organizationId: 42,
