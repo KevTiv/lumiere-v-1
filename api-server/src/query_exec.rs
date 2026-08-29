@@ -35,6 +35,16 @@ fn ai_skill_permission_allowed(field_access: Option<&FieldAccessContext>, action
     })
 }
 
+fn has_iot_read_permission(field_access: Option<&FieldAccessContext>, resource: &str) -> bool {
+    has_resource_read_permission(field_access, resource)
+        || field_access.is_some_and(|access| {
+            access
+                .role_permissions
+                .iter()
+                .any(|permission| permission == "module:iot:read" || permission == "module:iot:*")
+        })
+}
+
 fn strip_soft_delete_fields(row: &mut Value) {
     if let Value::Object(map) = row {
         map.remove("deletedAt");
@@ -400,6 +410,43 @@ pub async fn resolve_accounting_company_id(
     )
 }
 
+/// Resolve the only IoT company visible to this authenticated membership.
+///
+/// Every IoT table carries a required `company_id`, including pairing tokens.
+/// Organization-level memberships fall back to the default company; an explicit
+/// browser company remains actor intent and must match that server-derived scope.
+pub async fn resolve_iot_company_id(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+    requested_company_id: Option<u64>,
+) -> Result<u64, ApiError> {
+    let identity = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+    let sql = format!(
+        "SELECT id, organization_id, company_id, is_active FROM user_organization WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
+    );
+    let memberships = client
+        .query_sql(&sql)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let membership = memberships
+        .first()
+        .ok_or_else(|| ApiError::Forbidden("No active organization membership".into()))?;
+    let membership_company =
+        row_u64(membership, "companyId", "company_id").map_err(ApiError::Internal)?;
+    let allowed = match membership_company {
+        Some(company_id) if company_id > 0 => company_id,
+        _ => default_company_id(client, organization_id)
+            .await?
+            .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
+    };
+    enforce_requested_company(
+        allowed,
+        requested_company_id,
+        "Cannot query another company's IoT data",
+    )
+}
+
 pub(crate) fn crm_resource(resource: &str) -> bool {
     matches!(
         resource,
@@ -522,6 +569,19 @@ pub(crate) fn accounting_resource(resource: &str) -> bool {
             | "budget-lines"
             | "budget-posts"
             | "fiscal-years"
+    )
+}
+
+pub(crate) fn iot_resource(resource: &str) -> bool {
+    matches!(
+        resource,
+        "iot-actions"
+            | "iot-alerts"
+            | "iot-devices"
+            | "iot-hubs"
+            | "iot-pairing-tokens"
+            | "iot-telemetry"
+            | "iot-thresholds"
     )
 }
 
@@ -772,6 +832,11 @@ pub async fn execute_resource_query_for_company(
     requested_company_id: Option<u64>,
 ) -> Result<Vec<Value>, ApiError> {
     let fa = field_access;
+    if iot_resource(resource) && !has_iot_read_permission(fa, resource) {
+        return Err(ApiError::Forbidden(format!(
+            "Read permission denied for IoT resource '{resource}'"
+        )));
+    }
     let crm_company_id = if crm_resource(resource) {
         Some(
             resolve_crm_company_id(client, organization_id, identity_hex, requested_company_id)
@@ -815,6 +880,14 @@ pub async fn execute_resource_query_for_company(
                 requested_company_id,
             )
             .await?,
+        )
+    } else {
+        None
+    };
+    let iot_company_id = if iot_resource(resource) {
+        Some(
+            resolve_iot_company_id(client, organization_id, identity_hex, requested_company_id)
+                .await?,
         )
     } else {
         None
@@ -2003,6 +2076,9 @@ pub async fn execute_resource_query_for_company(
     } else if let Some(cid) = accounting_company_id {
         extra_where_owned = format!("{extra_where_raw} AND company_id = {cid}");
         extra_where_owned.as_str()
+    } else if let Some(cid) = iot_company_id {
+        extra_where_owned = format!("{extra_where_raw} AND company_id = {cid}");
+        extra_where_owned.as_str()
     } else {
         extra_where_raw
     };
@@ -2038,6 +2114,9 @@ pub async fn execute_resource_query_for_company(
         rows.retain(|row| row_company_matches(row, company_id, false));
     }
     if let Some(company_id) = accounting_company_id {
+        rows.retain(|row| row_company_matches(row, company_id, false));
+    }
+    if let Some(company_id) = iot_company_id {
         rows.retain(|row| row_company_matches(row, company_id, false));
     }
 
@@ -2541,6 +2620,79 @@ mod tests {
 
     #[test]
     fn accounting_company_scoped_rows_filtered_strictly_no_shared_fallback() {
+        let mut rows = vec![
+            json!({ "id": 1, "companyId": 7 }),
+            json!({ "id": 2, "companyId": null }),
+            json!({ "id": 3, "companyId": 8 }),
+        ];
+        rows.retain(|row| row_company_matches(row, 7, false));
+        assert_eq!(rows, vec![json!({ "id": 1, "companyId": 7 })]);
+    }
+
+    #[test]
+    fn iot_resource_classification_covers_every_company_owned_table() {
+        for resource in [
+            "iot-actions",
+            "iot-alerts",
+            "iot-devices",
+            "iot-hubs",
+            "iot-pairing-tokens",
+            "iot-telemetry",
+            "iot-thresholds",
+        ] {
+            assert!(iot_resource(resource), "{resource} must be company-scoped");
+        }
+        assert!(!iot_resource("contacts"));
+        assert!(!iot_resource("pos-configs"));
+    }
+
+    #[test]
+    fn iot_read_permission_accepts_module_and_resource_permissions() {
+        let module_reader = authoritative_access("module:iot:read");
+        for resource in [
+            "iot-actions",
+            "iot-alerts",
+            "iot-devices",
+            "iot-hubs",
+            "iot-pairing-tokens",
+            "iot-telemetry",
+            "iot-thresholds",
+        ] {
+            assert!(
+                has_iot_read_permission(Some(&module_reader), resource),
+                "{resource} must accept the checked-in Manager module permission"
+            );
+        }
+
+        let resource_reader = authoritative_access("iot_hub:read");
+        assert!(has_iot_read_permission(Some(&resource_reader), "iot-hubs"));
+
+        let writer = authoritative_access("module:iot:write");
+        assert!(!has_iot_read_permission(Some(&writer), "iot-hubs"));
+        assert!(!has_iot_read_permission(None, "iot-hubs"));
+    }
+
+    #[test]
+    fn iot_resources_project_company_id_for_defense_in_depth() {
+        for resource in [
+            "iot-actions",
+            "iot-alerts",
+            "iot-devices",
+            "iot-hubs",
+            "iot-pairing-tokens",
+            "iot-telemetry",
+            "iot-thresholds",
+        ] {
+            let columns = resolve_http_sql_columns(resource, None).expect("IoT HTTP projection");
+            assert!(
+                columns.iter().any(|column| column == "company_id"),
+                "{resource} must project company_id for post-fetch verification"
+            );
+        }
+    }
+
+    #[test]
+    fn iot_company_scoped_rows_exclude_null_and_cross_company_values() {
         let mut rows = vec![
             json!({ "id": 1, "companyId": 7 }),
             json!({ "id": 2, "companyId": null }),

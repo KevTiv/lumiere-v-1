@@ -74,6 +74,25 @@ static HTTP_SQL_EXCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         ["requirements"].into_iter().map(String::from).collect(),
     );
     m.insert(
+        "iot-actions".to_string(),
+        ["payload", "result_payload", "error"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    );
+    m.insert(
+        "iot-alerts".to_string(),
+        ["resolved_by"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
+        "iot-pairing-tokens".to_string(),
+        ["created_by"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
+        "iot-telemetry".to_string(),
+        ["raw_value"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
         "roles".to_string(),
         ["permissions"].into_iter().map(String::from).collect(),
     );
@@ -436,6 +455,19 @@ pub fn resolve_http_sql_columns(
     if resource_key == "landed-costs" && !cols.iter().any(|column| column == "state") {
         cols.push("state".to_string());
     }
+    if matches!(
+        resource_key,
+        "iot-actions"
+            | "iot-alerts"
+            | "iot-devices"
+            | "iot-hubs"
+            | "iot-pairing-tokens"
+            | "iot-telemetry"
+            | "iot-thresholds"
+    ) && !cols.iter().any(|column| column == "company_id")
+    {
+        cols.push("company_id".to_string());
+    }
     assert_safe_sql_identifiers(&filter_http_sql_unsafe_columns(&cols, Some(resource_key)))
 }
 
@@ -724,6 +756,42 @@ mod tests {
         assert!(
             !cols.iter().any(|c| c == "domain"),
             "domain must be excluded from HTTP SQL, got: {cols:?}"
+        );
+    }
+
+    #[test]
+    fn iot_http_projections_include_scope_and_hard_exclude_sensitive_payloads() {
+        for resource in [
+            "iot-actions",
+            "iot-alerts",
+            "iot-devices",
+            "iot-hubs",
+            "iot-pairing-tokens",
+            "iot-telemetry",
+            "iot-thresholds",
+        ] {
+            let cols = resolve_http_sql_columns(resource, None).expect("IoT columns");
+            assert!(
+                cols.iter().any(|column| column == "company_id"),
+                "{resource} must include company_id: {cols:?}"
+            );
+        }
+
+        let action_cols = resolve_http_sql_columns("iot-actions", None).expect("action columns");
+        for field in ["payload", "result_payload", "error"] {
+            assert!(!action_cols.iter().any(|column| column == field));
+        }
+        let telemetry_cols =
+            resolve_http_sql_columns("iot-telemetry", None).expect("telemetry columns");
+        assert!(!telemetry_cols.iter().any(|column| column == "raw_value"));
+        let alert_cols = resolve_http_sql_columns("iot-alerts", None).expect("alert columns");
+        assert!(!alert_cols.iter().any(|column| column == "resolved_by"));
+        let pairing_cols =
+            resolve_http_sql_columns("iot-pairing-tokens", None).expect("pairing columns");
+        assert!(!pairing_cols.iter().any(|column| column == "created_by"));
+        assert!(
+            pairing_cols.iter().any(|column| column == "token"),
+            "the current operator pairing flow reads the newly generated token"
         );
     }
 }
