@@ -192,6 +192,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Enforce mobile API boundary
+        run: pnpm --filter mobile lint
+
       - name: Unit tests (erp-shared)
         run: pnpm --dir packages/erp-shared test
 

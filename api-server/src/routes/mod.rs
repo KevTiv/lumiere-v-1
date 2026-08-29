@@ -20,7 +20,6 @@ mod session;
 mod settings;
 mod statement_imports;
 mod statutory_adapters;
-mod stdb;
 mod vertical_packs;
 mod whatsapp_webhooks;
 
@@ -35,7 +34,6 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(ai_certifications::router())
         .merge(auth::router())
         .merge(session::router())
-        .merge(stdb::router())
         .merge(crm::router())
         .merge(sales::router())
         .merge(accounting::router())

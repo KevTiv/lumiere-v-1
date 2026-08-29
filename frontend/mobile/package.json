@@ -8,12 +8,12 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
     "@lumiere/i18n": "workspace:*",
-    "@lumiere/stdb": "workspace:*",
     "@tanstack/react-query": "5.96.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@expo/vector-icons": "^15.0.3",

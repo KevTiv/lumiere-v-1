@@ -593,7 +593,6 @@ pub async fn serve() -> anyhow::Result<()> {
         .route("/call/:reducer", post(post_call))
         .route("/realtime/ws", get(realtime::realtime_ws_upgrade))
         .route("/realtime/info", get(realtime::realtime_info))
-        // Auth + STDB routes before domain routers so `/stdb/*` catch-all does not shadow `/stdb/subscription-queries`.
         .merge(routes::domain_router());
 
     let app = Router::new()
