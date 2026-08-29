@@ -277,6 +277,13 @@ pub fn subscription_queries_for_resource(
         return Ok(Some(vec![sql.clone()]));
     }
 
+    // These resources require BFF-side company filtering that subscription SQL
+    // cannot express: partner banks have optional company ownership and landed
+    // cost lines inherit ownership from their parent.
+    if matches!(r, "partner-banks" | "landed-cost-lines") {
+        return Ok(None);
+    }
+
     if r == "roles" {
         return Ok(Some(vec![select_roles_active_sql(ctx.field_access)?]));
     }
@@ -376,7 +383,7 @@ pub fn subscription_queries_for_resource(
         let cols = resolve_http_sql_columns("employee-documents", ctx.field_access)?.join(", ");
         let mut extra = String::from(" AND active = true");
         if !crate::field_policy::has_hr_permission(ctx.field_access, "hr_employee", "view_pii") {
-            extra.push_str(" AND purpose NOT IN ('tax_id', 'identity')");
+            extra.push_str(" AND purpose != 'tax_id' AND purpose != 'identity'");
         }
         return Ok(Some(vec![format!(
             "SELECT {cols} FROM hr_employee_document WHERE organization_id = {org}{extra}"
@@ -553,5 +560,39 @@ mod tests {
                 row.resource_key
             );
         }
+    }
+
+    #[test]
+    fn inherited_and_optional_company_resources_fail_closed() {
+        let company_ids = [7];
+        let context = SubscriptionQueryContext {
+            organization_id: Some(42),
+            company_ids: Some(&company_ids),
+            ..SubscriptionQueryContext::default()
+        };
+
+        for resource in ["partner-banks", "landed-cost-lines"] {
+            assert_eq!(
+                subscription_queries_for_resource(resource, &context)
+                    .expect("subscription SQL generation should not fail"),
+                None,
+                "{resource} must remain behind BFF company filtering"
+            );
+        }
+    }
+
+    #[test]
+    fn employee_documents_avoid_unsupported_not_in_expression() {
+        let context = SubscriptionQueryContext {
+            organization_id: Some(42),
+            ..SubscriptionQueryContext::default()
+        };
+        let queries = subscription_queries_for_resource("employee-documents", &context)
+            .expect("subscription SQL generation should not fail")
+            .expect("employee documents should resolve with organization context");
+        assert_eq!(queries.len(), 1);
+        assert!(!queries[0].contains("NOT IN"));
+        assert!(queries[0].contains("purpose != 'tax_id'"));
+        assert!(queries[0].contains("purpose != 'identity'"));
     }
 }

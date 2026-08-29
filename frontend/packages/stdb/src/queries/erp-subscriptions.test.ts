@@ -83,8 +83,6 @@ describe("PUR-RI-017: company-scoped Purchasing subscriptions", () => {
       "purchase-orders",
       "purchase-order-lines",
       "landed-costs",
-      "landed-cost-lines",
-      "partner-banks",
       "purchase-requisitions",
       "purchase-requisition-lines",
       "purchase-rfqs",
@@ -100,6 +98,19 @@ describe("PUR-RI-017: company-scoped Purchasing subscriptions", () => {
       assert.ok(sql, `${resource} should produce company-scoped SQL`)
       assert.match(sql![0], /organization_id\s*=\s*42/)
       assert.match(sql![0], /company_id\s*=\s*7/)
+    }
+  })
+
+  it("keeps inherited and optional company ownership behind the BFF", () => {
+    for (const resource of ["landed-cost-lines", "partner-banks"]) {
+      assert.equal(
+        subscriptionQueriesForResource(resource, {
+          organizationId: 42,
+          companyIds: [7],
+        }),
+        null,
+        `${resource} must not widen the realtime cache to organization scope`,
+      )
     }
   })
 
@@ -139,5 +150,17 @@ describe("PUR-RI-017: company-scoped Purchasing subscriptions", () => {
       }),
       null,
     )
+  })
+})
+
+describe("HR subscription SQL dialect", () => {
+  it("rewrites unsupported NOT IN for employee document purpose", () => {
+    const sql = subscriptionQueriesForResource("employee-documents", {
+      organizationId: 42,
+    })
+    assert.ok(sql)
+    assert.doesNotMatch(sql![0], /\bNOT IN\b/i)
+    assert.match(sql![0], /purpose\s*!=\s*'tax_id'/)
+    assert.match(sql![0], /purpose\s*!=\s*'identity'/)
   })
 })

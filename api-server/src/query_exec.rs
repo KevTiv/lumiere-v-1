@@ -10,9 +10,8 @@ use crate::error::ApiError;
 use stdb_auth::{
     erp_org_extra_where, has_hr_permission, has_resource_read_permission,
     hr_fields_require_read_audit, identity_sql_literal, is_hr_pii_resource,
-    purpose_for_hr_resource, registry_get, resolve_http_sql_columns,
-    select_company_scoped_sql, select_org_and_company_scoped_sql, select_org_scoped_sql,
-    FieldAccessContext,
+    purpose_for_hr_resource, registry_get, resolve_http_sql_columns, select_company_scoped_sql,
+    select_org_and_company_scoped_sql, select_org_scoped_sql, FieldAccessContext,
 };
 use stdb_client::StdbClient;
 use stdb_config::runtime_is_production;
@@ -133,6 +132,34 @@ fn optional_u64(value: Option<&Value>) -> Result<Option<u64>, String> {
 
 fn row_u64(row: &Value, camel: &str, snake: &str) -> Result<Option<u64>, String> {
     optional_u64(row.get(camel).or_else(|| row.get(snake)))
+}
+
+fn row_enum_tag_is(row: &Value, column: &str, expected: &[&str]) -> bool {
+    row.get(column)
+        .and_then(Value::as_str)
+        .is_some_and(|tag| expected.contains(&tag))
+}
+
+fn identity_value_is(value: &Value, target_hex: &str) -> bool {
+    if let Some(hex) = value.as_str() {
+        return hex
+            .trim_start_matches("0x")
+            .trim_start_matches("0X")
+            .eq_ignore_ascii_case(target_hex);
+    }
+    if let Some(inner) = value.as_array().and_then(|items| items.first()) {
+        return identity_value_is(inner, target_hex);
+    }
+    value
+        .as_object()
+        .and_then(|object| object.get("some").or_else(|| object.get("Some")))
+        .is_some_and(|inner| identity_value_is(inner, target_hex))
+}
+
+fn row_identity_option_is(row: &Value, camel: &str, snake: &str, target_hex: &str) -> bool {
+    row.get(camel)
+        .or_else(|| row.get(snake))
+        .is_some_and(|value| identity_value_is(value, target_hex))
 }
 
 fn sort_rows_by_id_desc(rows: &mut [Value]) {
@@ -574,17 +601,22 @@ async fn manager_employee_id(
     organization_id: u64,
     identity_hex: &str,
 ) -> Result<Option<u64>, ApiError> {
-    let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
     let sql = format!(
-        "SELECT id FROM hr_employee WHERE organization_id = {organization_id} AND user_id = {id} AND is_active = true LIMIT 1"
+        "SELECT id, user_id FROM hr_employee WHERE organization_id = {organization_id} AND is_active = true"
     );
+    let target = identity_hex
+        .trim()
+        .trim_start_matches("0x")
+        .trim_start_matches("0X");
     let rows = client
         .query_sql(&sql)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(rows
-        .first()
-        .and_then(|r| r.get("id").and_then(|v| v.as_u64())))
+    rows.iter()
+        .find(|row| row_identity_option_is(row, "userId", "user_id", target))
+        .map(row_id_u64_strict)
+        .transpose()
+        .map_err(ApiError::Internal)
 }
 
 async fn maybe_log_hr_pii_read(
@@ -649,8 +681,9 @@ fn authoritative_resource_scope(resource: &str) -> Option<AuthoritativeResourceS
     match resource {
         "products" => Some(AuthoritativeResourceScope::Organization),
         "contacts" => Some(AuthoritativeResourceScope::OrganizationOptionalCompany),
-        "sale-orders" | "purchase-orders" | "tasks" | "account-moves"
-        | "mrp-productions" => Some(AuthoritativeResourceScope::OrganizationAndCompany),
+        "sale-orders" | "purchase-orders" | "tasks" | "account-moves" | "mrp-productions" => {
+            Some(AuthoritativeResourceScope::OrganizationAndCompany)
+        }
         _ => None,
     }
 }
@@ -668,7 +701,9 @@ fn authoritative_record_sql(
         ));
     }
     if !has_resource_read_permission(field_access, resource) {
-        return Err(ApiError::NotFound("Authoritative resource not found".into()));
+        return Err(ApiError::NotFound(
+            "Authoritative resource not found".into(),
+        ));
     }
     let scope = authoritative_resource_scope(resource)
         .ok_or_else(|| ApiError::NotFound("Authoritative resource not found".into()))?;
@@ -990,17 +1025,44 @@ pub async fn execute_resource_query_for_company(
         // always rejected with a 400 — build the WHERE clause without it and
         // filter the None rows out here instead.
         "timesheets-to-validate" | "timesheets-unbilled" => {
-            let reg = registry_get(resource).ok_or_else(|| {
-                ApiError::NotFound(format!("Unknown resource: \"{resource}\""))
-            })?;
+            let reg = registry_get(resource)
+                .ok_or_else(|| ApiError::NotFound(format!("Unknown resource: \"{resource}\"")))?;
             let extra_where = if resource == "timesheets-to-validate" {
                 " AND validation_status = 'draft'"
             } else {
                 " AND validation_status = 'validated' AND timesheet_invoice_type = 'billable'"
             };
+            let sql =
+                select_org_scoped_sql(resource, &reg.table, organization_id, fa, extra_where, "")
+                    .map_err(ApiError::Internal)?;
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(|row| {
+                row_u64(row, "timesheetInvoiceId", "timesheet_invoice_id")
+                    .ok()
+                    .flatten()
+                    .is_none()
+            });
+            return Ok(rows);
+        }
+        "sale-orders-to-approve"
+        | "leaves-to-approve"
+        | "payslips-to-export"
+        | "expense-sheets-to-approve"
+        | "expenses-missing-receipt"
+        | "expense-policy-exceptions" => {
+            let registry = registry_get(resource)
+                .ok_or_else(|| ApiError::NotFound(format!("Unknown resource: \"{resource}\"")))?;
+            let extra_where = if resource == "expenses-missing-receipt" {
+                " AND has_receipt = false"
+            } else {
+                ""
+            };
             let sql = select_org_scoped_sql(
                 resource,
-                &reg.table,
+                &registry.table,
                 organization_id,
                 fa,
                 extra_where,
@@ -1011,11 +1073,96 @@ pub async fn execute_resource_query_for_company(
                 .query_sql(&sql)
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
+            let expected: &[&str] = match resource {
+                "sale-orders-to-approve" => &["ToApprove"],
+                "leaves-to-approve" => &["Confirm", "ValidatedOne"],
+                "payslips-to-export" => &["Verify"],
+                "expense-sheets-to-approve" => &["Submitted"],
+                "expenses-missing-receipt" => &["Draft"],
+                "expense-policy-exceptions" => &["Pending"],
+                _ => unreachable!(),
+            };
+            rows.retain(|row| row_enum_tag_is(row, "state", expected));
+            return Ok(rows);
+        }
+        "purchase-orders-to-approve" => {
+            let registry = registry_get(resource)
+                .ok_or_else(|| ApiError::NotFound(format!("Unknown resource: \"{resource}\"")))?;
+            let company_id = purchasing_company_id
+                .ok_or_else(|| ApiError::Internal("purchasing company id not resolved".into()))?;
+            let sql = select_org_and_company_scoped_sql(
+                resource,
+                &registry.table,
+                organization_id,
+                company_id,
+                fa,
+                "",
+                "",
+            )
+            .map_err(ApiError::Internal)?;
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(|row| row_enum_tag_is(row, "state", &["ToApprove"]));
+            return Ok(rows);
+        }
+        "partner-banks" => {
+            let registry = registry_get(resource)
+                .ok_or_else(|| ApiError::NotFound(format!("Unknown resource: \"{resource}\"")))?;
+            let company_id = purchasing_company_id
+                .ok_or_else(|| ApiError::Internal("purchasing company id not resolved".into()))?;
+            let sql = select_org_scoped_sql(resource, &registry.table, organization_id, fa, "", "")
+                .map_err(ApiError::Internal)?;
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(|row| row_company_matches(row, company_id, true));
+            return Ok(rows);
+        }
+        "landed-cost-lines" => {
+            let company_id = purchasing_company_id
+                .ok_or_else(|| ApiError::Internal("purchasing company id not resolved".into()))?;
+            let cost_rows = client
+                .query_sql(&format!(
+                    "SELECT id, company_id FROM stock_landed_cost WHERE organization_id = {organization_id} AND company_id = {company_id}"
+                ))
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            let cost_ids: HashSet<u64> = cost_rows
+                .iter()
+                .map(row_id_u64)
+                .filter(|id| *id > 0)
+                .collect();
+            if cost_ids.is_empty() {
+                return Ok(Vec::new());
+            }
+            let registry = registry_get(resource)
+                .ok_or_else(|| ApiError::NotFound(format!("Unknown resource: \"{resource}\"")))?;
+            let sql = select_org_scoped_sql(resource, &registry.table, organization_id, fa, "", "")
+                .map_err(ApiError::Internal)?;
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
             rows.retain(|row| {
-                row_u64(row, "timesheetInvoiceId", "timesheet_invoice_id")
+                row_u64(row, "landedCostId", "landed_cost_id")
                     .ok()
                     .flatten()
-                    .is_none()
+                    .is_some_and(|id| cost_ids.contains(&id))
+            });
+            rows.sort_by(|a, b| {
+                let key = |row: &Value| {
+                    (
+                        row_u64(row, "landedCostId", "landed_cost_id")
+                            .ok()
+                            .flatten()
+                            .unwrap_or(0),
+                        row_id_u64(row),
+                    )
+                };
+                key(a).cmp(&key(b))
             });
             return Ok(rows);
         }
@@ -1639,16 +1786,33 @@ pub async fn execute_resource_query_for_company(
     }
 
     if resource == "my-employee" {
-        let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+        let target = identity_hex
+            .trim()
+            .trim_start_matches("0x")
+            .trim_start_matches("0X");
         let cols = resolve_http_sql_columns("my-employee", fa).map_err(ApiError::Internal)?;
-        let col_part = cols.join(", ");
+        let needs_user_id = !cols.iter().any(|column| column == "user_id");
+        let mut fetch_cols = cols.clone();
+        if needs_user_id {
+            fetch_cols.push("user_id".to_string());
+        }
         let sql = format!(
-            "SELECT {col_part} FROM hr_employee WHERE organization_id = {organization_id} AND user_id = {id} AND is_active = true"
+            "SELECT {} FROM hr_employee WHERE organization_id = {organization_id} AND is_active = true",
+            fetch_cols.join(", ")
         );
-        let rows = client
+        let mut rows = client
             .query_sql(&sql)
             .await
             .map_err(|e| ApiError::Internal(e.to_string()))?;
+        rows.retain(|row| row_identity_option_is(row, "userId", "user_id", target));
+        if needs_user_id {
+            for row in &mut rows {
+                if let Value::Object(fields) = row {
+                    fields.remove("userId");
+                    fields.remove("user_id");
+                }
+            }
+        }
         let record_id = rows
             .first()
             .and_then(|r| r.get("id").and_then(|v| v.as_u64()))
@@ -1695,26 +1859,39 @@ pub async fn execute_resource_query_for_company(
 
     // H1: org-wide `employees` only for HR roles; others get self row only (same as my-employee).
     if resource == "employees" {
-        let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
         let cols = resolve_http_sql_columns("employees", fa).map_err(ApiError::Internal)?;
-        let col_part = cols.join(", ");
         let can_list_all = has_hr_permission(fa, "hr_employee", "read")
             || has_hr_permission(fa, "hr_employee", "create")
             || has_hr_permission(fa, "hr_employee", "update")
             || has_hr_permission(fa, "hr_employee", "view_pii");
-        let sql = if can_list_all {
-            format!(
-                "SELECT {col_part} FROM hr_employee WHERE organization_id = {organization_id} AND is_active = true"
-            )
-        } else {
-            format!(
-                "SELECT {col_part} FROM hr_employee WHERE organization_id = {organization_id} AND user_id = {id} AND is_active = true"
-            )
-        };
-        let rows = client
+        let needs_user_id = !can_list_all && !cols.iter().any(|column| column == "user_id");
+        let mut fetch_cols = cols.clone();
+        if needs_user_id {
+            fetch_cols.push("user_id".to_string());
+        }
+        let sql = format!(
+            "SELECT {} FROM hr_employee WHERE organization_id = {organization_id} AND is_active = true",
+            fetch_cols.join(", ")
+        );
+        let mut rows = client
             .query_sql(&sql)
             .await
             .map_err(|e| ApiError::Internal(e.to_string()))?;
+        if !can_list_all {
+            let target = identity_hex
+                .trim()
+                .trim_start_matches("0x")
+                .trim_start_matches("0X");
+            rows.retain(|row| row_identity_option_is(row, "userId", "user_id", target));
+            if needs_user_id {
+                for row in &mut rows {
+                    if let Value::Object(fields) = row {
+                        fields.remove("userId");
+                        fields.remove("user_id");
+                    }
+                }
+            }
+        }
         maybe_log_hr_pii_read(
             client,
             organization_id,
@@ -1792,7 +1969,8 @@ pub async fn execute_resource_query_for_company(
         "sale-commissions" | "sale-commissions-pending" => " ORDER BY id DESC",
         // SpacetimeDB HTTP SQL rejects ORDER BY for this table; sort below.
         "landed-costs" => "",
-        "landed-cost-lines" => " ORDER BY landed_cost_id ASC, id ASC",
+        // Dedicated company-safe arm sorts these rows in Rust.
+        "landed-cost-lines" => "",
         "contact-tags" => "",
         "contact-categories" => "",
         "contact-segments" => "",
@@ -1994,6 +2172,49 @@ mod tests {
             enforce_requested_company(7, Some(7), "cross-company").expect("same company"),
             7
         );
+    }
+
+    #[test]
+    fn enum_post_filter_matches_only_expected_sats_tags() {
+        assert!(row_enum_tag_is(
+            &json!({ "state": "ToApprove" }),
+            "state",
+            &["ToApprove"]
+        ));
+        assert!(row_enum_tag_is(
+            &json!({ "state": "ValidatedOne" }),
+            "state",
+            &["Confirm", "ValidatedOne"]
+        ));
+        assert!(!row_enum_tag_is(
+            &json!({ "state": "Approved" }),
+            "state",
+            &["ToApprove"]
+        ));
+    }
+
+    #[test]
+    fn identity_post_filter_accepts_sats_option_encodings() {
+        let target = "abcdef";
+        for row in [
+            json!({ "userId": ["0xABCDEF"] }),
+            json!({ "user_id": { "some": ["0xabcdef"] } }),
+            json!({ "userId": "ABCDEF" }),
+        ] {
+            assert!(row_identity_option_is(&row, "userId", "user_id", target));
+        }
+        assert!(!row_identity_option_is(
+            &json!({ "userId": { "none": [] } }),
+            "userId",
+            "user_id",
+            target
+        ));
+        assert!(!row_identity_option_is(
+            &json!({ "userId": ["0x123456"] }),
+            "userId",
+            "user_id",
+            target
+        ));
     }
 
     #[test]

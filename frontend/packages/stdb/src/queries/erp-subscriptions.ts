@@ -1975,6 +1975,12 @@ export function subscriptionQueriesForResource(
 
   if (PRIVATE_CRM_RESOURCES.has(r)) return null;
 
+  // These Purchasing resources cannot be scoped safely in subscription SQL:
+  // partner-bank company ownership is optional, while landed-cost lines inherit
+  // company ownership from their parent. Keep realtime fail-closed and read them
+  // through the BFF, which applies the required row/parent filtering.
+  if (r === "partner-banks" || r === "landed-cost-lines") return null;
+
   if (r === "roles") {
     return [selectRolesActiveSql(ctx.fieldAccess)];
   }
@@ -2049,7 +2055,7 @@ export function subscriptionQueriesForResource(
     const cols = resolveHttpSqlColumns("employee-documents", ctx.fieldAccess).join(", ");
     let extra = " AND active = true";
     if (!hasHrPermission(ctx.fieldAccess, "hr_employee", "view_pii")) {
-      extra += " AND purpose NOT IN ('tax_id', 'identity')";
+      extra += " AND purpose != 'tax_id' AND purpose != 'identity'";
     }
     return [
       `SELECT ${cols} FROM hr_employee_document WHERE organization_id = ${Number(org)}${extra}`,
