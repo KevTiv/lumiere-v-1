@@ -15,6 +15,7 @@ import {
   type StdbBffCommandInput,
   type StdbBffNamedReducerKey,
 } from "./commands/stdb-http"
+import { createStdbSdk, type StdbSdk } from "./sdk"
 
 function resolveApiFetch(): LumiereHttpFetch {
   const c = getLumiereApiClient()
@@ -25,6 +26,11 @@ function resolveApiFetch(): LumiereHttpFetch {
     }
     return fetch(input, { credentials: "include", ...init })
   }
+}
+
+/** Build the domain SDK with the browser's authenticated API transport. */
+export function createBrowserStdbSdk(): StdbSdk {
+  return createStdbSdk(resolveApiFetch())
 }
 
 export async function stdbBrowserQuery(resource: string): Promise<Record<string, unknown>[]> {

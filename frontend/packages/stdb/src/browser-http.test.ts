@@ -58,6 +58,26 @@ test("mutation bridge only uses the typed browser operation transport", async ()
   }
 })
 
+test("reviewed settings integrations delegate to the domain SDK", async () => {
+  const source = await readFile(
+    new URL("./mutations/settings-admin.ts", import.meta.url),
+    "utf8",
+  )
+  for (const operation of [
+    "create_google_drive_connection",
+    "update_google_drive_connection",
+    "delete_integration",
+    "create_whatsapp_business_account",
+    "update_whatsapp_business_account",
+    "delete_whatsapp_business_account",
+    "set_whatsapp_primary_account",
+    "archive_ai_chat_session",
+  ]) {
+    assert.equal(source.includes(operation), false, `${operation} must be SDK-owned`)
+  }
+  assert.match(source, /createBrowserStdbSdk\(\)/)
+})
+
 test("machine-owned integration callbacks are absent from the browser bridge and settings UI", async () => {
   const sources = await Promise.all([
     readFile(new URL("./mutations/settings-admin.ts", import.meta.url), "utf8"),

@@ -1,7 +1,15 @@
 import { strict as assert } from "node:assert"
 import { test } from "node:test"
 
+import { SESSION_OPERATION_DESCRIPTORS } from "@lumiere/contracts/generated/operation-descriptors"
+
 import { createStdbSdk } from "./sdk"
+
+function operationUrl(operation: keyof typeof SESSION_OPERATION_DESCRIPTORS): string {
+  return `/api/operations/${encodeURIComponent(
+    SESSION_OPERATION_DESCRIPTORS[operation].contractOperationId,
+  )}`
+}
 
 test("accounting SDK targets the immutable typed operation and selected company", async () => {
   let request: { url: string; body: string } | undefined
@@ -29,7 +37,7 @@ test("accounting SDK targets the immutable typed operation and selected company"
     metadata: null,
   })
 
-  assert.equal(request?.url, "/api/operations/erp.create_account_account")
+  assert.equal(request?.url, operationUrl("create_account_account"))
   assert.deepEqual(JSON.parse(request?.body ?? "{}"), {
     params: {
       company_id: { some: 42 },
@@ -51,4 +59,89 @@ test("accounting SDK targets the immutable typed operation and selected company"
       metadata: { none: [] },
     },
   })
+})
+
+test("settings SDK owns integration encoding and immutable operation routing", async () => {
+  const requests: Array<{ url: string; body: Record<string, unknown> }> = []
+  const apiFetch = async (url: string, init?: RequestInit) => {
+    requests.push({
+      url,
+      body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+    })
+    return new Response(null, { status: 204 })
+  }
+  const sdk = createStdbSdk(apiFetch)
+
+  await sdk.settings.integrations.googleDrive.create({
+    companyId: 42n,
+    name: "Finance drive",
+    accountEmail: "finance@example.com",
+    accountId: "drive-account",
+    credentialsReference: "secret/google-drive",
+    syncEnabled: true,
+    webhookEnabled: false,
+    syncDirection: "Bidirectional",
+    conflictPolicy: "PreferRemote",
+    syncFrequencyMinutes: 60,
+    allowedFileTypes: ["pdf"],
+    maxFileSizeMb: 50,
+  })
+  await sdk.settings.integrations.whatsapp.create({
+    name: "Support",
+    phoneNumber: "+31000000000",
+    phoneNumberId: "phone-id",
+    businessAccountId: "business-id",
+    displayName: "Support",
+    credentialsReference: "secret/whatsapp",
+    webhookSecretReference: "secret/whatsapp-webhook",
+    messagingEnabled: true,
+    notificationsEnabled: true,
+    templateMessagingEnabled: true,
+    interactiveMessagingEnabled: true,
+    defaultLanguage: "en",
+    webhookEnabled: false,
+    subscribedWebhookEvents: ["messages"],
+    dailyMessageLimit: 1000,
+    isPrimary: true,
+  })
+  await sdk.settings.integrations.googleDrive.delete(7n)
+  await sdk.forCompany(42n).settings.aiChats.setArchived("chat-1", true)
+
+  assert.deepEqual(
+    requests.map(({ url }) => url),
+    [
+      operationUrl("create_google_drive_connection"),
+      operationUrl("create_whatsapp_business_account"),
+      operationUrl("delete_integration"),
+      operationUrl("archive_ai_chat_session"),
+    ],
+  )
+  assert.equal("organizationId" in requests[0].body, false)
+  assert.equal(requests[0].body.companyId, 42)
+  assert.deepEqual(requests[0].body.syncDirection, { tag: "Bidirectional" })
+  assert.deepEqual(requests[0].body.conflictPolicy, { tag: "PreferRemote" })
+  assert.deepEqual(
+    (requests[1].body.params as Record<string, unknown>).company_id,
+    { none: [] },
+  )
+  assert.deepEqual(requests[2].body, {
+    integrationId: 7,
+    integrationType: { tag: "GoogleDrive" },
+  })
+  assert.deepEqual(requests[3].body, {
+    companyId: 42,
+    sessionKey: "chat-1",
+    archived: true,
+  })
+})
+
+test("settings SDK surfaces typed API errors", async () => {
+  const sdk = createStdbSdk(async () =>
+    new Response(JSON.stringify({ message: "integration denied" }), { status: 403 }),
+  )
+
+  await assert.rejects(
+    sdk.settings.integrations.whatsapp.setPrimary(9n),
+    /integration denied/,
+  )
 })
