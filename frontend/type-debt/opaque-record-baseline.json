@@ -34,7 +34,7 @@
   "packages/erp-shared/src/workflows-create-params.ts": 1,
   "packages/query-hooks/src/action-draft-intent.ts": 1,
   "packages/query-hooks/src/ai-ui-context.ts": 1,
-  "packages/query-hooks/src/hooks/accounting.ts": 51,
+  "packages/query-hooks/src/hooks/accounting.ts": 50,
   "packages/query-hooks/src/hooks/ai-action-drafts.ts": 5,
   "packages/query-hooks/src/hooks/ai-agents.ts": 4,
   "packages/query-hooks/src/hooks/ai-forms.ts": 1,
