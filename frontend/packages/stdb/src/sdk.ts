@@ -56,11 +56,17 @@ const PARAM_STRUCT_BY_OPERATION = {
   update_whatsapp_business_account: "UpdateWhatsAppBusinessAccountParams",
 } as const satisfies Partial<Record<StdbBffNamedReducerKey, string>>
 
+type EncodableOperationInput = {
+  syncDirection?: unknown
+  conflictPolicy?: unknown
+  params?: unknown
+}
+
 function encodeOperationInput<K extends StdbBffNamedReducerKey>(
   operation: K,
   input: StdbBffCommandInput<K>,
 ): StdbBffCommandInput<K> {
-  let encoded = input as Record<string, unknown>
+  let encoded = input as StdbBffCommandInput<K> & EncodableOperationInput
   if (
     operation === "create_google_drive_connection" ||
     operation === "update_google_drive_connection"
