@@ -56,6 +56,17 @@
       ]
     },
     {
+      "name": "create_whatsapp_business_account",
+      "company_paths": [
+        {
+          "path": ["params", "company_id"],
+          "required": false,
+          "nullable": true,
+          "meaning": "optional legal entity for the WhatsApp Business account"
+        }
+      ]
+    },
+    {
       "name": "delete_company",
       "company_paths": [
         {
