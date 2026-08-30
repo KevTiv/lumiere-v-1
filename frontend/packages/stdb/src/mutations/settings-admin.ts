@@ -1,42 +1,25 @@
 "use client"
 
-import { stdbBrowserCommand, stdbBrowserCompatCall } from "../browser-http"
+import { stdbBrowserCommand } from "../browser-http"
+import { stdbParamsToJson } from "../stdb-params-json"
 
 type UnitEnum =
-  | "Active"
-  | "Inactive"
-  | "Pending"
-  | "Suspended"
-  | "Connected"
-  | "Disconnected"
-  | "Syncing"
-  | "Error"
-  | "PendingAuth"
   | "GoogleDrive"
   | "WhatsAppBusiness"
   | "UploadOnly"
   | "DownloadOnly"
   | "Bidirectional"
-  | "Approved"
-  | "Rejected"
-  | "Expired"
-  | "Revoked"
-  | "Unverified"
-  | "BusinessPortfolio"
-  | "BusinessVerified"
-  | "Read"
-  | "Write"
-  | "Create"
-  | "Delete"
-  | "All"
-  | "Allow"
-  | "Deny"
+  | "PreferRemote"
+  | "PreferLocal"
+  | "Skip"
+  | "Manual"
 
 function unit(tag: UnitEnum): { tag: UnitEnum } {
   return { tag }
 }
 
 export interface CreateGoogleDriveConnectionArgs {
+  companyId?: bigint | null
   name: string
   accountEmail: string
   accountId: string
@@ -48,115 +31,79 @@ export interface CreateGoogleDriveConnectionArgs {
   webhookUrl?: string | null
   webhookSecretReference?: string | null
   syncDirection: "UploadOnly" | "DownloadOnly" | "Bidirectional"
+  conflictPolicy?: "PreferRemote" | "PreferLocal" | "Skip" | "Manual" | null
   syncFrequencyMinutes: number
   allowedFileTypes: string[]
   maxFileSizeMb: number
 }
 
 export function createGoogleDriveConnection(
-  organizationId: bigint,
+  _organizationId: bigint,
   args: CreateGoogleDriveConnectionArgs,
 ) {
-  return stdbBrowserCompatCall("create_google_drive_connection", [
-    organizationId,
-    args.name,
-    args.accountEmail,
-    args.accountId,
-    args.credentialsReference,
-    args.rootFolderId ?? null,
-    args.sharedDriveId ?? null,
-    args.syncEnabled,
-    args.webhookEnabled,
-    args.webhookUrl ?? null,
-    args.webhookSecretReference ?? null,
-    unit(args.syncDirection),
-    args.syncFrequencyMinutes,
-    args.allowedFileTypes,
-    args.maxFileSizeMb,
-  ])
+  return stdbBrowserCommand("create_google_drive_connection", {
+    companyId: args.companyId ?? null,
+    name: args.name,
+    accountEmail: args.accountEmail,
+    accountId: args.accountId,
+    credentialsReference: args.credentialsReference,
+    rootFolderId: args.rootFolderId ?? null,
+    sharedDriveId: args.sharedDriveId ?? null,
+    syncEnabled: args.syncEnabled,
+    webhookEnabled: args.webhookEnabled,
+    webhookUrl: args.webhookUrl ?? null,
+    webhookSecretReference: args.webhookSecretReference ?? null,
+    syncDirection: unit(args.syncDirection),
+    conflictPolicy: args.conflictPolicy ? unit(args.conflictPolicy) : null,
+    syncFrequencyMinutes: args.syncFrequencyMinutes,
+    allowedFileTypes: args.allowedFileTypes,
+    maxFileSizeMb: args.maxFileSizeMb,
+  })
 }
 
 export function updateGoogleDriveConnection(
-  organizationId: bigint,
+  _organizationId: bigint,
   connectionId: bigint,
   args: Partial<
-    Omit<CreateGoogleDriveConnectionArgs, "accountEmail" | "accountId" | "credentialsReference"> & {
+    Omit<
+      CreateGoogleDriveConnectionArgs,
+      "companyId" | "accountEmail" | "accountId" | "credentialsReference" | "conflictPolicy"
+    > & {
       autoSyncFiles: boolean
     }
   >,
 ) {
-  return stdbBrowserCompatCall("update_google_drive_connection", [
+  return stdbBrowserCommand("update_google_drive_connection", {
     connectionId,
-    organizationId,
-    args.name ?? null,
-    args.rootFolderId ?? null,
-    args.sharedDriveId ?? null,
-    args.syncEnabled ?? null,
-    args.autoSyncFiles ?? null,
-    args.allowedFileTypes ?? null,
-    args.maxFileSizeMb ?? null,
-    args.webhookEnabled ?? null,
-    args.webhookUrl ?? null,
-    args.syncDirection ? unit(args.syncDirection) : null,
-    args.syncFrequencyMinutes ?? null,
-  ])
-}
-
-export function recordGoogleDriveSync(
-  organizationId: bigint,
-  connectionId: bigint,
-  nextSyncAt: { microsSinceUnixEpoch: bigint } | null,
-) {
-  return stdbBrowserCompatCall("record_google_drive_sync", [connectionId, organizationId, nextSyncAt])
-}
-
-export function recordGoogleDriveSyncError(
-  organizationId: bigint,
-  connectionId: bigint,
-  errorMessage: string,
-) {
-  return stdbBrowserCompatCall("record_google_drive_sync_error", [
-    connectionId,
-    organizationId,
-    errorMessage,
-  ])
+    name: args.name ?? null,
+    rootFolderId: args.rootFolderId ?? null,
+    sharedDriveId: args.sharedDriveId ?? null,
+    syncEnabled: args.syncEnabled ?? null,
+    autoSyncFiles: args.autoSyncFiles ?? null,
+    allowedFileTypes: args.allowedFileTypes ?? null,
+    maxFileSizeMb: args.maxFileSizeMb ?? null,
+    webhookEnabled: args.webhookEnabled ?? null,
+    webhookUrl: args.webhookUrl ?? null,
+    syncDirection: args.syncDirection ? unit(args.syncDirection) : null,
+    syncFrequencyMinutes: args.syncFrequencyMinutes ?? null,
+  })
 }
 
 export type IntegrationKind = "GoogleDrive" | "WhatsAppBusiness"
-export type IntegrationStatusKind = "Active" | "Inactive" | "Pending" | "Suspended"
-export type SyncStatusKind = "Connected" | "Disconnected" | "Syncing" | "Error" | "PendingAuth"
-
-export function updateIntegrationStatus(
-  organizationId: bigint,
-  integrationId: bigint,
-  integrationType: IntegrationKind,
-  status: IntegrationStatusKind,
-  syncStatus: SyncStatusKind,
-  errorMessage?: string | null,
-) {
-  return stdbBrowserCompatCall("update_integration_status", [
-    organizationId,
-    integrationId,
-    unit(integrationType),
-    unit(status),
-    unit(syncStatus),
-    errorMessage ?? null,
-  ])
-}
 
 export function deleteIntegration(
-  organizationId: bigint,
+  _organizationId: bigint,
   integrationId: bigint,
   integrationType: IntegrationKind,
 ) {
-  return stdbBrowserCompatCall("delete_integration", [
-    organizationId,
+  return stdbBrowserCommand("delete_integration", {
     integrationId,
-    unit(integrationType),
-  ])
+    integrationType: unit(integrationType),
+  })
 }
 
 export interface CreateWhatsAppBusinessAccountArgs {
+  companyId?: bigint | null
   name: string
   phoneNumber: string
   phoneNumberId: string
@@ -180,58 +127,43 @@ export interface CreateWhatsAppBusinessAccountArgs {
 }
 
 export function createWhatsAppBusinessAccount(
-  organizationId: bigint,
+  _organizationId: bigint,
   args: CreateWhatsAppBusinessAccountArgs,
 ) {
-  return stdbBrowserCompatCall("create_whatsapp_business_account", [organizationId, args])
+  return stdbBrowserCommand("create_whatsapp_business_account", {
+    params: stdbParamsToJson(args, "CreateWhatsAppBusinessAccountParams"),
+  })
 }
 
 export function updateWhatsAppBusinessAccount(
-  organizationId: bigint,
+  _organizationId: bigint,
   accountId: bigint,
-  args: Partial<Omit<CreateWhatsAppBusinessAccountArgs, "phoneNumber" | "phoneNumberId" | "businessAccountId" | "credentialsReference" | "webhookSecretReference" | "isPrimary" | "metadata">>,
+  args: Partial<
+    Omit<
+      CreateWhatsAppBusinessAccountArgs,
+      | "companyId"
+      | "phoneNumber"
+      | "phoneNumberId"
+      | "businessAccountId"
+      | "credentialsReference"
+      | "webhookSecretReference"
+      | "isPrimary"
+      | "metadata"
+    >
+  >,
 ) {
-  return stdbBrowserCompatCall("update_whatsapp_business_account", [organizationId, accountId, args])
-}
-
-export function deleteWhatsAppBusinessAccount(organizationId: bigint, accountId: bigint) {
-  return stdbBrowserCompatCall("delete_whatsapp_business_account", [organizationId, accountId])
-}
-
-export function setWhatsAppPrimaryAccount(organizationId: bigint, accountId: bigint) {
-  return stdbBrowserCompatCall("set_whatsapp_primary_account", [organizationId, accountId])
-}
-
-export function updateWhatsAppVerificationStatus(
-  organizationId: bigint,
-  accountId: bigint,
-  verificationStatus: "Pending" | "Approved" | "Rejected" | "Expired" | "Revoked",
-  verificationLevel: "Unverified" | "BusinessPortfolio" | "BusinessVerified",
-) {
-  return stdbBrowserCompatCall("update_whatsapp_verification_status", [
-    organizationId,
+  return stdbBrowserCommand("update_whatsapp_business_account", {
     accountId,
-    {
-      verificationStatus: unit(verificationStatus),
-      businessVerificationLevel: unit(verificationLevel),
-    },
-  ])
+    params: stdbParamsToJson(args, "UpdateWhatsAppBusinessAccountParams"),
+  })
 }
 
-export function recordWhatsAppHealthCheck(
-  organizationId: bigint,
-  accountId: bigint,
-  isHealthy: boolean,
-) {
-  return stdbBrowserCompatCall("record_whatsapp_health_check", [
-    organizationId,
-    accountId,
-    { isHealthy },
-  ])
+export function deleteWhatsAppBusinessAccount(_organizationId: bigint, accountId: bigint) {
+  return stdbBrowserCommand("delete_whatsapp_business_account", { accountId })
 }
 
-export function recordWhatsAppMessageSent(organizationId: bigint, accountId: bigint) {
-  return stdbBrowserCompatCall("record_whatsapp_message_sent", [organizationId, accountId])
+export function setWhatsAppPrimaryAccount(_organizationId: bigint, accountId: bigint) {
+  return stdbBrowserCommand("set_whatsapp_primary_account", { accountId })
 }
 
 export function grantPermission(
@@ -270,15 +202,10 @@ export function revokePermission(_organizationId: bigint, permissionId: bigint) 
 }
 
 export function archiveAiChatSession(
-  organizationId: bigint,
+  _organizationId: bigint,
   companyId: bigint,
   sessionKey: string,
   archived: boolean,
 ) {
-  return stdbBrowserCompatCall("archive_ai_chat_session", [
-    organizationId,
-    companyId,
-    sessionKey,
-    archived,
-  ])
+  return stdbBrowserCommand("archive_ai_chat_session", { companyId, sessionKey, archived })
 }
