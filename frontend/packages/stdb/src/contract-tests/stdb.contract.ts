@@ -18,6 +18,7 @@ void stdbCommandContract("confirm_sales_order");
 
 const sessionOperation: SessionOperationName = "confirm_sales_order";
 void SESSION_OPERATION_DESCRIPTORS[sessionOperation];
+void SESSION_OPERATION_DESCRIPTORS[sessionOperation].contractOperationId;
 
 // @ts-expect-error denied operations are absent from the session descriptor.
 void stdbBffCallUrl("apply_global_migrations");

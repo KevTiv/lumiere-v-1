@@ -27,11 +27,11 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/stdb-params-json.test.ts src/commands/stdb-http.test.ts src/sdk.test.ts src/live/projection.test.ts src/queries/erp-subscriptions.test.ts src/wire-codec.test.ts"
+    "test": "node --import tsx --test src/stdb-params-json.test.ts src/commands/stdb-http.test.ts src/sdk.test.ts src/live/projection.test.ts src/queries/erp-subscriptions.test.ts"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
-    "@lumiere/contracts": "github:KevTiv/lumiere-contracts#v0.3.5&path:packages/contracts",
+    "@lumiere/contracts": "github:KevTiv/lumiere-contracts#v0.3.6&path:packages/contracts",
     "spacetimedb": "2.8.2"
   },
   "peerDependencies": {

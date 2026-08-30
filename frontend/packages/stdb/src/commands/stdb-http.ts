@@ -1,6 +1,7 @@
 import { stringifyReducerCommandBody } from "@lumiere/api-client";
 import type { OperationInputMap } from "@lumiere/contracts/generated/operation-inputs";
 import {
+  SESSION_OPERATION_DESCRIPTORS,
   SESSION_OPERATION_NAMES,
   type SessionOperationName,
 } from "@lumiere/contracts/generated/operation-descriptors";
@@ -29,7 +30,8 @@ export type StdbBffCommandInput<K extends NamedReducerKey> = {
 
 /** Same-origin typed operation path used by `apiFetch` in the web app. */
 export function stdbBffCallUrl(reducer: StdbBffReducerKey): string {
-  return `/api/operations/${encodeURIComponent(`erp.${reducer}`)}`;
+  const operationId = SESSION_OPERATION_DESCRIPTORS[reducer].contractOperationId;
+  return `/api/operations/${encodeURIComponent(operationId)}`;
 }
 
 /**

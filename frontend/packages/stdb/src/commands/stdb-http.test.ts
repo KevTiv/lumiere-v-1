@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import { encodeIdentity } from "../stdb-params-json"
+import { SESSION_OPERATION_DESCRIPTORS } from "@lumiere/contracts/generated/operation-descriptors"
 import { ACCOUNTING_BFF_REDUCERS, accountingBffCallUrl } from "./accounting-http"
 import { stdbBffCommandPost } from "./stdb-http"
 
@@ -25,7 +26,10 @@ test("unreconcile accounting command uses the canonical BFF URL once", () => {
     params: { moveIds: [11n, 13n], amountResidual: 42.5 },
   })
 
-  assert.equal(urlPath, "/api/operations/erp.unreconciled_account_bank_statement_line")
+  assert.equal(
+    urlPath,
+    `/api/operations/${SESSION_OPERATION_DESCRIPTORS.unreconciled_account_bank_statement_line.contractOperationId}`,
+  )
   assert.deepEqual(JSON.parse(String(init.body)), {
     companyId: 3,
     lineId: 7,
