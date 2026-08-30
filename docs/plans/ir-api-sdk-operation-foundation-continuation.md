@@ -1,11 +1,11 @@
 # IR-owned frontend operation descriptors — continuation PR
 
-**Status:** Phase 5C application SDK over generated contract facts, pinned to `lumiere-contracts` v0.3.15 — 2026-08-30
+**Status:** Phase 5C application SDK over generated contract facts, pinned to `lumiere-contracts` v0.3.16 — 2026-08-30
 **Depends on:** canonical IR/contracts extraction merge
-**Companion release:** `lumiere-contracts` v0.3.15
+**Companion release:** `lumiere-contracts` v0.3.16
 
-The application pins the immutable `v0.3.15` tag at companion release commit
-`49fd430e0b4b0db2043808e3b36e2c99a7ad108b`. The generated descriptor is now
+The application pins the immutable `v0.3.16` tag at companion release commit
+`a8176357b2ac941a08bda33eccdd6a38d255d64d`. The generated descriptor is now
 the application-owned named-command surface. The remaining positional
 accounting adapter and its duplicate hook have been removed.
 
@@ -17,7 +17,8 @@ left the retired, unexported source file in the tagged package. Release
 `v0.3.14` is superseded for SDK ownership because it generated an authored
 domain API from a Python string template. Release `v0.3.13` must not be
 consumed: its publisher run selected IR v1 and omitted immutable
-`contractOperationId` fields. The publisher now defaults to IR v2.
+`contractOperationId` fields. The publisher now defaults to IR v2, and
+`v0.3.16` adds a generator-owned guard that rejects or removes retired outputs.
 **Related:**
 [typed-bff-sdk-contract-hardening-execution-plan.md](./typed-bff-sdk-contract-hardening-execution-plan.md) ·
 [contracts-extraction-execution-plan.md](./contracts-extraction-execution-plan.md) ·
