@@ -4362,6 +4362,21 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "update_utm_campaign",
+      "exposure": "session",
+      "reason": "reviewed CRM UTM reducer: requires utm update permission and verifies the campaign belongs to the authenticated organization before writing"
+    },
+    {
+      "name": "update_utm_medium",
+      "exposure": "session",
+      "reason": "reviewed CRM UTM reducer: requires utm update permission and verifies the medium belongs to the authenticated organization before writing"
+    },
+    {
+      "name": "update_utm_source",
+      "exposure": "session",
+      "reason": "reviewed CRM UTM reducer: requires utm update permission and verifies the source belongs to the authenticated organization before writing"
+    },
+    {
       "name": "update_user_email",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site",
