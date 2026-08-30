@@ -168,6 +168,12 @@ python3 scripts/generate-from-ir.py
   echo "//! Published from lumiere-v-1 by scripts/publish-contracts.sh."
   echo
   echo "pub mod bindings;"
+  if [[ "$ACTIVE_IR_VERSION" == "2" ]]; then
+    echo
+    echo "/// Compact canonical descriptors generated from the active IR v2 pin."
+    echo '#[cfg(feature = "v2")]'
+    echo "pub mod generated;"
+  fi
   echo
   echo "pub mod manifests {"
   for f in manifests/*.json; do
