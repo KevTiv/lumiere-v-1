@@ -1,4 +1,4 @@
-import { stdbBrowserCommand, stdbBrowserCompatCall } from "../browser-http"
+import { stdbBrowserCommand } from "../browser-http"
 import type {
   CreateUtmCampaignParams,
   UpdateUtmCampaignParams,
@@ -27,15 +27,14 @@ export function createUtmCampaign(_organizationId: bigint, params: CreateUtmCamp
 }
 
 export function updateUtmCampaign(
-  organizationId: bigint,
+  _organizationId: bigint,
   campaignId: bigint,
   params: UpdateUtmCampaignParams,
 ) {
-  return stdbBrowserCompatCall("update_utm_campaign", [
-    organizationId.toString(),
-    campaignId.toString(),
-    params,
-  ])
+  return stdbBrowserCommand("update_utm_campaign", {
+    campaignId,
+    params: stdbParamsToJson(params as object, "UpdateUtmCampaignParams"),
+  })
 }
 
 export function createUtmMedium(_organizationId: bigint, params: CreateUtmMediumParams) {
@@ -45,15 +44,14 @@ export function createUtmMedium(_organizationId: bigint, params: CreateUtmMedium
 }
 
 export function updateUtmMedium(
-  organizationId: bigint,
+  _organizationId: bigint,
   mediumId: bigint,
   params: UpdateUtmMediumParams,
 ) {
-  return stdbBrowserCompatCall("update_utm_medium", [
-    organizationId.toString(),
-    mediumId.toString(),
-    params,
-  ])
+  return stdbBrowserCommand("update_utm_medium", {
+    mediumId,
+    params: stdbParamsToJson(params as object, "UpdateUtmMediumParams"),
+  })
 }
 
 export function createUtmSource(_organizationId: bigint, params: CreateUtmSourceParams) {
@@ -63,15 +61,14 @@ export function createUtmSource(_organizationId: bigint, params: CreateUtmSource
 }
 
 export function updateUtmSource(
-  organizationId: bigint,
+  _organizationId: bigint,
   sourceId: bigint,
   params: UpdateUtmSourceParams,
 ) {
-  return stdbBrowserCompatCall("update_utm_source", [
-    organizationId.toString(),
-    sourceId.toString(),
-    params,
-  ])
+  return stdbBrowserCommand("update_utm_source", {
+    sourceId,
+    params: stdbParamsToJson(params as object, "UpdateUtmSourceParams"),
+  })
 }
 
 // ── Chatter / followers ──────────────────────────────────────────────────────
