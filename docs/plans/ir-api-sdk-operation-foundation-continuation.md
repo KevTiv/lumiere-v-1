@@ -1,14 +1,13 @@
 # IR-owned frontend operation descriptors — continuation PR
 
-**Status:** Phase 1 release published; application readiness blocked by P0 — 2026-08-29
+**Status:** v0.3.5 descriptor consumption complete; IR v2 producer complete and companion consumer in PR #6 — 2026-08-30
 **Depends on:** canonical IR/contracts extraction merge
-**Companion release:** `lumiere-contracts` v0.3.4
+**Companion release:** `lumiere-contracts` v0.3.5
 
-The application pins the immutable `v0.3.4` tag at companion release commit
-`a4baae1ddd67c5027a25c8e85f0c760e363f133a`. The release was rebuilt from the
-authoritative Phase 1 staging artifact with provenance normalized to durable
-application commit `7a876a18d3c74ae48f3f21d405c1fdd0f7f5556c`. v0.3.3 is not a usable base:
-its checked-in IR pin and generated package contents are inconsistent.
+The application pins the immutable `v0.3.5` tag at companion release commit
+`f87f2d57dffddd8d7598dbd69abae249369fdaa1`. The generated descriptor is now
+the application-owned named-command surface. The remaining positional
+accounting adapter and its duplicate hook have been removed.
 **Related:**
 [typed-bff-sdk-contract-hardening-execution-plan.md](./typed-bff-sdk-contract-hardening-execution-plan.md) ·
 [contracts-extraction-execution-plan.md](./contracts-extraction-execution-plan.md) ·
@@ -23,7 +22,38 @@ list and emitter.
 
 This is the smallest independently mergeable step toward the generated SDK and
 typed API boundary. It changes contract ownership without changing server
-dispatch behavior or migrating legacy positional callers.
+dispatch behavior.
+
+## 1.1 IR v2 continuation
+
+The application extractor now writes a separate
+`lumiere-contract-ir-v2.json` beside the release-compatible v1 artifact. V2
+adds a contract-operation identity candidate, source target, canonical
+input/output references, codec state, idempotency state, resource row
+references, source tables, and mutation invalidation links.
+
+This is intentionally a versioned structural boundary rather than a silent v1
+shape change. Facts that cannot be derived from the STDB schema are explicit:
+
+- operation idempotency is `unclassified`;
+- application semantic kind is `unclassified`;
+- operation identity is `locked` by the authored `contract-operation-ids.json` manifest;
+- resource query/filter/cursor contracts are `unclassified`;
+- resource authorization scope is `unclassified`;
+- codecs are `unassigned`;
+- a registry table absent from the canonical table schema is `unresolved`.
+
+V1 remains the published consumer input until the companion v2 consumer in
+`lumiere-contracts` PR #6 is merged and released. The identity manifest must exactly cover the
+canonical operation set and keep IDs unique, so additions and renames require an
+explicit contract change. Promotion still requires authored scope and
+idempotency policy; generated code must not infer either from table columns or
+operation names.
+
+This active-name lock is not yet a historical anti-reuse ledger. Before the
+production hardening gate claims protection against same-name semantic
+replacement, evolve the manifest with retired-ID tombstones or canonical
+operation-shape fingerprints and an explicit compatibility policy.
 
 ## 2. Current duplication
 
@@ -109,7 +139,7 @@ copy of the reducer names in application code.
 - changing api-server dispatch behavior;
 - deleting or weakening the generated Rust `reducer_call!` allowlist;
 - generating wire codecs or the public domain SDK in this slice;
-- migrating legacy positional reducer callers;
+- adding new positional reducer callers;
 - broad domain or opaque-record cleanup;
 - generating one file per operation;
 - inventing business defaults or moving authorization into generated code.

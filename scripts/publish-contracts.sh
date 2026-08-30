@@ -27,13 +27,31 @@ if [[ ! -d "$STAGING/ts/generated" ]]; then
   echo "error: $STAGING/ts/generated missing — run make generate-stdb-ts-sdk && make codegen first" >&2
   exit 1
 fi
-if [[ ! -f "$STAGING/ir/lumiere-contract-ir-v1.json" || ! -f "$STAGING/ir/lumiere-contract-ir-v1.json.sha256" ]]; then
-  echo "error: canonical contract IR missing — run make codegen first" >&2
+if [[ ! -f "$STAGING/ir/lumiere-contract-ir-v1.json" \
+  || ! -f "$STAGING/ir/lumiere-contract-ir-v1.json.sha256" \
+  || ! -f "$STAGING/ir/lumiere-contract-ir-v2.json" \
+  || ! -f "$STAGING/ir/lumiere-contract-ir-v2.json.sha256" ]]; then
+  echo "error: canonical contract IR v1/v2 artifacts missing — run make codegen first" >&2
   exit 1
 fi
 
 python3 "$ROOT/scripts/verify-contract-ir.py" \
   "$STAGING/ir/lumiere-contract-ir-v1.json" --require-clean
+python3 "$ROOT/scripts/verify-contract-ir.py" \
+  "$STAGING/ir/lumiere-contract-ir-v2.json" --require-clean
+python3 - \
+  "$STAGING/ir/lumiere-contract-ir-v1.json" \
+  "$STAGING/ir/lumiere-contract-ir-v2.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    v1 = json.load(source)
+with open(sys.argv[2], encoding="utf-8") as source:
+    v2 = json.load(source)
+if v1["source_commit"] != v2["source_commit"]:
+    raise SystemExit("error: contract IR v1/v2 source commits do not match")
+PY
 
 SOURCE_REPO="$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)"
 if [[ -z "$SOURCE_REPO" ]]; then
@@ -67,6 +85,8 @@ cd "$WORK/repo"
 mkdir -p ir
 cp "$STAGING/ir/lumiere-contract-ir-v1.json" ir/
 cp "$STAGING/ir/lumiere-contract-ir-v1.json.sha256" ir/
+cp "$STAGING/ir/lumiere-contract-ir-v2.json" ir/
+cp "$STAGING/ir/lumiere-contract-ir-v2.json.sha256" ir/
 
 # Keep the provenance pin in sync with the verified handoff. The source commit
 # comes from the IR itself so the pin cannot accidentally describe a different

@@ -63,7 +63,7 @@ def main() -> None:
     missing = required - ir.keys()
     if missing:
         fail(f"missing fields: {', '.join(sorted(missing))}")
-    if ir["ir_version"] != 1:
+    if ir["ir_version"] not in {1, 2}:
         fail(f"unsupported ir_version {ir['ir_version']!r}")
     if not isinstance(ir["source_commit"], str) or not GIT_OBJECT_ID.fullmatch(
         ir["source_commit"]
@@ -86,18 +86,146 @@ def main() -> None:
     indexes = [item.get("index") for item in ir["types"]]
     if indexes != list(range(len(indexes))):
         fail("type indexes must be contiguous and ordered from zero")
+    type_names = {
+        name
+        for item in ir["types"]
+        for name in item.get("names", [])
+        if isinstance(name, str)
+    }
+    table_names = {item["name"] for item in ir["tables"]}
+    resource_names = {item["name"] for item in ir["resources"]}
+    operation_ids: set[str] = set()
     for operation in ir["operations"]:
         name = operation["name"]
         kind = operation.get("kind")
-        if kind not in {"reducer", "procedure", "view"}:
+        source_kind = operation.get("source_kind", kind)
+        if ir["ir_version"] == 1 and kind not in {"reducer", "procedure", "view"}:
             fail(f"operation {name} has unsupported kind {kind!r}")
+        if ir["ir_version"] == 2 and (
+            not isinstance(kind, dict)
+            or kind.get("status") != "unclassified"
+            or kind.get("value") is not None
+        ):
+            fail(f"operation {name} must declare semantic kind as unclassified")
         application = operation.get("application")
-        if kind == "reducer" and (not isinstance(application, dict) or application.get("name") != name):
+        if source_kind == "reducer" and (not isinstance(application, dict) or application.get("name") != name):
             fail(f"reducer operation {name} application contract does not match")
-        if kind != "reducer" and application is not None:
-            fail(f"unannotated {kind} operation {name} must have null application metadata")
+        if source_kind != "reducer" and application is not None:
+            fail(f"unannotated {source_kind} operation {name} must have null application metadata")
         if operation.get("schema", {}).get("name") != name:
             fail(f"operation {name} schema name does not match")
+        if ir["ir_version"] == 2:
+            operation_id = operation.get("contract_operation_id")
+            if not isinstance(operation_id, str) or not re.fullmatch(r"erp\.[a-z0-9_]+", operation_id):
+                fail(f"operation {name} has invalid contract_operation_id")
+            if operation_id in operation_ids:
+                fail(f"duplicate contract_operation_id {operation_id}")
+            operation_ids.add(operation_id)
+            if operation.get("contract_operation_id_status") != "locked":
+                fail(f"operation {name} must declare locked contract identity status")
+            target = operation.get("target")
+            expected_target = {
+                "reducer": "spacetimedb_reducer",
+                "procedure": "spacetimedb_procedure",
+                "view": "spacetimedb_view",
+            }.get(source_kind)
+            if not isinstance(target, dict) or target.get("kind") != expected_target or target.get("name") != name:
+                fail(f"operation {name} target does not match source operation")
+            input_metadata = operation.get("input")
+            if not isinstance(input_metadata, dict):
+                fail(f"operation {name} must declare input metadata")
+            if input_metadata.get("kind") not in {"operation_parameters", "unresolved"}:
+                fail(f"operation {name} has invalid input kind")
+            positions = input_metadata.get("parameter_positions")
+            params = application.get("params", []) if isinstance(application, dict) else []
+            client_fields = (
+                application.get("client_input", {}).get("fields", [])
+                if isinstance(application, dict)
+                else []
+            )
+            expected_positions = [field.get("parameter_position") for field in client_fields]
+            if (
+                not isinstance(positions, list)
+                or any(not isinstance(position, int) or position < 0 or position >= len(params) for position in positions)
+                or len(positions) != len(set(positions))
+                or positions != expected_positions
+            ):
+                fail(f"operation {name} has invalid input parameter positions")
+            input_ref = input_metadata.get("type_reference")
+            if input_ref is not None and input_ref not in type_names:
+                fail(f"operation {name} references unknown input type {input_ref!r}")
+            expected_input_ref = (
+                params[positions[0]].get("ref_target") if len(positions) == 1 else None
+            )
+            if input_ref != expected_input_ref:
+                fail(f"operation {name} input type reference does not match parameters")
+            output = operation.get("output")
+            if not isinstance(output, dict):
+                fail(f"operation {name} must declare output metadata")
+            if source_kind == "reducer" and (
+                output.get("kind") != "unit" or output.get("type_reference") is not None
+            ):
+                fail(f"reducer operation {name} must declare unit output")
+            if source_kind != "reducer" and (
+                output.get("kind") != "unresolved" or output.get("type_reference") is not None
+            ):
+                fail(f"operation {name} must declare unresolved output")
+            codec = operation.get("codec")
+            if (
+                not isinstance(codec, dict)
+                or codec.get("status") != "unassigned"
+                or codec.get("id") is not None
+                or codec.get("version") is not None
+            ):
+                fail(f"operation {name} must declare codec as unassigned")
+            idempotency = operation.get("idempotency")
+            if not isinstance(idempotency, dict) or idempotency.get("status") != "unclassified":
+                fail(f"operation {name} must declare idempotency status")
+        invalidates = operation.get("invalidates")
+        if not isinstance(invalidates, list) or any(
+            resource not in resource_names for resource in invalidates
+        ):
+            fail(f"operation {name} has invalid resource invalidations")
+
+    if ir["ir_version"] == 2:
+        for resource in ir["resources"]:
+            name = resource["name"]
+            row_ref = resource.get("row", {}).get("type_reference")
+            if row_ref not in type_names:
+                fail(f"resource {name} references unknown row type {row_ref!r}")
+            source = resource.get("source", {})
+            table_ref = source.get("table_reference")
+            source_kind = source.get("kind")
+            if source_kind not in {"table", "unresolved"}:
+                fail(f"resource {name} has invalid source kind {source_kind!r}")
+            if source_kind == "table" and table_ref not in table_names:
+                fail(f"resource {name} references unknown table {table_ref!r}")
+            if source_kind == "unresolved" and table_ref in table_names:
+                fail(f"resource {name} has an unnecessarily unresolved table source")
+            writers = resource.get("invalidated_by")
+            if (
+                not isinstance(writers, list)
+                or writers != sorted(set(writers))
+                or any(writer not in operation_ids for writer in writers)
+            ):
+                fail(f"resource {name} has invalid invalidated_by references")
+            scope = resource.get("scope")
+            if (
+                not isinstance(scope, dict)
+                or scope.get("kind") != "unclassified"
+                or scope.get("organization_field") is not None
+                or scope.get("company_field") is not None
+            ):
+                fail(f"resource {name} must declare scope classification status")
+            query = resource.get("query")
+            if (
+                not isinstance(query, dict)
+                or query.get("status") != "unclassified"
+                or query.get("input_type_reference") is not None
+                or query.get("filter_type_reference") is not None
+                or query.get("cursor_type_reference") is not None
+            ):
+                fail(f"resource {name} must declare query classification status")
 
     semantic = {
         field: ir[field]

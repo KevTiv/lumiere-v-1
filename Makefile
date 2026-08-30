@@ -882,6 +882,7 @@ codegen: schema-snapshot
 
 check-contract-ir: codegen
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v1.json
+	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json
 
 check-codegen: codegen check-contract-ir lint-reducer-call-literals
 	@git add -N \
