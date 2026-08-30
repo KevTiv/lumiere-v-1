@@ -12,11 +12,12 @@ function operationUrl(operation: keyof typeof SESSION_OPERATION_DESCRIPTORS): st
   )}`
 }
 
-test("application SDK binds the contracts-owned generated facade", async () => {
+test("application SDK owns the domain facade over generated contract facts", async () => {
   const source = await readFile(new URL("./sdk.ts", import.meta.url), "utf8")
-  assert.match(source, /createGeneratedStdbSdk/)
-  assert.doesNotMatch(source, /export interface StdbSdk/)
-  assert.doesNotMatch(source, /settings:\s*\{\s*integrations:/)
+  assert.match(source, /export interface StdbSdk/)
+  assert.match(source, /settings:\s*\{\s*readonly integrations:/)
+  assert.doesNotMatch(source, /@lumiere\/contracts\/generated\/sdk/)
+  assert.doesNotMatch(source, /createGeneratedStdbSdk/)
 })
 
 test("accounting SDK targets the immutable typed operation and selected company", async () => {
