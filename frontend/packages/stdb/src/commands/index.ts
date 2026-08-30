@@ -19,7 +19,6 @@ export {
   ACCOUNTING_BFF_REDUCERS,
   ACCOUNTING_COMMAND_SUBSCRIPTION_HINTS,
   accountingBffCallUrl,
-  accountingBffPost,
   accountingCommandContract,
   type AccountingBffReducerKey,
 } from "./accounting-http";

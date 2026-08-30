@@ -1,5 +1,3 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
-
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
@@ -119,7 +117,6 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "set_intercompany_rule_active",
   "unmatch_elimination_entry",
   "unreconciled_account_bank_statement_line",
-  "unreconciled_account_bank_statement_line",
   "update_account_account",
   "update_account_account_type",
   "update_account_asset",
@@ -165,7 +162,6 @@ const WITH_COMPANY_QUERY = new Set<AccountingBffReducerKey>([
   "update_account_bank_statement_line",
   "delete_account_bank_statement_line",
   "reconcile_account_bank_statement_line",
-  "unreconciled_account_bank_statement_line",
   "create_account_reconciliation_widget",
   "update_account_reconciliation_widget",
   "delete_account_reconciliation_widget",
@@ -175,20 +171,6 @@ const WITH_COMPANY_QUERY = new Set<AccountingBffReducerKey>([
 export function accountingBffCallUrl(reducer: AccountingBffReducerKey): string {
   const base = `/api/call/${reducer}`;
   return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
-
-export function accountingBffPost(
-  reducer: AccountingBffReducerKey,
-  args: unknown[],
-): { urlPath: string; init: RequestInit } {
-  return {
-    urlPath: accountingBffCallUrl(reducer),
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
-    },
-  };
 }
 
 const ACCOUNTING_HINT_OVERRIDES: Partial<

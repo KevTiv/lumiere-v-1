@@ -49,7 +49,6 @@ import type {
   UpdateCrossoveredBudgetLineParams,
   UpdateCrossoveredBudgetParams,
 } from "@lumiere/stdb/types"
-import { accountingBffPost, type AccountingBffReducerKey } from "@lumiere/stdb/commands"
 import { invalidateStdbQueryResources, useStdbQuery } from "./stdb"
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
 
@@ -422,25 +421,6 @@ export function useAccountAnalyticDistributionModels(
 }
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
-
-function useAccountingCallMutation(
-  reducer: AccountingBffReducerKey,
-  organizationId: bigint | number,
-  invalidateResources: readonly string[],
-) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (args: unknown[]) => {
-      const { urlPath, init } = accountingBffPost(reducer, args)
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) {
-        const json = (await r.json().catch(() => ({}))) as Record<string, unknown>
-        throw new Error((json.error as string | undefined) ?? `Reducer ${reducer} failed`)
-      }
-    },
-    onSuccess: () => invalidateStdbQueryResources(qc, organizationId, invalidateResources),
-  })
-}
 
 function invalidateBudgetQueries(qc: ReturnType<typeof useQueryClient>, organizationId: number) {
   // `stdbQueryKey` (hooks/stdb.ts) stringifies the organization id, so the invalidation key
@@ -963,17 +943,6 @@ export function useUpdateAccountBankStatement(organizationId: number) {
     onSuccess: () =>
       invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("update_account_bank_statement")),
   })
-}
-
-/**
- * Unreconcile a bank statement line.
- */
-export function useUnreconcileAccountBankStatementLine(organizationId: number) {
-  return useAccountingCallMutation(
-    "unreconciled_account_bank_statement_line",
-    organizationId,
-    stdbInvalidationFor("unreconciled_account_bank_statement_line"),
-  )
 }
 
 /**
