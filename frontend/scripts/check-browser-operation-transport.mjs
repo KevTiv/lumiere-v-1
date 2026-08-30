@@ -13,10 +13,25 @@ import process from "node:process"
 import ts from "typescript"
 
 const FRONTEND_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..")
+const REPOSITORY_ROOT = path.resolve(FRONTEND_ROOT, "..")
 const ROOTS = ["packages", "web/app", "web/lib"]
 const ALLOWLIST = new Set(["web/lib/api-url.ts"])
 const FORBIDDEN_PATHS = ["/api/call/", "/api/compat/reducer/"]
 const FORBIDDEN_CALLS = new Set(["stdbBrowserCall", "stdbBrowserCompatCall"])
+const RETIRED_ALIAS_PATTERNS = [
+  {
+    file: path.join(FRONTEND_ROOT, "web/next.config.mjs"),
+    pattern: "/api/call/:path*",
+  },
+  {
+    file: path.join(REPOSITORY_ROOT, "api-server/src/http_app.rs"),
+    pattern: '.route("/call/:reducer"',
+  },
+  {
+    file: path.join(REPOSITORY_ROOT, "api-server/src/http_app.rs"),
+    pattern: 'rename = "withCompany"',
+  },
+]
 
 function relativeToFrontend(absolutePath) {
   return path.relative(FRONTEND_ROOT, absolutePath).split(path.sep).join("/")
@@ -115,6 +130,14 @@ for (const root of ROOTS) {
     if (isExcluded(relativePath)) continue
     const fileViolations = sourceViolations(filePath, fs.readFileSync(filePath, "utf8"))
     violations.push(...fileViolations.map((violation) => `${relativePath}:${violation}`))
+  }
+}
+
+for (const { file, pattern } of RETIRED_ALIAS_PATTERNS) {
+  if (fs.readFileSync(file, "utf8").includes(pattern)) {
+    violations.push(
+      `${path.relative(REPOSITORY_ROOT, file)}: retired compatibility surface '${pattern}'`,
+    )
   }
 }
 

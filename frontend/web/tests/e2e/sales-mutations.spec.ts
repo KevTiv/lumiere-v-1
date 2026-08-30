@@ -6,6 +6,8 @@ import {
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   expectNoAppError,
+  fetchDefaultCompanyId,
+  fetchSessionOrganizationId,
   fillField,
   gotoModule,
   scalarQueryId,
@@ -86,11 +88,12 @@ test.describe("Sales update mutations", { tag: ["@p0", "@phase-3"] }, () => {
       )
       .toBeGreaterThan(0)
 
+    const organizationId = await fetchSessionOrganizationId(page)
+    const companyId = await fetchDefaultCompanyId(page)
     await callReducerBff(
       page,
       "update_sale_order",
-      [orderId, { clientOrderRef: updatedRef }],
-      { withCompany: true },
+      [organizationId, companyId, orderId, { clientOrderRef: updatedRef }],
     )
 
     await expect

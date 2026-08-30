@@ -6,8 +6,7 @@ use axum::{extract::Request, middleware::Next, response::Response};
 pub async fn track_http_metrics(request: Request, next: Next) -> Response {
     let skip = request.uri().path() == "/metrics";
     let typed_operation = request.uri().path().starts_with("/v1/operations/");
-    let compat_reducer = request.uri().path().starts_with("/v1/compat/reducer/")
-        || request.uri().path().starts_with("/v1/call/");
+    let compat_reducer = request.uri().path().starts_with("/v1/compat/reducer/");
     if !skip {
         crate::metrics::inc_request();
         if typed_operation {

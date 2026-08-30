@@ -90,7 +90,7 @@ async function waitForRow(
 }
 
 async function callRawReducer(page: Page, reducer: string, args: unknown[]): Promise<void> {
-  const response = await page.request.post(`/api/call/${reducer}`, {
+  const response = await page.request.post(`/api/compat/reducer/${reducer}`, {
     data: args,
     headers: { "Content-Type": "application/json" },
   })

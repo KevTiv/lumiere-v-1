@@ -80,7 +80,7 @@ const UI_SRC = path.join(REPO_ROOT, 'frontend/packages/ui/src')
 const REPORTS_DIR = path.join(WEB_SRC, 'reports')
 const DOCS_DIR = path.join(REPO_ROOT, 'docs')
 
-/** Roots scanned for `POST /api/call/:reducer` literals and `useStdbReducer` (includes shared hooks package). */
+/** Roots scanned for explicit compatibility literals and typed operation hooks. */
 const CLIENT_API_CALL_SCAN_ROOTS = [
   WEB_SRC,
   path.join(REPO_ROOT, 'frontend/packages/query-hooks'),
@@ -257,8 +257,8 @@ const PLATFORM_TRIAGE_EXCLUDED_FROM_PRODUCT: Record<string, string> = {
 
 // Patterns for detecting reducer usage in TypeScript
 const WEB_DETECTION_PATTERNS = {
-  // Direct fetch calls like '/api/call/create_account_account'
-  apiCallLiteral: /['"]\/api\/call\/([a-z0-9_]+)(\?[^'"]*)?['"]/g,
+  // Explicit positional compatibility calls.
+  apiCallLiteral: /['"]\/api\/compat\/reducer\/([a-z0-9_]+)(\?[^'"]*)?['"]/g,
   // useStdbReducer('name')
   useStdbReducer: /useStdbReducer\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
   // useStdbReducerWithInvalidation('name', ...)
@@ -426,11 +426,11 @@ function extractWebReducers(): {
     stdbBrowserCompatCall: new Set(),
   }
 
-  // Try ripgrep first for fast literal /api/call detection
+  // Try ripgrep first for fast explicit compatibility-path detection.
   try {
     const roots = CLIENT_API_CALL_SCAN_ROOTS.map((p) => JSON.stringify(p)).join(' ')
     const output = execSync(
-      `rg -o '/api/call/[a-z0-9_?]+' ${roots} --glob '*.ts' --glob '*.tsx' | sed 's|.*/api/call/||' | sed 's/?.*//' | sort -u`,
+      `rg -o '/api/compat/reducer/[a-z0-9_?]+' ${roots} --glob '*.ts' --glob '*.tsx' | sed 's|.*/api/compat/reducer/||' | sed 's/?.*//' | sort -u`,
       { encoding: 'utf-8', cwd: REPO_ROOT }
     )
     for (const name of output.trim().split('\n').filter(Boolean)) {
@@ -441,7 +441,7 @@ function extractWebReducers(): {
     // Fallback will handle this
   }
 
-  // Scan files for all patterns (including fallback for /api/call).
+  // Scan files for all patterns (including compatibility-path fallback).
   // Note: globSync does not expand `{ts,tsx}` — use separate patterns.
   const files: string[] = []
   for (const root of CLIENT_API_CALL_SCAN_ROOTS) {
@@ -644,7 +644,7 @@ function extractUiCallers(hooks: Map<string, Set<string>>): Map<string, Set<stri
     }
 
     for (const reducer of hooks.keys()) {
-      if (content.includes(`/api/call/${reducer}`) || content.includes(`"${reducer}"`) || content.includes(`'${reducer}'`)) {
+      if (content.includes(`/api/compat/reducer/${reducer}`) || content.includes(`"${reducer}"`) || content.includes(`'${reducer}'`)) {
         addIndexValue(callers, reducer, rel)
       }
     }
@@ -1626,7 +1626,7 @@ function printReport(report: CoverageReport): void {
 
   // Detection sources
   console.log('\n=== Detection Sources ===')
-  console.log(`  /api/call literal strings: ${report.detectionSources.apiCallLiteral}`)
+  console.log(`  /api/compat/reducer literal strings: ${report.detectionSources.apiCallLiteral}`)
   console.log(`  useStdbReducer('...'): ${report.detectionSources.useStdbReducer}`)
   console.log(`  useStdbReducerWithInvalidation('...'): ${report.detectionSources.useStdbReducerWithInvalidation}`)
   console.log(`  useStdbCallMutation('...'): ${report.detectionSources.useStdbCallMutation}`)

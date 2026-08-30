@@ -758,14 +758,13 @@ export async function fetchSessionOrganizationId(page: Page): Promise<number> {
   return Number(id)
 }
 
-/** Authenticated BFF reducer call (same-origin `/api/call`). */
+/** Authenticated fixture-only positional call through the explicit compatibility route. */
 export async function callReducerBff(
   page: Page,
   reducer: string,
   args: unknown[],
-  options?: { withCompany?: boolean },
 ) {
-  const result = await callReducerBffResult(page, reducer, args, options)
+  const result = await callReducerBffResult(page, reducer, args)
   if (!result.ok) {
     throw new Error(result.error ?? `Reducer ${reducer} failed (${result.status})`)
   }
@@ -776,11 +775,9 @@ export async function callReducerBffResult(
   page: Page,
   reducer: string,
   args: unknown[],
-  options?: { withCompany?: boolean },
 ): Promise<{ ok: boolean; status: number; error?: string }> {
-  const qs = options?.withCompany ? "?withCompany=true" : ""
   const encodedArgs = encodeReducerCallArgs(reducer, args)
-  const res = await page.request.post(`/api/call/${reducer}${qs}`, {
+  const res = await page.request.post(`/api/compat/reducer/${reducer}`, {
     data: JSON.parse(stringifyReducerCallBody(encodedArgs)),
     headers: { "Content-Type": "application/json" },
   })
@@ -830,9 +827,8 @@ export async function expectReducerPermissionDenied(
   page: Page,
   reducer: string,
   args: unknown[],
-  options?: { withCompany?: boolean },
 ) {
-  const result = await callReducerBffResult(page, reducer, args, options)
+  const result = await callReducerBffResult(page, reducer, args)
   expect(result.ok).toBe(false)
   const detail = result.error ?? ""
   const denied =
@@ -1964,10 +1960,14 @@ export async function createAiActionDraftTask(
   page: Page,
   taskName: string,
 ): Promise<number> {
+  const organizationId = await fetchSessionOrganizationId(page)
+  const companyId = await fetchDefaultCompanyId(page)
   await callReducerBff(
     page,
     "create_ai_action_draft",
     [
+      organizationId,
+      companyId,
       {
         reducer_name: "create_task",
         params_json: JSON.stringify({ name: taskName }),
@@ -1981,7 +1981,6 @@ export async function createAiActionDraftTask(
         metadata: null,
       },
     ],
-    { withCompany: true },
   )
 
   let draftId = 0

@@ -37,6 +37,10 @@ test("Next forwards the explicit reducer compatibility path to api-server", asyn
         destination: "http://127.0.0.1:8082/v1/compat/reducer/:path*",
       },
     )
+    assert.equal(
+      rewrites.some((rewrite) => rewrite.source === "/api/call/:path*"),
+      false,
+    )
   } finally {
     if (previous === undefined) delete process.env.LUMIERE_API_SERVER_URL
     else process.env.LUMIERE_API_SERVER_URL = previous

@@ -17,9 +17,7 @@ export function matchesOperationResponse(
   const encodedName = encodeURIComponent(operationName)
   if (
     pathname === `/api/compat/reducer/${encodedName}` ||
-    pathname === `/v1/compat/reducer/${encodedName}` ||
-    pathname === `/api/call/${encodedName}` ||
-    pathname === `/v1/call/${encodedName}`
+    pathname === `/v1/compat/reducer/${encodedName}`
   ) {
     return true
   }

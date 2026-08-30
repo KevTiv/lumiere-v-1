@@ -26,8 +26,7 @@ use crate::error::ApiError;
 use crate::metrics;
 use crate::middleware::metrics::track_http_metrics;
 use crate::query_exec::{
-    default_company_id, execute_authorized_resource_record, execute_resource_query_for_company,
-    resolve_crm_company_id,
+    execute_authorized_resource_record, execute_resource_query_for_company, resolve_crm_company_id,
 };
 use crate::routes;
 use crate::session::resolve_api_session;
@@ -46,12 +45,6 @@ struct OrgQuery {
     cursor: Option<String>,
     /// Page size for paginated resources; other resources ignore it.
     limit: Option<u32>,
-}
-
-#[derive(Debug, Deserialize)]
-struct CallQuery {
-    #[serde(default, rename = "withCompany")]
-    with_company: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -265,7 +258,6 @@ async fn post_compat_reducer(
     headers: HeaderMap,
     cookies: tower_cookies::Cookies,
     Path(reducer): Path<String>,
-    Query(q): Query<CallQuery>,
     Json(body): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
     let auth = headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok());
@@ -278,20 +270,11 @@ async fn post_compat_reducer(
         .organization_id
         .ok_or_else(|| ApiError::Forbidden("No organization assigned".into()))?;
     let contract = session_reducer_contract(&reducer)?;
-    let mut args = body.as_array().cloned().ok_or_else(|| {
+    let args = body.as_array().cloned().ok_or_else(|| {
         ApiError::Unprocessable(
             "Compatibility reducer body must be a positional argument array".into(),
         )
     })?;
-    if q.with_company {
-        let client = state.client_with_token(&session.stdb_token);
-        let company_id = default_company_id(&client, org_id)
-            .await?
-            .ok_or_else(|| ApiError::Unprocessable("No company found for organization".into()))?;
-        let mut next = vec![json!(org_id), json!(company_id)];
-        next.append(&mut args);
-        args = next;
-    }
     execute_reducer_call(&state, &session.stdb_token, contract, args, org_id).await
 }
 
@@ -640,7 +623,6 @@ pub async fn serve() -> anyhow::Result<()> {
             get(get_authoritative_resource),
         )
         .route("/operations/:operation", post(post_operation))
-        .route("/call/:reducer", post(post_compat_reducer))
         .route("/compat/reducer/:reducer", post(post_compat_reducer))
         .route("/realtime/ws", get(realtime::realtime_ws_upgrade))
         .route("/realtime/info", get(realtime::realtime_info))

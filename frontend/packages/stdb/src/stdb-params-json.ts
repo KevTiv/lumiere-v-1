@@ -337,7 +337,7 @@ export function encodeOptionalTimestamp(
 }
 
 /**
- * Encode generated TS reducer param structs for `POST /api/call/:reducer`.
+ * Encode generated TS operation parameter structs for the immutable-ID endpoint.
  *
  * @param structName - Generated params type name (e.g. `CreateLeadParams`) so
  *   `Option<T>` fields are wrapped as `{ some: v }` / `{ none: [] }`.
@@ -385,7 +385,7 @@ export function stdbParamsToJson(
   return out
 }
 
-/** Last-arg struct names for `POST /api/call/:reducer` bodies in Playwright / scripts. */
+/** Last-argument struct names retained for explicit compatibility fixtures. */
 const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & string>> = {
   create_ai_insight: "CreateAiInsightParams",
   create_dashboard_widget: "CreateDashboardWidgetParams",

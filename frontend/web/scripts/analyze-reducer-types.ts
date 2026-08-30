@@ -4,7 +4,7 @@
  *
  * Analyzes the type contract between:
  *   1. SpacetimeDB reducer bindings (generated *_reducer.ts + types.ts)
- *   2. Query-hooks mutation calls (/api/call/{reducer} body shapes)
+ *   2. Explicit compatibility mutation calls and their positional body shapes
  *   3. API-server route handlers (body.get("field") extraction patterns)
  *
  * Detects:
@@ -375,8 +375,8 @@ function loadHookCalls(): Map<string, HookCall[]> {
     const src = readFile(file)
     const relFile = path.relative(REPO_ROOT, file)
 
-    // Pattern 1: apiFetch('/api/call/{reducer}', { ... body: JSON.stringify([...]) ... })
-    const apiCallRe = /apiFetch\(['"`]\/api\/call\/([a-z_]+)['"`]/g
+    // Pattern 1: apiFetch('/api/compat/reducer/{reducer}', { ... positional body ... })
+    const apiCallRe = /apiFetch\(['"`]\/api\/compat\/reducer\/([a-z_]+)['"`]/g
     let m: RegExpExecArray | null
 
     while ((m = apiCallRe.exec(src)) !== null) {

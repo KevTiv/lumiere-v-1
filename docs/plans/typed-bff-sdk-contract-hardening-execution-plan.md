@@ -1,16 +1,32 @@
 # Typed BFF SDK and contract hardening — execution plan
 
-**Status:** Phase 5D application-owned domain SDK migration over generated contract facts — 2026-08-30
+**Status:** Phase 5 complete; Phase 6 typed-read decoding is next — 2026-08-30
 **First pickup:** `frontend/packages/query-hooks/src/hooks/accounting.ts`
 **First reducer:** `create_account_account` through `useCreateAccountAccount`
 **Companion caller:** `frontend/web/app/(modules)/accounting/accounting-client.tsx`
 **Tracks:** canonical IR, contracts extraction, write-path hardening, typed reads,
 generated codecs, generated SDK, frontend type debt
 
-**Immediate continuation:**
+**Completed foundation:**
 [ir-api-sdk-operation-foundation-continuation.md](./ir-api-sdk-operation-foundation-continuation.md)
-defines the first mergeable IR-to-SDK/API vertical slice and its cross-repository
-release gates.
+records the first IR-to-SDK/API vertical slice and its cross-repository release
+gates. The immediate continuation is Phase 6 typed reads.
+
+### Phase 5 completion evidence
+
+- 809 production query-hook mutations across 35 files use generated named input
+  types and immutable-ID `/api/operations/:operation` requests;
+- normal production browser code has zero positional `unknown[]` mutation
+  calls, zero `/api/call` calls, and zero `withCompany=true` calls;
+- the ambiguous `/v1/call/:reducer` alias and automatic default-company
+  insertion are removed;
+- positional calls remain only on the explicitly named
+  `/v1/compat/reducer/:reducer` boundary for excluded dev/E2E tooling;
+- `@lumiere/stdb` owns the handwritten domain façade and typed operation
+  transport; `lumiere-contracts` supplies immutable IDs, input types, and
+  codecs without generating business API structure;
+- the browser-operation transport check is required by CI and also rejects
+  restoration of the retired API and Next.js aliases.
 
 ## 1. Outcome
 
@@ -225,8 +241,14 @@ business façade.
 Migrate one domain at a time. A migrated domain must delete its positional
 adapter and unused `*-http.ts` transport function in the same change.
 
-**Exit:** no normal mutation hook accepts `unknown[]` and no browser call uses
-`?withCompany=true`.
+Domain convenience methods are curated application API, not a requirement to
+create a one-line wrapper for every operation. Hooks without a domain method
+use the typed `stdbBffCommandPost` operation highway directly; this is still a
+named, immutable-ID request and never a positional compatibility call.
+
+**Exit (achieved):** no normal mutation hook accepts `unknown[]`, no production
+browser call uses a compatibility reducer route, and no caller requests an
+implicitly selected company.
 
 ### Phase 6 — generate typed reads
 
