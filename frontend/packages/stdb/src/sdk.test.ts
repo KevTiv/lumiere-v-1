@@ -70,6 +70,21 @@ test("accounting SDK targets the immutable typed operation and selected company"
   })
 })
 
+test("organization company SDK decodes the typed read boundary", async () => {
+  let requestedUrl = ""
+  const sdk = createStdbSdk(async (url) => {
+    requestedUrl = url
+    return new Response(JSON.stringify({
+      data: [{ id: 7, organizationId: 11, name: "Lumiere" }],
+    }))
+  })
+
+  const companies = await sdk.organization.companies.list()
+
+  assert.equal(requestedUrl, "/api/query/companies")
+  assert.deepEqual(companies, [{ id: 7n, organizationId: 11n, name: "Lumiere" }])
+})
+
 test("accounting tax SDK binds selected company for create and update", async () => {
   const requests: Array<{ url: string; body: Record<string, unknown> }> = []
   const apiFetch = async (url: string, init?: RequestInit) => {

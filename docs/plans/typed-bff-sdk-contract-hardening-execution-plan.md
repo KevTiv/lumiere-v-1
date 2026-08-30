@@ -1,16 +1,16 @@
 # Typed BFF SDK and contract hardening — execution plan
 
-**Status:** Phase 5 complete; Phase 6 typed-read decoding is next — 2026-08-30
-**First pickup:** `frontend/packages/query-hooks/src/hooks/accounting.ts`
-**First reducer:** `create_account_account` through `useCreateAccountAccount`
-**Companion caller:** `frontend/web/app/(modules)/accounting/accounting-client.tsx`
+**Status:** Phase 5 complete; Phase 6 started with the projection-aware
+`companies` typed-read pilot — 2026-08-30
+**First Phase 6 pickup:** `frontend/packages/query-hooks/src/hooks/organization-company.ts`
 **Tracks:** canonical IR, contracts extraction, write-path hardening, typed reads,
 generated codecs, generated SDK, frontend type debt
 
 **Completed foundation:**
 [ir-api-sdk-operation-foundation-continuation.md](./ir-api-sdk-operation-foundation-continuation.md)
 records the first IR-to-SDK/API vertical slice and its cross-repository release
-gates. The immediate continuation is Phase 6 typed reads.
+gates. Phase 6 now continues with contracts-owned resource codecs and classified
+query/scope metadata.
 
 ### Phase 5 completion evidence
 
@@ -260,6 +260,25 @@ implicitly selected company.
   `Record<string, unknown>[]`.
 
 **Exit:** migrated domains have typed mutation inputs and typed query results.
+
+#### Phase 6 pilot evidence
+
+- `@lumiere/api-client` has a strict opt-in decoder for normal
+  `{ data: [...] }` responses; malformed envelopes and accidental paginated
+  responses fail rather than becoming an empty list;
+- `@lumiere/stdb` owns a projection-aware `CompanyQueryRow` decoder: registry
+  mandatory fields are required, policy-controlled fields may be omitted,
+  unknown fields and lossy IDs are rejected, and IDs/timestamps normalize to
+  generated runtime types;
+- `sdk.organization.companies.list()` is the first typed read domain method and
+  `useCompanies` no longer asserts an unknown HTTP body as `Company[]`;
+- the pilot deliberately excludes `pos-orders`, whose cursor envelope and read
+  authorization need a separate contract and scope repair.
+
+This is a Phase 6 pilot, not the phase exit. The v0.3.17 resource IR still marks
+all query and scope descriptors unclassified and does not emit projection-aware
+row codecs. The next release must generate those codecs and partial-row result
+types from the canonical type graph before accounting/CRM reads migrate broadly.
 
 ### Phase 7 — delete redundant layers
 

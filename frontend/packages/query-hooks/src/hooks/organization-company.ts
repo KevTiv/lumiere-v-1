@@ -8,7 +8,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type { ClearablePatch } from "@lumiere/erp-shared/accounting-create-params"
 import type {
-  Company,
   CreateCompanyParams,
   CreateDataClassificationParams,
   CreateDataClassificationRuleParams,
@@ -19,6 +18,8 @@ import type {
   UpdateCompanyHierarchyParams,
   UpdateCompanyParams,
 } from "@lumiere/stdb/types"
+import type { CompanyQueryRow } from "@lumiere/stdb/resource-reads"
+import { createStdbSdk } from "@lumiere/stdb/sdk"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
@@ -27,14 +28,9 @@ function stdbQueryKey(resource: string, organizationId: number) {
 }
 
 export function useCompanies(organizationId: number, enabled: boolean) {
-  return useQuery<Company[]>({
+  return useQuery<CompanyQueryRow[]>({
     queryKey: stdbQueryKey("companies", organizationId),
-    queryFn: async () => {
-      const r = await apiFetch("/api/query/companies")
-      if (!r.ok) throw new Error(await parseCallError(r))
-      const j = (await r.json()) as { data?: Company[] }
-      return j.data ?? []
-    },
+    queryFn: () => createStdbSdk(apiFetch).organization.companies.list(),
     enabled: enabled && organizationId > 0,
     staleTime: 30_000,
   })

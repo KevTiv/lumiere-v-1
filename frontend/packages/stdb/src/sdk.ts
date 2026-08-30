@@ -6,6 +6,10 @@ import {
   type StdbBffNamedReducerKey,
 } from "./commands"
 import { stdbParamsToJson } from "./stdb-params-json"
+import {
+  decodeCompaniesQueryResponse,
+  type CompanyQueryRow,
+} from "./resource-reads"
 
 type CreateAccountParams = Omit<
   Exclude<StdbBffCommandInput<"create_account_account">["params"], null>,
@@ -19,6 +23,11 @@ type UpdateWhatsAppParams =
   StdbBffCommandInput<"update_whatsapp_business_account">["params"]
 
 export interface StdbSdk {
+  readonly organization: {
+    readonly companies: {
+      list(): Promise<CompanyQueryRow[]>
+    }
+  }
   readonly settings: {
     readonly integrations: {
       readonly googleDrive: {
@@ -141,6 +150,22 @@ export function createStdbSdk(apiFetch: LumiereHttpFetch): StdbSdk {
   })
 
   return {
+    organization: {
+      companies: {
+        list: async () => {
+          const response = await apiFetch("/api/query/companies")
+          if (!response.ok) {
+            const payload = (await response.json().catch(() => ({}))) as {
+              error?: string
+              message?: string
+            }
+            throw new Error(payload.message ?? payload.error ?? "Query companies failed")
+          }
+          const payload: unknown = await response.json()
+          return decodeCompaniesQueryResponse(payload)
+        },
+      },
+    },
     settings: {
       integrations: {
         googleDrive: {
