@@ -2,9 +2,13 @@ import { strict as assert } from "node:assert"
 import { test } from "node:test"
 
 import { QueryResponseDecodeError } from "@lumiere/api-client"
+import { ResourceQueryRowDecodeError } from "@lumiere/contracts/generated/resource-codecs"
 import { CANONICAL_RESOURCE_BY_NAME } from "@lumiere/contracts/generated/resources"
 
-import { decodeCompaniesQueryResponse } from "./resource-reads"
+import {
+  decodeAccountAccountsQueryResponse,
+  decodeCompaniesQueryResponse,
+} from "./resource-reads"
 
 test("company typed read stays aligned with canonical mandatory metadata", () => {
   assert.deepEqual(CANONICAL_RESOURCE_BY_NAME.companies.mandatory, [
@@ -42,7 +46,12 @@ test("company typed read rejects malformed rows and lossy IDs", () => {
     { data: [{ id: 7, organizationId: 11, unexpected: true }] },
   ]
   for (const value of invalid) {
-    assert.throws(() => decodeCompaniesQueryResponse(value), QueryResponseDecodeError)
+    assert.throws(
+      () => decodeCompaniesQueryResponse(value),
+      (error) =>
+        error instanceof QueryResponseDecodeError ||
+        error instanceof ResourceQueryRowDecodeError,
+    )
   }
 })
 
@@ -55,4 +64,36 @@ test("company typed read normalizes timestamps", () => {
     }],
   })
   assert.equal(row.deletedAt?.microsSinceUnixEpoch, 1781987714525004n)
+})
+
+test("account typed read decodes generated projection fields", () => {
+  assert.deepEqual(CANONICAL_RESOURCE_BY_NAME["account-accounts"].mandatory, [
+    "id",
+    "organization_id",
+  ])
+  const [row] = decodeAccountAccountsQueryResponse({
+    data: [{
+      id: "9",
+      organizationId: 11,
+      code: "1100",
+      internalType: "Asset",
+      allowedJournalIds: [2, "3"],
+    }],
+  })
+  assert.equal(row.id, 9n)
+  assert.deepEqual(row.internalType, { tag: "Asset" })
+  assert.deepEqual(row.allowedJournalIds, [2n, 3n])
+})
+
+test("account typed read rejects unknown and missing mandatory fields", () => {
+  assert.throws(
+    () => decodeAccountAccountsQueryResponse({
+      data: [{ id: 9, organizationId: 11, credentialReference: "secret" }],
+    }),
+    ResourceQueryRowDecodeError,
+  )
+  assert.throws(
+    () => decodeAccountAccountsQueryResponse({ data: [{ id: 9 }] }),
+    ResourceQueryRowDecodeError,
+  )
 })

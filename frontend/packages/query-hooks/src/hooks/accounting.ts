@@ -2,16 +2,17 @@
 
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import type { AccountAccountQueryRow } from "@lumiere/stdb/resource-reads"
 import { createStdbSdk } from "@lumiere/stdb/sdk"
-import { apiFetch } from "../http"
+import { apiFetch, coalesceQueryInitialData } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useErpSession } from "@lumiere/erp-session"
 import {
   paymentParamsToJson,
   type ClearablePatch,
 } from "@lumiere/erp-shared/accounting-create-params"
 import { stdbParamsToJson, encodeOptionalU64 } from "@lumiere/erp-shared/stdb-params-json"
 import type {
-  AccountAccount,
   AccountFiscalYear,
   AccountJournal,
   AccountMove,
@@ -50,7 +51,7 @@ import type {
   UpdateCrossoveredBudgetLineParams,
   UpdateCrossoveredBudgetParams,
 } from "@lumiere/stdb/types"
-import { invalidateStdbQueryResources, useStdbQuery } from "./stdb"
+import { invalidateStdbQueryResources, stdbQueryKey, useStdbQuery } from "./stdb"
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
 
 function toScalarU64(v: bigint | number | string): bigint {
@@ -60,7 +61,6 @@ function toScalarU64(v: bigint | number | string): bigint {
 // ── Type Imports from @lumiere/stdb ─────────────────────────────────────────
 
 export type {
-  AccountAccount,
   AccountFiscalYear,
   AccountMove,
   AccountMoveLine,
@@ -78,6 +78,7 @@ export type {
   CreateAccountBankStatementParams,
   CreateAccountJournalParams,
 } from "@lumiere/stdb/types"
+export type { AccountAccountQueryRow as AccountAccount } from "@lumiere/stdb/resource-reads"
 
 // ── Query Hooks ───────────────────────────────────────────────────────────────
 
@@ -86,9 +87,32 @@ export type {
  */
 export function useAccountAccounts(
   organizationId: bigint,
-  options?: { staleTime?: number; enabled?: boolean; initialData?: AccountAccount[] },
+  options?: {
+    staleTime?: number
+    enabled?: boolean
+    initialData?: AccountAccountQueryRow[]
+  },
 ) {
-  return useStdbQuery("account-accounts", organizationId, options)
+  const { activeCompanyId, activeCompanyReady } = useErpSession()
+  const companyId = activeCompanyReady ? activeCompanyId : null
+  return useQuery<AccountAccountQueryRow[]>({
+    queryKey: stdbQueryKey("account-accounts", organizationId, companyId),
+    queryFn: () => {
+      if (companyId == null || companyId <= 0) {
+        throw new Error("An active company is required to query account-accounts")
+      }
+      return createStdbSdk(apiFetch)
+        .forCompany(BigInt(companyId))
+        .accounting.accounts.list()
+    },
+    enabled:
+      (options?.enabled ?? true) &&
+      organizationId > 0n &&
+      companyId != null &&
+      companyId > 0,
+    staleTime: options?.staleTime ?? 30_000,
+    initialData: coalesceQueryInitialData(options?.initialData),
+  })
 }
 
 /** Account types (chart classification / user types) for the organization. */

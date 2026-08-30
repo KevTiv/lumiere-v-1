@@ -7,7 +7,9 @@ import {
 } from "./commands"
 import { stdbParamsToJson } from "./stdb-params-json"
 import {
+  decodeAccountAccountsQueryResponse,
   decodeCompaniesQueryResponse,
+  type AccountAccountQueryRow,
   type CompanyQueryRow,
 } from "./resource-reads"
 
@@ -50,6 +52,7 @@ export interface StdbSdk {
   forCompany(companyId: bigint): {
     readonly accounting: {
       readonly accounts: {
+        list(): Promise<AccountAccountQueryRow[]>
         create(params: CreateAccountParams): Promise<void>
       }
       readonly taxes: {
@@ -131,6 +134,23 @@ async function executeOperation<K extends StdbBffNamedReducerKey>(
   throw new Error(payload.message ?? payload.error ?? `Operation ${operation} failed`)
 }
 
+async function executeQuery<Row>(
+  apiFetch: LumiereHttpFetch,
+  url: string,
+  errorMessage: string,
+  decode: (payload: unknown) => Row[],
+): Promise<Row[]> {
+  const response = await apiFetch(url)
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as {
+      error?: string
+      message?: string
+    }
+    throw new Error(payload.message ?? payload.error ?? errorMessage)
+  }
+  return decode(await response.json())
+}
+
 function integrationTag(tag: "GoogleDrive" | "WhatsAppBusiness") {
   return { tag }
 }
@@ -152,18 +172,12 @@ export function createStdbSdk(apiFetch: LumiereHttpFetch): StdbSdk {
   return {
     organization: {
       companies: {
-        list: async () => {
-          const response = await apiFetch("/api/query/companies")
-          if (!response.ok) {
-            const payload = (await response.json().catch(() => ({}))) as {
-              error?: string
-              message?: string
-            }
-            throw new Error(payload.message ?? payload.error ?? "Query companies failed")
-          }
-          const payload: unknown = await response.json()
-          return decodeCompaniesQueryResponse(payload)
-        },
+        list: () => executeQuery(
+          apiFetch,
+          "/api/query/companies",
+          "Query companies failed",
+          decodeCompaniesQueryResponse,
+        ),
       },
     },
     settings: {
@@ -189,6 +203,12 @@ export function createStdbSdk(apiFetch: LumiereHttpFetch): StdbSdk {
       return {
         accounting: {
           accounts: {
+            list: () => executeQuery(
+              apiFetch,
+              `/api/query/account-accounts?companyId=${encodeURIComponent(companyId.toString())}`,
+              "Query account-accounts failed",
+              decodeAccountAccountsQueryResponse,
+            ),
             create: (params) => execute("create_account_account", {
               params: { ...params, companyId },
             }),

@@ -85,6 +85,26 @@ test("organization company SDK decodes the typed read boundary", async () => {
   assert.deepEqual(companies, [{ id: 7n, organizationId: 11n, name: "Lumiere" }])
 })
 
+test("accounting SDK scopes and decodes account projections", async () => {
+  let requestedUrl = ""
+  const sdk = createStdbSdk(async (url) => {
+    requestedUrl = url
+    return new Response(JSON.stringify({
+      data: [{ id: "9", organizationId: 11, code: "1100", internalType: "Asset" }],
+    }))
+  })
+
+  const accounts = await sdk.forCompany(42n).accounting.accounts.list()
+
+  assert.equal(requestedUrl, "/api/query/account-accounts?companyId=42")
+  assert.deepEqual(accounts, [{
+    id: 9n,
+    organizationId: 11n,
+    code: "1100",
+    internalType: { tag: "Asset" },
+  }])
+})
+
 test("accounting tax SDK binds selected company for create and update", async () => {
   const requests: Array<{ url: string; body: Record<string, unknown> }> = []
   const apiFetch = async (url: string, init?: RequestInit) => {
