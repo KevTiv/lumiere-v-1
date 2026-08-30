@@ -7,7 +7,6 @@ export { parseQueryListResponse, type QueryRow, type QueryRows } from "./query-l
 export { resolveApiUrl, resolveRequestUrl } from "./resolve-url"
 export {
   queryStdbList,
-  callStdbReducer,
   stringifyReducerCallBody,
   stringifyReducerCommandBody,
   type LumiereHttpFetch,

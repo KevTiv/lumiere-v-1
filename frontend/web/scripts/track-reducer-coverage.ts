@@ -142,6 +142,20 @@ const EXPLICIT_REDUCER_MODULE: Record<string, string> = {
   // Privacy / compliance
   create_data_classification: 'settings',
   create_data_classification_rule: 'settings',
+  create_google_drive_connection: 'settings',
+  update_google_drive_connection: 'settings',
+  delete_integration: 'settings',
+  create_whatsapp_business_account: 'settings',
+  update_whatsapp_business_account: 'settings',
+  delete_whatsapp_business_account: 'settings',
+  set_whatsapp_primary_account: 'settings',
+  archive_ai_chat_session: 'settings',
+  record_google_drive_sync: 'settings',
+  record_google_drive_sync_error: 'settings',
+  update_integration_status: 'settings',
+  update_whatsapp_verification_status: 'settings',
+  record_whatsapp_health_check: 'settings',
+  record_whatsapp_message_sent: 'settings',
   // Payment terms & payments
   create_payment_term: 'accounting',
   update_payment_term: 'accounting',
@@ -232,6 +246,12 @@ const PLATFORM_TRIAGE_EXCLUDED_FROM_PRODUCT: Record<string, string> = {
   dev_promote_caller_superuser: 'platform_api',
   link_workos_user: 'platform_api',
   mark_reset_token_used: 'platform_api',
+  record_google_drive_sync: 'platform_api',
+  record_google_drive_sync_error: 'platform_api',
+  record_whatsapp_health_check: 'platform_api',
+  record_whatsapp_message_sent: 'platform_api',
+  update_integration_status: 'platform_api',
+  update_whatsapp_verification_status: 'platform_api',
   worker_heartbeat: 'platform_api',
 }
 

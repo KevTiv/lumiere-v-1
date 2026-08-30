@@ -189,6 +189,9 @@ jobs:
       - name: Opaque record type-debt ratchet
         run: pnpm type-debt:check
 
+      - name: Enforce immutable browser operation transport
+        run: pnpm operation-transport:check
+
       - name: Typecheck
         run: pnpm typecheck
 

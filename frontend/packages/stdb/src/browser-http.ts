@@ -1,12 +1,11 @@
 /**
- * Browser helpers for Next.js `/api/query/*` and `/api/call/*`.
+ * Browser helpers for Next.js typed query and operation endpoints.
  * Uses {@link getLumiereApiClient} when {@link LumiereApiProvider} is mounted (correct API gateway rewrite + Bearer on Expo);
  * otherwise falls back to same-origin `fetch` with cookies (tests / rare early calls).
  */
 "use client"
 
 import {
-  callStdbReducer,
   getLumiereApiClient,
   queryStdbList,
   type LumiereHttpFetch,
@@ -16,7 +15,6 @@ import {
   type StdbBffCommandInput,
   type StdbBffNamedReducerKey,
 } from "./commands/stdb-http"
-import { encodeReducerCallArgs } from "./stdb-params-json"
 
 function resolveApiFetch(): LumiereHttpFetch {
   const c = getLumiereApiClient()
@@ -31,10 +29,6 @@ function resolveApiFetch(): LumiereHttpFetch {
 
 export async function stdbBrowserQuery(resource: string): Promise<Record<string, unknown>[]> {
   return queryStdbList(resolveApiFetch(), resource)
-}
-
-export async function stdbBrowserCompatCall(reducer: string, args: unknown[]): Promise<void> {
-  return callStdbReducer(resolveApiFetch(), reducer, encodeReducerCallArgs(reducer, args))
 }
 
 /** Invoke a session-exposed operation through its generated immutable contract ID. */

@@ -63,21 +63,3 @@ export async function queryStdbList(
   const json = (await r.json()) as { data?: Record<string, unknown>[] }
   return json.data ?? []
 }
-
-/** POST the named legacy compatibility endpoint with positional JSON arguments. */
-export async function callStdbReducer(
-  apiFetch: LumiereHttpFetch,
-  reducer: string,
-  args: unknown[],
-): Promise<void> {
-  const body = stringifyReducerCallBody(args)
-  const r = await apiFetch(`/api/compat/reducer/${encodeURIComponent(reducer)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body,
-  })
-  if (!r.ok) {
-    const json = (await r.json().catch(() => ({}))) as Record<string, unknown>
-    throw new Error((json.error as string | undefined) ?? `Reducer ${reducer} failed`)
-  }
-}
