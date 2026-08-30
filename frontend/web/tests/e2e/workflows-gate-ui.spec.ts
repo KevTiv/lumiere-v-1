@@ -1,4 +1,4 @@
-import { matchesTypedOperationResponse } from "./operation-response"
+import { matchesOperationResponse } from "./operation-response"
 /**
  * Gate UI — workflows + approvals product surface.
  *
@@ -68,7 +68,7 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
     await fillField(page, "model", "e2e.subject")
     await fillField(page, "schemaVersion", "1")
     const createWait = page.waitForResponse(
-      (res) => matchesTypedOperationResponse(res, "create_workflow"),
+      (res) => matchesOperationResponse(res, "create_workflow"),
       { timeout: 30_000 },
     )
     await submitForm(page, "new-workflow")
@@ -86,7 +86,7 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
     await expect(page.getByTestId("workflow-version-publish")).toBeVisible()
 
     const publishWait = page.waitForResponse(
-      (res) => matchesTypedOperationResponse(res, "publish_workflow_version"),
+      (res) => matchesOperationResponse(res, "publish_workflow_version"),
       { timeout: 30_000 },
     )
     await page.getByTestId("workflow-version-publish").click()
@@ -97,7 +97,7 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
     await openWorkflowVersionRow(page, seeded.versionId)
     await expect(page.getByTestId("workflow-version-simulate")).toBeVisible()
     const simulateWait = page.waitForResponse(
-      (res) => matchesTypedOperationResponse(res, "simulate_workflow"),
+      (res) => matchesOperationResponse(res, "simulate_workflow"),
       { timeout: 30_000 },
     )
     await page.getByTestId("workflow-version-simulate").click()

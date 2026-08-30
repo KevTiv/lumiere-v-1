@@ -1,4 +1,4 @@
-import { matchesTypedOperationResponse } from "./operation-response"
+import { matchesOperationResponse } from "./operation-response"
 /**
  * Expenses Waves A–F UI coverage for this session.
  * Tags: @expenses @p0 (shell/lifecycle UI).
@@ -390,7 +390,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
 
       const [postRes] = await Promise.all([
         page.waitForResponse(
-          (res) => matchesTypedOperationResponse(res, "post_expense_sheet") && res.ok(),
+          (res) => matchesOperationResponse(res, "post_expense_sheet") && res.ok(),
           { timeout: 45_000 },
         ),
         submitForm(page, "post-expense-report"),
@@ -448,7 +448,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
 
     const [reimRes] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesTypedOperationResponse(res, "create_expense_reimbursement_payment") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_expense_reimbursement_payment") && res.ok(),
         { timeout: 45_000 },
       ),
       submitForm(page, "reimburse-expense-report"),

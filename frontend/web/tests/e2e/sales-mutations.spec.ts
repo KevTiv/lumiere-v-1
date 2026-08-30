@@ -1,4 +1,4 @@
-import { matchesTypedOperationResponse } from "./operation-response"
+import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
@@ -53,7 +53,7 @@ test.describe("Sales update mutations", { tag: ["@p0", "@phase-3"] }, () => {
 
     const [createOrderRes] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesTypedOperationResponse(res, "create_sale_order") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_sale_order") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-sale-order"),

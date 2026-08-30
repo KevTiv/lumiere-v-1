@@ -1,4 +1,4 @@
-import { matchesTypedOperationResponse } from "./operation-response"
+import { matchesOperationResponse } from "./operation-response"
 import { expect, test, type Page } from "@playwright/test"
 
 import {
@@ -61,7 +61,7 @@ test.describe("CRM opportunity stage workflow", { tag: "@phase-1" }, () => {
     await chooseFirstEnabledOption(page, "stageId")
     const [createOppRes] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesTypedOperationResponse(res, "create_opportunity") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_opportunity") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-opportunity"),
@@ -93,7 +93,7 @@ test.describe("CRM opportunity stage workflow", { tag: "@phase-1" }, () => {
     await chooseSelectOptionByLabel(page, "stageId", PROPOSAL_STAGE_LABEL)
     const [stageRes] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesTypedOperationResponse(res, "update_opportunity") && res.ok(),
+        (res) => matchesOperationResponse(res, "update_opportunity") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "change-opportunity-stage"),
@@ -166,7 +166,7 @@ test.describe("CRM-006 lead → opportunity → won conversion @p0", { tag: "@p0
     await chooseFirstEnabledOption(page, "opportunityStageId")
     const [convertRes] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesTypedOperationResponse(res, "convert_lead_to_customer") && res.ok(),
+        (res) => matchesOperationResponse(res, "convert_lead_to_customer") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "convert-lead"),
@@ -212,7 +212,7 @@ test.describe("CRM-006 lead → opportunity → won conversion @p0", { tag: "@p0
     await chooseSelectOptionByLabel(page, "stageId", WON_STAGE_LABEL)
     const [wonRes] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesTypedOperationResponse(res, "update_opportunity") && res.ok(),
+        (res) => matchesOperationResponse(res, "update_opportunity") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "change-opportunity-stage"),

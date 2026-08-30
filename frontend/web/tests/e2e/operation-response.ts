@@ -1,11 +1,29 @@
-import { stdbBffCallUrl, type StdbBffReducerKey } from "@lumiere/stdb/commands"
+import {
+  STDB_BFF_REDUCERS,
+  stdbBffCallUrl,
+  type StdbBffReducerKey,
+} from "@lumiere/stdb/commands"
 
-/** Match a UI mutation against its generated immutable operation identity. */
-export function matchesTypedOperationResponse(
+function isSessionOperation(operationName: string): operationName is StdbBffReducerKey {
+  return (STDB_BFF_REDUCERS as readonly string[]).includes(operationName)
+}
+
+/** Match canonical operation traffic or an explicitly named compatibility call. */
+export function matchesOperationResponse(
   response: { url(): string },
-  operationName: StdbBffReducerKey,
+  operationName: string,
 ): boolean {
   const pathname = new URL(response.url()).pathname
+  const encodedName = encodeURIComponent(operationName)
+  if (
+    pathname === `/api/compat/reducer/${encodedName}` ||
+    pathname === `/v1/compat/reducer/${encodedName}` ||
+    pathname === `/api/call/${encodedName}` ||
+    pathname === `/v1/call/${encodedName}`
+  ) {
+    return true
+  }
+  if (!isSessionOperation(operationName)) return false
   const operationPath = stdbBffCallUrl(operationName)
   return pathname === operationPath || pathname === `/v1${operationPath.slice(4)}`
 }

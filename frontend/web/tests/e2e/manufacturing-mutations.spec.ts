@@ -1,4 +1,4 @@
-import { matchesTypedOperationResponse } from "./operation-response"
+import { matchesOperationResponse } from "./operation-response"
 import { expect, test, type Page } from "@playwright/test"
 
 import {
@@ -108,7 +108,7 @@ test.describe("Manufacturing create mutations", { tag: ["@phase-4", "@manufactur
 
     const [createRes] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesTypedOperationResponse(res, "create_workcenter") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_workcenter") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-workcenter"),
@@ -133,7 +133,7 @@ test.describe("Manufacturing create mutations", { tag: ["@phase-4", "@manufactur
 
     const [createRes] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesTypedOperationResponse(res, "create_bom") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_bom") && res.ok(),
         { timeout: 60_000 },
       ),
       submitForm(page, "new-bom"),
@@ -177,7 +177,7 @@ test.describe("Manufacturing create mutations", { tag: ["@phase-4", "@manufactur
 
     const [createRes] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesTypedOperationResponse(res, "create_manufacturing_order") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_manufacturing_order") && res.ok(),
         { timeout: 60_000 },
       ),
       submitForm(page, "new-manufacturing-order"),

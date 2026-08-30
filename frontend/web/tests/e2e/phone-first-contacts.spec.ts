@@ -1,4 +1,4 @@
-import { matchesTypedOperationResponse } from "./operation-response"
+import { matchesOperationResponse } from "./operation-response"
 import {
   expect,
   request as playwrightRequest,
@@ -320,7 +320,7 @@ test.describe("P1-CONTACT-01 phone-first contacts", { tag: ["@p1", "@contacts"] 
       await fillField(alpha.page, "phone", FORMATTED_PHONE)
       const [customerCreate] = await Promise.all([
         alpha.page.waitForResponse(
-          (response) => matchesTypedOperationResponse(response, "create_contact") && response.ok(),
+          (response) => matchesOperationResponse(response, "create_contact") && response.ok(),
           { timeout: 30_000 },
         ),
         submitForm(alpha.page, "new-contact"),

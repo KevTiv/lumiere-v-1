@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url"
 import { expect, type Page } from "@playwright/test"
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { encodeReducerCallArgs } from "@lumiere/erp-shared/stdb-params-json"
-import { matchesTypedOperationResponse } from "./operation-response"
+import { matchesOperationResponse } from "./operation-response"
 import type { StdbBffReducerKey } from "@lumiere/stdb/commands"
 
 export const TEST_EMAIL = process.env.E2E_TEST_EMAIL ?? "test@email.com"
@@ -735,7 +735,7 @@ export async function clickEntityActionAndWaitForReducer(
   const timeout = options?.timeoutMs ?? 30_000
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => matchesTypedOperationResponse(r, reducerName) && r.ok(),
+      (r) => matchesOperationResponse(r, reducerName) && r.ok(),
       { timeout },
     ),
     page.getByTestId(actionTestId).click(),
@@ -1734,7 +1734,7 @@ export async function postDraftCreditNoteViaGl(page: Page, partnerName: string):
         if (await postBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
           const [postRes] = await Promise.all([
             page.waitForResponse(
-              (res) => matchesTypedOperationResponse(res, "post_invoice") && res.ok(),
+              (res) => matchesOperationResponse(res, "post_invoice") && res.ok(),
               { timeout: 30_000 },
             ),
             postBtn.click(),
@@ -1850,7 +1850,7 @@ export async function postDraftInvoiceViaUi(page: Page, partnerName: string): Pr
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
-      (res) => matchesTypedOperationResponse(res, "post_invoice") && res.ok(),
+      (res) => matchesOperationResponse(res, "post_invoice") && res.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId("invoice-detail-post-draft").click(),
@@ -1882,7 +1882,7 @@ export async function postDraftBillViaUi(page: Page, vendorName: string): Promis
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
-      (res) => matchesTypedOperationResponse(res, "post_invoice"),
+      (res) => matchesOperationResponse(res, "post_invoice"),
       { timeout: 30_000 },
     ),
     page.getByTestId("invoice-detail-post-draft").click(),
@@ -1904,7 +1904,7 @@ export async function expectPostDraftBillRejected(
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
-      (res) => matchesTypedOperationResponse(res, "post_invoice"),
+      (res) => matchesOperationResponse(res, "post_invoice"),
       { timeout: 30_000 },
     ),
     page.getByTestId("invoice-detail-post-draft").click(),
@@ -2117,7 +2117,7 @@ export async function rejectApprovalRequestViaUi(
   await page.getByTestId(`approval-reject-reason-${requestId}`).fill(reason)
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => matchesTypedOperationResponse(r, "decide_workflow_human_task") && r.ok(),
+      (r) => matchesOperationResponse(r, "decide_workflow_human_task") && r.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId(`approval-reject-confirm-${requestId}`).click(),
@@ -2154,7 +2154,7 @@ export async function grantPermissionViaSettings(
   }
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => matchesTypedOperationResponse(r, "grant_permission") && r.ok(),
+      (r) => matchesOperationResponse(r, "grant_permission") && r.ok(),
       { timeout: 30_000 },
     ),
     submitForm(page, "settings-grant-permission"),
@@ -2230,7 +2230,7 @@ export async function revokePermissionViaSettings(page: Page, permissionId: numb
   await fillField(page, "permissionId", String(permissionId))
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => matchesTypedOperationResponse(r, "revoke_permission") && r.ok(),
+      (r) => matchesOperationResponse(r, "revoke_permission") && r.ok(),
       { timeout: 30_000 },
     ),
     submitForm(page, "settings-revoke-permission"),
@@ -2270,8 +2270,8 @@ export async function ensureFormConfigDbFromRegistry(page: Page) {
     await Promise.all([
       page.waitForResponse(
         (r) =>
-          r.url().includes("/api/call/create_form_configuration") ||
-          matchesTypedOperationResponse(r, "add_form_field"),
+          matchesOperationResponse(r, "create_form_configuration") ||
+          matchesOperationResponse(r, "add_form_field"),
         { timeout: 90_000 },
       ),
       pushBtn.click(),
@@ -2383,7 +2383,7 @@ export async function addCustomFormFieldViaSettings(
   await page.getByRole("dialog").getByLabel(/label/i).fill(options.fieldLabel)
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => matchesTypedOperationResponse(r, "add_form_field") && r.ok(),
+      (r) => matchesOperationResponse(r, "add_form_field") && r.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId("form-config-save-field").click(),
@@ -2408,7 +2408,7 @@ export async function deleteCustomFormFieldViaSettings(page: Page, fieldId: stri
   await row.locator("button").nth(1).click()
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => matchesTypedOperationResponse(r, "delete_form_field") && r.ok(),
+      (r) => matchesOperationResponse(r, "delete_form_field") && r.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId(`form-config-delete-field-${fieldId}`).click(),
@@ -2427,7 +2427,7 @@ export async function postChatterNote(page: Page, body: string) {
   await page.getByTestId("record-chatter-note").fill(body)
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => matchesTypedOperationResponse(r, "post_message") && r.ok(),
+      (r) => matchesOperationResponse(r, "post_message") && r.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId("record-chatter-post").click(),
@@ -2478,7 +2478,7 @@ export async function savePivotReportViaUi(page: Page, name: string) {
   await expect(saveBtn).toBeEnabled({ timeout: 15_000 })
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => matchesTypedOperationResponse(r, "create_saved_report"),
+      (r) => matchesOperationResponse(r, "create_saved_report"),
       { timeout: 60_000 },
     ),
     saveBtn.click(),
@@ -2558,7 +2558,7 @@ export async function deletePivotReportViaUi(page: Page, reportName: string) {
   await expect(page.getByTestId("pivot-delete-definition")).toBeVisible({ timeout: 10_000 })
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => matchesTypedOperationResponse(r, "delete_saved_report") && r.ok(),
+      (r) => matchesOperationResponse(r, "delete_saved_report") && r.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId("pivot-delete-definition").click(),
@@ -2581,7 +2581,7 @@ export async function generateVatReportViaUi(
   await page.locator('input[type="date"]').nth(1).fill(options.dateTo)
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => matchesTypedOperationResponse(r, "generate_eu_vat_report") && r.ok(),
+      (r) => matchesOperationResponse(r, "generate_eu_vat_report") && r.ok(),
       { timeout: 60_000 },
     ),
     page.getByTestId("vat-report-generate").click(),

@@ -1,4 +1,4 @@
-import { matchesTypedOperationResponse } from "./operation-response"
+import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
@@ -32,7 +32,7 @@ test.describe("MVP AI action draft workflow", { tag: "@p0" }, () => {
 
     const [approveRes] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesTypedOperationResponse(res, "approve_ai_action_draft") && res.ok(),
+        (res) => matchesOperationResponse(res, "approve_ai_action_draft") && res.ok(),
         { timeout: 30_000 },
       ),
       approveCard.getByTestId("ai-action-draft-approve").click(),
@@ -56,7 +56,7 @@ test.describe("MVP AI action draft workflow", { tag: "@p0" }, () => {
 
     const [rejectRes] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesTypedOperationResponse(res, "reject_ai_action_draft") && res.ok(),
+        (res) => matchesOperationResponse(res, "reject_ai_action_draft") && res.ok(),
         { timeout: 30_000 },
       ),
       rejectCard.getByTestId("ai-action-draft-reject").click(),

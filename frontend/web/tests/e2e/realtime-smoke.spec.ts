@@ -1,4 +1,4 @@
-import { matchesTypedOperationResponse } from "./operation-response"
+import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
@@ -25,7 +25,7 @@ test.describe("Realtime query invalidation", { tag: "@phase-11" }, () => {
 
     const [mutationRes, refetchRes] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesTypedOperationResponse(res, "create_contact") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_contact") && res.ok(),
         { timeout: 30_000 },
       ),
       page.waitForResponse(

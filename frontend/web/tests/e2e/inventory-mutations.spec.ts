@@ -1,4 +1,4 @@
-import { matchesTypedOperationResponse } from "./operation-response"
+import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
@@ -45,7 +45,7 @@ test.describe("Inventory update/delete mutations", { tag: ["@p0", "@phase-2"] },
 
     const [createProductRes] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesTypedOperationResponse(res, "create_product") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_product") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-product"),
@@ -64,7 +64,7 @@ test.describe("Inventory update/delete mutations", { tag: ["@p0", "@phase-2"] },
 
     const [updateProductRes] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesTypedOperationResponse(res, "update_product") && res.ok(),
+        (res) => matchesOperationResponse(res, "update_product") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "edit-product"),
@@ -113,7 +113,7 @@ test.describe("Inventory update/delete mutations", { tag: ["@p0", "@phase-2"] },
 
     const [deleteCategoryRes] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesTypedOperationResponse(res, "delete_product_category") && res.ok(),
+        (res) => matchesOperationResponse(res, "delete_product_category") && res.ok(),
         { timeout: 30_000 },
       ),
       page.getByTestId("entity-action-delete-category").click(),
