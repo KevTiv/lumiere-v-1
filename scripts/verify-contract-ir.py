@@ -42,6 +42,11 @@ def main() -> None:
         type=Path,
         help="require the same semantic schema hash as another IR artifact",
     )
+    parser.add_argument(
+        "--expect-pin-from",
+        type=Path,
+        help="require the artifact to match an immutable contracts pin",
+    )
     args = parser.parse_args()
 
     raw = args.ir.read_bytes()
@@ -256,6 +261,36 @@ def main() -> None:
     artifact_hash = hashlib.sha256(raw).hexdigest()
     if checksum_parts[0] != artifact_hash:
         fail(f"artifact checksum mismatch: expected {artifact_hash}")
+
+    if args.expect_pin_from is not None:
+        try:
+            pin = json.loads(args.expect_pin_from.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            fail(f"cannot read expected pin: {error}")
+        required_pin = {
+            "artifact_sha256",
+            "ir_version",
+            "path",
+            "schema_hash",
+            "source_commit",
+            "source_repository",
+        }
+        if not isinstance(pin, dict) or set(pin) != required_pin:
+            fail(
+                f"expected pin must contain exactly: {', '.join(sorted(required_pin))}"
+            )
+        if pin["path"] != f"ir/{args.ir.name}":
+            fail(f"pin path does not identify {args.ir.name}")
+        if pin["artifact_sha256"] != artifact_hash:
+            fail("pin artifact_sha256 does not match the IR artifact")
+        if pin["ir_version"] != ir["ir_version"]:
+            fail("pin ir_version does not match the IR artifact")
+        if pin["schema_hash"] != ir["schema_hash"]:
+            fail("pin schema_hash does not match the IR artifact")
+        if pin["source_commit"] != ir["source_commit"]:
+            fail("pin source_commit does not match the IR artifact")
+        if not isinstance(pin["source_repository"], str) or not pin["source_repository"]:
+            fail("pin source_repository must be a non-empty string")
 
     print(
         "verify-contract-ir: valid "

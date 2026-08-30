@@ -18,6 +18,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STAGING="$ROOT/.contracts-staging"
 CONTRACTS_REPO="${LUMIERE_CONTRACTS_REPO:-git@github.com:KevTiv/lumiere-contracts.git}"
 VERSION="${1:?usage: publish-contracts.sh <version, e.g. 0.1.0>}"
+ACTIVE_IR_VERSION="${LUMIERE_CONTRACT_IR_VERSION:-1}"
+
+if [[ "$ACTIVE_IR_VERSION" != "1" && "$ACTIVE_IR_VERSION" != "2" ]]; then
+  echo "error: LUMIERE_CONTRACT_IR_VERSION must be 1 or 2" >&2
+  exit 1
+fi
 
 if [[ ! -d "$STAGING/bindings" || ! -d "$STAGING/manifests" ]]; then
   echo "error: $STAGING/{bindings,manifests} missing — run make generate-stdb-rust-sdk && make codegen first" >&2
@@ -88,29 +94,60 @@ cp "$STAGING/ir/lumiere-contract-ir-v1.json.sha256" ir/
 cp "$STAGING/ir/lumiere-contract-ir-v2.json" ir/
 cp "$STAGING/ir/lumiere-contract-ir-v2.json.sha256" ir/
 
-# Keep the provenance pin in sync with the verified handoff. The source commit
-# comes from the IR itself so the pin cannot accidentally describe a different
-# checkout than the one that produced the artifact.
-python3 - "$SOURCE_REPO" "$SOURCE_COMMIT" "$IR_SHA256" "$IR_VERSION" "$SCHEMA_HASH" <<'PY'
+# Keep one immutable provenance pin per IR generation. `PIN.json` is only the
+# active-generation pointer consumed by downstream emitters. The source commit
+# comes from each IR itself so a pin cannot accidentally describe a different
+# checkout than the artifact that produced it.
+readarray -t IR_V2_METADATA < <(python3 - "$STAGING/ir/lumiere-contract-ir-v2.json" <<'PY'
+import hashlib
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    ir = json.load(source)
+print(ir["source_commit"])
+print(ir["ir_version"])
+print(ir["schema_hash"])
+print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())
+PY
+)
+V2_SOURCE_COMMIT="${IR_V2_METADATA[0]}"
+V2_IR_VERSION="${IR_V2_METADATA[1]}"
+V2_SCHEMA_HASH="${IR_V2_METADATA[2]}"
+V2_IR_SHA256="${IR_V2_METADATA[3]}"
+
+python3 - "$SOURCE_REPO" "$SOURCE_COMMIT" "$IR_SHA256" "$IR_VERSION" "$SCHEMA_HASH" "$V2_SOURCE_COMMIT" "$V2_IR_SHA256" "$V2_IR_VERSION" "$V2_SCHEMA_HASH" "$ACTIVE_IR_VERSION" <<'PY'
 import json
 import sys
 from pathlib import Path
 
-Path("ir/PIN.json").write_text(
-    json.dumps(
-        {
-            "artifact_sha256": sys.argv[3],
-            "ir_version": int(sys.argv[4]),
-            "path": "ir/lumiere-contract-ir-v1.json",
-            "schema_hash": sys.argv[5],
-            "source_commit": sys.argv[2],
-            "source_repository": sys.argv[1],
-        },
-        indent=2,
+def write_pin(path, source_commit, artifact_sha256, ir_version, schema_hash, artifact_name):
+    Path(path).write_text(
+        json.dumps(
+            {
+                "artifact_sha256": artifact_sha256,
+                "ir_version": int(ir_version),
+                "path": f"ir/{artifact_name}",
+                "schema_hash": schema_hash,
+                "source_commit": source_commit,
+                "source_repository": sys.argv[1],
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
     )
-    + "\n",
-    encoding="utf-8",
+
+write_pin(
+    "ir/PIN-v1.json", sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5],
+    "lumiere-contract-ir-v1.json",
 )
+write_pin(
+    "ir/PIN-v2.json", sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9],
+    "lumiere-contract-ir-v2.json",
+)
+active = Path(f"ir/PIN-v{sys.argv[10]}.json").read_text(encoding="utf-8")
+Path("ir/PIN.json").write_text(active, encoding="utf-8")
 PY
 
 rm -rf crates/lumiere-contracts/src/bindings

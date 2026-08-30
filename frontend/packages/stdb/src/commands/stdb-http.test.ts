@@ -25,7 +25,7 @@ test("unreconcile accounting command uses the canonical BFF URL once", () => {
     params: { moveIds: [11n, 13n], amountResidual: 42.5 },
   })
 
-  assert.equal(urlPath, "/api/call/unreconciled_account_bank_statement_line")
+  assert.equal(urlPath, "/api/operations/erp.unreconciled_account_bank_statement_line")
   assert.deepEqual(JSON.parse(String(init.body)), {
     companyId: 3,
     lineId: 7,

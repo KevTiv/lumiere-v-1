@@ -29,6 +29,12 @@ export * from './context';
 export * from './queries/auth';
 export * from './queries/erp-subscriptions';
 export * from './warehouse-3d-types';
+export {
+  createStdbSdk,
+  type CreateAccountInput,
+  type StdbCompanyId,
+  type StdbSdk,
+} from './sdk';
 
 /** Form config enums / structs live in `generated/types.ts`, not the SpacetimeDB `generated/index` barrel. */
 export { FieldType, FieldWidth, FieldOption, FieldValidation } from './generated/types';

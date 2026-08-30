@@ -2,6 +2,7 @@
 
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import { createStdbSdk } from "@lumiere/stdb/sdk"
 import { apiFetch } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
@@ -451,13 +452,14 @@ function invalidateTaxQueries(qc: ReturnType<typeof useQueryClient>, organizatio
  */
 export function useCreateAccountAccount(organizationId: number) {
   const qc = useQueryClient()
+  const sdk = createStdbSdk(apiFetch)
   return useMutation({
     mutationFn: async (params: CreateAccountAccountParams) => {
-      const { urlPath, init } = stdbBffCommandPost("create_account_account", {
-        params: stdbParamsToJson(params as object, "CreateAccountAccountParams"),
-      })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
+      if (params.companyId == null) {
+        throw new Error("Account creation requires a company")
+      }
+      const { companyId, ...input } = params
+      await sdk.forCompany(companyId).accounting.accounts.create(input)
     },
     onSuccess: () =>
       invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("create_account_account")),

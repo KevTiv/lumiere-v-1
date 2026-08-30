@@ -166,9 +166,13 @@ async fn get_authoritative_resource(
     Path((resource, record_id)): Path<(String, u64)>,
     Query(query): Query<AuthoritativeQuery>,
 ) -> Result<Json<Value>, ApiError> {
-    let auth = headers.get(AUTHORIZATION).and_then(|value| value.to_str().ok());
+    let auth = headers
+        .get(AUTHORIZATION)
+        .and_then(|value| value.to_str().ok());
     let identity_hint = stdb_identity_hex_hint(&headers, &cookies);
-    let cookie_token = cookies.get("stdb_token").map(|cookie| cookie.value().to_string());
+    let cookie_token = cookies
+        .get("stdb_token")
+        .map(|cookie| cookie.value().to_string());
     let session = resolve_api_session(
         &state,
         auth,
@@ -210,7 +214,53 @@ async fn get_authoritative_resource(
     Ok(Json(json!({ "data": row })))
 }
 
-async fn post_call(
+async fn post_operation(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: tower_cookies::Cookies,
+    Path(operation): Path<String>,
+    Json(body): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    let operation_id = operation.clone();
+    match post_operation_inner(state, headers, cookies, operation, body).await {
+        Ok(response) => {
+            tracing::info!(operation = %operation_id, outcome = "success", "typed operation completed");
+            Ok(response)
+        }
+        Err(error) => {
+            tracing::info!(operation = %operation_id, outcome = "error", "typed operation rejected");
+            Err(error)
+        }
+    }
+}
+
+async fn post_operation_inner(
+    state: Arc<AppState>,
+    headers: HeaderMap,
+    cookies: tower_cookies::Cookies,
+    operation: String,
+    body: Value,
+) -> Result<Json<Value>, ApiError> {
+    let auth = headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok());
+    let id_hint = stdb_identity_hex_hint(&headers, &cookies);
+    let cookie_tok = cookies.get("stdb_token").map(|c| c.value().to_string());
+    let session = resolve_api_session(&state, auth, cookie_tok.as_deref(), id_hint.as_deref())
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    let org_id = session
+        .organization_id
+        .ok_or_else(|| ApiError::Forbidden("No organization assigned".into()))?;
+    let contract = session_operation_contract(&operation)?;
+    if !body.is_object() {
+        return Err(ApiError::Unprocessable(
+            "Operation body must be a named object".into(),
+        ));
+    }
+    let args = named_command_args(contract, body, org_id)?;
+    execute_reducer_call(&state, &session.stdb_token, contract, args, org_id).await
+}
+
+async fn post_compat_reducer(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     cookies: tower_cookies::Cookies,
@@ -221,34 +271,19 @@ async fn post_call(
     let auth = headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok());
     let id_hint = stdb_identity_hex_hint(&headers, &cookies);
     let cookie_tok = cookies.get("stdb_token").map(|c| c.value().to_string());
-
     let session = resolve_api_session(&state, auth, cookie_tok.as_deref(), id_hint.as_deref())
         .await?
         .ok_or(ApiError::Unauthorized)?;
-
     let org_id = session
         .organization_id
         .ok_or_else(|| ApiError::Forbidden("No organization assigned".into()))?;
-
     let contract = session_reducer_contract(&reducer)?;
-
-    let named_input = body.is_object();
-    let mut args: Vec<Value> = if let Some(arguments) = body.as_array() {
-        arguments.clone()
-    } else if named_input {
-        named_command_args(contract, body, org_id)?
-    } else {
-        return Err(ApiError::Unprocessable(
-            "Reducer body must be a named object or legacy argument array".into(),
-        ));
-    };
-
+    let mut args = body.as_array().cloned().ok_or_else(|| {
+        ApiError::Unprocessable(
+            "Compatibility reducer body must be a positional argument array".into(),
+        )
+    })?;
     if q.with_company {
-        if named_input {
-            return Err(ApiError::Unprocessable(
-                "withCompany is only supported by the legacy positional call format".into(),
-            ));
-        }
         let client = state.client_with_token(&session.stdb_token);
         let company_id = default_company_id(&client, org_id)
             .await?
@@ -257,7 +292,6 @@ async fn post_call(
         next.append(&mut args);
         args = next;
     }
-
     execute_reducer_call(&state, &session.stdb_token, contract, args, org_id).await
 }
 
@@ -270,6 +304,21 @@ fn session_reducer_contract(reducer: &str) -> Result<&'static ReducerContract, A
     if contract.exposure != Exposure::Session {
         return Err(ApiError::Forbidden(format!(
             "Reducer '{reducer}' is not session-exposed"
+        )));
+    }
+    Ok(contract)
+}
+
+fn session_operation_contract(operation_id: &str) -> Result<&'static ReducerContract, ApiError> {
+    let contract =
+        stdb_client::reducer_contract_by_operation_id(operation_id).ok_or_else(|| {
+            ApiError::Forbidden(format!(
+                "Operation '{operation_id}' is not exposed by the module contract"
+            ))
+        })?;
+    if contract.exposure != Exposure::Session {
+        return Err(ApiError::Forbidden(format!(
+            "Operation '{operation_id}' is not session-exposed"
         )));
     }
     Ok(contract)
@@ -590,7 +639,9 @@ pub async fn serve() -> anyhow::Result<()> {
             "/authoritative/:resource/:id",
             get(get_authoritative_resource),
         )
-        .route("/call/:reducer", post(post_call))
+        .route("/operations/:operation", post(post_operation))
+        .route("/call/:reducer", post(post_compat_reducer))
+        .route("/compat/reducer/:reducer", post(post_compat_reducer))
         .route("/realtime/ws", get(realtime::realtime_ws_upgrade))
         .route("/realtime/info", get(realtime::realtime_info))
         .merge(routes::domain_router());
@@ -673,6 +724,40 @@ mod tests {
         assert!(zero_arg.params.is_empty());
         assert_eq!(zero_arg.exposure, Exposure::Denied);
         assert!(stdb_client::reducer_contract("not_a_reducer").is_none());
+    }
+
+    #[test]
+    fn typed_operation_resolves_locked_identity_and_not_reducer_name() {
+        let contract = session_operation_contract("erp.create_account_account")
+            .expect("session operation identity");
+        assert_eq!(contract.name, "create_account_account");
+        assert!(session_operation_contract("create_account_account").is_err());
+        assert!(session_operation_contract("erp.apply_global_migrations").is_err());
+    }
+
+    #[test]
+    fn account_create_requires_and_validates_the_selected_company() {
+        let contract = session_operation_contract("erp.create_account_account")
+            .expect("account create operation");
+        let args = named_command_args(
+            contract,
+            json!({ "params": { "company_id": { "some": 42 } } }),
+            7,
+        )
+        .expect("named account create input");
+        assert_eq!(args[0], json!(7));
+        assert_eq!(
+            validate_reducer_scope(contract, &args, 7).unwrap(),
+            vec![42]
+        );
+        assert!(matches!(
+            validate_reducer_scope(
+                contract,
+                &[json!(7), json!({ "company_id": { "none": [] } })],
+                7,
+            ),
+            Err(ApiError::Unprocessable(_))
+        ));
     }
 
     #[test]

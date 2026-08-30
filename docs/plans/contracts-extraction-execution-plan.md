@@ -57,6 +57,17 @@ Current implementation emits
 `make check-contract-ir` validates the envelope, ordering, cross-links,
 semantic hash, and artifact checksum.
 
+The additive v2 handoff is emitted beside v1 as
+`.contracts-staging/ir/lumiere-contract-ir-v2.json`. A future contracts
+release must retain both artifacts and publish one provenance pin for each:
+`ir/PIN-v1.json` identifies v1 and `ir/PIN-v2.json` identifies v2.
+`ir/PIN.json` is the active-generation pointer consumed by downstream
+generators; it initially identifies v1 and moves to v2 only when the companion
+consumer is released. The publisher and drift checks
+validate each pin against the artifact bytes, semantic hash, IR version,
+and source commit. A v1-only pinned release remains valid; once a v2 artifact
+appears in a pinned checkout, its v2 pin is mandatory.
+
 Generated PG DDL stays local for now: `api-server/src/cold_tier/migrate.rs:20-29` consumes it via `include_str!` as a build intermediate, not as a released contract artifact. It qualifies as *Investigate* under the scope rule and does not need to move to unblock the IR work.
 
 ---
@@ -204,7 +215,7 @@ Release rules:
 ### 5.4 Release automation
 
 - [x] transitional `make publish-contracts` — validate canonical IR, copy IR
-  plus current generated targets, push, and tag;
+  plus current generated targets, write v1/v2 provenance pins, push, and tag;
 - [x] add a contracts-owned `generate-from-ir` entry point for the first four
   IR-derived targets;
 - [ ] replace the remaining transitional direct-copy portions after the SDK

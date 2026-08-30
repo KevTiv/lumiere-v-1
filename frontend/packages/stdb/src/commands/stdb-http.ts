@@ -27,14 +27,15 @@ export type StdbBffCommandInput<K extends NamedReducerKey> = {
   [P in keyof OperationInputMap[K]]: WireField<OperationInputMap[K][P]>;
 };
 
-/** Same-origin path used by `apiFetch` in the web app. */
+/** Same-origin typed operation path used by `apiFetch` in the web app. */
 export function stdbBffCallUrl(reducer: StdbBffReducerKey): string {
-  return `/api/call/${encodeURIComponent(reducer)}`;
+  return `/api/operations/${encodeURIComponent(`erp.${reducer}`)}`;
 }
 
 /**
- * Named command transport. The input deliberately omits `organization_id`;
- * api-server injects it from the authenticated session using contract metadata.
+ * Named operation transport. The input deliberately omits `organization_id`;
+ * api-server injects it from the authenticated session using locked contract
+ * operation metadata.
  */
 export function stdbBffCommandPost<K extends NamedReducerKey>(
   reducer: K,

@@ -22,11 +22,12 @@
     "./field-policy": "./src/field-policy.ts",
     "./live": "./src/live/index.ts",
     "./stored-dashboard-model-registry": "./src/stored-dashboard-model-registry.ts",
-    "./stdb-params-json": "./src/stdb-params-json.ts"
+    "./stdb-params-json": "./src/stdb-params-json.ts",
+    "./sdk": "./src/sdk.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/stdb-params-json.test.ts src/commands/stdb-http.test.ts src/live/projection.test.ts src/queries/erp-subscriptions.test.ts"
+    "test": "node --import tsx --test src/stdb-params-json.test.ts src/commands/stdb-http.test.ts src/sdk.test.ts src/live/projection.test.ts src/queries/erp-subscriptions.test.ts src/wire-codec.test.ts"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",

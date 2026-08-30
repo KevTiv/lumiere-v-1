@@ -50,6 +50,15 @@ explicit contract change. Promotion still requires authored scope and
 idempotency policy; generated code must not infer either from table columns or
 operation names.
 
+The release handoff keeps this migration reversible: a publisher run writes
+generation-specific `ir/PIN-v1.json` and `ir/PIN-v2.json` files, each bound to
+its own artifact digest, semantic hash, schema version, and source commit.
+`ir/PIN.json` is the active-generation pointer used by the companion generator.
+The application drift gate verifies both generation-specific pins when both
+artifacts are present. Until the companion v2 consumer is tagged and the
+application dependency is intentionally bumped, the active pointer remains v1;
+the v2 release promotes it to `PIN-v2.json` atomically with generated outputs.
+
 This active-name lock is not yet a historical anti-reuse ledger. Before the
 production hardening gate claims protection against same-name semantic
 replacement, evolve the manifest with retired-ID tombstones or canonical
