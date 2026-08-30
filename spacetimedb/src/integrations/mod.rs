@@ -43,7 +43,7 @@ pub fn update_integration_status(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "integrations", "write")?;
 
-    match integration_type {
+    let company_id = match integration_type {
         crate::types::IntegrationType::GoogleDrive => {
             let conn = ctx
                 .db
@@ -55,6 +55,11 @@ pub fn update_integration_status(
             if conn.organization_id != organization_id {
                 return Err("Integration does not belong to this organization".to_string());
             }
+            if conn.deleted_at.is_some() {
+                return Err("Integration is already deleted".to_string());
+            }
+
+            let company_id = conn.company_id;
 
             ctx.db
                 .google_drive_connection()
@@ -66,6 +71,7 @@ pub fn update_integration_status(
                     updated_at: ctx.timestamp,
                     ..conn
                 });
+            company_id
         }
         crate::types::IntegrationType::WhatsAppBusiness => {
             let conn = ctx
@@ -78,6 +84,11 @@ pub fn update_integration_status(
             if conn.organization_id != organization_id {
                 return Err("Integration does not belong to this organization".to_string());
             }
+            if conn.deleted_at.is_some() {
+                return Err("Integration is already deleted".to_string());
+            }
+
+            let company_id = conn.company_id;
 
             ctx.db.whatsapp_business_account().id().update(
                 whatsapp_business::WhatsAppBusinessAccount {
@@ -88,6 +99,7 @@ pub fn update_integration_status(
                     ..conn
                 },
             );
+            company_id
         }
         _ => {
             return Err(format!(
@@ -95,10 +107,10 @@ pub fn update_integration_status(
                 integration_type
             ));
         }
-    }
+    };
 
     write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: None,
+        company_id,
         table_name: "integration",
         record_id: integration_id,
         action: "UPDATE",
@@ -122,7 +134,7 @@ pub fn delete_integration(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "integrations", "delete")?;
 
-    match integration_type {
+    let company_id = match integration_type {
         crate::types::IntegrationType::GoogleDrive => {
             let conn = ctx
                 .db
@@ -134,6 +146,11 @@ pub fn delete_integration(
             if conn.organization_id != organization_id {
                 return Err("Integration does not belong to this organization".to_string());
             }
+            if conn.deleted_at.is_some() {
+                return Err("Integration is already deleted".to_string());
+            }
+
+            let company_id = conn.company_id;
 
             ctx.db
                 .google_drive_connection()
@@ -145,6 +162,7 @@ pub fn delete_integration(
                     updated_at: ctx.timestamp,
                     ..conn
                 });
+            company_id
         }
         crate::types::IntegrationType::WhatsAppBusiness => {
             let conn = ctx
@@ -157,6 +175,11 @@ pub fn delete_integration(
             if conn.organization_id != organization_id {
                 return Err("Integration does not belong to this organization".to_string());
             }
+            if conn.deleted_at.is_some() {
+                return Err("Integration is already deleted".to_string());
+            }
+
+            let company_id = conn.company_id;
 
             ctx.db.whatsapp_business_account().id().update(
                 whatsapp_business::WhatsAppBusinessAccount {
@@ -167,6 +190,7 @@ pub fn delete_integration(
                     ..conn
                 },
             );
+            company_id
         }
         _ => {
             return Err(format!(
@@ -174,13 +198,13 @@ pub fn delete_integration(
                 integration_type
             ));
         }
-    }
+    };
 
     write_audit_log_v2(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id,
             table_name: "integration",
             record_id: integration_id,
             action: "DELETE",

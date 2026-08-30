@@ -796,6 +796,57 @@ mod tests {
     }
 
     #[test]
+    fn interactive_integration_operations_are_exposed_but_machine_callbacks_are_denied() {
+        for reducer in [
+            "create_whatsapp_business_account",
+            "delete_integration",
+            "delete_whatsapp_business_account",
+            "set_whatsapp_primary_account",
+            "update_whatsapp_business_account",
+        ] {
+            let contract = stdb_client::reducer_contract(reducer).expect(reducer);
+            assert_eq!(contract.exposure, Exposure::Session, "{reducer}");
+            assert_eq!(contract.organization_position, Some(0), "{reducer}");
+            assert_eq!(contract.company_position, None, "{reducer}");
+        }
+
+        let create_drive = stdb_client::reducer_contract("create_google_drive_connection")
+            .expect("create_google_drive_connection");
+        assert_eq!(create_drive.exposure, Exposure::Session);
+        assert_eq!(create_drive.organization_position, Some(0));
+        assert_eq!(create_drive.company_position, Some(1));
+
+        let update_drive = stdb_client::reducer_contract("update_google_drive_connection")
+            .expect("update_google_drive_connection");
+        assert_eq!(update_drive.exposure, Exposure::Session);
+        assert_eq!(update_drive.organization_position, Some(1));
+        assert_eq!(update_drive.company_position, None);
+
+        let archive = stdb_client::reducer_contract("archive_ai_chat_session")
+            .expect("archive_ai_chat_session");
+        assert_eq!(archive.exposure, Exposure::Session);
+        assert_eq!(archive.organization_position, Some(0));
+        assert_eq!(archive.company_position, Some(1));
+
+        assert_eq!(
+            stdb_client::company_scope_paths("create_whatsapp_business_account").len(),
+            1
+        );
+
+        for reducer in [
+            "record_google_drive_sync",
+            "record_google_drive_sync_error",
+            "record_whatsapp_health_check",
+            "record_whatsapp_message_sent",
+            "update_integration_status",
+            "update_whatsapp_verification_status",
+        ] {
+            let contract = stdb_client::reducer_contract(reducer).expect(reducer);
+            assert_eq!(contract.exposure, Exposure::Denied, "{reducer}");
+        }
+    }
+
+    #[test]
     fn reviewed_unscoped_reducer_is_explicit() {
         let contract = stdb_client::reducer_contract("create_country").expect("create_country");
         assert_eq!(contract.exposure, Exposure::Session);

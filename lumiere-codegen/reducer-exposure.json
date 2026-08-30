@@ -292,6 +292,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "archive_ai_chat_session",
+      "exposure": "session",
+      "reason": "reviewed interactive AI session action guarded by reducer permission and organization/company ownership checks"
+    },
+    {
       "name": "archive_contact_category",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -1196,6 +1201,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_google_drive_connection",
+      "exposure": "session",
+      "reason": "reviewed interactive integration action guarded by reducer permission and organization/company ownership checks"
+    },
+    {
       "name": "create_helpdesk_sla",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -1883,6 +1893,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_whatsapp_business_account",
+      "exposure": "session",
+      "reason": "reviewed interactive integration action guarded by reducer permission and organization/company ownership checks"
+    },
+    {
       "name": "create_work_schedule",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2026,6 +2041,11 @@
       "name": "delete_form_field",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "delete_integration",
+      "exposure": "session",
+      "reason": "reviewed interactive integration action guarded by reducer delete permission and organization ownership checks"
     },
     {
       "name": "delete_record_custom_field_values",
@@ -2201,6 +2221,11 @@
       "name": "delete_warehouse_3_d_zone",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "delete_whatsapp_business_account",
+      "exposure": "session",
+      "reason": "reviewed interactive integration action guarded by reducer delete permission and organization ownership checks"
     },
     {
       "name": "deprecate_account_account",
@@ -3545,6 +3570,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "set_whatsapp_primary_account",
+      "exposure": "session",
+      "reason": "reviewed interactive integration action guarded by reducer permission and validated target ownership"
+    },
+    {
       "name": "set_workflow_migration_plan_active",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -4018,6 +4048,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "update_google_drive_connection",
+      "exposure": "session",
+      "reason": "reviewed interactive integration action guarded by reducer permission and organization ownership checks"
+    },
+    {
       "name": "update_google_drive_credentials",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -4429,6 +4464,11 @@
       "name": "update_warehouse_task_status",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "update_whatsapp_business_account",
+      "exposure": "session",
+      "reason": "reviewed interactive integration action guarded by reducer permission and organization ownership checks"
     },
     {
       "name": "update_whatsapp_credentials",
