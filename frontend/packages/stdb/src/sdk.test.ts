@@ -1,4 +1,5 @@
 import { strict as assert } from "node:assert"
+import { readFile } from "node:fs/promises"
 import { test } from "node:test"
 
 import { SESSION_OPERATION_DESCRIPTORS } from "@lumiere/contracts/generated/operation-descriptors"
@@ -10,6 +11,13 @@ function operationUrl(operation: keyof typeof SESSION_OPERATION_DESCRIPTORS): st
     SESSION_OPERATION_DESCRIPTORS[operation].contractOperationId,
   )}`
 }
+
+test("application SDK binds the contracts-owned generated facade", async () => {
+  const source = await readFile(new URL("./sdk.ts", import.meta.url), "utf8")
+  assert.match(source, /createGeneratedStdbSdk/)
+  assert.doesNotMatch(source, /export interface StdbSdk/)
+  assert.doesNotMatch(source, /settings:\s*\{\s*integrations:/)
+})
 
 test("accounting SDK targets the immutable typed operation and selected company", async () => {
   let request: { url: string; body: string } | undefined

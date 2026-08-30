@@ -1,13 +1,20 @@
 # IR-owned frontend operation descriptors — continuation PR
 
-**Status:** v0.3.5 descriptor consumption complete; IR v2 producer complete and companion consumer in PR #6 — 2026-08-30
+**Status:** Phase 5C generated domain SDK consumed from `lumiere-contracts` v0.3.14 — 2026-08-30
 **Depends on:** canonical IR/contracts extraction merge
-**Companion release:** `lumiere-contracts` v0.3.5
+**Companion release:** `lumiere-contracts` v0.3.14
 
-The application pins the immutable `v0.3.5` tag at companion release commit
-`f87f2d57dffddd8d7598dbd69abae249369fdaa1`. The generated descriptor is now
+The application pins the immutable `v0.3.14` tag at companion release commit
+`a3fffdb8b3599ce42b612bbf68f6d905a1688fa8`. The generated descriptor is now
 the application-owned named-command surface. The remaining positional
 accounting adapter and its duplicate hook have been removed.
+
+Phase 5C adds the first contracts-owned domain SDK façade and moves the
+application's command input type to the generated SDK input map. Release
+`v0.3.13` is superseded and must not be consumed: its publisher run selected
+IR v1 and therefore omitted immutable `contractOperationId` fields. The
+publisher now defaults to IR v2, and `v0.3.14` contains the corrected atomic
+descriptor, compact target, wire-codec, and SDK surface.
 **Related:**
 [typed-bff-sdk-contract-hardening-execution-plan.md](./typed-bff-sdk-contract-hardening-execution-plan.md) ·
 [contracts-extraction-execution-plan.md](./contracts-extraction-execution-plan.md) ·

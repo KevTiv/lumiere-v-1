@@ -31,14 +31,7 @@ export * from './queries/erp-subscriptions';
 export * from './warehouse-3d-types';
 export {
   createStdbSdk,
-  type CreateAccountInput,
-  type CreateGoogleDriveConnectionInput,
-  type CreateWhatsAppBusinessAccountInput,
-  type IntegrationKind,
-  type StdbCompanyId,
   type StdbSdk,
-  type UpdateGoogleDriveConnectionInput,
-  type UpdateWhatsAppBusinessAccountInput,
 } from './sdk';
 
 /** Form config enums / structs live in `generated/types.ts`, not the SpacetimeDB `generated/index` barrel. */

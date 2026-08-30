@@ -1,32 +1,94 @@
 "use client"
 
 import { createBrowserStdbSdk, stdbBrowserCommand } from "../browser-http"
-import type {
-  CreateGoogleDriveConnectionInput,
-  CreateWhatsAppBusinessAccountInput,
-  IntegrationKind,
-  UpdateGoogleDriveConnectionInput,
-  UpdateWhatsAppBusinessAccountInput,
-} from "../sdk"
 
-export type CreateGoogleDriveConnectionArgs = CreateGoogleDriveConnectionInput
+type UnitEnum =
+  | "UploadOnly"
+  | "DownloadOnly"
+  | "Bidirectional"
+  | "PreferRemote"
+  | "PreferLocal"
+  | "Skip"
+  | "Manual"
+
+function unit<T extends UnitEnum>(tag: T): { tag: T } {
+  return { tag }
+}
+
+export interface CreateGoogleDriveConnectionArgs {
+  companyId?: bigint | null
+  name: string
+  accountEmail: string
+  accountId: string
+  credentialsReference: string
+  rootFolderId?: string | null
+  sharedDriveId?: string | null
+  syncEnabled: boolean
+  webhookEnabled: boolean
+  webhookUrl?: string | null
+  webhookSecretReference?: string | null
+  syncDirection: "UploadOnly" | "DownloadOnly" | "Bidirectional"
+  conflictPolicy?: "PreferRemote" | "PreferLocal" | "Skip" | "Manual" | null
+  syncFrequencyMinutes: number
+  allowedFileTypes: string[]
+  maxFileSizeMb: number
+}
+
+type UpdateGoogleDriveConnectionArgs = Partial<
+  Omit<
+    CreateGoogleDriveConnectionArgs,
+    "companyId" | "accountEmail" | "accountId" | "credentialsReference" | "conflictPolicy"
+  > & {
+    autoSyncFiles: boolean
+  }
+>
+
+export type IntegrationKind = "GoogleDrive" | "WhatsAppBusiness"
 
 export function createGoogleDriveConnection(
   _organizationId: bigint,
   args: CreateGoogleDriveConnectionArgs,
 ) {
-  return createBrowserStdbSdk().settings.integrations.googleDrive.create(args)
+  return createBrowserStdbSdk().settings.integrations.googleDrive.create({
+    companyId: args.companyId ?? null,
+    name: args.name,
+    accountEmail: args.accountEmail,
+    accountId: args.accountId,
+    credentialsReference: args.credentialsReference,
+    rootFolderId: args.rootFolderId ?? null,
+    sharedDriveId: args.sharedDriveId ?? null,
+    syncEnabled: args.syncEnabled,
+    webhookEnabled: args.webhookEnabled,
+    webhookUrl: args.webhookUrl ?? null,
+    webhookSecretReference: args.webhookSecretReference ?? null,
+    syncDirection: unit(args.syncDirection),
+    conflictPolicy: args.conflictPolicy ? unit(args.conflictPolicy) : null,
+    syncFrequencyMinutes: args.syncFrequencyMinutes,
+    allowedFileTypes: args.allowedFileTypes,
+    maxFileSizeMb: args.maxFileSizeMb,
+  })
 }
 
 export function updateGoogleDriveConnection(
   _organizationId: bigint,
   connectionId: bigint,
-  args: UpdateGoogleDriveConnectionInput,
+  args: UpdateGoogleDriveConnectionArgs,
 ) {
-  return createBrowserStdbSdk().settings.integrations.googleDrive.update(connectionId, args)
+  return createBrowserStdbSdk().settings.integrations.googleDrive.update({
+    connectionId,
+    name: args.name ?? null,
+    rootFolderId: args.rootFolderId ?? null,
+    sharedDriveId: args.sharedDriveId ?? null,
+    syncEnabled: args.syncEnabled ?? null,
+    autoSyncFiles: args.autoSyncFiles ?? null,
+    allowedFileTypes: args.allowedFileTypes ?? null,
+    maxFileSizeMb: args.maxFileSizeMb ?? null,
+    webhookEnabled: args.webhookEnabled ?? null,
+    webhookUrl: args.webhookUrl ?? null,
+    syncDirection: args.syncDirection ? unit(args.syncDirection) : null,
+    syncFrequencyMinutes: args.syncFrequencyMinutes ?? null,
+  })
 }
-
-export type { IntegrationKind }
 
 export function deleteIntegration(
   _organizationId: bigint,
@@ -36,21 +98,69 @@ export function deleteIntegration(
   return createBrowserStdbSdk().settings.integrations.delete(integrationId, integrationType)
 }
 
-export type CreateWhatsAppBusinessAccountArgs = CreateWhatsAppBusinessAccountInput
+export interface CreateWhatsAppBusinessAccountArgs {
+  companyId?: bigint | null
+  name: string
+  phoneNumber: string
+  phoneNumberId: string
+  businessAccountId: string
+  displayName: string
+  credentialsReference: string
+  webhookSecretReference: string
+  messagingEnabled: boolean
+  notificationsEnabled: boolean
+  templateMessagingEnabled: boolean
+  interactiveMessagingEnabled: boolean
+  defaultLanguage: string
+  webhookEnabled: boolean
+  webhookUrl?: string | null
+  subscribedWebhookEvents: string[]
+  dailyMessageLimit: number
+  isPrimary: boolean
+  templateNamespace?: string | null
+  mediaProvider?: string | null
+  metadata?: string | null
+}
+
+type UpdateWhatsAppBusinessAccountArgs = Partial<
+  Omit<
+    CreateWhatsAppBusinessAccountArgs,
+    | "companyId"
+    | "phoneNumber"
+    | "phoneNumberId"
+    | "businessAccountId"
+    | "credentialsReference"
+    | "webhookSecretReference"
+    | "isPrimary"
+    | "metadata"
+  >
+>
 
 export function createWhatsAppBusinessAccount(
   _organizationId: bigint,
   args: CreateWhatsAppBusinessAccountArgs,
 ) {
-  return createBrowserStdbSdk().settings.integrations.whatsapp.create(args)
+  return createBrowserStdbSdk().settings.integrations.whatsapp.create({
+    ...args,
+    companyId: args.companyId ?? undefined,
+    webhookUrl: args.webhookUrl ?? undefined,
+    templateNamespace: args.templateNamespace ?? undefined,
+    mediaProvider: args.mediaProvider ?? undefined,
+    metadata: args.metadata ?? undefined,
+  })
 }
 
 export function updateWhatsAppBusinessAccount(
   _organizationId: bigint,
   accountId: bigint,
-  args: UpdateWhatsAppBusinessAccountInput,
+  args: UpdateWhatsAppBusinessAccountArgs,
 ) {
-  return createBrowserStdbSdk().settings.integrations.whatsapp.update(accountId, args)
+  return createBrowserStdbSdk().settings.integrations.whatsapp.update(accountId, {
+    ...args,
+    webhookUrl: args.webhookUrl ?? undefined,
+    templateNamespace: args.templateNamespace ?? undefined,
+    mediaProvider: args.mediaProvider ?? undefined,
+  })
 }
 
 export function deleteWhatsAppBusinessAccount(_organizationId: bigint, accountId: bigint) {

@@ -1,10 +1,13 @@
 import { stringifyReducerCommandBody } from "@lumiere/api-client";
-import type { OperationInputMap } from "@lumiere/contracts/generated/operation-inputs";
 import {
   SESSION_OPERATION_DESCRIPTORS,
   SESSION_OPERATION_NAMES,
   type SessionOperationName,
 } from "@lumiere/contracts/generated/operation-descriptors";
+import type {
+  SdkOperationInput,
+  SdkOperationName,
+} from "@lumiere/contracts/generated/sdk";
 
 import type { ReducerCommandContractMeta } from "./types";
 
@@ -14,19 +17,8 @@ type StdbBffReducerKey = SessionOperationName;
 
 export { STDB_BFF_REDUCERS, type StdbBffReducerKey };
 
-export type StdbBffNamedReducerKey = Extract<StdbBffReducerKey, keyof OperationInputMap>;
-type WireField<T> =
-  | T
-  | null
-  | (T extends bigint ? number | string : never)
-  | (T extends object ? Record<string, unknown> : never)
-  | { __identity__: string }
-  | { some: unknown }
-  | { none: [] };
-
-export type StdbBffCommandInput<K extends StdbBffNamedReducerKey> = {
-  [P in keyof OperationInputMap[K]]: WireField<OperationInputMap[K][P]>;
-};
+export type StdbBffNamedReducerKey = SdkOperationName;
+export type StdbBffCommandInput<K extends StdbBffNamedReducerKey> = SdkOperationInput<K>;
 
 /** Same-origin typed-operation path for all named command consumers. */
 export function stdbBffCallUrl(reducer: StdbBffReducerKey): string {
