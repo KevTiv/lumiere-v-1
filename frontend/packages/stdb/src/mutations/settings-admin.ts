@@ -1,6 +1,6 @@
 "use client"
 
-import { stdbBrowserCall } from "../browser-http"
+import { stdbBrowserCommand, stdbBrowserCompatCall } from "../browser-http"
 
 type UnitEnum =
   | "Active"
@@ -57,7 +57,7 @@ export function createGoogleDriveConnection(
   organizationId: bigint,
   args: CreateGoogleDriveConnectionArgs,
 ) {
-  return stdbBrowserCall("create_google_drive_connection", [
+  return stdbBrowserCompatCall("create_google_drive_connection", [
     organizationId,
     args.name,
     args.accountEmail,
@@ -85,7 +85,7 @@ export function updateGoogleDriveConnection(
     }
   >,
 ) {
-  return stdbBrowserCall("update_google_drive_connection", [
+  return stdbBrowserCompatCall("update_google_drive_connection", [
     connectionId,
     organizationId,
     args.name ?? null,
@@ -107,7 +107,7 @@ export function recordGoogleDriveSync(
   connectionId: bigint,
   nextSyncAt: { microsSinceUnixEpoch: bigint } | null,
 ) {
-  return stdbBrowserCall("record_google_drive_sync", [connectionId, organizationId, nextSyncAt])
+  return stdbBrowserCompatCall("record_google_drive_sync", [connectionId, organizationId, nextSyncAt])
 }
 
 export function recordGoogleDriveSyncError(
@@ -115,7 +115,7 @@ export function recordGoogleDriveSyncError(
   connectionId: bigint,
   errorMessage: string,
 ) {
-  return stdbBrowserCall("record_google_drive_sync_error", [
+  return stdbBrowserCompatCall("record_google_drive_sync_error", [
     connectionId,
     organizationId,
     errorMessage,
@@ -134,7 +134,7 @@ export function updateIntegrationStatus(
   syncStatus: SyncStatusKind,
   errorMessage?: string | null,
 ) {
-  return stdbBrowserCall("update_integration_status", [
+  return stdbBrowserCompatCall("update_integration_status", [
     organizationId,
     integrationId,
     unit(integrationType),
@@ -149,7 +149,7 @@ export function deleteIntegration(
   integrationId: bigint,
   integrationType: IntegrationKind,
 ) {
-  return stdbBrowserCall("delete_integration", [
+  return stdbBrowserCompatCall("delete_integration", [
     organizationId,
     integrationId,
     unit(integrationType),
@@ -183,7 +183,7 @@ export function createWhatsAppBusinessAccount(
   organizationId: bigint,
   args: CreateWhatsAppBusinessAccountArgs,
 ) {
-  return stdbBrowserCall("create_whatsapp_business_account", [organizationId, args])
+  return stdbBrowserCompatCall("create_whatsapp_business_account", [organizationId, args])
 }
 
 export function updateWhatsAppBusinessAccount(
@@ -191,15 +191,15 @@ export function updateWhatsAppBusinessAccount(
   accountId: bigint,
   args: Partial<Omit<CreateWhatsAppBusinessAccountArgs, "phoneNumber" | "phoneNumberId" | "businessAccountId" | "credentialsReference" | "webhookSecretReference" | "isPrimary" | "metadata">>,
 ) {
-  return stdbBrowserCall("update_whatsapp_business_account", [organizationId, accountId, args])
+  return stdbBrowserCompatCall("update_whatsapp_business_account", [organizationId, accountId, args])
 }
 
 export function deleteWhatsAppBusinessAccount(organizationId: bigint, accountId: bigint) {
-  return stdbBrowserCall("delete_whatsapp_business_account", [organizationId, accountId])
+  return stdbBrowserCompatCall("delete_whatsapp_business_account", [organizationId, accountId])
 }
 
 export function setWhatsAppPrimaryAccount(organizationId: bigint, accountId: bigint) {
-  return stdbBrowserCall("set_whatsapp_primary_account", [organizationId, accountId])
+  return stdbBrowserCompatCall("set_whatsapp_primary_account", [organizationId, accountId])
 }
 
 export function updateWhatsAppVerificationStatus(
@@ -208,7 +208,7 @@ export function updateWhatsAppVerificationStatus(
   verificationStatus: "Pending" | "Approved" | "Rejected" | "Expired" | "Revoked",
   verificationLevel: "Unverified" | "BusinessPortfolio" | "BusinessVerified",
 ) {
-  return stdbBrowserCall("update_whatsapp_verification_status", [
+  return stdbBrowserCompatCall("update_whatsapp_verification_status", [
     organizationId,
     accountId,
     {
@@ -223,7 +223,7 @@ export function recordWhatsAppHealthCheck(
   accountId: bigint,
   isHealthy: boolean,
 ) {
-  return stdbBrowserCall("record_whatsapp_health_check", [
+  return stdbBrowserCompatCall("record_whatsapp_health_check", [
     organizationId,
     accountId,
     { isHealthy },
@@ -231,7 +231,7 @@ export function recordWhatsAppHealthCheck(
 }
 
 export function recordWhatsAppMessageSent(organizationId: bigint, accountId: bigint) {
-  return stdbBrowserCall("record_whatsapp_message_sent", [organizationId, accountId])
+  return stdbBrowserCompatCall("record_whatsapp_message_sent", [organizationId, accountId])
 }
 
 export function grantPermission(
@@ -255,19 +255,18 @@ export function grantPermission(
           },
         }
 
-  return stdbBrowserCall("grant_permission", [
-    organizationId,
-    {
+  return stdbBrowserCommand("grant_permission", {
+    params: {
       subject,
       resource: args.resource,
       action: { [actionKey]: [] },
       effect: { [effectKey]: [] },
     },
-  ])
+  })
 }
 
-export function revokePermission(organizationId: bigint, permissionId: bigint) {
-  return stdbBrowserCall("revoke_permission", [organizationId, permissionId])
+export function revokePermission(_organizationId: bigint, permissionId: bigint) {
+  return stdbBrowserCommand("revoke_permission", { permissionId })
 }
 
 export function archiveAiChatSession(
@@ -276,7 +275,7 @@ export function archiveAiChatSession(
   sessionKey: string,
   archived: boolean,
 ) {
-  return stdbBrowserCall("archive_ai_chat_session", [
+  return stdbBrowserCompatCall("archive_ai_chat_session", [
     organizationId,
     companyId,
     sessionKey,

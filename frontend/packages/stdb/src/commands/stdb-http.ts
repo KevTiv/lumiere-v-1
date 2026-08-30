@@ -14,7 +14,7 @@ type StdbBffReducerKey = SessionOperationName;
 
 export { STDB_BFF_REDUCERS, type StdbBffReducerKey };
 
-type NamedReducerKey = Extract<StdbBffReducerKey, keyof OperationInputMap>;
+export type StdbBffNamedReducerKey = Extract<StdbBffReducerKey, keyof OperationInputMap>;
 type WireField<T> =
   | T
   | null
@@ -24,7 +24,7 @@ type WireField<T> =
   | { some: unknown }
   | { none: [] };
 
-export type StdbBffCommandInput<K extends NamedReducerKey> = {
+export type StdbBffCommandInput<K extends StdbBffNamedReducerKey> = {
   [P in keyof OperationInputMap[K]]: WireField<OperationInputMap[K][P]>;
 };
 
@@ -39,7 +39,7 @@ export function stdbBffCallUrl(reducer: StdbBffReducerKey): string {
  * api-server injects it from the authenticated session using locked contract
  * operation metadata.
  */
-export function stdbBffCommandPost<K extends NamedReducerKey>(
+export function stdbBffCommandPost<K extends StdbBffNamedReducerKey>(
   reducer: K,
   input: StdbBffCommandInput<K>,
 ): { urlPath: string; init: RequestInit } {

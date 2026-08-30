@@ -11,6 +11,11 @@ import {
   queryStdbList,
   type LumiereHttpFetch,
 } from "@lumiere/api-client"
+import {
+  stdbBffCommandPost,
+  type StdbBffCommandInput,
+  type StdbBffNamedReducerKey,
+} from "./commands/stdb-http"
 import { encodeReducerCallArgs } from "./stdb-params-json"
 
 function resolveApiFetch(): LumiereHttpFetch {
@@ -28,6 +33,19 @@ export async function stdbBrowserQuery(resource: string): Promise<Record<string,
   return queryStdbList(resolveApiFetch(), resource)
 }
 
-export async function stdbBrowserCall(reducer: string, args: unknown[]): Promise<void> {
+export async function stdbBrowserCompatCall(reducer: string, args: unknown[]): Promise<void> {
   return callStdbReducer(resolveApiFetch(), reducer, encodeReducerCallArgs(reducer, args))
+}
+
+/** Invoke a session-exposed operation through its generated immutable contract ID. */
+export async function stdbBrowserCommand<K extends StdbBffNamedReducerKey>(
+  operation: K,
+  input: StdbBffCommandInput<K>,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost(operation, input)
+  const response = await resolveApiFetch()(urlPath, init)
+  if (!response.ok) {
+    const json = (await response.json().catch(() => ({}))) as Record<string, unknown>
+    throw new Error((json.error as string | undefined) ?? `Operation ${operation} failed`)
+  }
 }

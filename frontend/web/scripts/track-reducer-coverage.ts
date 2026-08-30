@@ -249,8 +249,10 @@ const WEB_DETECTION_PATTERNS = {
   callReducerLiteral: /callReducer\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
   // callReducersBatch entries
   callReducersBatch: /\{\s*reducer\s*:\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
-  /** `@lumiere/stdb` browser mutations → same gateway as `/api/call` */
-  stdbBrowserCall: /stdbBrowserCall\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
+  /** Session-exposed browser mutations routed by immutable contract identity. */
+  stdbBrowserCommand: /stdbBrowserCommand\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
+  /** Explicit positional compatibility calls for operations not exposed to sessions. */
+  stdbBrowserCompatCall: /stdbBrowserCompatCall\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
 }
 
 interface CoverageReport {
@@ -283,7 +285,8 @@ interface CoverageReport {
     useStdbCallMutation: number
     callReducerLiteral: number
     callReducersBatch: number
-    stdbBrowserCall: number
+    stdbBrowserCommand: number
+    stdbBrowserCompatCall: number
   }
 }
 
@@ -399,7 +402,8 @@ function extractWebReducers(): {
     useStdbCallMutation: new Set(),
     callReducerLiteral: new Set(),
     callReducersBatch: new Set(),
-    stdbBrowserCall: new Set(),
+    stdbBrowserCommand: new Set(),
+    stdbBrowserCompatCall: new Set(),
   }
 
   // Try ripgrep first for fast literal /api/call detection
@@ -474,10 +478,16 @@ function extractWebReducers(): {
         sources.callReducersBatch.add(match[1])
       }
 
-      WEB_DETECTION_PATTERNS.stdbBrowserCall.lastIndex = 0
-      while ((match = WEB_DETECTION_PATTERNS.stdbBrowserCall.exec(content)) !== null) {
+      WEB_DETECTION_PATTERNS.stdbBrowserCommand.lastIndex = 0
+      while ((match = WEB_DETECTION_PATTERNS.stdbBrowserCommand.exec(content)) !== null) {
         allReducers.add(match[1])
-        sources.stdbBrowserCall.add(match[1])
+        sources.stdbBrowserCommand.add(match[1])
+      }
+
+      WEB_DETECTION_PATTERNS.stdbBrowserCompatCall.lastIndex = 0
+      while ((match = WEB_DETECTION_PATTERNS.stdbBrowserCompatCall.exec(content)) !== null) {
+        allReducers.add(match[1])
+        sources.stdbBrowserCompatCall.add(match[1])
       }
     } catch {
       // Skip unreadable files
@@ -560,7 +570,7 @@ function extractHookWrappers(): Map<string, Set<string>> {
     /['"]\/api\/call\/([a-z_][a-z0-9_]*)/g,
     /useAccountingCallMutation\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
     /useStdb(?:Reducer|CallMutation|ReducerWithInvalidation)?\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
-    /stdbBrowserCall\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
+    /stdbBrowser(?:Command|CompatCall)\s*\(\s*['"`]([a-z_][a-z0-9_]*)['"`]/g,
   ]
 
   for (const file of files) {
@@ -1328,7 +1338,8 @@ function generateReport(
       useStdbCallMutation: webResult.sources.useStdbCallMutation.size,
       callReducerLiteral: webResult.sources.callReducerLiteral.size,
       callReducersBatch: webResult.sources.callReducersBatch.size,
-      stdbBrowserCall: webResult.sources.stdbBrowserCall.size,
+      stdbBrowserCommand: webResult.sources.stdbBrowserCommand.size,
+      stdbBrowserCompatCall: webResult.sources.stdbBrowserCompatCall.size,
     },
   }
 
@@ -1601,7 +1612,8 @@ function printReport(report: CoverageReport): void {
   console.log(`  useStdbCallMutation('...'): ${report.detectionSources.useStdbCallMutation}`)
   console.log(`  callReducer('...'): ${report.detectionSources.callReducerLiteral}`)
   console.log(`  callReducersBatch entries: ${report.detectionSources.callReducersBatch}`)
-  console.log(`  stdbBrowserCall('...'): ${report.detectionSources.stdbBrowserCall}`)
+  console.log(`  stdbBrowserCommand('...'): ${report.detectionSources.stdbBrowserCommand}`)
+  console.log(`  stdbBrowserCompatCall('...'): ${report.detectionSources.stdbBrowserCompatCall}`)
 
   // Excluded by category
   if (report.excludedReducers.count > 0) {

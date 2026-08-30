@@ -17,7 +17,7 @@
  * For the HTTP gateway stack (Next.js, cookies, `/api/query/*`, `/api/operations/*`):
  * - `@lumiere/query-hooks/hooks/*` — React Query hooks (api-server via `LumiereApiProvider`)
  * - `@lumiere/stdb/server` — `stdbSql` + entity types for Next.js API routes (not RSC reads)
- * - `@lumiere/stdb/browser-http` — `stdbBrowserCall` / `stdbBrowserQuery` when the provider is mounted
+ * - `@lumiere/stdb/browser-http` — immutable `stdbBrowserCommand`, explicit compatibility calls, and queries
  * - `@lumiere/stdb/client-ui-bridge` — minimal mutation helpers for `@lumiere/ui`
  *
  * Web: realtime invalidation uses `@lumiere/query-hooks/hooks/realtime` (`useLumiereRealtime`); optional native `StdbConnectionProvider` + `createClientSubscriptions` for non-web or legacy.
