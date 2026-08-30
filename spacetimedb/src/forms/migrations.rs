@@ -10,6 +10,7 @@ use crate::forms::{
     CreateFormConfigParams, CreateFormFieldParams, CreateRoleConfigParams, FieldOption, FieldType,
     FieldValidation, FieldWidth,
 };
+use crate::helpers::check_permission;
 
 /// Shared implementation for `seed_organization_form_configs` and tenant bootstrap.
 pub(crate) fn run_seed_organization_form_configs(
@@ -58,6 +59,7 @@ pub fn seed_organization_form_configs(
     ctx: &ReducerContext,
     organization_id: u64,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "form_configuration", "create")?;
     run_seed_organization_form_configs(ctx, organization_id)
 }
 
@@ -280,7 +282,7 @@ pub fn migrate_all_organizations(ctx: &ReducerContext) -> Result<(), String> {
         .collect();
 
     for org_id in orgs {
-        match seed_organization_form_configs(ctx, org_id) {
+        match run_seed_organization_form_configs(ctx, org_id) {
             Ok(_) => log::info!("Migrated org {}", org_id),
             Err(e) => log::error!("Failed to migrate org {}: {}", org_id, e),
         }

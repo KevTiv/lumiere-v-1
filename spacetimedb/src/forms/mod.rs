@@ -1241,7 +1241,7 @@ pub fn add_user_custom_field(
         updated_at: ctx.timestamp,
     };
 
-    ctx.db.user_custom_field().insert(custom_field);
+    let custom_field = ctx.db.user_custom_field().insert(custom_field);
 
     write_audit_log_v2(
         ctx,
@@ -1249,7 +1249,7 @@ pub fn add_user_custom_field(
         AuditLogParams {
             company_id: None,
             table_name: "user_custom_field",
-            record_id: params.configuration_id,
+            record_id: custom_field.id,
             action: "create",
             old_values: None,
             new_values: None,
@@ -1268,6 +1268,8 @@ pub fn delete_user_custom_field(
     organization_id: u64,
     custom_field_id: u64,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "form_configuration", "delete")?;
+
     let field = ctx
         .db
         .user_custom_field()

@@ -137,6 +137,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "add_user_custom_field",
+      "exposure": "session",
+      "reason": "reviewed form customization reducer: requires create permission, verifies parent configuration organization ownership, and binds the custom field to the authenticated sender"
+    },
+    {
       "name": "add_user_to_organization",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2181,6 +2186,11 @@
       "name": "delete_tax_deadline",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "delete_user_custom_field",
+      "exposure": "session",
+      "reason": "reviewed form customization reducer: requires delete permission and verifies authenticated-sender plus organization ownership before deleting"
     },
     {
       "name": "delete_warehouse",
