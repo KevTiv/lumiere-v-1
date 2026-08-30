@@ -1,11 +1,11 @@
 # IR-owned frontend operation descriptors — continuation PR
 
-**Status:** Phase 5C application SDK over generated contract facts, pinned to `lumiere-contracts` v0.3.16 — 2026-08-30
+**Status:** Phase 5C application SDK over generated contract facts, pinned to `lumiere-contracts` v0.3.17 — 2026-08-30
 **Depends on:** canonical IR/contracts extraction merge
-**Companion release:** `lumiere-contracts` v0.3.16
+**Companion release:** `lumiere-contracts` v0.3.17
 
-The application pins the immutable `v0.3.16` tag at companion release commit
-`a8176357b2ac941a08bda33eccdd6a38d255d64d`. The generated descriptor is now
+The application pins the immutable `v0.3.17` tag at companion release commit
+`7151a44bdaf5959df7b55ced5114f10396a722a0`. The generated descriptor is now
 the application-owned named-command surface. The remaining positional
 accounting adapter and its duplicate hook have been removed.
 
@@ -14,11 +14,14 @@ operation IDs, descriptors, input maps, compact targets, and wire codecs, while
 `@lumiere/stdb` owns the readable domain façade and authenticated API calls.
 Release `v0.3.15` removes the SDK export but is superseded because stale staging
 left the retired, unexported source file in the tagged package. Release
+`v0.3.16` contains the correct generated artifacts but is superseded because
+its release CI still referenced the removed SDK emitter API. Release
 `v0.3.14` is superseded for SDK ownership because it generated an authored
 domain API from a Python string template. Release `v0.3.13` must not be
 consumed: its publisher run selected IR v1 and omitted immutable
 `contractOperationId` fields. The publisher now defaults to IR v2, and
-`v0.3.16` adds a generator-owned guard that rejects or removes retired outputs.
+`v0.3.17` adds a generator-owned guard that rejects or removes retired outputs
+and a green contract-boundary test suite for that behavior.
 **Related:**
 [typed-bff-sdk-contract-hardening-execution-plan.md](./typed-bff-sdk-contract-hardening-execution-plan.md) ·
 [contracts-extraction-execution-plan.md](./contracts-extraction-execution-plan.md) ·
