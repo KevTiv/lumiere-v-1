@@ -397,6 +397,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "cancel_ai_agent_run",
+      "exposure": "session",
+      "reason": "AI Skills UI action guarded by reducer-side write permission and organization/company ownership checks"
+    },
+    {
       "name": "cancel_budget",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
