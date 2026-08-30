@@ -289,12 +289,15 @@ export function useCancelAiAgentRun(organizationId: number, companyId?: number) 
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (runId: number) => {
-      const cid = companyId ?? 0
-      const r = await apiFetch("/api/call/cancel_ai_agent_run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([organizationId, cid, runId, "Cancelled from UI"]),
+      if (companyId == null || companyId <= 0) {
+        throw new Error("A valid company is required to cancel an AI agent run")
+      }
+      const { urlPath, init } = stdbBffCommandPost("cancel_ai_agent_run", {
+        companyId,
+        runId,
+        reason: "Cancelled from UI",
       })
+      const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseAiError(r))
     },
     onSuccess: () => {

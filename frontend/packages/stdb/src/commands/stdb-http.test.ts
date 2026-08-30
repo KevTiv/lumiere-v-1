@@ -38,3 +38,21 @@ test("unreconcile accounting command uses the immutable descriptor URL", () => {
     params: { moveIds: [11, 13], amountResidual: 42.5 },
   })
 })
+
+test("AI run cancellation uses its released immutable ID and named company input", () => {
+  const { urlPath, init } = stdbBffCommandPost("cancel_ai_agent_run", {
+    companyId: 3n,
+    runId: 7n,
+    reason: "Cancelled from UI",
+  })
+
+  assert.equal(
+    urlPath,
+    `/api/operations/${encodeURIComponent(SESSION_OPERATION_DESCRIPTORS.cancel_ai_agent_run.contractOperationId)}`,
+  )
+  assert.deepEqual(JSON.parse(String(init.body)), {
+    companyId: 3,
+    runId: 7,
+    reason: "Cancelled from UI",
+  })
+})
