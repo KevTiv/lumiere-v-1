@@ -11,6 +11,8 @@ type CreateAccountParams = Omit<
   Exclude<StdbBffCommandInput<"create_account_account">["params"], null>,
   "companyId"
 >
+type CreateAccountTaxParams = StdbBffCommandInput<"create_account_tax">["params"]
+type UpdateAccountTaxParams = StdbBffCommandInput<"update_account_tax">["params"]
 type CreateWhatsAppParams =
   StdbBffCommandInput<"create_whatsapp_business_account">["params"]
 type UpdateWhatsAppParams =
@@ -41,6 +43,10 @@ export interface StdbSdk {
       readonly accounts: {
         create(params: CreateAccountParams): Promise<void>
       }
+      readonly taxes: {
+        create(params: CreateAccountTaxParams): Promise<void>
+        update(taxId: bigint, params: UpdateAccountTaxParams): Promise<void>
+      }
     }
     readonly settings: {
       readonly aiChats: {
@@ -52,7 +58,9 @@ export interface StdbSdk {
 
 const PARAM_STRUCT_BY_OPERATION = {
   create_account_account: "CreateAccountAccountParams",
+  create_account_tax: "CreateAccountTaxParams",
   create_whatsapp_business_account: "CreateWhatsAppBusinessAccountParams",
+  update_account_tax: "UpdateAccountTaxParams",
   update_whatsapp_business_account: "UpdateWhatsAppBusinessAccountParams",
 } as const satisfies Partial<Record<StdbBffNamedReducerKey, string>>
 
@@ -159,6 +167,11 @@ export function createStdbSdk(apiFetch: LumiereHttpFetch): StdbSdk {
             create: (params) => execute("create_account_account", {
               params: { ...params, companyId },
             }),
+          },
+          taxes: {
+            create: (params) => execute("create_account_tax", { companyId, params }),
+            update: (taxId, params) =>
+              execute("update_account_tax", { companyId, taxId, params }),
           },
         },
         settings: {

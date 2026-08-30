@@ -70,6 +70,69 @@ test("accounting SDK targets the immutable typed operation and selected company"
   })
 })
 
+test("accounting tax SDK binds selected company for create and update", async () => {
+  const requests: Array<{ url: string; body: Record<string, unknown> }> = []
+  const apiFetch = async (url: string, init?: RequestInit) => {
+    requests.push({
+      url,
+      body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+    })
+    return new Response(null, { status: 204 })
+  }
+  const taxes = createStdbSdk(apiFetch).forCompany(42n).accounting.taxes
+
+  await taxes.create({
+    name: "VAT 21%",
+    description: null,
+    typeTaxUse: { tag: "Sale" },
+    amountType: { tag: "Percent" },
+    amount: 21,
+    active: true,
+    priceInclude: false,
+    includeBaseAmount: false,
+    isBaseAffected: false,
+    sequence: 1,
+    taxGroupId: null,
+    countryId: null,
+    countryCode: null,
+    tags: [],
+    hasNegativeFactor: false,
+    invoiceRepartitionLineIds: [],
+    refundRepartitionLineIds: [],
+    metadata: null,
+  })
+  await taxes.update(9n, {
+    name: "VAT 20%",
+    description: undefined,
+    typeTaxUse: undefined,
+    amount: 20,
+    active: undefined,
+    priceInclude: undefined,
+    includeBaseAmount: undefined,
+    isBaseAffected: undefined,
+    sequence: undefined,
+    taxGroupId: undefined,
+    tags: undefined,
+    metadata: undefined,
+  })
+
+  assert.deepEqual(
+    requests.map(({ url }) => url),
+    [operationUrl("create_account_tax"), operationUrl("update_account_tax")],
+  )
+  assert.equal(requests[0].body.companyId, 42)
+  assert.equal(requests[1].body.companyId, 42)
+  assert.equal(requests[1].body.taxId, 9)
+  assert.deepEqual(
+    (requests[0].body.params as Record<string, unknown>).type_tax_use,
+    { sale: [] },
+  )
+  assert.deepEqual(
+    (requests[1].body.params as Record<string, unknown>).name,
+    { some: "VAT 20%" },
+  )
+})
+
 test("settings SDK owns integration encoding and immutable operation routing", async () => {
   const requests: Array<{ url: string; body: Record<string, unknown> }> = []
   const apiFetch = async (url: string, init?: RequestInit) => {

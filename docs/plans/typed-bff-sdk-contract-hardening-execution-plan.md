@@ -1,6 +1,6 @@
 # Typed BFF SDK and contract hardening — execution plan
 
-**Status:** IR handoff and type-debt ratchet foundation established; API/SDK continuation remains — 2026-08-22
+**Status:** Phase 5D application-owned domain SDK migration over generated contract facts — 2026-08-30
 **First pickup:** `frontend/packages/query-hooks/src/hooks/accounting.ts`
 **First reducer:** `create_account_account` through `useCreateAccountAccount`
 **Companion caller:** `frontend/web/app/(modules)/accounting/accounting-client.tsx`
@@ -161,8 +161,7 @@ TypeScript:
 
 - `packages/contracts/src/generated/operations.ts`;
 - `packages/contracts/src/generated/resources.ts`;
-- `packages/contracts/src/generated/wire-codecs.ts`;
-- domain SDK modules and a compact root client.
+- `packages/contracts/src/generated/wire-codecs.ts`.
 
 Rust:
 
@@ -207,7 +206,7 @@ agree for every reachable operation type.
 **Exit:** api-server normal business routes cannot dispatch an arbitrary reducer
 name or an arbitrary JSON array.
 
-### Phase 5 — generate the business TypeScript SDK and migrate writes
+### Phase 5 — build the application TypeScript SDK and migrate writes
 
 The public shape is domain-oriented:
 
@@ -216,9 +215,12 @@ const accounting = sdk.forCompany(selectedCompanyId).accounting
 await accounting.accounts.create(input)
 ```
 
-The generated SDK must not contain defaults, permissions, workflow decisions,
-or form behavior. Auth/session and selected-company providers bind transport
-context; operation modules encode and send generated requests.
+The application-owned SDK consumes generated operation IDs, input types, and
+wire codecs, but keeps domain grouping, method names, defaults, workflow
+decisions, and form behavior in normal TypeScript. Auth/session and
+selected-company providers bind transport context; operation modules encode
+and send generated requests. The contracts generator must not emit the authored
+business façade.
 
 Migrate one domain at a time. A migrated domain must delete its positional
 adapter and unused `*-http.ts` transport function in the same change.

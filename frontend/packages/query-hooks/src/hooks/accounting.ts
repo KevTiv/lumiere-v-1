@@ -640,14 +640,10 @@ export function useDeleteAccountMoveLine(organizationId: number) {
  */
 export function useCreateAccountTax(organizationId: number) {
   const qc = useQueryClient()
+  const sdk = createStdbSdk(apiFetch)
   return useMutation({
     mutationFn: async (args: { companyId: bigint; params: CreateAccountTaxParams }) => {
-      const { urlPath, init } = stdbBffCommandPost("create_account_tax", {
-        companyId: args.companyId,
-        params: stdbParamsToJson(args.params as object, "CreateAccountTaxParams"),
-      })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
+      await sdk.forCompany(args.companyId).accounting.taxes.create(args.params)
     },
     onSuccess: () =>
       invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("create_account_tax")),
@@ -659,15 +655,10 @@ export function useCreateAccountTax(organizationId: number) {
  */
 export function useUpdateAccountTax(organizationId: number) {
   const qc = useQueryClient()
+  const sdk = createStdbSdk(apiFetch)
   return useMutation({
     mutationFn: async (args: { companyId: bigint; taxId: bigint; params: UpdateAccountTaxParams }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_account_tax", {
-        companyId: args.companyId,
-        taxId: args.taxId,
-        params: stdbParamsToJson(args.params as object, "UpdateAccountTaxParams"),
-      })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
+      await sdk.forCompany(args.companyId).accounting.taxes.update(args.taxId, args.params)
     },
     onSuccess: () =>
       invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("update_account_tax")),
