@@ -167,6 +167,7 @@ python3 scripts/generate-from-ir.py
   echo "//! Generated-only crate. Do not hand-edit."
   echo "//! Published from lumiere-v-1 by scripts/publish-contracts.sh."
   echo
+  echo '#[cfg(feature = "bindings")]'
   echo "pub mod bindings;"
   if [[ "$ACTIVE_IR_VERSION" == "2" ]]; then
     echo
