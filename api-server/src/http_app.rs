@@ -763,7 +763,9 @@ mod tests {
     #[test]
     fn form_configuration_mutators_are_session_exposed_and_org_scoped() {
         for reducer in [
+            "add_user_custom_field",
             "add_form_field",
+            "delete_user_custom_field",
             "delete_form_field",
             "initialize_default_form_configs",
             "publish_form_configuration",
@@ -775,6 +777,12 @@ mod tests {
             assert_eq!(contract.organization_position, Some(0), "{reducer}");
             assert_eq!(contract.company_position, None, "{reducer}");
         }
+
+        let seed = stdb_client::reducer_contract("seed_organization_form_configs")
+            .expect("seed_organization_form_configs");
+        assert_eq!(seed.exposure, Exposure::Denied);
+        assert_eq!(seed.organization_position, Some(0));
+        assert_eq!(seed.company_position, None);
 
         for reducer in [
             "delete_record_custom_field_values",
