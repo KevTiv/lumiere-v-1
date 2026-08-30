@@ -1,3 +1,4 @@
+import { matchesTypedOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 import { parseQueryListResponse } from "@lumiere/api-client"
 
@@ -61,7 +62,7 @@ test.describe("Parity phase 2 — form config mutations", { tag: ["@p0", "@parit
 
     const [createRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_lead") && res.ok(),
+        (res) => matchesTypedOperationResponse(res, "create_lead") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-lead"),

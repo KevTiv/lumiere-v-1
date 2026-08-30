@@ -2,7 +2,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Helpdesk mutations via Next.js BFF `POST /api/call/:reducer`.
+ * Helpdesk mutations via Next.js BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` helpdesk hooks.
  */
 export const HELPDESK_BFF_REDUCERS = [
@@ -22,20 +22,12 @@ export const HELPDESK_BFF_REDUCERS = [
 
 export type HelpdeskBffReducerKey = (typeof HELPDESK_BFF_REDUCERS)[number];
 
-const WITH_COMPANY_QUERY = new Set<HelpdeskBffReducerKey>();
-
 const HELPDESK_RESOURCE_KEYS = [
   "helpdesk-tickets",
   "helpdesk-teams",
   "helpdesk-stages",
   "helpdesk-slas",
 ] as const;
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function helpdeskBffCallUrl(reducer: HelpdeskBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 const HELPDESK_HINT_OVERRIDES: Partial<
   Record<HelpdeskBffReducerKey, readonly string[]>

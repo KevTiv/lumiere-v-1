@@ -1,13 +1,11 @@
 /**
- * Compile-only — Messages BFF reducer keys stay aligned with `messagesBffCallUrl`.
+ * Compile-only — Messages BFF reducer keys stay aligned with command metadata.
  */
 import {
   MESSAGES_BFF_REDUCERS,
-  messagesBffCallUrl,
   messagesCommandContract,
 } from "../commands/messages-http";
 
 for (const k of MESSAGES_BFF_REDUCERS) {
-  void messagesBffCallUrl(k);
   void messagesCommandContract(k);
 }

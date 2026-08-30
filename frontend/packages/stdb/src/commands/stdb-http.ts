@@ -28,7 +28,7 @@ export type StdbBffCommandInput<K extends NamedReducerKey> = {
   [P in keyof OperationInputMap[K]]: WireField<OperationInputMap[K][P]>;
 };
 
-/** Same-origin typed operation path used by `apiFetch` in the web app. */
+/** Same-origin typed-operation path for all named command consumers. */
 export function stdbBffCallUrl(reducer: StdbBffReducerKey): string {
   const operationId = SESSION_OPERATION_DESCRIPTORS[reducer].contractOperationId;
   return `/api/operations/${encodeURIComponent(operationId)}`;

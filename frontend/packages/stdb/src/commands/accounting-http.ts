@@ -1,7 +1,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Accounting mutations via Next.js BFF `POST /api/call/:reducer`.
+ * Accounting mutations via Next.js BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` accounting hooks.
  */
 export const ACCOUNTING_BFF_REDUCERS = [
@@ -154,24 +154,6 @@ export const ACCOUNTING_BFF_REDUCERS = [
 ] as const;
 
 export type AccountingBffReducerKey = (typeof ACCOUNTING_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<AccountingBffReducerKey>([
-  "post_account_bank_statement",
-  "delete_account_bank_statement",
-  "create_account_bank_statement_line",
-  "update_account_bank_statement_line",
-  "delete_account_bank_statement_line",
-  "reconcile_account_bank_statement_line",
-  "create_account_reconciliation_widget",
-  "update_account_reconciliation_widget",
-  "delete_account_reconciliation_widget",
-]);
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function accountingBffCallUrl(reducer: AccountingBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 const ACCOUNTING_HINT_OVERRIDES: Partial<
   Record<AccountingBffReducerKey, readonly string[]>

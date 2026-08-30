@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url"
 import { expect, type Page } from "@playwright/test"
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { encodeReducerCallArgs } from "@lumiere/erp-shared/stdb-params-json"
+import { matchesTypedOperationResponse } from "./operation-response"
+import type { StdbBffReducerKey } from "@lumiere/stdb/commands"
 
 export const TEST_EMAIL = process.env.E2E_TEST_EMAIL ?? "test@email.com"
 export const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD ?? "Password123$"
@@ -726,14 +728,14 @@ export async function waitForEntityActionEnabled(page: Page, actionTestId: strin
 export async function clickEntityActionAndWaitForReducer(
   page: Page,
   actionTestId: string,
-  reducerName: string,
+  reducerName: StdbBffReducerKey,
   options?: { timeoutMs?: number },
 ) {
   await waitForEntityActionEnabled(page, actionTestId)
   const timeout = options?.timeoutMs ?? 30_000
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes(`/api/call/${reducerName}`) && r.ok(),
+      (r) => matchesTypedOperationResponse(r, reducerName) && r.ok(),
       { timeout },
     ),
     page.getByTestId(actionTestId).click(),
@@ -1732,7 +1734,7 @@ export async function postDraftCreditNoteViaGl(page: Page, partnerName: string):
         if (await postBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
           const [postRes] = await Promise.all([
             page.waitForResponse(
-              (res) => res.url().includes("/api/call/post_invoice") && res.ok(),
+              (res) => matchesTypedOperationResponse(res, "post_invoice") && res.ok(),
               { timeout: 30_000 },
             ),
             postBtn.click(),
@@ -1848,7 +1850,7 @@ export async function postDraftInvoiceViaUi(page: Page, partnerName: string): Pr
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
-      (res) => res.url().includes("/api/call/post_invoice") && res.ok(),
+      (res) => matchesTypedOperationResponse(res, "post_invoice") && res.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId("invoice-detail-post-draft").click(),
@@ -1880,7 +1882,7 @@ export async function postDraftBillViaUi(page: Page, vendorName: string): Promis
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
-      (res) => res.url().includes("/api/call/post_invoice"),
+      (res) => matchesTypedOperationResponse(res, "post_invoice"),
       { timeout: 30_000 },
     ),
     page.getByTestId("invoice-detail-post-draft").click(),
@@ -1902,7 +1904,7 @@ export async function expectPostDraftBillRejected(
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
-      (res) => res.url().includes("/api/call/post_invoice"),
+      (res) => matchesTypedOperationResponse(res, "post_invoice"),
       { timeout: 30_000 },
     ),
     page.getByTestId("invoice-detail-post-draft").click(),
@@ -2115,7 +2117,7 @@ export async function rejectApprovalRequestViaUi(
   await page.getByTestId(`approval-reject-reason-${requestId}`).fill(reason)
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/decide_workflow_human_task") && r.ok(),
+      (r) => matchesTypedOperationResponse(r, "decide_workflow_human_task") && r.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId(`approval-reject-confirm-${requestId}`).click(),
@@ -2152,7 +2154,7 @@ export async function grantPermissionViaSettings(
   }
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/grant_permission") && r.ok(),
+      (r) => matchesTypedOperationResponse(r, "grant_permission") && r.ok(),
       { timeout: 30_000 },
     ),
     submitForm(page, "settings-grant-permission"),
@@ -2228,7 +2230,7 @@ export async function revokePermissionViaSettings(page: Page, permissionId: numb
   await fillField(page, "permissionId", String(permissionId))
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/revoke_permission") && r.ok(),
+      (r) => matchesTypedOperationResponse(r, "revoke_permission") && r.ok(),
       { timeout: 30_000 },
     ),
     submitForm(page, "settings-revoke-permission"),
@@ -2269,7 +2271,7 @@ export async function ensureFormConfigDbFromRegistry(page: Page) {
       page.waitForResponse(
         (r) =>
           r.url().includes("/api/call/create_form_configuration") ||
-          r.url().includes("/api/call/add_form_field"),
+          matchesTypedOperationResponse(r, "add_form_field"),
         { timeout: 90_000 },
       ),
       pushBtn.click(),
@@ -2381,7 +2383,7 @@ export async function addCustomFormFieldViaSettings(
   await page.getByRole("dialog").getByLabel(/label/i).fill(options.fieldLabel)
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/add_form_field") && r.ok(),
+      (r) => matchesTypedOperationResponse(r, "add_form_field") && r.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId("form-config-save-field").click(),
@@ -2406,7 +2408,7 @@ export async function deleteCustomFormFieldViaSettings(page: Page, fieldId: stri
   await row.locator("button").nth(1).click()
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/delete_form_field") && r.ok(),
+      (r) => matchesTypedOperationResponse(r, "delete_form_field") && r.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId(`form-config-delete-field-${fieldId}`).click(),
@@ -2425,7 +2427,7 @@ export async function postChatterNote(page: Page, body: string) {
   await page.getByTestId("record-chatter-note").fill(body)
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/post_message") && r.ok(),
+      (r) => matchesTypedOperationResponse(r, "post_message") && r.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId("record-chatter-post").click(),
@@ -2476,7 +2478,7 @@ export async function savePivotReportViaUi(page: Page, name: string) {
   await expect(saveBtn).toBeEnabled({ timeout: 15_000 })
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/create_saved_report"),
+      (r) => matchesTypedOperationResponse(r, "create_saved_report"),
       { timeout: 60_000 },
     ),
     saveBtn.click(),
@@ -2556,7 +2558,7 @@ export async function deletePivotReportViaUi(page: Page, reportName: string) {
   await expect(page.getByTestId("pivot-delete-definition")).toBeVisible({ timeout: 10_000 })
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/delete_saved_report") && r.ok(),
+      (r) => matchesTypedOperationResponse(r, "delete_saved_report") && r.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId("pivot-delete-definition").click(),
@@ -2579,7 +2581,7 @@ export async function generateVatReportViaUi(
   await page.locator('input[type="date"]').nth(1).fill(options.dateTo)
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/generate_eu_vat_report") && r.ok(),
+      (r) => matchesTypedOperationResponse(r, "generate_eu_vat_report") && r.ok(),
       { timeout: 60_000 },
     ),
     page.getByTestId("vat-report-generate").click(),

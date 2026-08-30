@@ -1,3 +1,4 @@
+import { matchesTypedOperationResponse } from "./operation-response"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -86,7 +87,7 @@ test.describe("Import rollback", { tag: ["@phase-4", "@import"] }, () => {
 
     const [importRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/import_contact_csv") && res.ok(),
+        (res) => matchesTypedOperationResponse(res, "import_contact_csv") && res.ok(),
         { timeout: 60_000 },
       ),
       dialog.getByRole("button", { name: /^Confirm import$/i }).click(),
@@ -101,7 +102,7 @@ test.describe("Import rollback", { tag: ["@phase-4", "@import"] }, () => {
 
     const [rollbackRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/rollback_import_job") && res.ok(),
+        (res) => matchesTypedOperationResponse(res, "rollback_import_job") && res.ok(),
         { timeout: 60_000 },
       ),
       dialog.getByRole("button", { name: /^Rollback import$/i }).click(),

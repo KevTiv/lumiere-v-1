@@ -1,3 +1,4 @@
+import { matchesTypedOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
@@ -34,7 +35,7 @@ test.describe("CRM phone identities and roles", { tag: ["@p1", "@contacts", "@ui
 
     await Promise.all([
       page.waitForResponse(
-        (response) => response.url().includes("/api/call/create_contact_identity") && response.ok(),
+        (response) => matchesTypedOperationResponse(response, "create_contact_identity") && response.ok(),
         { timeout: 30_000 },
       ),
       identityDialog.getByRole("button", { name: "Add phone", exact: true }).click(),
@@ -47,7 +48,7 @@ test.describe("CRM phone identities and roles", { tag: ["@p1", "@contacts", "@ui
     await roleDialog.getByTestId("form-field-role").fill("customer")
     await Promise.all([
       page.waitForResponse(
-        (response) => response.url().includes("/api/call/assign_contact_role") && response.ok(),
+        (response) => matchesTypedOperationResponse(response, "assign_contact_role") && response.ok(),
         { timeout: 30_000 },
       ),
       roleDialog.getByRole("button", { name: "Assign role", exact: true }).click(),
@@ -63,7 +64,7 @@ test.describe("CRM phone identities and roles", { tag: ["@p1", "@contacts", "@ui
     await endRoleDialog.getByTestId("form-field-reason").fill("test correction")
     await Promise.all([
       page.waitForResponse(
-        (response) => response.url().includes("/api/call/end_contact_role") && response.ok(),
+        (response) => matchesTypedOperationResponse(response, "end_contact_role") && response.ok(),
         { timeout: 30_000 },
       ),
       endRoleDialog.getByRole("button", { name: "End role", exact: true }).click(),

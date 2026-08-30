@@ -2,7 +2,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Fleet mutations via Next.js BFF `POST /api/call/:reducer`.
+ * Fleet mutations via Next.js BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` fleet hooks.
  */
 export const FLEET_BFF_REDUCERS = [
@@ -11,14 +11,6 @@ export const FLEET_BFF_REDUCERS = [
 ] as const;
 
 export type FleetBffReducerKey = (typeof FLEET_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<FleetBffReducerKey>();
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function fleetBffCallUrl(reducer: FleetBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 /** Subscription resource keys whose mirrors should reflect fleet reducer effects. */
 export const FLEET_COMMAND_SUBSCRIPTION_HINTS: Record<

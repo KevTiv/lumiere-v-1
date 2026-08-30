@@ -14,7 +14,7 @@
  * existing `@lumiere/stdb/generated/*` import specifiers keep working; new
  * code should import from `@lumiere/contracts/generated/*` directly instead.
  *
- * For the HTTP gateway stack (Next.js, cookies, `/api/query/*`, `/api/call/*`):
+ * For the HTTP gateway stack (Next.js, cookies, `/api/query/*`, `/api/operations/*`):
  * - `@lumiere/query-hooks/hooks/*` — React Query hooks (api-server via `LumiereApiProvider`)
  * - `@lumiere/stdb/server` — `stdbSql` + entity types for Next.js API routes (not RSC reads)
  * - `@lumiere/stdb/browser-http` — `stdbBrowserCall` / `stdbBrowserQuery` when the provider is mounted

@@ -1075,7 +1075,10 @@ function InventoryClientLoaded({
   const deleteQualityAlertReason = useDeleteQualityAlertReason(orgId);
   const addMemberToQualityTeam = useAddMemberToQualityTeam(orgId);
   const removeMemberFromQualityTeam = useRemoveMemberFromQualityTeam(orgId);
-  const executeReplenishmentRule = useExecuteReplenishmentRule(orgId);
+  const executeReplenishmentRule = useExecuteReplenishmentRule(
+    orgId,
+    selectedOperatingCompanyId,
+  );
   const createStockQuant = useCreateStockQuant(orgId, {
     companyId: operatingCompanyId ?? undefined,
   });
@@ -3288,7 +3291,16 @@ function InventoryClientLoaded({
                         `${t('inventory.replenishmentActions.executeRule')}\n${t('inventory.replenishmentActions.executeRuleHint')}`,
                       )
                     ) {
-                      void executeReplenishmentRule.mutateAsync(id);
+                      if (
+                        typeof globalThis.crypto === 'undefined' ||
+                        typeof globalThis.crypto.randomUUID !== 'function'
+                      ) {
+                        return;
+                      }
+                      void executeReplenishmentRule.mutateAsync({
+                        ruleId: id,
+                        idempotencyKey: globalThis.crypto.randomUUID(),
+                      });
                     }
                   },
                 },

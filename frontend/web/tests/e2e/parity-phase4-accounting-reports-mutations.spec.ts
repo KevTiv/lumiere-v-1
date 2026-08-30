@@ -1,3 +1,4 @@
+import { matchesTypedOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
@@ -29,7 +30,7 @@ test.describe(
 
       const [setupRes] = await Promise.all([
         page.waitForResponse(
-          (res) => res.url().includes("/api/call/setup_fiscal_calendar") && res.ok(),
+          (res) => matchesTypedOperationResponse(res, "setup_fiscal_calendar") && res.ok(),
           { timeout: 60_000 },
         ),
         submitForm(page, "fiscal-setup-wizard"),

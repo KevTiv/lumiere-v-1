@@ -2,7 +2,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Calendar mutations via Next.js BFF `POST /api/call/:reducer`.
+ * Calendar mutations via Next.js BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` calendar hooks.
  */
 export const CALENDAR_BFF_REDUCERS = [
@@ -12,14 +12,6 @@ export const CALENDAR_BFF_REDUCERS = [
 ] as const;
 
 export type CalendarBffReducerKey = (typeof CALENDAR_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<CalendarBffReducerKey>();
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function calendarBffCallUrl(reducer: CalendarBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 /** Subscription resource keys whose mirrors should reflect calendar reducer effects. */
 export const CALENDAR_COMMAND_SUBSCRIPTION_HINTS: Record<

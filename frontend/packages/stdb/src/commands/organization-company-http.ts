@@ -2,7 +2,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Organization / company / privacy mutations via the api-server BFF `POST /api/call/:reducer`.
+ * Organization / company / privacy mutations via the api-server BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` organization-company hooks.
  */
 export const ORGANIZATION_COMPANY_BFF_REDUCERS = [
@@ -21,16 +21,6 @@ export const ORGANIZATION_COMPANY_BFF_REDUCERS = [
 
 export type OrganizationCompanyBffReducerKey =
   (typeof ORGANIZATION_COMPANY_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<OrganizationCompanyBffReducerKey>();
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function organizationCompanyBffCallUrl(
-  reducer: OrganizationCompanyBffReducerKey,
-): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 const ORGANIZATION_COMPANY_HINT_OVERRIDES: Partial<
   Record<OrganizationCompanyBffReducerKey, readonly string[]>

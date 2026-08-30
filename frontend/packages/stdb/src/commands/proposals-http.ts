@@ -1,7 +1,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Proposals mutations via the api-server BFF `POST /api/call/:reducer`.
+ * Proposals mutations via the api-server BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` proposals hooks.
  */
 export const PROPOSALS_BFF_REDUCERS = [
@@ -44,11 +44,6 @@ export const PROPOSALS_BFF_REDUCERS = [
 ] as const;
 
 export type ProposalsBffReducerKey = (typeof PROPOSALS_BFF_REDUCERS)[number];
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function proposalsBffCallUrl(reducer: ProposalsBffReducerKey): string {
-  return `/api/call/${reducer}`;
-}
 
 const PROPOSALS_HINT_OVERRIDES: Partial<
   Record<ProposalsBffReducerKey, readonly string[]>

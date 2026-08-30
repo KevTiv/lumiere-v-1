@@ -2,7 +2,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Organization settings mutations via Next.js BFF `POST /api/call/:reducer`.
+ * Organization settings mutations via Next.js BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` settings hooks.
  */
 export const SETTINGS_BFF_REDUCERS = [
@@ -12,14 +12,6 @@ export const SETTINGS_BFF_REDUCERS = [
 ] as const;
 
 export type SettingsBffReducerKey = (typeof SETTINGS_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<SettingsBffReducerKey>();
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function settingsBffCallUrl(reducer: SettingsBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 const SETTINGS_HINT_OVERRIDES: Partial<
   Record<SettingsBffReducerKey, readonly string[]>

@@ -1,3 +1,4 @@
+import { matchesTypedOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 import { encodeIdentity } from "@lumiere/stdb/stdb-params-json"
 
@@ -193,7 +194,7 @@ test.describe("Helpdesk update mutations", { tag: "@phase-6" }, () => {
     await chooseFirstEnabledOption(page, "stageId")
     const [createTicketRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_ticket") && res.ok(),
+        (res) => matchesTypedOperationResponse(res, "create_ticket") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-helpdesk-ticket"),
@@ -210,7 +211,7 @@ test.describe("Helpdesk update mutations", { tag: "@phase-6" }, () => {
 
     const [updateTicketRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/update_ticket") && res.ok(),
+        (res) => matchesTypedOperationResponse(res, "update_ticket") && res.ok(),
         { timeout: 30_000 },
       ),
       page.locator('[data-testid^="form-submit-helpdesk-ticket-detail-"]').click(),
@@ -256,7 +257,7 @@ test.describe("Helpdesk ticket assign and close", { tag: "@p0" }, () => {
 
     const [createTicketRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_ticket") && res.ok(),
+        (res) => matchesTypedOperationResponse(res, "create_ticket") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-helpdesk-ticket"),
@@ -306,7 +307,7 @@ test.describe("Helpdesk ticket assign and close", { tag: "@p0" }, () => {
 
     const [closeTicketRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/close_ticket") && res.ok(),
+        (res) => matchesTypedOperationResponse(res, "close_ticket") && res.ok(),
         { timeout: 30_000 },
       ),
       page.getByTestId("entity-action-close-ticket").click(),

@@ -8,7 +8,6 @@ import { stdbBffCommandPost } from '@lumiere/stdb/commands';
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
  */
 
-import { inventoryBffPost } from '@lumiere/stdb/commands';
 import { stdbParamsToJson } from '@lumiere/erp-shared/stdb-params-json';
 import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -1004,14 +1003,15 @@ export function useValidateStockPicking(
         typeof arg === 'object' && arg !== null && 'pickingId' in arg
           ? Boolean(arg.createBackorder)
           : false;
-      const reducer = createBackorder
-        ? 'validate_stock_picking_backorder'
-        : 'validate_stock_picking';
-      const { urlPath, init } = inventoryBffPost(reducer, [
-        organizationId,
-        toScalarU64(pickingId),
-        companyScopeParams(companyId),
-      ]);
+      const { urlPath, init } = createBackorder
+        ? stdbBffCommandPost('validate_stock_picking_backorder', {
+            pickingId: toScalarU64(pickingId),
+            params: companyScopeParams(companyId),
+          })
+        : stdbBffCommandPost('validate_stock_picking', {
+            pickingId: toScalarU64(pickingId),
+            params: companyScopeParams(companyId),
+          });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to validate stock picking');
     },
@@ -3281,13 +3281,24 @@ export function useRemoveMemberFromQualityTeam(organizationId: bigint) {
 }
 
 /** Stamps rule last_run / next_run (differs from trigger_replenishment which evaluates stock). */
-export function useExecuteReplenishmentRule(organizationId: bigint) {
+export function useExecuteReplenishmentRule(
+  organizationId: bigint,
+  companyId?: bigint | null,
+) {
   const qc = useQueryClient();
-  return useMutation<void, Error, ScalarId>({
-    mutationFn: async (ruleId) => {
-      const { urlPath, init } = inventoryBffPost('execute_replenishment_rule', [
-        toScalarU64(ruleId),
-      ]);
+  return useMutation<void, Error, { ruleId: ScalarId; idempotencyKey: string }>({
+    mutationFn: async ({ ruleId, idempotencyKey }) => {
+      if (companyId == null || companyId <= 0n) {
+        throw new Error('A selected company is required');
+      }
+      const { urlPath, init } = stdbBffCommandPost(
+        'execute_replenishment_rule',
+        {
+          companyId,
+          ruleId: toScalarU64(ruleId),
+          idempotencyKey,
+        },
+      );
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to execute replenishment rule');
     },

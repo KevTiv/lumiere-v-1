@@ -1,7 +1,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * IoT mutations via the api-server BFF `POST /api/call/:reducer`.
+ * IoT mutations via the api-server BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` IoT hooks.
  */
 export const IOT_BFF_REDUCERS = [
@@ -41,11 +41,6 @@ const IOT_MODULE_RESOURCES = [
   "iot-telemetry",
   "iot-thresholds",
 ] as const;
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function iotBffCallUrl(reducer: IotBffReducerKey): string {
-  return `/api/call/${reducer}`;
-}
 
 function iotReducerHints(): Record<IotBffReducerKey, readonly string[]> {
   const o = {} as Record<IotBffReducerKey, readonly string[]>;

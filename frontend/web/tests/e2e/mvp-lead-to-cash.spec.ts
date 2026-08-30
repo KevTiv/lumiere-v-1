@@ -1,3 +1,4 @@
+import { matchesTypedOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
@@ -87,7 +88,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await chooseSelectOptionByLabel(page, "state", "Qualified")
     const [createLeadRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_lead") && res.ok(),
+        (res) => matchesTypedOperationResponse(res, "create_lead") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-lead"),
@@ -107,7 +108,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await chooseFirstEnabledOption(page, "opportunityStageId")
     const [convertLeadRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/convert_lead_to_customer") && res.ok(),
+        (res) => matchesTypedOperationResponse(res, "convert_lead_to_customer") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "convert-lead"),
@@ -132,7 +133,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await fillField(page, "priceUnit", "1200")
     const [oppLineRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_opportunity_line") && res.ok(),
+        (res) => matchesTypedOperationResponse(res, "create_opportunity_line") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "add-opportunity-line"),
@@ -152,7 +153,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     const [convertOppRes] = await Promise.all([
       page.waitForResponse(
         (res) =>
-          res.url().includes("/api/call/convert_opportunity_to_sale_order") && res.ok(),
+          matchesTypedOperationResponse(res, "convert_opportunity_to_sale_order") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "convert-opportunity-order"),
@@ -168,7 +169,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await selectEntityRowById(page, orderId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
     const confirmResPromise = page.waitForResponse(
-      (res) => res.url().includes("/api/call/confirm_sales_order"),
+      (res) => matchesTypedOperationResponse(res, "confirm_sales_order"),
       { timeout: 30_000 },
     )
     await page.getByTestId("entity-action-confirm-orders").click()
@@ -193,7 +194,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await selectEntityRowById(page, pickingId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-picking")
     const confirmPickingResPromise = page.waitForResponse(
-      (res) => res.url().includes("/api/call/confirm_stock_picking"),
+      (res) => matchesTypedOperationResponse(res, "confirm_stock_picking"),
       { timeout: 45_000 },
     )
     await page.getByTestId("entity-action-confirm-picking").click()
@@ -205,7 +206,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await selectEntityRowById(page, pickingId)
     await waitForEntityActionEnabled(page, "entity-action-assign-picking")
     const assignPickingResPromise = page.waitForResponse(
-      (res) => res.url().includes("/api/call/assign_stock_picking"),
+      (res) => matchesTypedOperationResponse(res, "assign_stock_picking"),
       { timeout: 30_000 },
     )
     await page.getByTestId("entity-action-assign-picking").click()
@@ -217,7 +218,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await selectEntityRowById(page, pickingId)
     await waitForEntityActionEnabled(page, "entity-action-validate-picking")
     const validatePickingResPromise = page.waitForResponse(
-      (res) => res.url().includes("/api/call/validate_stock_picking"),
+      (res) => matchesTypedOperationResponse(res, "validate_stock_picking"),
       { timeout: 30_000 },
     )
     await page.getByTestId("entity-action-validate-picking").click()
@@ -244,7 +245,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     const [invoiceRes] = await Promise.all([
       page.waitForResponse(
         (res) =>
-          res.url().includes("/api/call/create_invoice_from_sale_order") && res.ok(),
+          matchesTypedOperationResponse(res, "create_invoice_from_sale_order") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "create-invoice-from-sale-order"),
@@ -274,7 +275,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await fillField(page, "date", isoDate(0))
     const [createPaymentRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_payment") && res.ok(),
+        (res) => matchesTypedOperationResponse(res, "create_payment") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-account-payment"),
@@ -286,7 +287,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await waitForEntityActionEnabled(page, "entity-action-pay-post")
     const [postPaymentRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/post_payment") && res.ok(),
+        (res) => matchesTypedOperationResponse(res, "post_payment") && res.ok(),
         { timeout: 30_000 },
       ),
       page.getByTestId("entity-action-pay-post").click(),
@@ -301,7 +302,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await chooseSelectOptionByValue(page, "invoiceIds", moveId)
     const [registerRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/register_payment_on_invoice") && res.ok(),
+        (res) => matchesTypedOperationResponse(res, "register_payment_on_invoice") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "register-payment-invoices"),
@@ -346,7 +347,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
 
     const [createOrderRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_sale_order") && res.ok(),
+        (res) => matchesTypedOperationResponse(res, "create_sale_order") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-sale-order"),
@@ -391,7 +392,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await fillField(page, "priceUnit", "1200")
     const [lineRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_sale_order_line") && res.ok(),
+        (res) => matchesTypedOperationResponse(res, "create_sale_order_line") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "add-sale-order-line"),
@@ -406,7 +407,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await selectEntityRowById(page, orderId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
     const confirmResPromise = page.waitForResponse(
-      (res) => res.url().includes("/api/call/confirm_sales_order"),
+      (res) => matchesTypedOperationResponse(res, "confirm_sales_order"),
       { timeout: 30_000 },
     )
     await page.getByTestId("entity-action-confirm-orders").click()
@@ -430,7 +431,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await selectEntityRowById(page, pickingId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-picking")
     const confirmPickingResPromise = page.waitForResponse(
-      (res) => res.url().includes("/api/call/confirm_stock_picking"),
+      (res) => matchesTypedOperationResponse(res, "confirm_stock_picking"),
       { timeout: 45_000 },
     )
     await page.getByTestId("entity-action-confirm-picking").click()
@@ -442,7 +443,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await selectEntityRowById(page, pickingId)
     await waitForEntityActionEnabled(page, "entity-action-assign-picking")
     const assignPickingResPromise = page.waitForResponse(
-      (res) => res.url().includes("/api/call/assign_stock_picking"),
+      (res) => matchesTypedOperationResponse(res, "assign_stock_picking"),
       { timeout: 30_000 },
     )
     await page.getByTestId("entity-action-assign-picking").click()
@@ -454,7 +455,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await selectEntityRowById(page, pickingId)
     await waitForEntityActionEnabled(page, "entity-action-validate-picking")
     const validatePickingResPromise = page.waitForResponse(
-      (res) => res.url().includes("/api/call/validate_stock_picking"),
+      (res) => matchesTypedOperationResponse(res, "validate_stock_picking"),
       { timeout: 30_000 },
     )
     await page.getByTestId("entity-action-validate-picking").click()
@@ -480,7 +481,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     const [invoiceRes] = await Promise.all([
       page.waitForResponse(
         (res) =>
-          res.url().includes("/api/call/create_invoice_from_sale_order") && res.ok(),
+          matchesTypedOperationResponse(res, "create_invoice_from_sale_order") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "create-invoice-from-sale-order"),

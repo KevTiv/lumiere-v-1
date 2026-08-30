@@ -3,7 +3,7 @@
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 /**
- * Helpdesk — React Query over `/api/query/*` and `/api/call/*`.
+ * Helpdesk — React Query over `/api/query/*` and `/api/operations/*`.
  */
 
 

@@ -31,15 +31,6 @@ export const WORKFLOWS_BFF_REDUCERS = [
 
 export type WorkflowsBffReducerKey = (typeof WORKFLOWS_BFF_REDUCERS)[number];
 
-/**
- * `?withCompany=true` prepends `[organizationId, companyId]` on the BFF.
- * Only use for reducers whose signature starts with `(organization_id, company_id: u64, …)`.
- * Do not use for `Option<u64>` company args or reducers without a company parameter.
- */
-const WITH_COMPANY_QUERY = new Set<WorkflowsBffReducerKey>([
-  "set_workflow_migration_plan_active",
-]);
-
 const WORKFLOW_RESOURCE_KEYS = [
   "workflows",
   "workflow-versions",
@@ -54,12 +45,6 @@ const WORKFLOW_RESOURCE_KEYS = [
   "workflow-migration-preflights",
   "workflow-migration-results",
 ] as const;
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function workflowsBffCallUrl(reducer: WorkflowsBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 const WORKFLOWS_HINT_OVERRIDES: Partial<
   Record<WorkflowsBffReducerKey, readonly string[]>

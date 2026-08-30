@@ -3,7 +3,7 @@
 /**
  * Generic SpacetimeDB hooks
  *
- * useStdbReducer  — call any reducer via POST /api/call/:reducer
+ * useStdbReducer  — call any named operation via POST /api/operations/:operation
  * useStdbQuery    — fetch any resource via GET /api/query/:resource
  *
  * These provide access to the full SpacetimeDB surface area without
@@ -116,7 +116,7 @@ export function invalidateStdbQueryResources(
 }
 
 /**
- * POST `/api/call/:reducer` and invalidate listed `stdb` query resources on success.
+ * POST `/api/operations/:operation` and invalidate listed `stdb` query resources on success.
  * When `invalidateResources` is omitted or empty, uses `STDB_REDUCER_INVALIDATION` from codegen manifest.
  */
 type NamedReducerKey = Extract<StdbBffReducerKey, keyof OperationInputMap>

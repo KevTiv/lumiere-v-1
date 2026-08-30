@@ -2,7 +2,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * HR mutations via Next.js BFF `POST /api/call/:reducer`.
+ * HR mutations via Next.js BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` HR hooks.
  */
 export const HR_BFF_REDUCERS = [
@@ -84,14 +84,6 @@ export const HR_BFF_REDUCERS = [
 ] as const;
 
 export type HrBffReducerKey = (typeof HR_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<HrBffReducerKey>();
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function hrBffCallUrl(reducer: HrBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 const HR_HINT_OVERRIDES: Partial<Record<HrBffReducerKey, readonly string[]>> = {
   approve_leave: ["leave-requests", "leaves-to-approve", "resource-capacity-by-employee"],

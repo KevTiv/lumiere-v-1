@@ -11,15 +11,6 @@ export const TEMPLATES_BFF_REDUCERS = [
 
 export type TemplatesBffReducerKey = (typeof TEMPLATES_BFF_REDUCERS)[number];
 
-const WITH_COMPANY_QUERY = new Set<TemplatesBffReducerKey>([
-  "queue_mail_from_template",
-]);
-
-export function templatesBffCallUrl(reducer: TemplatesBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
-
 export function templatesCommandContract(
   reducer: TemplatesBffReducerKey,
 ): ReducerCommandContractMeta {

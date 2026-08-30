@@ -1,7 +1,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Reports mutations via the api-server BFF `POST /api/call/:reducer`.
+ * Reports mutations via the api-server BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` reports hooks.
  */
 export const REPORTS_BFF_REDUCERS = [
@@ -32,11 +32,6 @@ export const REPORTS_BFF_REDUCERS = [
 ] as const;
 
 export type ReportsBffReducerKey = (typeof REPORTS_BFF_REDUCERS)[number];
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function reportsBffCallUrl(reducer: ReportsBffReducerKey): string {
-  return `/api/call/${reducer}`;
-}
 
 const REPORTS_MODULE_RESOURCES = [
   "financial-reports",

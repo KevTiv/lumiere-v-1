@@ -3,8 +3,10 @@ import test from "node:test"
 
 import { encodeIdentity } from "../stdb-params-json"
 import { SESSION_OPERATION_DESCRIPTORS } from "@lumiere/contracts/generated/operation-descriptors"
-import { ACCOUNTING_BFF_REDUCERS, accountingBffCallUrl } from "./accounting-http"
-import { stdbBffCommandPost } from "./stdb-http"
+import {
+  stdbBffCallUrl,
+  stdbBffCommandPost,
+} from "./stdb-http"
 
 test("assign_ticket accepts and emits the SpacetimeDB identity wire shape", () => {
   const identity = "ab".repeat(32)
@@ -19,7 +21,7 @@ test("assign_ticket accepts and emits the SpacetimeDB identity wire shape", () =
   })
 })
 
-test("unreconcile accounting command uses the canonical BFF URL once", () => {
+test("unreconcile accounting command uses the immutable descriptor URL", () => {
   const { urlPath, init } = stdbBffCommandPost("unreconciled_account_bank_statement_line", {
     companyId: 3n,
     lineId: 7n,
@@ -28,19 +30,11 @@ test("unreconcile accounting command uses the canonical BFF URL once", () => {
 
   assert.equal(
     urlPath,
-    `/api/operations/${SESSION_OPERATION_DESCRIPTORS.unreconciled_account_bank_statement_line.contractOperationId}`,
+    `/api/operations/${encodeURIComponent(SESSION_OPERATION_DESCRIPTORS.unreconciled_account_bank_statement_line.contractOperationId)}`,
   )
   assert.deepEqual(JSON.parse(String(init.body)), {
     companyId: 3,
     lineId: 7,
     params: { moveIds: [11, 13], amountResidual: 42.5 },
   })
-  assert.equal(
-    accountingBffCallUrl("unreconciled_account_bank_statement_line"),
-    "/api/call/unreconciled_account_bank_statement_line",
-  )
-  assert.equal(
-    ACCOUNTING_BFF_REDUCERS.filter((key) => key === "unreconciled_account_bank_statement_line").length,
-    1,
-  )
 })

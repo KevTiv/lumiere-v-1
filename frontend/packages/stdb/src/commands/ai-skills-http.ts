@@ -2,7 +2,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * AI skills mutations via Next.js BFF `POST /api/call/:reducer`.
+ * AI skills mutations via Next.js BFF `POST /api/operations/:operation`.
  */
 export const AI_SKILLS_BFF_REDUCERS = [
   "create_ai_skill",
@@ -18,13 +18,6 @@ export const AI_SKILLS_BFF_REDUCERS = [
 ] as const;
 
 export type AiSkillsBffReducerKey = (typeof AI_SKILLS_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<AiSkillsBffReducerKey>();
-
-export function aiSkillsBffCallUrl(reducer: AiSkillsBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 const AI_SKILLS_HINT_OVERRIDES: Partial<
   Record<AiSkillsBffReducerKey, readonly string[]>

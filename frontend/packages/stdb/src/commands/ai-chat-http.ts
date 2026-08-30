@@ -10,10 +10,6 @@ export const AI_CHAT_BFF_REDUCERS = [
 
 export type AiChatBffReducerKey = (typeof AI_CHAT_BFF_REDUCERS)[number];
 
-export function aiChatBffCallUrl(reducer: AiChatBffReducerKey): string {
-  return `/api/call/${reducer}`;
-}
-
 export const AI_CHAT_COMMAND_SUBSCRIPTION_HINTS: Record<
   AiChatBffReducerKey,
   readonly string[]

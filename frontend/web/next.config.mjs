@@ -48,6 +48,10 @@ function rustApiRewrites() {
       source: '/api/call/:path*',
       destination: `${base}/v1/call/:path*`,
     },
+    {
+      source: '/api/operations/:path*',
+      destination: `${base}/v1/operations/:path*`,
+    },
   ]
 }
 

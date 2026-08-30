@@ -1,3 +1,4 @@
+import { matchesTypedOperationResponse } from "./operation-response"
 /**
  * Requires `seed_dev_data` (via `make e2e-smoke` / `pnpm run e2e-seed-fixture`).
  *
@@ -50,7 +51,7 @@ test.describe(
       await fillField(page, "origin", origin)
       const [createPoRes] = await Promise.all([
         page.waitForResponse(
-          (res) => res.url().includes("/api/call/create_purchase_order") && res.ok(),
+          (res) => matchesTypedOperationResponse(res, "create_purchase_order") && res.ok(),
           { timeout: 30_000 },
         ),
         submitForm(page, "new-purchase-order"),
@@ -70,7 +71,7 @@ test.describe(
       await fillField(page, "priceUnit", "500")
       const [lineRes] = await Promise.all([
         page.waitForResponse(
-          (res) => res.url().includes("/api/call/add_purchase_order_line") && res.ok(),
+          (res) => matchesTypedOperationResponse(res, "add_purchase_order_line") && res.ok(),
           { timeout: 30_000 },
         ),
         submitForm(page, "add-purchase-order-line"),

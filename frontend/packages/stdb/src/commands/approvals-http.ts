@@ -2,7 +2,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Human-task / delegation mutations via BFF `POST /api/call/:reducer`.
+ * Human-task / delegation mutations via BFF `POST /api/operations/:operation`.
  * Replaces the removed approval_rule / approval_request reducers.
  */
 export const APPROVALS_BFF_REDUCERS = [
@@ -16,17 +16,6 @@ export const APPROVALS_BFF_REDUCERS = [
 ] as const;
 
 export type ApprovalsBffReducerKey = (typeof APPROVALS_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<ApprovalsBffReducerKey>([
-  "create_workflow_delegation",
-  "revoke_workflow_delegation",
-  "set_workflow_candidate_group_member",
-]);
-
-export function approvalsBffCallUrl(reducer: ApprovalsBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 const INBOX_RESOURCES = [
   "workflow-human-tasks-inbox",

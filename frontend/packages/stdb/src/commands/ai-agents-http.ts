@@ -2,7 +2,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * AI agents mutations via Next.js BFF `POST /api/call/:reducer`.
+ * AI agents mutations via Next.js BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` ai-agents hooks.
  */
 export const AI_AGENTS_BFF_REDUCERS = [
@@ -16,14 +16,6 @@ export const AI_AGENTS_BFF_REDUCERS = [
 ] as const;
 
 export type AiAgentsBffReducerKey = (typeof AI_AGENTS_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<AiAgentsBffReducerKey>();
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function aiAgentsBffCallUrl(reducer: AiAgentsBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 const AI_AGENTS_HINT_OVERRIDES: Partial<
   Record<AiAgentsBffReducerKey, readonly string[]>
