@@ -13,6 +13,10 @@ import {
   updateUtmMedium,
   updateUtmSource,
 } from "./mutations/crm"
+import {
+  addUserCustomField,
+  deleteUserCustomField,
+} from "./mutations/form-config"
 
 test("browser command uses the generated immutable operation ID and named input", async () => {
   const previousFetch = globalThis.fetch
@@ -100,6 +104,63 @@ test("reviewed UTM updates use immutable IDs and named inputs", async () => {
     await updateUtmMedium(99n, 7n, { name: "Autumn", isActive: false })
     await updateUtmSource(99n, 7n, { name: "Autumn", isActive: false })
     assert.equal(call, expected.length)
+  } finally {
+    globalThis.fetch = previousFetch
+  }
+})
+
+test("custom field writes use immutable IDs and named inputs", async () => {
+  const previousFetch = globalThis.fetch
+  const expectedOperations = ["add_user_custom_field", "delete_user_custom_field"] as const
+  const requests: Array<{ input: string; body: Record<string, unknown> }> = []
+
+  globalThis.fetch = async (input, init) => {
+    requests.push({
+      input: String(input),
+      body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+    })
+    return new Response(null, { status: 204 })
+  }
+
+  try {
+    await addUserCustomField(99n, {
+      configurationId: 7n,
+      fieldId: "customer_code",
+      name: "customer_code",
+      label: "Customer code",
+      fieldType: { tag: "Text" },
+      description: undefined,
+      placeholder: undefined,
+      defaultValue: undefined,
+      options: [],
+      validation: {
+        required: false,
+        minLength: undefined,
+        maxLength: undefined,
+        min: undefined,
+        max: undefined,
+        pattern: undefined,
+        message: undefined,
+      },
+      order: 1,
+      width: { tag: "Full" },
+    })
+    await deleteUserCustomField(99n, 8n)
+
+    assert.equal(requests.length, expectedOperations.length)
+    for (const [index, operation] of expectedOperations.entries()) {
+      assert.equal(
+        requests[index].input,
+        `/api/operations/${encodeURIComponent(
+          SESSION_OPERATION_DESCRIPTORS[operation].contractOperationId,
+        )}`,
+      )
+    }
+    assert.equal(
+      (requests[0].body.params as Record<string, unknown>).configuration_id,
+      7,
+    )
+    assert.deepEqual(requests[1].body, { customFieldId: 8 })
   } finally {
     globalThis.fetch = previousFetch
   }

@@ -11,8 +11,6 @@ vi.mock("@lumiere/stdb/browser-http", () => ({
 }))
 
 vi.mock("@lumiere/stdb/client-ui-bridge", () => ({
-  getFormConfiguration: vi.fn().mockResolvedValue(undefined),
-  getOrganizationFormConfigs: vi.fn().mockResolvedValue(undefined),
   addUserCustomField: vi.fn(),
   deleteUserCustomField: vi.fn(),
 }))

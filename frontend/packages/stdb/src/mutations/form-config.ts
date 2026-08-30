@@ -1,6 +1,5 @@
-import { stdbBrowserCommand, stdbBrowserCompatCall } from "../browser-http"
+import { stdbBrowserCommand } from "../browser-http"
 import type {
-  CreateFormConfigParams,
   CreateFormFieldParams,
   CreateRoleConfigParams,
   CreateUserCustomFieldParams,
@@ -11,20 +10,12 @@ import type {
 import { stdbParamsToJson } from "../stdb-params-json"
 
 export type {
-  CreateFormConfigParams,
   CreateFormFieldParams,
   CreateRoleConfigParams,
   CreateUserCustomFieldParams,
   PublishFormConfigurationParams,
   SetRecordCustomFieldValuesParams,
   UpdateFormFieldParams,
-}
-
-export function createFormConfiguration(
-  organizationId: bigint,
-  params: CreateFormConfigParams,
-) {
-  return stdbBrowserCompatCall("create_form_configuration", [organizationId.toString(), params])
 }
 
 export function publishFormConfiguration(
@@ -36,24 +27,8 @@ export function publishFormConfiguration(
   })
 }
 
-export function getFormConfiguration(
-  organizationId: bigint,
-  moduleId: string,
-  formId: string,
-) {
-  return stdbBrowserCompatCall("get_form_configuration", [organizationId.toString(), moduleId, formId])
-}
-
-export function getOrganizationFormConfigs(organizationId: bigint) {
-  return stdbBrowserCompatCall("get_organization_form_configs", [organizationId.toString()])
-}
-
 export function initializeDefaultFormConfigs(_organizationId: bigint) {
   return stdbBrowserCommand("initialize_default_form_configs", {})
-}
-
-export function seedOrganizationFormConfigs(organizationId: bigint) {
-  return stdbBrowserCompatCall("seed_organization_form_configs", [organizationId.toString()])
 }
 
 export function addFormField(
@@ -99,33 +74,20 @@ export function setFormRoleConfig(
   })
 }
 
-export function setFormFieldLabel(
-  organizationId: bigint,
-  fieldRowId: bigint,
-  params: { locale: string; label: string },
-) {
-  return stdbBrowserCompatCall("set_form_field_label", [
-    organizationId.toString(),
-    fieldRowId.toString(),
-    params,
-  ])
-}
-
 export function addUserCustomField(
-  organizationId: bigint,
+  _organizationId: bigint,
   params: CreateUserCustomFieldParams,
 ) {
-  return stdbBrowserCompatCall("add_user_custom_field", [organizationId.toString(), params])
+  return stdbBrowserCommand("add_user_custom_field", {
+    params: stdbParamsToJson(params as object, "CreateUserCustomFieldParams"),
+  })
 }
 
 export function deleteUserCustomField(
-  organizationId: bigint,
+  _organizationId: bigint,
   customFieldId: bigint,
 ) {
-  return stdbBrowserCompatCall("delete_user_custom_field", [
-    organizationId.toString(),
-    customFieldId.toString(),
-  ])
+  return stdbBrowserCommand("delete_user_custom_field", { customFieldId })
 }
 
 export function setRecordCustomFieldValues(
