@@ -197,6 +197,30 @@ fi
 sed -i.bak "s/^version = .*/version = \"$VERSION\"/" crates/lumiere-contracts/Cargo.toml
 rm -f crates/lumiere-contracts/Cargo.toml.bak
 
+# The generated Rust package manifest is contract-owned. Reassert its feature
+# surface on every release so a drifted companion main branch cannot silently
+# drop the bindings/v2 API required by pinned consumers.
+python3 - <<'PY'
+from pathlib import Path
+
+path = Path("crates/lumiere-contracts/Cargo.toml")
+package = path.read_text(encoding="utf-8").split("[features]", 1)[0]
+package = package.split("[dependencies]", 1)[0].rstrip()
+path.write_text(
+    package
+    + f'''\n\n[features]
+default = ["bindings"]
+bindings = ["dep:spacetimedb-sdk"]
+v2 = []
+
+[dependencies]
+spacetimedb-sdk = {{ version = "=2.8.2", optional = true }}
+serde_json = "1.0"
+''',
+    encoding="utf-8",
+)
+PY
+
 cargo build --manifest-path crates/lumiere-contracts/Cargo.toml
 
 # TypeScript package: verbatim spacetime-generate output + lumiere-codegen
