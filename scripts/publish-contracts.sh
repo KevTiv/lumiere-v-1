@@ -18,7 +18,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STAGING="$ROOT/.contracts-staging"
 CONTRACTS_REPO="${LUMIERE_CONTRACTS_REPO:-git@github.com:KevTiv/lumiere-contracts.git}"
 VERSION="${1:?usage: publish-contracts.sh <version, e.g. 0.1.0>}"
-ACTIVE_IR_VERSION="${LUMIERE_CONTRACT_IR_VERSION:-1}"
+ACTIVE_IR_VERSION="${LUMIERE_CONTRACT_IR_VERSION:-2}"
 
 if [[ "$ACTIVE_IR_VERSION" != "1" && "$ACTIVE_IR_VERSION" != "2" ]]; then
   echo "error: LUMIERE_CONTRACT_IR_VERSION must be 1 or 2" >&2
