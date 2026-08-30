@@ -1,20 +1,23 @@
 # IR-owned frontend operation descriptors — continuation PR
 
-**Status:** Phase 5C generated domain SDK consumed from `lumiere-contracts` v0.3.14 — 2026-08-30
+**Status:** Phase 5C application SDK over generated contract facts, pinned to `lumiere-contracts` v0.3.15 — 2026-08-30
 **Depends on:** canonical IR/contracts extraction merge
-**Companion release:** `lumiere-contracts` v0.3.14
+**Companion release:** `lumiere-contracts` v0.3.15
 
-The application pins the immutable `v0.3.14` tag at companion release commit
-`a3fffdb8b3599ce42b612bbf68f6d905a1688fa8`. The generated descriptor is now
+The application pins the immutable `v0.3.15` tag at companion release commit
+`49fd430e0b4b0db2043808e3b36e2c99a7ad108b`. The generated descriptor is now
 the application-owned named-command surface. The remaining positional
 accounting adapter and its duplicate hook have been removed.
 
-Phase 5C adds the first contracts-owned domain SDK façade and moves the
-application's command input type to the generated SDK input map. Release
-`v0.3.13` is superseded and must not be consumed: its publisher run selected
-IR v1 and therefore omitted immutable `contractOperationId` fields. The
-publisher now defaults to IR v2, and `v0.3.14` contains the corrected atomic
-descriptor, compact target, wire-codec, and SDK surface.
+Phase 5C keeps generation mechanical: `lumiere-contracts` owns immutable
+operation IDs, descriptors, input maps, compact targets, and wire codecs, while
+`@lumiere/stdb` owns the readable domain façade and authenticated API calls.
+Release `v0.3.15` removes the SDK export but is superseded because stale staging
+left the retired, unexported source file in the tagged package. Release
+`v0.3.14` is superseded for SDK ownership because it generated an authored
+domain API from a Python string template. Release `v0.3.13` must not be
+consumed: its publisher run selected IR v1 and omitted immutable
+`contractOperationId` fields. The publisher now defaults to IR v2.
 **Related:**
 [typed-bff-sdk-contract-hardening-execution-plan.md](./typed-bff-sdk-contract-hardening-execution-plan.md) ·
 [contracts-extraction-execution-plan.md](./contracts-extraction-execution-plan.md) ·
@@ -27,9 +30,8 @@ compact session-operation descriptor in `lumiere-contracts`, consume it in the
 STDB command highway, and delete the duplicate application-owned reducer-name
 list and emitter.
 
-This is the smallest independently mergeable step toward the generated SDK and
-typed API boundary. It changes contract ownership without changing server
-dispatch behavior.
+This is the smallest independently mergeable step toward a typed domain API.
+It changes contract ownership without changing server dispatch behavior.
 
 ## 1.1 IR v2 continuation
 
