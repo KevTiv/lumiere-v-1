@@ -8,6 +8,7 @@ import { CANONICAL_RESOURCE_BY_NAME } from "@lumiere/contracts/generated/resourc
 import {
   decodeAccountAccountsQueryResponse,
   decodeAccountJournalsQueryResponse,
+  decodeAccountMoveLinesQueryResponse,
   decodeAccountTaxesQueryResponse,
   decodeCompaniesQueryResponse,
 } from "./resource-reads"
@@ -166,6 +167,46 @@ test("tax typed read decodes default and optional enum projections", () => {
   )
 })
 
+test("move-line typed read decodes default and mandatory-only projections", () => {
+  assert.deepEqual(CANONICAL_RESOURCE_BY_NAME["account-move-lines"].mandatory, [
+    "id",
+    "organization_id",
+  ])
+  const rows = decodeAccountMoveLinesQueryResponse({
+    data: [
+      {
+        id: "8",
+        organizationId: 11,
+        moveId: "13",
+        companyId: 42,
+        date: { microsSinceUnixEpoch: "1781987714525006" },
+        name: "Receivable",
+        debit: 125.5,
+        credit: 0,
+        balance: 125.5,
+        accountId: "1100",
+        partnerId: null,
+      },
+      { id: 9, organizationId: "11" },
+    ],
+  })
+  const { date, ...line } = rows[0]
+  assert.equal(date?.microsSinceUnixEpoch, 1781987714525006n)
+  assert.deepEqual(line, {
+    id: 8n,
+    organizationId: 11n,
+    moveId: 13n,
+    companyId: 42n,
+    name: "Receivable",
+    debit: 125.5,
+    credit: 0,
+    balance: 125.5,
+    accountId: 1100n,
+    partnerId: undefined,
+  })
+  assert.deepEqual(rows[1], { id: 9n, organizationId: 11n })
+})
+
 test("journal and tax typed reads fail closed for malformed projections", () => {
   assert.throws(
     () => decodeAccountJournalsQueryResponse({
@@ -181,6 +222,12 @@ test("journal and tax typed reads fail closed for malformed projections", () => 
   )
   assert.throws(
     () => decodeAccountTaxesQueryResponse({ data: [{ organizationId: 11 }] }),
+    ResourceQueryRowDecodeError,
+  )
+  assert.throws(
+    () => decodeAccountMoveLinesQueryResponse({
+      data: [{ id: 8, organizationId: 11, credentialReference: "secret" }],
+    }),
     ResourceQueryRowDecodeError,
   )
 })

@@ -5,6 +5,7 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import type {
   AccountAccountQueryRow,
   AccountJournalQueryRow,
+  AccountMoveLineQueryRow,
   AccountTaxQueryRow,
 } from "@lumiere/stdb/resource-reads"
 import { createStdbSdk } from "@lumiere/stdb/sdk"
@@ -85,7 +86,11 @@ export type {
   CreateAccountJournalParams,
 } from "@lumiere/stdb/types"
 export type { AccountAccountQueryRow as AccountAccount } from "@lumiere/stdb/resource-reads"
-export type { AccountJournalQueryRow, AccountTaxQueryRow } from "@lumiere/stdb/resource-reads"
+export type {
+  AccountJournalQueryRow,
+  AccountMoveLineQueryRow,
+  AccountTaxQueryRow,
+} from "@lumiere/stdb/resource-reads"
 
 // ── Query Hooks ───────────────────────────────────────────────────────────────
 
@@ -141,7 +146,13 @@ export function useAccountMoveLines(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean }
 ) {
-  return useStdbQuery("account-move-lines", organizationId, options)
+  const sdk = createStdbSdk(apiFetch)
+  return useCompanyScopedTypedQuery<AccountMoveLineQueryRow>(
+    "account-move-lines",
+    organizationId,
+    (companyId) => sdk.forCompany(companyId).accounting.moveLines.list(),
+    options,
+  )
 }
 
 /**
@@ -1970,9 +1981,7 @@ export function useRetryIntercompanyTransaction(organizationId: number, companyI
 // ── Moves / Payments ──────────────────────────────────────────────────────────
 
 function invalidateMoveQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint | number) {
-  const k = organizationId
-  void qc.invalidateQueries({ queryKey: ["stdb", "account-moves", k] })
-  void qc.invalidateQueries({ queryKey: ["stdb", "account-move-lines", k] })
+  invalidateStdbQueryResources(qc, organizationId, ["account-moves", "account-move-lines"])
 }
 
 /** Recompute `amount_untaxed` / `amount_tax` / `amount_total` from lines (invoice/refund moves only). */

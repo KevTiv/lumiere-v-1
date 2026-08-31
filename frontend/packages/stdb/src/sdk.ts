@@ -9,10 +9,12 @@ import { stdbParamsToJson } from "./stdb-params-json"
 import {
   decodeAccountAccountsQueryResponse,
   decodeAccountJournalsQueryResponse,
+  decodeAccountMoveLinesQueryResponse,
   decodeAccountTaxesQueryResponse,
   decodeCompaniesQueryResponse,
   type AccountAccountQueryRow,
   type AccountJournalQueryRow,
+  type AccountMoveLineQueryRow,
   type AccountTaxQueryRow,
   type CompanyQueryRow,
 } from "./resource-reads"
@@ -61,6 +63,9 @@ export interface StdbSdk {
       }
       readonly journals: {
         list(): Promise<AccountJournalQueryRow[]>
+      }
+      readonly moveLines: {
+        list(): Promise<AccountMoveLineQueryRow[]>
       }
       readonly taxes: {
         list(): Promise<AccountTaxQueryRow[]>
@@ -227,6 +232,14 @@ export function createStdbSdk(apiFetch: LumiereHttpFetch): StdbSdk {
               `/api/query/account-journals?companyId=${encodeURIComponent(companyId.toString())}`,
               "Query account-journals failed",
               decodeAccountJournalsQueryResponse,
+            ),
+          },
+          moveLines: {
+            list: () => executeQuery(
+              apiFetch,
+              `/api/query/account-move-lines?companyId=${encodeURIComponent(companyId.toString())}`,
+              "Query account-move-lines failed",
+              decodeAccountMoveLinesQueryResponse,
             ),
           },
           taxes: {

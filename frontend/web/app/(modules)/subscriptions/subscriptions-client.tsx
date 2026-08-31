@@ -338,9 +338,9 @@ function SubscriptionsClientLoaded({
   }, [accountMoves, t])
 
   const recognizeMoveLineSelectOptions = useMemo(() => {
-    const lines = (accountMoveLines as Record<string, unknown>[]).filter((line) => {
+    const lines = accountMoveLines.filter((line) => {
       if (!recognizeMoveId) return true
-      return String(line.moveId ?? line.move_id ?? "") === recognizeMoveId
+      return String(line.moveId ?? "") === recognizeMoveId
     })
     const fromApi = accountMoveLineRowsToSelectOptions(lines)
     if (fromApi.length > 0) return fromApi

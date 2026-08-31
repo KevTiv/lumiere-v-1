@@ -1,7 +1,7 @@
 # Typed BFF SDK and contract hardening — execution plan
 
-**Status:** Phase 5 complete; Phase 6 started with the projection-aware
-`companies` typed-read pilot — 2026-08-30
+**Status:** Phase 5 complete; Phase 6 in progress through the projection-aware
+company and accounting read slices — 2026-08-31
 **First Phase 6 pickup:** `frontend/packages/query-hooks/src/hooks/organization-company.ts`
 **Tracks:** canonical IR, contracts extraction, write-path hardening, typed reads,
 generated codecs, generated SDK, frontend type debt
@@ -261,7 +261,7 @@ implicitly selected company.
 
 **Exit:** migrated domains have typed mutation inputs and typed query results.
 
-#### Phase 6 pilot evidence
+#### Phase 6 progress evidence
 
 - `@lumiere/api-client` has a strict opt-in decoder for normal
   `{ data: [...] }` responses; malformed envelopes and accidental paginated
@@ -272,13 +272,27 @@ implicitly selected company.
   generated runtime types;
 - `sdk.organization.companies.list()` is the first typed read domain method and
   `useCompanies` no longer asserts an unknown HTTP body as `Company[]`;
+- contracts releases through v0.3.20 generate projection-aware codecs for
+  `companies`, `account-accounts`, `account-journals`, `account-taxes`, and
+  `account-move-lines` directly from the canonical resource/type graph;
+- the accounting SDK and hooks bind the selected company on all four migrated
+  accounting reads, decode the HTTP body from `unknown`, preserve mandatory-only
+  projections, and reject unknown fields, lossy IDs, malformed enums, and
+  malformed timestamps;
+- `account-move-lines` browser consumers now use the projected row type directly
+  and no longer fall back to snake-case/full-table assertions;
+- accounting and subscription mutations that change move lines invalidate the
+  typed HTTP cache through the shared resource invalidation path;
 - the pilot deliberately excludes `pos-orders`, whose cursor envelope and read
   authorization need a separate contract and scope repair.
 
-This is a Phase 6 pilot, not the phase exit. The v0.3.17 resource IR still marks
-all query and scope descriptors unclassified and does not emit projection-aware
-row codecs. The next release must generate those codecs and partial-row result
-types from the canonical type graph before accounting/CRM reads migrate broadly.
+This is Phase 6 progress, not the phase exit. Most resource query and scope
+descriptors remain unclassified, so typed codecs continue to ship behind an
+explicit reviewed resource allowlist. `account-account-types` is intentionally
+deferred until its shared-plus-optional-company visibility is explicit; the
+next accounting slice should either repair that scope contract or migrate the
+company-bound `account-moves` read without asserting projected rows as full
+table records.
 
 ### Phase 7 — delete redundant layers
 

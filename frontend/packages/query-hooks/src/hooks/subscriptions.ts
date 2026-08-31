@@ -9,6 +9,7 @@ import { stdbBffCommandPost } from '@lumiere/stdb/commands';
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { invalidateStdbQueryResources } from './stdb';
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from '../http';
 import { withCompanyScope } from '@lumiere/erp-shared/org-scoped';
@@ -306,6 +307,10 @@ export function useGenerateSubscriptionInvoice(
       if (!r.ok) throw new Error('Failed to generate subscription invoice');
     },
     onSuccess: async () => {
+      invalidateStdbQueryResources(qc, organizationId, [
+        'account-moves',
+        'account-move-lines',
+      ]);
       await Promise.all([
         qc.invalidateQueries({
           queryKey: ['subscriptions', rqBigIntKey(organizationId)],
@@ -318,12 +323,6 @@ export function useGenerateSubscriptionInvoice(
         }),
         qc.invalidateQueries({
           queryKey: ['deferred-revenue-lines', rqBigIntKey(organizationId)],
-        }),
-        qc.invalidateQueries({
-          queryKey: ['stdb', 'account-moves', rqBigIntKey(organizationId)],
-        }),
-        qc.invalidateQueries({
-          queryKey: ['stdb', 'account-move-lines', rqBigIntKey(organizationId)],
         }),
       ]);
     },
@@ -354,15 +353,13 @@ export function usePaySubscriptionInvoice(
         throw new Error('Failed to apply subscription invoice payment');
     },
     onSuccess: async () => {
+      invalidateStdbQueryResources(qc, organizationId, [
+        'account-moves',
+        'account-move-lines',
+      ]);
       await Promise.all([
         qc.invalidateQueries({
           queryKey: ['subscriptions', rqBigIntKey(organizationId)],
-        }),
-        qc.invalidateQueries({
-          queryKey: ['stdb', 'account-moves', rqBigIntKey(organizationId)],
-        }),
-        qc.invalidateQueries({
-          queryKey: ['stdb', 'account-move-lines', rqBigIntKey(organizationId)],
         }),
         qc.invalidateQueries({
           queryKey: ['stdb', 'account-payments', rqBigIntKey(organizationId)],
@@ -915,18 +912,16 @@ export function useRecognizeDeferredRevenue(
       if (!r.ok) throw new Error('Failed to recognize deferred revenue');
     },
     onSuccess: async () => {
+      invalidateStdbQueryResources(qc, organizationId, [
+        'account-moves',
+        'account-move-lines',
+      ]);
       await Promise.all([
         qc.invalidateQueries({
           queryKey: ['deferred-revenue-lines', rqBigIntKey(organizationId)],
         }),
         qc.invalidateQueries({
           queryKey: ['deferred-revenue-schedules', rqBigIntKey(organizationId)],
-        }),
-        qc.invalidateQueries({
-          queryKey: ['stdb', 'account-moves', rqBigIntKey(organizationId)],
-        }),
-        qc.invalidateQueries({
-          queryKey: ['stdb', 'account-move-lines', rqBigIntKey(organizationId)],
         }),
       ]);
     },

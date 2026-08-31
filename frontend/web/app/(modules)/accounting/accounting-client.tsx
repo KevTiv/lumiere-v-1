@@ -1177,8 +1177,8 @@ function AccountingClientReady({
           label: t("accounting.tabs.moveLines"),
           content: (record) => {
             const moveId = String(record.id ?? "")
-            const lines = (accountMoveLines as Record<string, unknown>[]).filter(
-              (line) => String(line.moveId ?? line.move_id) === moveId,
+            const lines = accountMoveLines.filter(
+              (line) => String(line.moveId ?? "") === moveId,
             )
             return (
               <EntityView
@@ -3409,7 +3409,7 @@ function AccountingClientReady({
                     journalOptions={journalFieldOptionsForModularForm}
                     glAccountOptions={glAccountFieldOptions}
                     partnerOptions={partnerSelectOptions}
-                    moveLines={accountMoveLines as Record<string, unknown>[]}
+                    moveLines={accountMoveLines}
                   />
                 ),
               }
@@ -3896,7 +3896,7 @@ function AccountingClientReady({
 
       <AccountGlDrilldownPanel
         account={glDrilldownAccount}
-        moveLines={accountMoveLines as Record<string, unknown>[]}
+        moveLines={accountMoveLines}
         moves={
           // ACC-RI-018 rationale: safe because this BFF resource selects all AccountMove view fields.
           allMoves as unknown as AccountMove[]
