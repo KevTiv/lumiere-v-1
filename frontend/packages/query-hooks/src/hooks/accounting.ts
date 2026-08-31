@@ -2,11 +2,14 @@
 
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
-import type { AccountAccountQueryRow } from "@lumiere/stdb/resource-reads"
+import type {
+  AccountAccountQueryRow,
+  AccountJournalQueryRow,
+  AccountTaxQueryRow,
+} from "@lumiere/stdb/resource-reads"
 import { createStdbSdk } from "@lumiere/stdb/sdk"
-import { apiFetch, coalesceQueryInitialData } from "../http"
+import { apiFetch } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useErpSession } from "@lumiere/erp-session"
 import {
   paymentParamsToJson,
   type ClearablePatch,
@@ -14,7 +17,6 @@ import {
 import { stdbParamsToJson, encodeOptionalU64 } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   AccountFiscalYear,
-  AccountJournal,
   AccountMove,
   AccountPeriod,
   AddAccountMoveLineParams,
@@ -51,7 +53,11 @@ import type {
   UpdateCrossoveredBudgetLineParams,
   UpdateCrossoveredBudgetParams,
 } from "@lumiere/stdb/types"
-import { invalidateStdbQueryResources, stdbQueryKey, useStdbQuery } from "./stdb"
+import {
+  invalidateStdbQueryResources,
+  useCompanyScopedTypedQuery,
+  useStdbQuery,
+} from "./stdb"
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
 
 function toScalarU64(v: bigint | number | string): bigint {
@@ -79,6 +85,7 @@ export type {
   CreateAccountJournalParams,
 } from "@lumiere/stdb/types"
 export type { AccountAccountQueryRow as AccountAccount } from "@lumiere/stdb/resource-reads"
+export type { AccountJournalQueryRow, AccountTaxQueryRow } from "@lumiere/stdb/resource-reads"
 
 // ── Query Hooks ───────────────────────────────────────────────────────────────
 
@@ -90,29 +97,15 @@ export function useAccountAccounts(
   options?: {
     staleTime?: number
     enabled?: boolean
-    initialData?: AccountAccountQueryRow[]
   },
 ) {
-  const { activeCompanyId, activeCompanyReady } = useErpSession()
-  const companyId = activeCompanyReady ? activeCompanyId : null
-  return useQuery<AccountAccountQueryRow[]>({
-    queryKey: stdbQueryKey("account-accounts", organizationId, companyId),
-    queryFn: () => {
-      if (companyId == null || companyId <= 0) {
-        throw new Error("An active company is required to query account-accounts")
-      }
-      return createStdbSdk(apiFetch)
-        .forCompany(BigInt(companyId))
-        .accounting.accounts.list()
-    },
-    enabled:
-      (options?.enabled ?? true) &&
-      organizationId > 0n &&
-      companyId != null &&
-      companyId > 0,
-    staleTime: options?.staleTime ?? 30_000,
-    initialData: coalesceQueryInitialData(options?.initialData),
-  })
+  const sdk = createStdbSdk(apiFetch)
+  return useCompanyScopedTypedQuery<AccountAccountQueryRow>(
+    "account-accounts",
+    organizationId,
+    (companyId) => sdk.forCompany(companyId).accounting.accounts.list(),
+    options,
+  )
 }
 
 /** Account types (chart classification / user types) for the organization. */
@@ -158,7 +151,13 @@ export function useAccountTaxes(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean }
 ) {
-  return useStdbQuery("account-taxes", organizationId, options)
+  const sdk = createStdbSdk(apiFetch)
+  return useCompanyScopedTypedQuery<AccountTaxQueryRow>(
+    "account-taxes",
+    organizationId,
+    (companyId) => sdk.forCompany(companyId).accounting.taxes.list(),
+    options,
+  )
 }
 
 /**
@@ -420,9 +419,15 @@ export function useCreatePaymentFee(organizationId: bigint) {
  */
 export function useAccountJournals(
   organizationId: bigint,
-  options?: { staleTime?: number; enabled?: boolean; initialData?: AccountJournal[] },
+  options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("account-journals", organizationId, options)
+  const sdk = createStdbSdk(apiFetch)
+  return useCompanyScopedTypedQuery<AccountJournalQueryRow>(
+    "account-journals",
+    organizationId,
+    (companyId) => sdk.forCompany(companyId).accounting.journals.list(),
+    options,
+  )
 }
 
 /**
@@ -458,10 +463,11 @@ function invalidateBudgetQueries(qc: ReturnType<typeof useQueryClient>, organiza
 }
 
 function invalidateChartStructureQueries(qc: ReturnType<typeof useQueryClient>, organizationId: number) {
-  const k = organizationId
-  void qc.invalidateQueries({ queryKey: ["stdb", "account-accounts", k] })
-  void qc.invalidateQueries({ queryKey: ["stdb", "account-account-types", k] })
-  void qc.invalidateQueries({ queryKey: ["stdb", "account-groups", k] })
+  invalidateStdbQueryResources(qc, organizationId, [
+    "account-accounts",
+    "account-account-types",
+    "account-groups",
+  ])
 }
 
 /** Account taxes + related tax master data (TanStack scope = organization id). */

@@ -45,6 +45,18 @@ function normalizeCompanyIds(companyIds?: readonly number[]): number[] {
     .filter((id) => Number.isFinite(id) && id > 0)
 }
 
+/** Keep a valid selection, otherwise choose the first company authorized by the session. */
+export function resolveAllowedActiveCompanyId(
+  activeCompanyId: number | null,
+  companyIds?: readonly number[],
+): number | null {
+  const allowed = normalizeCompanyIds(companyIds)
+  if (allowed.length === 0) return null
+  return activeCompanyId != null && allowed.includes(activeCompanyId)
+    ? activeCompanyId
+    : (allowed[0] ?? null)
+}
+
 export function ErpSessionProvider({
   value,
   children,
@@ -71,13 +83,10 @@ export function ErpSessionProvider({
 
   useEffect(() => {
     if (!activeCompanyReady || organizationId == null || organizationId <= 0) return
-    if (activeCompanyId == null) return
-
     const allowed = normalizeCompanyIds(value.companyIds)
     if (allowed.length === 0) return
-    if (allowed.includes(activeCompanyId)) return
-
-    const fallback = allowed[0] ?? null
+    const fallback = resolveAllowedActiveCompanyId(activeCompanyId, allowed)
+    if (fallback === activeCompanyId) return
     setActiveCompanyIdState(fallback)
     if (fallback != null) writeStoredActiveCompany(organizationId, fallback)
     else clearStoredActiveCompany()

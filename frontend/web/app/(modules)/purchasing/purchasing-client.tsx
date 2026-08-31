@@ -205,7 +205,7 @@ function recordTimestampMs(row: Record<string, unknown>): number {
   return n > 1e15 ? n / 1000 : n
 }
 
-function journalTypeTag(row: Record<string, unknown>): string {
+function journalTypeTag(row: { type?: unknown; type_?: unknown }): string {
   const v = row.type_ ?? row.type
   if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
   return String(v ?? "")
@@ -1162,7 +1162,7 @@ function PurchasingClientLoaded({
   }, [products, t])
 
   const purchaseJournalFieldOptions = useMemo(() => {
-    const purchaseRows = (accountJournals as Record<string, unknown>[]).filter(
+    const purchaseRows = accountJournals.filter(
       (row) => journalTypeTag(row) === "Purchase" && row.active !== false,
     )
     const fromApi = accountJournalRowsToSelectOptions(purchaseRows)

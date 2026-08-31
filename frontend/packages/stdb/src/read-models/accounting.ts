@@ -1,9 +1,28 @@
 import { primaryLabel } from "./primary-label";
 
-/** Loose row shape from accounting `/api/query` lists (accounts, journals, etc.). */
-export type AccountingAccountQueryRow = Record<string, unknown>;
+/** Fields used by accounting labels; generated projection rows may omit any display field. */
+export type AccountingQueryRow = {
+  id?: unknown
+  code?: unknown
+  name?: unknown
+  displayName?: unknown
+  partnerName?: unknown
+  companyName?: unknown
+  contactName?: unknown
+  symbol?: unknown
+  currencyName?: unknown
+  currency_name?: unknown
+  legalName?: unknown
+  ref?: unknown
+  reference?: unknown
+  number?: unknown
+  invoiceNumber?: unknown
+  invoice_number?: unknown
+  clientOrderRef?: unknown
+  client_order_ref?: unknown
+}
 
-export type AccountingQueryRow = Record<string, unknown>;
+export type AccountingAccountQueryRow = AccountingQueryRow;
 
 function trimScalar(value: unknown): string {
   if (value == null) return "";

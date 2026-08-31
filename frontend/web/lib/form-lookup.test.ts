@@ -1,7 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { paymentJournalRowsToSelectOptions } from "./form-lookup"
+import {
+  accountJournalRowsToSelectOptions,
+  paymentJournalRowsToSelectOptions,
+} from "./form-lookup"
 
 test("payment journal options include only reducer-compatible journal types", () => {
   const options = paymentJournalRowsToSelectOptions([
@@ -17,4 +20,20 @@ test("payment journal options include only reducer-compatible journal types", ()
     { value: "3", label: "CSH — Cash" },
     { value: "4", label: "CHK — Check" },
   ])
+})
+
+test("journal options tolerate omitted projection fields", () => {
+  assert.deepEqual(
+    accountJournalRowsToSelectOptions([
+      { id: 1n },
+      { id: 2n, code: "BNK" },
+      { id: 3n, name: "Cash" },
+    ]),
+    [
+      { value: "1", label: "1" },
+      { value: "2", label: "BNK" },
+      { value: "3", label: "Cash" },
+    ],
+  )
+  assert.deepEqual(paymentJournalRowsToSelectOptions([{ id: 1n }]), [])
 })

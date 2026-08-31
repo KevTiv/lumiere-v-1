@@ -45,7 +45,7 @@ const COMMISSION_ROW_QUEUES: SalesOpsQueueId[] = [
   'commissions_settled',
 ]
 
-function rowId(row: Record<string, unknown>): string {
+function rowId(row: { id?: unknown }): string {
   return String(row.id ?? '')
 }
 
@@ -134,8 +134,8 @@ export interface SalesOpsPanelProps {
   /** Server-bounded `sale-commissions-pending` (accrued) when subscribed; falls back to client filter. */
   commissionsPending?: Record<string, unknown>[]
   accountMoves: Record<string, unknown>[]
-  accountJournals: Record<string, unknown>[]
-  accountAccounts: Record<string, unknown>[]
+  accountJournals: readonly { id?: unknown; name?: unknown; code?: unknown }[]
+  accountAccounts: readonly { id?: unknown; name?: unknown; code?: unknown }[]
   settlePending?: boolean
   cancelPending?: boolean
   reversePending?: boolean

@@ -3,6 +3,15 @@
  */
 
 import { expenseVariantTag } from './expense-state'
+
+type JournalLookupRow = {
+  id?: unknown
+  code?: unknown
+  name?: unknown
+  type?: unknown
+  type_?: unknown
+}
+
 /** Chart of accounts — code + name for GL pickers. */
 export function accountAccountRowsToSelectOptions(
   rows: Record<string, unknown>[],
@@ -18,7 +27,7 @@ export function accountAccountRowsToSelectOptions(
 }
 
 export function accountJournalRowsToSelectOptions(
-  rows: Record<string, unknown>[],
+  rows: readonly JournalLookupRow[],
 ): Array<{ value: string; label: string }> {
   return rows.map((row) => {
     const id = row.id

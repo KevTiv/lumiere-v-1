@@ -15,7 +15,7 @@ The audit baseline is 39 pages, 169 TypeScript/TSX files in `app`, about 47,810 
 
 ## Confirmed defects to fix first
 
-- [ ] Accounting: wire `initialTaxes`, `initialAnalytic`, and `initialJournals` into the matching query cache instead of accepting and ignoring them.
+- [ ] Accounting: wire `initialAnalytic` into its matching query cache. Keep company-scoped account, tax, and journal reads browser-loaded until SSR carries the resolved company ID with its seed.
 - [ ] Inventory: stop fetching and discarding `initialWarehouse3dZones`; remove it from the default dashboard contract and fetch it only when the dynamically loaded 3D tab is active.
 - [ ] Reports: stop fetching and dropping `saved-reports`; defer it to `PivotExplorer`, seeding it only for a validated direct deep link to that tab.
 - [ ] Proposal workspace: remove the `orgId` search-parameter override; tenant scope must come only from the authenticated server session.

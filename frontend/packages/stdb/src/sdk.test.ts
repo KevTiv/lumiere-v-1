@@ -105,6 +105,42 @@ test("accounting SDK scopes and decodes account projections", async () => {
   }])
 })
 
+test("accounting SDK scopes and decodes journal and tax projections", async () => {
+  const requestedUrls: string[] = []
+  const sdk = createStdbSdk(async (url) => {
+    requestedUrls.push(url)
+    if (url.includes("account-journals")) {
+      return new Response(JSON.stringify({
+        data: [{ id: "5", organizationId: 11, code: "BNK1", type: "Bank" }],
+      }))
+    }
+    return new Response(JSON.stringify({
+      data: [{ id: 9, organizationId: "11", amount: 21, typeTaxUse: "Sale" }],
+    }))
+  })
+
+  const companySdk = sdk.forCompany(42n).accounting
+  const journals = await companySdk.journals.list()
+  const taxes = await companySdk.taxes.list()
+
+  assert.deepEqual(requestedUrls, [
+    "/api/query/account-journals?companyId=42",
+    "/api/query/account-taxes?companyId=42",
+  ])
+  assert.deepEqual(journals, [{
+    id: 5n,
+    organizationId: 11n,
+    code: "BNK1",
+    type: { tag: "Bank" },
+  }])
+  assert.deepEqual(taxes, [{
+    id: 9n,
+    organizationId: 11n,
+    amount: 21,
+    typeTaxUse: { tag: "Sale" },
+  }])
+})
+
 test("accounting tax SDK binds selected company for create and update", async () => {
   const requests: Array<{ url: string; body: Record<string, unknown> }> = []
   const apiFetch = async (url: string, init?: RequestInit) => {

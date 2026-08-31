@@ -21,6 +21,7 @@ import {
 } from "@lumiere/stdb/commands"
 import type { OperationInputMap } from "@lumiere/contracts/generated/operation-inputs"
 import { isSubscriptionReady, useSubscriptionCache } from "@lumiere/stdb/live"
+import type { QueryResourceKey } from "@lumiere/stdb/generated/query-registry"
 import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
 
 import { apiFetch, coalesceQueryInitialData } from "../http"
@@ -34,6 +35,21 @@ export function stdbQueryKey(
   return companyId != null && companyId > 0
     ? (['stdb', resource, organizationId.toString(), 'company', companyId] as const)
     : (['stdb', resource, organizationId.toString()] as const)
+}
+
+/** Cache namespace for rows that passed a generated HTTP projection decoder. */
+export function typedStdbQueryKey(
+  resource: string,
+  organizationId: bigint | number,
+  companyId?: number | null,
+) {
+  return companyId != null && companyId > 0
+    ? (['typed-stdb', resource, organizationId.toString(), 'company', companyId] as const)
+    : (['typed-stdb', resource, organizationId.toString()] as const)
+}
+
+function hasPositiveOrganizationId(value: bigint | number): boolean {
+  return typeof value === 'bigint' ? value > 0n : value > 0
 }
 
 /**
@@ -107,8 +123,13 @@ export function invalidateStdbQueryResources(
   organizationId: bigint | number,
   resources: readonly string[],
 ) {
-  if (isSubscriptionReady()) return
   for (const resource of resources) {
+    // Typed HTTP rows use a separate namespace so the opt-in legacy direct-row
+    // cache can never populate them with unprojected SDK entities.
+    void qc.invalidateQueries({
+      queryKey: typedStdbQueryKey(resource, organizationId),
+    })
+    if (isSubscriptionReady()) continue
     for (const queryKey of realtimeQueryKeysForResource(resource, organizationId)) {
       void qc.invalidateQueries({ queryKey })
     }
@@ -221,6 +242,39 @@ export function useStdbQuery<K extends string>(
     refetchOnWindowFocus: !subscriptionReady,
     enabled: options?.enabled,
     initialData: coalesceQueryInitialData(options?.initialData),
+  })
+}
+
+/**
+ * Fetch a company-scoped resource through a generated projection decoder.
+ * The loader owns transport and decoding; this hook owns selected-company
+ * readiness, cache identity, and React Query lifecycle only.
+ */
+export function useCompanyScopedTypedQuery<Row>(
+  resource: QueryResourceKey,
+  organizationId: bigint | number,
+  loadRows: (companyId: bigint) => Promise<Row[]>,
+  options?: {
+    staleTime?: number
+    enabled?: boolean
+  },
+) {
+  const { activeCompanyId, activeCompanyReady } = useErpSession()
+  const companyId = activeCompanyReady ? activeCompanyId : null
+  return useQuery<Row[]>({
+    queryKey: typedStdbQueryKey(resource, organizationId, companyId),
+    queryFn: () => {
+      if (companyId == null || companyId <= 0) {
+        throw new Error(`An active company is required to query ${resource}`)
+      }
+      return loadRows(BigInt(companyId))
+    },
+    enabled:
+      (options?.enabled ?? true) &&
+      hasPositiveOrganizationId(organizationId) &&
+      companyId != null &&
+      companyId > 0,
+    staleTime: options?.staleTime ?? 30_000,
   })
 }
 

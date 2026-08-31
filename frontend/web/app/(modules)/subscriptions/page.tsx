@@ -3,6 +3,7 @@ import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
 import { SubscriptionsClient } from "./subscriptions-client"
 
 const SSR_RESOURCES = [
+  // Account and journal projections load after active-company resolution in the browser.
   "subscriptions",
   "subscription-plans",
   "deferred-revenue-schedules",
@@ -11,8 +12,6 @@ const SSR_RESOURCES = [
   "sale-orders",
   "pricelists",
   "products",
-  "account-journals",
-  "account-accounts",
 ] as const
 
 export default async function SubscriptionsPage() {
@@ -30,8 +29,6 @@ export default async function SubscriptionsPage() {
     saleOrders,
     pricelists,
     products,
-    journals,
-    accounts,
   ] = await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
 
   return (
@@ -44,8 +41,6 @@ export default async function SubscriptionsPage() {
       initialSaleOrders={saleOrders}
       initialPricelists={pricelists}
       initialProducts={products}
-      initialJournals={journals}
-      initialAccounts={accounts}
       organizationId={session.organizationId}
     />
   )

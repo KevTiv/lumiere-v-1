@@ -127,7 +127,6 @@ import { useSaleOrders, usePricelists, type SaleOrder, type ProductPricelist } f
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { useAccountJournals, useAccountAccounts, useAccountMoves, useAccountMoveLines } from "@lumiere/query-hooks/hooks/accounting"
-import type { AccountAccount, AccountJournal } from "@lumiere/query-hooks/hooks/accounting"
 import type { Product } from "@lumiere/stdb/types"
 import {
   saleOrderRowsToSelectOptions,
@@ -160,8 +159,6 @@ interface SubscriptionsClientProps {
   initialSaleOrders?: SaleOrder[]
   initialPricelists?: ProductPricelist[]
   initialProducts?: Product[]
-  initialJournals?: AccountJournal[]
-  initialAccounts?: AccountAccount[]
   organizationId?: number
 }
 
@@ -185,8 +182,6 @@ function SubscriptionsClientLoaded({
   initialSaleOrders,
   initialPricelists,
   initialProducts,
-  initialJournals,
-  initialAccounts,
   organizationId,
 }: SubscriptionsClientLoadedProps) {
   useSubscriptionsModuleSubscription()
@@ -226,8 +221,8 @@ function SubscriptionsClientLoaded({
   const { data: saleOrders = [] } = useSaleOrders(orgId, initialSaleOrders)
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: products = [] } = useProducts(orgId, initialProducts)
-  const { data: journals = [] } = useAccountJournals(orgId, { initialData: initialJournals })
-  const { data: accounts = [] } = useAccountAccounts(orgId, { initialData: initialAccounts })
+  const { data: journals = [] } = useAccountJournals(orgId)
+  const { data: accounts = [] } = useAccountAccounts(orgId)
   const { data: accountMoves = [] } = useAccountMoves(orgId)
   const { data: accountMoveLines = [] } = useAccountMoveLines(orgId)
   const { data: currencies = [] } = useCurrencies()

@@ -12,8 +12,12 @@ import type { QueryResourceKey } from "@lumiere/stdb/generated/query-registry"
 import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
 import {
   decodeAccountAccountsQueryResponse,
+  decodeAccountJournalsQueryResponse,
+  decodeAccountTaxesQueryResponse,
   decodeCompaniesQueryResponse,
   type AccountAccountQueryRow,
+  type AccountJournalQueryRow,
+  type AccountTaxQueryRow,
   type CompanyQueryRow,
 } from "@lumiere/stdb/resource-reads"
 
@@ -29,7 +33,9 @@ export type ServerQueryCredentials = {
 export type ServerQueryRowFor<K extends QueryResourceKey> =
   K extends "companies" ? CompanyQueryRow
     : K extends "account-accounts" ? AccountAccountQueryRow
-      : QueryRowFor<K>
+      : K extends "account-journals" ? AccountJournalQueryRow
+        : K extends "account-taxes" ? AccountTaxQueryRow
+          : QueryRowFor<K>
 
 function requireApiServerBase(): string {
   const base = resolveApiServerBaseUrl()
@@ -68,6 +74,12 @@ async function fetchFromApiServer<K extends QueryResourceKey>(
   }
   if (resource === "account-accounts") {
     return decodeAccountAccountsQueryResponse(payload) as ServerQueryRowFor<K>[]
+  }
+  if (resource === "account-journals") {
+    return decodeAccountJournalsQueryResponse(payload) as ServerQueryRowFor<K>[]
+  }
+  if (resource === "account-taxes") {
+    return decodeAccountTaxesQueryResponse(payload) as ServerQueryRowFor<K>[]
   }
   // Unmigrated Phase 6 resources retain their existing structural boundary.
   return parseQueryListResponse(payload) as ServerQueryRowFor<K>[]

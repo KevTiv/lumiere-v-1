@@ -27,13 +27,13 @@ export interface AccountMove {
 
 export interface AccountAccount {
   id: bigint | number | string
-  code: string
-  name: string
+  code?: string
+  name?: string
   internalGroup?: unknown  // stringified: "Asset" | "Liability" | "Equity" | "Income" | "Expense"
-  isBankAccount: boolean
-  used: boolean
-  deprecated: boolean
-  openingBalance: number
+  isBankAccount?: boolean
+  used?: boolean
+  deprecated?: boolean
+  openingBalance?: number
 }
 
 export interface CreateAccountMoveParams {

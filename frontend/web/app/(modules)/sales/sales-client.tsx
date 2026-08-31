@@ -855,7 +855,7 @@ function SalesClientLoaded({
   }, [productCategories, t]);
 
   const journalFieldOptions = useMemo(() => {
-    const fromApi = accountJournalRowsToSelectOptions(accountJournals as Record<string, unknown>[]);
+    const fromApi = accountJournalRowsToSelectOptions(accountJournals);
     if (fromApi.length > 0) return fromApi;
     return [{ value: '', label: t('common.lookup.noJournals'), disabled: true }];
   }, [accountJournals, t]);
@@ -2462,12 +2462,8 @@ function SalesClientLoaded({
                   accountMoves={
                     accountMoves as unknown as Record<string, unknown>[]
                   }
-                  accountJournals={
-                    accountJournals as unknown as Record<string, unknown>[]
-                  }
-                  accountAccounts={
-                    accountAccounts as unknown as Record<string, unknown>[]
-                  }
+                  accountJournals={accountJournals}
+                  accountAccounts={accountAccounts}
                   settlePending={settleSaleCommissions.isPending}
                   cancelPending={cancelSaleCommission.isPending}
                   reversePending={reverseSaleCommissionSettlement.isPending}

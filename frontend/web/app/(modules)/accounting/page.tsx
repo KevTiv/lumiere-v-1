@@ -3,12 +3,10 @@ import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
 import { AccountingClient } from "./accounting-client"
 
 const SSR_RESOURCES = [
-  "account-accounts",
+  // Generated company-scoped reads load after active-company resolution in the browser.
   "account-moves",
-  "account-taxes",
   "budgets",
   "analytic-accounts",
-  "account-journals",
   "fiscal-years",
   "account-periods",
 ] as const
@@ -19,17 +17,14 @@ export default async function AccountingPage() {
     return <AccountingClient />
   }
 
-  const [accounts, moves, taxes, budgets, analytic, journals, fiscalYears, accountPeriods] =
+  const [moves, budgets, analytic, fiscalYears, accountPeriods] =
     await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
 
   return (
     <AccountingClient
-      initialAccounts={accounts}
       initialMoves={moves}
-      initialTaxes={taxes}
       initialBudgets={budgets}
       initialAnalytic={analytic}
-      initialJournals={journals}
       initialFiscalYears={fiscalYears}
       initialAccountPeriods={accountPeriods}
       organizationId={session.organizationId}

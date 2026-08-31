@@ -7,6 +7,8 @@ import { CANONICAL_RESOURCE_BY_NAME } from "@lumiere/contracts/generated/resourc
 
 import {
   decodeAccountAccountsQueryResponse,
+  decodeAccountJournalsQueryResponse,
+  decodeAccountTaxesQueryResponse,
   decodeCompaniesQueryResponse,
 } from "./resource-reads"
 
@@ -94,6 +96,91 @@ test("account typed read rejects unknown and missing mandatory fields", () => {
   )
   assert.throws(
     () => decodeAccountAccountsQueryResponse({ data: [{ id: 9 }] }),
+    ResourceQueryRowDecodeError,
+  )
+})
+
+test("journal typed read decodes default and mandatory-only projections", () => {
+  assert.deepEqual(CANONICAL_RESOURCE_BY_NAME["account-journals"].mandatory, [
+    "id",
+    "organization_id",
+  ])
+  const rows = decodeAccountJournalsQueryResponse({
+    data: [
+      {
+        id: "5",
+        organizationId: 11,
+        companyId: 42,
+        code: "BNK1",
+        name: "Bank",
+        type: "Bank",
+        active: true,
+        defaultAccountId: null,
+      },
+      { id: 6, organizationId: "11" },
+    ],
+  })
+  assert.deepEqual(rows[0], {
+    id: 5n,
+    organizationId: 11n,
+    companyId: 42n,
+    code: "BNK1",
+    name: "Bank",
+    type: { tag: "Bank" },
+    active: true,
+    defaultAccountId: undefined,
+  })
+  assert.deepEqual(rows[1], { id: 6n, organizationId: 11n })
+})
+
+test("tax typed read decodes default and optional enum projections", () => {
+  assert.deepEqual(CANONICAL_RESOURCE_BY_NAME["account-taxes"].mandatory, [
+    "id",
+    "organization_id",
+  ])
+  const [tax] = decodeAccountTaxesQueryResponse({
+    data: [{
+      id: 9,
+      organizationId: 11,
+      companyId: "42",
+      name: "VAT 21%",
+      amount: 21,
+      description: null,
+      typeTaxUse: "Sale",
+      amountType: "Percent",
+    }],
+  })
+  assert.deepEqual(tax, {
+    id: 9n,
+    organizationId: 11n,
+    companyId: 42n,
+    name: "VAT 21%",
+    amount: 21,
+    description: undefined,
+    typeTaxUse: { tag: "Sale" },
+    amountType: { tag: "Percent" },
+  })
+  assert.deepEqual(
+    decodeAccountTaxesQueryResponse({ data: [{ id: 10, organizationId: 11 }] }),
+    [{ id: 10n, organizationId: 11n }],
+  )
+})
+
+test("journal and tax typed reads fail closed for malformed projections", () => {
+  assert.throws(
+    () => decodeAccountJournalsQueryResponse({
+      data: [{ id: 5, organizationId: 11, type: "Unsupported" }],
+    }),
+    ResourceQueryRowDecodeError,
+  )
+  assert.throws(
+    () => decodeAccountTaxesQueryResponse({
+      data: [{ id: 9, organizationId: 11, credentialReference: "secret" }],
+    }),
+    ResourceQueryRowDecodeError,
+  )
+  assert.throws(
+    () => decodeAccountTaxesQueryResponse({ data: [{ organizationId: 11 }] }),
     ResourceQueryRowDecodeError,
   )
 })

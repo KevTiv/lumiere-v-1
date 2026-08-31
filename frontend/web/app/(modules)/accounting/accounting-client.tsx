@@ -323,13 +323,10 @@ import {
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { useToast } from "@/hooks/use-toast"
 import type {
-  AccountAccount as AccountAccountRow,
   AccountAnalyticAccount,
   AccountFiscalYear,
-  AccountJournal,
   AccountMove,
   AccountPeriod,
-  AccountTax,
   CrossoveredBudget,
 } from "@lumiere/query-hooks/hooks/accounting"
 import {
@@ -581,7 +578,7 @@ function moveLineIdsFromRow(line: Record<string, unknown>): bigint[] {
 /** Resolve journal for `create_account_move` from modal payload or first loaded journal. */
 function journalIdFromInvoiceModalSave(
   params: unknown,
-  journals: Record<string, unknown>[],
+  journals: readonly { id?: unknown }[],
 ): bigint | null {
   const j = (params as { journalId?: unknown }).journalId
   if (j != null) {
@@ -601,12 +598,9 @@ type AccountingCsvImportKind =
   | "analytic"
 
 interface AccountingClientProps {
-  initialAccounts?: AccountAccountRow[]
   initialMoves?: AccountMove[]
-  initialTaxes?: AccountTax[]
   initialBudgets?: CrossoveredBudget[]
   initialAnalytic?: AccountAnalyticAccount[]
-  initialJournals?: AccountJournal[]
   initialFiscalYears?: AccountFiscalYear[]
   initialAccountPeriods?: AccountPeriod[]
   organizationId?: number
@@ -640,12 +634,9 @@ function AccountingClientLoaded(props: AccountingClientLoadedProps) {
 }
 
 function AccountingClientReady({
-  initialAccounts,
   initialMoves,
-  initialTaxes,
   initialBudgets,
   initialAnalytic,
-  initialJournals,
   initialFiscalYears,
   initialAccountPeriods,
   organizationId,
@@ -737,7 +728,6 @@ function AccountingClientReady({
   // ── Data hooks ──────────────────────────────────────────────────────────────
   const { data: accounts = [] } = useAccountAccounts(orgId, {
     enabled: organizationId > 0,
-    initialData: initialAccounts,
   })
   const { data: allMoves = [], isLoading: movesLoading } = useAccountMoves(orgId, {
     enabled: organizationId > 0,
@@ -1031,7 +1021,7 @@ function AccountingClientReady({
     [contacts],
   )
   const journalLabelMap = useMemo(
-    () => buildJournalLabelMap(journals as Record<string, unknown>[]),
+    () => buildJournalLabelMap(journals),
     [journals],
   )
   const accountLabelMap = useMemo(
@@ -3186,10 +3176,7 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <ChartOfAccountsView
-                    accounts={
-                      // ACC-RI-018 rationale: safe because this resource selects every AccountAccount view field.
-                      accounts as unknown as Parameters<typeof ChartOfAccountsView>[0]["accounts"]
-                    }
+                    accounts={accounts}
                     chartStructureContent={chartStructurePanel}
                     onImportAccountsCsv={() => setCsvKind("account")}
                     onAccountClick={(account) => setGlDrilldownAccount(account)}
@@ -4126,7 +4113,7 @@ function AccountingClientReady({
             })
             return
           }
-          const jid = journalIdFromInvoiceModalSave(params, journals as Record<string, unknown>[])
+          const jid = journalIdFromInvoiceModalSave(params, journals)
           if (jid == null) {
             toast({
               variant: "destructive",
@@ -4167,7 +4154,7 @@ function AccountingClientReady({
             })
             return
           }
-          const jid = journalIdFromInvoiceModalSave(params, journals as Record<string, unknown>[])
+          const jid = journalIdFromInvoiceModalSave(params, journals)
           if (jid == null) {
             toast({
               variant: "destructive",

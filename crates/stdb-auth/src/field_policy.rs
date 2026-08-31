@@ -236,7 +236,12 @@ pub fn has_resource_read_permission(
     let Some(access) = field_access else {
         return false;
     };
-    if access.is_superuser || access.role_permissions.iter().any(|permission| permission == "*:*") {
+    if access.is_superuser
+        || access
+            .role_permissions
+            .iter()
+            .any(|permission| permission == "*:*")
+    {
         return true;
     }
     let Some(resource) = registry_get(resource_key) else {
@@ -455,6 +460,17 @@ pub fn resolve_http_sql_columns(
     if resource_key == "landed-costs" && !cols.iter().any(|column| column == "state") {
         cols.push("state".to_string());
     }
+    // `company_id` is an authorization scope column, not an optional business
+    // field. Keep it in custom projections whenever the canonical default
+    // projection exposes it so api-server post-filters can verify SQL scope.
+    let company_id_is_scope_metadata = reg
+        .mandatory
+        .iter()
+        .chain(reg.default_restricted.iter())
+        .any(|column| column == "company_id");
+    if company_id_is_scope_metadata && !cols.iter().any(|column| column == "company_id") {
+        cols.push("company_id".to_string());
+    }
     if matches!(
         resource_key,
         "iot-actions"
@@ -637,7 +653,10 @@ mod tests {
             role_id: 9,
             role_name: "member".into(),
             is_superuser: false,
-            role_permissions: permissions.iter().map(|value| (*value).to_string()).collect(),
+            role_permissions: permissions
+                .iter()
+                .map(|value| (*value).to_string())
+                .collect(),
             identity_hex: "actor".into(),
             field_permissions: Vec::new(),
         }
@@ -713,9 +732,33 @@ mod tests {
     }
 
     #[test]
+    fn selective_accounting_field_policies_keep_company_scope_metadata() {
+        for resource in ["account-accounts", "account-journals", "account-taxes"] {
+            let mut access = field_access(&[&format!("{resource}:read")]);
+            access.field_permissions.push(FieldPermissionLike {
+                id: Some(1),
+                organization_id: Some(7),
+                role_id: Some(9),
+                resource: resource.to_string(),
+                action: "read".to_string(),
+                allowed_fields: vec!["name".to_string()],
+                subject_user_hex: None,
+                subject_role_id: Some(9),
+            });
+
+            let cols = resolve_http_sql_columns(resource, Some(&access))
+                .expect("selective accounting columns");
+            assert!(cols.iter().any(|column| column == "company_id"));
+            assert!(cols.iter().any(|column| column == "id"));
+            assert!(cols.iter().any(|column| column == "organization_id"));
+            assert!(cols.iter().any(|column| column == "name"));
+        }
+    }
+
+    #[test]
     fn resolve_http_sql_columns_exposes_helpdesk_lifecycle_without_customer_pii() {
-        let cols = resolve_http_sql_columns("helpdesk-tickets", None)
-            .expect("helpdesk-tickets columns");
+        let cols =
+            resolve_http_sql_columns("helpdesk-tickets", None).expect("helpdesk-tickets columns");
         for field in ["state", "priority"] {
             assert!(
                 cols.iter().any(|column| column == field),

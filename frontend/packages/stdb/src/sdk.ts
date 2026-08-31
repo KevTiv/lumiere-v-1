@@ -8,8 +8,12 @@ import {
 import { stdbParamsToJson } from "./stdb-params-json"
 import {
   decodeAccountAccountsQueryResponse,
+  decodeAccountJournalsQueryResponse,
+  decodeAccountTaxesQueryResponse,
   decodeCompaniesQueryResponse,
   type AccountAccountQueryRow,
+  type AccountJournalQueryRow,
+  type AccountTaxQueryRow,
   type CompanyQueryRow,
 } from "./resource-reads"
 
@@ -55,7 +59,11 @@ export interface StdbSdk {
         list(): Promise<AccountAccountQueryRow[]>
         create(params: CreateAccountParams): Promise<void>
       }
+      readonly journals: {
+        list(): Promise<AccountJournalQueryRow[]>
+      }
       readonly taxes: {
+        list(): Promise<AccountTaxQueryRow[]>
         create(params: CreateAccountTaxParams): Promise<void>
         update(taxId: bigint, params: UpdateAccountTaxParams): Promise<void>
       }
@@ -213,7 +221,21 @@ export function createStdbSdk(apiFetch: LumiereHttpFetch): StdbSdk {
               params: { ...params, companyId },
             }),
           },
+          journals: {
+            list: () => executeQuery(
+              apiFetch,
+              `/api/query/account-journals?companyId=${encodeURIComponent(companyId.toString())}`,
+              "Query account-journals failed",
+              decodeAccountJournalsQueryResponse,
+            ),
+          },
           taxes: {
+            list: () => executeQuery(
+              apiFetch,
+              `/api/query/account-taxes?companyId=${encodeURIComponent(companyId.toString())}`,
+              "Query account-taxes failed",
+              decodeAccountTaxesQueryResponse,
+            ),
             create: (params) => execute("create_account_tax", { companyId, params }),
             update: (taxId, params) =>
               execute("update_account_tax", { companyId, taxId, params }),
