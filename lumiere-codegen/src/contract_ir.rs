@@ -78,6 +78,21 @@ struct OperationIdentityManifest {
     operations: BTreeMap<String, String>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ResourceScopeManifest {
+    schema_version: u32,
+    resources: BTreeMap<String, ResourceScopeMetadata>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ResourceScopeMetadata {
+    kind: String,
+    organization_field: String,
+    company_field: String,
+}
+
 pub fn run(paths: &Paths, registry_text: &str) -> Result<()> {
     let module_schema: Value = serde_json::from_str(&read_to_string(&paths.module_schema_json)?)
         .with_context(|| format!("parse {}", paths.module_schema_json.display()))?;
@@ -130,12 +145,16 @@ pub fn run(paths: &Paths, registry_text: &str) -> Result<()> {
             .with_context(|| format!("parse {}", paths.contract_operation_ids_json.display()))?;
     let operation_ids = locked_operation_ids(&ir.operations, identity_manifest)?;
     let v2_operations = v2_operations(&ir.operations, &operation_ids)?;
+    let resource_scope_manifest: ResourceScopeManifest =
+        serde_json::from_str(&read_to_string(&paths.resource_scope_metadata_json)?)
+            .with_context(|| format!("parse {}", paths.resource_scope_metadata_json.display()))?;
     let v2_resources = v2_resources(
         &ir.resources,
         &row_types,
         &ir.tables,
         &ir.types,
         &v2_operations,
+        resource_scope_manifest,
     )?;
     let v2_semantic = SemanticContractV2 {
         operations: &v2_operations,
@@ -352,7 +371,29 @@ fn v2_resources(
     tables: &[Value],
     types: &[IndexedType],
     operations: &[Value],
+    scope_manifest: ResourceScopeManifest,
 ) -> Result<Vec<Value>> {
+    if scope_manifest.schema_version != 1 {
+        bail!(
+            "resource scope manifest has unsupported schema_version {}",
+            scope_manifest.schema_version
+        );
+    }
+    let resource_names = resources
+        .iter()
+        .map(|resource| resource.name.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    for (name, scope) in &scope_manifest.resources {
+        if !resource_names.contains(name.as_str()) {
+            bail!("resource scope manifest references unknown resource {name}");
+        }
+        if scope.kind != "organization_optional_company" {
+            bail!("resource {name} has unsupported scope kind {}", scope.kind);
+        }
+        if scope.organization_field.is_empty() || scope.company_field.is_empty() {
+            bail!("resource {name} scope fields must not be empty");
+        }
+    }
     let row_type_names = types
         .iter()
         .flat_map(|item| item.names.iter().map(String::as_str))
@@ -433,6 +474,19 @@ fn v2_resources(
             }
             let mut writers = invalidated_by.remove(resource.name.as_str()).unwrap_or_default();
             writers.sort_unstable();
+            let scope = if let Some(scope) = scope_manifest.resources.get(&resource.name) {
+                serde_json::json!({
+                    "company_field": scope.company_field,
+                    "kind": scope.kind,
+                    "organization_field": scope.organization_field,
+                })
+            } else {
+                serde_json::json!({
+                    "company_field": Value::Null,
+                    "kind": "unclassified",
+                    "organization_field": Value::Null,
+                })
+            };
             Ok(serde_json::json!({
                 "contract": resource.contract,
                 "invalidated_by": writers,
@@ -446,11 +500,7 @@ fn v2_resources(
                 "row": {
                     "type_reference": row_type,
                 },
-                "scope": {
-                    "company_field": Value::Null,
-                    "kind": "unclassified",
-                    "organization_field": Value::Null,
-                },
+                "scope": scope,
                 "source": {
                     "kind": if derived_row_type.is_some() { "table" } else { "unresolved" },
                     "table_reference": table,
@@ -924,7 +974,18 @@ mod tests {
             "contract_operation_id": "erp.create_order",
             "invalidates": ["orders"]
         })];
-        let output = v2_resources(&resources, &row_types, &tables, &types, &operations).unwrap();
+        let output = v2_resources(
+            &resources,
+            &row_types,
+            &tables,
+            &types,
+            &operations,
+            ResourceScopeManifest {
+                schema_version: 1,
+                resources: BTreeMap::new(),
+            },
+        )
+        .unwrap();
         assert_eq!(output[0]["row"]["type_reference"], "SaleOrder");
         assert_eq!(output[0]["source"]["table_reference"], "sale_order");
         assert_eq!(
@@ -948,8 +1009,90 @@ mod tests {
             names: vec!["SaleOrder".to_owned()],
             definition: serde_json::json!({"Product": {"elements": []}}),
         }];
-        let error = v2_resources(&resources, &row_types, &tables, &types, &[])
-            .expect_err("unknown row type must fail");
+        let error = v2_resources(
+            &resources,
+            &row_types,
+            &tables,
+            &types,
+            &[],
+            ResourceScopeManifest {
+                schema_version: 1,
+                resources: BTreeMap::new(),
+            },
+        )
+        .expect_err("unknown row type must fail");
         assert!(error.to_string().contains("unknown row type MissingRow"));
+    }
+
+    #[test]
+    fn v2_resource_emits_reviewed_optional_company_scope() {
+        let resources = vec![NamedContract {
+            name: "account-account-types".to_owned(),
+            contract: serde_json::json!({"table": "account_account_type"}),
+        }];
+        let row_types = BTreeMap::from([(
+            "account-account-types".to_owned(),
+            "AccountAccountType".to_owned(),
+        )]);
+        let tables = vec![serde_json::json!({
+            "name": "account_account_type",
+            "product_type_ref": 0
+        })];
+        let types = vec![IndexedType {
+            index: 0,
+            names: vec!["AccountAccountType".to_owned()],
+            definition: serde_json::json!({"Product": {"elements": []}}),
+        }];
+        let scope = ResourceScopeMetadata {
+            kind: "organization_optional_company".to_owned(),
+            organization_field: "organization_id".to_owned(),
+            company_field: "company_id".to_owned(),
+        };
+        let output = v2_resources(
+            &resources,
+            &row_types,
+            &tables,
+            &types,
+            &[],
+            ResourceScopeManifest {
+                schema_version: 1,
+                resources: BTreeMap::from([("account-account-types".to_owned(), scope)]),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            output[0]["scope"],
+            serde_json::json!({
+                "company_field": "company_id",
+                "kind": "organization_optional_company",
+                "organization_field": "organization_id",
+            })
+        );
+    }
+
+    #[test]
+    fn v2_resource_rejects_unknown_scope_resource() {
+        let error = v2_resources(
+            &[],
+            &BTreeMap::new(),
+            &[],
+            &[],
+            &[],
+            ResourceScopeManifest {
+                schema_version: 1,
+                resources: BTreeMap::from([(
+                    "missing".to_owned(),
+                    ResourceScopeMetadata {
+                        kind: "organization_optional_company".to_owned(),
+                        organization_field: "organization_id".to_owned(),
+                        company_field: "company_id".to_owned(),
+                    },
+                )]),
+            },
+        )
+        .expect_err("unknown scoped resource must fail");
+        assert!(error
+            .to_string()
+            .contains("resource scope manifest references unknown resource missing"));
     }
 }

@@ -549,9 +549,7 @@ pub(crate) fn purchasing_resource(resource: &str) -> bool {
 }
 
 /// Accounting resources backed by a table with a required (non-nullable)
-/// `company_id`. `account-account-types`, `account-payment-terms`, and
-/// `account-payment-term-lines` are deliberately excluded — those tables have
-/// no `company_id` column at all and are org-wide by design.
+/// `company_id`.
 pub(crate) fn accounting_resource(resource: &str) -> bool {
     matches!(
         resource,
@@ -570,6 +568,12 @@ pub(crate) fn accounting_resource(resource: &str) -> bool {
             | "budget-posts"
             | "fiscal-years"
     )
+}
+
+/// Accounting resources whose rows are either owned by the selected company
+/// or explicitly shared inside the organization with a null `company_id`.
+pub(crate) fn optional_company_accounting_resource(resource: &str) -> bool {
+    matches!(resource, "account-account-types")
 }
 
 pub(crate) fn iot_resource(resource: &str) -> bool {
@@ -871,19 +875,20 @@ pub async fn execute_resource_query_for_company(
     } else {
         None
     };
-    let accounting_company_id = if accounting_resource(resource) {
-        Some(
-            resolve_accounting_company_id(
-                client,
-                organization_id,
-                identity_hex,
-                requested_company_id,
+    let accounting_company_id =
+        if accounting_resource(resource) || optional_company_accounting_resource(resource) {
+            Some(
+                resolve_accounting_company_id(
+                    client,
+                    organization_id,
+                    identity_hex,
+                    requested_company_id,
+                )
+                .await?,
             )
-            .await?,
-        )
-    } else {
-        None
-    };
+        } else {
+            None
+        };
     let iot_company_id = if iot_resource(resource) {
         Some(
             resolve_iot_company_id(client, organization_id, identity_hex, requested_company_id)
@@ -2073,6 +2078,8 @@ pub async fn execute_resource_query_for_company(
     } else if let Some(cid) = purchasing_company_id {
         extra_where_owned = format!("{extra_where_raw} AND company_id = {cid}");
         extra_where_owned.as_str()
+    } else if optional_company_accounting_resource(resource) {
+        extra_where_raw
     } else if let Some(cid) = accounting_company_id {
         extra_where_owned = format!("{extra_where_raw} AND company_id = {cid}");
         extra_where_owned.as_str()
@@ -2114,7 +2121,13 @@ pub async fn execute_resource_query_for_company(
         rows.retain(|row| row_company_matches(row, company_id, false));
     }
     if let Some(company_id) = accounting_company_id {
-        rows.retain(|row| row_company_matches(row, company_id, false));
+        rows.retain(|row| {
+            row_company_matches(
+                row,
+                company_id,
+                optional_company_accounting_resource(resource),
+            )
+        });
     }
     if let Some(company_id) = iot_company_id {
         rows.retain(|row| row_company_matches(row, company_id, false));
@@ -2577,11 +2590,17 @@ mod tests {
     }
 
     #[test]
-    fn accounting_resource_excludes_org_wide_tables_and_other_domains() {
-        // These accounting tables carry no company_id column at all — org-wide by design.
+    fn accounting_resource_distinguishes_optional_company_and_org_wide_tables() {
         assert!(!accounting_resource("account-account-types"));
+        assert!(optional_company_accounting_resource(
+            "account-account-types"
+        ));
+        // These tables carry no company_id column and remain org-wide.
         assert!(!accounting_resource("account-payment-terms"));
         assert!(!accounting_resource("account-payment-term-lines"));
+        assert!(!optional_company_accounting_resource(
+            "account-payment-terms"
+        ));
         // Sanity: not misclassified as another domain's resource.
         assert!(!accounting_resource("contacts"));
         assert!(!accounting_resource("stock-quants"));
@@ -2627,6 +2646,30 @@ mod tests {
         ];
         rows.retain(|row| row_company_matches(row, 7, false));
         assert_eq!(rows, vec![json!({ "id": 1, "companyId": 7 })]);
+    }
+
+    #[test]
+    fn accounting_optional_company_rows_include_selected_and_shared_only() {
+        let entry = registry_get("account-account-types")
+            .expect("optional-company accounting resource must be registered");
+        assert!(entry
+            .default_restricted
+            .iter()
+            .any(|field| field == "company_id"));
+
+        let mut rows = vec![
+            json!({ "id": 1, "companyId": 7 }),
+            json!({ "id": 2, "companyId": null }),
+            json!({ "id": 3, "companyId": 8 }),
+        ];
+        rows.retain(|row| row_company_matches(row, 7, true));
+        assert_eq!(
+            rows,
+            vec![
+                json!({ "id": 1, "companyId": 7 }),
+                json!({ "id": 2, "companyId": null }),
+            ]
+        );
     }
 
     #[test]

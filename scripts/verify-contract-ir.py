@@ -215,13 +215,22 @@ def main() -> None:
             ):
                 fail(f"resource {name} has invalid invalidated_by references")
             scope = resource.get("scope")
-            if (
-                not isinstance(scope, dict)
-                or scope.get("kind") != "unclassified"
-                or scope.get("organization_field") is not None
-                or scope.get("company_field") is not None
-            ):
-                fail(f"resource {name} must declare scope classification status")
+            unclassified_scope = {
+                "company_field": None,
+                "kind": "unclassified",
+                "organization_field": None,
+            }
+            optional_company_scope = (
+                isinstance(scope, dict)
+                and set(scope) == {"company_field", "kind", "organization_field"}
+                and scope.get("kind") == "organization_optional_company"
+                and isinstance(scope.get("organization_field"), str)
+                and bool(scope["organization_field"])
+                and isinstance(scope.get("company_field"), str)
+                and bool(scope["company_field"])
+            )
+            if scope != unclassified_scope and not optional_company_scope:
+                fail(f"resource {name} has invalid scope classification")
             query = resource.get("query")
             if (
                 not isinstance(query, dict)
