@@ -271,7 +271,7 @@ implicitly selected company.
   generated runtime types;
 - `sdk.organization.companies.list()` is the first typed read domain method and
   `useCompanies` no longer asserts an unknown HTTP body as `Company[]`;
-- contracts releases through v0.3.23 generate projection-aware codecs for
+- contracts releases through v0.3.24 generate projection-aware codecs for
   `companies`, `account-account-types`, `account-accounts`, `account-journals`,
   `account-taxes`, `account-move-lines`, and `account-moves` directly from the
   canonical resource/type graph;
@@ -291,6 +291,9 @@ implicitly selected company.
   consolidation accounts and journals to the authenticated organization, and
   scopes consolidation elimination entries to both organization and selected
   company;
+- v0.3.24 republishes those projection changes from clean source commit
+  `77e12c903`, so the generated resource registry and runtime decoders share
+  the same canonical IR provenance;
 - `account-move-lines` browser consumers now use the projected row type directly
   and no longer fall back to snake-case/full-table assertions;
 - the primary accounting and sales `account-moves` consumers now accept the
