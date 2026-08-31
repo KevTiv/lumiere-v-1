@@ -4,7 +4,6 @@ import { AccountingClient } from "./accounting-client"
 
 const SSR_RESOURCES = [
   // Generated company-scoped reads load after active-company resolution in the browser.
-  "account-moves",
   "budgets",
   "analytic-accounts",
   "fiscal-years",
@@ -17,12 +16,11 @@ export default async function AccountingPage() {
     return <AccountingClient />
   }
 
-  const [moves, budgets, analytic, fiscalYears, accountPeriods] =
+  const [budgets, analytic, fiscalYears, accountPeriods] =
     await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
 
   return (
     <AccountingClient
-      initialMoves={moves}
       initialBudgets={budgets}
       initialAnalytic={analytic}
       initialFiscalYears={fiscalYears}

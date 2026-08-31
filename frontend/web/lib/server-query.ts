@@ -14,11 +14,13 @@ import {
   decodeAccountAccountsQueryResponse,
   decodeAccountJournalsQueryResponse,
   decodeAccountMoveLinesQueryResponse,
+  decodeAccountMovesQueryResponse,
   decodeAccountTaxesQueryResponse,
   decodeCompaniesQueryResponse,
   type AccountAccountQueryRow,
   type AccountJournalQueryRow,
   type AccountMoveLineQueryRow,
+  type AccountMoveQueryRow,
   type AccountTaxQueryRow,
   type CompanyQueryRow,
 } from "@lumiere/stdb/resource-reads"
@@ -37,8 +39,9 @@ export type ServerQueryRowFor<K extends QueryResourceKey> =
     : K extends "account-accounts" ? AccountAccountQueryRow
       : K extends "account-journals" ? AccountJournalQueryRow
         : K extends "account-move-lines" ? AccountMoveLineQueryRow
-          : K extends "account-taxes" ? AccountTaxQueryRow
-            : QueryRowFor<K>
+          : K extends "account-moves" ? AccountMoveQueryRow
+            : K extends "account-taxes" ? AccountTaxQueryRow
+              : QueryRowFor<K>
 
 function requireApiServerBase(): string {
   const base = resolveApiServerBaseUrl()
@@ -83,6 +86,9 @@ async function fetchFromApiServer<K extends QueryResourceKey>(
   }
   if (resource === "account-move-lines") {
     return decodeAccountMoveLinesQueryResponse(payload) as ServerQueryRowFor<K>[]
+  }
+  if (resource === "account-moves") {
+    return decodeAccountMovesQueryResponse(payload) as ServerQueryRowFor<K>[]
   }
   if (resource === "account-taxes") {
     return decodeAccountTaxesQueryResponse(payload) as ServerQueryRowFor<K>[]

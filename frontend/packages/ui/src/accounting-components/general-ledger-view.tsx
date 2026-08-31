@@ -106,7 +106,7 @@ export function GeneralLedgerView({
     total: moves.length,
     posted: moves.filter((m) => String(m.state) === "Posted").length,
     pending: moves.filter((m) => String(m.state) === "Draft").length,
-    totalMovement: moves.reduce((s, m) => s + m.amountTotal, 0),
+    totalMovement: moves.reduce((s, m) => s + (m.amountTotal ?? 0), 0),
   }
 
   const addLine = () =>
@@ -208,7 +208,7 @@ export function GeneralLedgerView({
                       {move.ref && <Badge variant="outline" className="text-xs">{move.ref}</Badge>}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{String(move.moveType)}</TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(move.amountTotal)}</TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(move.amountTotal ?? 0)}</TableCell>
                     <TableCell>
                       <Badge variant={isPosted ? "default" : "secondary"} className="gap-1">
                         {isPosted
@@ -261,16 +261,16 @@ export function GeneralLedgerView({
                     <TableBody>
                       <TableRow>
                         <TableCell>{selectedMove.invoicePartnerDisplayName ?? `Partner #${selectedMove.partnerId}`}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(selectedMove.amountUntaxed)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(selectedMove.amountTax)}</TableCell>
-                        <TableCell className="text-right font-bold">{formatCurrency(selectedMove.amountTotal)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(selectedMove.amountUntaxed ?? 0)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(selectedMove.amountTax ?? 0)}</TableCell>
+                        <TableCell className="text-right font-bold">{formatCurrency(selectedMove.amountTotal ?? 0)}</TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
                   <div className="flex justify-end gap-8 p-4 border-t bg-muted/30">
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">{t("accounting.journalEntries.residual")}</p>
-                      <p className="text-lg font-bold">{formatCurrency(selectedMove.amountResidual)}</p>
+                      <p className="text-lg font-bold">{formatCurrency(selectedMove.amountResidual ?? 0)}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">{t("accounting.journalEntries.payment")}</p>

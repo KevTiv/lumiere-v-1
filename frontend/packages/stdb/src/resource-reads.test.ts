@@ -9,6 +9,7 @@ import {
   decodeAccountAccountsQueryResponse,
   decodeAccountJournalsQueryResponse,
   decodeAccountMoveLinesQueryResponse,
+  decodeAccountMovesQueryResponse,
   decodeAccountTaxesQueryResponse,
   decodeCompaniesQueryResponse,
 } from "./resource-reads"
@@ -207,6 +208,54 @@ test("move-line typed read decodes default and mandatory-only projections", () =
   assert.deepEqual(rows[1], { id: 9n, organizationId: 11n })
 })
 
+test("move typed read decodes projection enums, timestamps, and optional fields", () => {
+  assert.deepEqual(CANONICAL_RESOURCE_BY_NAME["account-moves"].mandatory, [
+    "id",
+    "organization_id",
+  ])
+  const rows = decodeAccountMovesQueryResponse({
+    data: [
+      {
+        id: "21",
+        organizationId: 11,
+        name: "INV/2026/0021",
+        moveType: "OutInvoice",
+        state: "Posted",
+        date: { microsSinceUnixEpoch: "1781987714525007" },
+        companyId: 42,
+        journalId: "5",
+        partnerId: null,
+        currencyId: 1,
+        amountUntaxed: 100,
+        amountTax: 21,
+        amountTotal: 121,
+        amountResidual: 40,
+        paymentState: "Partial",
+      },
+      { id: 22, organizationId: "11" },
+    ],
+  })
+  const { date, ...move } = rows[0]
+  assert.equal(date?.microsSinceUnixEpoch, 1781987714525007n)
+  assert.deepEqual(move, {
+    id: 21n,
+    organizationId: 11n,
+    name: "INV/2026/0021",
+    moveType: { tag: "OutInvoice" },
+    state: { tag: "Posted" },
+    companyId: 42n,
+    journalId: 5n,
+    partnerId: undefined,
+    currencyId: 1n,
+    amountUntaxed: 100,
+    amountTax: 21,
+    amountTotal: 121,
+    amountResidual: 40,
+    paymentState: { tag: "Partial" },
+  })
+  assert.deepEqual(rows[1], { id: 22n, organizationId: 11n })
+})
+
 test("journal and tax typed reads fail closed for malformed projections", () => {
   assert.throws(
     () => decodeAccountJournalsQueryResponse({
@@ -227,6 +276,12 @@ test("journal and tax typed reads fail closed for malformed projections", () => 
   assert.throws(
     () => decodeAccountMoveLinesQueryResponse({
       data: [{ id: 8, organizationId: 11, credentialReference: "secret" }],
+    }),
+    ResourceQueryRowDecodeError,
+  )
+  assert.throws(
+    () => decodeAccountMovesQueryResponse({
+      data: [{ id: 21, organizationId: 11, state: "Unknown" }],
     }),
     ResourceQueryRowDecodeError,
   )

@@ -4,6 +4,7 @@ import {
   type AccountAccountQueryRow,
   type AccountJournalQueryRow,
   type AccountMoveLineQueryRow,
+  type AccountMoveQueryRow,
   type AccountTaxQueryRow,
   type CompanyQueryRow,
 } from "@lumiere/contracts/generated/resource-codecs"
@@ -12,6 +13,7 @@ export type {
   AccountAccountQueryRow,
   AccountJournalQueryRow,
   AccountMoveLineQueryRow,
+  AccountMoveQueryRow,
   AccountTaxQueryRow,
   CompanyQueryRow,
 }
@@ -47,6 +49,15 @@ export function decodeAccountMoveLinesQueryResponse(
 ): AccountMoveLineQueryRow[] {
   return decodeQueryListResponse(value, (row, index) =>
     decodeResourceQueryRow("account-move-lines", row, index),
+  )
+}
+
+/** Decode a field-policy projection of accounting move rows. */
+export function decodeAccountMovesQueryResponse(
+  value: unknown,
+): AccountMoveQueryRow[] {
+  return decodeQueryListResponse(value, (row, index) =>
+    decodeResourceQueryRow("account-moves", row, index),
   )
 }
 

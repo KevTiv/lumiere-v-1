@@ -598,7 +598,6 @@ type AccountingCsvImportKind =
   | "analytic"
 
 interface AccountingClientProps {
-  initialMoves?: AccountMove[]
   initialBudgets?: CrossoveredBudget[]
   initialAnalytic?: AccountAnalyticAccount[]
   initialFiscalYears?: AccountFiscalYear[]
@@ -634,7 +633,6 @@ function AccountingClientLoaded(props: AccountingClientLoadedProps) {
 }
 
 function AccountingClientReady({
-  initialMoves,
   initialBudgets,
   initialAnalytic,
   initialFiscalYears,
@@ -731,7 +729,6 @@ function AccountingClientReady({
   })
   const { data: allMoves = [], isLoading: movesLoading } = useAccountMoves(orgId, {
     enabled: organizationId > 0,
-    initialData: initialMoves,
   })
   const { data: accountMoveLines = [] } = useAccountMoveLines(orgId, { enabled: organizationId > 0 })
   const { data: taxes = [] } = useAccountTaxes(orgId, { enabled: organizationId > 0 })
@@ -2838,7 +2835,8 @@ function AccountingClientReady({
           const nowMs = Date.now()
           const oldestDays = overdueInvoices.reduce((max, m) => {
             if (!m.invoiceDateDue) return max
-            const dueMs = Number(m.invoiceDateDue) / 1000
+            const dueMs = flexibleTimestampMs(m.invoiceDateDue)
+            if (dueMs == null) return max
             const days = Math.max(0, Math.round((nowMs - dueMs) / 86400000))
             return Math.max(max, days)
           }, 0)
@@ -3130,10 +3128,7 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <InvoiceListView
-                    invoices={
-                      // ACC-RI-018 rationale: safe because this BFF resource selects all AccountMove view fields.
-                      invoices as unknown as AccountMove[]
-                    }
+                    invoices={invoices}
                     onSelectInvoice={(invoice) =>
                       // ACC-RI-018 rationale: safe because this sheet receives only InvoiceListView AccountMove rows.
                       setInvoiceSheetRecord(invoice as unknown as Record<string, unknown>)
@@ -3153,10 +3148,7 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <BillsListView
-                    bills={
-                      // ACC-RI-018 rationale: safe because this BFF resource selects all AccountMove view fields.
-                      bills as unknown as AccountMove[]
-                    }
+                    bills={bills}
                     onCreateBill={() => setShowCreateBill(true)}
                     onSelectBill={(bill) =>
                       // ACC-RI-018 rationale: safe because this sheet receives only BillsListView AccountMove rows.
@@ -3199,10 +3191,7 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <GeneralLedgerView
-                    moves={
-                      // ACC-RI-018 rationale: safe because this BFF resource selects all AccountMove view fields.
-                      allMoves as unknown as AccountMove[]
-                    }
+                    moves={allMoves}
                     onImportMovesCsv={() => setCsvKind("accountMove")}
                     onImportMoveLinesCsv={() => setCsvKind("accountMoveLine")}
                     onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
@@ -3897,10 +3886,7 @@ function AccountingClientReady({
       <AccountGlDrilldownPanel
         account={glDrilldownAccount}
         moveLines={accountMoveLines}
-        moves={
-          // ACC-RI-018 rationale: safe because this BFF resource selects all AccountMove view fields.
-          allMoves as unknown as AccountMove[]
-        }
+        moves={allMoves}
         open={glDrilldownAccount != null}
         onOpenChange={(open) => {
           if (!open) setGlDrilldownAccount(null)

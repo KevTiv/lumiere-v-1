@@ -20,7 +20,7 @@ import { useOverviewModuleSubscription } from "@/lib/module-subscription-hooks"
 import { enumTag, moveTypeTagFromRow } from "@/lib/accounting-post-draft"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useSaleOrders, type SaleOrder } from "@lumiere/query-hooks/hooks/sales"
-import { useAccountMoves, type AccountMove } from "@lumiere/query-hooks/hooks/accounting"
+import { useAccountMoves } from "@lumiere/query-hooks/hooks/accounting"
 import { usePaymentReconciliations, usePaymentTransactions } from "@lumiere/query-hooks/hooks/accounting"
 import { useStockQuants, useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import { usePurchaseOrders, type PurchaseOrder } from "@lumiere/query-hooks/hooks/purchasing"
@@ -35,7 +35,6 @@ import type { StockQuant, Product } from "@lumiere/stdb/types"
 interface OverviewClientProps {
   organizationId?: number
   initialOrders?: SaleOrder[]
-  initialMoves?: AccountMove[]
   initialStockQuants?: StockQuant[]
   initialProducts?: Product[]
   initialTasks?: ProjectTask[]
@@ -65,6 +64,17 @@ function orderTimestampMs(row: Record<string, unknown>): number {
   const n = Number(raw)
   if (!Number.isFinite(n) || n <= 0) return 0
   return n > 1e15 ? n / 1000 : n
+}
+
+function timestampMs(value: unknown): number | null {
+  if (value == null) return null
+  if (typeof value === "object" && "microsSinceUnixEpoch" in (value as object)) {
+    const micros = Number((value as { microsSinceUnixEpoch: unknown }).microsSinceUnixEpoch)
+    return Number.isFinite(micros) && micros !== 0 ? micros / 1_000 : null
+  }
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || numeric === 0) return null
+  return numeric > 1e15 ? numeric / 1_000 : numeric
 }
 
 function lastSixMonthLabels(): string[] {
@@ -114,7 +124,6 @@ export function OverviewClient(props: OverviewClientProps) {
 function OverviewClientLoaded({
   organizationId,
   initialOrders,
-  initialMoves,
   initialStockQuants,
   initialProducts,
   initialTasks,
@@ -128,7 +137,7 @@ function OverviewClientLoaded({
   const operatingCompanyId = useOperatingCompanyId(organizationId)
 
   const { data: orders = [], isLoading: ordersLoading } = useSaleOrders(orgId, initialOrders)
-  const { data: moves = [], isLoading: movesLoading } = useAccountMoves(orgId, { initialData: initialMoves })
+  const { data: moves = [], isLoading: movesLoading } = useAccountMoves(orgId)
   const { data: stockQuants = [], isLoading: stockQuantsLoading } = useStockQuants(orgId, initialStockQuants)
   const { data: products = [], isLoading: productsLoading } = useProducts(orgId, initialProducts)
   const { data: tasks = [], isLoading: tasksLoading } = useTasks(orgId, initialTasks)
@@ -251,8 +260,8 @@ function OverviewClientLoaded({
       const residual = Number(m.amountResidual ?? 0)
       if (residual <= 0) return false
       if (m.invoiceDateDue == null) return true
-      const dueMs = Number(m.invoiceDateDue) / 1000
-      return dueMs < nowMs
+      const dueMs = timestampMs(m.invoiceDateDue)
+      return dueMs != null && dueMs < nowMs
     })
     const overdueInvoiceTotal = overdueInvoices.reduce(
       (sum, m) => sum + Number(m.amountResidual ?? 0),
@@ -362,8 +371,8 @@ function OverviewClientLoaded({
     const pendingMessageApprovals = messageBatches.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId) && enumTag((row as Record<string, unknown>).status) === "PendingApproval").length
     const overdueInvoices = scopedMoves.filter((row) => {
       const move = row as Record<string, unknown>
-      const due = Number(move.invoiceDateDue ?? 0) / 1000
-      return moveTypeTagFromRow(move) === "OutInvoice" && Number(move.amountResidual ?? 0) > 0 && due > 0 && due < Date.now()
+      const due = timestampMs(move.invoiceDateDue)
+      return moveTypeTagFromRow(move) === "OutInvoice" && Number(move.amountResidual ?? 0) > 0 && due != null && due < Date.now()
     }).length
     return { overdueInvoices, unreconciledPayments, lowStockProducts, pendingMessageApprovals }
   }, [messageBatches, operatingCompanyId, paymentReconciliations, paymentTransactions, products, scopedMoves, stockQuants])

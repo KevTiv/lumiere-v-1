@@ -10,11 +10,13 @@ import {
   decodeAccountAccountsQueryResponse,
   decodeAccountJournalsQueryResponse,
   decodeAccountMoveLinesQueryResponse,
+  decodeAccountMovesQueryResponse,
   decodeAccountTaxesQueryResponse,
   decodeCompaniesQueryResponse,
   type AccountAccountQueryRow,
   type AccountJournalQueryRow,
   type AccountMoveLineQueryRow,
+  type AccountMoveQueryRow,
   type AccountTaxQueryRow,
   type CompanyQueryRow,
 } from "./resource-reads"
@@ -66,6 +68,9 @@ export interface StdbSdk {
       }
       readonly moveLines: {
         list(): Promise<AccountMoveLineQueryRow[]>
+      }
+      readonly moves: {
+        list(): Promise<AccountMoveQueryRow[]>
       }
       readonly taxes: {
         list(): Promise<AccountTaxQueryRow[]>
@@ -240,6 +245,14 @@ export function createStdbSdk(apiFetch: LumiereHttpFetch): StdbSdk {
               `/api/query/account-move-lines?companyId=${encodeURIComponent(companyId.toString())}`,
               "Query account-move-lines failed",
               decodeAccountMoveLinesQueryResponse,
+            ),
+          },
+          moves: {
+            list: () => executeQuery(
+              apiFetch,
+              `/api/query/account-moves?companyId=${encodeURIComponent(companyId.toString())}`,
+              "Query account-moves failed",
+              decodeAccountMovesQueryResponse,
             ),
           },
           taxes: {

@@ -6,6 +6,7 @@ import type {
   AccountAccountQueryRow,
   AccountJournalQueryRow,
   AccountMoveLineQueryRow,
+  AccountMoveQueryRow,
   AccountTaxQueryRow,
 } from "@lumiere/stdb/resource-reads"
 import { createStdbSdk } from "@lumiere/stdb/sdk"
@@ -18,7 +19,6 @@ import {
 import { stdbParamsToJson, encodeOptionalU64 } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   AccountFiscalYear,
-  AccountMove,
   AccountPeriod,
   AddAccountMoveLineParams,
   AllocatePaymentParams,
@@ -69,7 +69,6 @@ function toScalarU64(v: bigint | number | string): bigint {
 
 export type {
   AccountFiscalYear,
-  AccountMove,
   AccountMoveLine,
   AccountPeriod,
   AccountTax,
@@ -89,8 +88,10 @@ export type { AccountAccountQueryRow as AccountAccount } from "@lumiere/stdb/res
 export type {
   AccountJournalQueryRow,
   AccountMoveLineQueryRow,
+  AccountMoveQueryRow,
   AccountTaxQueryRow,
 } from "@lumiere/stdb/resource-reads"
+export type { AccountMoveQueryRow as AccountMove } from "@lumiere/stdb/resource-reads"
 
 // ── Query Hooks ───────────────────────────────────────────────────────────────
 
@@ -134,9 +135,15 @@ export function useAccountGroups(
  */
 export function useAccountMoves(
   organizationId: bigint,
-  options?: { staleTime?: number; enabled?: boolean; initialData?: AccountMove[] },
+  options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("account-moves", organizationId, options)
+  const sdk = createStdbSdk(apiFetch)
+  return useCompanyScopedTypedQuery<AccountMoveQueryRow>(
+    "account-moves",
+    organizationId,
+    (companyId) => sdk.forCompany(companyId).accounting.moves.list(),
+    options,
+  )
 }
 
 /**

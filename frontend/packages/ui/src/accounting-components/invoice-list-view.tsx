@@ -73,7 +73,7 @@ function getMoveStatus(move: AccountMove): DisplayStatus {
   if (state === "Draft") return "draft"
   if (paymentState === "Paid") return "paid"
   if (paymentState === "InPayment") return "partial"
-  if (move.amountResidual > 0 && move.invoiceDateDue) {
+  if ((move.amountResidual ?? 0) > 0 && move.invoiceDateDue) {
     const due = microsSinceEpochToDate(move.invoiceDateDue)
     if (due != null && due < new Date()) return "overdue"
   }
@@ -126,8 +126,8 @@ export function InvoiceListView({
     paid: invoices.filter((i) => getMoveStatus(i) === "paid").length,
     pending: invoices.filter((i) => ["sent", "partial"].includes(getMoveStatus(i))).length,
     overdue: invoices.filter((i) => getMoveStatus(i) === "overdue").length,
-    totalAmount: invoices.reduce((s, i) => s + i.amountTotal, 0),
-    totalDue: invoices.reduce((s, i) => s + i.amountResidual, 0),
+    totalAmount: invoices.reduce((s, i) => s + (i.amountTotal ?? 0), 0),
+    totalDue: invoices.reduce((s, i) => s + (i.amountResidual ?? 0), 0),
   }
 
   return (
@@ -232,10 +232,10 @@ export function InvoiceListView({
                     </TableCell>
                     <TableCell>{formatTimestamp(inv.invoiceDate)}</TableCell>
                     <TableCell>{formatTimestamp(inv.invoiceDateDue)}</TableCell>
-                    <TableCell className="font-medium">{formatCurrency(inv.amountTotal)}</TableCell>
+                    <TableCell className="font-medium">{formatCurrency(inv.amountTotal ?? 0)}</TableCell>
                     <TableCell>
-                      <span className={cn("font-medium", inv.amountResidual > 0 ? "text-warning" : "text-success")}>
-                        {formatCurrency(inv.amountResidual)}
+                      <span className={cn("font-medium", (inv.amountResidual ?? 0) > 0 ? "text-warning" : "text-success")}>
+                        {formatCurrency(inv.amountResidual ?? 0)}
                       </span>
                     </TableCell>
                     <TableCell>

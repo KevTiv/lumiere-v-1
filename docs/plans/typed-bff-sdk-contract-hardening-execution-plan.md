@@ -272,15 +272,21 @@ implicitly selected company.
   generated runtime types;
 - `sdk.organization.companies.list()` is the first typed read domain method and
   `useCompanies` no longer asserts an unknown HTTP body as `Company[]`;
-- contracts releases through v0.3.20 generate projection-aware codecs for
+- contracts releases through v0.3.21 generate projection-aware codecs for
   `companies`, `account-accounts`, `account-journals`, `account-taxes`, and
-  `account-move-lines` directly from the canonical resource/type graph;
-- the accounting SDK and hooks bind the selected company on all four migrated
+  `account-move-lines` and `account-moves` directly from the canonical
+  resource/type graph;
+- the accounting SDK and hooks bind the selected company on all five migrated
   accounting reads, decode the HTTP body from `unknown`, preserve mandatory-only
   projections, and reject unknown fields, lossy IDs, malformed enums, and
   malformed timestamps;
 - `account-move-lines` browser consumers now use the projected row type directly
   and no longer fall back to snake-case/full-table assertions;
+- the primary accounting and sales `account-moves` consumers now accept the
+  projected row type directly; organization-wide SSR seeds were removed because
+  they could not safely seed the selected-company cache, and timestamp consumers
+  now handle the generated timestamp object rather than coercing it with
+  `Number(...)`;
 - accounting and subscription mutations that change move lines invalidate the
   typed HTTP cache through the shared resource invalidation path;
 - the pilot deliberately excludes `pos-orders`, whose cursor envelope and read
@@ -289,10 +295,9 @@ implicitly selected company.
 This is Phase 6 progress, not the phase exit. Most resource query and scope
 descriptors remain unclassified, so typed codecs continue to ship behind an
 explicit reviewed resource allowlist. `account-account-types` is intentionally
-deferred until its shared-plus-optional-company visibility is explicit; the
-next accounting slice should either repair that scope contract or migrate the
-company-bound `account-moves` read without asserting projected rows as full
-table records.
+deferred until its shared-plus-optional-company visibility is explicit; that
+scope contract is the next accounting boundary to repair before its typed-read
+migration.
 
 ### Phase 7 — delete redundant layers
 

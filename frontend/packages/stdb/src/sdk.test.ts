@@ -105,7 +105,7 @@ test("accounting SDK scopes and decodes account projections", async () => {
   }])
 })
 
-test("accounting SDK scopes and decodes journal, move-line, and tax projections", async () => {
+test("accounting SDK scopes and decodes journal, move, move-line, and tax projections", async () => {
   const requestedUrls: string[] = []
   const sdk = createStdbSdk(async (url) => {
     requestedUrls.push(url)
@@ -119,6 +119,11 @@ test("accounting SDK scopes and decodes journal, move-line, and tax projections"
         data: [{ id: "8", organizationId: 11, moveId: 13, accountId: "1100" }],
       }))
     }
+    if (url.includes("account-moves")) {
+      return new Response(JSON.stringify({
+        data: [{ id: "21", organizationId: 11, moveType: "OutInvoice", amountTotal: 121 }],
+      }))
+    }
     return new Response(JSON.stringify({
       data: [{ id: 9, organizationId: "11", amount: 21, typeTaxUse: "Sale" }],
     }))
@@ -127,11 +132,13 @@ test("accounting SDK scopes and decodes journal, move-line, and tax projections"
   const companySdk = sdk.forCompany(42n).accounting
   const journals = await companySdk.journals.list()
   const moveLines = await companySdk.moveLines.list()
+  const moves = await companySdk.moves.list()
   const taxes = await companySdk.taxes.list()
 
   assert.deepEqual(requestedUrls, [
     "/api/query/account-journals?companyId=42",
     "/api/query/account-move-lines?companyId=42",
+    "/api/query/account-moves?companyId=42",
     "/api/query/account-taxes?companyId=42",
   ])
   assert.deepEqual(journals, [{
@@ -151,6 +158,12 @@ test("accounting SDK scopes and decodes journal, move-line, and tax projections"
     organizationId: 11n,
     moveId: 13n,
     accountId: 1100n,
+  }])
+  assert.deepEqual(moves, [{
+    id: 21n,
+    organizationId: 11n,
+    moveType: { tag: "OutInvoice" },
+    amountTotal: 121,
   }])
 })
 
