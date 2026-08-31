@@ -563,10 +563,30 @@ pub(crate) fn accounting_resource(resource: &str) -> bool {
             | "account-periods"
             | "account-reconciliation-widgets"
             | "account-taxes"
+            | "amortization-lines"
+            | "amortization-schedules"
+            | "analytic-accounts"
+            | "analytic-distribution-models"
+            | "analytic-lines"
+            | "bank-statements"
             | "budgets"
             | "budget-lines"
             | "budget-posts"
+            | "consolidation-elimination-entries"
+            | "depreciation-lines"
             | "fiscal-years"
+            | "fixed-assets"
+            | "fx-revaluation-runs"
+            | "partner-credit-controls"
+            | "partner-credit-holds"
+            | "payment-accounts"
+            | "payment-fees"
+            | "payment-reconciliations"
+            | "payment-reversals"
+            | "payment-transactions"
+            | "tax-deadlines"
+            | "tax-groups"
+            | "tax-schedules"
     )
 }
 
@@ -1268,7 +1288,10 @@ pub async fn execute_resource_query_for_company(
         }
         "consolidation-accounts" => {
             let col = resolve_http_sql_columns(resource, fa).map_err(ApiError::Internal)?;
-            let sql = format!("SELECT {} FROM consolidation_account", col.join(", "));
+            let sql = format!(
+                "SELECT {} FROM consolidation_account WHERE organization_id = {organization_id}",
+                col.join(", ")
+            );
             return client
                 .query_sql(&sql)
                 .await
@@ -1276,7 +1299,10 @@ pub async fn execute_resource_query_for_company(
         }
         "consolidation-journals" => {
             let col = resolve_http_sql_columns(resource, fa).map_err(ApiError::Internal)?;
-            let sql = format!("SELECT {} FROM consolidation_journal", col.join(", "));
+            let sql = format!(
+                "SELECT {} FROM consolidation_journal WHERE organization_id = {organization_id}",
+                col.join(", ")
+            );
             return client
                 .query_sql(&sql)
                 .await
@@ -1284,8 +1310,13 @@ pub async fn execute_resource_query_for_company(
         }
         "consolidation-elimination-entries" => {
             let col = resolve_http_sql_columns(resource, fa).map_err(ApiError::Internal)?;
+            let company_id = accounting_company_id.ok_or_else(|| {
+                ApiError::Internal(
+                    "consolidation elimination entries require accounting company scope".into(),
+                )
+            })?;
             let sql = format!(
-                "SELECT {} FROM consolidation_elimination_entry",
+                "SELECT {} FROM consolidation_elimination_entry WHERE organization_id = {organization_id} AND company_id = {company_id}",
                 col.join(", ")
             );
             return client
@@ -2577,10 +2608,30 @@ mod tests {
             "account-periods",
             "account-reconciliation-widgets",
             "account-taxes",
+            "amortization-lines",
+            "amortization-schedules",
+            "analytic-accounts",
+            "analytic-distribution-models",
+            "analytic-lines",
+            "bank-statements",
             "budgets",
             "budget-lines",
             "budget-posts",
+            "consolidation-elimination-entries",
+            "depreciation-lines",
             "fiscal-years",
+            "fixed-assets",
+            "fx-revaluation-runs",
+            "partner-credit-controls",
+            "partner-credit-holds",
+            "payment-accounts",
+            "payment-fees",
+            "payment-reconciliations",
+            "payment-reversals",
+            "payment-transactions",
+            "tax-deadlines",
+            "tax-groups",
+            "tax-schedules",
         ] {
             assert!(
                 accounting_resource(resource),
@@ -2622,10 +2673,30 @@ mod tests {
             "account-periods",
             "account-reconciliation-widgets",
             "account-taxes",
+            "amortization-lines",
+            "amortization-schedules",
+            "analytic-accounts",
+            "analytic-distribution-models",
+            "analytic-lines",
+            "bank-statements",
             "budgets",
             "budget-lines",
             "budget-posts",
+            "consolidation-elimination-entries",
+            "depreciation-lines",
             "fiscal-years",
+            "fixed-assets",
+            "fx-revaluation-runs",
+            "partner-credit-controls",
+            "partner-credit-holds",
+            "payment-accounts",
+            "payment-fees",
+            "payment-reconciliations",
+            "payment-reversals",
+            "payment-transactions",
+            "tax-deadlines",
+            "tax-groups",
+            "tax-schedules",
         ] {
             let entry = registry_get(resource).expect("accounting resource must be registered");
             let projects_company_id = entry.mandatory.iter().any(|f| f == "company_id")

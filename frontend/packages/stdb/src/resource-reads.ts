@@ -8,6 +8,7 @@ import {
   type AccountMoveQueryRow,
   type AccountTaxQueryRow,
   type CompanyQueryRow,
+  type ResourceQueryRowMap,
 } from "@lumiere/contracts/generated/resource-codecs"
 
 export type {
@@ -18,6 +19,19 @@ export type {
   AccountMoveQueryRow,
   AccountTaxQueryRow,
   CompanyQueryRow,
+  ResourceQueryRowMap,
+}
+
+export type TypedResourceReadKey = keyof ResourceQueryRowMap
+
+/** Decode a normal `{ data: [...] }` query envelope using its generated row descriptor. */
+export function decodeTypedResourceQueryResponse<Resource extends TypedResourceReadKey>(
+  resource: Resource,
+  value: unknown,
+): ResourceQueryRowMap[Resource][] {
+  return decodeQueryListResponse(value, (row, index) =>
+    decodeResourceQueryRow(resource, row, index),
+  )
 }
 
 /** Decode selected-company and organization-shared account type rows. */

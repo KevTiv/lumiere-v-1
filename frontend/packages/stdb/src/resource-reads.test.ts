@@ -13,7 +13,20 @@ import {
   decodeAccountMovesQueryResponse,
   decodeAccountTaxesQueryResponse,
   decodeCompaniesQueryResponse,
+  decodeTypedResourceQueryResponse,
 } from "./resource-reads"
+
+test("generic typed read decodes expanded accounting resources", () => {
+  const rows = decodeTypedResourceQueryResponse("account-groups", {
+    data: [{ id: "41", organizationId: 11, companyId: "42", level: 2 }],
+  })
+  assert.deepEqual(rows, [{
+    id: 41n,
+    organizationId: 11n,
+    companyId: 42n,
+    level: 2,
+  }])
+})
 
 test("account type read preserves shared and selected-company rows", () => {
   assert.deepEqual(

@@ -1,8 +1,7 @@
 # Typed BFF SDK and contract hardening — execution plan
 
-**Status:** Phase 5 complete; Phase 6 in progress through the projection-aware
-company and accounting read slices — 2026-08-31
-**First Phase 6 pickup:** `frontend/packages/query-hooks/src/hooks/organization-company.ts`
+**Status:** Phase 6 complete for the migrated organization and accounting
+domains; Phase 7 is next — 2026-08-31
 **Tracks:** canonical IR, contracts extraction, write-path hardening, typed reads,
 generated codecs, generated SDK, frontend type debt
 
@@ -272,7 +271,7 @@ implicitly selected company.
   generated runtime types;
 - `sdk.organization.companies.list()` is the first typed read domain method and
   `useCompanies` no longer asserts an unknown HTTP body as `Company[]`;
-- contracts releases through v0.3.22 generate projection-aware codecs for
+- contracts releases through v0.3.23 generate projection-aware codecs for
   `companies`, `account-account-types`, `account-accounts`, `account-journals`,
   `account-taxes`, `account-move-lines`, and `account-moves` directly from the
   canonical resource/type graph;
@@ -280,6 +279,18 @@ implicitly selected company.
   accounting reads, decode the HTTP body from `unknown`, preserve mandatory-only
   projections, and reject unknown fields, lossy IDs, malformed enums, and
   malformed timestamps;
+- v0.3.23 expands the generated codec map to every normal accounting resource
+  consumed by `hooks/accounting.ts`; the generic typed loader validates the
+  normal `{ data: [...] }` envelope and every row from `unknown`, uses a cache
+  namespace that cannot be seeded by direct subscriptions, and requires an
+  explicit active-company selection;
+- all 37 remaining accounting query hooks use that generated loader rather than
+  `useStdbQuery`'s unchecked assertion boundary;
+- api-server now classifies every direct-company accounting table in the
+  migrated surface, projects/filters `company_id` fail-closed, scopes
+  consolidation accounts and journals to the authenticated organization, and
+  scopes consolidation elimination entries to both organization and selected
+  company;
 - `account-move-lines` browser consumers now use the projected row type directly
   and no longer fall back to snake-case/full-table assertions;
 - the primary accounting and sales `account-moves` consumers now accept the
@@ -296,11 +307,13 @@ implicitly selected company.
 - the pilot deliberately excludes `pos-orders`, whose cursor envelope and read
   authorization need a separate contract and scope repair.
 
-This is Phase 6 progress, not the phase exit. Most resource query and scope
-descriptors remain unclassified, so typed codecs continue to ship behind an
-explicit reviewed resource allowlist. The next accounting slice is
-`account-groups`, whose required-company API scope is already classified in the
-server but whose projection and consumers still use the generic row boundary.
+**Phase 6 exit achieved:** the migrated organization and accounting domains now
+have generated mutation inputs and generated, runtime-decoded query results.
+Typed codecs remain behind an explicit reviewed resource allowlist: this exit
+does not assert that every one of the 336 registry resources is safe to migrate.
+`pos-orders` remains explicitly excluded because its cursor envelope requires a
+separate result contract, and future domain migrations must classify their API
+scope before joining the typed-read set.
 
 ### Phase 7 — delete redundant layers
 

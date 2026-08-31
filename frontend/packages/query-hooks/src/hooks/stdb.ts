@@ -23,6 +23,11 @@ import type { OperationInputMap } from "@lumiere/contracts/generated/operation-i
 import { isSubscriptionReady, useSubscriptionCache } from "@lumiere/stdb/live"
 import type { QueryResourceKey } from "@lumiere/stdb/generated/query-registry"
 import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
+import {
+  decodeTypedResourceQueryResponse,
+  type ResourceQueryRowMap,
+  type TypedResourceReadKey,
+} from "@lumiere/stdb/resource-reads"
 
 import { apiFetch, coalesceQueryInitialData } from "../http"
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
@@ -275,6 +280,43 @@ export function useCompanyScopedTypedQuery<Row>(
       companyId != null &&
       companyId > 0,
     staleTime: options?.staleTime ?? 30_000,
+  })
+}
+
+/** Fetch and decode any resource in the reviewed generated typed-read set. */
+export function useTypedStdbQuery<Resource extends TypedResourceReadKey>(
+  resource: Resource,
+  organizationId: bigint | number,
+  options?: {
+    staleTime?: number
+    enabled?: boolean
+    initialData?: ResourceQueryRowMap[Resource][]
+  },
+) {
+  const { activeCompanyId, activeCompanyReady } = useErpSession()
+  const companyId = activeCompanyReady ? activeCompanyId : null
+  return useQuery<ResourceQueryRowMap[Resource][]>({
+    queryKey: typedStdbQueryKey(resource, organizationId, companyId),
+    queryFn: async () => {
+      if (companyId == null || companyId <= 0) {
+        throw new Error(`An active company is required to query ${resource}`)
+      }
+      const companyQuery = `?companyId=${encodeURIComponent(String(companyId))}`
+      const response = await apiFetch(`/api/query/${resource}${companyQuery}`)
+      if (!response.ok) {
+        const json = await response.json().catch(() => ({})) as Record<string, unknown>
+        throw new Error((json.error as string | undefined) ?? `Query ${resource} failed`)
+      }
+      return decodeTypedResourceQueryResponse(resource, await response.json())
+    },
+    enabled:
+      (options?.enabled ?? true) &&
+      hasPositiveOrganizationId(organizationId) &&
+      activeCompanyReady &&
+      companyId != null &&
+      companyId > 0,
+    staleTime: options?.staleTime ?? 30_000,
+    initialData: coalesceQueryInitialData(options?.initialData),
   })
 }
 

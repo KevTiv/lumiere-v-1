@@ -982,7 +982,8 @@
       "debit",
       "credit",
       "elimination_type",
-      "is_matched"
+      "is_matched",
+      "company_id"
     ],
     "mandatory": [
       "id",
@@ -1526,7 +1527,8 @@
       "amount",
       "depreciation_date",
       "remaining_value",
-      "depreciated_value"
+      "depreciated_value",
+      "company_id"
     ],
     "mandatory": [
       "id",
