@@ -2987,7 +2987,7 @@ function AccountingClientReady({
     if (action === "createAccount") {
       const p = toCreateAccountAccountParams(formData, {
         companyId: operatingCompanyId,
-        accountTypes: accountTypes as Record<string, unknown>[],
+        accountTypes,
       })
       if (p) await createAccount.mutateAsync(p)
     } else if (action === "createMove") {
@@ -3175,7 +3175,7 @@ function AccountingClientReady({
                     onCreate={async (data) => {
                       const p = toCreateAccountAccountParams(data as Record<string, unknown>, {
                         companyId: operatingCompanyId,
-                        accountTypes: accountTypes as Record<string, unknown>[],
+                        accountTypes,
                       })
                       if (p) await createAccount.mutateAsync(p)
                     }}

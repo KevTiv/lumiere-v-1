@@ -40,7 +40,10 @@ import type {
 } from '@lumiere/stdb/types'
 import type { Timestamp } from "spacetimedb"
 
-import { userTypeIdFromAccountTypes } from "./accounting-defaults"
+import {
+  userTypeIdFromAccountTypes,
+  type AccountTypeLookupRow,
+} from "./accounting-defaults"
 import {
   formValue as field,
   optionalBigIntU64,
@@ -146,7 +149,7 @@ function toInternalGroup(
 
 export function toCreateAccountAccountParams(
   formData: Record<string, unknown>,
-  opts: { companyId: bigint; accountTypes?: ReadonlyArray<Record<string, unknown>> },
+  opts: { companyId: bigint; accountTypes?: ReadonlyArray<AccountTypeLookupRow> },
 ): CreateAccountAccountParams | null {
   const rawUt = formData.userTypeId
   let userTypeId: bigint | null =

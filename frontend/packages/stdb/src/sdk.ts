@@ -7,12 +7,14 @@ import {
 } from "./commands"
 import { stdbParamsToJson } from "./stdb-params-json"
 import {
+  decodeAccountAccountTypesQueryResponse,
   decodeAccountAccountsQueryResponse,
   decodeAccountJournalsQueryResponse,
   decodeAccountMoveLinesQueryResponse,
   decodeAccountMovesQueryResponse,
   decodeAccountTaxesQueryResponse,
   decodeCompaniesQueryResponse,
+  type AccountAccountTypeQueryRow,
   type AccountAccountQueryRow,
   type AccountJournalQueryRow,
   type AccountMoveLineQueryRow,
@@ -62,6 +64,9 @@ export interface StdbSdk {
       readonly accounts: {
         list(): Promise<AccountAccountQueryRow[]>
         create(params: CreateAccountParams): Promise<void>
+      }
+      readonly accountTypes: {
+        list(): Promise<AccountAccountTypeQueryRow[]>
       }
       readonly journals: {
         list(): Promise<AccountJournalQueryRow[]>
@@ -230,6 +235,14 @@ export function createStdbSdk(apiFetch: LumiereHttpFetch): StdbSdk {
             create: (params) => execute("create_account_account", {
               params: { ...params, companyId },
             }),
+          },
+          accountTypes: {
+            list: () => executeQuery(
+              apiFetch,
+              `/api/query/account-account-types?companyId=${encodeURIComponent(companyId.toString())}`,
+              "Query account-account-types failed",
+              decodeAccountAccountTypesQueryResponse,
+            ),
           },
           journals: {
             list: () => executeQuery(

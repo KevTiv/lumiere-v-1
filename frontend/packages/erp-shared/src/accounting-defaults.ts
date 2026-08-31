@@ -7,16 +7,20 @@ function slugFromAccountInternalGroupField(v: unknown): string {
   return String(v ?? "").toLowerCase()
 }
 
+export interface AccountTypeLookupRow {
+  readonly id?: unknown
+  readonly internalGroup?: unknown
+}
+
 /** First account type whose internal group matches the form slug (`asset`, `income`, …). */
 export function userTypeIdFromAccountTypes(
-  accountTypes: ReadonlyArray<Record<string, unknown>>,
+  accountTypes: ReadonlyArray<AccountTypeLookupRow>,
   internalGroupSlug: string | undefined,
 ): bigint | undefined {
   const want = String(internalGroupSlug ?? "").toLowerCase()
   if (!want) return undefined
   for (const row of accountTypes) {
-    const ig =
-      row.internalGroup ?? (row as Record<string, unknown>).internal_group
+    const ig = row.internalGroup
     if (slugFromAccountInternalGroupField(ig) !== want) continue
     const id = row.id
     if (id == null || id === "") continue

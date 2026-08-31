@@ -272,11 +272,11 @@ implicitly selected company.
   generated runtime types;
 - `sdk.organization.companies.list()` is the first typed read domain method and
   `useCompanies` no longer asserts an unknown HTTP body as `Company[]`;
-- contracts releases through v0.3.21 generate projection-aware codecs for
-  `companies`, `account-accounts`, `account-journals`, `account-taxes`, and
-  `account-move-lines` and `account-moves` directly from the canonical
-  resource/type graph;
-- the accounting SDK and hooks bind the selected company on all five migrated
+- contracts releases through v0.3.22 generate projection-aware codecs for
+  `companies`, `account-account-types`, `account-accounts`, `account-journals`,
+  `account-taxes`, `account-move-lines`, and `account-moves` directly from the
+  canonical resource/type graph;
+- the accounting SDK and hooks bind the selected company on all six migrated
   accounting reads, decode the HTTP body from `unknown`, preserve mandatory-only
   projections, and reject unknown fields, lossy IDs, malformed enums, and
   malformed timestamps;
@@ -287,6 +287,10 @@ implicitly selected company.
   they could not safely seed the selected-company cache, and timestamp consumers
   now handle the generated timestamp object rather than coercing it with
   `Number(...)`;
+- `account-account-types` now has an authored canonical
+  `organization_optional_company` scope: the API resolves the session-authorized
+  selected company, returns that company plus null-company organization-shared
+  rows, and filters out rows owned by every other company before decoding;
 - accounting and subscription mutations that change move lines invalidate the
   typed HTTP cache through the shared resource invalidation path;
 - the pilot deliberately excludes `pos-orders`, whose cursor envelope and read
@@ -294,10 +298,9 @@ implicitly selected company.
 
 This is Phase 6 progress, not the phase exit. Most resource query and scope
 descriptors remain unclassified, so typed codecs continue to ship behind an
-explicit reviewed resource allowlist. `account-account-types` is intentionally
-deferred until its shared-plus-optional-company visibility is explicit; that
-scope contract is the next accounting boundary to repair before its typed-read
-migration.
+explicit reviewed resource allowlist. The next accounting slice is
+`account-groups`, whose required-company API scope is already classified in the
+server but whose projection and consumers still use the generic row boundary.
 
 ### Phase 7 — delete redundant layers
 

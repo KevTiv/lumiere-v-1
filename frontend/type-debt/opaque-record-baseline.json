@@ -1,7 +1,6 @@
 {
   "packages/api-client/src/query-list.ts": 2,
-  "packages/erp-shared/src/accounting-create-params.ts": 121,
-  "packages/erp-shared/src/accounting-defaults.ts": 2,
+  "packages/erp-shared/src/accounting-create-params.ts": 120,
   "packages/erp-shared/src/ai-coverage-create-params.ts": 3,
   "packages/erp-shared/src/ai-create-params.ts": 17,
   "packages/erp-shared/src/ai-skill-harness-schemas.ts": 1,
@@ -157,7 +156,7 @@
   "packages/ui/src/settings/user-management.tsx": 1,
   "packages/ui/src/tasks/task-board-view.tsx": 1,
   "web/app/(auth)/onboarding/page.tsx": 1,
-  "web/app/(modules)/accounting/accounting-client.tsx": 132,
+  "web/app/(modules)/accounting/accounting-client.tsx": 130,
   "web/app/(modules)/accounting/payment-operations-panel.tsx": 1,
   "web/app/(modules)/ai-harness/ai-harness-client.tsx": 1,
   "web/app/(modules)/ai-harness/low-stock-panel.tsx": 1,

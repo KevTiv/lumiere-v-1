@@ -3,6 +3,7 @@
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import type {
+  AccountAccountTypeQueryRow,
   AccountAccountQueryRow,
   AccountJournalQueryRow,
   AccountMoveLineQueryRow,
@@ -86,6 +87,7 @@ export type {
 } from "@lumiere/stdb/types"
 export type { AccountAccountQueryRow as AccountAccount } from "@lumiere/stdb/resource-reads"
 export type {
+  AccountAccountTypeQueryRow,
   AccountJournalQueryRow,
   AccountMoveLineQueryRow,
   AccountMoveQueryRow,
@@ -119,7 +121,13 @@ export function useAccountAccountTypes(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("account-account-types", organizationId, options)
+  const sdk = createStdbSdk(apiFetch)
+  return useCompanyScopedTypedQuery<AccountAccountTypeQueryRow>(
+    "account-account-types",
+    organizationId,
+    (companyId) => sdk.forCompany(companyId).accounting.accountTypes.list(),
+    options,
+  )
 }
 
 /** Account groups (hierarchy / code ranges) for the organization. */

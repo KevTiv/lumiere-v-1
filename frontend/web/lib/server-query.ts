@@ -11,12 +11,14 @@ import { parseQueryListResponse } from "@lumiere/api-client"
 import type { QueryResourceKey } from "@lumiere/stdb/generated/query-registry"
 import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
 import {
+  decodeAccountAccountTypesQueryResponse,
   decodeAccountAccountsQueryResponse,
   decodeAccountJournalsQueryResponse,
   decodeAccountMoveLinesQueryResponse,
   decodeAccountMovesQueryResponse,
   decodeAccountTaxesQueryResponse,
   decodeCompaniesQueryResponse,
+  type AccountAccountTypeQueryRow,
   type AccountAccountQueryRow,
   type AccountJournalQueryRow,
   type AccountMoveLineQueryRow,
@@ -36,6 +38,7 @@ export type ServerQueryCredentials = {
 
 export type ServerQueryRowFor<K extends QueryResourceKey> =
   K extends "companies" ? CompanyQueryRow
+    : K extends "account-account-types" ? AccountAccountTypeQueryRow
     : K extends "account-accounts" ? AccountAccountQueryRow
       : K extends "account-journals" ? AccountJournalQueryRow
         : K extends "account-move-lines" ? AccountMoveLineQueryRow
@@ -77,6 +80,9 @@ async function fetchFromApiServer<K extends QueryResourceKey>(
   const payload: unknown = await res.json()
   if (resource === "companies") {
     return decodeCompaniesQueryResponse(payload) as ServerQueryRowFor<K>[]
+  }
+  if (resource === "account-account-types") {
+    return decodeAccountAccountTypesQueryResponse(payload) as ServerQueryRowFor<K>[]
   }
   if (resource === "account-accounts") {
     return decodeAccountAccountsQueryResponse(payload) as ServerQueryRowFor<K>[]

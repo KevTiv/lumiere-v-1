@@ -6,6 +6,7 @@ import { ResourceQueryRowDecodeError } from "@lumiere/contracts/generated/resour
 import { CANONICAL_RESOURCE_BY_NAME } from "@lumiere/contracts/generated/resources"
 
 import {
+  decodeAccountAccountTypesQueryResponse,
   decodeAccountAccountsQueryResponse,
   decodeAccountJournalsQueryResponse,
   decodeAccountMoveLinesQueryResponse,
@@ -13,6 +14,53 @@ import {
   decodeAccountTaxesQueryResponse,
   decodeCompaniesQueryResponse,
 } from "./resource-reads"
+
+test("account type read preserves shared and selected-company rows", () => {
+  assert.deepEqual(
+    CANONICAL_RESOURCE_BY_NAME["account-account-types"].scope,
+    {
+      company_field: "company_id",
+      kind: "organization_optional_company",
+      organization_field: "organization_id",
+    },
+  )
+  const rows = decodeAccountAccountTypesQueryResponse({
+    data: [
+      {
+        id: "31",
+        organizationId: 11,
+        name: "Receivable",
+        type: "receivable",
+        internalGroup: "Asset",
+        companyId: null,
+        includeInitialBalance: true,
+        isDeprecated: false,
+      },
+      { id: 32, organizationId: "11", companyId: "42" },
+    ],
+  })
+  assert.deepEqual(rows[0], {
+    id: 31n,
+    organizationId: 11n,
+    name: "Receivable",
+    type: "receivable",
+    internalGroup: { tag: "Asset" },
+    companyId: undefined,
+    includeInitialBalance: true,
+    isDeprecated: false,
+  })
+  assert.deepEqual(rows[1], {
+    id: 32n,
+    organizationId: 11n,
+    companyId: 42n,
+  })
+  assert.throws(
+    () => decodeAccountAccountTypesQueryResponse({
+      data: [{ id: 33, organizationId: 11, internalGroup: "Unsupported" }],
+    }),
+    ResourceQueryRowDecodeError,
+  )
+})
 
 test("company typed read stays aligned with canonical mandatory metadata", () => {
   assert.deepEqual(CANONICAL_RESOURCE_BY_NAME.companies.mandatory, [

@@ -1,5 +1,6 @@
 import { decodeQueryListResponse } from "@lumiere/api-client"
 import {
+  type AccountAccountTypeQueryRow,
   decodeResourceQueryRow,
   type AccountAccountQueryRow,
   type AccountJournalQueryRow,
@@ -10,12 +11,22 @@ import {
 } from "@lumiere/contracts/generated/resource-codecs"
 
 export type {
+  AccountAccountTypeQueryRow,
   AccountAccountQueryRow,
   AccountJournalQueryRow,
   AccountMoveLineQueryRow,
   AccountMoveQueryRow,
   AccountTaxQueryRow,
   CompanyQueryRow,
+}
+
+/** Decode selected-company and organization-shared account type rows. */
+export function decodeAccountAccountTypesQueryResponse(
+  value: unknown,
+): AccountAccountTypeQueryRow[] {
+  return decodeQueryListResponse(value, (row, index) =>
+    decodeResourceQueryRow("account-account-types", row, index),
+  )
 }
 
 /** Decode a company list while leaving HTTP envelope ownership in the app. */

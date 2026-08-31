@@ -9,6 +9,7 @@ import { mergeFieldDefaultValues, mergeSelectOptionsByFieldName } from "@/lib/fo
 import { FormModal } from "@/components/forms/form-modal"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import type { AccountAccountTypeQueryRow } from "@lumiere/stdb/resource-reads"
 
 function enumTag(v: unknown): string {
   if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
@@ -22,7 +23,7 @@ function internalGroupFormValue(v: unknown): string {
 }
 
 export interface ChartStructureWorkspaceProps {
-  accountTypes: Record<string, unknown>[]
+  accountTypes: AccountAccountTypeQueryRow[]
   accountGroups: Record<string, unknown>[]
   onCreateAccountType: (params: Record<string, unknown>) => void | Promise<void>
   onUpdateAccountType: (typeId: bigint, params: Record<string, unknown>) => void | Promise<void>
@@ -222,7 +223,7 @@ export function ChartStructureWorkspace({
         <CardContent>
           <EntityView
             config={typesTitleBlock}
-            data={accountTypes}
+            data={accountTypes as unknown as Record<string, unknown>[]}
             onRowClick={(row) => {
               const r = row as Record<string, unknown>
               setTypeDefaults({

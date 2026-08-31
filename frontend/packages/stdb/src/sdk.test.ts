@@ -105,6 +105,32 @@ test("accounting SDK scopes and decodes account projections", async () => {
   }])
 })
 
+test("accounting SDK scopes and decodes shared account type projections", async () => {
+  let requestedUrl = ""
+  const sdk = createStdbSdk(async (url) => {
+    requestedUrl = url
+    return new Response(JSON.stringify({
+      data: [
+        { id: "31", organizationId: 11, companyId: null, internalGroup: "Asset" },
+        { id: 32, organizationId: 11, companyId: "42" },
+      ],
+    }))
+  })
+
+  const accountTypes = await sdk.forCompany(42n).accounting.accountTypes.list()
+
+  assert.equal(requestedUrl, "/api/query/account-account-types?companyId=42")
+  assert.deepEqual(accountTypes, [
+    {
+      id: 31n,
+      organizationId: 11n,
+      companyId: undefined,
+      internalGroup: { tag: "Asset" },
+    },
+    { id: 32n, organizationId: 11n, companyId: 42n },
+  ])
+})
+
 test("accounting SDK scopes and decodes journal, move, move-line, and tax projections", async () => {
   const requestedUrls: string[] = []
   const sdk = createStdbSdk(async (url) => {
