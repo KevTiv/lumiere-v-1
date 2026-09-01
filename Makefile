@@ -985,7 +985,7 @@ check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-std
 	python3 "$$CHECKOUT/scripts/generate-from-ir.py" --check && \
 	diff -rq \
 		-x query-registry.ts -x operation-inputs.ts -x operation-descriptors.ts \
-		-x operations.ts -x resources.ts -x wire-codecs.ts \
+		-x operations.ts -x resources.ts -x resource-codecs.ts -x wire-codecs.ts \
 		"$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
 	diff "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/stdb-generated-sql-columns.json && \
 	if [ -f "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" ]; then \
