@@ -886,6 +886,7 @@ check-contract-ir: codegen
 	python3 lumiere-codegen/tests/test_contract_ir_pin.py
 
 check-codegen: codegen check-contract-ir lint-reducer-call-literals
+	@node scripts/validate-subscription-census.mjs --check
 	@git add -N \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		crates/stdb-client/src/generated_reducer_contract.rs \
