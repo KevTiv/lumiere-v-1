@@ -14,6 +14,20 @@ jobs:
   rust:
     name: Rust
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: lumiere
+          POSTGRES_USER: lumiere
+          POSTGRES_PASSWORD: lumiere
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U lumiere -d lumiere"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     steps:
       - uses: actions/checkout@v4
 
@@ -72,6 +86,17 @@ jobs:
 
       - name: api-server reducer contract tests
         run: cargo test -p api-server http_app::tests
+
+      - name: C3 PostgreSQL projection matrix
+        env:
+          C3_TEST_PG: "1"
+          PG_HOST: 127.0.0.1
+          PG_PORT: "5432"
+          PG_DATABASE: lumiere
+          PG_USER: lumiere
+          PG_PASSWORD: lumiere
+          PG_TLS_MODE: disable
+        run: cargo test -p api-server cold_tier::commit_projection::tests::postgres_manifest_matrix -- --nocapture
 
       - name: ai-gateway unit tests
         run: cargo test -p ai-gateway health_returns

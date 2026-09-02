@@ -170,10 +170,10 @@ fn read_pg_column(col: &ColumnCodec, row: &Row, i: usize) -> Result<Value> {
 /// A decoded, bindable value for one column.
 #[derive(Debug, Clone)]
 pub enum PgValue {
-    /// u64-domain integer, bound as decimal text and cast `::NUMERIC` —
+    /// u64-domain integer, bound as decimal text and cast `::TEXT::NUMERIC` —
     /// avoids needing a bignum crate just to bind `NUMERIC(20,0)`.
     NumericText(Option<String>),
-    /// Array/struct column, bound as JSON text and cast `::JSONB`.
+    /// Array/struct column, bound as JSON text and cast `::TEXT::JSONB`.
     JsonbText(Option<String>),
     BigInt(Option<i64>),
     Integer(Option<i32>),
@@ -187,8 +187,8 @@ pub enum PgValue {
 impl PgValue {
     pub(crate) fn needs_cast(&self) -> Option<&'static str> {
         match self {
-            PgValue::NumericText(_) => Some("NUMERIC"),
-            PgValue::JsonbText(_) => Some("JSONB"),
+            PgValue::NumericText(_) => Some("TEXT::NUMERIC"),
+            PgValue::JsonbText(_) => Some("TEXT::JSONB"),
             _ => None,
         }
     }

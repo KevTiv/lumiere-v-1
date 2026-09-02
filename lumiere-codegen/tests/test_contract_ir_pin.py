@@ -50,6 +50,8 @@ class ContractIrPinTest(unittest.TestCase):
         projection_tables = {
             table["name"]: {
                 "projection_table": table["name"],
+                "module": "test",
+                "projection_mode": "upsert-current",
                 "primary_key": {"name": projection_primary_key, "type": "U64"},
                 "columns": [
                     {
@@ -91,6 +93,8 @@ class ContractIrPinTest(unittest.TestCase):
                 "policies": [
                     {
                         "table": table["name"],
+                        "module": "test",
+                        "projection_mode": "upsert-current",
                         "cooling_eligibility": "never",
                         "organization_column": "organization_id",
                         "primary_key": {"column": "id"},

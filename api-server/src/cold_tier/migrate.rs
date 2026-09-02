@@ -38,6 +38,14 @@ const GENERATED_COLD_TABLE_DDL: &[(&str, &str)] = &[
         "organization_projection_watermark.sql",
         include_str!("../generated/pg_ddl/organization_projection_watermark.sql"),
     ),
+    (
+        "organization_projection_quarantine.sql",
+        include_str!("../generated/pg_ddl/organization_projection_quarantine.sql"),
+    ),
+    (
+        "organization_projection_status.sql",
+        include_str!("../generated/pg_ddl/organization_projection_status.sql"),
+    ),
 ];
 
 /// Apply every cold-tier DDL statement. Safe to call unconditionally on

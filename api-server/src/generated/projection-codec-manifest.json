@@ -267,11 +267,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_account"
     },
     "account_account_type": {
@@ -394,11 +396,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_account_type"
     },
     "account_analytic_account": {
@@ -683,11 +687,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_analytic_account"
     },
     "account_analytic_distribution_model": {
@@ -828,11 +834,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_analytic_distribution_model"
     },
     "account_analytic_line": {
@@ -1135,11 +1143,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_analytic_line"
     },
     "account_asset": {
@@ -1658,11 +1668,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_asset"
     },
     "account_asset_depreciation_line": {
@@ -1830,11 +1842,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_asset_depreciation_line"
     },
     "account_bank_statement": {
@@ -2065,11 +2079,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_bank_statement"
     },
     "account_bank_statement_line": {
@@ -2300,11 +2316,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_bank_statement_line"
     },
     "account_fiscal_position": {
@@ -2400,11 +2418,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_fiscal_position"
     },
     "account_fiscal_position_tax": {
@@ -2473,11 +2493,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_fiscal_position_tax"
     },
     "account_fiscal_year": {
@@ -2645,11 +2667,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_fiscal_year"
     },
     "account_group": {
@@ -2772,11 +2796,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_group"
     },
     "account_incoterm": {
@@ -2872,11 +2898,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_incoterm"
     },
     "account_journal": {
@@ -3215,11 +3243,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_journal"
     },
     "account_move": {
@@ -3702,11 +3732,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_move"
     },
     "account_move_line": {
@@ -4306,11 +4338,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_move_line"
     },
     "account_payment": {
@@ -4487,11 +4521,13 @@
           "stdb_type": "Identity"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_payment"
     },
     "account_payment_term": {
@@ -4551,11 +4587,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_payment_term"
     },
     "account_payment_term_line": {
@@ -4642,11 +4680,13 @@
           "stdb_type": "U32"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_payment_term_line"
     },
     "account_period": {
@@ -4796,11 +4836,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_period"
     },
     "account_reconciliation_widget": {
@@ -4923,11 +4965,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_reconciliation_widget"
     },
     "account_tax": {
@@ -5158,11 +5202,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_tax"
     },
     "account_tax_group": {
@@ -5294,11 +5340,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "account_tax_group"
     },
     "accounting_operation_receipt": {
@@ -5394,11 +5442,13 @@
           "stdb_type": "Identity"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "String"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "accounting_operation_receipt"
     },
     "accounting_ownership_backfill_issue": {
@@ -5476,11 +5526,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "accounting_ownership_backfill_issue"
     },
     "accounting_ownership_backfill_run": {
@@ -5558,11 +5610,13 @@
           "stdb_type": "Identity"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "accounting_ownership_backfill_run"
     },
     "activity": {
@@ -5793,11 +5847,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "activity"
     },
     "activity_type": {
@@ -5938,11 +5994,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "activity_type"
     },
     "adjustment_reason": {
@@ -6020,11 +6078,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "adjustment_reason"
     },
     "ai_action_draft": {
@@ -6237,11 +6297,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_action_draft"
     },
     "ai_agent": {
@@ -6499,11 +6561,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_agent"
     },
     "ai_agent_run": {
@@ -6716,11 +6780,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_agent_run"
     },
     "ai_agent_run_policy_snapshot": {
@@ -6924,11 +6990,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "snapshot",
       "projection_table": "ai_agent_run_policy_snapshot"
     },
     "ai_agent_run_step": {
@@ -7042,11 +7110,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_agent_run_step"
     },
     "ai_chat_message": {
@@ -7178,11 +7248,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_chat_message"
     },
     "ai_chat_session": {
@@ -7314,11 +7386,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_chat_session"
     },
     "ai_document_processing_job": {
@@ -7558,11 +7632,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_document_processing_job"
     },
     "ai_insight": {
@@ -7811,11 +7887,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_insight"
     },
     "ai_reducer_allowlist": {
@@ -7902,11 +7980,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_reducer_allowlist"
     },
     "ai_skill": {
@@ -8092,11 +8172,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_skill"
     },
     "ai_skill_certification_environment": {
@@ -8201,11 +8283,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_skill_certification_environment"
     },
     "ai_skill_certification_evidence": {
@@ -8427,11 +8511,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_skill_certification_evidence"
     },
     "ai_skill_certification_request": {
@@ -8599,11 +8685,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_skill_certification_request"
     },
     "ai_skill_certification_runtime_profile": {
@@ -8699,11 +8787,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_skill_certification_runtime_profile"
     },
     "ai_skill_config": {
@@ -8808,11 +8898,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_skill_config"
     },
     "ai_skill_fixture": {
@@ -8917,11 +9009,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_skill_fixture"
     },
     "ai_skill_release": {
@@ -9035,11 +9129,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_skill_release"
     },
     "ai_skill_test_run": {
@@ -9153,11 +9249,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_skill_test_run"
     },
     "ai_skill_version": {
@@ -9352,11 +9450,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_skill_version"
     },
     "ai_team_member": {
@@ -9524,11 +9624,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_team_member"
     },
     "ai_team_member_skill": {
@@ -9606,11 +9708,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "ai_team_member_skill"
     },
     "amortization_line": {
@@ -9724,11 +9828,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "amortization_line"
     },
     "amortization_schedule": {
@@ -9905,11 +10011,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "amortization_schedule"
     },
     "analytics_metric": {
@@ -10158,11 +10266,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "analytics",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "analytics_metric"
     },
     "assignment_rule": {
@@ -10276,11 +10386,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "assignment_rule"
     },
     "audit_log": {
@@ -10422,11 +10534,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "append-history",
       "projection_table": "audit_log"
     },
     "audit_rule": {
@@ -10513,11 +10627,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "audit_rule"
     },
     "balance_sheet_line": {
@@ -10721,11 +10837,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "balance_sheet_line"
     },
     "bank_match_candidate": {
@@ -10812,11 +10930,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "bank_match_candidate"
     },
     "bank_statement_import": {
@@ -10975,11 +11095,13 @@
           "stdb_type": "Identity"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "bank_statement_import"
     },
     "bank_statement_import_line": {
@@ -11075,11 +11197,13 @@
           "stdb_type": "U64"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "bank_statement_import_line"
     },
     "barcode_nomenclature": {
@@ -11184,11 +11308,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "barcode_nomenclature"
     },
     "barcode_rule": {
@@ -11311,11 +11437,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "barcode_rule"
     },
     "barcode_scan": {
@@ -11501,11 +11629,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "barcode_scan"
     },
     "billing_account": {
@@ -11610,11 +11740,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "billing_account"
     },
     "bom_explosion_result": {
@@ -11719,11 +11851,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "manufacturing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "bom_explosion_result"
     },
     "budget_post": {
@@ -11846,11 +11980,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "budget_post"
     },
     "calendar_event": {
@@ -12081,11 +12217,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "calendar_event"
     },
     "capacity_forecast_snapshot": {
@@ -12208,11 +12346,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "snapshot",
       "projection_table": "capacity_forecast_snapshot"
     },
     "cartonization_result": {
@@ -12335,11 +12475,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "cartonization_result"
     },
     "cash_flow_line": {
@@ -12525,11 +12667,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "cash_flow_line"
     },
     "cold_tier_service_identity": {
@@ -12598,11 +12742,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "core",
       "organization_column": null,
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "cold_tier_service_identity"
     },
     "commodity_price_index": {
@@ -12707,11 +12853,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "commodity_price_index"
     },
     "company": {
@@ -12897,11 +13045,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "company"
     },
     "company_country_pack": {
@@ -12988,11 +13138,13 @@
           "stdb_type": "Identity"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "company_country_pack"
     },
     "company_vertical_pack": {
@@ -13070,11 +13222,13 @@
           "stdb_type": "Identity"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "company_vertical_pack"
     },
     "consignment_agreement": {
@@ -13197,11 +13351,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "consignment_agreement"
     },
     "consolidation_account": {
@@ -13369,11 +13525,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "consolidation_account"
     },
     "consolidation_company_rate": {
@@ -13478,11 +13636,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "consolidation_company_rate"
     },
     "consolidation_elimination_entry": {
@@ -13686,11 +13846,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "consolidation_elimination_entry"
     },
     "consolidation_journal": {
@@ -13930,11 +14092,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "consolidation_journal"
     },
     "contact": {
@@ -14345,11 +14509,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "contact"
     },
     "contact_category": {
@@ -14427,11 +14593,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "contact_category"
     },
     "contact_category_assignment": {
@@ -14509,11 +14677,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "contact_category_assignment"
     },
     "contact_communication_preference": {
@@ -14618,11 +14788,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "contact_communication_preference"
     },
     "contact_duplicate_candidate": {
@@ -14691,11 +14863,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "contact_duplicate_candidate"
     },
     "contact_identity_verification_authority": {
@@ -14737,11 +14911,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "crm",
       "organization_column": null,
       "primary_key": {
         "name": "id",
         "type": "U8"
       },
+      "projection_mode": "external-reference",
       "projection_table": "contact_identity_verification_authority"
     },
     "contact_identity_verification_proof": {
@@ -14873,11 +15049,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "contact_identity_verification_proof"
     },
     "contact_phone_identity": {
@@ -15018,11 +15196,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "contact_phone_identity"
     },
     "contact_relationship": {
@@ -15145,11 +15325,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "contact_relationship"
     },
     "contact_relationship_insight": {
@@ -15281,11 +15463,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "contact_relationship_insight"
     },
     "contact_role_assignment": {
@@ -15408,11 +15592,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "contact_role_assignment"
     },
     "contact_segment": {
@@ -15535,11 +15721,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "contact_segment"
     },
     "contact_segment_rule": {
@@ -15635,11 +15823,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "contact_segment_rule"
     },
     "contact_tag": {
@@ -15708,11 +15898,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "contact_tag"
     },
     "contact_tag_assignment": {
@@ -15781,11 +15973,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "contact_tag_assignment"
     },
     "country": {
@@ -15881,11 +16075,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": null,
       "primary_key": {
         "name": "code",
         "type": "String"
       },
+      "projection_mode": "external-reference",
       "projection_table": "country"
     },
     "country_pack_definition": {
@@ -15954,11 +16150,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": null,
       "primary_key": {
         "name": "pack_key",
         "type": "String"
       },
+      "projection_mode": "external-reference",
       "projection_table": "country_pack_definition"
     },
     "country_pack_tax_rule": {
@@ -16036,11 +16234,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": null,
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "external-reference",
       "projection_table": "country_pack_tax_rule"
     },
     "crm_conversation": {
@@ -16190,11 +16390,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "crm_conversation"
     },
     "crm_conversation_message": {
@@ -16308,11 +16510,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "crm_conversation_message"
     },
     "crm_forecast_snapshot": {
@@ -16417,11 +16621,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "snapshot",
       "projection_table": "crm_forecast_snapshot"
     },
     "crm_provider_event_receipt": {
@@ -16517,11 +16723,13 @@
           "stdb_type": "Identity"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "crm_provider_event_receipt"
     },
     "crm_provider_principal": {
@@ -16599,11 +16807,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "crm_provider_principal"
     },
     "crm_team": {
@@ -16654,11 +16864,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "crm_team"
     },
     "crossovered_budget": {
@@ -16826,11 +17038,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "crossovered_budget"
     },
     "crossovered_budget_lines": {
@@ -17025,11 +17239,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "crossovered_budget_lines"
     },
     "currency": {
@@ -17125,11 +17341,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": null,
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "external-reference",
       "projection_table": "currency"
     },
     "currency_rate": {
@@ -17225,11 +17443,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "currency_rate"
     },
     "dashboard": {
@@ -17379,11 +17599,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "analytics",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "dashboard"
     },
     "dashboard_widget": {
@@ -17614,11 +17836,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "analytics",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "dashboard_widget"
     },
     "data_classification": {
@@ -17696,11 +17920,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "data_classification"
     },
     "data_classification_rule": {
@@ -17778,11 +18004,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "data_classification_rule"
     },
     "deferred_revenue_line": {
@@ -17941,11 +18169,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "deferred_revenue_line"
     },
     "deferred_revenue_schedule": {
@@ -18167,11 +18397,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "deferred_revenue_schedule"
     },
     "delegated_admin_scope": {
@@ -18249,11 +18481,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "delegated_admin_scope"
     },
     "delivery_carrier": {
@@ -18556,11 +18790,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "delivery_carrier"
     },
     "delivery_price_rule": {
@@ -18701,11 +18937,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "delivery_price_rule"
     },
     "doc_folder": {
@@ -18963,11 +19201,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "documents",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "doc_folder"
     },
     "document": {
@@ -19414,11 +19654,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "documents",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "document"
     },
     "document_external_ref": {
@@ -19550,11 +19792,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "documents",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "document_external_ref"
     },
     "document_legal_hold": {
@@ -19686,11 +19930,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "documents",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "document_legal_hold"
     },
     "document_presence": {
@@ -19750,11 +19996,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "documents",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "document_presence"
     },
     "document_retention_purge_job": {
@@ -19787,11 +20035,13 @@
           "stdb_type": "U64"
         }
       ],
+      "module": "documents",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "scheduled_id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "document_retention_purge_job"
     },
     "document_sequence": {
@@ -19833,11 +20083,13 @@
           "stdb_type": "U64"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "sequence_key",
         "type": "String"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "document_sequence"
     },
     "document_signature_request": {
@@ -19996,11 +20248,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "documents",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "document_signature_request"
     },
     "document_template": {
@@ -20159,11 +20413,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "documents",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "document_template"
     },
     "document_version": {
@@ -20304,11 +20560,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "documents",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "document_version"
     },
     "expense_card_statement_line": {
@@ -20458,11 +20716,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "expenses",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "expense_card_statement_line"
     },
     "expense_integration_intent": {
@@ -20630,11 +20890,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "expenses",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "expense_integration_intent"
     },
     "expense_sheet": {
@@ -20811,11 +21073,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "expenses",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "expense_sheet"
     },
     "field_permission": {
@@ -20902,11 +21166,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "field_permission"
     },
     "financial_report": {
@@ -21191,11 +21457,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "analytics",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "financial_report"
     },
     "fleet_vehicle": {
@@ -21399,11 +21667,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "fleet",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "fleet_vehicle"
     },
     "fleet_vehicle_service_type": {
@@ -21490,11 +21760,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "fleet",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "fleet_vehicle_service_type"
     },
     "form_config": {
@@ -21617,11 +21889,13 @@
           "stdb_type": "Identity"
         }
       ],
+      "module": "forms",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "form_config"
     },
     "form_config_field": {
@@ -21834,11 +22108,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "forms",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "form_config_field"
     },
     "form_field_label": {
@@ -21898,11 +22174,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "forms",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "form_field_label"
     },
     "form_role_config": {
@@ -21998,11 +22276,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "forms",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "form_role_config"
     },
     "fx_revaluation_run": {
@@ -22179,11 +22459,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "fx_revaluation_run"
     },
     "generated_owner_report": {
@@ -22324,11 +22606,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "analytics",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "generated_owner_report"
     },
     "google_drive_connection": {
@@ -22613,11 +22897,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "integrations",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "google_drive_connection"
     },
     "guarded_action_receipt": {
@@ -22749,11 +23035,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "String"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "guarded_action_receipt"
     },
     "helpdesk_sla": {
@@ -22849,11 +23137,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "helpdesk",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "helpdesk_sla"
     },
     "helpdesk_sla_check_job": {
@@ -22895,11 +23185,13 @@
           "stdb_type": "U64"
         }
       ],
+      "module": "helpdesk",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "scheduled_id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "helpdesk_sla_check_job"
     },
     "helpdesk_stage": {
@@ -22986,11 +23278,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "helpdesk",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "helpdesk_stage"
     },
     "helpdesk_team": {
@@ -23050,11 +23344,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "helpdesk",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "helpdesk_team"
     },
     "helpdesk_team_member": {
@@ -23105,11 +23401,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "helpdesk",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "helpdesk_team_member"
     },
     "helpdesk_ticket": {
@@ -23277,11 +23575,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "helpdesk",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "helpdesk_ticket"
     },
     "hr_applicant": {
@@ -23395,11 +23695,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_applicant"
     },
     "hr_attendance": {
@@ -23477,11 +23779,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_attendance"
     },
     "hr_benefit_enrollment": {
@@ -23595,11 +23899,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_benefit_enrollment"
     },
     "hr_benefit_plan": {
@@ -23704,11 +24010,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_benefit_plan"
     },
     "hr_capacity_forecast": {
@@ -23831,11 +24139,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_capacity_forecast"
     },
     "hr_compensation_event": {
@@ -23931,11 +24241,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_compensation_event"
     },
     "hr_contract": {
@@ -24067,11 +24379,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_contract"
     },
     "hr_country_pack_leave_default": {
@@ -24149,11 +24463,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "hr",
       "organization_column": null,
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "external-reference",
       "projection_table": "hr_country_pack_leave_default"
     },
     "hr_department": {
@@ -24258,11 +24574,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_department"
     },
     "hr_employee": {
@@ -24565,11 +24883,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_employee"
     },
     "hr_employee_document": {
@@ -24701,11 +25021,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_employee_document"
     },
     "hr_employee_skill": {
@@ -24828,11 +25150,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_employee_skill"
     },
     "hr_expense": {
@@ -25135,11 +25459,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_expense"
     },
     "hr_expense_advance": {
@@ -25262,11 +25588,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_expense_advance"
     },
     "hr_expense_advance_application": {
@@ -25335,11 +25663,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_expense_advance_application"
     },
     "hr_expense_allocation": {
@@ -25435,11 +25765,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_expense_allocation"
     },
     "hr_expense_mileage_rate": {
@@ -25544,11 +25876,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_expense_mileage_rate"
     },
     "hr_expense_per_diem_rate": {
@@ -25653,11 +25987,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_expense_per_diem_rate"
     },
     "hr_expense_policy": {
@@ -25726,11 +26062,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_expense_policy"
     },
     "hr_expense_policy_exception": {
@@ -25835,11 +26173,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_expense_policy_exception"
     },
     "hr_expense_receipt": {
@@ -25935,11 +26275,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_expense_receipt"
     },
     "hr_global_assignment": {
@@ -26071,11 +26413,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_global_assignment"
     },
     "hr_integration_intent": {
@@ -26261,11 +26605,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_integration_intent"
     },
     "hr_job_position": {
@@ -26379,11 +26725,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_job_position"
     },
     "hr_labor_cost_snapshot": {
@@ -26497,11 +26845,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "snapshot",
       "projection_table": "hr_labor_cost_snapshot"
     },
     "hr_leave": {
@@ -26651,11 +27001,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_leave"
     },
     "hr_leave_allocation": {
@@ -26742,11 +27094,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_leave_allocation"
     },
     "hr_leave_type": {
@@ -26860,11 +27214,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_leave_type"
     },
     "hr_offboarding_checklist": {
@@ -27005,11 +27361,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_offboarding_checklist"
     },
     "hr_onboarding_progress": {
@@ -27132,11 +27490,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_onboarding_progress"
     },
     "hr_onboarding_template": {
@@ -27232,11 +27592,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_onboarding_template"
     },
     "hr_onboarding_template_item": {
@@ -27350,11 +27712,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_onboarding_template_item"
     },
     "hr_payroll_export_intent": {
@@ -27522,11 +27886,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_payroll_export_intent"
     },
     "hr_payroll_structure": {
@@ -27586,11 +27952,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_payroll_structure"
     },
     "hr_payslip": {
@@ -27776,11 +28144,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_payslip"
     },
     "hr_performance_cycle": {
@@ -27903,11 +28273,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_performance_cycle"
     },
     "hr_performance_goal": {
@@ -28039,11 +28411,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_performance_goal"
     },
     "hr_performance_review": {
@@ -28193,11 +28567,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_performance_review"
     },
     "hr_pii_access_log": {
@@ -28302,11 +28678,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "append-history",
       "projection_table": "hr_pii_access_log"
     },
     "hr_resource": {
@@ -28384,11 +28762,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_resource"
     },
     "hr_salary_rule": {
@@ -28502,11 +28882,13 @@
           "stdb_type": "Bool"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_salary_rule"
     },
     "hr_shift_opt_job": {
@@ -28593,11 +28975,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_shift_opt_job"
     },
     "hr_skill": {
@@ -28720,11 +29104,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_skill"
     },
     "hr_statutory_id": {
@@ -28829,11 +29215,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_statutory_id"
     },
     "hr_work_schedule": {
@@ -28911,11 +29299,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "hr",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "hr_work_schedule"
     },
     "import_job": {
@@ -29038,11 +29428,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "data_ops",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "import_job"
     },
     "import_job_error": {
@@ -29120,11 +29512,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "data_ops",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "import_job_error"
     },
     "import_job_record": {
@@ -29193,11 +29587,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "data_ops",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "import_job_record"
     },
     "import_mapping_template": {
@@ -29293,11 +29689,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "data_ops",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "import_mapping_template"
     },
     "intercompany_rule": {
@@ -29483,11 +29881,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "intercompany_rule"
     },
     "intercompany_transaction": {
@@ -29709,11 +30109,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "intercompany_transaction"
     },
     "inventory_adjustment": {
@@ -29971,11 +30373,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "inventory_adjustment"
     },
     "inventory_audit_run": {
@@ -30044,11 +30448,13 @@
           "stdb_type": "Identity"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "inventory_audit_run"
     },
     "inventory_audit_violation": {
@@ -30153,11 +30559,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "inventory_audit_violation"
     },
     "inventory_close": {
@@ -30343,11 +30751,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "inventory_close"
     },
     "inventory_close_line": {
@@ -30470,11 +30880,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "inventory_close_line"
     },
     "inventory_exception": {
@@ -30615,11 +31027,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "inventory_exception"
     },
     "inventory_integration_intent": {
@@ -30796,11 +31210,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "inventory_integration_intent"
     },
     "inventory_valuation": {
@@ -31067,11 +31483,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "inventory_valuation"
     },
     "iot_action": {
@@ -31194,11 +31612,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "iot",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "iot_action"
     },
     "iot_alert": {
@@ -31303,11 +31723,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "iot",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "iot_alert"
     },
     "iot_device": {
@@ -31484,11 +31906,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "iot",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "iot_device"
     },
     "iot_hub": {
@@ -31629,11 +32053,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "iot",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "iot_hub"
     },
     "iot_pairing_token": {
@@ -31702,11 +32128,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "iot",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "token",
         "type": "String"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "iot_pairing_token"
     },
     "iot_telemetry": {
@@ -31802,11 +32230,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "iot",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "append-history",
       "projection_table": "iot_telemetry"
     },
     "iot_threshold": {
@@ -31893,11 +32323,13 @@
           "stdb_type": "Bool"
         }
       ],
+      "module": "iot",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "iot_threshold"
     },
     "kb_category": {
@@ -32020,11 +32452,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "documents",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "kb_category"
     },
     "knowledge_article": {
@@ -32408,11 +32842,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "documents",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "knowledge_article"
     },
     "knowledge_article_presence": {
@@ -32472,11 +32908,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "documents",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "knowledge_article_presence"
     },
     "lead": {
@@ -32860,11 +33298,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "lead"
     },
     "lead_lost_reason": {
@@ -32924,11 +33364,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "lead_lost_reason"
     },
     "lead_score": {
@@ -33024,11 +33466,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "lead_score"
     },
     "lead_score_factor": {
@@ -33106,11 +33550,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "lead_score_factor"
     },
     "lead_source": {
@@ -33179,11 +33625,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "lead_source"
     },
     "mail_follower": {
@@ -33243,11 +33691,13 @@
           "stdb_type": "Vec(String)"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "mail_follower"
     },
     "mail_message": {
@@ -33361,11 +33811,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "mail_message"
     },
     "mail_template": {
@@ -33515,11 +33967,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "mail_template"
     },
     "message_batch": {
@@ -33696,11 +34150,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "message_batch"
     },
     "message_template": {
@@ -33868,11 +34324,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "message_template"
     },
     "mrp_bom": {
@@ -34130,11 +34588,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "manufacturing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "mrp_bom"
     },
     "mrp_bom_line": {
@@ -34338,11 +34798,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "manufacturing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "mrp_bom_line"
     },
     "mrp_loss_category": {
@@ -34420,11 +34882,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "manufacturing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "mrp_loss_category"
     },
     "mrp_production": {
@@ -35042,11 +35506,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "manufacturing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "mrp_production"
     },
     "mrp_routing_workcenter": {
@@ -35232,11 +35698,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "manufacturing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "mrp_routing_workcenter"
     },
     "mrp_workcenter": {
@@ -35557,11 +36025,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "manufacturing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "mrp_workcenter"
     },
     "mrp_workcenter_productivity": {
@@ -35711,11 +36181,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "manufacturing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "mrp_workcenter_productivity"
     },
     "mrp_workorder": {
@@ -36081,11 +36553,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "manufacturing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "mrp_workorder"
     },
     "operational_message": {
@@ -36289,11 +36763,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "operational_message"
     },
     "opp_stage": {
@@ -36398,11 +36874,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "opp_stage"
     },
     "opportunity": {
@@ -36714,11 +37192,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "opportunity"
     },
     "opportunity_line": {
@@ -36859,11 +37339,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "opportunity_line"
     },
     "opportunity_presence": {
@@ -36932,11 +37414,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "opportunity_presence"
     },
     "org_permission": {
@@ -37023,11 +37507,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "org_permission"
     },
     "org_schema_migration": {
@@ -37087,11 +37573,13 @@
           "stdb_type": "Identity"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "org_schema_migration"
     },
     "organization": {
@@ -37259,11 +37747,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "organization"
     },
     "organization_commit": {
@@ -37368,11 +37858,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "String"
       },
+      "projection_mode": "append-history",
       "projection_table": "organization_commit"
     },
     "organization_commit_cursor": {
@@ -37396,11 +37888,13 @@
           "stdb_type": "U64"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "organization_id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "organization_commit_cursor"
     },
     "organization_row_change": {
@@ -37487,11 +37981,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "String"
       },
+      "projection_mode": "append-history",
       "projection_table": "organization_row_change"
     },
     "organization_settings": {
@@ -37551,11 +38047,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "organization_id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "organization_settings"
     },
     "packaging_material": {
@@ -37705,11 +38203,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "packaging_material"
     },
     "partner_credit_control": {
@@ -37823,11 +38323,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "partner_credit_control"
     },
     "password_reset_token": {
@@ -37878,11 +38380,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "core",
       "organization_column": null,
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "password_reset_token"
     },
     "payment_account": {
@@ -38068,11 +38572,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "payment_account"
     },
     "payment_fee": {
@@ -38204,11 +38710,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "payment_fee"
     },
     "payment_reconciliation": {
@@ -38376,11 +38884,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "payment_reconciliation"
     },
     "payment_reversal": {
@@ -38485,11 +38995,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "payment_reversal"
     },
     "payment_transaction": {
@@ -38720,11 +39232,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "payment_transaction"
     },
     "picking_wave": {
@@ -38865,11 +39379,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "picking_wave"
     },
     "policy_snapshot": {
@@ -38974,11 +39490,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "snapshot",
       "projection_table": "policy_snapshot"
     },
     "pos_config": {
@@ -39641,11 +40159,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "pos_config"
     },
     "pos_loyalty_card": {
@@ -39804,11 +40324,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "pos_loyalty_card"
     },
     "pos_loyalty_program": {
@@ -40021,11 +40543,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "pos_loyalty_program"
     },
     "pos_order": {
@@ -40500,11 +41024,13 @@
           "stdb_type": "U64"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "pos_order"
     },
     "pos_order_line": {
@@ -40816,11 +41342,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "pos_order_line"
     },
     "pos_payment": {
@@ -41024,11 +41552,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "pos_payment"
     },
     "pos_payment_method": {
@@ -41250,11 +41780,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "pos_payment_method"
     },
     "pos_session": {
@@ -41593,11 +42125,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "pos_session"
     },
     "pos_terminal": {
@@ -41747,11 +42281,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "pos_terminal"
     },
     "privacy_consent": {
@@ -41856,11 +42392,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "privacy_consent"
     },
     "product": {
@@ -42487,11 +43025,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "product"
     },
     "product_attribute": {
@@ -42596,11 +43136,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "product_attribute"
     },
     "product_attribute_line": {
@@ -42669,11 +43211,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "product_attribute_line"
     },
     "product_attribute_value": {
@@ -42796,11 +43340,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "product_attribute_value"
     },
     "product_category": {
@@ -42914,11 +43460,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "product_category"
     },
     "product_packaging": {
@@ -43095,11 +43643,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "product_packaging"
     },
     "product_pricelist": {
@@ -43177,11 +43727,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "product_pricelist"
     },
     "product_pricelist_item": {
@@ -43349,11 +43901,13 @@
           "stdb_type": "U32"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "product_pricelist_item"
     },
     "product_supplier_info": {
@@ -43512,11 +44066,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "product_supplier_info"
     },
     "product_variant": {
@@ -43774,11 +44330,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "product_variant"
     },
     "profit_loss_line": {
@@ -43982,11 +44540,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "profit_loss_line"
     },
     "project_baseline": {
@@ -44109,11 +44669,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "project_baseline"
     },
     "project_change_order": {
@@ -44308,11 +44870,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "project_change_order"
     },
     "project_earned_value_snapshot": {
@@ -44435,11 +44999,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "snapshot",
       "projection_table": "project_earned_value_snapshot"
     },
     "project_integration_intent": {
@@ -44598,11 +45164,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "project_integration_intent"
     },
     "project_margin_snapshot": {
@@ -44752,11 +45320,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "snapshot",
       "projection_table": "project_margin_snapshot"
     },
     "project_milestone": {
@@ -44933,11 +45503,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "project_milestone"
     },
     "project_project": {
@@ -45456,11 +46028,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "project_project"
     },
     "project_rate_card": {
@@ -45592,11 +46166,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "project_rate_card"
     },
     "project_rate_card_line": {
@@ -45764,11 +46340,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "project_rate_card_line"
     },
     "project_revenue_line": {
@@ -45927,11 +46505,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "project_revenue_line"
     },
     "project_revenue_schedule": {
@@ -46117,11 +46697,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "project_revenue_schedule"
     },
     "project_subcontractor_cost": {
@@ -46289,11 +46871,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "project_subcontractor_cost"
     },
     "project_task": {
@@ -46776,11 +47360,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "project_task"
     },
     "project_task_stage": {
@@ -46876,11 +47462,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "project_task_stage"
     },
     "project_timesheet": {
@@ -47237,11 +47825,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "project_timesheet"
     },
     "project_timesheet_approval": {
@@ -47355,11 +47945,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "project_timesheet_approval"
     },
     "proposal": {
@@ -47581,11 +48173,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "proposals",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "proposal"
     },
     "proposal_analysis": {
@@ -47708,11 +48302,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "proposals",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "proposal_analysis"
     },
     "proposal_bid_decision": {
@@ -47790,11 +48386,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "proposals",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "proposal_bid_decision"
     },
     "proposal_clarification": {
@@ -47935,11 +48533,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "proposals",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "proposal_clarification"
     },
     "proposal_clause": {
@@ -48071,11 +48671,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "proposals",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "proposal_clause"
     },
     "proposal_comment": {
@@ -48189,11 +48791,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "proposals",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "proposal_comment"
     },
     "proposal_compliance_requirement": {
@@ -48352,11 +48956,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "proposals",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "proposal_compliance_requirement"
     },
     "proposal_integration_intent": {
@@ -48524,11 +49130,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "proposals",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "proposal_integration_intent"
     },
     "proposal_line_item": {
@@ -48696,11 +49304,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "proposals",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "proposal_line_item"
     },
     "proposal_presence": {
@@ -48778,11 +49388,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "proposals",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "proposal_presence"
     },
     "proposal_procurement_score": {
@@ -48905,11 +49517,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "proposals",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "proposal_procurement_score"
     },
     "proposal_section": {
@@ -49041,11 +49655,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "proposals",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "proposal_section"
     },
     "proposal_source_doc": {
@@ -49141,11 +49757,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "proposals",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "proposal_source_doc"
     },
     "proposal_template": {
@@ -49277,11 +49895,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "proposals",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "proposal_template"
     },
     "proposal_version": {
@@ -49359,11 +49979,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "proposals",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "proposal_version"
     },
     "public_holiday": {
@@ -49486,11 +50108,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "public_holiday"
     },
     "purchase_approval_delegate": {
@@ -49595,11 +50219,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "purchase_approval_delegate"
     },
     "purchase_blanket_order": {
@@ -49749,11 +50375,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "purchase_blanket_order"
     },
     "purchase_blanket_order_line": {
@@ -49885,11 +50513,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "purchase_blanket_order_line"
     },
     "purchase_blanket_release": {
@@ -49976,11 +50606,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "purchase_blanket_release"
     },
     "purchase_contract": {
@@ -50103,11 +50735,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "purchase_contract"
     },
     "purchase_order": {
@@ -50599,11 +51233,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "purchase_order"
     },
     "purchase_order_line": {
@@ -51014,11 +51650,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "purchase_order_line"
     },
     "purchase_requisition": {
@@ -51267,11 +51905,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "purchase_requisition"
     },
     "purchase_requisition_line": {
@@ -51358,11 +51998,13 @@
           "stdb_type": "U32"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "purchase_requisition_line"
     },
     "purchase_return": {
@@ -51503,11 +52145,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "purchase_return"
     },
     "purchase_return_line": {
@@ -51603,11 +52247,13 @@
           "stdb_type": "Bool"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "purchase_return_line"
     },
     "purchase_rfq": {
@@ -51766,11 +52412,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "purchase_rfq"
     },
     "purchase_rfq_bid": {
@@ -51902,11 +52550,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "purchase_rfq_bid"
     },
     "purchase_rfq_line": {
@@ -51993,11 +52643,13 @@
           "stdb_type": "U32"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "purchase_rfq_line"
     },
     "purchasing_integration_intent": {
@@ -52156,11 +52808,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "purchasing_integration_intent"
     },
     "quality_alert": {
@@ -52373,11 +53027,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "manufacturing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "quality_alert"
     },
     "quality_alert_reason": {
@@ -52446,11 +53102,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "manufacturing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "quality_alert_reason"
     },
     "quality_check": {
@@ -52816,11 +53474,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "manufacturing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "quality_check"
     },
     "quality_point": {
@@ -53042,11 +53702,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "manufacturing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "quality_point"
     },
     "quality_team": {
@@ -53151,11 +53813,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "manufacturing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "quality_team"
     },
     "queue_attempt": {
@@ -53278,11 +53942,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "queue_attempt"
     },
     "queue_effect_receipt": {
@@ -53396,11 +54062,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "scope_key",
         "type": "String"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "queue_effect_receipt"
     },
     "queue_job": {
@@ -53703,11 +54371,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "queue_job"
     },
     "queue_worker": {
@@ -53794,11 +54464,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "queue_worker"
     },
     "record_custom_field_value": {
@@ -53903,11 +54575,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "data_ops",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "record_custom_field_value"
     },
     "replenishment_rule": {
@@ -54111,11 +54785,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "replenishment_rule"
     },
     "report_template": {
@@ -54355,11 +55031,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "analytics",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "report_template"
     },
     "res_partner_bank": {
@@ -54536,11 +55214,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "res_partner_bank"
     },
     "resource_allocation": {
@@ -54726,11 +55406,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "resource_allocation"
     },
     "resource_capacity_snapshot": {
@@ -54880,11 +55562,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "snapshot",
       "projection_table": "resource_capacity_snapshot"
     },
     "resource_utilisation_snapshot": {
@@ -55016,11 +55700,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "projects",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "snapshot",
       "projection_table": "resource_utilisation_snapshot"
     },
     "return_order": {
@@ -55161,11 +55847,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "return_order"
     },
     "return_order_line": {
@@ -55270,11 +55958,13 @@
           "stdb_type": "U64"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "return_order_line"
     },
     "revenue_recognition_rule": {
@@ -55433,11 +56123,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "revenue_recognition_rule"
     },
     "role": {
@@ -55542,11 +56234,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "role"
     },
     "sale_commission": {
@@ -55705,11 +56399,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "sale_commission"
     },
     "sale_commission_plan": {
@@ -55814,11 +56510,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "sale_commission_plan"
     },
     "sale_commission_plan_split": {
@@ -55914,11 +56612,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "sale_commission_plan_split"
     },
     "sale_contract": {
@@ -56050,11 +56750,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "sale_contract"
     },
     "sale_cpq_constraint": {
@@ -56159,11 +56861,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "sale_cpq_constraint"
     },
     "sale_order": {
@@ -57123,11 +57827,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "sale_order"
     },
     "sale_order_line": {
@@ -57700,11 +58406,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "sale_order_line"
     },
     "sale_order_option": {
@@ -57854,11 +58562,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "sale_order_option"
     },
     "sale_promotion": {
@@ -58008,11 +58718,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "sale_promotion"
     },
     "sales_integration_intent": {
@@ -58171,11 +58883,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "sales_integration_intent"
     },
     "sales_sla_escalation_job": {
@@ -58217,11 +58931,13 @@
           "stdb_type": "U64"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "scheduled_id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "sales_sla_escalation_job"
     },
     "saved_report": {
@@ -58371,11 +59087,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "analytics",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "saved_report"
     },
     "scheduled_report": {
@@ -58642,11 +59360,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "analytics",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "scheduled_report"
     },
     "scheduled_report_run": {
@@ -58769,11 +59489,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "analytics",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "scheduled_report_run"
     },
     "schema_migration": {
@@ -58815,11 +59537,13 @@
           "stdb_type": "Identity"
         }
       ],
+      "module": "core",
       "organization_column": null,
       "primary_key": {
         "name": "version",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "schema_migration"
     },
     "search_embedding": {
@@ -58996,11 +59720,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "ai",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "search_embedding"
     },
     "segment_member": {
@@ -59087,11 +59813,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "segment_member"
     },
     "serial_lot_traceability": {
@@ -59250,11 +59978,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "serial_lot_traceability"
     },
     "shipping_method": {
@@ -59431,11 +60161,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "sales",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "shipping_method"
     },
     "sod_conflict_rule": {
@@ -59513,11 +60245,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "sod_conflict_rule"
     },
     "stock_count_sheet": {
@@ -59685,11 +60419,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_count_sheet"
     },
     "stock_cycle_count": {
@@ -59911,11 +60647,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_cycle_count"
     },
     "stock_inventory": {
@@ -60164,11 +60902,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_inventory"
     },
     "stock_inventory_line": {
@@ -60489,11 +61229,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_inventory_line"
     },
     "stock_landed_cost": {
@@ -60706,11 +61448,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_landed_cost"
     },
     "stock_landed_cost_allocation": {
@@ -60824,11 +61568,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_landed_cost_allocation"
     },
     "stock_landed_cost_application": {
@@ -60897,11 +61643,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_landed_cost_application"
     },
     "stock_landed_cost_lines": {
@@ -61024,11 +61772,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_landed_cost_lines"
     },
     "stock_location": {
@@ -61295,11 +62045,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_location"
     },
     "stock_move": {
@@ -62106,11 +62858,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_move"
     },
     "stock_move_line": {
@@ -62584,11 +63338,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_move_line"
     },
     "stock_package": {
@@ -62756,11 +63512,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_package"
     },
     "stock_picking": {
@@ -63324,11 +64082,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_picking"
     },
     "stock_picking_batch": {
@@ -63595,11 +64355,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_picking_batch"
     },
     "stock_production_lot": {
@@ -63794,11 +64556,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_production_lot"
     },
     "stock_production_serial": {
@@ -64056,11 +64820,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_production_serial"
     },
     "stock_quant": {
@@ -64300,11 +65066,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_quant"
     },
     "stock_reorder_group": {
@@ -64418,11 +65186,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_reorder_group"
     },
     "stock_route": {
@@ -64599,11 +65369,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_route"
     },
     "stock_rule": {
@@ -64843,11 +65615,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_rule"
     },
     "stock_traceability_report": {
@@ -64997,11 +65771,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "stock_traceability_report"
     },
     "subscription": {
@@ -65448,11 +66224,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "subscription"
     },
     "subscription_amendment": {
@@ -65611,11 +66389,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "subscription_amendment"
     },
     "subscription_billing_run": {
@@ -65729,11 +66509,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "subscription_billing_run"
     },
     "subscription_bundle": {
@@ -65829,11 +66611,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "subscription_bundle"
     },
     "subscription_bundle_item": {
@@ -65956,11 +66740,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "subscription_bundle_item"
     },
     "subscription_collection": {
@@ -66083,11 +66869,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "subscription_collection"
     },
     "subscription_commitment": {
@@ -66183,11 +66971,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "subscription_commitment"
     },
     "subscription_entitlement": {
@@ -66301,11 +67091,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "subscription_entitlement"
     },
     "subscription_line": {
@@ -66662,11 +67454,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "subscription_line"
     },
     "subscription_payment_intent": {
@@ -66834,11 +67628,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "subscription_payment_intent"
     },
     "subscription_plan": {
@@ -67159,11 +67955,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "subscription_plan"
     },
     "subscription_price_index": {
@@ -67268,11 +68066,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "subscription_price_index"
     },
     "subscription_price_tier": {
@@ -67395,11 +68195,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "subscription_price_tier"
     },
     "subscription_tax_settle_intent": {
@@ -67549,11 +68351,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "subscription_tax_settle_intent"
     },
     "subscription_usage_charge": {
@@ -67712,11 +68516,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "subscription_usage_charge"
     },
     "subscription_usage_event": {
@@ -67866,11 +68672,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "subscriptions",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "append-history",
       "projection_table": "subscription_usage_event"
     },
     "supplier_intake_request": {
@@ -68200,11 +69008,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "supplier_intake_request"
     },
     "tax_deadline": {
@@ -68390,11 +69200,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "tax_deadline"
     },
     "tax_deadline_reminder": {
@@ -68499,11 +69311,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "tax_deadline_reminder"
     },
     "tax_deadline_status_job": {
@@ -68536,11 +69350,13 @@
           "stdb_type": "U64"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "scheduled_id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "tax_deadline_status_job"
     },
     "tax_jurisdiction": {
@@ -68690,11 +69506,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "tax_jurisdiction"
     },
     "tax_schedule": {
@@ -68835,11 +69653,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "tax_schedule"
     },
     "trial_balance": {
@@ -69043,11 +69863,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "accounting",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "trial_balance"
     },
     "uom": {
@@ -69161,11 +69983,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "uom"
     },
     "uom_cat": {
@@ -69234,11 +70058,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "uom_cat"
     },
     "uom_conversion": {
@@ -69325,11 +70151,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "uom_conversion"
     },
     "user_credential": {
@@ -69416,11 +70244,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "core",
       "organization_column": null,
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "user_credential"
     },
     "user_custom_field": {
@@ -69498,11 +70328,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "user_custom_field"
     },
     "user_invite": {
@@ -69580,11 +70412,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "user_invite"
     },
     "user_organization": {
@@ -69698,11 +70532,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "user_organization"
     },
     "user_profile": {
@@ -69888,11 +70724,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": null,
       "primary_key": {
         "name": "identity",
         "type": "Identity"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "user_profile"
     },
     "user_role_assignment": {
@@ -69979,11 +70817,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "user_role_assignment"
     },
     "user_session": {
@@ -70097,11 +70937,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "core",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "user_session"
     },
     "utm_campaign": {
@@ -70152,11 +70994,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "utm_campaign"
     },
     "utm_medium": {
@@ -70207,11 +71051,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "utm_medium"
     },
     "utm_source": {
@@ -70262,11 +71108,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "crm",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "utm_source"
     },
     "vendor_risk_flag": {
@@ -70380,11 +71228,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "vendor_risk_flag"
     },
     "vendor_scorecard": {
@@ -70489,11 +71339,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "purchasing",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "vendor_scorecard"
     },
     "warehouse": {
@@ -70850,11 +71702,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "warehouse"
     },
     "warehouse_3_d_zone": {
@@ -70995,11 +71849,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "warehouse_3_d_zone"
     },
     "warehouse_geo": {
@@ -71122,11 +71978,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "warehouse_geo"
     },
     "warehouse_sync_intent": {
@@ -71285,11 +72143,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "warehouse_sync_intent"
     },
     "warehouse_task": {
@@ -71529,11 +72389,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "inventory",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "warehouse_task"
     },
     "whatsapp_business_account": {
@@ -71890,11 +72752,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "integrations",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "whatsapp_business_account"
     },
     "workflow": {
@@ -71963,11 +72827,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow"
     },
     "workflow_calendar": {
@@ -72045,11 +72911,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_calendar"
     },
     "workflow_calendar_exception": {
@@ -72217,11 +73085,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_calendar_exception"
     },
     "workflow_calendar_version": {
@@ -72416,11 +73286,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_calendar_version"
     },
     "workflow_candidate_group_member": {
@@ -72516,11 +73388,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_candidate_group_member"
     },
     "workflow_command_receipt": {
@@ -72652,11 +73526,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "scope_key",
         "type": "String"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_command_receipt"
     },
     "workflow_decision_event": {
@@ -72968,11 +73844,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "append-history",
       "projection_table": "workflow_decision_event"
     },
     "workflow_delegation": {
@@ -73104,11 +73982,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_delegation"
     },
     "workflow_delivery_attempt": {
@@ -73258,11 +74138,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_delivery_attempt"
     },
     "workflow_delivery_receipt": {
@@ -73394,11 +74276,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "scope_key",
         "type": "String"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_delivery_receipt"
     },
     "workflow_edge": {
@@ -73548,11 +74432,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_edge"
     },
     "workflow_fork": {
@@ -73693,11 +74579,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_fork"
     },
     "workflow_human_task": {
@@ -74036,11 +74924,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_human_task"
     },
     "workflow_human_task_candidate": {
@@ -74118,11 +75008,13 @@
           "stdb_type": "Identity"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_human_task_candidate"
     },
     "workflow_human_task_event": {
@@ -74335,11 +75227,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "append-history",
       "projection_table": "workflow_human_task_event"
     },
     "workflow_human_task_receipt": {
@@ -74453,11 +75347,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "scope_key",
         "type": "String"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_human_task_receipt"
     },
     "workflow_instance": {
@@ -74643,11 +75539,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_instance"
     },
     "workflow_join_arrival": {
@@ -74743,11 +75641,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_join_arrival"
     },
     "workflow_migration_instance_result": {
@@ -74906,11 +75806,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_migration_instance_result"
     },
     "workflow_migration_plan": {
@@ -75060,11 +75962,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_migration_plan"
     },
     "workflow_migration_preflight": {
@@ -75169,11 +76073,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_migration_preflight"
     },
     "workflow_node": {
@@ -75368,11 +76274,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_node"
     },
     "workflow_outbox": {
@@ -75576,11 +76484,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_outbox"
     },
     "workflow_simulation_result": {
@@ -75712,11 +76622,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_simulation_result"
     },
     "workflow_simulation_step": {
@@ -75812,11 +76724,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_simulation_step"
     },
     "workflow_timer": {
@@ -76011,11 +76925,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_timer"
     },
     "workflow_token": {
@@ -76156,11 +77072,13 @@
           "stdb_type": "Timestamp"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_token"
     },
     "workflow_version": {
@@ -76346,11 +77264,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "workflow_version"
     },
     "working_calendar": {
@@ -76527,11 +77447,13 @@
           "stdb_type": "String"
         }
       ],
+      "module": "workflow",
       "organization_column": "organization_id",
       "primary_key": {
         "name": "id",
         "type": "U64"
       },
+      "projection_mode": "upsert-current",
       "projection_table": "working_calendar"
     }
   },

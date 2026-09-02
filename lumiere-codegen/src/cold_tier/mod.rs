@@ -142,9 +142,12 @@ pub fn run(paths: &Paths) -> Result<()> {
     write_file(&paths.codec_manifest_out, &codec_manifest_json)?;
     println!("Wrote {}", paths.codec_manifest_out.display());
 
-    let projection_codec_manifest_json =
-        codec_emit::emit_projection_codec_manifest(&candidates_json, &schema_manifest)
-            .context("generating projection codec manifest")?;
+    let projection_codec_manifest_json = codec_emit::emit_projection_codec_manifest(
+        &candidates_json,
+        &schema_manifest,
+        &storage_policy_manifest,
+    )
+    .context("generating projection codec manifest")?;
     write_file(
         &paths.projection_codec_manifest_out,
         &projection_codec_manifest_json,

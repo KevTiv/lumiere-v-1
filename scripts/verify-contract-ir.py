@@ -370,6 +370,8 @@ def main() -> None:
                 fail(f"PostgreSQL projection table {table} must be an object")
             unknown_fields = set(projection_table) - {
                 "projection_table",
+                "module",
+                "projection_mode",
                 "primary_key",
                 "organization_column",
                 "columns",
@@ -382,6 +384,10 @@ def main() -> None:
                 )
             if projection_table.get("projection_table") != table:
                 fail(f"PostgreSQL projection table {table} has mismatched projection-table metadata")
+            if projection_table.get("module") != policy_by_table[table].get("module"):
+                fail(f"PostgreSQL projection table {table} module disagrees with storage policy")
+            if projection_table.get("projection_mode") != policy_by_table[table].get("projection_mode"):
+                fail(f"PostgreSQL projection table {table} mode disagrees with storage policy")
             organization_column = projection_table.get("organization_column")
             if organization_column not in (None, "organization_id"):
                 fail(f"PostgreSQL projection table {table} has invalid organization-column metadata")

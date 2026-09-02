@@ -95,6 +95,7 @@ pub fn emit_codec_manifest(
 pub fn emit_projection_codec_manifest(
     candidates_json: &str,
     schema_manifest: &LumiereSchemaManifest,
+    storage_policy_manifest: &Value,
 ) -> Result<String> {
     let config: Value =
         serde_json::from_str(candidates_json).context("parse archive-candidates.json")?;
@@ -120,14 +121,39 @@ pub fn emit_projection_codec_manifest(
         archive_tables.insert(table.to_string(), cold_table.to_string());
     }
 
+    let policies = storage_policy_manifest["policies"]
+        .as_array()
+        .context("storage policy manifest: missing 'policies' array")?;
+    let mut projection_policies = std::collections::BTreeMap::new();
+    for (i, policy) in policies.iter().enumerate() {
+        let table = policy["table"]
+            .as_str()
+            .with_context(|| format!("storage policies[{i}].table is not a string"))?;
+        let module = policy["module"]
+            .as_str()
+            .with_context(|| format!("storage policies[{i}].module is not a string"))?;
+        let projection_mode = policy["projection_mode"]
+            .as_str()
+            .with_context(|| format!("storage policies[{i}].projection_mode is not a string"))?;
+        if projection_policies
+            .insert(table.to_string(), (module, projection_mode))
+            .is_some()
+        {
+            anyhow::bail!("storage policy manifest has duplicate table '{table}'");
+        }
+    }
+
     let mut schemas: Vec<&GeneratedTableSchema> = schema_manifest.tables.iter().collect();
     schemas.sort_by(|left, right| left.sql_name.cmp(&right.sql_name));
     let mut tables = serde_json::Map::new();
     for schema in schemas {
         let archive_table = archive_tables.get(&schema.sql_name).map(String::as_str);
+        let (module, projection_mode) = projection_policies
+            .get(&schema.sql_name)
+            .with_context(|| format!("table '{}' lacks a storage policy", schema.sql_name))?;
         tables.insert(
             schema.sql_name.clone(),
-            build_projection_table_entry(schema, archive_table),
+            build_projection_table_entry(schema, archive_table, module, projection_mode),
         );
     }
 
@@ -154,12 +180,19 @@ fn build_archive_table_entry(schema: &GeneratedTableSchema, cold_table: &str) ->
 fn build_projection_table_entry(
     schema: &GeneratedTableSchema,
     archive_table: Option<&str>,
+    module: &str,
+    projection_mode: &str,
 ) -> Value {
     let columns = build_columns(schema);
     let mut entry = serde_json::Map::new();
     entry.insert(
         "projection_table".into(),
         Value::String(schema.sql_name.clone()),
+    );
+    entry.insert("module".into(), Value::String(module.into()));
+    entry.insert(
+        "projection_mode".into(),
+        Value::String(projection_mode.into()),
     );
     entry.insert(
         "primary_key".into(),
@@ -342,6 +375,21 @@ mod tests {
         .to_string()
     }
 
+    fn projection_policies(manifest: &LumiereSchemaManifest) -> Value {
+        serde_json::json!({
+            "version": 1,
+            "policies": manifest.tables.iter().map(|table| serde_json::json!({
+                "table": table.sql_name,
+                "module": if table.sql_name == "audit_log" { "platform" } else { "localization" },
+                "projection_mode": if table.sql_name == "audit_log" {
+                    "append-history"
+                } else {
+                    "upsert-current"
+                },
+            })).collect::<Vec<_>>()
+        })
+    }
+
     #[test]
     fn emit_contains_expected_fields() {
         let manifest = audit_log_manifest();
@@ -426,7 +474,8 @@ mod tests {
         });
         manifest.tables.reverse();
 
-        let out = emit_projection_codec_manifest(&candidates_json(), &manifest).unwrap();
+        let policies = projection_policies(&manifest);
+        let out = emit_projection_codec_manifest(&candidates_json(), &manifest, &policies).unwrap();
         let parsed: Value = serde_json::from_str(&out).unwrap();
         let table_names: Vec<&str> = parsed["tables"]
             .as_object()
@@ -441,8 +490,24 @@ mod tests {
         assert_eq!(country["projection_table"], "country");
         assert_eq!(country["primary_key"]["name"], "code");
         assert_eq!(country["primary_key"]["type"], "String");
+        assert_eq!(country["module"], "localization");
+        assert_eq!(country["projection_mode"], "upsert-current");
         assert!(country.get("archive_table").is_none());
         assert!(country.get("extra_columns").is_none());
+
+        let audit = &parsed["tables"]["audit_log"];
+        assert_eq!(audit["module"], "platform");
+        assert_eq!(audit["projection_mode"], "append-history");
+    }
+
+    #[test]
+    fn projection_manifest_requires_policy_for_every_schema_table() {
+        let manifest = audit_log_manifest();
+        let missing = serde_json::json!({ "version": 1, "policies": [] });
+        let error =
+            emit_projection_codec_manifest(&candidates_json(), &manifest, &missing).unwrap_err();
+
+        assert!(error.to_string().contains("audit_log"));
     }
 
     #[test]
