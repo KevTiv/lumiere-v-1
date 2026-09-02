@@ -125,6 +125,7 @@ pub struct ContactSegment {
 
 #[spacetimedb::table(
     accessor = segment_member,
+    index(accessor = segment_member_by_organization, btree(columns = [organization_id])),
     index(accessor = segment_member_by_segment, btree(columns = [segment_id]))
 )]
 pub struct SegmentMember {

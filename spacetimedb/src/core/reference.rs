@@ -213,13 +213,25 @@ pub struct UOMConversion {
     pub metadata: Option<String>,
 }
 
-/// Document Sequence — Auto-incrementing counters for human-readable document numbers.
+/// Document Sequence — organization-owned counters for human-readable document numbers.
 ///
-/// Each `doc_type` key (e.g. "SO", "PO", "INV", "BILL", "JRNL") tracks its own counter.
-/// Use `next_doc_number(ctx, "SO")` from `helpers` to atomically read + bump the counter.
-#[spacetimedb::table(accessor = document_sequence, public)]
+/// Each `(organization_id, doc_type)` key (e.g. `SO`, `PO`, `INV`, `BILL`, `JRNL`)
+/// tracks its own counter. Use `next_doc_number(ctx, organization_id, "SO")` from
+/// `helpers` to atomically read and bump the counter.
+#[spacetimedb::table(
+    accessor = document_sequence,
+    public,
+    index(
+        accessor = document_sequence_by_organization_and_type,
+        btree(columns = [organization_id, doc_type])
+    )
+)]
 pub struct DocumentSequence {
     #[primary_key]
+    /// Tenant-aware business key (`{organization_id}:{doc_type}`).
+    pub sequence_key: String,
+    #[index(btree)]
+    pub organization_id: u64,
     pub doc_type: String, // "SO" | "PO" | "INV" | "BILL" | "JRNL"
     pub next_number: u64,
 }

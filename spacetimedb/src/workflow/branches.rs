@@ -45,6 +45,7 @@ pub struct WorkflowFork {
 #[derive(Clone, Debug)]
 #[spacetimedb::table(
     accessor = workflow_join_arrival,
+    index(accessor = workflow_join_arrival_by_organization, btree(columns = [organization_id])),
     index(accessor = workflow_join_arrival_by_fork, btree(columns = [fork_id])),
     index(
         accessor = workflow_join_arrival_by_unique,

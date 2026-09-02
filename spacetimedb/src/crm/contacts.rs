@@ -97,7 +97,10 @@ pub struct ContactCategory {
     pub metadata: Option<String>,
 }
 
-#[spacetimedb::table(accessor = contact_category_assignment)]
+#[spacetimedb::table(
+    accessor = contact_category_assignment,
+    index(accessor = contact_category_assignment_by_organization, btree(columns = [organization_id]))
+)]
 pub struct ContactCategoryAssignment {
     #[primary_key]
     #[auto_inc]
@@ -111,7 +114,10 @@ pub struct ContactCategoryAssignment {
     pub metadata: Option<String>,
 }
 
-#[spacetimedb::table(accessor = contact_relationship)]
+#[spacetimedb::table(
+    accessor = contact_relationship,
+    index(accessor = contact_relationship_by_organization, btree(columns = [organization_id]))
+)]
 pub struct ContactRelationship {
     #[primary_key]
     #[auto_inc]
@@ -146,7 +152,10 @@ pub struct ContactTag {
     pub metadata: Option<String>,
 }
 
-#[spacetimedb::table(accessor = contact_tag_assignment)]
+#[spacetimedb::table(
+    accessor = contact_tag_assignment,
+    index(accessor = contact_tag_assignment_by_organization, btree(columns = [organization_id]))
+)]
 pub struct ContactTagAssignment {
     #[primary_key]
     #[auto_inc]

@@ -23,7 +23,7 @@ pub mod stdb_bindings_parse;
 use crate::paths::Paths;
 use crate::support::{read_to_string, write_file};
 use anyhow::{Context, Result};
-use schema_ir::LumiereSchemaManifest;
+use schema_ir::{GeneratedTableOwnership, LumiereSchemaManifest, OwnershipCounts};
 use serde_json::Value;
 
 pub fn run(paths: &Paths) -> Result<()> {
@@ -31,8 +31,47 @@ pub fn run(paths: &Paths) -> Result<()> {
 
     let schema_manifest = stdb_bindings_parse::parse_bindings(&paths.stdb_bindings_dir)
         .context("extracting schema IR from STDB Rust bindings")?;
-    let schema_manifest_json =
-        serde_json::to_string_pretty(&schema_manifest).context("serialise schema manifest")?;
+    let c0_enforced = std::env::var("C0_ENFORCE_TENANT_OWNERSHIP").as_deref() == Ok("1");
+    let ownership_counts: Option<OwnershipCounts> = match schema_manifest.ownership_counts() {
+        Ok(counts) => Some(counts),
+        Err(error) if !c0_enforced => {
+            eprintln!(
+                "lumiere-codegen: warning: C0 ownership gate disabled; {}",
+                error
+            );
+            None
+        }
+        Err(error) => return Err(error).context("classifying schema table ownership"),
+    };
+    if c0_enforced {
+        schema_manifest
+            .validate_tenant_ownership()
+            .context("validating C0 organization ownership")?;
+    }
+    let mut schema_manifest_value =
+        serde_json::to_value(&schema_manifest).context("serialise schema manifest")?;
+    let platform_global_tables = schema_manifest
+        .tables
+        .iter()
+        .filter_map(|table| match table.ownership() {
+            Ok(GeneratedTableOwnership::PlatformGlobal(platform)) => Some(serde_json::json!({
+                "sql_name": platform.sql_name,
+                "rationale": platform.rationale,
+            })),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    schema_manifest_value["ownership_summary"] = match ownership_counts {
+        Some(counts) => serde_json::json!({
+            "verified": true,
+            "erp_owned_count": counts.erp_owned_count,
+            "platform_global_count": counts.platform_global_count,
+            "platform_global_tables": platform_global_tables,
+        }),
+        None => serde_json::json!({ "verified": false }),
+    };
+    let schema_manifest_json = serde_json::to_string_pretty(&schema_manifest_value)
+        .context("serialise schema manifest")?;
     write_file(&paths.schema_manifest_out, &schema_manifest_json)?;
 
     // ── 2. Archive manifest: validate candidates + emit archive-manifest.json
@@ -81,6 +120,17 @@ pub fn run(paths: &Paths) -> Result<()> {
         schema_manifest.tables.len(),
         schema_manifest.enum_types.len(),
         paths.stdb_bindings_dir.display()
+    );
+    println!(
+        "lumiere-codegen: ownership summary: {}",
+        ownership_counts
+            .map(|counts| {
+                format!(
+                    "{} ERP-owned, {} platform-global",
+                    counts.erp_owned_count, counts.platform_global_count
+                )
+            })
+            .unwrap_or_else(|| "ownership not verified (gate disabled)".to_string())
     );
     println!("lumiere-codegen: {ddl_file_count} cold PG DDL file(s) from archive-candidates.json");
     println!("Wrote {}", paths.schema_manifest_out.display());

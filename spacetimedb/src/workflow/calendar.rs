@@ -15,6 +15,8 @@ use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::organization::organization;
+
 /// Monday is bit zero and Sunday is bit six.
 pub const MONDAY_TO_FRIDAY: u8 = 0b0001_1111;
 const MAX_LOCAL_RESOLUTION_SECONDS: i64 = 172_800;
@@ -91,6 +93,10 @@ pub enum CalendarExceptionCategory {
     accessor = workflow_calendar,
     index(accessor = workflow_calendar_by_key, btree(columns = [calendar_key])),
     index(accessor = workflow_calendar_by_organization, btree(columns = [organization_id])),
+    index(
+        accessor = workflow_calendar_by_organization_and_key,
+        btree(columns = [organization_id, calendar_key])
+    ),
     index(accessor = workflow_calendar_by_company, btree(columns = [company_id]))
 )]
 pub struct WorkflowCalendar {
@@ -101,7 +107,7 @@ pub struct WorkflowCalendar {
     pub name: String,
     pub market: WorkflowCalendarMarket,
     pub scope: WorkflowCalendarScope,
-    pub organization_id: Option<u64>,
+    pub organization_id: u64,
     pub company_id: Option<u64>,
     pub created_at: Timestamp,
 }
@@ -111,12 +117,17 @@ pub struct WorkflowCalendar {
 #[spacetimedb::table(
     accessor = workflow_calendar_version,
     index(accessor = workflow_calendar_version_by_calendar, btree(columns = [calendar_id])),
-    index(accessor = workflow_calendar_version_by_hash, btree(columns = [content_hash]))
+    index(accessor = workflow_calendar_version_by_hash, btree(columns = [content_hash])),
+    index(
+        accessor = workflow_calendar_version_by_organization,
+        btree(columns = [organization_id])
+    )
 )]
 pub struct WorkflowCalendarVersion {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub calendar_id: u64,
     pub version_number: u32,
     pub locale: String,
@@ -149,12 +160,17 @@ pub struct WorkflowCalendarVersion {
     index(
         accessor = workflow_calendar_exception_by_date,
         btree(columns = [local_date_days])
+    ),
+    index(
+        accessor = workflow_calendar_exception_by_organization,
+        btree(columns = [organization_id])
     )
 )]
 pub struct WorkflowCalendarException {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub calendar_version_id: u64,
     /// Days since 1970-01-01. This avoids interpreting a local date as a UTC timestamp.
     pub local_date_days: i32,
@@ -288,7 +304,7 @@ pub fn foundation_calendar_packs() -> Result<Vec<WorkflowCalendarPackSeed>, Stri
     Ok(asset.packs)
 }
 
-/// Idempotently materialize the source-controlled global packs by content hash.
+/// Idempotently materialize organization-owned copies of the foundation packs.
 ///
 /// This bridge only inserts. A new content hash creates a new immutable version; a
 /// repeated hash returns the existing version. No current-version pointer is changed.
@@ -296,20 +312,27 @@ pub(crate) fn activate_foundation_calendar_packs(
     ctx: &ReducerContext,
 ) -> Result<CalendarSeedSummary, String> {
     let mut summary = CalendarSeedSummary::default();
-    for pack in foundation_calendar_packs()? {
-        let receipt = activate_calendar_pack(ctx, &pack)?;
-        if receipt.inserted {
-            summary.inserted_versions += 1;
-        } else {
-            summary.replayed_versions += 1;
+    let organization_ids: Vec<u64> = ctx.db.organization().iter().map(|row| row.id).collect();
+    if organization_ids.is_empty() {
+        return Err("cannot activate workflow calendar packs without an organization".to_string());
+    }
+    for organization_id in organization_ids {
+        for pack in foundation_calendar_packs()? {
+            let receipt = activate_calendar_pack(ctx, organization_id, &pack)?;
+            if receipt.inserted {
+                summary.inserted_versions += 1;
+            } else {
+                summary.replayed_versions += 1;
+            }
         }
     }
     Ok(summary)
 }
 
-/// Insert one global pack version, or return the identical existing version.
+/// Insert one organization-owned pack version, or return the identical existing version.
 pub(crate) fn activate_calendar_pack(
     ctx: &ReducerContext,
+    organization_id: u64,
     pack: &WorkflowCalendarPackSeed,
 ) -> Result<CalendarActivationReceipt, String> {
     validate_pack(pack)?;
@@ -321,7 +344,7 @@ pub(crate) fn activate_calendar_pack(
         .filter(&pack.calendar_key)
         .find(|row| {
             row.scope == WorkflowCalendarScope::GlobalPack
-                && row.organization_id.is_none()
+                && row.organization_id == organization_id
                 && row.company_id.is_none()
         }) {
         Some(existing) => {
@@ -339,7 +362,7 @@ pub(crate) fn activate_calendar_pack(
             name: pack.name.clone(),
             market: pack.market,
             scope: WorkflowCalendarScope::GlobalPack,
-            organization_id: None,
+            organization_id,
             company_id: None,
             created_at: ctx.timestamp,
         }),
@@ -352,6 +375,20 @@ pub(crate) fn activate_calendar_pack(
         .filter(&pack.content_hash)
         .find(|version| version.calendar_id == calendar.id)
     {
+        if existing.organization_id != calendar.organization_id {
+            return Err("calendar version does not belong to calendar organization".to_string());
+        }
+        if ctx
+            .db
+            .workflow_calendar_exception()
+            .workflow_calendar_exception_by_version()
+            .filter(&existing.id)
+            .any(|exception| exception.organization_id != existing.organization_id)
+        {
+            return Err(
+                "calendar exception does not belong to calendar version organization".to_string(),
+            );
+        }
         ensure_replay_matches(&existing, pack)?;
         return Ok(CalendarActivationReceipt {
             calendar_id: calendar.id,
@@ -366,7 +403,15 @@ pub(crate) fn activate_calendar_pack(
         .workflow_calendar_version()
         .workflow_calendar_version_by_hash()
         .filter(&pack.content_hash)
-        .any(|version| version.calendar_id != calendar.id)
+        .any(|version| {
+            version.calendar_id != calendar.id
+                && ctx
+                    .db
+                    .workflow_calendar()
+                    .id()
+                    .find(&version.calendar_id)
+                    .is_some_and(|row| row.organization_id == organization_id)
+        })
     {
         return Err("calendar content hash is already bound to another calendar".to_string());
     }
@@ -387,6 +432,7 @@ pub(crate) fn activate_calendar_pack(
         .workflow_calendar_version()
         .insert(WorkflowCalendarVersion {
             id: 0,
+            organization_id: calendar.organization_id,
             calendar_id: calendar.id,
             version_number,
             locale: pack.locale.clone(),
@@ -415,6 +461,7 @@ pub(crate) fn activate_calendar_pack(
             .workflow_calendar_exception()
             .insert(WorkflowCalendarException {
                 id: 0,
+                organization_id: version.organization_id,
                 calendar_version_id: version.id,
                 local_date_days: local_date_days(local_date)?,
                 name: exception.name.clone(),
@@ -475,6 +522,14 @@ pub fn calculate_workflow_deadline(
     exceptions: &[WorkflowCalendarException],
     request: &DeadlineRequest,
 ) -> Result<WorkflowDeadlineEvidence, String> {
+    if exceptions.iter().any(|exception| {
+        exception.calendar_version_id == version.id
+            && exception.organization_id != version.organization_id
+    }) {
+        return Err(
+            "calendar exception does not belong to calendar version organization".to_string(),
+        );
+    }
     validate_version_rules(version)?;
     let timezone = parse_timezone(&version.iana_timezone)?;
     let start_utc =

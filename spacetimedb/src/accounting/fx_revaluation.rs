@@ -378,7 +378,7 @@ fn run_fx_revaluation_impl(
     }
 
     let net = total_gain - total_loss;
-    let name = next_doc_number(ctx, "FXREVAL");
+    let name = next_doc_number(ctx, organization_id, "FXREVAL");
 
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
@@ -841,7 +841,7 @@ pub fn post_realized_fx_gain_loss(
         return Err("clearing account must be an asset or liability account".to_string());
     }
 
-    let name = next_doc_number(ctx, "FXREAL");
+    let name = next_doc_number(ctx, organization_id, "FXREAL");
     let abs = difference.abs();
 
     let move_record = ctx.db.account_move().insert(AccountMove {

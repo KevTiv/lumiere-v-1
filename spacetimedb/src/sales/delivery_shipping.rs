@@ -98,6 +98,7 @@ pub struct ShippingCostResult {
 #[spacetimedb::table(
     accessor = stock_picking_batch,
     public,
+    index(accessor = batch_by_organization, btree(columns = [organization_id])),
     index(accessor = batch_by_company, btree(columns = [company_id])),
     index(accessor = batch_by_state, btree(columns = [state]))
 )]
@@ -105,6 +106,7 @@ pub struct StockPickingBatch {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub name: String,
     pub user_id: Identity,
     pub state: BatchState,
@@ -137,12 +139,14 @@ pub struct StockPickingBatch {
 #[spacetimedb::table(
     accessor = delivery_carrier,
     public,
+    index(accessor = carrier_by_organization, btree(columns = [organization_id])),
     index(accessor = carrier_by_company, btree(columns = [company_id]))
 )]
 pub struct DeliveryCarrier {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub name: String,
     pub active: bool,
     pub company_id: u64,
@@ -179,12 +183,14 @@ pub struct DeliveryCarrier {
 #[spacetimedb::table(
     accessor = delivery_price_rule,
     public,
+    index(accessor = price_rule_by_organization, btree(columns = [organization_id])),
     index(accessor = price_rule_by_company, btree(columns = [company_id]))
 )]
 pub struct DeliveryPriceRule {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub carrier_id: u64,
     pub variable: String,
     pub operator: String,
@@ -203,12 +209,14 @@ pub struct DeliveryPriceRule {
 #[spacetimedb::table(
     accessor = shipping_method,
     public,
+    index(accessor = shipping_method_by_organization, btree(columns = [organization_id])),
     index(accessor = shipping_method_by_company, btree(columns = [company_id]))
 )]
 pub struct ShippingMethod {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub name: String,
     pub provider: String,
     pub company_id: u64,
@@ -302,6 +310,13 @@ pub fn calculate_shipping_cost_internal(
             let mut rule_cost = 0.0;
             for rule_id in &carrier.price_rule_ids {
                 if let Some(rule) = ctx.db.delivery_price_rule().id().find(rule_id) {
+                    if rule.organization_id != carrier.organization_id
+                        || rule.company_id != carrier.company_id
+                    {
+                        return Err(
+                            "Carrier price rule does not match carrier ownership".to_string()
+                        );
+                    }
                     let matches = match rule.variable.as_str() {
                         "weight" => {
                             check_rule_condition(order_weight, &rule.operator, rule.max_value)
@@ -364,7 +379,7 @@ pub fn create_picking_batch(
             .find(picking_id)
             .ok_or_else(|| format!("Picking {} not found", picking_id))?;
 
-        if picking.company_id != company_id {
+        if picking.organization_id != organization_id || picking.company_id != company_id {
             return Err(format!(
                 "Picking {} belongs to different company",
                 picking_id
@@ -378,6 +393,7 @@ pub fn create_picking_batch(
 
     let batch = ctx.db.stock_picking_batch().insert(StockPickingBatch {
         id: 0,
+        organization_id,
         name: params.name,
         user_id: ctx.sender(),
         state: BatchState::Draft,
@@ -454,6 +470,7 @@ pub fn create_delivery_carrier(
     params: CreateDeliveryCarrierParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "delivery_carrier", "create")?;
+    let company_id = company_id_from_scope(ctx, organization_id, Some(company_id))?;
 
     for rule_id in &params.price_rule_ids {
         let rule = ctx
@@ -462,7 +479,7 @@ pub fn create_delivery_carrier(
             .id()
             .find(rule_id)
             .ok_or_else(|| format!("Price rule {} not found", rule_id))?;
-        if rule.company_id != company_id {
+        if rule.organization_id != organization_id || rule.company_id != company_id {
             return Err(format!(
                 "Price rule {} does not belong to this company",
                 rule_id
@@ -472,6 +489,7 @@ pub fn create_delivery_carrier(
 
     let carrier = ctx.db.delivery_carrier().insert(DeliveryCarrier {
         id: 0,
+        organization_id,
         name: params.name,
         active: true,
         company_id,
@@ -537,9 +555,11 @@ pub fn create_delivery_price_rule(
     params: CreateDeliveryPriceRuleParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "delivery_price_rule", "create")?;
+    let company_id = company_id_from_scope(ctx, organization_id, Some(company_id))?;
 
     let rule = ctx.db.delivery_price_rule().insert(DeliveryPriceRule {
         id: 0,
+        organization_id,
         carrier_id: 0, // Should be set when linking to carrier
         variable: params.variable,
         operator: params.operator,
@@ -592,9 +612,11 @@ pub fn create_shipping_method(
     params: CreateShippingMethodParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "shipping_method", "create")?;
+    let company_id = company_id_from_scope(ctx, organization_id, Some(company_id))?;
 
     let method = ctx.db.shipping_method().insert(ShippingMethod {
         id: 0,
+        organization_id,
         name: params.name,
         provider: params.provider,
         company_id,
@@ -650,6 +672,9 @@ pub fn start_picking_batch(
         .id()
         .find(&batch_id)
         .ok_or("Batch not found")?;
+    if batch.organization_id != organization_id {
+        return Err("Batch does not belong to this organization".to_string());
+    }
 
     check_permission(ctx, organization_id, "stock_picking_batch", "write")?;
 
@@ -695,6 +720,9 @@ pub fn complete_picking_batch(
         .id()
         .find(&batch_id)
         .ok_or("Batch not found")?;
+    if batch.organization_id != organization_id {
+        return Err("Batch does not belong to this organization".to_string());
+    }
 
     check_permission(ctx, organization_id, "stock_picking_batch", "write")?;
 
@@ -740,6 +768,9 @@ pub fn cancel_picking_batch(
         .id()
         .find(&batch_id)
         .ok_or("Batch not found")?;
+    if batch.organization_id != organization_id {
+        return Err("Batch does not belong to this organization".to_string());
+    }
 
     check_permission(ctx, organization_id, "stock_picking_batch", "cancel")?;
 

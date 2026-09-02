@@ -451,7 +451,7 @@ fn finalize_payslip_done(
     let number = payslip
         .number
         .clone()
-        .or_else(|| Some(next_doc_number(ctx, "PAYSLIP")));
+        .or_else(|| Some(next_doc_number(ctx, organization_id, "PAYSLIP")));
     ctx.db.hr_payslip().id().update(HrPayslip {
         state: PayslipState::Done,
         number,
@@ -898,7 +898,7 @@ pub fn post_payslip(
     let gross = payslip.gross_wage;
     let net = payslip.net_wage;
     let origin = format!("PAYSLIP-{}", payslip.id);
-    let move_name = next_doc_number(ctx, "PAY");
+    let move_name = next_doc_number(ctx, organization_id, "PAY");
 
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,

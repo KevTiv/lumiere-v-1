@@ -1443,7 +1443,7 @@ pub fn post_account_move_impl(
             MoveType::InInvoice | MoveType::InRefund => "BILL",
             _ => "JRNL",
         };
-        next_doc_number(ctx, doc_type)
+        next_doc_number(ctx, organization_id, doc_type)
     } else {
         move_record.name.clone()
     };

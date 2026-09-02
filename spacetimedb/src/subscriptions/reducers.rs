@@ -56,17 +56,14 @@ pub(crate) fn validate_subscription_metadata(metadata: &str) -> Result<(), Strin
     if metadata.is_empty() {
         return Ok(());
     }
-    let parsed: serde_json::Value = serde_json::from_str(metadata)
-        .map_err(|_| "metadata must be valid JSON".to_string())?;
+    let parsed: serde_json::Value =
+        serde_json::from_str(metadata).map_err(|_| "metadata must be valid JSON".to_string())?;
     let obj = parsed
         .as_object()
         .ok_or("metadata must be a JSON object".to_string())?;
     for key in obj.keys() {
         if SUBSCRIPTION_RESERVED_METADATA_KEYS.contains(&key.as_str()) {
-            return Err(format!(
-                "metadata key '{}' is reserved for system use",
-                key
-            ));
+            return Err(format!("metadata key '{}' is reserved for system use", key));
         }
     }
     Ok(())
@@ -374,13 +371,17 @@ pub fn create_subscription_plan(
     // SUB-001: Validate currency FK
     require_active_currency_id(ctx, params.currency_id, "plan currency")?;
     // SUB-002: Validate journal FK
-    require_active_journal(ctx, organization_id, company_id, params.journal_id, "plan journal")?;
+    require_active_journal(
+        ctx,
+        organization_id,
+        company_id,
+        params.journal_id,
+        "plan journal",
+    )?;
     // SUB-003: Validate product FK
     require_product_in_org(ctx, organization_id, params.product_id)?;
     // SUB-005: Validate metadata schema
-    validate_subscription_metadata(
-        params.metadata.as_deref().unwrap_or_default(),
-    )?;
+    validate_subscription_metadata(params.metadata.as_deref().unwrap_or_default())?;
 
     let plan = SubscriptionPlan {
         id: 0,
@@ -1376,7 +1377,7 @@ pub fn recognize_deferred_revenue(
     let liability_account_id = line.account_id;
     let income_account_id = line.deferred_account_id;
     let amount = line.amount;
-    let name = next_doc_number(ctx, "REVREC");
+    let name = next_doc_number(ctx, organization_id, "REVREC");
     let currency_id = line.currency_id;
 
     let move_record = ctx.db.account_move().insert(AccountMove {

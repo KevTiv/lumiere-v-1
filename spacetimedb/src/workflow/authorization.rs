@@ -28,6 +28,7 @@ pub struct WorkflowDelegation {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    #[index(btree)]
     pub organization_id: u64,
     pub company_id: u64,
     pub delegator_identity: Identity,

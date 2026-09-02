@@ -1,8 +1,7 @@
 //! Operational orchestration and validation for the ACC-RI-001 ownership backfill.
 //!
-//! The four domain backfills intentionally commit quarantined rows and issue
-//! records. Validation is a separate reducer so a failed completion gate does
-//! not roll back that evidence.
+//! The four domain checks validate final-schema ownership and retain issue
+//! records for provenance conflicts. Validation is a separate reducer.
 
 use std::collections::HashMap;
 
@@ -15,6 +14,7 @@ use crate::accounting::consolidation::{
 use crate::accounting::fiscal_periods::{
     account_fiscal_year, account_period, accounting_ownership_backfill_issue,
     accounting_ownership_backfill_run, backfill_fiscal_period_organization_ownership,
+    require_single_backfill_organization,
 };
 use crate::accounting::fixed_assets::{
     account_asset, account_asset_depreciation_line, backfill_fixed_asset_organization_ownership,
@@ -47,11 +47,11 @@ fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
 /// Execute every ACC-RI-001 ownership backfill in dependency order.
 ///
 /// The underlying reducers derive ownership only from authoritative company or
-/// parent rows. Missing, ambiguous, and conflicting relationships are left
-/// nullable and recorded in `accounting_ownership_backfill_issue`.
+/// parent rows. Missing or conflicting relationships fail closed.
 #[spacetimedb::reducer]
 pub fn run_accounting_ownership_backfill(ctx: &ReducerContext) -> Result<(), String> {
     require_superuser(ctx)?;
+    require_single_backfill_organization(ctx)?;
     backfill_fiscal_period_organization_ownership(ctx)?;
     backfill_fixed_asset_organization_ownership(ctx)?;
     backfill_consolidation_organization_ownership(ctx)?;
@@ -64,7 +64,7 @@ pub fn run_accounting_ownership_backfill(ctx: &ReducerContext) -> Result<(), Str
 }
 
 /// Fail closed unless the latest full accounting ownership backfill completed
-/// with no quarantined or nullable ownership rows.
+/// with no quarantined or invalid ownership rows.
 ///
 /// Call this only after `run_accounting_ownership_backfill`. It is deliberately
 /// read-only so failed validation preserves issue rows for investigation.
@@ -80,9 +80,11 @@ pub fn validate_accounting_ownership_backfill(ctx: &ReducerContext) -> Result<()
     }
 
     let latest_runs = ctx.db.accounting_ownership_backfill_run().iter().fold(
-        HashMap::<String, (u64, u64)>::new(),
+        HashMap::<(u64, String), (u64, u64)>::new(),
         |mut latest, run| {
-            let entry = latest.entry(run.scope).or_insert((0, 0));
+            let entry = latest
+                .entry((run.organization_id, run.scope))
+                .or_insert((0, 0));
             if run.id > entry.0 {
                 *entry = (run.id, run.unresolved_rows);
             }
@@ -90,8 +92,10 @@ pub fn validate_accounting_ownership_backfill(ctx: &ReducerContext) -> Result<()
         },
     );
 
+    let organization_id = require_single_backfill_organization(ctx)?;
     for scope in BACKFILL_SCOPES {
-        let Some((_, unresolved_rows)) = latest_runs.get(scope) else {
+        let Some((_, unresolved_rows)) = latest_runs.get(&(organization_id, scope.to_string()))
+        else {
             return Err(format!(
                 "accounting ownership validation failed: no completed {scope} backfill run"
             ));
@@ -103,75 +107,75 @@ pub fn validate_accounting_ownership_backfill(ctx: &ReducerContext) -> Result<()
         }
     }
 
-    let nullable_rows = ctx
+    let invalid_rows = ctx
         .db
         .account_fiscal_year()
         .iter()
-        .filter(|row| row.organization_id.is_none())
+        .filter(|row| row.organization_id == 0)
         .count()
         + ctx
             .db
             .account_period()
             .iter()
-            .filter(|row| row.organization_id.is_none())
+            .filter(|row| row.organization_id == 0)
             .count()
         + ctx
             .db
             .account_asset()
             .iter()
-            .filter(|row| row.organization_id.is_none())
+            .filter(|row| row.organization_id == 0)
             .count()
         + ctx
             .db
             .account_asset_depreciation_line()
             .iter()
-            .filter(|row| row.organization_id.is_none() || row.company_id.is_none())
+            .filter(|row| row.organization_id == 0 || row.company_id.is_none())
             .count()
         + ctx
             .db
             .consolidation_account()
             .iter()
-            .filter(|row| row.organization_id.is_none())
+            .filter(|row| row.organization_id == 0)
             .count()
         + ctx
             .db
             .consolidation_journal()
             .iter()
-            .filter(|row| row.organization_id.is_none())
+            .filter(|row| row.organization_id == 0)
             .count()
         + ctx
             .db
             .consolidation_elimination_entry()
             .iter()
-            .filter(|row| row.organization_id.is_none())
+            .filter(|row| row.organization_id == 0)
             .count()
         + ctx
             .db
             .consolidation_company_rate()
             .iter()
-            .filter(|row| row.organization_id.is_none())
+            .filter(|row| row.organization_id == 0)
             .count()
         + ctx
             .db
             .intercompany_rule()
             .iter()
-            .filter(|row| row.organization_id.is_none())
+            .filter(|row| row.organization_id == 0)
             .count()
         + ctx
             .db
             .intercompany_transaction()
             .iter()
-            .filter(|row| row.organization_id.is_none())
+            .filter(|row| row.organization_id == 0)
             .count();
 
-    if nullable_rows != 0 {
+    if invalid_rows != 0 {
         return Err(format!(
-            "accounting ownership validation failed: {nullable_rows} row(s) still lack required ownership"
+            "accounting ownership validation failed: {invalid_rows} row(s) use invalid organization ownership"
         ));
     }
 
     log::info!(
-        "accounting ownership validation passed: all four scopes ran, zero unresolved issues, zero nullable ownership rows"
+        "accounting ownership validation passed: all four scopes ran, zero unresolved issues, zero invalid ownership rows"
     );
     Ok(())
 }

@@ -632,7 +632,7 @@ pub fn post_payment_impl(
         let name = payment
             .name
             .clone()
-            .unwrap_or_else(|| next_doc_number(ctx, "PAY"));
+            .unwrap_or_else(|| next_doc_number(ctx, payment.organization_id, "PAY"));
         ctx.db.account_payment().id().update(AccountPayment {
             name: Some(name),
             state: PaymentState::Paid,
@@ -661,7 +661,7 @@ pub fn post_payment_impl(
         return Ok(());
     }
 
-    let name = next_doc_number(ctx, "PAY");
+    let name = next_doc_number(ctx, organization_id, "PAY");
     let amount = payment.amount;
     let partner_id = payment.partner_id;
     let company_id = payment.company_id;

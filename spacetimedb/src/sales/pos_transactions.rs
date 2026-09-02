@@ -69,6 +69,7 @@ pub struct CreatePosPaymentParams {
 #[table(
     accessor = pos_session,
     public,
+    index(accessor = session_by_organization, btree(columns = [organization_id])),
     index(accessor = session_by_user, btree(columns = [user_id])),
     index(accessor = session_by_config, btree(columns = [config_id]))
 )]
@@ -76,6 +77,7 @@ pub struct PosSession {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub name: String,
     pub user_id: Identity,
     pub config_id: u64,
@@ -197,12 +199,14 @@ pub struct PosOrder {
 #[table(
     accessor = pos_order_line,
     public,
+    index(accessor = pos_line_by_organization, btree(columns = [organization_id])),
     index(accessor = pos_line_by_order, btree(columns = [order_id]))
 )]
 pub struct PosOrderLine {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub order_id: u64,
     pub name: String,
     pub skip_change: bool,
@@ -240,12 +244,14 @@ pub struct PosOrderLine {
 #[table(
     accessor = pos_payment,
     public,
+    index(accessor = payment_by_organization, btree(columns = [organization_id])),
     index(accessor = payment_by_session, btree(columns = [session_id]))
 )]
 pub struct PosPayment {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub order_id: u64,
     pub payment_method_id: u64,
     pub session_id: u64,
@@ -280,6 +286,7 @@ pub struct PosLoyaltyCard {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    #[index(btree)]
     pub organization_id: u64,
     pub partner_id: Option<u64>,
     pub code: String,
@@ -351,6 +358,9 @@ pub fn open_pos_session(
         .id()
         .find(&config_id)
         .ok_or("POS config not found")?;
+    if config.organization_id != organization_id {
+        return Err("POS config does not belong to this organization".to_string());
+    }
 
     check_permission(ctx, organization_id, "pos_session", "create")?;
 
@@ -373,6 +383,7 @@ pub fn open_pos_session(
 
     let session = ctx.db.pos_session().insert(PosSession {
         id: 0,
+        organization_id: config.organization_id,
         name,
         user_id: ctx.sender(),
         config_id,
@@ -460,6 +471,9 @@ pub fn compute_pos_session_totals(
         .id()
         .find(&session_id)
         .ok_or("Session not found")?;
+    if session.organization_id != organization_id {
+        return Err("Session does not belong to this organization".to_string());
+    }
 
     check_permission(ctx, organization_id, "pos_session", "write")?;
 
@@ -493,6 +507,9 @@ pub fn close_pos_session(
         .id()
         .find(&session_id)
         .ok_or("Session not found")?;
+    if session.organization_id != organization_id {
+        return Err("Session does not belong to this organization".to_string());
+    }
 
     let config = ctx
         .db
@@ -500,6 +517,11 @@ pub fn close_pos_session(
         .id()
         .find(&session.config_id)
         .ok_or("POS config not found")?;
+    if config.organization_id != session.organization_id
+        || config.organization_id != organization_id
+    {
+        return Err("POS session and config do not belong to this organization".to_string());
+    }
 
     check_permission(ctx, organization_id, "pos_session", "close")?;
 
@@ -578,6 +600,9 @@ pub fn create_pos_order(
         .id()
         .find(&params.session_id)
         .ok_or("Session not found")?;
+    if session.organization_id != organization_id {
+        return Err("Session does not belong to this organization".to_string());
+    }
 
     if session.state != SessionState::Opened {
         return Err("Session must be open to create orders".to_string());
@@ -589,6 +614,11 @@ pub fn create_pos_order(
         .id()
         .find(&session.config_id)
         .ok_or("POS config not found")?;
+    if config.organization_id != organization_id
+        || config.organization_id != session.organization_id
+    {
+        return Err("POS session and config do not belong to this organization".to_string());
+    }
 
     check_permission(ctx, organization_id, "pos_order", "create")?;
 
@@ -609,6 +639,7 @@ pub fn create_pos_order(
 
         let inserted_line = ctx.db.pos_order_line().insert(PosOrderLine {
             id: 0,
+            organization_id,
             order_id: 0,
             name: line
                 .name
@@ -669,6 +700,7 @@ pub fn create_pos_order(
     for payment in &params.payments {
         let inserted_payment = ctx.db.pos_payment().insert(PosPayment {
             id: 0,
+            organization_id,
             order_id: 0,
             payment_method_id: payment.payment_method_id,
             session_id: params.session_id,

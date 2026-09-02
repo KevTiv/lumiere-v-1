@@ -455,7 +455,7 @@ fn post_project_revrec_je(
     if amount <= 0.0 {
         return Err("Recognition amount must be positive".to_string());
     }
-    let name = next_doc_number(ctx, "PREVREC");
+    let name = next_doc_number(ctx, organization_id, "PREVREC");
     let currency_id = schedule.currency_id;
 
     let move_record = ctx.db.account_move().insert(AccountMove {

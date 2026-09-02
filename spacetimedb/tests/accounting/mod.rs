@@ -14,6 +14,7 @@ pub mod payments_test;
 pub mod period_lock_test;
 pub mod posted_immutability_test;
 pub mod relational_integrity_test;
+pub mod tax_deadline_scheduler_test;
 pub mod trial_balance_test;
 
 use spacetimedb::ReducerContext;
@@ -51,6 +52,8 @@ pub fn run_all_accounting_tests(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|error| format!("ACC-RI-021 analytic account parent: {error}"))?;
     adversarial_p0_fixes_test::test_bank_statement_reducers_reject_cross_tenant(ctx)
         .map_err(|error| format!("ACC-RI-022 bank statement: {error}"))?;
+    tax_deadline_scheduler_test::test_tax_deadline_status_jobs_are_org_scoped_and_idempotent(ctx)
+        .map_err(|error| format!("tax deadline scheduler ownership: {error}"))?;
     log::info!("✅ run_all_accounting_tests complete");
     Ok(())
 }

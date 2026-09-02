@@ -11,7 +11,6 @@ use crate::accounting::chart_of_accounts::{
     create_account_account_type, create_account_journal, CreateAccountAccountParams,
     CreateAccountAccountTypeParams, CreateAccountJournalParams,
 };
-use crate::accounting::fiscal_periods::accounting_ownership_backfill_issue;
 use crate::accounting::fixed_assets::{
     account_asset, account_asset_depreciation_line, backfill_fixed_asset_organization_ownership,
     confirm_account_asset, create_account_asset, create_depreciation_line, dispose_account_asset,
@@ -312,7 +311,7 @@ pub fn test_asset_and_amortization_relation_negative_matrix(
         .db
         .account_asset()
         .iter()
-        .filter(|row| row.organization_id == Some(fixture.organization_id))
+        .filter(|row| row.organization_id == fixture.organization_id)
         .count();
     for (label, params) in [
         (
@@ -440,7 +439,7 @@ pub fn test_asset_and_amortization_relation_negative_matrix(
         .db
         .account_asset()
         .iter()
-        .filter(|row| row.organization_id == Some(fixture.organization_id))
+        .filter(|row| row.organization_id == fixture.organization_id)
         .count()
         != asset_before + 1
     {
@@ -795,87 +794,28 @@ pub fn test_fixed_asset_ownership_is_derived_and_tenant_scoped(
     {
         return Err("depreciation line retry duplicated a child or parent effect".to_string());
     }
-    let line_a_id = line_a.id;
-    let line_b_id = line_b.id;
-    if line_a.organization_id != Some(fixture_a.organization_id)
+    if line_a.organization_id != fixture_a.organization_id
         || line_a.company_id != Some(fixture_a.company_id)
-        || line_b.organization_id != Some(fixture_b.organization_id)
+        || line_b.organization_id != fixture_b.organization_id
         || line_b.company_id != Some(fixture_b.company_id)
     {
         return Err("new depreciation line did not inherit asset scope".to_string());
     }
 
+    let asset_a_id = asset_a.id;
     ctx.db.account_asset().id().update(AccountAsset {
-        organization_id: Some(fixture_b.organization_id),
+        organization_id: fixture_b.organization_id,
         ..asset_a
     });
-    ctx.db.account_asset().id().update(AccountAsset {
-        organization_id: None,
-        ..asset_b
-    });
-    ctx.db
-        .account_asset_depreciation_line()
-        .id()
-        .update(AccountAssetDepreciationLine {
-            organization_id: None,
-            company_id: None,
-            ..line_a
-        });
-    ctx.db
-        .account_asset_depreciation_line()
-        .id()
-        .update(AccountAssetDepreciationLine {
-            organization_id: None,
-            company_id: None,
-            ..line_b
-        });
-
-    backfill_fixed_asset_organization_ownership(ctx)?;
-
-    let quarantined_asset = find_asset(ctx, &code_a)?;
-    if quarantined_asset.organization_id.is_some() {
-        return Err("conflicting asset ownership was not quarantined".to_string());
-    }
-    if !ctx
-        .db
-        .accounting_ownership_backfill_issue()
-        .iter()
-        .any(|issue| issue.table_name == "account_asset" && issue.record_id == quarantined_asset.id)
-    {
-        return Err("conflicting asset ownership was not reported".to_string());
-    }
-
-    let backfilled_asset = find_asset(ctx, &code_b)?;
-    if backfilled_asset.organization_id != Some(fixture_b.organization_id) {
-        return Err("missing asset ownership was not derived from company".to_string());
-    }
-
-    let quarantined_line = ctx
-        .db
-        .account_asset_depreciation_line()
-        .id()
-        .find(&line_a_id)
-        .ok_or("quarantined depreciation line missing")?;
-    if quarantined_line.organization_id.is_some() || quarantined_line.company_id.is_some() {
-        return Err("line with unresolved parent ownership was not quarantined".to_string());
-    }
-    let backfilled_line = ctx
-        .db
-        .account_asset_depreciation_line()
-        .id()
-        .find(&line_b_id)
-        .ok_or("backfilled depreciation line missing")?;
-    if backfilled_line.organization_id != Some(fixture_b.organization_id)
-        || backfilled_line.company_id != Some(fixture_b.company_id)
-    {
-        return Err("line scope was not derived from parent asset".to_string());
+    if backfill_fixed_asset_organization_ownership(ctx).is_ok() {
+        return Err("conflicting asset ownership was accepted".to_string());
     }
 
     if set_asset_active(
         ctx,
         fixture_a.organization_id,
         fixture_a.company_id,
-        quarantined_asset.id,
+        asset_a_id,
         false,
     )
     .is_ok()

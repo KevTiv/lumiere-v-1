@@ -348,11 +348,16 @@ pub struct SaleOrderLine {
     pub metadata: Option<String>,
 }
 
-#[spacetimedb::table(accessor = sale_order_option, public)]
+#[spacetimedb::table(
+    accessor = sale_order_option,
+    public,
+    index(accessor = sale_order_option_by_organization, btree(columns = [organization_id]))
+)]
 pub struct SaleOrderOption {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub order_id: u64,
     pub line_id: Option<u64>,
     pub product_id: u64,
@@ -695,7 +700,7 @@ pub fn create_sale_order(
         company_id,
         origin: params.origin,
         client_order_ref: params.client_order_ref,
-        reference: Some(next_doc_number(ctx, "SO")),
+        reference: Some(next_doc_number(ctx, organization_id, "SO")),
         state: SaleState::Draft,
         date_order: ctx.timestamp,
         validity_date,

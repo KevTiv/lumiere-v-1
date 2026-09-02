@@ -254,11 +254,11 @@ use crate::ai::skills::{
 use crate::workflow::calendar::activate_foundation_calendar_packs;
 use crate::workflow::definitions::{
     create_workflow, publish_workflow_version, upsert_workflow_edge, upsert_workflow_node,
-    workflow, workflow_version, ConditionComparison, ConditionFieldDefinition, ConditionInstruction,
-    ConditionProgram, ConditionValue, ConditionValueType, CreateWorkflowParams,
-    UpsertWorkflowEdgeParams, UpsertWorkflowNodeParams, WorkflowActionReference,
-    WorkflowBranchKind, WorkflowHumanTaskKind, WorkflowNodeKind, WorkflowTaskAssignment,
-    WorkflowTaskPolicy, WorkflowTrigger, WorkflowVersionStatus,
+    workflow, workflow_version, ConditionComparison, ConditionFieldDefinition,
+    ConditionInstruction, ConditionProgram, ConditionValue, ConditionValueType,
+    CreateWorkflowParams, UpsertWorkflowEdgeParams, UpsertWorkflowNodeParams,
+    WorkflowActionReference, WorkflowBranchKind, WorkflowHumanTaskKind, WorkflowNodeKind,
+    WorkflowTaskAssignment, WorkflowTaskPolicy, WorkflowTrigger, WorkflowVersionStatus,
 };
 use crate::workflow::evaluator::{canonical_condition_snapshot_hash, ConditionSnapshot};
 use crate::workflow::packs::activate_foundation_workflow_template_packs;
@@ -274,11 +274,26 @@ fn require_dev_reducers_enabled() -> Result<(), String> {
     }
 }
 
-/// Insert a document counter only when missing (domain tests may create JRNL/PAY before seed runs).
-fn ensure_document_sequence(ctx: &ReducerContext, doc_type: &str, next_number: u64) {
+/// Insert an organization document counter only when missing (domain tests may create JRNL/PAY
+/// before seed runs).
+fn ensure_document_sequence(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    doc_type: &str,
+    next_number: u64,
+) {
     let key = doc_type.to_string();
-    if ctx.db.document_sequence().doc_type().find(&key).is_none() {
+    if ctx
+        .db
+        .document_sequence()
+        .document_sequence_by_organization_and_type()
+        .filter((&organization_id, &key))
+        .next()
+        .is_none()
+    {
         ctx.db.document_sequence().insert(DocumentSequence {
+            sequence_key: format!("{organization_id}:{doc_type}"),
+            organization_id,
             doc_type: key,
             next_number,
         });
@@ -702,7 +717,10 @@ fn seed_ai_skill_certification_environment(
 /// Repairs only the stable browser-fixture rows when a local database was
 /// seeded by an older revision. The main seed is intentionally idempotent, so
 /// this keeps rerunning the E2E setup safe without duplicating the full demo.
-fn ensure_canonical_e2e_seed_rows(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+fn ensure_canonical_e2e_seed_rows(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<(), String> {
     let seeder = ctx.sender();
     let company_id = ctx
         .db
@@ -747,12 +765,9 @@ fn ensure_canonical_e2e_seed_rows(ctx: &ReducerContext, organization_id: u64) ->
         .find(|product| product.organization_id == organization_id)
         .ok_or_else(|| format!("seed organization {organization_id} has no product template"))?;
 
-    let canonical_product_id = if let Some(product) = ctx
-        .db
-        .product()
-        .iter()
-        .find(|product| product.organization_id == organization_id && product.name == "Seeded Product")
-    {
+    let canonical_product_id = if let Some(product) = ctx.db.product().iter().find(|product| {
+        product.organization_id == organization_id && product.name == "Seeded Product"
+    }) {
         product.id
     } else {
         ctx.db
@@ -771,7 +786,9 @@ fn ensure_canonical_e2e_seed_rows(ctx: &ReducerContext, organization_id: u64) ->
                 uom_po_id: template_product.uom_po_id,
                 description: Some("Canonical proposal lifecycle coverage product".to_string()),
                 description_purchase: None,
-                description_sale: Some("Seeded product for proposal conversion coverage".to_string()),
+                description_sale: Some(
+                    "Seeded product for proposal conversion coverage".to_string(),
+                ),
                 cost_method: "standard".to_string(),
                 valuation: "manual_periodic".to_string(),
                 standard_price: 500.0,
@@ -1057,6 +1074,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     // ── 1.3 Organization ──────────────────────────────────────────────────────
     let org = ctx.db.organization().insert(Organization {
         id: 0,
+        organization_id: 0,
         external_id: new_external_id(ctx),
         name: "Lumiere Demo Corp".to_string(),
         code: "DEMO".to_string(),
@@ -1075,6 +1093,10 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
     let org_id = org.id;
+    ctx.db.organization().id().update(Organization {
+        organization_id: org_id,
+        ..org
+    });
     log::info!("[seed] org_id={}", org_id);
 
     // ── 1.4 Role (owner) ──────────────────────────────────────────────────────
@@ -5400,7 +5422,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         code: "LAPTOP-001".to_string(),
         name: "Developer Laptop Fleet".to_string(),
         active: true,
-        organization_id: Some(org_id),
+        organization_id: org_id,
         company_id: company_id,
         state: AssetState::Running,
         asset_type: AssetType::Purchase,
@@ -5460,7 +5482,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         .account_asset_depreciation_line()
         .insert(AccountAssetDepreciationLine {
             id: 0,
-            organization_id: Some(org_id),
+            organization_id: org_id,
             company_id: Some(company_id),
             asset_id: asset_laptop_fleet.id,
             name: Some("Month 1 Depreciation".to_string()),
@@ -5496,7 +5518,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         name: "Fiscal Year 2026".to_string(),
         date_from: fy_from,
         date_to: fy_to,
-        organization_id: Some(org_id),
+        organization_id: org_id,
         company_id: company_id,
         state: FiscalYearState::Running,
         type_: "standard".to_string(),
@@ -5518,7 +5540,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         code: "JAN-2026".to_string(),
         date_from: closed_a_from,
         date_to: closed_a_to,
-        organization_id: Some(org_id),
+        organization_id: org_id,
         company_id: company_id,
         fiscal_year_id: fiscal_year_2026.id,
         state: PeriodState::Closed,
@@ -5537,7 +5559,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         code: "FEB-2026".to_string(),
         date_from: closed_b_from,
         date_to: closed_b_to,
-        organization_id: Some(org_id),
+        organization_id: org_id,
         company_id: company_id,
         fiscal_year_id: fiscal_year_2026.id,
         state: PeriodState::Closed,
@@ -5556,7 +5578,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         code: "MAR-2026".to_string(),
         date_from: open_from,
         date_to: open_to,
-        organization_id: Some(org_id),
+        organization_id: org_id,
         company_id: company_id,
         fiscal_year_id: fiscal_year_2026.id,
         state: PeriodState::Open,
@@ -5687,7 +5709,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
 
     let _ = ctx.db.intercompany_rule().insert(IntercompanyRule {
         id: 0,
-        organization_id: Some(org_id),
+        organization_id: org_id,
         name: "HQ → EU — mirrored invoices".to_string(),
         rule_type: RuleType::Invoice,
         source_company_id: company_id,
@@ -5713,7 +5735,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         .intercompany_transaction()
         .insert(IntercompanyTransaction {
             id: 0,
-            organization_id: Some(org_id),
+            organization_id: org_id,
             name: "IC-INV-SEED-001".to_string(),
             origin_company_id: company_id,
             destination_company_id: company_sub.id,
@@ -5740,7 +5762,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
 
     let cons_acct = ctx.db.consolidation_account().insert(ConsolidationAccount {
         id: 0,
-        organization_id: Some(org_id),
+        organization_id: org_id,
         name: "Elimination — Intercompany AR".to_string(),
         code: "ELIM-AR-IC".to_string(),
         account_type: "asset".to_string(),
@@ -5761,7 +5783,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
 
     let cons_journal = ctx.db.consolidation_journal().insert(ConsolidationJournal {
         id: 0,
-        organization_id: Some(org_id),
+        organization_id: org_id,
         name: "FY2026 Q1 elimination (seed)".to_string(),
         period_id: fiscal_year_2026.id,
         period_name: fiscal_year_2026.name.clone(),
@@ -5793,7 +5815,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             .consolidation_elimination_entry()
             .insert(ConsolidationEliminationEntry {
                 id: 0,
-                organization_id: Some(org_id),
+                organization_id: org_id,
                 journal_id: cons_journal.id,
                 sequence: 1,
                 name: "IC receivable elimination".to_string(),
@@ -8212,12 +8234,12 @@ Prioritize high-severity findings and cite related records."#,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
 
-    ensure_document_sequence(ctx, "SO", 1001);
-    ensure_document_sequence(ctx, "PO", 1001);
-    ensure_document_sequence(ctx, "INV", 1001);
-    ensure_document_sequence(ctx, "BILL", 1001);
-    ensure_document_sequence(ctx, "JRNL", 1001);
-    ensure_document_sequence(ctx, "PAY", 1001);
+    ensure_document_sequence(ctx, org_id, "SO", 1001);
+    ensure_document_sequence(ctx, org_id, "PO", 1001);
+    ensure_document_sequence(ctx, org_id, "INV", 1001);
+    ensure_document_sequence(ctx, org_id, "BILL", 1001);
+    ensure_document_sequence(ctx, org_id, "JRNL", 1001);
+    ensure_document_sequence(ctx, org_id, "PAY", 1001);
 
     let uom_box = ctx.db.uom().insert(UOM {
         id: 0,
@@ -8550,6 +8572,7 @@ Prioritize high-severity findings and cite related records."#,
     });
     ctx.db.form_config_field().insert(FormConfigField {
         id: 0,
+        organization_id: form_config.organization_id,
         configuration_id: form_config.id,
         field_id: "budget_band".to_string(),
         name: "budget_band".to_string(),
@@ -8597,6 +8620,7 @@ Prioritize high-severity findings and cite related records."#,
     });
     ctx.db.form_role_config().insert(FormRoleConfig {
         id: 0,
+        organization_id: form_config.organization_id,
         configuration_id: form_config.id,
         role_id: owner_role.id.to_string(),
         enabled_fields_json: serde_json::to_string(&vec!["budget_band"]).unwrap(),
@@ -9208,6 +9232,7 @@ Prioritize high-severity findings and cite related records."#,
 
     let pos_cash_method = ctx.db.pos_payment_method().insert(PosPaymentMethod {
         id: 0,
+        organization_id: org_id,
         name: "Cash Drawer".to_string(),
         outstanding_account_id: Some(acc_bank.id),
         receivable_account_id: Some(acc_ar.id),
@@ -9233,6 +9258,7 @@ Prioritize high-severity findings and cite related records."#,
     });
     let pos_card_method = ctx.db.pos_payment_method().insert(PosPaymentMethod {
         id: 0,
+        organization_id: org_id,
         name: "Card Terminal".to_string(),
         outstanding_account_id: Some(acc_bank.id),
         receivable_account_id: Some(acc_ar.id),
@@ -9258,6 +9284,7 @@ Prioritize high-severity findings and cite related records."#,
     });
     let pos_config_frontdesk = ctx.db.pos_config().insert(PosConfig {
         id: 0,
+        organization_id: org_id,
         name: "Front Desk Demo POS".to_string(),
         is_active: true,
         company_id,
@@ -9388,6 +9415,7 @@ Prioritize high-severity findings and cite related records."#,
     });
     let pos_session_history = ctx.db.pos_session().insert(PosSession {
         id: 0,
+        organization_id: org_id,
         name: "POS/FrontDesk/0001".to_string(),
         user_id: seeder,
         config_id: pos_config_frontdesk.id,
@@ -9426,6 +9454,7 @@ Prioritize high-severity findings and cite related records."#,
     });
     let pos_order_line_demo = ctx.db.pos_order_line().insert(PosOrderLine {
         id: 0,
+        organization_id: org_id,
         order_id: 0,
         name: "Wireless Ergonomic Mouse".to_string(),
         skip_change: false,
@@ -9461,6 +9490,7 @@ Prioritize high-severity findings and cite related records."#,
     });
     let pos_payment_demo = ctx.db.pos_payment().insert(PosPayment {
         id: 0,
+        organization_id: org_id,
         order_id: 0,
         payment_method_id: pos_card_method.id,
         session_id: pos_session_history.id,
@@ -11008,6 +11038,7 @@ fn ensure_minimal_dev_org(ctx: &ReducerContext) -> Result<(), String> {
 
     let org = ctx.db.organization().insert(Organization {
         id: 0,
+        organization_id: 0,
         external_id: new_external_id(ctx),
         name: "Lumiere Dev Org".to_string(),
         code: "DEV".to_string(),
@@ -11026,6 +11057,10 @@ fn ensure_minimal_dev_org(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":\"dev_minimal\"}".to_string()),
     });
     let org_id = org.id;
+    ctx.db.organization().id().update(Organization {
+        organization_id: org_id,
+        ..org
+    });
 
     let company = ctx.db.company().insert(Company {
         id: 0,

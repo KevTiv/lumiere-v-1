@@ -44,6 +44,7 @@ pub struct AccountFiscalPosition {
 #[spacetimedb::table(
     accessor = account_fiscal_position_tax,
     public,
+    index(accessor = fiscal_tax_by_organization, btree(columns = [organization_id])),
     index(accessor = fiscal_tax_by_position, btree(columns = [fiscal_position_id]))
 )]
 pub struct AccountFiscalPositionTax {
@@ -901,6 +902,7 @@ pub fn create_sale_order_option(
     let _ = ctx.db.product().id().find(&params.product_id);
     let row = ctx.db.sale_order_option().insert(SaleOrderOption {
         id: 0,
+        organization_id: order.organization_id,
         order_id,
         line_id: None,
         product_id: params.product_id,
@@ -956,6 +958,9 @@ pub fn update_sale_order_option(
     if order.organization_id != organization_id {
         return Err("Sale order does not belong to this organization".to_string());
     }
+    if option.organization_id != order.organization_id {
+        return Err("Sale order option does not match its order organization".to_string());
+    }
     ctx.db.sale_order_option().id().update(SaleOrderOption {
         name: params.name.unwrap_or(option.name),
         quantity: params.quantity.unwrap_or(option.quantity),
@@ -1006,6 +1011,9 @@ pub fn delete_sale_order_option(
     if order.organization_id != organization_id {
         return Err("Sale order does not belong to this organization".to_string());
     }
+    if option.organization_id != order.organization_id {
+        return Err("Sale order option does not match its order organization".to_string());
+    }
     ctx.db.sale_order_option().id().delete(&option_id);
     write_audit_log_v2(
         ctx,
@@ -1050,7 +1058,12 @@ pub fn apply_sale_order_options(
         .db
         .sale_order_option()
         .iter()
-        .filter(|o| o.order_id == order_id && o.is_present && o.line_id.is_none())
+        .filter(|o| {
+            o.organization_id == order.organization_id
+                && o.order_id == order_id
+                && o.is_present
+                && o.line_id.is_none()
+        })
         .collect();
 
     let mut applied = 0u32;
@@ -1363,7 +1376,7 @@ pub fn settle_sale_commissions(
         .find(&company_id)
         .ok_or("Company not found")?;
     let currency_id = company_row.currency_id;
-    let name = next_doc_number(ctx, "COMM");
+    let name = next_doc_number(ctx, organization_id, "COMM");
 
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
@@ -1620,7 +1633,7 @@ pub fn reverse_sale_commission_settlement(
         .find(&company_id)
         .ok_or("Company not found")?;
     let currency_id = company_row.currency_id;
-    let name = next_doc_number(ctx, "COMMR");
+    let name = next_doc_number(ctx, organization_id, "COMMR");
 
     // Find expense (debit) and payable (credit) accounts from original settle move.
     let lines: Vec<_> = ctx
