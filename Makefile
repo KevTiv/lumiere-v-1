@@ -883,7 +883,6 @@ codegen: schema-snapshot
 	cargo run -p lumiere-codegen
 
 check-contract-ir: codegen
-	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v1.json
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json
 	python3 lumiere-codegen/tests/test_contract_ir_pin.py
 
@@ -938,19 +937,11 @@ contracts-staging-from-pinned:
 	cp -R "$$CHECKOUT/crates/lumiere-contracts/src/bindings/." .contracts-staging/bindings/; \
 	cp "$$CHECKOUT/manifests/"*.json .contracts-staging/manifests/; \
 	if [ -d "$$CHECKOUT/ir" ]; then cp -R "$$CHECKOUT/ir/." .contracts-staging/ir/; fi; \
-	V1_PIN="$$CHECKOUT/ir/PIN-v1.json"; \
-	if [ ! -f "$$V1_PIN" ]; then V1_PIN="$$CHECKOUT/ir/PIN.json"; fi; \
+	V2_PIN="$$CHECKOUT/ir/PIN-v2.json"; \
+	if [ ! -f "$$V2_PIN" ]; then V2_PIN="$$CHECKOUT/ir/PIN.json"; fi; \
 	python3 scripts/verify-contract-ir.py \
-		"$$CHECKOUT/ir/lumiere-contract-ir-v1.json" \
-		--require-clean --expect-pin-from "$$V1_PIN"; \
-	if [ -f "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" ]; then \
-		if [ ! -f "$$CHECKOUT/ir/PIN-v2.json" ]; then \
-			echo "contracts-staging-from-pinned: v2 IR is missing ir/PIN-v2.json" >&2; exit 1; \
-		fi; \
-		python3 scripts/verify-contract-ir.py \
-			"$$CHECKOUT/ir/lumiere-contract-ir-v2.json" \
-			--require-clean --expect-pin-from "$$CHECKOUT/ir/PIN-v2.json"; \
-	fi; \
+		"$$CHECKOUT/ir/lumiere-contract-ir-v2.json" \
+		--require-clean --allow-legacy-v2 --expect-pin-from "$$V2_PIN"; \
 	cp -R "$$CHECKOUT/packages/contracts/src/generated/." .contracts-staging/ts/generated/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" .contracts-staging/ts/; \
@@ -984,24 +975,18 @@ check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-std
 		echo "check-contracts-drift: could not resolve the pinned lumiere-contracts checkout (run cargo fetch first); skipping" >&2; \
 		exit 0; \
 	fi; \
-	V1_PIN="$$CHECKOUT/ir/PIN-v1.json"; \
-	if [ ! -f "$$V1_PIN" ]; then V1_PIN="$$CHECKOUT/ir/PIN.json"; fi; \
+	V2_PIN="$$CHECKOUT/ir/PIN-v2.json"; \
+	if [ ! -f "$$V2_PIN" ]; then V2_PIN="$$CHECKOUT/ir/PIN.json"; fi; \
 	diff -rq "$$CHECKOUT/crates/lumiere-contracts/src/bindings" .contracts-staging/bindings && \
 	for manifest in .contracts-staging/manifests/*.json; do diff "$$CHECKOUT/manifests/$$(basename "$$manifest")" "$$manifest" || exit 1; done && \
-	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v1.json --require-clean --expect-schema-hash-from "$$CHECKOUT/ir/lumiere-contract-ir-v1.json" && \
-	python3 scripts/verify-contract-ir.py "$$CHECKOUT/ir/lumiere-contract-ir-v1.json" --require-clean --expect-pin-from "$$V1_PIN" && \
+	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean --expect-schema-hash-from "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" && \
+	python3 scripts/verify-contract-ir.py "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" --require-clean --expect-pin-from "$$V2_PIN" && \
 	python3 "$$CHECKOUT/scripts/generate-from-ir.py" --check && \
 	diff -rq \
 		-x query-registry.ts -x operation-inputs.ts -x operation-descriptors.ts \
 		-x operations.ts -x resources.ts -x wire-codecs.ts \
 		"$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
 	diff "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/stdb-generated-sql-columns.json && \
-	if [ -f "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" ]; then \
-		python3 scripts/verify-contract-ir.py "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" --require-clean --expect-pin-from "$$CHECKOUT/ir/PIN-v2.json" && \
-		python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean --expect-schema-hash-from "$$CHECKOUT/ir/lumiere-contract-ir-v2.json"; \
-	else \
-		echo "check-contracts-drift: pinned release is v1-only; v2 remains staged for the next companion release"; \
-	fi && \
 	echo "check-contracts-drift: staging matches pinned lumiere-contracts release" || \
 	(echo "Local generation drifted from the pinned lumiere-contracts tag. Run: make publish-contracts VERSION=x.y.z" && exit 1)
 

@@ -38,6 +38,11 @@ def main() -> None:
         help="reject an IR extracted from a dirty source checkout",
     )
     parser.add_argument(
+        "--allow-legacy-v2",
+        action="store_true",
+        help="allow a pinned pre-persistence v2 artifact during release bootstrap",
+    )
+    parser.add_argument(
         "--expect-schema-hash-from",
         type=Path,
         help="require the same semantic schema hash as another IR artifact",
@@ -68,8 +73,10 @@ def main() -> None:
     missing = required - ir.keys()
     if missing:
         fail(f"missing fields: {', '.join(sorted(missing))}")
-    if ir["ir_version"] not in {1, 2}:
-        fail(f"unsupported ir_version {ir['ir_version']!r}")
+    if ir["ir_version"] != 2:
+        fail(f"unsupported ir_version {ir['ir_version']!r}; only v2 is accepted")
+    if "persistence" not in ir and not args.allow_legacy_v2:
+        fail("v2 persistence contract is required")
     if not isinstance(ir["source_commit"], str) or not GIT_OBJECT_ID.fullmatch(
         ir["source_commit"]
     ):
@@ -100,13 +107,13 @@ def main() -> None:
     table_names = {item["name"] for item in ir["tables"]}
     resource_names = {item["name"] for item in ir["resources"]}
     operation_ids: set[str] = set()
+    operation_names: set[str] = set()
     for operation in ir["operations"]:
         name = operation["name"]
+        operation_names.add(name)
         kind = operation.get("kind")
         source_kind = operation.get("source_kind", kind)
-        if ir["ir_version"] == 1 and kind not in {"reducer", "procedure", "view"}:
-            fail(f"operation {name} has unsupported kind {kind!r}")
-        if ir["ir_version"] == 2 and (
+        if (
             not isinstance(kind, dict)
             or kind.get("status") != "unclassified"
             or kind.get("value") is not None
@@ -192,58 +199,124 @@ def main() -> None:
         ):
             fail(f"operation {name} has invalid resource invalidations")
 
-    if ir["ir_version"] == 2:
-        for resource in ir["resources"]:
-            name = resource["name"]
-            row_ref = resource.get("row", {}).get("type_reference")
-            if row_ref not in type_names:
-                fail(f"resource {name} references unknown row type {row_ref!r}")
-            source = resource.get("source", {})
-            table_ref = source.get("table_reference")
-            source_kind = source.get("kind")
-            if source_kind not in {"table", "unresolved"}:
-                fail(f"resource {name} has invalid source kind {source_kind!r}")
-            if source_kind == "table" and table_ref not in table_names:
-                fail(f"resource {name} references unknown table {table_ref!r}")
-            if source_kind == "unresolved" and table_ref in table_names:
-                fail(f"resource {name} has an unnecessarily unresolved table source")
-            writers = resource.get("invalidated_by")
-            if (
-                not isinstance(writers, list)
-                or writers != sorted(set(writers))
-                or any(writer not in operation_ids for writer in writers)
-            ):
-                fail(f"resource {name} has invalid invalidated_by references")
-            scope = resource.get("scope")
-            unclassified_scope = {
-                "company_field": None,
-                "kind": "unclassified",
-                "organization_field": None,
-            }
-            optional_company_scope = (
-                isinstance(scope, dict)
-                and set(scope) == {"company_field", "kind", "organization_field"}
-                and scope.get("kind") == "organization_optional_company"
-                and isinstance(scope.get("organization_field"), str)
-                and bool(scope["organization_field"])
-                and isinstance(scope.get("company_field"), str)
-                and bool(scope["company_field"])
-            )
-            if scope != unclassified_scope and not optional_company_scope:
-                fail(f"resource {name} has invalid scope classification")
-            query = resource.get("query")
-            if (
-                not isinstance(query, dict)
-                or query.get("status") != "unclassified"
-                or query.get("input_type_reference") is not None
-                or query.get("filter_type_reference") is not None
-                or query.get("cursor_type_reference") is not None
-            ):
-                fail(f"resource {name} must declare query classification status")
+    for resource in ir["resources"]:
+        name = resource["name"]
+        row_ref = resource.get("row", {}).get("type_reference")
+        if row_ref not in type_names:
+            fail(f"resource {name} references unknown row type {row_ref!r}")
+        source = resource.get("source", {})
+        table_ref = source.get("table_reference")
+        source_kind = source.get("kind")
+        if source_kind not in {"table", "unresolved"}:
+            fail(f"resource {name} has invalid source kind {source_kind!r}")
+        if source_kind == "table" and table_ref not in table_names:
+            fail(f"resource {name} references unknown table {table_ref!r}")
+        if source_kind == "unresolved" and table_ref in table_names:
+            fail(f"resource {name} has an unnecessarily unresolved table source")
+        writers = resource.get("invalidated_by")
+        if (
+            not isinstance(writers, list)
+            or writers != sorted(set(writers))
+            or any(writer not in operation_ids for writer in writers)
+        ):
+            fail(f"resource {name} has invalid invalidated_by references")
+        scope = resource.get("scope")
+        unclassified_scope = {
+            "company_field": None,
+            "kind": "unclassified",
+            "organization_field": None,
+        }
+        optional_company_scope = (
+            isinstance(scope, dict)
+            and set(scope) == {"company_field", "kind", "organization_field"}
+            and scope.get("kind") == "organization_optional_company"
+            and isinstance(scope.get("organization_field"), str)
+            and bool(scope["organization_field"])
+            and isinstance(scope.get("company_field"), str)
+            and bool(scope["company_field"])
+        )
+        if scope != unclassified_scope and not optional_company_scope:
+            fail(f"resource {name} has invalid scope classification")
+        query = resource.get("query")
+        if (
+            not isinstance(query, dict)
+            or query.get("status") != "unclassified"
+            or query.get("input_type_reference") is not None
+            or query.get("filter_type_reference") is not None
+            or query.get("cursor_type_reference") is not None
+        ):
+            fail(f"resource {name} must declare query classification status")
+
+    persistence = ir.get("persistence")
+    if persistence is not None:
+        if not isinstance(persistence, dict):
+            fail("persistence must be an object")
+        if persistence.get("schema_version") != 1:
+            fail("persistence schema_version must be 1")
+        authority = persistence.get("authority")
+        expected_authority = {
+            "business_logic": "spacetimedb_reducers",
+            "business_system_of_record": "spacetimedb",
+            "postgresql_role": "derived_projection",
+            "direct_postgresql_business_writes": "forbidden",
+            "projection_finalization": "spacetimedb_reducer",
+        }
+        if authority != expected_authority:
+            fail("persistence authority must keep SpacetimeDB as business authority")
+        storage = persistence.get("storage")
+        policies = storage.get("policies") if isinstance(storage, dict) else None
+        coverage = storage.get("coverage") if isinstance(storage, dict) else None
+        if not isinstance(policies, list) or not isinstance(coverage, dict):
+            fail("persistence.storage must contain policies and coverage")
+        if coverage.get("classified") != 458 or coverage.get("total") != 458 or coverage.get("unclassified") != 0:
+            fail("persistence storage coverage must be 458/458 with zero unclassified")
+        policy_tables = {policy.get("table") for policy in policies if isinstance(policy, dict)}
+        if policy_tables != table_names or len(policies) != len(table_names):
+            fail("persistence storage policies must exactly cover IR tables")
+        postgresql = persistence.get("postgresql")
+        archive = postgresql.get("archive") if isinstance(postgresql, dict) else None
+        codec = postgresql.get("codec") if isinstance(postgresql, dict) else None
+        candidates = archive.get("candidates") if isinstance(archive, dict) else None
+        codec_tables = codec.get("tables") if isinstance(codec, dict) else None
+        if not isinstance(candidates, list) or not isinstance(codec_tables, dict):
+            fail("persistence.postgresql must contain archive candidates and codecs")
+        archive_tables = {candidate.get("table") for candidate in candidates if isinstance(candidate, dict)}
+        if archive_tables != set(codec_tables):
+            fail("PostgreSQL archive candidates and codec tables must match")
+        if not archive_tables <= table_names:
+            fail("PostgreSQL projection references an unknown IR table")
+        policy_by_table = {policy["table"]: policy for policy in policies}
+        candidate_by_table = {candidate["table"]: candidate for candidate in candidates}
+        for table in archive_tables:
+            if policy_by_table[table].get("cooling_eligibility") == "never":
+                fail(f"PostgreSQL projection table {table} is not cooling eligible")
+            candidate = candidate_by_table[table]
+            if candidate.get("finalize_reducer") not in operation_names:
+                fail(f"PostgreSQL projection table {table} references an unknown finalize reducer")
+            codec_table = codec_tables[table]
+            if codec_table.get("cold_table") != candidate.get("cold_table"):
+                fail(f"PostgreSQL projection table {table} has mismatched cold-table metadata")
+            columns = codec_table.get("columns")
+            if not isinstance(columns, list) or not columns:
+                fail(f"PostgreSQL projection table {table} has no codec columns")
+            column_names = [column.get("name") for column in columns if isinstance(column, dict)]
+            if len(column_names) != len(columns) or len(column_names) != len(set(column_names)):
+                fail(f"PostgreSQL projection table {table} has invalid codec column names")
+            for column in columns:
+                if (
+                    not isinstance(column.get("stdb_type"), str)
+                    or not isinstance(column.get("pg_type"), str)
+                    or not isinstance(column.get("nullable"), bool)
+                    or not isinstance(column.get("pg_bind"), str)
+                    or not isinstance(column.get("pg_from"), str)
+                    or not isinstance(column.get("api_json"), str)
+                ):
+                    fail(f"PostgreSQL projection table {table} has incomplete codec semantics")
 
     semantic = {
         field: ir[field]
-        for field in ("operations", "resources", "tables", "types")
+        for field in ("operations", "resources", "tables", "types", "persistence")
+        if field in ir
     }
     canonical = json.dumps(
         semantic, ensure_ascii=False, separators=(",", ":")

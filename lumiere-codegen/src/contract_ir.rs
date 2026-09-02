@@ -13,10 +13,15 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::process::Command;
 
-const IR_VERSION: u32 = 1;
-const IR_FILENAME: &str = "lumiere-contract-ir-v1.json";
-const IR_V2_VERSION: u32 = 2;
-const IR_V2_FILENAME: &str = "lumiere-contract-ir-v2.json";
+const IR_VERSION: u32 = 2;
+const IR_FILENAME: &str = "lumiere-contract-ir-v2.json";
+
+struct BaseContract {
+    operations: Vec<Value>,
+    resources: Vec<NamedContract>,
+    tables: Vec<Value>,
+    types: Vec<IndexedType>,
+}
 
 #[derive(Debug, Serialize)]
 struct ContractIr {
@@ -25,37 +30,19 @@ struct ContractIr {
     source_dirty: bool,
     schema_hash: String,
     operations: Vec<Value>,
-    resources: Vec<NamedContract>,
-    tables: Vec<Value>,
-    types: Vec<IndexedType>,
-}
-
-#[derive(Debug, Serialize)]
-struct ContractIrV2 {
-    ir_version: u32,
-    source_commit: String,
-    source_dirty: bool,
-    schema_hash: String,
-    operations: Vec<Value>,
     resources: Vec<Value>,
     tables: Vec<Value>,
     types: Vec<IndexedType>,
+    persistence: Value,
 }
 
 #[derive(Debug, Serialize)]
 struct SemanticContract<'a> {
     operations: &'a [Value],
-    resources: &'a [NamedContract],
-    tables: &'a [Value],
-    types: &'a [IndexedType],
-}
-
-#[derive(Debug, Serialize)]
-struct SemanticContractV2<'a> {
-    operations: &'a [Value],
     resources: &'a [Value],
     tables: &'a [Value],
     types: &'a [IndexedType],
+    persistence: &'a Value,
 }
 
 #[derive(Debug, Serialize)]
@@ -109,25 +96,52 @@ pub fn run(paths: &Paths, registry_text: &str) -> Result<()> {
     let operations = merge_operations(&module_schema, &reducer_manifest, invalidations)?;
     let tables = sorted_values(&module_schema, "tables", table_sort_key)?;
     let types = indexed_types(&module_schema)?;
-    let semantic = SemanticContract {
-        operations: &operations,
-        resources: &resources,
-        tables: &tables,
-        types: &types,
-    };
-    let schema_hash = prefixed_sha256(&serde_json::to_vec(&semantic)?);
-    let (source_commit, source_dirty) = source_provenance()?;
-    let ir = ContractIr {
-        ir_version: IR_VERSION,
-        source_commit,
-        source_dirty,
-        schema_hash,
+    let base = BaseContract {
         operations,
         resources,
         tables,
         types,
     };
 
+    let row_types: BTreeMap<String, String> =
+        serde_json::from_str(&read_to_string(&paths.query_resource_row_type_asset)?)
+            .with_context(|| format!("parse {}", paths.query_resource_row_type_asset.display()))?;
+    let identity_manifest: OperationIdentityManifest =
+        serde_json::from_str(&read_to_string(&paths.contract_operation_ids_json)?)
+            .with_context(|| format!("parse {}", paths.contract_operation_ids_json.display()))?;
+    let operation_ids = locked_operation_ids(&base.operations, identity_manifest)?;
+    let operations = v2_operations(&base.operations, &operation_ids)?;
+    let resource_scope_manifest: ResourceScopeManifest =
+        serde_json::from_str(&read_to_string(&paths.resource_scope_metadata_json)?)
+            .with_context(|| format!("parse {}", paths.resource_scope_metadata_json.display()))?;
+    let resources = v2_resources(
+        &base.resources,
+        &row_types,
+        &base.tables,
+        &base.types,
+        &operations,
+        resource_scope_manifest,
+    )?;
+    let persistence = persistence_contract(paths)?;
+    let semantic = SemanticContract {
+        operations: &operations,
+        resources: &resources,
+        tables: &base.tables,
+        types: &base.types,
+        persistence: &persistence,
+    };
+    let (source_commit, source_dirty) = source_provenance()?;
+    let ir = ContractIr {
+        ir_version: IR_VERSION,
+        source_commit,
+        source_dirty,
+        schema_hash: prefixed_sha256(&serde_json::to_vec(&semantic)?),
+        operations,
+        resources,
+        tables: base.tables,
+        types: base.types,
+        persistence,
+    };
     write_ir_artifact(
         &paths.contract_ir_out,
         &paths.contract_ir_checksum_out,
@@ -136,51 +150,31 @@ pub fn run(paths: &Paths, registry_text: &str) -> Result<()> {
     )?;
     println!("Wrote {}", paths.contract_ir_out.display());
     println!("Wrote {}", paths.contract_ir_checksum_out.display());
-
-    let row_types: BTreeMap<String, String> =
-        serde_json::from_str(&read_to_string(&paths.query_resource_row_type_asset)?)
-            .with_context(|| format!("parse {}", paths.query_resource_row_type_asset.display()))?;
-    let identity_manifest: OperationIdentityManifest =
-        serde_json::from_str(&read_to_string(&paths.contract_operation_ids_json)?)
-            .with_context(|| format!("parse {}", paths.contract_operation_ids_json.display()))?;
-    let operation_ids = locked_operation_ids(&ir.operations, identity_manifest)?;
-    let v2_operations = v2_operations(&ir.operations, &operation_ids)?;
-    let resource_scope_manifest: ResourceScopeManifest =
-        serde_json::from_str(&read_to_string(&paths.resource_scope_metadata_json)?)
-            .with_context(|| format!("parse {}", paths.resource_scope_metadata_json.display()))?;
-    let v2_resources = v2_resources(
-        &ir.resources,
-        &row_types,
-        &ir.tables,
-        &ir.types,
-        &v2_operations,
-        resource_scope_manifest,
-    )?;
-    let v2_semantic = SemanticContractV2 {
-        operations: &v2_operations,
-        resources: &v2_resources,
-        tables: &ir.tables,
-        types: &ir.types,
-    };
-    let v2 = ContractIrV2 {
-        ir_version: IR_V2_VERSION,
-        source_commit: ir.source_commit,
-        source_dirty: ir.source_dirty,
-        schema_hash: prefixed_sha256(&serde_json::to_vec(&v2_semantic)?),
-        operations: v2_operations,
-        resources: v2_resources,
-        tables: ir.tables,
-        types: ir.types,
-    };
-    write_ir_artifact(
-        &paths.contract_ir_v2_out,
-        &paths.contract_ir_v2_checksum_out,
-        IR_V2_FILENAME,
-        &v2,
-    )?;
-    println!("Wrote {}", paths.contract_ir_v2_out.display());
-    println!("Wrote {}", paths.contract_ir_v2_checksum_out.display());
     Ok(())
+}
+
+fn persistence_contract(paths: &Paths) -> Result<Value> {
+    let storage: Value = serde_json::from_str(&read_to_string(&paths.storage_policy_manifest_out)?)
+        .context("parse generated storage-policy-manifest.json")?;
+    let archive: Value = serde_json::from_str(&read_to_string(&paths.archive_manifest_out)?)
+        .context("parse generated archive-manifest.json")?;
+    let codec: Value = serde_json::from_str(&read_to_string(&paths.codec_manifest_out)?)
+        .context("parse generated codec-manifest.json")?;
+    Ok(serde_json::json!({
+        "schema_version": 1,
+        "authority": {
+            "business_logic": "spacetimedb_reducers",
+            "business_system_of_record": "spacetimedb",
+            "postgresql_role": "derived_projection",
+            "direct_postgresql_business_writes": "forbidden",
+            "projection_finalization": "spacetimedb_reducer"
+        },
+        "storage": storage,
+        "postgresql": {
+            "archive": archive,
+            "codec": codec
+        }
+    }))
 }
 
 fn write_ir_artifact<T: Serialize>(
@@ -765,15 +759,17 @@ mod tests {
 
     #[test]
     fn semantic_hash_ignores_provenance() {
-        let resources = vec![NamedContract {
-            name: "orders".to_owned(),
-            contract: serde_json::json!({"table": "sale_order"}),
-        }];
+        let resources = vec![serde_json::json!({
+            "name": "orders",
+            "contract": {"table": "sale_order"}
+        })];
+        let persistence = serde_json::json!({});
         let semantic = SemanticContract {
             operations: &[],
             resources: &resources,
             tables: &[],
             types: &[],
+            persistence: &persistence,
         };
         let first = prefixed_sha256(&serde_json::to_vec(&semantic).unwrap());
         let second = prefixed_sha256(&serde_json::to_vec(&semantic).unwrap());

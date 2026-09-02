@@ -15,14 +15,44 @@ VERIFIER = ROOT / "scripts" / "verify-contract-ir.py"
 
 
 class ContractIrPinTest(unittest.TestCase):
-    def _fixture(self, pin_extra=None):
+    def _fixture(self, pin_extra=None, legacy=False):
         temp = tempfile.TemporaryDirectory()
         root = Path(temp.name) / "ir"
         root.mkdir()
-        ir_path = root / "lumiere-contract-ir-v1.json"
-        semantic = {"operations": [], "resources": [], "tables": [], "types": []}
+        ir_path = root / "lumiere-contract-ir-v2.json"
+        tables = [{"name": f"table_{index:03d}"} for index in range(458)]
+        persistence = {
+            "schema_version": 1,
+            "authority": {
+                "business_logic": "spacetimedb_reducers",
+                "business_system_of_record": "spacetimedb",
+                "postgresql_role": "derived_projection",
+                "direct_postgresql_business_writes": "forbidden",
+                "projection_finalization": "spacetimedb_reducer",
+            },
+            "storage": {
+                "coverage": {"classified": 458, "total": 458, "unclassified": 0},
+                "policies": [
+                    {"table": table["name"], "cooling_eligibility": "never"}
+                    for table in tables
+                ],
+            },
+            "postgresql": {
+                "archive": {"candidates": []},
+                "codec": {"tables": {}},
+            },
+        }
+        semantic = {
+            "operations": [],
+            "resources": [],
+            "tables": tables,
+            "types": [],
+            "persistence": persistence,
+        }
+        if legacy:
+            semantic.pop("persistence")
         ir = {
-            "ir_version": 1,
+            "ir_version": 2,
             "source_commit": "a" * 40,
             "source_dirty": False,
             "schema_hash": "sha256:" + hashlib.sha256(
@@ -37,8 +67,8 @@ class ContractIrPinTest(unittest.TestCase):
         )
         pin = {
             "artifact_sha256": hashlib.sha256(raw).hexdigest(),
-            "ir_version": 1,
-            "path": "ir/lumiere-contract-ir-v1.json",
+            "ir_version": 2,
+            "path": "ir/lumiere-contract-ir-v2.json",
             "schema_hash": ir["schema_hash"],
             "source_commit": ir["source_commit"],
             "source_repository": "https://github.com/KevTiv/lumiere-v-1",
@@ -49,9 +79,13 @@ class ContractIrPinTest(unittest.TestCase):
         pin_path.write_text(json.dumps(pin, indent=2) + "\n")
         return temp, ir_path, pin_path
 
-    def _run(self, ir_path, pin_path):
+    def _run(self, ir_path, pin_path, allow_legacy=False):
+        command = [sys.executable, str(VERIFIER), str(ir_path)]
+        if allow_legacy:
+            command.append("--allow-legacy-v2")
+        command.extend(["--expect-pin-from", str(pin_path)])
         return subprocess.run(
-            [sys.executable, str(VERIFIER), str(ir_path), "--expect-pin-from", str(pin_path)],
+            command,
             capture_output=True,
             text=True,
             check=False,
@@ -70,11 +104,20 @@ class ContractIrPinTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("exactly", result.stderr)
 
+    def test_legacy_v2_requires_the_explicit_bootstrap_flag(self):
+        temp, ir_path, pin_path = self._fixture(legacy=True)
+        self.addCleanup(temp.cleanup)
+        strict = self._run(ir_path, pin_path)
+        self.assertNotEqual(strict.returncode, 0)
+        self.assertIn("persistence contract is required", strict.stderr)
+        compatible = self._run(ir_path, pin_path, allow_legacy=True)
+        self.assertEqual(compatible.returncode, 0, compatible.stderr)
+
     def test_pin_rejects_artifact_identity_mismatches(self):
         cases = {
             "artifact_sha256": "0" * 64,
-            "ir_version": 2,
-            "path": "ir/lumiere-contract-ir-v2.json",
+            "ir_version": 1,
+            "path": "ir/lumiere-contract-ir-v1.json",
             "schema_hash": "sha256:" + "0" * 64,
             "source_commit": "b" * 40,
         }

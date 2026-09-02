@@ -55,8 +55,6 @@ pub struct Paths {
     // ── canonical contract IR ───────────────────────────────────────────
     pub contract_ir_out: PathBuf,
     pub contract_ir_checksum_out: PathBuf,
-    pub contract_ir_v2_out: PathBuf,
-    pub contract_ir_v2_checksum_out: PathBuf,
 }
 
 impl Paths {
@@ -136,11 +134,8 @@ impl Paths {
             reducer_contract_rust_out: repo_root
                 .join("crates/stdb-client/src/generated_reducer_contract.rs"),
 
-            contract_ir_out: contracts_staging_dir.join("ir/lumiere-contract-ir-v1.json"),
+            contract_ir_out: contracts_staging_dir.join("ir/lumiere-contract-ir-v2.json"),
             contract_ir_checksum_out: contracts_staging_dir
-                .join("ir/lumiere-contract-ir-v1.json.sha256"),
-            contract_ir_v2_out: contracts_staging_dir.join("ir/lumiere-contract-ir-v2.json"),
-            contract_ir_v2_checksum_out: contracts_staging_dir
                 .join("ir/lumiere-contract-ir-v2.json.sha256"),
         }
     }
