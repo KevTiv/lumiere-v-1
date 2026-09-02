@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
-    "@lumiere/contracts": "github:KevTiv/lumiere-contracts#v0.3.25&path:packages/contracts",
+    "@lumiere/contracts": "github:KevTiv/lumiere-contracts#v0.3.26&path:packages/contracts",
     "@lumiere/erp-session": "workspace:*",
     "@lumiere/erp-shared": "workspace:*",
     "@lumiere/i18n": "workspace:*",
