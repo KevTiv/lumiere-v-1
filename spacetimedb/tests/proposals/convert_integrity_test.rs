@@ -1,14 +1,14 @@
 //! R5: proposal → SO convert derives UoM from product; missing product fail-closed.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::core::reference::{create_uom, uom, CreateUomParams};
 use crate::inventory::product::{product, Product};
 use crate::proposals::proposals::{
     add_proposal_comment, add_proposal_line_item, convert_proposal_to_sale_order, create_proposal,
-    delete_proposal_section, proposal, proposal_comment, proposal_line_item,
-    proposal_section, upsert_proposal_section, AddProposalLineItemParams,
-    ConvertProposalToSaleOrderParams, CreateProposalParams, Proposal, ProposalLineItem,
-    ProposalStatus, UpsertProposalSectionParams,
+    delete_proposal_section, proposal, proposal_comment, proposal_line_item, proposal_section,
+    upsert_proposal_section, AddProposalLineItemParams, ConvertProposalToSaleOrderParams,
+    CreateProposalParams, Proposal, ProposalLineItem, ProposalStatus, UpsertProposalSectionParams,
 };
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
 use crate::sales::sales_core::{sale_order, sale_order_line};
@@ -291,6 +291,43 @@ pub fn test_convert_proposal_derives_product_uom(ctx: &ReducerContext) -> Result
         ));
     }
 
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == org_id
+                && commit.operation_id == "erp.convert_proposal_to_sale_order"
+                && commit.correlation_id == format!("proposal:{proposal_id}:sale-order:{}", so.id)
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 3 {
+        return Err(format!(
+            "proposal conversion commit mismatch: {}",
+            commits.len()
+        ));
+    }
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == org_id && change.commit_sequence == commits[0].sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables != ["proposal", "sale_order", "sale_order_line"]
+        || changes
+            .iter()
+            .any(|change| change.organization_id != org_id)
+    {
+        return Err(format!("proposal row order/scope mismatch: {tables:?}"));
+    }
+
     Ok(())
 }
 
@@ -541,9 +578,7 @@ pub fn test_add_proposal_comment_orphan_section_rejected(
     )
     .expect_err("comment on deleted section must be rejected");
     if !err.contains("not found") {
-        return Err(format!(
-            "Expected section-not-found error, got: {err}"
-        ));
+        return Err(format!("Expected section-not-found error, got: {err}"));
     }
     if ctx.db.proposal_comment().iter().count() != comment_count_before {
         return Err("rejected orphan-section comment was persisted".into());

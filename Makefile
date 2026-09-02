@@ -102,7 +102,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	e2e-crm-isolation \
 	init-stack docker-dev docker-dev-iot \
-	codegen check-codegen check-contract-ir check-tenant-ownership check-storage-policy check-reducer-contracts-drift check-contracts-drift \
+	codegen check-codegen check-contract-ir check-tenant-ownership check-storage-policy check-c2-commit-coverage check-reducer-contracts-drift check-contracts-drift \
 	clean-contracts-live-staging lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
@@ -150,6 +150,7 @@ help-legacy:
 	@echo "  check-contract-ir       Validate the versioned IR envelope and both SHA-256 hashes"
 	@echo "  check-tenant-ownership  Validate C0 direct organization ownership (required by check-codegen)"
 	@echo "  check-storage-policy    Validate C1 all-table storage census (required by check-codegen)"
+	@echo "  check-c2-commit-coverage Validate registered C2 reducer commit coverage (required by check-codegen)"
 	@echo "  check-reducer-contracts-drift  CI-safe live-schema drift check for reducer-manifest.json"
 	@echo "  check-contracts-drift   Full bindings/manifests drift check (requires spacetime CLI)"
 	@echo "  publish-contracts VERSION=x.y.z  Transitional release: publish canonical IR plus current generated packages"
@@ -893,13 +894,18 @@ check-tenant-ownership:
 check-storage-policy: codegen
 	node scripts/bootstrap-storage-policies.mjs --check
 
-check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-policy lint-reducer-call-literals
+check-c2-commit-coverage:
+	python3 scripts/verify-c2-commit-coverage.py
+	python3 lumiere-codegen/tests/test_c2_commit_coverage.py
+
+check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-policy check-c2-commit-coverage lint-reducer-call-literals
 	@node scripts/validate-subscription-census.mjs --check
 	@git add -N \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
 		crates/stdb-auth/assets/query_exec_non_registry.json \
+		api-server/src/generated/projection-codec-manifest.json \
 		api-server/src/generated/pg_ddl/ \
 		2>/dev/null || true
 	@git diff --exit-code -- \
@@ -907,6 +913,7 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
 		crates/stdb-auth/assets/query_exec_non_registry.json \
+		api-server/src/generated/projection-codec-manifest.json \
 		api-server/src/generated/pg_ddl/ || \
 		(echo "Generated artifacts are out of date. Run: make generate-stdb-ts-sdk && make codegen" && exit 1)
 

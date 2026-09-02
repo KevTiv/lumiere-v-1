@@ -163,6 +163,10 @@ pub mod helpdesk_tests;
 #[path = "../tests/integrations/mod.rs"]
 pub mod integrations_tests;
 
+/// Data-operations tests — call `run_data_ops_commit_test` reducer.
+#[path = "../tests/data_ops/mod.rs"]
+pub mod data_ops_tests;
+
 use crate::core::migrations::apply_pending_global_migrations;
 use crate::core::reference::{currency, Currency};
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
@@ -201,6 +205,7 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
     iot_tests::run_all_iot_tests(ctx).map_err(|e| format!("iot: {e}"))?;
     helpdesk_tests::run_all_helpdesk_tests(ctx).map_err(|e| format!("helpdesk: {e}"))?;
     integrations_tests::run_all_integrations_tests(ctx).map_err(|e| format!("integrations: {e}"))?;
+    data_ops_tests::run_data_ops_commit_test(ctx).map_err(|e| format!("data_ops: {e}"))?;
     log::info!("✅ run_all_domain_tests complete");
     Ok(())
 }

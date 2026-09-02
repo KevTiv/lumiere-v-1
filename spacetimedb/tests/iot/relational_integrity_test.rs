@@ -2,12 +2,13 @@
 //! IoTAlert, and IoTAction — all four previously had no company_id column at all.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::iot::actions::{create_iot_action, iot_action, CreateActionParams};
 use crate::iot::alerts::iot_alert;
 use crate::iot::integrations::link_device_to_location;
 use crate::iot::registry::{
-    iot_device, iot_hub, register_iot_device, register_iot_hub, RegisterDeviceParams,
-    RegisterHubParams,
+    iot_device, iot_hub, register_iot_device, register_iot_hub, sync_hub_devices, DeviceSyncEntry,
+    RegisterDeviceParams, RegisterHubParams,
 };
 use crate::iot::telemetry::{
     iot_telemetry, iot_threshold, record_telemetry, set_iot_threshold, RecordTelemetryParams,
@@ -216,6 +217,106 @@ pub fn test_link_device_rejects_cross_org(ctx: &ReducerContext) -> Result<(), St
         .ok_or("device missing after cross-org location attempt")?;
     if unlinked.stock_location_id.is_some() {
         return Err("cross-org location link was persisted despite rejection".to_string());
+    }
+    Ok(())
+}
+
+/// A device discovery batch is one ordered organization commit, including
+/// every changed device and no rows from another tenant.
+pub fn test_device_sync_records_one_ordered_commit(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let device_id = seed_device(ctx, &fixture, "Iot Sync Existing", "TemperatureSensor")?;
+    let hub_id = ctx
+        .db
+        .iot_device()
+        .id()
+        .find(&device_id)
+        .ok_or("sync device missing")?
+        .hub_id;
+    let before_commits = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_org()
+        .filter(&fixture.organization_id)
+        .count();
+
+    sync_hub_devices(
+        ctx,
+        fixture.organization_id,
+        hub_id,
+        vec![
+            DeviceSyncEntry {
+                identifier: "ID-Iot Sync Existing".to_string(),
+                name: "Iot Sync Existing Updated".to_string(),
+                device_type: "TemperatureSensor".to_string(),
+                capabilities: vec!["temperature".to_string()],
+            },
+            DeviceSyncEntry {
+                identifier: "ID-Iot Sync New".to_string(),
+                name: "Iot Sync New".to_string(),
+                device_type: "BarcodeScanner".to_string(),
+                capabilities: vec!["barcode".to_string()],
+            },
+        ],
+    )?;
+
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_org()
+        .filter(&fixture.organization_id)
+        .collect();
+    if commits.len() != before_commits + 1 {
+        return Err("device sync must create exactly one commit".to_string());
+    }
+    let commit = commits
+        .iter()
+        .max_by_key(|commit| commit.sequence)
+        .ok_or("device sync commit missing")?;
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_commit()
+        .filter(&fixture.organization_id)
+        .filter(|change| change.commit_sequence == commit.sequence)
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let synced_ids: Vec<u64> = ctx
+        .db
+        .iot_device()
+        .iter()
+        .filter(|device| device.hub_id == hub_id)
+        .filter(|device| {
+            device.identifier == "ID-Iot Sync Existing" || device.identifier == "ID-Iot Sync New"
+        })
+        .map(|device| device.id)
+        .collect();
+    let new_device_id = ctx
+        .db
+        .iot_device()
+        .iter()
+        .find(|device| device.identifier == "ID-Iot Sync New")
+        .map(|device| device.id)
+        .ok_or("new synced device missing")?;
+    if commit.row_change_count != 2
+        || changes.len() != 2
+        || changes[0].row_identity_json != format!(r#"{{"id":{device_id}}}"#)
+        || changes[1].row_identity_json != format!(r#"{{"id":{new_device_id}}}"#)
+        || changes.iter().enumerate().any(|(ordinal, change)| {
+            change.ordinal as usize != ordinal
+                || change.table_name != "iot_device"
+                || change.organization_id != fixture.organization_id
+        })
+        || changes
+            .iter()
+            .filter_map(|change| {
+                serde_json::from_str::<serde_json::Value>(&change.row_identity_json).ok()
+            })
+            .filter_map(|identity| identity.get("id").and_then(serde_json::Value::as_u64))
+            .any(|id| !synced_ids.contains(&id))
+    {
+        return Err("device sync commit did not preserve exact ordered org rows".to_string());
     }
     Ok(())
 }

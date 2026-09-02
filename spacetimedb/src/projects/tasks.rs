@@ -8,6 +8,7 @@ use serde_json::{Map, Value};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::projects::milestones::validate_milestone_fk;
 use crate::projects::projects::{project_project, ProjectProject};
@@ -730,6 +731,54 @@ pub fn create_task(
             metadata: None,
         },
     );
+
+    let task = ctx
+        .db
+        .project_task()
+        .id()
+        .find(&task.id)
+        .ok_or("Task not found after creation")?;
+    let mut changes = Vec::new();
+    if let Some(project_id) = task.project_id {
+        let project = ctx
+            .db
+            .project_project()
+            .id()
+            .find(&project_id)
+            .ok_or("Project not found after task creation")?;
+        changes.push(RowChange::upsert_stdb_row(
+            "project_project",
+            serde_json::json!({"id": project.id}),
+            &project,
+        )?);
+    }
+    if let Some(parent_id) = task.parent_id {
+        let parent = ctx
+            .db
+            .project_task()
+            .id()
+            .find(&parent_id)
+            .ok_or("Parent task not found after child creation")?;
+        changes.push(RowChange::upsert_stdb_row(
+            "project_task",
+            serde_json::json!({"id": parent.id}),
+            &parent,
+        )?);
+    }
+    changes.push(RowChange::upsert_stdb_row(
+        "project_task",
+        serde_json::json!({"id": task.id}),
+        &task,
+    )?);
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.create_task".to_string(),
+            correlation_id: format!("project-task:{}", task.id),
+            changes,
+        },
+    )?;
 
     log::info!("Task created: id={}", task.id);
     Ok(())

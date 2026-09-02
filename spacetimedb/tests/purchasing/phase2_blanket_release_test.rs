@@ -5,6 +5,7 @@ use std::time::Duration;
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
 use crate::core::organization::{organization_settings, OrganizationSettings};
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::purchasing::procurement_advanced::{
     create_purchase_blanket_order, purchase_blanket_order, purchase_blanket_order_line,
     purchase_blanket_release, release_blanket_to_po, CreatePurchaseBlanketOrderLineParams,
@@ -253,6 +254,90 @@ pub fn test_blanket_release_lines_bounds_and_retry(ctx: &ReducerContext) -> Resu
         blanket.id,
         release.clone(),
     )?;
+
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == scope.organization_id
+                && commit.operation_id == "erp.release_blanket_to_po"
+                && commit.correlation_id
+                    == format!(
+                        "blanket-order:{}:release:{}",
+                        blanket.id, release.idempotency_key
+                    )
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 5 {
+        return Err(format!(
+            "blanket release should emit one five-row organization commit, got {} / {:?}",
+            commits.len(),
+            commits.first().map(|commit| commit.row_change_count)
+        ));
+    }
+    let commit = &commits[0];
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == scope.organization_id
+                && change.commit_sequence == commit.sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    let release_row = ctx
+        .db
+        .purchase_blanket_release()
+        .iter()
+        .find(|row| {
+            row.organization_id == scope.organization_id
+                && row.company_id == scope.company_id
+                && row.blanket_order_id == blanket.id
+                && row.idempotency_key == release.idempotency_key
+        })
+        .ok_or("blanket release row was not persisted")?;
+    let purchase_order = ctx
+        .db
+        .purchase_order()
+        .id()
+        .find(&release_row.purchase_order_id)
+        .ok_or("purchase order row was not persisted")?;
+    let purchase_order_line = ctx
+        .db
+        .purchase_order_line()
+        .purchase_order_line_by_order()
+        .filter(&purchase_order.id)
+        .next()
+        .ok_or("purchase order line was not persisted")?;
+    if tables
+        != [
+            "purchase_blanket_order",
+            "purchase_blanket_order_line",
+            "purchase_order",
+            "purchase_order_line",
+            "purchase_blanket_release",
+        ]
+        || changes.len() != 5
+        || changes[0].row_identity_json != format!(r#"{{"id":{}}}"#, blanket.id)
+        || changes[1].row_identity_json != format!(r#"{{"id":{}}}"#, line.id)
+        || changes[2].row_identity_json != format!(r#"{{"id":{}}}"#, purchase_order.id)
+        || changes[3].row_identity_json != format!(r#"{{"id":{}}}"#, purchase_order_line.id)
+        || changes[4].row_identity_json != format!(r#"{{"id":{}}}"#, release_row.id)
+        || changes
+            .iter()
+            .enumerate()
+            .any(|(ordinal, change)| change.ordinal as usize != ordinal)
+    {
+        return Err(format!(
+            "blanket release commit row order mismatch: {tables:?}"
+        ));
+    }
     release_blanket_to_po(
         ctx,
         scope.organization_id,

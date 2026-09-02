@@ -9,6 +9,7 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company_id_from_scope, require_company_in_organization};
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::core::queue::{enqueue_job_internal, queue_payload_hash, EnqueueJobParams};
 use crate::documents::documents::{document, document_version, Document};
 use crate::documents::pack_locale::{document_search_language_for_company, truncate_index_content};
@@ -615,6 +616,7 @@ pub fn approve_document_processing_job(
     }
 
     // Promote approved OCR / extraction into the linked document search index (expenses/AP).
+    let mut indexed_document_id = None;
     if let Some(doc_id) = job.document_id {
         if let Some(extracted) = job.extracted_data.as_ref() {
             let content = truncate_index_content(extracted);
@@ -666,6 +668,7 @@ pub fn approve_document_processing_job(
                             write_date: ctx.timestamp,
                             ..doc
                         });
+                        indexed_document_id = Some(doc_id);
                     }
                 }
             }
@@ -699,6 +702,41 @@ pub fn approve_document_processing_job(
             metadata: None,
         },
     );
+
+    let committed_job = ctx
+        .db
+        .ai_document_processing_job()
+        .id()
+        .find(&job_id)
+        .ok_or("Processing job disappeared before commit recording")?;
+    let mut changes = Vec::new();
+    if let Some(document_id) = indexed_document_id {
+        let committed_document = ctx
+            .db
+            .document()
+            .id()
+            .find(&document_id)
+            .ok_or("Indexed document disappeared before commit recording")?;
+        changes.push(RowChange::upsert_stdb_row(
+            "document",
+            serde_json::json!({"id": committed_document.id}),
+            &committed_document,
+        )?);
+    }
+    changes.push(RowChange::upsert_stdb_row(
+        "ai_document_processing_job",
+        serde_json::json!({"id": committed_job.id}),
+        &committed_job,
+    )?);
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.approve_document_processing_job".to_string(),
+            correlation_id: format!("document-processing-job:{job_id}:approve"),
+            changes,
+        },
+    )?;
 
     log::info!("Document processing job approved: id={}", job_id);
     Ok(())

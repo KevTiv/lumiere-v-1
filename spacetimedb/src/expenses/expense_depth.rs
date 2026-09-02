@@ -10,13 +10,16 @@ use crate::accounting::journal_entries::{
 use crate::accounting::tax_management::{account_tax, account_tax_group};
 use crate::core::country_pack::company_enabled_pack_keys;
 use crate::core::organization::company_id_from_scope;
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::expenses::expenses::{
     expense_sheet, hr_expense, metadata_str_eq, HrExpense, HrExpenseSheet,
 };
 use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
 };
-use crate::projects::project_accounting::refresh_project_margin_for_projects;
+use crate::projects::project_accounting::{
+    project_margin_snapshot, refresh_project_margin_for_projects,
+};
 use crate::projects::projects::project_project;
 use crate::sales::oms_extensions::remap_taxes_for_fiscal_position;
 use crate::types::{
@@ -1042,7 +1045,93 @@ pub fn create_expense_project_rebill(
         },
     );
 
+    let rebill_project_set: std::collections::BTreeSet<u64> =
+        rebill_project_ids.iter().copied().collect();
+    let mut previous_margin_snapshots: Vec<_> = ctx
+        .db
+        .project_margin_snapshot()
+        .iter()
+        .filter(|snapshot| {
+            snapshot.organization_id == organization_id
+                && snapshot.company_id == company_id
+                && rebill_project_set.contains(&snapshot.project_id)
+        })
+        .collect();
+    previous_margin_snapshots.sort_by_key(|snapshot| snapshot.id);
+
     refresh_project_margin_for_projects(ctx, organization_id, company_id, rebill_project_ids);
+
+    let sheet = ctx
+        .db
+        .expense_sheet()
+        .id()
+        .find(&sheet_id)
+        .ok_or("Expense sheet not found after rebill")?;
+    let move_record = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&move_record.id)
+        .ok_or("Rebill move not found after posting")?;
+    let mut changes = vec![
+        RowChange::upsert_stdb_row(
+            "hr_expense_sheet",
+            serde_json::json!({"id": sheet.id}),
+            &sheet,
+        )?,
+        RowChange::upsert_stdb_row(
+            "account_move",
+            serde_json::json!({"id": move_record.id}),
+            &move_record,
+        )?,
+    ];
+    let mut move_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|line| line.move_id == move_record.id)
+        .collect();
+    move_lines.sort_by_key(|line| line.id);
+    for line in move_lines {
+        changes.push(RowChange::upsert_stdb_row(
+            "account_move_line",
+            serde_json::json!({"id": line.id}),
+            &line,
+        )?);
+    }
+    for snapshot in &previous_margin_snapshots {
+        changes.push(RowChange::delete(
+            "project_margin_snapshot",
+            serde_json::json!({"id": snapshot.id}),
+        ));
+    }
+    let mut committed_margin_snapshots: Vec<_> = ctx
+        .db
+        .project_margin_snapshot()
+        .iter()
+        .filter(|snapshot| {
+            snapshot.organization_id == organization_id
+                && snapshot.company_id == company_id
+                && rebill_project_set.contains(&snapshot.project_id)
+        })
+        .collect();
+    committed_margin_snapshots.sort_by_key(|snapshot| snapshot.id);
+    for snapshot in &committed_margin_snapshots {
+        changes.push(RowChange::upsert_stdb_row(
+            "project_margin_snapshot",
+            serde_json::json!({"id": snapshot.id}),
+            snapshot,
+        )?);
+    }
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.create_expense_project_rebill".to_string(),
+            correlation_id: format!("expense-sheet:{sheet_id}:rebill:{}", move_record.id),
+            changes,
+        },
+    )?;
 
     Ok(())
 }

@@ -9,6 +9,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 use crate::accounting::tax_management::account_tax;
 use crate::core::organization::company_id_from_scope;
 use crate::core::permissions::role;
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::core::reference::{currency, uom};
 use crate::core::users::{user_organization, user_profile};
 use crate::core::utm::{utm_campaign, utm_medium, utm_source};
@@ -18,7 +19,8 @@ use crate::crm::require_single_company_crm_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::sales::sales_core::{
-    create_sale_order, sale_order, CreateSaleOrderLineParams, CreateSaleOrderParams,
+    create_sale_order, sale_order, sale_order_line, CreateSaleOrderLineParams,
+    CreateSaleOrderParams,
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1304,6 +1306,7 @@ pub fn convert_opportunity_to_sale_order(
     // Validate the partner up front (read-only) — the customer flag is only
     // flipped once every other validation below has passed.
     let partner = ctx.db.contact().id().find(&partner_id);
+    let partner_needs_customer_flag = partner.as_ref().is_some_and(|p| !p.is_customer);
     if let Some(partner) = &partner {
         if partner.organization_id != organization_id {
             return Err("Opportunity partner does not belong to this organization".to_string());
@@ -1479,6 +1482,69 @@ pub fn convert_opportunity_to_sale_order(
             metadata: None,
         },
     );
+
+    let opportunity = ctx
+        .db
+        .opportunity()
+        .id()
+        .find(&opportunity_id)
+        .ok_or("Opportunity not found after conversion")?;
+    let sale_order = ctx
+        .db
+        .sale_order()
+        .iter()
+        .filter(|order| {
+            order.organization_id == organization_id && order.opportunity_id == Some(opportunity_id)
+        })
+        .max_by_key(|order| order.id)
+        .ok_or("Sale order not found after opportunity conversion")?;
+    let mut changes = Vec::new();
+    if partner_needs_customer_flag {
+        let contact = ctx
+            .db
+            .contact()
+            .id()
+            .find(&partner_id)
+            .ok_or("Opportunity partner not found after conversion")?;
+        changes.push(RowChange::upsert_stdb_row(
+            "contact",
+            serde_json::json!({"id": contact.id}),
+            &contact,
+        )?);
+    }
+    changes.push(RowChange::upsert_stdb_row(
+        "opportunity",
+        serde_json::json!({"id": opportunity.id}),
+        &opportunity,
+    )?);
+    changes.push(RowChange::upsert_stdb_row(
+        "sale_order",
+        serde_json::json!({"id": sale_order.id}),
+        &sale_order,
+    )?);
+    let mut sale_order_lines: Vec<_> = ctx
+        .db
+        .sale_order_line()
+        .iter()
+        .filter(|line| line.order_id == sale_order.id)
+        .collect();
+    sale_order_lines.sort_by_key(|line| line.id);
+    for line in sale_order_lines {
+        changes.push(RowChange::upsert_stdb_row(
+            "sale_order_line",
+            serde_json::json!({"id": line.id}),
+            &line,
+        )?);
+    }
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.convert_opportunity_to_sale_order".to_string(),
+            correlation_id: format!("opportunity:{opportunity_id}:sale-order:{}", sale_order.id),
+            changes,
+        },
+    )?;
 
     Ok(())
 }

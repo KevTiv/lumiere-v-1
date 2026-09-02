@@ -12,6 +12,7 @@ use crate::accounting::journal_entries::{
     CreateInvoiceFromSaleOrderParams,
 };
 use crate::core::organization::CompanyScopeParams;
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::inventory::product::product;
 use crate::inventory::stock::{
     assign_stock_picking, confirm_stock_picking, done_stock_move, stock_move, stock_picking,
@@ -337,6 +338,48 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
             metadata: None,
         },
     )?;
+
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == org_id
+                && commit.operation_id == "erp.create_invoice_from_sale_order"
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 5 {
+        return Err(format!(
+            "invoice should emit one five-row organization commit, got {} commits / {:?}",
+            commits.len(),
+            commits.first().map(|commit| commit.row_change_count)
+        ));
+    }
+    let commit = &commits[0];
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == org_id && change.commit_sequence == commit.sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables
+        != [
+            "sale_order",
+            "account_move",
+            "account_move_line",
+            "account_move_line",
+            "sale_order_line",
+        ]
+    {
+        return Err(format!("invoice commit row order mismatch: {tables:?}"));
+    }
 
     let invoiced_order = ctx
         .db

@@ -4,8 +4,11 @@ use spacetimedb::{ReducerContext, Table};
 use crate::analytics::reports::{
     analytics_metric, report_template, AnalyticsMetric, ReportTemplate,
 };
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::data_ops::helpers::*;
-use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
+use crate::data_ops::import_tracker::{
+    begin_import_job, finish_import_job, import_job, import_job_error, record_import_error,
+};
 use crate::helpers::check_permission;
 
 // ── ReportTemplate ────────────────────────────────────────────────────────────
@@ -149,8 +152,10 @@ pub fn import_analytics_metric_csv(
         None,
         rows.len() as u32,
     );
+    let job_id = job.id;
     let mut imported = 0u32;
     let mut errors = 0u32;
+    let mut committed_metrics = Vec::new();
 
     for (i, row) in rows.iter().enumerate() {
         let row_num = (i + 2) as u32;
@@ -171,7 +176,7 @@ pub fn import_analytics_metric_csv(
             }
         };
 
-        ctx.db.analytics_metric().insert(AnalyticsMetric {
+        let metric = ctx.db.analytics_metric().insert(AnalyticsMetric {
             id: 0,
             organization_id,
             name,
@@ -235,10 +240,58 @@ pub fn import_analytics_metric_csv(
             write_date: ctx.timestamp,
             metadata: opt_str(col(&headers, row, "metadata")),
         });
+        committed_metrics.push(metric);
         imported += 1;
     }
 
     finish_import_job(ctx, job, imported, errors);
+    let committed_job = ctx
+        .db
+        .import_job()
+        .id()
+        .find(&job_id)
+        .ok_or("Analytics import job disappeared before commit recording")?;
+    committed_metrics.sort_by_key(|metric| metric.id);
+    let mut changes = vec![RowChange::upsert_stdb_row(
+        "import_job",
+        serde_json::json!({"id": committed_job.id}),
+        &committed_job,
+    )?];
+    let mut committed_errors: Vec<_> = ctx
+        .db
+        .import_job_error()
+        .import_error_by_job()
+        .filter(&job_id)
+        .collect();
+    committed_errors.sort_by_key(|error| error.id);
+    for error in &committed_errors {
+        changes.push(RowChange::upsert_stdb_row(
+            "import_job_error",
+            serde_json::json!({"id": error.id}),
+            error,
+        )?);
+    }
+    changes.extend(
+        committed_metrics
+            .iter()
+            .map(|metric| {
+                RowChange::upsert_stdb_row(
+                    "analytics_metric",
+                    serde_json::json!({"id": metric.id}),
+                    metric,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+    );
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.import_analytics_metric_csv".to_string(),
+            correlation_id: format!("import:analytics_metric:{job_id}"),
+            changes,
+        },
+    )?;
     log::info!(
         "Import analytics_metric: imported={}, errors={}",
         imported,

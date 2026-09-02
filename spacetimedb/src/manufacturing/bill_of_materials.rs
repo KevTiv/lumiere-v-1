@@ -9,6 +9,7 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::manufacturing::manufacturing_orders::mrp_production;
@@ -581,6 +582,41 @@ pub fn create_bom(
             metadata: None,
         },
     );
+
+    let bom = ctx
+        .db
+        .mrp_bom()
+        .id()
+        .find(&bom.id)
+        .ok_or("BOM not found after creation")?;
+    let mut changes = vec![RowChange::upsert_stdb_row(
+        "mrp_bom",
+        serde_json::json!({"id": bom.id}),
+        &bom,
+    )?];
+    let mut bom_lines: Vec<_> = ctx
+        .db
+        .mrp_bom_line()
+        .iter()
+        .filter(|line| line.bom_id == bom.id)
+        .collect();
+    bom_lines.sort_by_key(|line| line.id);
+    for line in bom_lines {
+        changes.push(RowChange::upsert_stdb_row(
+            "mrp_bom_line",
+            serde_json::json!({"id": line.id}),
+            &line,
+        )?);
+    }
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.create_bom".to_string(),
+            correlation_id: format!("bom:{}", bom.id),
+            changes,
+        },
+    )?;
 
     log::info!("BOM created: id={}", bom.id);
     Ok(())

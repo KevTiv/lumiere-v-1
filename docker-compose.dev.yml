@@ -323,6 +323,39 @@ services:
       retries: 12
       start_period: 20s
 
+  projection-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server --bin projection-worker'
+    environment:
+      STDB_HOST: http://spacetimedb:3000
+      STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
+      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN in .env.docker}
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${PG_DATABASE:-lumiere}
+      PG_USER: ${PG_USER:-lumiere}
+      PG_PASSWORD: ${PG_PASSWORD:-lumiere}
+      PG_TLS_MODE: disable
+      LUMIERE_PROJECTION_WORKER_POLL_SECS: ${LUMIERE_PROJECTION_WORKER_POLL_SECS:-5}
+      LUMIERE_PROJECTION_WORKER_BATCH: ${LUMIERE_PROJECTION_WORKER_BATCH:-100}
+      LUMIERE_PROJECTION_WORKER_PORT: 8096
+    volumes:
+      - .:/workspace
+      - cargo-target:/cargo-target
+    depends_on:
+      spacetimedb:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8096/health/ready >/dev/null"]
+      interval: 10s
+      timeout: 4s
+      retries: 12
+      start_period: 20s
+
   web:
     build:
       context: ./frontend

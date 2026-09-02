@@ -205,6 +205,30 @@ services:
       - "8095"
     restart: unless-stopped
 
+  projection-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.rust
+      args:
+        BIN: projection-worker
+    environment:
+      NODE_ENV: production
+      STDB_HOST: ${STDB_HOST:-https://maincloud.spacetimedb.com}
+      STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE}
+      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN}
+      PG_HOST: ${PG_HOST:?set PG_HOST}
+      PG_PORT: ${PG_PORT:-5432}
+      PG_DATABASE: ${PG_DATABASE:-lumiere}
+      PG_USER: ${PG_USER:-lumiere}
+      PG_PASSWORD: ${PG_PASSWORD:?set PG_PASSWORD}
+      PG_TLS_MODE: ${PG_TLS_MODE:-require}
+      LUMIERE_PROJECTION_WORKER_POLL_SECS: ${LUMIERE_PROJECTION_WORKER_POLL_SECS:-5}
+      LUMIERE_PROJECTION_WORKER_BATCH: ${LUMIERE_PROJECTION_WORKER_BATCH:-100}
+      LUMIERE_PROJECTION_WORKER_PORT: 8096
+    expose:
+      - "8096"
+    restart: unless-stopped
+
   ai-gateway:
     build:
       context: .

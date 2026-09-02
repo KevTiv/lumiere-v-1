@@ -2,6 +2,7 @@
 
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::purchasing::purchase_orders::{
     create_purchase_order, purchase_order, CreatePurchaseOrderParams,
@@ -49,6 +50,49 @@ fn test_start_replay_mismatch_singleton_and_scope(ctx: &ReducerContext) -> Resul
 
     start_workflow(ctx, fixture.organization_id, params.clone())?;
     let instance = latest_instance(ctx, fixture.organization_id, workflow_id)?;
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_org()
+        .filter(&fixture.organization_id)
+        .collect();
+    let commit = commits
+        .iter()
+        .max_by_key(|commit| commit.sequence)
+        .ok_or("workflow start commit missing")?;
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_commit()
+        .filter(&fixture.organization_id)
+        .filter(|change| change.commit_sequence == commit.sequence)
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let token_id = ctx
+        .db
+        .workflow_token()
+        .workflow_token_by_instance()
+        .filter(&instance.id)
+        .next()
+        .map(|token| token.id)
+        .ok_or("workflow start token missing")?;
+    if commit.operation_id != "erp.start_workflow"
+        || commit.row_change_count != 2
+        || changes.len() != 2
+        || changes[0].table_name != "workflow_instance"
+        || changes[1].table_name != "workflow_token"
+        || changes[0].row_identity_json != format!(r#"{{"id":{}}}"#, instance.id)
+        || changes[1].row_identity_json != format!(r#"{{"id":{token_id}}}"#)
+        || changes[0].ordinal != 0
+        || changes[1].ordinal != 1
+        || changes
+            .iter()
+            .any(|change| change.organization_id != fixture.organization_id)
+    {
+        return Err(
+            "workflow start commit did not preserve parent-before-child org rows".to_string(),
+        );
+    }
     let counts = runtime_counts(ctx, instance.id);
     start_workflow(ctx, fixture.organization_id, params.clone())?;
     if runtime_counts(ctx, instance.id) != counts {

@@ -89,19 +89,15 @@ pub fn test_driver_id_relations(ctx: &ReducerContext) -> Result<(), String> {
     let inactive_driver_id = create_test_employee(ctx, &local, "FLT-003 Inactive Driver")?;
     // Deactivate directly — there is no dedicated deactivate reducer for employees.
     if let Some(row) = ctx.db.hr_employee().id().find(&inactive_driver_id) {
-        ctx.db.hr_employee().id().update(crate::hr::employees::HrEmployee {
-            is_active: false,
-            ..row
-        });
+        ctx.db
+            .hr_employee()
+            .id()
+            .update(crate::hr::employees::HrEmployee {
+                is_active: false,
+                ..row
+            });
     }
-    let missing_driver_id = ctx
-        .db
-        .hr_employee()
-        .iter()
-        .map(|e| e.id)
-        .max()
-        .unwrap_or(0)
-        + 1000;
+    let missing_driver_id = ctx.db.hr_employee().iter().map(|e| e.id).max().unwrap_or(0) + 1000;
 
     for (case, driver_id, expected) in [
         ("missing", missing_driver_id, "not found"),
@@ -253,13 +249,12 @@ pub fn test_service_type_id_relations(ctx: &ReducerContext) -> Result<(), String
         .id()
         .find(&inactive_type_id)
     {
-        ctx.db
-            .fleet_vehicle_service_type()
-            .id()
-            .update(crate::fleet::fleet::FleetVehicleServiceType {
+        ctx.db.fleet_vehicle_service_type().id().update(
+            crate::fleet::fleet::FleetVehicleServiceType {
                 is_active: false,
                 ..row
-            });
+            },
+        );
     }
 
     let missing_type_id = ctx
@@ -327,7 +322,9 @@ pub fn test_service_type_id_relations(ctx: &ReducerContext) -> Result<(), String
         ctx.db
             .fleet_vehicle()
             .iter()
-            .find(|v| v.organization_id == local.organization_id && v.name == "FLT-004 Valid Vehicle")
+            .find(|v| {
+                v.organization_id == local.organization_id && v.name == "FLT-004 Valid Vehicle"
+            })
             .map(|v| v.id)
             .ok_or_else(|| "valid vehicle missing after create".to_string())
     })?;

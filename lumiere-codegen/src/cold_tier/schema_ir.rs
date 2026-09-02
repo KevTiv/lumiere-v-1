@@ -189,9 +189,9 @@ impl LumiereSchemaManifest {
 
     /// Enforce the C0 organization-ownership invariant for every ERP table.
     pub fn validate_tenant_ownership(&self) -> Result<()> {
-        if self.tables.len() != 458 {
+        if self.tables.len() != 461 {
             bail!(
-                "C0 requires 458 schema tables (447 ERP-owned + 11 platform-global), found {}",
+                "C0 requires 461 schema tables (450 ERP-owned + 11 platform-global), found {}",
                 self.tables.len()
             );
         }
@@ -454,7 +454,7 @@ mod tests {
     fn c0_validation_requires_the_closed_platform_allowlist() {
         let manifest = LumiereSchemaManifest {
             version: 1,
-            tables: vec![table("orders", Some((GeneratedType::U64, false)), true); 458],
+            tables: vec![table("orders", Some((GeneratedType::U64, false)), true); 461],
             enum_types: vec![],
         };
         let error = manifest

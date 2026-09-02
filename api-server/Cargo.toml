@@ -38,6 +38,10 @@ path = "src/bin/audit-cold-drainer.rs"
 name = "pos-order-cold-drainer"
 path = "src/bin/pos-order-cold-drainer.rs"
 
+[[bin]]
+name = "projection-worker"
+path = "src/bin/projection-worker.rs"
+
 [dependencies]
 lumiere-contracts.workspace = true
 anyhow.workspace = true

@@ -14,6 +14,7 @@ use crate::accounting::payment_management::payment_transaction;
 use crate::accounting::payments::account_payment;
 use crate::ai::action_drafts::ai_action_draft;
 use crate::core::organization::require_company_in_organization;
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::expenses::expenses::expense_sheet;
 use crate::helpers::check_permission;
 use crate::hr::leaves::hr_leave;
@@ -531,6 +532,26 @@ pub(crate) fn start_workflow_internal(
         &params.correlation_id,
         params.causation_id,
     );
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.start_workflow".to_string(),
+            correlation_id: params.correlation_id,
+            changes: vec![
+                RowChange::upsert_stdb_row(
+                    "workflow_instance",
+                    serde_json::json!({"id": instance.id}),
+                    &instance,
+                )?,
+                RowChange::upsert_stdb_row(
+                    "workflow_token",
+                    serde_json::json!({"id": token.id}),
+                    &token,
+                )?,
+            ],
+        },
+    )?;
     Ok(())
 }
 

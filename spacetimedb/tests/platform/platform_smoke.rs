@@ -12,10 +12,10 @@ use crate::core::country_pack::{
     country_pack_definition, set_company_country_pack, SetCompanyCountryPackParams,
 };
 use crate::documents::documents::{
-    create_document, create_document_folder, delete_document, delete_document_folder, doc_folder,
-    document, document_version, lock_document, restore_document, update_document,
-    update_document_folder, CreateDocumentFolderParams, CreateDocumentParams, Document,
-    DocumentFolder, UpdateDocumentFolderParams, UpdateDocumentParams,
+    add_document_version, create_document, create_document_folder, delete_document,
+    delete_document_folder, doc_folder, document, document_version, lock_document, restore_document,
+    update_document, update_document_folder, AddDocumentVersionParams, CreateDocumentFolderParams,
+    CreateDocumentParams, Document, DocumentFolder, UpdateDocumentFolderParams, UpdateDocumentParams,
 };
 use crate::documents::drive_sync::{
     document_external_ref, set_google_drive_conflict_policy, sync_external_file_to_document,
@@ -1336,6 +1336,7 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
+    use crate::core::persistence::{organization_commit, organization_row_change};
     let checksum = "d".repeat(64);
 
     create_document(
@@ -1370,6 +1371,56 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
         .iter()
         .find(|d| d.organization_id == org_id && d.name == "Wave D Hold Doc")
         .ok_or("wave d doc missing")?;
+
+    add_document_version(
+        ctx,
+        org_id,
+        doc.id,
+        AddDocumentVersionParams {
+            file_name: "hold-v2.pdf".to_string(),
+            file_size: 96,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/1/default/hold-v2".to_string(),
+            checksum: "e".repeat(64),
+            changes_description: Some("C2 version".to_string()),
+        },
+    )?;
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == org_id
+                && commit.operation_id == "erp.add_document_version"
+                && commit.correlation_id == format!("document:{}:version:2", doc.id)
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 3 {
+        return Err(format!(
+            "document version should emit one three-row organization commit, got {} / {:?}",
+            commits.len(),
+            commits.first().map(|commit| commit.row_change_count)
+        ));
+    }
+    let commit = &commits[0];
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == org_id && change.commit_sequence == commit.sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables != ["document", "document_version", "document_version"] {
+        return Err(format!(
+            "document version commit row order mismatch: {tables:?}"
+        ));
+    }
 
     apply_document_legal_hold(
         ctx,
@@ -1804,6 +1855,42 @@ pub fn test_forms_custom_field_eav(ctx: &ReducerContext) -> Result<(), String> {
             false,
         ),
     )?;
+
+    use crate::core::persistence::{organization_commit, organization_row_change};
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == org_id
+                && commit.operation_id == "erp.publish_form_configuration"
+                && commit.correlation_id.starts_with("form:crm/new-lead:config:")
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 2 {
+        return Err(format!(
+            "form publish should emit one two-row organization commit, got {} / {:?}",
+            commits.len(),
+            commits.first().map(|commit| commit.row_change_count)
+        ));
+    }
+    let commit = &commits[0];
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == org_id && change.commit_sequence == commit.sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables != ["form_config", "form_config_field"] {
+        return Err(format!("form publish commit row order mismatch: {tables:?}"));
+    }
 
     if set_eav(ctx, org_id, company_id, lead_id, "custom:unknown", "\"x\"").is_ok() {
         return Err("unknown custom field should be rejected".to_string());

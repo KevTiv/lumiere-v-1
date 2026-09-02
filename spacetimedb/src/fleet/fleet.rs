@@ -9,6 +9,7 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::employees::hr_employee;
 use crate::inventory::warehouse::warehouse;
@@ -768,6 +769,27 @@ pub fn upsert_warehouse_geo(
             },
         );
     }
+
+    let committed_geo = ctx
+        .db
+        .warehouse_geo()
+        .warehouse_geo_by_warehouse()
+        .filter(&warehouse_id)
+        .next()
+        .ok_or("Warehouse geo disappeared before commit recording")?;
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.upsert_warehouse_geo".to_string(),
+            correlation_id: format!("warehouse-geo:{}", warehouse_id),
+            changes: vec![RowChange::upsert_stdb_row(
+                "warehouse_geo",
+                serde_json::json!({"id": committed_geo.id}),
+                &committed_geo,
+            )?],
+        },
+    )?;
 
     Ok(())
 }

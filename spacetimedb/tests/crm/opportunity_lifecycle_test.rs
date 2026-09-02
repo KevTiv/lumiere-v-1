@@ -4,6 +4,7 @@
 /// (mirrors `seed.rs`) so `convert_opportunity_to_sale_order` can find a won stage.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::core::reference::currency;
 use crate::crm::opportunities::{
     convert_opportunity_to_sale_order, create_opportunity, create_opportunity_line, opp_stage,
@@ -187,6 +188,49 @@ pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<()
         .any(|so| so.organization_id == org_id && so.opportunity_id == Some(opp.id));
     if !has_so {
         return Err("Expected sale order linked to opportunity after convert".to_string());
+    }
+
+    let order = ctx
+        .db
+        .sale_order()
+        .iter()
+        .find(|order| order.organization_id == org_id && order.opportunity_id == Some(opp.id))
+        .ok_or("Expected converted sale order row")?;
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == org_id
+                && commit.operation_id == "erp.convert_opportunity_to_sale_order"
+                && commit.correlation_id
+                    == format!("opportunity:{}:sale-order:{}", opp.id, order.id)
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 3 {
+        return Err(format!("CRM conversion commit mismatch: {}", commits.len()));
+    }
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == org_id && change.commit_sequence == commits[0].sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables != ["opportunity", "sale_order", "sale_order_line"]
+        || changes
+            .iter()
+            .any(|change| change.organization_id != org_id)
+    {
+        return Err(format!(
+            "CRM conversion row order/scope mismatch: {tables:?}"
+        ));
     }
 
     Ok(())

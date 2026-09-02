@@ -4,6 +4,7 @@
 /// tickets are assigned to agents within teams.
 use spacetimedb::{reducer, Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, Timestamp};
 
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{HelpdeskTicketState, TicketPriority};
@@ -582,6 +583,38 @@ pub fn create_ticket(
             ticket_id: ticket.id,
         });
     }
+    let committed_ticket = ctx
+        .db
+        .helpdesk_ticket()
+        .id()
+        .find(&ticket.id)
+        .ok_or("Helpdesk ticket disappeared before commit recording")?;
+    let mut changes = vec![RowChange::upsert_stdb_row(
+        "helpdesk_ticket",
+        serde_json::json!({"id": committed_ticket.id}),
+        &committed_ticket,
+    )?];
+    if let Some(job) = ctx
+        .db
+        .helpdesk_sla_check_job()
+        .iter()
+        .find(|job| job.organization_id == organization_id && job.ticket_id == ticket.id)
+    {
+        changes.push(RowChange::upsert_stdb_row(
+            "helpdesk_sla_check_job",
+            serde_json::json!({"scheduled_id": job.scheduled_id}),
+            &job,
+        )?);
+    }
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.create_ticket".to_string(),
+            correlation_id: format!("helpdesk-ticket:{}", ticket.id),
+            changes,
+        },
+    )?;
     Ok(())
 }
 

@@ -11,6 +11,7 @@ use spacetimedb::Identity;
 /// 4. Hub then calls `sync_hub_devices` to register all detected peripherals
 use spacetimedb::{reducer, table, ReducerContext, Table, Timestamp};
 
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
@@ -375,12 +376,13 @@ pub fn sync_hub_devices(
         .iot_device_by_hub()
         .filter(&hub_id)
         .collect();
+    let mut changed_devices = Vec::new();
 
     // Create or update detected devices
     for entry in &detected {
         if let Some(existing_device) = existing.iter().find(|d| d.identifier == entry.identifier) {
             // Update name/capabilities and mark online
-            ctx.db.iot_device().id().update(IoTDevice {
+            let updated = ctx.db.iot_device().id().update(IoTDevice {
                 name: entry.name.clone(),
                 device_type: entry.device_type.clone(),
                 capabilities: entry.capabilities.clone(),
@@ -390,9 +392,10 @@ pub fn sync_hub_devices(
                 write_date: ctx.timestamp,
                 ..existing_device.clone()
             });
+            changed_devices.push(updated);
         } else {
             // New device — create it
-            ctx.db.iot_device().insert(IoTDevice {
+            let inserted = ctx.db.iot_device().insert(IoTDevice {
                 id: 0,
                 hub_id,
                 organization_id,
@@ -413,6 +416,7 @@ pub fn sync_hub_devices(
                 write_date: ctx.timestamp,
                 metadata: None,
             });
+            changed_devices.push(inserted);
 
             log::info!(
                 "Auto-discovered device: type={} identifier={} hub={}",
@@ -427,13 +431,37 @@ pub fn sync_hub_devices(
     let detected_ids: Vec<&str> = detected.iter().map(|e| e.identifier.as_str()).collect();
     for device in &existing {
         if !detected_ids.contains(&device.identifier.as_str()) && device.status != "Offline" {
-            ctx.db.iot_device().id().update(IoTDevice {
+            let updated = ctx.db.iot_device().id().update(IoTDevice {
                 status: "Offline".to_string(),
                 write_uid: ctx.sender(),
                 write_date: ctx.timestamp,
                 ..device.clone()
             });
+            changed_devices.push(updated);
         }
+    }
+
+    changed_devices.sort_by_key(|device| device.id);
+    if !changed_devices.is_empty() {
+        let changes = changed_devices
+            .iter()
+            .map(|device| {
+                RowChange::upsert_stdb_row(
+                    "iot_device",
+                    serde_json::json!({"id": device.id}),
+                    device,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        record_organization_commit(
+            ctx,
+            OrganizationCommitInput {
+                organization_id,
+                operation_id: "erp.sync_hub_devices".to_string(),
+                correlation_id: format!("iot-hub:{organization_id}:{hub_id}:sync"),
+                changes,
+            },
+        )?;
     }
 
     Ok(())

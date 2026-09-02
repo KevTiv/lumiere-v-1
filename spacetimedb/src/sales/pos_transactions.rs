@@ -14,8 +14,9 @@
 ///   - Loyalty point tracking
 use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::iot::actions::queue_action_internal;
+use crate::iot::actions::{iot_action, queue_action_internal};
 use crate::iot::registry::iot_device;
 use crate::sales::pos_config::{pos_config, pos_loyalty_program, PosConfig};
 use crate::types::{CardState, PaymentStatus, PosOrderState, SessionState};
@@ -313,7 +314,7 @@ fn update_loyalty_points(
     partner_id: u64,
     points: f64,
     currency_id: u64,
-) -> Result<(), String> {
+) -> Result<Option<PosLoyaltyCard>, String> {
     let cards: Vec<_> = ctx
         .db
         .pos_loyalty_card()
@@ -330,6 +331,7 @@ fn update_loyalty_points(
     if let Some(card) = cards.into_iter().next() {
         let new_points = card.points + points;
         let new_balance = new_points * 0.01;
+        let card_id = card.id;
         ctx.db.pos_loyalty_card().id().update(PosLoyaltyCard {
             points: new_points,
             points_display: format!("{:.0} points", new_points),
@@ -338,9 +340,10 @@ fn update_loyalty_points(
             write_date: ctx.timestamp,
             ..card
         });
+        return Ok(ctx.db.pos_loyalty_card().id().find(&card_id));
     }
 
-    Ok(())
+    Ok(None)
 }
 
 // ── Reducers ──────────────────────────────────────────────────────────────────
@@ -822,27 +825,34 @@ pub fn create_pos_order(
         ..session
     });
 
-    if let Some(partner_id) = params.partner_id {
+    let updated_loyalty_card = if let Some(partner_id) = params.partner_id {
         if config.module_pos_loyalty {
-            let _ = update_loyalty_points(
+            update_loyalty_points(
                 ctx,
                 organization_id,
                 partner_id,
                 loyalty_points,
                 config.currency_id,
-            );
+            )?
+        } else {
+            None
         }
-    }
+    } else {
+        None
+    };
 
     // ── IoT hooks ─────────────────────────────────────────────────────────────
     // Push order total to any CustomerDisplay linked to this POS config
     // Initiate payment on any PaymentTerminal linked to this POS config
-    for device in ctx
+    let mut online_devices: Vec<_> = ctx
         .db
         .iot_device()
         .iter()
         .filter(|d| d.pos_config_id == Some(config.id) && d.status == "Online")
-    {
+        .collect();
+    online_devices.sort_by_key(|device| device.id);
+    let mut queued_iot_action_ids = Vec::new();
+    for device in online_devices {
         match device.device_type.as_str() {
             "CustomerDisplay" => {
                 let display_payload = serde_json::json!({
@@ -852,7 +862,7 @@ pub fn create_pos_order(
                     "lines": params.lines.len(),
                 })
                 .to_string();
-                queue_action_internal(
+                let action_id = queue_action_internal(
                     ctx,
                     organization_id,
                     device.company_id,
@@ -861,6 +871,7 @@ pub fn create_pos_order(
                     &display_payload,
                     "create_pos_order",
                 );
+                queued_iot_action_ids.push(action_id);
             }
             "PaymentTerminal" => {
                 // Only trigger payment terminal if payment method is card
@@ -874,7 +885,7 @@ pub fn create_pos_order(
                         "currency_id": config.currency_id,
                     })
                     .to_string();
-                    queue_action_internal(
+                    let action_id = queue_action_internal(
                         ctx,
                         organization_id,
                         device.company_id,
@@ -883,12 +894,13 @@ pub fn create_pos_order(
                         &payment_payload,
                         "create_pos_order",
                     );
+                    queued_iot_action_ids.push(action_id);
                 }
             }
             "ReceiptPrinter" => {
                 let receipt_payload =
                     serde_json::json!({ "order_id": order.id, "auto": true }).to_string();
-                queue_action_internal(
+                let action_id = queue_action_internal(
                     ctx,
                     organization_id,
                     device.company_id,
@@ -897,6 +909,7 @@ pub fn create_pos_order(
                     &receipt_payload,
                     "create_pos_order",
                 );
+                queued_iot_action_ids.push(action_id);
             }
             _ => {}
         }
@@ -916,6 +929,89 @@ pub fn create_pos_order(
             metadata: None,
         },
     );
+
+    let committed_session = ctx
+        .db
+        .pos_session()
+        .id()
+        .find(&params.session_id)
+        .ok_or("POS session disappeared before commit recording")?;
+    let committed_order = ctx
+        .db
+        .pos_order()
+        .id()
+        .find(&order.id)
+        .ok_or("POS order disappeared before commit recording")?;
+    let mut committed_lines: Vec<_> = ctx
+        .db
+        .pos_order_line()
+        .iter()
+        .filter(|line| line.organization_id == organization_id && line.order_id == order.id)
+        .collect();
+    committed_lines.sort_by_key(|line| line.id);
+    let mut committed_payments: Vec<_> = ctx
+        .db
+        .pos_payment()
+        .iter()
+        .filter(|payment| {
+            payment.organization_id == organization_id && payment.order_id == order.id
+        })
+        .collect();
+    committed_payments.sort_by_key(|payment| payment.id);
+    let mut changes = vec![RowChange::upsert_stdb_row(
+        "pos_session",
+        serde_json::json!({"id": committed_session.id}),
+        &committed_session,
+    )?];
+    changes.push(RowChange::upsert_stdb_row(
+        "pos_order",
+        serde_json::json!({"id": committed_order.id}),
+        &committed_order,
+    )?);
+    for line in &committed_lines {
+        changes.push(RowChange::upsert_stdb_row(
+            "pos_order_line",
+            serde_json::json!({"id": line.id}),
+            line,
+        )?);
+    }
+    for payment in &committed_payments {
+        changes.push(RowChange::upsert_stdb_row(
+            "pos_payment",
+            serde_json::json!({"id": payment.id}),
+            payment,
+        )?);
+    }
+    if let Some(loyalty_card) = updated_loyalty_card {
+        changes.push(RowChange::upsert_stdb_row(
+            "pos_loyalty_card",
+            serde_json::json!({"id": loyalty_card.id}),
+            &loyalty_card,
+        )?);
+    }
+    queued_iot_action_ids.sort_unstable();
+    for action_id in queued_iot_action_ids {
+        let action = ctx
+            .db
+            .iot_action()
+            .id()
+            .find(&action_id)
+            .ok_or("IoT action disappeared before commit recording")?;
+        changes.push(RowChange::upsert_stdb_row(
+            "iot_action",
+            serde_json::json!({"id": action.id}),
+            &action,
+        )?);
+    }
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.create_pos_order".to_string(),
+            correlation_id: format!("pos-session:{}:order:{}", params.session_id, order.id),
+            changes,
+        },
+    )?;
 
     Ok(())
 }

@@ -11,7 +11,8 @@
 //! 3. `archive_manifest_emit` — validate `archive-candidates.json` against
 //!    the schema manifest, emit `archive-manifest.json`
 //! 4. `pg_ddl_emit` — one cold-table `CREATE TABLE` per active candidate
-//! 5. `codec_emit` — STDB ↔ PG type-mapping manifest per candidate
+//! 5. `codec_emit` — STDB ↔ PG type-mapping manifests for archive candidates
+//!    and all projection tables
 //! 6. `hydration_manifest_emit` — reducers that may target archived rows
 //!    (validated against the schema manifest + active candidate set)
 
@@ -128,12 +129,35 @@ pub fn run(paths: &Paths) -> Result<()> {
 
     let ddl_file_count = emit_ddl(paths, &schema_manifest, candidates_arr)?;
 
+    for (file_name, ddl) in pg_ddl_emit::emit_commit_stream_ddl() {
+        let ddl_path = paths.cold_ddl_dir.join(file_name);
+        write_file(&ddl_path, &ddl)?;
+        println!("Wrote {}", ddl_path.display());
+    }
+
     // ── 4. Codec manifest: STDB ↔ PG type mapping per archive candidate ────
 
     let codec_manifest_json = codec_emit::emit_codec_manifest(&candidates_json, &schema_manifest)
         .context("generating codec manifest")?;
     write_file(&paths.codec_manifest_out, &codec_manifest_json)?;
     println!("Wrote {}", paths.codec_manifest_out.display());
+
+    let projection_codec_manifest_json =
+        codec_emit::emit_projection_codec_manifest(&candidates_json, &schema_manifest)
+            .context("generating projection codec manifest")?;
+    write_file(
+        &paths.projection_codec_manifest_out,
+        &projection_codec_manifest_json,
+    )?;
+    write_file(
+        &paths.projection_codec_manifest_api_out,
+        &projection_codec_manifest_json,
+    )?;
+    println!("Wrote {}", paths.projection_codec_manifest_out.display());
+    println!(
+        "Wrote {}",
+        paths.projection_codec_manifest_api_out.display()
+    );
 
     // ── 5. Hydration manifest: reducers that may target archived rows ──────
 

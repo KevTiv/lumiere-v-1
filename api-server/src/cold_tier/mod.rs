@@ -24,6 +24,7 @@
 
 pub mod audit_drainer;
 pub mod audit_read;
+pub mod commit_projection;
 pub mod conventions;
 pub mod cursor;
 pub mod ledger;
@@ -32,6 +33,7 @@ pub mod pg_codec;
 pub mod pg_pool;
 pub mod pos_order_drainer;
 pub mod pos_order_read;
+pub mod projection_worker;
 
 /// The canonical read contract for one API resource request.
 ///

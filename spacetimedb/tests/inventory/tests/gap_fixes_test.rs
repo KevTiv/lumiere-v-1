@@ -1069,10 +1069,13 @@ pub fn test_expired_lot_blocked_on_reserve(ctx: &ReducerContext) -> Result<(), S
         Some(lot_id),
     )?;
 
-    ctx.db.stock_production_lot().id().update(StockProductionLot {
-        expiration_date: Some(past_timestamp(ctx)),
-        ..lot
-    });
+    ctx.db
+        .stock_production_lot()
+        .id()
+        .update(StockProductionLot {
+            expiration_date: Some(past_timestamp(ctx)),
+            ..lot
+        });
 
     match reserve_stock_quant(
         ctx,

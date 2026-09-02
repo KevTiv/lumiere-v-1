@@ -185,7 +185,7 @@ pub enum PgValue {
 }
 
 impl PgValue {
-    fn needs_cast(&self) -> Option<&'static str> {
+    pub(crate) fn needs_cast(&self) -> Option<&'static str> {
         match self {
             PgValue::NumericText(_) => Some("NUMERIC"),
             PgValue::JsonbText(_) => Some("JSONB"),
@@ -193,7 +193,7 @@ impl PgValue {
         }
     }
 
-    fn as_sql(&self) -> &(dyn ToSql + Sync) {
+    pub(crate) fn as_sql(&self) -> &(dyn ToSql + Sync) {
         match self {
             PgValue::NumericText(v) | PgValue::JsonbText(v) | PgValue::Text(v) => v,
             PgValue::BigInt(v) => v,
@@ -316,6 +316,12 @@ fn decode_column(col: &ColumnCodec, raw: &Value) -> Result<PgValue> {
         }
         other => anyhow::bail!("unhandled pg_type '{other}'"),
     })
+}
+
+/// Decode one value using generated column metadata. Projection application
+/// uses this for a tombstone key, where a complete row is intentionally absent.
+pub(crate) fn decode_key_value(col: &ColumnCodec, raw: &Value) -> Result<PgValue> {
+    decode_column(col, raw)
 }
 
 fn null_value_for(pg_type: &str) -> Result<PgValue> {

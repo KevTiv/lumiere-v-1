@@ -160,6 +160,9 @@ fn persistence_contract(paths: &Paths) -> Result<Value> {
         .context("parse generated archive-manifest.json")?;
     let codec: Value = serde_json::from_str(&read_to_string(&paths.codec_manifest_out)?)
         .context("parse generated codec-manifest.json")?;
+    let projection: Value =
+        serde_json::from_str(&read_to_string(&paths.projection_codec_manifest_out)?)
+            .context("parse generated projection-codec-manifest.json")?;
     Ok(serde_json::json!({
         "schema_version": 1,
         "authority": {
@@ -169,10 +172,28 @@ fn persistence_contract(paths: &Paths) -> Result<Value> {
             "direct_postgresql_business_writes": "forbidden",
             "projection_finalization": "spacetimedb_reducer"
         },
+        "commit_stream": {
+            "envelope_table": "organization_commit",
+            "row_change_table": "organization_row_change",
+            "sequence_scope": "organization_id",
+            "sequence_order": "strictly_monotonic",
+            "transaction_boundary": "spacetimedb_reducer",
+            "contract_version": "ir-v2",
+            "row_order": "reducer_declared_dependency_safe",
+            "upsert_payload": "canonical_full_row_json",
+            "delete_payload": "durable_identity_tombstone",
+            "checksum": {
+                "algorithm": "sha256",
+                "row_preimage": "table_newline_identity_newline_kind_newline_row",
+                "commit_preimage": "length_prefixed_envelope_fields_then_row_checksums"
+            },
+            "audit_relation": "separate_schema_not_reconstruction_source"
+        },
         "storage": storage,
         "postgresql": {
             "archive": archive,
-            "codec": codec
+            "codec": codec,
+            "projection": projection
         }
     }))
 }

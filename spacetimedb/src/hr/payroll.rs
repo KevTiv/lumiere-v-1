@@ -14,6 +14,7 @@ use crate::accounting::journal_entries::{
 };
 use crate::core::country_pack::company_enabled_pack_keys;
 use crate::core::organization::{company, company_id_from_scope};
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::hr::contracts::hr_contract;
 use crate::types::{AccountMoveState, MoveType, PaymentState, PayslipState};
@@ -754,10 +755,30 @@ pub fn create_payroll_export_intent(
         .find(|i| i.organization_id == organization_id);
     if let Some(intent) = existing {
         if payslip.export_intent_id != Some(intent.id) {
-            ctx.db.hr_payslip().id().update(HrPayslip {
+            let repaired_payslip = ctx.db.hr_payslip().id().update(HrPayslip {
                 export_intent_id: Some(intent.id),
                 ..payslip
             });
+            record_organization_commit(
+                ctx,
+                OrganizationCommitInput {
+                    organization_id,
+                    operation_id: "erp.create_payroll_export_intent".to_string(),
+                    correlation_id: format!("payslip:{payslip_id}:export-intent:{}", intent.id),
+                    changes: vec![
+                        RowChange::upsert_stdb_row(
+                            "hr_payslip",
+                            serde_json::json!({"id": repaired_payslip.id}),
+                            &repaired_payslip,
+                        )?,
+                        RowChange::upsert_stdb_row(
+                            "hr_payroll_export_intent",
+                            serde_json::json!({"id": intent.id}),
+                            &intent,
+                        )?,
+                    ],
+                },
+            )?;
         }
         return Ok(());
     }
@@ -810,6 +831,38 @@ pub fn create_payroll_export_intent(
             metadata: None,
         },
     );
+    let payslip = ctx
+        .db
+        .hr_payslip()
+        .id()
+        .find(&payslip_id)
+        .ok_or("Payslip not found after export intent")?;
+    let intent = ctx
+        .db
+        .hr_payroll_export_intent()
+        .id()
+        .find(&row.id)
+        .ok_or("Payroll export intent not found after creation")?;
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.create_payroll_export_intent".to_string(),
+            correlation_id: format!("payslip:{payslip_id}:export-intent:{}", intent.id),
+            changes: vec![
+                RowChange::upsert_stdb_row(
+                    "hr_payslip",
+                    serde_json::json!({"id": payslip.id}),
+                    &payslip,
+                )?,
+                RowChange::upsert_stdb_row(
+                    "hr_payroll_export_intent",
+                    serde_json::json!({"id": intent.id}),
+                    &intent,
+                )?,
+            ],
+        },
+    )?;
     Ok(())
 }
 

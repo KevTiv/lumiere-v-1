@@ -7911,6 +7911,93 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "organization_commit",
+      "module": "core",
+      "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
+      "authoritative_resources": [],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "none",
+      "company_column_path": null,
+      "company_column_nullable": null,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "not eligible until a reviewed cooling policy is declared",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "append_only",
+      "postgres_access_path": "organization_partition"
+    },
+    {
+      "table": "organization_commit_cursor",
+      "module": "core",
+      "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "none",
+      "company_column_path": null,
+      "company_column_nullable": null,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "organization_id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "not eligible until a reviewed cooling policy is declared",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "organization_row_change",
+      "module": "core",
+      "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
+      "authoritative_resources": [],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "none",
+      "company_column_path": null,
+      "company_column_nullable": null,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "not eligible until a reviewed cooling policy is declared",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "append_only",
+      "postgres_access_path": "organization_partition"
+    },
+    {
       "table": "organization_settings",
       "module": "core",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",

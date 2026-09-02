@@ -3,6 +3,7 @@
 use spacetimedb::rand::Rng;
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, Table};
 
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::data_ops::helpdesk_imports::{
     import_helpdesk_sla_csv, import_helpdesk_stage_csv, import_helpdesk_ticket_csv,
@@ -365,6 +366,42 @@ pub fn test_sla_reached_is_system_only(ctx: &ReducerContext) -> Result<(), Strin
         .ok_or("sla_deadline was not derived from the SLA policy")?;
     if deadline <= ctx.timestamp {
         return Err("derived sla_deadline is not in the future".to_string());
+    }
+
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == fixture.organization_id
+                && commit.operation_id == "erp.create_ticket"
+                && commit.correlation_id == format!("helpdesk-ticket:{}", ticket.id)
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 2 {
+        return Err(format!(
+            "ticket with SLA should emit one two-row organization commit, got {} / {:?}",
+            commits.len(),
+            commits.first().map(|commit| commit.row_change_count)
+        ));
+    }
+    let commit = &commits[0];
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == fixture.organization_id
+                && change.commit_sequence == commit.sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables != ["helpdesk_ticket", "helpdesk_sla_check_job"] {
+        return Err(format!("ticket commit row order mismatch: {tables:?}"));
     }
 
     // The system job must be a no-op before the deadline...

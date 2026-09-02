@@ -1,6 +1,7 @@
 //! FLT-005/FLT-006: PosTerminal org isolation and WarehouseGeo FK validation.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::fleet::fleet::{create_pos_terminal, pos_terminal, upsert_warehouse_geo, warehouse_geo};
 use crate::test_harness::OrgFixture;
 
@@ -142,6 +143,44 @@ pub fn test_warehouse_geo_rejects_invalid_warehouse(ctx: &ReducerContext) -> Res
         .any(|g| g.organization_id == local.organization_id && g.warehouse_id == local.warehouse_id);
     if !persisted {
         return Err("valid warehouse_geo upsert was not persisted".to_string());
+    }
+
+    let correlation_id = format!("warehouse-geo:{}", local.warehouse_id);
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == local.organization_id
+                && commit.operation_id == "erp.upsert_warehouse_geo"
+                && commit.correlation_id == correlation_id
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 1 {
+        return Err(format!(
+            "warehouse geo should emit one one-row organization commit, got {} / {:?}",
+            commits.len(),
+            commits.first().map(|commit| commit.row_change_count)
+        ));
+    }
+    let commit = &commits[0];
+    let changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == local.organization_id
+                && change.commit_sequence == commit.sequence
+        })
+        .collect();
+    if changes.len() != 1 || changes[0].table_name != "warehouse_geo" {
+        return Err(format!(
+            "warehouse geo commit should contain one warehouse_geo row in local org, got {:?}",
+            changes
+                .iter()
+                .map(|change| (&change.organization_id, &change.table_name))
+                .collect::<Vec<_>>()
+        ));
     }
 
     Ok(())

@@ -455,7 +455,10 @@ fn seed_purchase_order_subject(
         .db
         .contact()
         .iter()
-        .find(|c| c.organization_id == fixture.organization_id && c.display_name == format!("Vendor {tag}"))
+        .find(|c| {
+            c.organization_id == fixture.organization_id
+                && c.display_name == format!("Vendor {tag}")
+        })
         .map(|c| c.id)
         .ok_or_else(|| format!("vendor contact {tag} missing"))?;
     create_purchase_order(

@@ -150,6 +150,9 @@ const EXPLICIT_MODULES = {
   message_batch: "core",
   message_template: "core",
   organization: "core",
+  organization_commit: "core",
+  organization_commit_cursor: "core",
+  organization_row_change: "core",
   organization_settings: "core",
   org_permission: "core",
   org_schema_migration: "core",
@@ -183,6 +186,8 @@ const APPEND_HISTORY_TABLES = new Set([
   "audit_log",
   "hr_pii_access_log",
   "iot_telemetry",
+  "organization_commit",
+  "organization_row_change",
   "subscription_usage_event",
   "workflow_decision_event",
   "workflow_human_task_event",
@@ -277,6 +282,8 @@ const SNAPSHOT_TABLES = new Set([
   "resource_utilisation_snapshot",
 ]);
 
+const OPERATIONAL_STATE_TABLES = new Set(["organization_commit_cursor"]);
+
 const ACTIVE_ARCHIVE_POLICIES = {
   audit_log: { cooling: "policy", hot: "time_window", hydration: "not_applicable" },
   pos_order: { cooling: "policy", hot: "terminal_window", hydration: "full_row" },
@@ -357,6 +364,7 @@ function versionStrategy(table) {
 function primaryKeyStrategy(table) {
   const { column_name: column, ty } = table.primary_key;
   if (ty === "Identity") return "identity";
+  if (table.sql_name === "organization_commit_cursor") return "natural";
   if (ty === "U64") return "auto_increment";
   if (column.endsWith("_key") || column === "code" || column === "token" || column === "scope_key") {
     return "natural";
@@ -396,6 +404,7 @@ function buildPolicy(table, allTables, resourcesByTable) {
   const platform = PLATFORM_GLOBAL_TABLES.has(table.sql_name);
   const appendHistory = APPEND_HISTORY_TABLES.has(table.sql_name);
   const snapshot = SNAPSHOT_TABLES.has(table.sql_name);
+  const operationalState = OPERATIONAL_STATE_TABLES.has(table.sql_name);
   const primaryKey = table.primary_key.column_name;
   const hasCompany = hasColumn(table, "company_id");
   const parentOverride = PARENT_OVERRIDES[table.sql_name];
@@ -421,6 +430,8 @@ function buildPolicy(table, allTables, resourcesByTable) {
       ? "durable_history"
       : snapshot
         ? "derived_rebuildable"
+        : operationalState
+          ? "durable_operational_state"
         : ["queue_", "job", "_job", "intent", "receipt", "token", "session", "presence", "run"].some((marker) => table.sql_name.includes(marker))
           ? "durable_operational_state"
           : "durable_business_record";
@@ -500,8 +511,8 @@ function validateParentOverrides(tables) {
 }
 
 function validate(schema, policyDocument, resourceRegistry) {
-  if (!Array.isArray(schema.tables) || schema.tables.length !== 458) {
-    throw new Error(`expected schema manifest with 458 tables, found ${schema.tables?.length ?? "none"}`);
+  if (!Array.isArray(schema.tables) || schema.tables.length !== 461) {
+    throw new Error(`expected schema manifest with 461 tables, found ${schema.tables?.length ?? "none"}`);
   }
   if (policyDocument.version !== 1 || !Array.isArray(policyDocument.policies)) {
     throw new Error("storage policy source must have version 1 and a policies array");
@@ -513,9 +524,9 @@ function validate(schema, policyDocument, resourceRegistry) {
   const schemaNames = new Set(schema.tables.map((table) => table.sql_name));
   if (schemaNames.size !== schema.tables.length) throw new Error("schema manifest contains duplicate table names");
   if (schema.ownership_summary?.verified !== true
-      || schema.ownership_summary.erp_owned_count !== 447
+      || schema.ownership_summary.erp_owned_count !== 450
       || schema.ownership_summary.platform_global_count !== 11) {
-    throw new Error("schema manifest must carry verified C0 ownership totals (447 organization + 11 platform)");
+    throw new Error("schema manifest must carry verified C0 ownership totals (450 organization + 11 platform)");
   }
   const policyNames = new Set();
   const resources = new Map(Object.entries(resourceRegistry));
@@ -624,8 +635,8 @@ function validate(schema, policyDocument, resourceRegistry) {
 
   const platform = policyDocument.policies.filter((entry) => entry.organization_ownership === "platform_global");
   const organization = policyDocument.policies.filter((entry) => entry.organization_ownership === "direct");
-  if (platform.length !== PLATFORM_GLOBAL_TABLES.size || organization.length !== 447) {
-    throw new Error(`C0 ownership split must be 447 organization + 11 platform, got ${organization.length} + ${platform.length}`);
+  if (platform.length !== PLATFORM_GLOBAL_TABLES.size || organization.length !== 450) {
+    throw new Error(`C0 ownership split must be 450 organization + 11 platform, got ${organization.length} + ${platform.length}`);
   }
   const wrongPlatform = platform.filter((entry) => !PLATFORM_GLOBAL_TABLES.has(entry.table));
   if (wrongPlatform.length) throw new Error(`unapproved platform-global policy: ${wrongPlatform.map((entry) => entry.table).join(", ")}`);
@@ -673,9 +684,9 @@ if (checkOnly) {
 validate(schema, policyDocument, resourceRegistry);
 
 if (checkOnly) {
-  console.log(`C1 storage policy check passed: ${policyDocument.policies.length}/458 tables`);
+  console.log(`C1 storage policy check passed: ${policyDocument.policies.length}/461 tables`);
 } else {
   fs.writeFileSync(policyPath, `${JSON.stringify(policyDocument, null, 2)}\n`);
   console.log(`Wrote ${policyPath}`);
-  console.log(`C1 storage policy bootstrap passed: ${policyDocument.policies.length}/458 tables`);
+  console.log(`C1 storage policy bootstrap passed: ${policyDocument.policies.length}/461 tables`);
 }

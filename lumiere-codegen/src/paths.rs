@@ -40,6 +40,8 @@ pub struct Paths {
     pub archive_manifest_out: PathBuf,
     pub cold_ddl_dir: PathBuf,
     pub codec_manifest_out: PathBuf,
+    pub projection_codec_manifest_out: PathBuf,
+    pub projection_codec_manifest_api_out: PathBuf,
     pub hydration_policies_json: PathBuf,
     pub hydration_manifest_out: PathBuf,
 
@@ -122,6 +124,9 @@ impl Paths {
             archive_manifest_out: staging_manifests.join("archive-manifest.json"),
             cold_ddl_dir: repo_root.join("api-server/src/generated/pg_ddl"),
             codec_manifest_out: staging_manifests.join("codec-manifest.json"),
+            projection_codec_manifest_out: staging_manifests.join("projection-codec-manifest.json"),
+            projection_codec_manifest_api_out: repo_root
+                .join("api-server/src/generated/projection-codec-manifest.json"),
             hydration_policies_json: manifest_dir.join("hydration-policies.json"),
             hydration_manifest_out: staging_manifests.join("hydration-manifest.json"),
 

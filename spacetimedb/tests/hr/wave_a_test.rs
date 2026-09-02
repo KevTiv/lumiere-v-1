@@ -1,9 +1,10 @@
 //! HR Wave A — isolation, leave balance, payslip artifact, offboarding gate.
 use std::time::Duration;
 
-use spacetimedb::ReducerContext;
+use spacetimedb::{ReducerContext, Table};
 
 use crate::core::organization::{company, create_company, CreateCompanyParams};
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::hr::contracts::{create_contract, hr_contract, CreateContractParams};
 use crate::hr::employees::{archive_employee, create_employee, hr_employee, CreateEmployeeParams};
 use crate::hr::leaves::{
@@ -18,7 +19,7 @@ use crate::hr::payroll::{
     confirm_payslip, create_payroll_export_intent, create_payroll_structure, create_payslip,
     hr_payroll_export_intent, hr_payroll_structure, hr_payslip, record_payroll_export_result,
     ConfirmPayslipParams, CreatePayrollExportIntentParams, CreatePayrollStructureParams,
-    CreatePayslipParams, RecordPayrollExportResultParams,
+    CreatePayslipParams, HrPayslip, RecordPayrollExportResultParams,
 };
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{EmploymentType, HrLeaveState, PayslipState};
@@ -336,6 +337,145 @@ pub fn test_payslip_done_requires_artifact(ctx: &ReducerContext) -> Result<(), S
         .map(|i| i.id)
         .max()
         .ok_or_else(|| "export intent missing".to_string())?;
+
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == fixture.organization_id
+                && commit.operation_id == "erp.create_payroll_export_intent"
+                && commit.correlation_id
+                    == format!("payslip:{payslip_id}:export-intent:{intent_id}")
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 2 {
+        return Err(format!("payroll intent commit mismatch: {}", commits.len()));
+    }
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == fixture.organization_id
+                && change.commit_sequence == commits[0].sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables != ["hr_payslip", "hr_payroll_export_intent"]
+        || changes
+            .iter()
+            .any(|change| change.organization_id != fixture.organization_id)
+        || changes[0].row_identity_json != format!(r#"{{"id":{payslip_id}}}"#)
+        || changes[1].row_identity_json != format!(r#"{{"id":{intent_id}}}"#)
+        || changes
+            .iter()
+            .enumerate()
+            .any(|(ordinal, change)| change.ordinal as usize != ordinal)
+    {
+        return Err(format!(
+            "payroll intent row order/scope mismatch: {tables:?}"
+        ));
+    }
+
+    // Exercise the repair path: an existing idempotency key must emit the
+    // repaired payslip plus intent in one complete commit, then become a no-op.
+    let repair_payslip = ctx
+        .db
+        .hr_payslip()
+        .id()
+        .find(&payslip_id)
+        .ok_or_else(|| "payslip missing before repair retry".to_string())?;
+    ctx.db.hr_payslip().id().update(HrPayslip {
+        export_intent_id: None,
+        ..repair_payslip
+    });
+    create_payroll_export_intent(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        payslip_id,
+        CreatePayrollExportIntentParams {
+            pack_key: Some("au".to_string()),
+            idempotency_key: format!("test-intent-{payslip_id}"),
+            payload: r#"{"employee":"test"}"#.to_string(),
+            metadata: None,
+        },
+    )?;
+    let repaired_commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == fixture.organization_id
+                && commit.operation_id == "erp.create_payroll_export_intent"
+                && commit.correlation_id
+                    == format!("payslip:{payslip_id}:export-intent:{intent_id}")
+        })
+        .collect();
+    if repaired_commits.len() != 2 {
+        return Err(format!(
+            "repair retry should emit exactly one additional commit, got {}",
+            repaired_commits.len()
+        ));
+    }
+    let repair_commit = repaired_commits
+        .iter()
+        .max_by_key(|commit| commit.sequence)
+        .ok_or_else(|| "repair commit missing".to_string())?;
+    let mut repair_changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == fixture.organization_id
+                && change.commit_sequence == repair_commit.sequence
+        })
+        .collect();
+    repair_changes.sort_by_key(|change| change.ordinal);
+    if repair_changes.len() != 2
+        || repair_changes[0].table_name != "hr_payslip"
+        || repair_changes[1].table_name != "hr_payroll_export_intent"
+        || repair_changes[0].row_identity_json != format!(r#"{{"id":{payslip_id}}}"#)
+        || repair_changes[1].row_identity_json != format!(r#"{{"id":{intent_id}}}"#)
+        || repair_changes.iter().enumerate().any(|(ordinal, change)| {
+            change.ordinal as usize != ordinal
+                || change.change_kind != "upsert"
+                || change.organization_id != fixture.organization_id
+        })
+    {
+        return Err("repair commit row order, identities, or scope mismatch".to_string());
+    }
+    create_payroll_export_intent(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        payslip_id,
+        CreatePayrollExportIntentParams {
+            pack_key: Some("au".to_string()),
+            idempotency_key: format!("test-intent-{payslip_id}"),
+            payload: r#"{"employee":"test"}"#.to_string(),
+            metadata: None,
+        },
+    )?;
+    let commits_after_noop: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == fixture.organization_id
+                && commit.operation_id == "erp.create_payroll_export_intent"
+                && commit.correlation_id
+                    == format!("payslip:{payslip_id}:export-intent:{intent_id}")
+        })
+        .collect();
+    if commits_after_noop.len() != 2 {
+        return Err("exact idempotent retry should not emit another commit".to_string());
+    }
 
     let bad_applied = record_payroll_export_result(
         ctx,

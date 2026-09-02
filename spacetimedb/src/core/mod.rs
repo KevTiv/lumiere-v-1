@@ -26,6 +26,7 @@ pub mod migrations;
 pub mod operational_messaging;
 pub mod organization;
 pub mod permissions;
+pub mod persistence;
 pub mod privacy;
 pub mod queue;
 pub mod reference;

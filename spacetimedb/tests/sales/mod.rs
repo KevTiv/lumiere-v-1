@@ -55,7 +55,9 @@ pub fn run_pos_order_finalize_test(ctx: &ReducerContext) -> Result<(), String> {
     pos_order_finalize_test::test_pos_order_finalize_is_idempotent_when_already_gone(ctx)
         .map_err(|e| format!("pos_order_finalize_idempotent: {e}"))?;
     pos_order_finalize_test::test_pos_order_finalize_rejects_unregistered_caller(ctx)
-        .map_err(|e| format!("pos_order_finalize_unregistered_caller: {e}"))
+        .map_err(|e| format!("pos_order_finalize_unregistered_caller: {e}"))?;
+    pos_order_finalize_test::test_create_pos_order_records_ordered_commit(ctx)
+        .map_err(|e| format!("create_pos_order_ordered_commit: {e}"))
 }
 
 #[spacetimedb::reducer]
