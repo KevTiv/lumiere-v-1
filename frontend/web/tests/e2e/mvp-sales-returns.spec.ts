@@ -1,3 +1,4 @@
+import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
@@ -57,7 +58,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await chooseSelectOptionByLabel(page, "state", "Qualified")
     await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_lead") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_lead") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-lead"),
@@ -72,7 +73,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await chooseFirstEnabledOption(page, "opportunityStageId")
     await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/convert_lead_to_customer") && res.ok(),
+        (res) => matchesOperationResponse(res, "convert_lead_to_customer") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "convert-lead"),
@@ -92,7 +93,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await fillField(page, "priceUnit", "1200")
     await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_opportunity_line") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_opportunity_line") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "add-opportunity-line"),
@@ -109,7 +110,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await Promise.all([
       page.waitForResponse(
         (res) =>
-          res.url().includes("/api/call/convert_opportunity_to_sale_order") && res.ok(),
+          matchesOperationResponse(res, "convert_opportunity_to_sale_order") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "convert-opportunity-order"),
@@ -124,7 +125,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
     await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/confirm_sales_order") && res.ok(),
+        (res) => matchesOperationResponse(res, "confirm_sales_order") && res.ok(),
         { timeout: 30_000 },
       ),
       page.getByTestId("entity-action-confirm-orders").click(),
@@ -139,7 +140,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await waitForEntityActionEnabled(page, "entity-action-confirm-picking")
     await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/confirm_stock_picking") && res.ok(),
+        (res) => matchesOperationResponse(res, "confirm_stock_picking") && res.ok(),
         { timeout: 45_000 },
       ),
       page.getByTestId("entity-action-confirm-picking").click(),
@@ -148,7 +149,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await waitForEntityActionEnabled(page, "entity-action-assign-picking")
     await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/assign_stock_picking") && res.ok(),
+        (res) => matchesOperationResponse(res, "assign_stock_picking") && res.ok(),
         { timeout: 30_000 },
       ),
       page.getByTestId("entity-action-assign-picking").click(),
@@ -157,7 +158,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await waitForEntityActionEnabled(page, "entity-action-validate-picking")
     await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/validate_stock_picking") && res.ok(),
+        (res) => matchesOperationResponse(res, "validate_stock_picking") && res.ok(),
         { timeout: 30_000 },
       ),
       page.getByTestId("entity-action-validate-picking").click(),
@@ -178,7 +179,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await Promise.all([
       page.waitForResponse(
         (res) =>
-          res.url().includes("/api/call/create_invoice_from_sale_order") && res.ok(),
+          matchesOperationResponse(res, "create_invoice_from_sale_order") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "create-invoice-from-sale-order"),
@@ -202,7 +203,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await fillField(page, "priceUnit", "1200")
     await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_return_order") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_return_order") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-return-order"),
@@ -213,7 +214,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await waitForEntityActionEnabled(page, "entity-action-confirm-return")
     await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/confirm_return_order") && res.ok(),
+        (res) => matchesOperationResponse(res, "confirm_return_order") && res.ok(),
         { timeout: 30_000 },
       ),
       page.getByTestId("entity-action-confirm-return").click(),
@@ -224,7 +225,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await waitForEntityActionEnabled(page, "entity-action-receive-return")
     await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/validate_stock_picking") && res.ok(),
+        (res) => matchesOperationResponse(res, "validate_stock_picking") && res.ok(),
         { timeout: 60_000 },
       ),
       page.getByTestId("entity-action-receive-return").click(),
@@ -243,7 +244,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await Promise.all([
       page.waitForResponse(
         (res) =>
-          res.url().includes("/api/call/create_credit_note_from_return_order") && res.ok(),
+          matchesOperationResponse(res, "create_credit_note_from_return_order") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "create-invoice-from-sale-order"),

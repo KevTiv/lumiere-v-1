@@ -1,5 +1,6 @@
 export { SubscriptionCacheProvider, useSubscriptionCache } from "./context"
 export { StdbSubscriptionProvider, type SubscriptionQueryKeyFactory } from "./StdbSubscriptionProvider"
+export { type DirectSubscriptionMode } from "./direct-subscription-mode"
 export { isSubscriptionReady, setSubscriptionReady } from "./state"
 export { BOOT_SUBSCRIPTION_RESOURCES } from "./boot-resources"
 export { useModuleSubscription } from "./use-module-subscription"

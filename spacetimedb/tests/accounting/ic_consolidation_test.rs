@@ -4,22 +4,19 @@ use std::time::Duration;
 use spacetimedb::{ReducerContext, Table};
 
 use crate::accounting::consolidation::{
-    backfill_consolidation_organization_ownership, consolidation_account,
-    consolidation_company_rate, consolidation_elimination_entry, consolidation_journal,
-    create_consolidation_account, create_consolidation_journal, create_elimination_entry,
-    process_consolidation, set_consolidation_company_rate, update_consolidation_account,
-    ConsolidationAccount, ConsolidationCompanyRate, ConsolidationEliminationEntry,
-    ConsolidationJournal, CreateConsolidationAccountParams, CreateConsolidationJournalParams,
-    CreateEliminationEntryParams, SetConsolidationCompanyRateParams,
-    UpdateConsolidationAccountParams,
+    consolidation_account, consolidation_company_rate, consolidation_elimination_entry,
+    consolidation_journal, create_consolidation_account, create_consolidation_journal,
+    create_elimination_entry, process_consolidation, set_consolidation_company_rate,
+    update_consolidation_account, CreateConsolidationAccountParams,
+    CreateConsolidationJournalParams, CreateEliminationEntryParams,
+    SetConsolidationCompanyRateParams, UpdateConsolidationAccountParams,
 };
-use crate::accounting::fiscal_periods::accounting_ownership_backfill_issue;
 use crate::accounting::idempotency::accounting_operation_receipt;
 use crate::accounting::intercompany::{
     backfill_intercompany_organization_ownership, create_intercompany_rule,
     create_intercompany_transaction, intercompany_rule, intercompany_transaction,
     set_intercompany_rule_active, CreateIntercompanyRuleParams,
-    CreateIntercompanyTransactionParams, IntercompanyRule, IntercompanyTransaction,
+    CreateIntercompanyTransactionParams, IntercompanyRule,
 };
 use crate::core::audit::audit_log;
 use crate::core::organization::{company, create_company, CreateCompanyParams};
@@ -430,14 +427,14 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
         return Err("Consolidation journal totals not balanced".to_string());
     }
 
-    if rule.organization_id != Some(fixture.organization_id)
-        || transaction.organization_id != Some(fixture.organization_id)
-        || consolidation_account.organization_id != Some(fixture.organization_id)
-        || updated.organization_id != Some(fixture.organization_id)
-        || company_rate.organization_id != Some(fixture.organization_id)
+    if rule.organization_id != fixture.organization_id
+        || transaction.organization_id != fixture.organization_id
+        || consolidation_account.organization_id != fixture.organization_id
+        || updated.organization_id != fixture.organization_id
+        || company_rate.organization_id != fixture.organization_id
         || entries
             .iter()
-            .any(|entry| entry.organization_id != Some(fixture.organization_id))
+            .any(|entry| entry.organization_id != fixture.organization_id)
     {
         return Err("new accounting ownership was not persisted".to_string());
     }
@@ -525,120 +522,14 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
     }
 
     let rule_id = rule.id;
-    let transaction_id = transaction.id;
     let consolidation_account_id = consolidation_account.id;
-    let journal_id = updated.id;
-    let entry_id = entries[0].id;
-    let company_rate_id = company_rate.id;
     ctx.db.intercompany_rule().id().update(IntercompanyRule {
-        organization_id: Some(foreign_fixture.organization_id),
+        organization_id: foreign_fixture.organization_id,
         ..rule
     });
-    ctx.db
-        .intercompany_transaction()
-        .id()
-        .update(IntercompanyTransaction {
-            organization_id: None,
-            ..transaction
-        });
-    ctx.db
-        .consolidation_account()
-        .id()
-        .update(ConsolidationAccount {
-            organization_id: Some(foreign_fixture.organization_id),
-            ..consolidation_account
-        });
-    ctx.db
-        .consolidation_journal()
-        .id()
-        .update(ConsolidationJournal {
-            organization_id: None,
-            ..processed_twice
-        });
-    ctx.db
-        .consolidation_elimination_entry()
-        .id()
-        .update(ConsolidationEliminationEntry {
-            organization_id: None,
-            ..entries[0].clone()
-        });
-    ctx.db
-        .consolidation_company_rate()
-        .id()
-        .update(ConsolidationCompanyRate {
-            organization_id: None,
-            ..company_rate
-        });
-
-    backfill_intercompany_organization_ownership(ctx)?;
-    backfill_consolidation_organization_ownership(ctx)?;
-
-    let quarantined_rule = ctx
-        .db
-        .intercompany_rule()
-        .id()
-        .find(&rule_id)
-        .ok_or("Quarantined intercompany rule missing")?;
-    let backfilled_transaction = ctx
-        .db
-        .intercompany_transaction()
-        .id()
-        .find(&transaction_id)
-        .ok_or("Backfilled intercompany transaction missing")?;
-    let quarantined_account = ctx
-        .db
-        .consolidation_account()
-        .id()
-        .find(&consolidation_account_id)
-        .ok_or("Quarantined consolidation account missing")?;
-    let backfilled_journal = ctx
-        .db
-        .consolidation_journal()
-        .id()
-        .find(&journal_id)
-        .ok_or("Backfilled consolidation journal missing")?;
-    let backfilled_entry = ctx
-        .db
-        .consolidation_elimination_entry()
-        .id()
-        .find(&entry_id)
-        .ok_or("Backfilled elimination entry missing")?;
-    let backfilled_rate = ctx
-        .db
-        .consolidation_company_rate()
-        .id()
-        .find(&company_rate_id)
-        .ok_or("Backfilled consolidation company rate missing")?;
-
-    if quarantined_rule.organization_id.is_some() || quarantined_account.organization_id.is_some() {
-        return Err("conflicting accounting ownership was not quarantined".to_string());
+    if backfill_intercompany_organization_ownership(ctx).is_ok() {
+        return Err("conflicting intercompany ownership was accepted".to_string());
     }
-    if backfilled_transaction.organization_id != Some(fixture.organization_id)
-        || backfilled_journal.organization_id != Some(fixture.organization_id)
-        || backfilled_entry.organization_id != Some(fixture.organization_id)
-        || backfilled_rate.organization_id != Some(fixture.organization_id)
-    {
-        return Err(
-            "missing accounting ownership was not deterministically backfilled".to_string(),
-        );
-    }
-    if !ctx
-        .db
-        .accounting_ownership_backfill_issue()
-        .iter()
-        .any(|issue| issue.table_name == "intercompany_rule" && issue.record_id == rule_id)
-        || !ctx
-            .db
-            .accounting_ownership_backfill_issue()
-            .iter()
-            .any(|issue| {
-                issue.table_name == "consolidation_account"
-                    && issue.record_id == consolidation_account_id
-            })
-    {
-        return Err("conflicting accounting ownership was not reported".to_string());
-    }
-
     if set_intercompany_rule_active(
         ctx,
         fixture.organization_id,
@@ -650,12 +541,12 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
     {
         return Err("quarantined intercompany rule remained mutable".to_string());
     }
-    if update_consolidation_account(
+    update_consolidation_account(
         ctx,
         fixture.organization_id,
         consolidation_account_id,
         UpdateConsolidationAccountParams {
-            name: Some("must remain quarantined".to_string()),
+            name: Some("valid owned consolidation account".to_string()),
             code: None,
             account_type: None,
             company_ids: None,
@@ -667,10 +558,17 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
             notes: None,
             metadata: None,
         },
-    )
-    .is_ok()
+    )?;
+    let updated_consolidation_account = ctx
+        .db
+        .consolidation_account()
+        .id()
+        .find(&consolidation_account_id)
+        .ok_or("updated consolidation account not found")?;
+    if updated_consolidation_account.organization_id != fixture.organization_id
+        || updated_consolidation_account.name != "valid owned consolidation account"
     {
-        return Err("quarantined consolidation account remained mutable".to_string());
+        return Err("valid consolidation account ownership was not preserved".to_string());
     }
 
     Ok(())
@@ -801,8 +699,7 @@ pub fn test_process_intercompany_transaction_rejects_cross_tenant_destination(
         .intercompany_transaction()
         .iter()
         .find(|t| {
-            t.organization_id == Some(fixture_a.organization_id)
-                && t.origin_document_id == origin_move
+            t.organization_id == fixture_a.organization_id && t.origin_document_id == origin_move
         })
         .ok_or("intercompany transaction not found after create")?;
 

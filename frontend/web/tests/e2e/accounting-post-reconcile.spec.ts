@@ -1,3 +1,4 @@
+import { matchesOperationResponse } from "./operation-response"
 import { expect, test, type Page } from "@playwright/test"
 
 import {
@@ -412,7 +413,7 @@ test.describe("Accounting journal entry post + reconcile", { tag: "@p0" }, () =>
     await expect(postButton).toBeVisible({ timeout: 15_000 })
     const [postRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/post_account_move") && res.ok(),
+        (res) => matchesOperationResponse(res, "post_account_move") && res.ok(),
         { timeout: 30_000 },
       ),
       postButton.click(),
@@ -450,7 +451,7 @@ test.describe("Accounting journal entry post + reconcile", { tag: "@p0" }, () =>
 
     const [reconcileRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/reconcile_payment_with_invoice") && res.ok(),
+        (res) => matchesOperationResponse(res, "reconcile_payment_with_invoice") && res.ok(),
         { timeout: 30_000 },
       ),
       page.getByTestId("form-submit-reconcile-payment-invoice").click(),

@@ -10,6 +10,22 @@ import "server-only"
 import { parseQueryListResponse } from "@lumiere/api-client"
 import type { QueryResourceKey } from "@lumiere/stdb/generated/query-registry"
 import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
+import {
+  decodeAccountAccountTypesQueryResponse,
+  decodeAccountAccountsQueryResponse,
+  decodeAccountJournalsQueryResponse,
+  decodeAccountMoveLinesQueryResponse,
+  decodeAccountMovesQueryResponse,
+  decodeAccountTaxesQueryResponse,
+  decodeCompaniesQueryResponse,
+  type AccountAccountTypeQueryRow,
+  type AccountAccountQueryRow,
+  type AccountJournalQueryRow,
+  type AccountMoveLineQueryRow,
+  type AccountMoveQueryRow,
+  type AccountTaxQueryRow,
+  type CompanyQueryRow,
+} from "@lumiere/stdb/resource-reads"
 
 import type { ApiSession } from "@/lib/api-session"
 import { resolveApiServerBaseUrl } from "@/lib/api-server-forward"
@@ -19,6 +35,16 @@ export type ServerQueryCredentials = {
   stdbToken: string
   identityHex?: string
 }
+
+export type ServerQueryRowFor<K extends QueryResourceKey> =
+  K extends "companies" ? CompanyQueryRow
+    : K extends "account-account-types" ? AccountAccountTypeQueryRow
+    : K extends "account-accounts" ? AccountAccountQueryRow
+      : K extends "account-journals" ? AccountJournalQueryRow
+        : K extends "account-move-lines" ? AccountMoveLineQueryRow
+          : K extends "account-moves" ? AccountMoveQueryRow
+            : K extends "account-taxes" ? AccountTaxQueryRow
+              : QueryRowFor<K>
 
 function requireApiServerBase(): string {
   const base = resolveApiServerBaseUrl()
@@ -33,7 +59,7 @@ function requireApiServerBase(): string {
 async function fetchFromApiServer<K extends QueryResourceKey>(
   creds: ServerQueryCredentials,
   resource: K,
-): Promise<QueryRowFor<K>[]> {
+): Promise<ServerQueryRowFor<K>[]> {
   const base = requireApiServerBase()
   const headers = new Headers()
   headers.set("Authorization", `Bearer ${creds.stdbToken}`)
@@ -51,9 +77,30 @@ async function fetchFromApiServer<K extends QueryResourceKey>(
     const detail = typeof json.error === "string" ? json.error : res.statusText
     throw new Error(detail || `Query ${resource} failed`)
   }
-  // Boundary cast: `parseQueryListResponse` only validates that rows are plain
-  // objects. `resource` pins the specific generated row shape from here on.
-  return parseQueryListResponse(await res.json()) as QueryRowFor<K>[]
+  const payload: unknown = await res.json()
+  if (resource === "companies") {
+    return decodeCompaniesQueryResponse(payload) as ServerQueryRowFor<K>[]
+  }
+  if (resource === "account-account-types") {
+    return decodeAccountAccountTypesQueryResponse(payload) as ServerQueryRowFor<K>[]
+  }
+  if (resource === "account-accounts") {
+    return decodeAccountAccountsQueryResponse(payload) as ServerQueryRowFor<K>[]
+  }
+  if (resource === "account-journals") {
+    return decodeAccountJournalsQueryResponse(payload) as ServerQueryRowFor<K>[]
+  }
+  if (resource === "account-move-lines") {
+    return decodeAccountMoveLinesQueryResponse(payload) as ServerQueryRowFor<K>[]
+  }
+  if (resource === "account-moves") {
+    return decodeAccountMovesQueryResponse(payload) as ServerQueryRowFor<K>[]
+  }
+  if (resource === "account-taxes") {
+    return decodeAccountTaxesQueryResponse(payload) as ServerQueryRowFor<K>[]
+  }
+  // Unmigrated Phase 6 resources retain their existing structural boundary.
+  return parseQueryListResponse(payload) as ServerQueryRowFor<K>[]
 }
 
 function sessionCredentials(session: ApiSession): ServerQueryCredentials {
@@ -70,7 +117,7 @@ export async function serverFetchQueryList<K extends QueryResourceKey>(
   session: ApiSession,
   resource: K,
   errorMessage: string,
-): Promise<QueryRowFor<K>[]> {
+): Promise<ServerQueryRowFor<K>[]> {
   try {
     return await fetchFromApiServer(sessionCredentials(session), resource)
   } catch (e) {
@@ -83,7 +130,7 @@ export async function serverFetchQueryList<K extends QueryResourceKey>(
 export async function serverFetchQueryListAllowEmpty<K extends QueryResourceKey>(
   session: ApiSession,
   resource: K,
-): Promise<QueryRowFor<K>[]> {
+): Promise<ServerQueryRowFor<K>[]> {
   try {
     return await fetchFromApiServer(sessionCredentials(session), resource)
   } catch {
@@ -95,18 +142,22 @@ export async function serverFetchQueryListAllowEmpty<K extends QueryResourceKey>
 export async function serverFetchQueryListsAllowEmpty<const T extends readonly QueryResourceKey[]>(
   session: ApiSession,
   resources: T,
-): Promise<{ [K in keyof T]: K extends QueryResourceKey ? QueryRowFor<K>[] : never }> {
+): Promise<{
+  [K in keyof T]: T[K] extends QueryResourceKey ? ServerQueryRowFor<T[K]>[] : never
+}> {
   const rows = await Promise.all(
     resources.map((resource) => serverFetchQueryListAllowEmpty(session, resource)),
   )
-  return rows as { [K in keyof T]: K extends QueryResourceKey ? QueryRowFor<K>[] : never }
+  return rows as {
+    [K in keyof T]: T[K] extends QueryResourceKey ? ServerQueryRowFor<T[K]>[] : never
+  }
 }
 
 /** Token-based fetch for session bootstrap (e.g. `user-organization` before org id is known). */
 export async function serverFetchQueryListWithCredentialsAllowEmpty<K extends QueryResourceKey>(
   creds: ServerQueryCredentials,
   resource: K,
-): Promise<QueryRowFor<K>[]> {
+): Promise<ServerQueryRowFor<K>[]> {
   try {
     return await fetchFromApiServer(creds, resource)
   } catch {

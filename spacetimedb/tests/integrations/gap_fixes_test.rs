@@ -7,8 +7,8 @@ use crate::integrations::google_drive::{
     create_google_drive_connection, google_drive_connection, DriveConflictPolicy, SyncDirection,
 };
 use crate::integrations::whatsapp_business::{
-    create_whatsapp_business_account, whatsapp_business_account,
-    CreateWhatsAppBusinessAccountParams,
+    create_whatsapp_business_account, delete_whatsapp_business_account,
+    set_whatsapp_primary_account, whatsapp_business_account, CreateWhatsAppBusinessAccountParams,
 };
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 
@@ -111,6 +111,60 @@ pub fn test_whatsapp_company_id_populated_and_validated(
         .count();
     if before_count != after_count {
         return Err("rejected cross-org create should not have persisted a row".to_string());
+    }
+
+    Ok(())
+}
+
+/// Creating or selecting a primary account preserves the one-primary invariant,
+/// and deleted accounts cannot be promoted back into active configuration.
+pub fn test_whatsapp_primary_account_integrity(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+
+    let mut first = whatsapp_params(Some(fixture.company_id), "Primary One");
+    first.is_primary = true;
+    create_whatsapp_business_account(ctx, fixture.organization_id, first)?;
+
+    let mut second = whatsapp_params(Some(fixture.company_id), "Primary Two");
+    second.is_primary = true;
+    create_whatsapp_business_account(ctx, fixture.organization_id, second)?;
+
+    let accounts: Vec<_> = ctx
+        .db
+        .whatsapp_business_account()
+        .iter()
+        .filter(|account| account.organization_id == fixture.organization_id)
+        .collect();
+    let first = accounts
+        .iter()
+        .find(|account| account.name == "Primary One")
+        .ok_or("first WhatsApp account missing")?;
+    let second = accounts
+        .iter()
+        .find(|account| account.name == "Primary Two")
+        .ok_or("second WhatsApp account missing")?;
+    if first.is_primary || !second.is_primary {
+        return Err("creating a new primary must unset the previous primary".to_string());
+    }
+
+    let second_id = second.id;
+    delete_whatsapp_business_account(ctx, fixture.organization_id, second_id)?;
+    let result = set_whatsapp_primary_account(ctx, fixture.organization_id, second_id);
+    match result {
+        Err(ref error) if error.contains("deleted or inactive") => {}
+        other => return Err(format!("expected deleted-primary rejection, got {other:?}")),
+    }
+
+    set_whatsapp_primary_account(ctx, fixture.organization_id, first.id)?;
+    let restored = ctx
+        .db
+        .whatsapp_business_account()
+        .id()
+        .find(&first.id)
+        .ok_or("restored primary WhatsApp account missing")?;
+    if !restored.is_primary {
+        return Err("active WhatsApp account was not promoted to primary".to_string());
     }
 
     Ok(())

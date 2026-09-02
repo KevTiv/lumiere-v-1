@@ -1,5 +1,5 @@
 /**
- * Map modular form values → SpacetimeDB reducer bodies for purchasing `/api/call/*`.
+ * Map modular form values to named purchasing operation inputs.
  */
 
 import type {

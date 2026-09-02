@@ -2,7 +2,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Manufacturing mutations via Next.js BFF `POST /api/call/:reducer`.
+ * Manufacturing mutations via Next.js BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` manufacturing hooks.
  */
 export const MANUFACTURING_BFF_REDUCERS = [
@@ -38,16 +38,6 @@ export const MANUFACTURING_BFF_REDUCERS = [
 
 export type ManufacturingBffReducerKey =
   (typeof MANUFACTURING_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<ManufacturingBffReducerKey>();
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function manufacturingBffCallUrl(
-  reducer: ManufacturingBffReducerKey,
-): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 /** Mirrors hook invalidation targets where explicit (TanStack uses query keys separately). */
 const MANUFACTURING_HINT_OVERRIDES: Partial<

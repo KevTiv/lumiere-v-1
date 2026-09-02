@@ -16,11 +16,16 @@ import { responseErrorMessage as parseAiError } from "@lumiere/api-client/respon
 
 export type AiMemoryContextHit = {
   score: number
-  entity_type: string
-  entity_id: string
-  text: string
-  timestamp: number
-  source: string
+  organization_id: number
+  company_id: number
+  resource_kind: string
+  resource_id: string
+  resource_version: string
+  source_fingerprint: string
+  embedding_model: string
+  indexed_at: string
+  tags: string[]
+  activity_timestamp: number
 }
 
 export type AiRagSource = {
@@ -93,12 +98,13 @@ export function aiChatMessagesQueryKey(organizationId: number, sessionKey?: stri
 
 export function useAiMemorySearch() {
   return useMutation({
-    mutationFn: async (args: { query: string; top_k?: number }) => {
+    mutationFn: async (args: { query: string; companyId: number; top_k?: number }) => {
       const r = await apiFetch("/api/ai/context/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: args.query,
+          companyId: args.companyId,
           top_k: args.top_k,
         }),
       })

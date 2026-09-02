@@ -185,7 +185,11 @@ pub struct HelpdeskTeamMember {
 
 /// HLP-007: scheduled, system-only check that flips `sla_reached` once a ticket's
 /// deadline passes. `sla_reached` must never be set directly by user input.
-#[spacetimedb::table(accessor = helpdesk_sla_check_job, scheduled(run_helpdesk_sla_check))]
+#[spacetimedb::table(
+    accessor = helpdesk_sla_check_job,
+    index(accessor = helpdesk_sla_check_job_by_organization, btree(columns = [organization_id])),
+    scheduled(run_helpdesk_sla_check)
+)]
 pub struct HelpdeskSlaCheckJob {
     #[primary_key]
     #[auto_inc]
@@ -585,7 +589,10 @@ pub fn create_ticket(
 /// direct user input (see `create_ticket`, `update_ticket`, and CSV import) —
 /// this scheduled reducer is the sole place that flips it to true.
 #[reducer]
-pub fn run_helpdesk_sla_check(ctx: &ReducerContext, job: HelpdeskSlaCheckJob) -> Result<(), String> {
+pub fn run_helpdesk_sla_check(
+    ctx: &ReducerContext,
+    job: HelpdeskSlaCheckJob,
+) -> Result<(), String> {
     let Some(ticket) = ctx.db.helpdesk_ticket().id().find(&job.ticket_id) else {
         return Ok(());
     };

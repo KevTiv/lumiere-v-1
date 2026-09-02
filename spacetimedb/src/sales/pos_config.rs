@@ -107,12 +107,14 @@ pub struct CreateLoyaltyProgramParams {
 #[spacetimedb::table(
     accessor = pos_config,
     public,
+    index(accessor = pos_config_by_organization, btree(columns = [organization_id])),
     index(accessor = pos_config_by_company, btree(columns = [company_id]))
 )]
 pub struct PosConfig {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub name: String,
     pub is_active: bool,
     pub company_id: u64,
@@ -189,12 +191,14 @@ pub struct PosConfig {
 #[spacetimedb::table(
     accessor = pos_payment_method,
     public,
+    index(accessor = payment_method_by_organization, btree(columns = [organization_id])),
     index(accessor = payment_method_by_company, btree(columns = [company_id]))
 )]
 pub struct PosPaymentMethod {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub name: String,
     pub outstanding_account_id: Option<u64>,
     pub receivable_account_id: Option<u64>,
@@ -265,6 +269,8 @@ pub fn create_pos_config(
     params: CreatePosConfigParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "pos_config", "create")?;
+    let company_id =
+        crate::core::organization::company_id_from_scope(ctx, organization_id, Some(company_id))?;
 
     for method_id in &params.payment_method_ids {
         let method = ctx
@@ -273,7 +279,7 @@ pub fn create_pos_config(
             .id()
             .find(method_id)
             .ok_or_else(|| format!("Payment method {} not found", method_id))?;
-        if method.company_id != company_id {
+        if method.organization_id != organization_id || method.company_id != company_id {
             return Err(format!(
                 "Payment method {} does not belong to this company",
                 method_id
@@ -283,6 +289,7 @@ pub fn create_pos_config(
 
     let config = ctx.db.pos_config().insert(PosConfig {
         id: 0,
+        organization_id,
         name: params.name,
         is_active: true,
         company_id,
@@ -386,12 +393,15 @@ pub fn create_payment_method(
     params: CreatePaymentMethodParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "pos_payment_method", "create")?;
+    let company_id =
+        crate::core::organization::company_id_from_scope(ctx, organization_id, Some(company_id))?;
 
     let use_payment_terminal = params.use_payment_terminal.clone();
     let hide_use_payment_terminal = use_payment_terminal.is_none();
 
     let method = ctx.db.pos_payment_method().insert(PosPaymentMethod {
         id: 0,
+        organization_id,
         name: params.name,
         outstanding_account_id: params.outstanding_account_id,
         receivable_account_id: params.receivable_account_id,
@@ -518,6 +528,9 @@ pub fn activate_pos_config(
         .id()
         .find(&config_id)
         .ok_or("POS config not found")?;
+    if config.organization_id != organization_id {
+        return Err("POS config does not belong to this organization".to_string());
+    }
 
     check_permission(ctx, organization_id, "pos_config", "write")?;
 
@@ -559,6 +572,9 @@ pub fn deactivate_pos_config(
         .id()
         .find(&config_id)
         .ok_or("POS config not found")?;
+    if config.organization_id != organization_id {
+        return Err("POS config does not belong to this organization".to_string());
+    }
 
     check_permission(ctx, organization_id, "pos_config", "write")?;
 

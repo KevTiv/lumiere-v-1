@@ -864,7 +864,7 @@ pub fn create_expense_project_rebill(
     let amount_total = rebill_total + amount_tax;
 
     let origin = format!("EXP{sheet_id}-REBILL");
-    let name = next_doc_number(ctx, "INV");
+    let name = next_doc_number(ctx, organization_id, "INV");
     let company_currency_id = if sheet.company_currency_id > 0 {
         sheet.company_currency_id
     } else {

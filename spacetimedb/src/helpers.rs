@@ -270,20 +270,28 @@ pub fn write_audit_log(
 
 /// Generate the next human-readable document number for a given document type.
 ///
-/// Atomically reads and bumps the counter in the `DocumentSequence` table.
+/// Atomically reads and bumps the organization-owned counter in the
+/// `DocumentSequence` table.
 /// Creates a new sequence starting at 1 if none exists yet.
 ///
 /// # Examples
 /// ```
-/// let so_ref = next_doc_number(ctx, "SO");  // "SO-0001"
-/// let po_ref = next_doc_number(ctx, "PO");  // "PO-0001"
+/// let so_ref = next_doc_number(ctx, organization_id, "SO");  // "SO-0001"
+/// let po_ref = next_doc_number(ctx, organization_id, "PO");  // "PO-0001"
 /// ```
-pub fn next_doc_number(ctx: &ReducerContext, doc_type: &str) -> String {
+pub fn next_doc_number(ctx: &ReducerContext, organization_id: u64, doc_type: &str) -> String {
     let doc_type_key = doc_type.to_string();
-    let number = if let Some(seq) = ctx.db.document_sequence().doc_type().find(&doc_type_key) {
+    let sequence_key = format!("{organization_id}:{doc_type}");
+    let number = if let Some(seq) = ctx
+        .db
+        .document_sequence()
+        .document_sequence_by_organization_and_type()
+        .filter((&organization_id, &doc_type_key))
+        .next()
+    {
         ctx.db
             .document_sequence()
-            .doc_type()
+            .sequence_key()
             .update(DocumentSequence {
                 next_number: seq.next_number + 1,
                 ..seq
@@ -291,7 +299,9 @@ pub fn next_doc_number(ctx: &ReducerContext, doc_type: &str) -> String {
         seq.next_number
     } else {
         ctx.db.document_sequence().insert(DocumentSequence {
-            doc_type: doc_type_key,
+            sequence_key,
+            organization_id,
+            doc_type: doc_type_key.clone(),
             next_number: 2,
         });
         1

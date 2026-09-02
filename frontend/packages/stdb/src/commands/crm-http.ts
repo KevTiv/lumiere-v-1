@@ -2,7 +2,7 @@ import type { ReducerCommandContractMeta } from "./types";
 
 /**
  * CRM reducer metadata for the named api-server command transport.
- * The frontend sends `POST /api/call/:reducer` with a named object; api-server
+ * The frontend sends `POST /api/operations/:operation` with a named object; api-server
  * injects organization scope and validates any selected company context.
  * Keys match SpacetimeDB reducer snake_case names.
  */

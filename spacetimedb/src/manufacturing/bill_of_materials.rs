@@ -153,6 +153,7 @@ pub struct BomExplosionRow {
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = bom_explosion_result,
+    index(accessor = bom_explosion_by_organization, btree(columns = [organization_id])),
     public,
     index(name = "by_root_bom", accessor = bom_explosion_by_root_bom, btree(columns = [root_bom_id])),
     index(accessor = bom_explosion_by_bom, btree(columns = [bom_id]))

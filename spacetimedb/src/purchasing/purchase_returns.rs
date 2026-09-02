@@ -28,6 +28,7 @@ use crate::types::{
 #[spacetimedb::table(
     accessor = purchase_return,
     public,
+    index(accessor = purchase_return_by_organization, btree(columns = [organization_id])),
     index(accessor = purchase_return_by_company, btree(columns = [company_id]))
 )]
 pub struct PurchaseReturn {
@@ -53,6 +54,7 @@ pub struct PurchaseReturn {
 #[spacetimedb::table(
     accessor = purchase_return_line,
     public,
+    index(accessor = purchase_return_line_by_organization, btree(columns = [organization_id])),
     index(accessor = purchase_return_line_by_return, btree(columns = [purchase_return_id]))
 )]
 pub struct PurchaseReturnLine {
@@ -536,7 +538,7 @@ pub fn create_purchase_return(
         validated_lines.push(validated);
     }
 
-    let name = next_doc_number(ctx, "VRMA");
+    let name = next_doc_number(ctx, organization_id, "VRMA");
     let purchase_return = ctx.db.purchase_return().insert(PurchaseReturn {
         id: 0,
         organization_id,

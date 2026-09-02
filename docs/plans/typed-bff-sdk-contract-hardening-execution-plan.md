@@ -1,11 +1,31 @@
 # Typed BFF SDK and contract hardening — execution plan
 
-**Status:** IR handoff and type-debt ratchet foundation established; API/SDK continuation remains — 2026-08-22
-**First pickup:** `frontend/packages/query-hooks/src/hooks/accounting.ts`
-**First reducer:** `create_account_account` through `useCreateAccountAccount`
-**Companion caller:** `frontend/web/app/(modules)/accounting/accounting-client.tsx`
+**Status:** Phase 6 complete for the migrated organization and accounting
+domains; Phase 7 is next — 2026-08-31
 **Tracks:** canonical IR, contracts extraction, write-path hardening, typed reads,
 generated codecs, generated SDK, frontend type debt
+
+**Completed foundation:**
+[ir-api-sdk-operation-foundation-continuation.md](./ir-api-sdk-operation-foundation-continuation.md)
+records the first IR-to-SDK/API vertical slice and its cross-repository release
+gates. Phase 6 now continues with contracts-owned resource codecs and classified
+query/scope metadata.
+
+### Phase 5 completion evidence
+
+- 809 production query-hook mutations across 35 files use generated named input
+  types and immutable-ID `/api/operations/:operation` requests;
+- normal production browser code has zero positional `unknown[]` mutation
+  calls, zero `/api/call` calls, and zero `withCompany=true` calls;
+- the ambiguous `/v1/call/:reducer` alias and automatic default-company
+  insertion are removed;
+- positional calls remain only on the explicitly named
+  `/v1/compat/reducer/:reducer` boundary for excluded dev/E2E tooling;
+- `@lumiere/stdb` owns the handwritten domain façade and typed operation
+  transport; `lumiere-contracts` supplies immutable IDs, input types, and
+  codecs without generating business API structure;
+- the browser-operation transport check is required by CI and also rejects
+  restoration of the retired API and Next.js aliases.
 
 ## 1. Outcome
 
@@ -156,8 +176,7 @@ TypeScript:
 
 - `packages/contracts/src/generated/operations.ts`;
 - `packages/contracts/src/generated/resources.ts`;
-- `packages/contracts/src/generated/wire-codecs.ts`;
-- domain SDK modules and a compact root client.
+- `packages/contracts/src/generated/wire-codecs.ts`.
 
 Rust:
 
@@ -202,7 +221,7 @@ agree for every reachable operation type.
 **Exit:** api-server normal business routes cannot dispatch an arbitrary reducer
 name or an arbitrary JSON array.
 
-### Phase 5 — generate the business TypeScript SDK and migrate writes
+### Phase 5 — build the application TypeScript SDK and migrate writes
 
 The public shape is domain-oriented:
 
@@ -211,15 +230,24 @@ const accounting = sdk.forCompany(selectedCompanyId).accounting
 await accounting.accounts.create(input)
 ```
 
-The generated SDK must not contain defaults, permissions, workflow decisions,
-or form behavior. Auth/session and selected-company providers bind transport
-context; operation modules encode and send generated requests.
+The application-owned SDK consumes generated operation IDs, input types, and
+wire codecs, but keeps domain grouping, method names, defaults, workflow
+decisions, and form behavior in normal TypeScript. Auth/session and
+selected-company providers bind transport context; operation modules encode
+and send generated requests. The contracts generator must not emit the authored
+business façade.
 
 Migrate one domain at a time. A migrated domain must delete its positional
 adapter and unused `*-http.ts` transport function in the same change.
 
-**Exit:** no normal mutation hook accepts `unknown[]` and no browser call uses
-`?withCompany=true`.
+Domain convenience methods are curated application API, not a requirement to
+create a one-line wrapper for every operation. Hooks without a domain method
+use the typed `stdbBffCommandPost` operation highway directly; this is still a
+named, immutable-ID request and never a positional compatibility call.
+
+**Exit (achieved):** no normal mutation hook accepts `unknown[]`, no production
+browser call uses a compatibility reducer route, and no caller requests an
+implicitly selected company.
 
 ### Phase 6 — generate typed reads
 
@@ -231,6 +259,64 @@ adapter and unused `*-http.ts` transport function in the same change.
   `Record<string, unknown>[]`.
 
 **Exit:** migrated domains have typed mutation inputs and typed query results.
+
+#### Phase 6 progress evidence
+
+- `@lumiere/api-client` has a strict opt-in decoder for normal
+  `{ data: [...] }` responses; malformed envelopes and accidental paginated
+  responses fail rather than becoming an empty list;
+- `@lumiere/stdb` owns a projection-aware `CompanyQueryRow` decoder: registry
+  mandatory fields are required, policy-controlled fields may be omitted,
+  unknown fields and lossy IDs are rejected, and IDs/timestamps normalize to
+  generated runtime types;
+- `sdk.organization.companies.list()` is the first typed read domain method and
+  `useCompanies` no longer asserts an unknown HTTP body as `Company[]`;
+- contracts releases through v0.3.24 generate projection-aware codecs for
+  `companies`, `account-account-types`, `account-accounts`, `account-journals`,
+  `account-taxes`, `account-move-lines`, and `account-moves` directly from the
+  canonical resource/type graph;
+- the accounting SDK and hooks bind the selected company on all six migrated
+  accounting reads, decode the HTTP body from `unknown`, preserve mandatory-only
+  projections, and reject unknown fields, lossy IDs, malformed enums, and
+  malformed timestamps;
+- v0.3.23 expands the generated codec map to every normal accounting resource
+  consumed by `hooks/accounting.ts`; the generic typed loader validates the
+  normal `{ data: [...] }` envelope and every row from `unknown`, uses a cache
+  namespace that cannot be seeded by direct subscriptions, and requires an
+  explicit active-company selection;
+- all 37 remaining accounting query hooks use that generated loader rather than
+  `useStdbQuery`'s unchecked assertion boundary;
+- api-server now classifies every direct-company accounting table in the
+  migrated surface, projects/filters `company_id` fail-closed, scopes
+  consolidation accounts and journals to the authenticated organization, and
+  scopes consolidation elimination entries to both organization and selected
+  company;
+- v0.3.24 republishes those projection changes from clean source commit
+  `77e12c903`, so the generated resource registry and runtime decoders share
+  the same canonical IR provenance;
+- `account-move-lines` browser consumers now use the projected row type directly
+  and no longer fall back to snake-case/full-table assertions;
+- the primary accounting and sales `account-moves` consumers now accept the
+  projected row type directly; organization-wide SSR seeds were removed because
+  they could not safely seed the selected-company cache, and timestamp consumers
+  now handle the generated timestamp object rather than coercing it with
+  `Number(...)`;
+- `account-account-types` now has an authored canonical
+  `organization_optional_company` scope: the API resolves the session-authorized
+  selected company, returns that company plus null-company organization-shared
+  rows, and filters out rows owned by every other company before decoding;
+- accounting and subscription mutations that change move lines invalidate the
+  typed HTTP cache through the shared resource invalidation path;
+- the pilot deliberately excludes `pos-orders`, whose cursor envelope and read
+  authorization need a separate contract and scope repair.
+
+**Phase 6 exit achieved:** the migrated organization and accounting domains now
+have generated mutation inputs and generated, runtime-decoded query results.
+Typed codecs remain behind an explicit reviewed resource allowlist: this exit
+does not assert that every one of the 336 registry resources is safe to migrate.
+`pos-orders` remains explicitly excluded because its cursor envelope requires a
+separate result contract, and future domain migrations must classify their API
+scope before joining the typed-read set.
 
 ### Phase 7 — delete redundant layers
 

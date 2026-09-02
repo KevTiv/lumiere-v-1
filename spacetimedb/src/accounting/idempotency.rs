@@ -10,6 +10,7 @@ use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 pub struct AccountingOperationReceipt {
     #[primary_key]
     pub id: String,
+    #[index(btree)]
     pub organization_id: u64,
     pub company_id: u64,
     pub action_kind: String,

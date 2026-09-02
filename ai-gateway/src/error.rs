@@ -27,6 +27,9 @@ pub enum AppError {
 
     #[error("Internal error: {0}")]
     Internal(String),
+
+    #[error("Unavailable: {0}")]
+    Unavailable(String),
 }
 
 impl IntoResponse for AppError {
@@ -40,6 +43,7 @@ impl IntoResponse for AppError {
             AppError::Qdrant(e) => (StatusCode::BAD_GATEWAY, e.to_string()),
             AppError::Embedding(m) => (StatusCode::BAD_GATEWAY, m.clone()),
             AppError::Internal(m) => (StatusCode::INTERNAL_SERVER_ERROR, m.clone()),
+            AppError::Unavailable(m) => (StatusCode::SERVICE_UNAVAILABLE, m.clone()),
         };
 
         tracing::error!("Request error: {}", message);

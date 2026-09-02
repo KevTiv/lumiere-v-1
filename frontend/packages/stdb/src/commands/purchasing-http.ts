@@ -2,7 +2,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Purchasing mutations via Next.js BFF `POST /api/call/:reducer`.
+ * Purchasing mutations via Next.js BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` purchasing hooks.
  */
 export const PURCHASING_BFF_REDUCERS = [
@@ -72,14 +72,6 @@ export const PURCHASING_BFF_REDUCERS = [
 ] as const;
 
 export type PurchasingBffReducerKey = (typeof PURCHASING_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<PurchasingBffReducerKey>();
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function purchasingBffCallUrl(reducer: PurchasingBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 const PURCHASING_HINT_OVERRIDES: Partial<
   Record<PurchasingBffReducerKey, readonly string[]>

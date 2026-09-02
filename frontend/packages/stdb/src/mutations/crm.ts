@@ -1,4 +1,4 @@
-import { stdbBrowserCall } from "../browser-http"
+import { stdbBrowserCommand } from "../browser-http"
 import type {
   CreateUtmCampaignParams,
   UpdateUtmCampaignParams,
@@ -7,6 +7,7 @@ import type {
   CreateUtmSourceParams,
   UpdateUtmSourceParams,
 } from "../generated/types"
+import { stdbParamsToJson } from "../stdb-params-json"
 
 export type {
   CreateUtmCampaignParams,
@@ -19,88 +20,77 @@ export type {
 
 // ── UTM (marketing attribution) ──────────────────────────────────────────────
 
-export function createUtmCampaign(organizationId: bigint, params: CreateUtmCampaignParams) {
-  return stdbBrowserCall("create_utm_campaign", [organizationId.toString(), params])
+export function createUtmCampaign(_organizationId: bigint, params: CreateUtmCampaignParams) {
+  return stdbBrowserCommand("create_utm_campaign", {
+    params: stdbParamsToJson(params as object, "CreateUtmCampaignParams"),
+  })
 }
 
 export function updateUtmCampaign(
-  organizationId: bigint,
+  _organizationId: bigint,
   campaignId: bigint,
   params: UpdateUtmCampaignParams,
 ) {
-  return stdbBrowserCall("update_utm_campaign", [
-    organizationId.toString(),
-    campaignId.toString(),
-    params,
-  ])
+  return stdbBrowserCommand("update_utm_campaign", {
+    campaignId,
+    params: stdbParamsToJson(params as object, "UpdateUtmCampaignParams"),
+  })
 }
 
-export function createUtmMedium(organizationId: bigint, params: CreateUtmMediumParams) {
-  return stdbBrowserCall("create_utm_medium", [organizationId.toString(), params])
+export function createUtmMedium(_organizationId: bigint, params: CreateUtmMediumParams) {
+  return stdbBrowserCommand("create_utm_medium", {
+    params: stdbParamsToJson(params as object, "CreateUtmMediumParams"),
+  })
 }
 
 export function updateUtmMedium(
-  organizationId: bigint,
+  _organizationId: bigint,
   mediumId: bigint,
   params: UpdateUtmMediumParams,
 ) {
-  return stdbBrowserCall("update_utm_medium", [
-    organizationId.toString(),
-    mediumId.toString(),
-    params,
-  ])
+  return stdbBrowserCommand("update_utm_medium", {
+    mediumId,
+    params: stdbParamsToJson(params as object, "UpdateUtmMediumParams"),
+  })
 }
 
-export function createUtmSource(organizationId: bigint, params: CreateUtmSourceParams) {
-  return stdbBrowserCall("create_utm_source", [organizationId.toString(), params])
+export function createUtmSource(_organizationId: bigint, params: CreateUtmSourceParams) {
+  return stdbBrowserCommand("create_utm_source", {
+    params: stdbParamsToJson(params as object, "CreateUtmSourceParams"),
+  })
 }
 
 export function updateUtmSource(
-  organizationId: bigint,
+  _organizationId: bigint,
   sourceId: bigint,
   params: UpdateUtmSourceParams,
 ) {
-  return stdbBrowserCall("update_utm_source", [
-    organizationId.toString(),
-    sourceId.toString(),
-    params,
-  ])
+  return stdbBrowserCommand("update_utm_source", {
+    sourceId,
+    params: stdbParamsToJson(params as object, "UpdateUtmSourceParams"),
+  })
 }
 
 // ── Chatter / followers ──────────────────────────────────────────────────────
 
 export function postInternalNote(
-  organizationId: bigint,
+  _organizationId: bigint,
   model: string,
   resId: bigint,
   body: string,
 ) {
-  return stdbBrowserCall("post_internal_note", [
-    organizationId.toString(),
-    model,
-    resId.toString(),
-    body,
-  ])
+  return stdbBrowserCommand("post_internal_note", { model, resId, body })
 }
 
 export function subscribeToRecord(
-  organizationId: bigint,
+  _organizationId: bigint,
   resModel: string,
   resId: bigint,
   subtypes: string[],
 ) {
-  return stdbBrowserCall("subscribe_to_record", [
-    organizationId.toString(),
-    resModel,
-    resId.toString(),
-    subtypes,
-  ])
+  return stdbBrowserCommand("subscribe_to_record", { resModel, resId, subtypes })
 }
 
-export function unsubscribeFromRecord(organizationId: bigint, resModel: string, resId: bigint) {
-  return stdbBrowserCall("unsubscribe_from_record", [
-    organizationId.toString(),
-    resModel,
-    resId.toString(),
-  ])
+export function unsubscribeFromRecord(_organizationId: bigint, resModel: string, resId: bigint) {
+  return stdbBrowserCommand("unsubscribe_from_record", { resModel, resId })
 }

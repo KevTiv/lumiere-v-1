@@ -265,6 +265,7 @@ pub struct PolicySnapshot {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    #[index(btree)]
     pub organization_id: u64,
     pub user_identity: Identity,
     pub role_id: u64,

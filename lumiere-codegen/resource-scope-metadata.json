@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "resources": {
+    "account-account-types": {
+      "kind": "organization_optional_company",
+      "organization_field": "organization_id",
+      "company_field": "company_id"
+    }
+  }
+}

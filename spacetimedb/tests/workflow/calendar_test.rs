@@ -6,6 +6,7 @@ use chrono::{NaiveDate, NaiveDateTime, TimeZone, Timelike, Utc};
 use chrono_tz::Tz;
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
+use crate::core::organization::organization;
 use crate::workflow::calendar::{
     activate_foundation_calendar_packs, calculate_deadline_from_delay_seconds,
     calculate_workflow_deadline, foundation_calendar_packs, resolve_local_datetime,
@@ -199,16 +200,23 @@ pub fn test_deadline_uses_observed_and_local_overlays() -> Result<(), String> {
 }
 
 pub fn test_foundation_activation_is_idempotent(ctx: &ReducerContext) -> Result<(), String> {
+    let expected_versions = ctx.db.organization().iter().count() * 10;
     let first = activate_foundation_calendar_packs(ctx)?;
-    if first.inserted_versions + first.replayed_versions != 10 {
-        return Err("first foundation activation did not process ten versions".to_string());
+    if usize::try_from(first.inserted_versions + first.replayed_versions) != Ok(expected_versions) {
+        return Err(
+            "first foundation activation did not process ten versions per organization".to_string(),
+        );
     }
     let version_count = ctx.db.workflow_calendar_version().iter().count();
     let exception_count = ctx.db.workflow_calendar_exception().iter().count();
 
     let second = activate_foundation_calendar_packs(ctx)?;
-    if second.inserted_versions != 0 || second.replayed_versions != 10 {
-        return Err("second foundation activation did not replay all versions".to_string());
+    if second.inserted_versions != 0
+        || usize::try_from(second.replayed_versions) != Ok(expected_versions)
+    {
+        return Err(
+            "second foundation activation did not replay all versions per organization".to_string(),
+        );
     }
     if ctx.db.workflow_calendar_version().iter().count() != version_count
         || ctx.db.workflow_calendar_exception().iter().count() != exception_count
@@ -270,6 +278,7 @@ fn pack(
 fn fixture_version() -> WorkflowCalendarVersion {
     WorkflowCalendarVersion {
         id: 42,
+        organization_id: 1,
         calendar_id: 7,
         version_number: 1,
         locale: "en-AU".to_string(),
@@ -308,6 +317,7 @@ fn fixture_exception(
         i32::try_from((local_date - epoch).num_days()).map_err(|_| "fixture date out of range")?;
     Ok(WorkflowCalendarException {
         id: 0,
+        organization_id: 1,
         calendar_version_id,
         local_date_days,
         name: "fixture exception".to_string(),

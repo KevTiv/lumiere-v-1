@@ -34,6 +34,7 @@ pub struct SaleCommissionPlan {
 #[spacetimedb::table(
     accessor = sale_commission_plan_split,
     public,
+    index(accessor = commission_split_by_organization, btree(columns = [organization_id])),
     index(accessor = commission_split_by_plan, btree(columns = [plan_id]))
 )]
 pub struct SaleCommissionPlanSplit {
@@ -126,7 +127,11 @@ pub struct SalesIntegrationIntent {
     pub metadata: Option<String>,
 }
 
-#[spacetimedb::table(accessor = sales_sla_escalation_job, scheduled(run_sales_sla_escalation))]
+#[spacetimedb::table(
+    accessor = sales_sla_escalation_job,
+    index(accessor = sales_sla_escalation_job_by_organization, btree(columns = [organization_id])),
+    scheduled(run_sales_sla_escalation)
+)]
 pub struct SalesSlaEscalationJob {
     #[primary_key]
     #[auto_inc]

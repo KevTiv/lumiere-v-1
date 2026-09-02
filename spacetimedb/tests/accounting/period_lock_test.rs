@@ -1,9 +1,8 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::accounting::fiscal_periods::{
-    account_fiscal_year, account_period, accounting_ownership_backfill_issue,
-    backfill_fiscal_period_organization_ownership, close_account_period, update_fiscal_year,
-    AccountFiscalYear, UpdateFiscalYearParams,
+    account_fiscal_year, account_period, backfill_fiscal_period_organization_ownership,
+    close_account_period, update_fiscal_year, AccountFiscalYear, UpdateFiscalYearParams,
 };
 use crate::accounting::journal_entries::{account_move, account_move_line, post_invoice};
 use crate::accounting::payments::{
@@ -28,13 +27,6 @@ pub fn test_fiscal_ownership_is_derived_and_tenant_scoped(
         .id()
         .find(&fixture_a.fiscal_year_id)
         .ok_or("organization A fiscal year missing")?;
-    let fiscal_year_b = ctx
-        .db
-        .account_fiscal_year()
-        .id()
-        .find(&fixture_b.fiscal_year_id)
-        .ok_or("organization B fiscal year missing")?;
-
     let cross_tenant_update = update_fiscal_year(
         ctx,
         fixture_b.organization_id,
@@ -60,44 +52,11 @@ pub fn test_fiscal_ownership_is_derived_and_tenant_scoped(
     }
 
     ctx.db.account_fiscal_year().id().update(AccountFiscalYear {
-        organization_id: Some(fixture_b.organization_id),
+        organization_id: fixture_b.organization_id,
         ..fiscal_year_a
     });
-    ctx.db.account_fiscal_year().id().update(AccountFiscalYear {
-        organization_id: None,
-        ..fiscal_year_b
-    });
-
-    backfill_fiscal_period_organization_ownership(ctx)?;
-
-    let quarantined = ctx
-        .db
-        .account_fiscal_year()
-        .id()
-        .find(&fixture_a.fiscal_year_id)
-        .ok_or("quarantined fiscal year missing")?;
-    if quarantined.organization_id.is_some() {
-        return Err("conflicting fiscal year ownership was not quarantined".to_string());
-    }
-    if !ctx
-        .db
-        .accounting_ownership_backfill_issue()
-        .iter()
-        .any(|issue| {
-            issue.table_name == "account_fiscal_year" && issue.record_id == fixture_a.fiscal_year_id
-        })
-    {
-        return Err("conflicting fiscal year ownership was not reported".to_string());
-    }
-
-    let backfilled = ctx
-        .db
-        .account_fiscal_year()
-        .id()
-        .find(&fixture_b.fiscal_year_id)
-        .ok_or("backfilled fiscal year missing")?;
-    if backfilled.organization_id != Some(fixture_b.organization_id) {
-        return Err("missing fiscal year ownership was not derived from company".to_string());
+    if backfill_fiscal_period_organization_ownership(ctx).is_ok() {
+        return Err("conflicting fiscal year ownership was accepted".to_string());
     }
 
     let quarantined_update = update_fiscal_year(
@@ -131,7 +90,7 @@ fn seed_closed_period(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<(), 
         .account_period()
         .period_by_fiscal_year()
         .filter(&fixture.fiscal_year_id)
-        .find(|period| period.organization_id == Some(fixture.organization_id))
+        .find(|period| period.organization_id == fixture.organization_id)
         .map(|p| p.id)
         .ok_or("Fixture period not found")?;
 

@@ -1,3 +1,4 @@
+import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
@@ -35,7 +36,7 @@ test.describe("CRM update/delete mutations", { tag: ["@p0", "@phase-1"] }, () =>
 
     const [updateContactRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/update_contact") && res.ok(),
+        (res) => matchesOperationResponse(res, "update_contact") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "edit-contact"),
@@ -68,7 +69,7 @@ test.describe("CRM update/delete mutations", { tag: ["@p0", "@phase-1"] }, () =>
 
     const [deleteLeadRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/delete_lead") && res.ok(),
+        (res) => matchesOperationResponse(res, "delete_lead") && res.ok(),
         { timeout: 30_000 },
       ),
       page.getByTestId("entity-action-delete-lead").click(),

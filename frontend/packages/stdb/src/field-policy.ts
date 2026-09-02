@@ -315,6 +315,12 @@ export function resolveHttpSqlColumns(
       ? restricted
       : assertSafeSqlIdentifiers(uniquePreserveOrder([...reg.mandatory, ...reg.defaultRestricted]))
   const policyCols = applyHrFieldPolicy(resourceKey, cols, fieldAccess)
+  // The v0.3.4 registry projection predates the landed-cost lifecycle UI.
+  // Keep the operational state available until the next contracts release
+  // carries it in the canonical resource registry.
+  if (resourceKey === 'landed-costs' && !policyCols.includes('state')) {
+    policyCols.push('state')
+  }
   return assertSafeSqlIdentifiers(filterHttpSqlUnsafeColumns(policyCols, resourceKey))
 }
 

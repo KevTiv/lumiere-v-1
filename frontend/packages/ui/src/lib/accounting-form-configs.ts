@@ -827,8 +827,16 @@ export const newAccountPaymentForm = (t: TFunction): FormConfig => ({
           type: "select",
           label: t("accounting.forms.newAccountPayment.fields.journalId"),
           required: true,
-          width: "full",
+          width: "1/2",
           options: [{ value: "", label: "—", disabled: true }],
+        },
+        {
+          id: "date",
+          name: "date",
+          type: "date",
+          label: t("accounting.forms.newAccountPayment.fields.date"),
+          required: true,
+          width: "1/2",
         },
         {
           id: "ref",

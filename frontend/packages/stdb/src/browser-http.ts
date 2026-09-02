@@ -1,17 +1,21 @@
 /**
- * Browser helpers for Next.js `/api/query/*` and `/api/call/*`.
+ * Browser helpers for Next.js typed query and operation endpoints.
  * Uses {@link getLumiereApiClient} when {@link LumiereApiProvider} is mounted (correct API gateway rewrite + Bearer on Expo);
  * otherwise falls back to same-origin `fetch` with cookies (tests / rare early calls).
  */
 "use client"
 
 import {
-  callStdbReducer,
   getLumiereApiClient,
   queryStdbList,
   type LumiereHttpFetch,
 } from "@lumiere/api-client"
-import { encodeReducerCallArgs } from "./stdb-params-json"
+import {
+  stdbBffCommandPost,
+  type StdbBffCommandInput,
+  type StdbBffNamedReducerKey,
+} from "./commands/stdb-http"
+import { createStdbSdk, type StdbSdk } from "./sdk"
 
 function resolveApiFetch(): LumiereHttpFetch {
   const c = getLumiereApiClient()
@@ -24,10 +28,24 @@ function resolveApiFetch(): LumiereHttpFetch {
   }
 }
 
+/** Build the domain SDK with the browser's authenticated API transport. */
+export function createBrowserStdbSdk(): StdbSdk {
+  return createStdbSdk(resolveApiFetch())
+}
+
 export async function stdbBrowserQuery(resource: string): Promise<Record<string, unknown>[]> {
   return queryStdbList(resolveApiFetch(), resource)
 }
 
-export async function stdbBrowserCall(reducer: string, args: unknown[]): Promise<void> {
-  return callStdbReducer(resolveApiFetch(), reducer, encodeReducerCallArgs(reducer, args))
+/** Invoke a session-exposed operation through its generated immutable contract ID. */
+export async function stdbBrowserCommand<K extends StdbBffNamedReducerKey>(
+  operation: K,
+  input: StdbBffCommandInput<K>,
+): Promise<void> {
+  const { urlPath, init } = stdbBffCommandPost(operation, input)
+  const response = await resolveApiFetch()(urlPath, init)
+  if (!response.ok) {
+    const json = (await response.json().catch(() => ({}))) as Record<string, unknown>
+    throw new Error((json.error as string | undefined) ?? `Operation ${operation} failed`)
+  }
 }

@@ -1,37 +1,46 @@
 import { stringifyReducerCommandBody } from "@lumiere/api-client";
+import {
+  SESSION_OPERATION_DESCRIPTORS,
+  SESSION_OPERATION_NAMES,
+  type SessionOperationName,
+} from "@lumiere/contracts/generated/operation-descriptors";
 import type { OperationInputMap } from "@lumiere/contracts/generated/operation-inputs";
 
 import type { ReducerCommandContractMeta } from "./types";
-import {
-  STDB_BFF_REDUCERS,
-  type StdbBffReducerKey,
-} from "./generated-stdb-bff-reducers";
+
+/** Backward-compatible names for the canonical session-operation surface. */
+const STDB_BFF_REDUCERS = SESSION_OPERATION_NAMES;
+type StdbBffReducerKey = SessionOperationName;
 
 export { STDB_BFF_REDUCERS, type StdbBffReducerKey };
 
-type NamedReducerKey = Extract<StdbBffReducerKey, keyof OperationInputMap>;
-type WireField<T> =
+export type StdbBffNamedReducerKey = Extract<SessionOperationName, keyof OperationInputMap>;
+
+type StdbWireField<T> =
   | T
   | null
   | (T extends bigint ? number | string : never)
   | (T extends object ? Record<string, unknown> : never)
+  | { __identity__: string }
   | { some: unknown }
   | { none: [] };
 
-export type StdbBffCommandInput<K extends NamedReducerKey> = {
-  [P in keyof OperationInputMap[K]]: WireField<OperationInputMap[K][P]>;
+export type StdbBffCommandInput<K extends StdbBffNamedReducerKey> = {
+  [P in keyof OperationInputMap[K]]: StdbWireField<OperationInputMap[K][P]>;
 };
 
-/** Same-origin path used by `apiFetch` in the web app. */
+/** Same-origin typed-operation path for all named command consumers. */
 export function stdbBffCallUrl(reducer: StdbBffReducerKey): string {
-  return `/api/call/${encodeURIComponent(reducer)}`;
+  const operationId = SESSION_OPERATION_DESCRIPTORS[reducer].contractOperationId;
+  return `/api/operations/${encodeURIComponent(operationId)}`;
 }
 
 /**
- * Named command transport. The input deliberately omits `organization_id`;
- * api-server injects it from the authenticated session using contract metadata.
+ * Named operation transport. The input deliberately omits `organization_id`;
+ * api-server injects it from the authenticated session using locked contract
+ * operation metadata.
  */
-export function stdbBffCommandPost<K extends NamedReducerKey>(
+export function stdbBffCommandPost<K extends StdbBffNamedReducerKey>(
   reducer: K,
   input: StdbBffCommandInput<K>,
 ): { urlPath: string; init: RequestInit } {

@@ -344,6 +344,13 @@ function HelpdeskClientLoaded({
       ({
         ...moduleConfig,
         tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
+          if (tab.id === "tickets") {
+            return {
+              ...tab,
+              createForm: ticketFormConfig,
+              entityConfig: ticketsEntityConfig,
+            }
+          }
           if (tab.id === "teams") return { ...tab, createForm: teamFormConfig }
           if (tab.id === "stages") return { ...tab, createForm: stageFormConfig }
           if (tab.id === "slas") return { ...tab, createForm: slaFormConfig }

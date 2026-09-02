@@ -158,7 +158,7 @@ async function fetchQuery(resource: string): Promise<Row[]> {
 export function AiSettings() {
   const { t } = useTranslation()
   const { toast } = useToast()
-  const { organizationId } = useErpSession()
+  const { organizationId, activeCompanyId } = useErpSession()
 
   const orgReady = organizationId != null && organizationId > 0
   const orgId = organizationId ?? 0
@@ -683,29 +683,39 @@ export function AiSettings() {
               type="button"
               size="sm"
               disabled={
-                mutating || !orgReady || memorySearchMutation.isPending || memoryTestQuery.trim() === ""
+                mutating ||
+                !orgReady ||
+                !activeCompanyId ||
+                memorySearchMutation.isPending ||
+                memoryTestQuery.trim() === ""
               }
               onClick={() =>
-                void memorySearchMutation.mutateAsync({ query: memoryTestQuery.trim(), top_k: 8 }).then(
-                  (data) => {
-                    const hits = data.hits ?? []
-                    const top = hits
-                      .slice(0, 3)
-                      .map((h) => `${h.entity_type}:${h.entity_id}`)
-                      .join(" · ")
-                    setMemorySearchPreview(top || t("settings.ai.memoryNoHits"))
-                    toast({
-                      title: t("settings.ai.memorySearchDone"),
-                      description: `${t("settings.ai.memoryHitsLabel")}: ${String(hits.length)}`,
-                    })
-                  },
-                  (e: unknown) =>
-                    toast({
-                      title: t("settings.ai.mutationError"),
-                      description: e instanceof Error ? e.message : "",
-                      variant: "destructive",
-                    }),
-                )
+                void memorySearchMutation
+                  .mutateAsync({
+                    query: memoryTestQuery.trim(),
+                    companyId: activeCompanyId ?? 0,
+                    top_k: 8,
+                  })
+                  .then(
+                    (data) => {
+                      const hits = data.hits ?? []
+                      const top = hits
+                        .slice(0, 3)
+                        .map((h) => `${h.resource_kind}:${h.resource_id}`)
+                        .join(" · ")
+                      setMemorySearchPreview(top || t("settings.ai.memoryNoHits"))
+                      toast({
+                        title: t("settings.ai.memorySearchDone"),
+                        description: `${t("settings.ai.memoryHitsLabel")}: ${String(hits.length)}`,
+                      })
+                    },
+                    (e: unknown) =>
+                      toast({
+                        title: t("settings.ai.mutationError"),
+                        description: e instanceof Error ? e.message : "",
+                        variant: "destructive",
+                      }),
+                  )
               }
             >
               {memorySearchMutation.isPending ? (

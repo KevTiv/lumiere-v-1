@@ -12,21 +12,6 @@ export const AI_ACTION_DRAFTS_BFF_REDUCERS = [
 export type AiActionDraftsBffReducerKey =
   (typeof AI_ACTION_DRAFTS_BFF_REDUCERS)[number];
 
-const WITH_COMPANY_QUERY = new Set<AiActionDraftsBffReducerKey>([
-  "approve_ai_action_draft",
-  "create_ai_action_draft",
-  "expire_ai_action_drafts",
-  "reject_ai_action_draft",
-  "update_ai_action_draft_params",
-]);
-
-export function aiActionDraftsBffCallUrl(
-  reducer: AiActionDraftsBffReducerKey,
-): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
-
 export const AI_ACTION_DRAFTS_COMMAND_SUBSCRIPTION_HINTS: Record<
   AiActionDraftsBffReducerKey,
   readonly string[]

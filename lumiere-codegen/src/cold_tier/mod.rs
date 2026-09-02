@@ -1,16 +1,18 @@
 //! Cold-tier schema pipeline: SpacetimeDB-generated Rust bindings → Lumiere
-//! schema IR → archive manifest, PG DDL, codec manifest, hydration manifest.
+//! schema IR → total storage policy, archive manifest, PG DDL, codec manifest,
+//! hydration manifest.
 //!
 //! Steps run strictly in order because each later step consumes the schema
 //! manifest (or the archive candidate list) produced/validated by an earlier
 //! one:
 //!
 //! 1. `stdb_bindings_parse` — bindings → [`schema_ir::LumiereSchemaManifest`]
-//! 2. `archive_manifest_emit` — validate `archive-candidates.json` against
+//! 2. `storage_policy_manifest_emit` — validate the C1 all-table census
+//! 3. `archive_manifest_emit` — validate `archive-candidates.json` against
 //!    the schema manifest, emit `archive-manifest.json`
-//! 3. `pg_ddl_emit` — one cold-table `CREATE TABLE` per active candidate
-//! 4. `codec_emit` — STDB ↔ PG type-mapping manifest per candidate
-//! 5. `hydration_manifest_emit` — reducers that may target archived rows
+//! 4. `pg_ddl_emit` — one cold-table `CREATE TABLE` per active candidate
+//! 5. `codec_emit` — STDB ↔ PG type-mapping manifest per candidate
+//! 6. `hydration_manifest_emit` — reducers that may target archived rows
 //!    (validated against the schema manifest + active candidate set)
 
 pub mod archive_manifest_emit;
@@ -19,11 +21,12 @@ pub mod hydration_manifest_emit;
 pub mod pg_ddl_emit;
 pub mod schema_ir;
 pub mod stdb_bindings_parse;
+pub mod storage_policy_manifest_emit;
 
 use crate::paths::Paths;
 use crate::support::{read_to_string, write_file};
 use anyhow::{Context, Result};
-use schema_ir::LumiereSchemaManifest;
+use schema_ir::{GeneratedTableOwnership, LumiereSchemaManifest, OwnershipCounts};
 use serde_json::Value;
 
 pub fn run(paths: &Paths) -> Result<()> {
@@ -31,9 +34,81 @@ pub fn run(paths: &Paths) -> Result<()> {
 
     let schema_manifest = stdb_bindings_parse::parse_bindings(&paths.stdb_bindings_dir)
         .context("extracting schema IR from STDB Rust bindings")?;
-    let schema_manifest_json =
-        serde_json::to_string_pretty(&schema_manifest).context("serialise schema manifest")?;
+    let c0_enforced = std::env::var("C0_ENFORCE_TENANT_OWNERSHIP").as_deref() == Ok("1");
+    let ownership_counts: Option<OwnershipCounts> = match schema_manifest.ownership_counts() {
+        Ok(counts) => Some(counts),
+        Err(error) if !c0_enforced => {
+            eprintln!(
+                "lumiere-codegen: warning: C0 ownership gate disabled; {}",
+                error
+            );
+            None
+        }
+        Err(error) => return Err(error).context("classifying schema table ownership"),
+    };
+    if c0_enforced {
+        schema_manifest
+            .validate_tenant_ownership()
+            .context("validating C0 organization ownership")?;
+    }
+    let mut schema_manifest_value =
+        serde_json::to_value(&schema_manifest).context("serialise schema manifest")?;
+    let platform_global_tables = schema_manifest
+        .tables
+        .iter()
+        .filter_map(|table| match table.ownership() {
+            Ok(GeneratedTableOwnership::PlatformGlobal(platform)) => Some(serde_json::json!({
+                "sql_name": platform.sql_name,
+                "rationale": platform.rationale,
+            })),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    schema_manifest_value["ownership_summary"] = match ownership_counts {
+        Some(counts) => serde_json::json!({
+            "verified": true,
+            "erp_owned_count": counts.erp_owned_count,
+            "platform_global_count": counts.platform_global_count,
+            "platform_global_tables": platform_global_tables,
+        }),
+        None => serde_json::json!({ "verified": false }),
+    };
+    let schema_manifest_json = serde_json::to_string_pretty(&schema_manifest_value)
+        .context("serialise schema manifest")?;
     write_file(&paths.schema_manifest_out, &schema_manifest_json)?;
+
+    // ── 1b. Total storage-policy census ─────────────────────────────────
+
+    let storage_policy_json = read_to_string(&paths.storage_policy_json)?;
+    let resource_registry_json = read_to_string(&paths.resource_registry_json)?;
+    let storage_policy_manifest_json = storage_policy_manifest_emit::emit_storage_policy_manifest(
+        &storage_policy_json,
+        &schema_manifest,
+        &resource_registry_json,
+    )
+    .context("generating storage policy manifest")?;
+    write_file(
+        &paths.storage_policy_manifest_out,
+        &storage_policy_manifest_json,
+    )?;
+    let storage_policy_manifest: Value = serde_json::from_str(&storage_policy_manifest_json)
+        .context("re-parse generated storage policy manifest")?;
+    let storage_coverage = &storage_policy_manifest["coverage"];
+    let module_totals = storage_coverage["by_module"]
+        .as_object()
+        .context("storage policy coverage.by_module must be an object")?
+        .iter()
+        .map(|(module, count)| format!("{module}={count}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    println!(
+        "lumiere-codegen: storage policy coverage: {}/{} classified, {} unclassified; modules: {}",
+        storage_coverage["classified"],
+        storage_coverage["total"],
+        storage_coverage["unclassified"],
+        module_totals
+    );
+    println!("Wrote {}", paths.storage_policy_manifest_out.display());
 
     // ── 2. Archive manifest: validate candidates + emit archive-manifest.json
 
@@ -81,6 +156,17 @@ pub fn run(paths: &Paths) -> Result<()> {
         schema_manifest.tables.len(),
         schema_manifest.enum_types.len(),
         paths.stdb_bindings_dir.display()
+    );
+    println!(
+        "lumiere-codegen: ownership summary: {}",
+        ownership_counts
+            .map(|counts| {
+                format!(
+                    "{} ERP-owned, {} platform-global",
+                    counts.erp_owned_count, counts.platform_global_count
+                )
+            })
+            .unwrap_or_else(|| "ownership not verified (gate disabled)".to_string())
     );
     println!("lumiere-codegen: {ddl_file_count} cold PG DDL file(s) from archive-candidates.json");
     println!("Wrote {}", paths.schema_manifest_out.display());

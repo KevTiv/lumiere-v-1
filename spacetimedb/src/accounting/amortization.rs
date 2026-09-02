@@ -356,7 +356,7 @@ pub fn recognize_amortization_line(
     ensure_accounting_period_open_for_date(ctx, company_id, line.recognition_date)?;
 
     let amount = line.amount;
-    let name = next_doc_number(ctx, "AMORT");
+    let name = next_doc_number(ctx, organization_id, "AMORT");
     let currency_id = schedule.currency_id;
 
     // Accrual: Dr expense / Cr accrual liability

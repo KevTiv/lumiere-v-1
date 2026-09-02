@@ -180,7 +180,6 @@ import {
   useComputeInvoiceTotals,
   usePartnerCreditControls,
   usePartnerCreditHolds,
-  type AccountMove,
 } from '@lumiere/query-hooks/hooks/accounting';
 import {
   useStockPickings,
@@ -304,7 +303,6 @@ interface SalesClientProps {
   initialLoyaltyCards?: PosLoyaltyCard[];
   initialContacts?: Contact[];
   initialWarehouses?: Warehouse[];
-  initialAccountMoves?: AccountMove[];
   initialStockPickings?: StockPicking[];
   initialReturnOrders?: ReturnOrder[];
   initialReturnOrderLines?: ReturnOrderLine[];
@@ -356,7 +354,6 @@ function SalesClientLoaded({
   initialLoyaltyCards,
   initialContacts,
   initialWarehouses,
-  initialAccountMoves,
   initialStockPickings,
   initialReturnOrders,
   initialReturnOrderLines,
@@ -444,7 +441,7 @@ function SalesClientLoaded({
   const { data: products = [] } = useProducts(orgId);
   const { data: productCategories = [] } = useProductCategories(orgId);
   const { data: uoms = [] } = useUoms(orgId);
-  const { data: accountMoves = [] } = useAccountMoves(orgId, { initialData: initialAccountMoves });
+  const { data: accountMoves = [] } = useAccountMoves(orgId);
   const { data: accountJournals = [] } = useAccountJournals(orgId);
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId);
@@ -855,7 +852,7 @@ function SalesClientLoaded({
   }, [productCategories, t]);
 
   const journalFieldOptions = useMemo(() => {
-    const fromApi = accountJournalRowsToSelectOptions(accountJournals as Record<string, unknown>[]);
+    const fromApi = accountJournalRowsToSelectOptions(accountJournals);
     if (fromApi.length > 0) return fromApi;
     return [{ value: '', label: t('common.lookup.noJournals'), disabled: true }];
   }, [accountJournals, t]);
@@ -1134,8 +1131,8 @@ function SalesClientLoaded({
 
   const salesInvoices = useMemo(
     () =>
-      (accountMoves as Record<string, unknown>[]).filter(
-        (m) => moveTypeTag(m) === 'OutInvoice',
+      accountMoves.filter(
+        (m) => moveTypeTag(m as unknown as Record<string, unknown>) === 'OutInvoice',
       ),
     [accountMoves],
   );
@@ -2412,7 +2409,7 @@ function SalesClientLoaded({
               type: 'custom' as const,
               customContent: (
                 <InvoiceListView
-                  invoices={salesInvoices as unknown as AccountMove[]}
+                  invoices={salesInvoices}
                   onRecalculateTotals={(inv) =>
                     void computeInvoiceTotals.mutateAsync(
                       inv.id as string | number | bigint,
@@ -2462,12 +2459,8 @@ function SalesClientLoaded({
                   accountMoves={
                     accountMoves as unknown as Record<string, unknown>[]
                   }
-                  accountJournals={
-                    accountJournals as unknown as Record<string, unknown>[]
-                  }
-                  accountAccounts={
-                    accountAccounts as unknown as Record<string, unknown>[]
-                  }
+                  accountJournals={accountJournals}
+                  accountAccounts={accountAccounts}
                   settlePending={settleSaleCommissions.isPending}
                   cancelPending={cancelSaleCommission.isPending}
                   reversePending={reverseSaleCommissionSettlement.isPending}

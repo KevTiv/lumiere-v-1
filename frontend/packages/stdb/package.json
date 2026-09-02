@@ -22,15 +22,17 @@
     "./field-policy": "./src/field-policy.ts",
     "./live": "./src/live/index.ts",
     "./stored-dashboard-model-registry": "./src/stored-dashboard-model-registry.ts",
-    "./stdb-params-json": "./src/stdb-params-json.ts"
+    "./stdb-params-json": "./src/stdb-params-json.ts",
+    "./sdk": "./src/sdk.ts",
+    "./resource-reads": "./src/resource-reads.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/stdb-params-json.test.ts src/live/projection.test.ts src/queries/erp-subscriptions.test.ts"
+    "test": "node --import tsx --test src/browser-http.test.ts src/stdb-params-json.test.ts src/commands/stdb-http.test.ts src/sdk.test.ts src/resource-reads.test.ts src/live/projection.test.ts src/queries/erp-subscriptions.test.ts"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
-    "@lumiere/contracts": "github:KevTiv/lumiere-contracts#v0.3.2&path:packages/contracts",
+    "@lumiere/contracts": "github:KevTiv/lumiere-contracts#v0.3.25&path:packages/contracts",
     "spacetimedb": "2.8.2"
   },
   "peerDependencies": {

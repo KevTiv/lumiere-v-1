@@ -35,7 +35,7 @@ export default function HomeScreen() {
         {!apiBase ? (
           <ThemedText>
             Set <ThemedText type="defaultSemiBold">EXPO_PUBLIC_LUMIERE_API_URL</ThemedText> to your Next.js
-            origin (e.g. http://192.168.1.2:3000) to probe <ThemedText type="defaultSemiBold">GET /api/query/roles</ThemedText> with the same Bearer token as SpacetimeDB.
+            origin (e.g. http://192.168.1.2:3000) to probe <ThemedText type="defaultSemiBold">GET /api/query/roles</ThemedText> through the authorized API boundary.
           </ThemedText>
         ) : rolesQuery.isPending ? (
           <ThemedText>Loading roles…</ThemedText>

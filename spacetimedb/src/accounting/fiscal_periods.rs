@@ -5,7 +5,7 @@
 /// Tables for managing fiscal years and accounting periods.
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::{company, require_company_in_organization};
+use crate::core::organization::{company, organization, require_company_in_organization};
 use crate::core::users::user_profile;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{FiscalYearState, PeriodState};
@@ -28,8 +28,7 @@ pub struct AccountFiscalYear {
     pub name: String,
     pub date_from: Timestamp,
     pub date_to: Timestamp,
-    /// Nullable only during the legacy ownership backfill.
-    pub organization_id: Option<u64>,
+    pub organization_id: u64,
     pub company_id: u64,
     pub state: FiscalYearState,
     pub type_: String,
@@ -63,8 +62,7 @@ pub struct AccountPeriod {
     pub code: String,
     pub date_from: Timestamp,
     pub date_to: Timestamp,
-    /// Nullable only during the legacy ownership backfill.
-    pub organization_id: Option<u64>,
+    pub organization_id: u64,
     pub company_id: u64,
     pub fiscal_year_id: u64,
     pub state: PeriodState,
@@ -80,12 +78,14 @@ pub struct AccountPeriod {
 /// Server-only record of a legacy row whose ownership could not be derived safely.
 #[spacetimedb::table(
     accessor = accounting_ownership_backfill_issue,
+    index(accessor = ownership_issue_by_organization, btree(columns = [organization_id])),
     index(accessor = ownership_issue_by_table, btree(columns = [table_name]))
 )]
 pub struct AccountingOwnershipBackfillIssue {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub table_name: String,
     pub record_id: u64,
     pub company_id: Option<u64>,
@@ -95,11 +95,15 @@ pub struct AccountingOwnershipBackfillIssue {
 }
 
 /// Server-only summary proving how many legacy rows remain quarantined.
-#[spacetimedb::table(accessor = accounting_ownership_backfill_run)]
+#[spacetimedb::table(
+    accessor = accounting_ownership_backfill_run,
+    index(accessor = ownership_run_by_organization, btree(columns = [organization_id]))
+)]
 pub struct AccountingOwnershipBackfillRun {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub scope: String,
     pub scanned_rows: u64,
     pub backfilled_rows: u64,
@@ -173,7 +177,7 @@ fn load_fiscal_year_in_scope(
         .find(&fiscal_year_id)
         .ok_or("fiscal year not found")?;
 
-    if fiscal_year.organization_id != Some(organization_id) {
+    if fiscal_year.organization_id != organization_id {
         return Err("fiscal year does not belong to this organization".to_string());
     }
     if fiscal_year.company_id != company_id {
@@ -198,7 +202,7 @@ fn load_period_in_scope(
         .find(&period_id)
         .ok_or("period not found")?;
 
-    if period.organization_id != Some(organization_id) {
+    if period.organization_id != organization_id {
         return Err("period does not belong to this organization".to_string());
     }
     if period.company_id != company_id {
@@ -236,7 +240,7 @@ pub fn create_fiscal_year(
         .fiscal_year_by_company()
         .filter(&company_id)
         .filter(|fy| {
-            fy.organization_id == Some(organization_id)
+            fy.organization_id == organization_id
                 && ((params.date_from >= fy.date_from && params.date_from <= fy.date_to)
                     || (params.date_to >= fy.date_from && params.date_to <= fy.date_to)
                     || (params.date_from <= fy.date_from && params.date_to >= fy.date_to))
@@ -252,7 +256,7 @@ pub fn create_fiscal_year(
         name: params.name.clone(),
         date_from: params.date_from,
         date_to: params.date_to,
-        organization_id: Some(organization_id),
+        organization_id,
         company_id,
         state: FiscalYearState::Draft,
         type_: params.type_,
@@ -566,7 +570,7 @@ pub fn create_account_period(
         .period_by_company()
         .filter(&company_id)
         .filter(|p| {
-            p.organization_id == Some(organization_id)
+            p.organization_id == organization_id
                 && ((params.date_from >= p.date_from && params.date_from <= p.date_to)
                     || (params.date_to >= p.date_from && params.date_to <= p.date_to)
                     || (params.date_from <= p.date_from && params.date_to >= p.date_to))
@@ -583,7 +587,7 @@ pub fn create_account_period(
         code: params.code.clone(),
         date_from: params.date_from,
         date_to: params.date_to,
-        organization_id: Some(organization_id),
+        organization_id,
         company_id,
         fiscal_year_id: params.fiscal_year_id,
         state: PeriodState::Draft,
@@ -858,7 +862,7 @@ pub fn ensure_accounting_period_open_for_date(
         .period_by_company()
         .filter(&company_id)
         .filter(|period| {
-            period.organization_id == Some(company.organization_id)
+            period.organization_id == company.organization_id
                 && move_date >= period.date_from
                 && move_date <= period.date_to
         })
@@ -890,16 +894,23 @@ pub fn ensure_accounting_period_open_for_date(
 
 pub(crate) fn record_ownership_issue(
     ctx: &ReducerContext,
+    organization_id: Option<u64>,
     table_name: &str,
     record_id: u64,
     company_id: Option<u64>,
     parent_id: Option<u64>,
     issue: &str,
-) {
+) -> Result<(), String> {
+    let organization_id = organization_id.ok_or_else(|| {
+        format!(
+            "cannot quarantine {table_name} {record_id}: organization ownership is indeterminate"
+        )
+    })?;
     ctx.db
         .accounting_ownership_backfill_issue()
         .insert(AccountingOwnershipBackfillIssue {
             id: 0,
+            organization_id,
             table_name: table_name.to_string(),
             record_id,
             company_id,
@@ -907,12 +918,37 @@ pub(crate) fn record_ownership_issue(
             issue: issue.to_string(),
             detected_at: ctx.timestamp,
         });
+    Ok(())
 }
 
-/// Backfill the first ACC-RI-001 ownership slice from company and parent relations.
+/// Return the only organization permitted for an unscoped legacy backfill.
 ///
-/// Rows with missing or conflicting provenance remain at `organization_id = None`.
-/// Every mutation loader rejects those quarantined rows.
+/// Backfill reducers are being migrated to explicit organization scopes. Until
+/// their reducer contracts carry that scope, refusing a multi-organization run
+/// is safer than attributing its summary to an arbitrary tenant.
+pub(crate) fn require_single_backfill_organization(ctx: &ReducerContext) -> Result<u64, String> {
+    let mut organizations = ctx
+        .db
+        .organization()
+        .iter()
+        .map(|organization| organization.id);
+    let Some(organization_id) = organizations.next() else {
+        return Err("cannot run accounting ownership backfill without an organization".to_string());
+    };
+    if organizations.next().is_some() {
+        return Err(
+            "accounting ownership backfill requires an explicit organization scope when multiple organizations exist"
+                .to_string(),
+        );
+    }
+    Ok(organization_id)
+}
+
+/// Validate the first ACC-RI-001 ownership slice from company and parent relations.
+///
+/// Ownership is now mandatory. This reducer remains as a compatibility entry
+/// point for operators, but it performs validation only and never fabricates or
+/// rewrites ownership.
 #[spacetimedb::reducer]
 pub fn backfill_fiscal_period_organization_ownership(ctx: &ReducerContext) -> Result<(), String> {
     let user = ctx
@@ -924,150 +960,53 @@ pub fn backfill_fiscal_period_organization_ownership(ctx: &ReducerContext) -> Re
     if !user.is_superuser {
         return Err("only superusers may backfill accounting ownership".to_string());
     }
-
-    let stale_issue_ids: Vec<_> = ctx
-        .db
-        .accounting_ownership_backfill_issue()
-        .iter()
-        .filter(|issue| {
-            issue.table_name == "account_fiscal_year" || issue.table_name == "account_period"
-        })
-        .map(|issue| issue.id)
-        .collect();
-    for issue_id in stale_issue_ids {
-        ctx.db
-            .accounting_ownership_backfill_issue()
+    for fiscal_year in ctx.db.account_fiscal_year().iter() {
+        let company = ctx
+            .db
+            .company()
             .id()
-            .delete(&issue_id);
-    }
-
-    let mut scanned_rows = 0_u64;
-    let mut backfilled_rows = 0_u64;
-    let mut unresolved_rows = 0_u64;
-
-    let fiscal_years: Vec<_> = ctx.db.account_fiscal_year().iter().collect();
-    for fiscal_year in fiscal_years {
-        scanned_rows += 1;
-        let Some(company) = ctx.db.company().id().find(&fiscal_year.company_id) else {
-            unresolved_rows += 1;
-            if fiscal_year.organization_id.is_some() {
-                ctx.db.account_fiscal_year().id().update(AccountFiscalYear {
-                    organization_id: None,
-                    ..fiscal_year.clone()
-                });
-            }
-            record_ownership_issue(
-                ctx,
-                "account_fiscal_year",
-                fiscal_year.id,
-                Some(fiscal_year.company_id),
-                None,
-                "company not found",
-            );
-            continue;
-        };
-
-        match fiscal_year.organization_id {
-            None => {
-                ctx.db.account_fiscal_year().id().update(AccountFiscalYear {
-                    organization_id: Some(company.organization_id),
-                    ..fiscal_year
-                });
-                backfilled_rows += 1;
-            }
-            Some(organization_id) if organization_id == company.organization_id => {}
-            Some(_) => {
-                unresolved_rows += 1;
-                ctx.db.account_fiscal_year().id().update(AccountFiscalYear {
-                    organization_id: None,
-                    ..fiscal_year.clone()
-                });
-                record_ownership_issue(
-                    ctx,
-                    "account_fiscal_year",
-                    fiscal_year.id,
-                    Some(fiscal_year.company_id),
-                    None,
-                    "stored organization conflicts with company organization",
-                );
-            }
+            .find(&fiscal_year.company_id)
+            .ok_or_else(|| {
+                format!(
+                    "account fiscal year {} references a missing company",
+                    fiscal_year.id
+                )
+            })?;
+        if fiscal_year.organization_id != company.organization_id {
+            return Err(format!(
+                "account fiscal year {} organization conflicts with company",
+                fiscal_year.id
+            ));
         }
     }
-
-    let periods: Vec<_> = ctx.db.account_period().iter().collect();
-    for period in periods {
-        scanned_rows += 1;
-        let company = ctx.db.company().id().find(&period.company_id);
+    for period in ctx.db.account_period().iter() {
+        let company = ctx
+            .db
+            .company()
+            .id()
+            .find(&period.company_id)
+            .ok_or_else(|| format!("account period {} references a missing company", period.id))?;
         let fiscal_year = ctx
             .db
             .account_fiscal_year()
             .id()
-            .find(&period.fiscal_year_id);
-
-        let derived_organization_id = match (company, fiscal_year) {
-            (None, _) => Err("company not found"),
-            (_, None) => Err("parent fiscal year not found"),
-            (Some(company), Some(fiscal_year)) if fiscal_year.company_id != period.company_id => {
-                Err("period company conflicts with parent fiscal year company")
-            }
-            (Some(_), Some(fiscal_year)) if fiscal_year.organization_id.is_none() => {
-                Err("parent fiscal year ownership is unresolved")
-            }
-            (Some(company), Some(fiscal_year))
-                if fiscal_year.organization_id != Some(company.organization_id) =>
-            {
-                Err("parent fiscal year organization conflicts with company organization")
-            }
-            (Some(company), Some(_)) => Ok(company.organization_id),
-        };
-
-        match derived_organization_id {
-            Ok(organization_id) if period.organization_id == Some(organization_id) => {}
-            Ok(organization_id) if period.organization_id.is_none() => {
-                ctx.db.account_period().id().update(AccountPeriod {
-                    organization_id: Some(organization_id),
-                    ..period
-                });
-                backfilled_rows += 1;
-            }
-            Ok(_) | Err(_) => {
-                unresolved_rows += 1;
-                let issue = derived_organization_id
-                    .err()
-                    .unwrap_or("stored organization conflicts with derived organization");
-                if period.organization_id.is_some() {
-                    ctx.db.account_period().id().update(AccountPeriod {
-                        organization_id: None,
-                        ..period.clone()
-                    });
-                }
-                record_ownership_issue(
-                    ctx,
-                    "account_period",
-                    period.id,
-                    Some(period.company_id),
-                    Some(period.fiscal_year_id),
-                    issue,
-                );
-            }
+            .find(&period.fiscal_year_id)
+            .ok_or_else(|| {
+                format!(
+                    "account period {} references a missing fiscal year",
+                    period.id
+                )
+            })?;
+        if fiscal_year.company_id != period.company_id
+            || fiscal_year.organization_id != company.organization_id
+            || period.organization_id != company.organization_id
+        {
+            return Err(format!(
+                "account period {} organization conflicts with its parents",
+                period.id
+            ));
         }
     }
-
-    ctx.db
-        .accounting_ownership_backfill_run()
-        .insert(AccountingOwnershipBackfillRun {
-            id: 0,
-            scope: "fiscal_periods".to_string(),
-            scanned_rows,
-            backfilled_rows,
-            unresolved_rows,
-            completed_at: ctx.timestamp,
-            completed_by: ctx.sender(),
-        });
-
-    log::info!(
-        "accounting fiscal ownership backfill: scanned={scanned_rows} backfilled={backfilled_rows} unresolved={unresolved_rows}"
-    );
     Ok(())
 }
 
@@ -1113,9 +1052,7 @@ pub fn setup_fiscal_calendar(
         .account_fiscal_year()
         .fiscal_year_by_company()
         .filter(&company_id)
-        .filter(|fy| {
-            fy.organization_id == Some(organization_id) && fy.name == params.fiscal_year_name
-        })
+        .filter(|fy| fy.organization_id == organization_id && fy.name == params.fiscal_year_name)
         .map(|fy| fy.id)
         .last()
         .ok_or("Fiscal year not found after create")?;
@@ -1184,9 +1121,7 @@ pub fn setup_fiscal_calendar(
                 .account_period()
                 .period_by_fiscal_year()
                 .filter(&fiscal_year_id)
-                .find(|period| {
-                    period.organization_id == Some(organization_id) && period.code == code
-                })
+                .find(|period| period.organization_id == organization_id && period.code == code)
                 .map(|period| period.id)
                 .ok_or("First fiscal period not found after create")?;
             open_account_period(ctx, organization_id, company_id, period_id)?;

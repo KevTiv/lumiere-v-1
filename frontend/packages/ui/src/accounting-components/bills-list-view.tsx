@@ -72,7 +72,7 @@ function getBillStatus(move: AccountMove): BillStatus {
   if (state === "Cancelled") return "cancelled"
   if (state === "Draft") return "draft"
   if (paymentState === "Paid") return "paid"
-  if (move.amountResidual > 0 && move.invoiceDateDue) {
+  if ((move.amountResidual ?? 0) > 0 && move.invoiceDateDue) {
     const due = microsSinceEpochToDate(move.invoiceDateDue)
     if (due != null && due < new Date()) return "overdue"
   }
@@ -122,8 +122,8 @@ export function BillsListView({
     paid: bills.filter((b) => getBillStatus(b) === "paid").length,
     pending: bills.filter((b) => ["pending", "approved", "partial"].includes(getBillStatus(b))).length,
     overdue: bills.filter((b) => getBillStatus(b) === "overdue").length,
-    totalAmount: bills.reduce((s, b) => s + b.amountTotal, 0),
-    totalDue: bills.reduce((s, b) => s + b.amountResidual, 0),
+    totalAmount: bills.reduce((s, b) => s + (b.amountTotal ?? 0), 0),
+    totalDue: bills.reduce((s, b) => s + (b.amountResidual ?? 0), 0),
   }
 
   return (
@@ -229,10 +229,10 @@ export function BillsListView({
                     </TableCell>
                     <TableCell>{formatTimestamp(bill.invoiceDate)}</TableCell>
                     <TableCell>{formatTimestamp(bill.invoiceDateDue)}</TableCell>
-                    <TableCell className="font-medium">{formatCurrency(bill.amountTotal)}</TableCell>
+                    <TableCell className="font-medium">{formatCurrency(bill.amountTotal ?? 0)}</TableCell>
                     <TableCell>
-                      <span className={cn("font-medium", bill.amountResidual > 0 ? "text-destructive" : "text-success")}>
-                        {formatCurrency(bill.amountResidual)}
+                      <span className={cn("font-medium", (bill.amountResidual ?? 0) > 0 ? "text-destructive" : "text-success")}>
+                        {formatCurrency(bill.amountResidual ?? 0)}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -260,7 +260,7 @@ export function BillsListView({
                                 {t("accounting.bills.billActions.recalculateTotals")}
                               </DropdownMenuItem>
                             )}
-                          {bill.amountResidual > 0 && (
+                          {(bill.amountResidual ?? 0) > 0 && (
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onPayBill?.(bill) }}>
                               <CreditCard className="h-4 w-4 mr-2" />{t("accounting.bills.billActions.payBill")}
                             </DropdownMenuItem>

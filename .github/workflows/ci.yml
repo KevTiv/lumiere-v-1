@@ -189,8 +189,14 @@ jobs:
       - name: Opaque record type-debt ratchet
         run: pnpm type-debt:check
 
+      - name: Enforce immutable browser operation transport
+        run: pnpm operation-transport:check
+
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Enforce mobile API boundary
+        run: pnpm --filter mobile lint
 
       - name: Unit tests (erp-shared)
         run: pnpm --dir packages/erp-shared test
@@ -274,5 +280,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: owner-report-pdf-diagnostics
-          path: artifacts/owner-report-pdf
+          context: ./chromium-worker
+          tags: lumiere-chromium-worker
+          load: true

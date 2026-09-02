@@ -1,13 +1,11 @@
 /**
- * Compile-only — Accounting BFF reducer keys stay aligned with `accountingBffCallUrl`.
+ * Compile-only — Accounting BFF reducer keys stay aligned with command metadata.
  */
 import {
   ACCOUNTING_BFF_REDUCERS,
-  accountingBffCallUrl,
   accountingCommandContract,
 } from "../commands/accounting-http";
 
 for (const k of ACCOUNTING_BFF_REDUCERS) {
-  void accountingBffCallUrl(k);
   void accountingCommandContract(k);
 }

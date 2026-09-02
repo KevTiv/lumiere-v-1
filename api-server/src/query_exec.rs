@@ -8,9 +8,10 @@ use serde_json::Value;
 
 use crate::error::ApiError;
 use stdb_auth::{
-    erp_org_extra_where, has_hr_permission, hr_fields_require_read_audit, identity_sql_literal,
-    is_hr_pii_resource, purpose_for_hr_resource, registry_get, resolve_http_sql_columns,
-    select_company_scoped_sql, select_org_scoped_sql, FieldAccessContext,
+    erp_org_extra_where, has_hr_permission, has_resource_read_permission,
+    hr_fields_require_read_audit, identity_sql_literal, is_hr_pii_resource,
+    purpose_for_hr_resource, registry_get, resolve_http_sql_columns, select_company_scoped_sql,
+    select_org_and_company_scoped_sql, select_org_scoped_sql, FieldAccessContext,
 };
 use stdb_client::StdbClient;
 use stdb_config::runtime_is_production;
@@ -32,6 +33,16 @@ fn ai_skill_permission_allowed(field_access: Option<&FieldAccessContext>, action
                     || permission == &format!("ai_skill:{action}")
             })
     })
+}
+
+fn has_iot_read_permission(field_access: Option<&FieldAccessContext>, resource: &str) -> bool {
+    has_resource_read_permission(field_access, resource)
+        || field_access.is_some_and(|access| {
+            access
+                .role_permissions
+                .iter()
+                .any(|permission| permission == "module:iot:read" || permission == "module:iot:*")
+        })
 }
 
 fn strip_soft_delete_fields(row: &mut Value) {
@@ -133,8 +144,47 @@ fn row_u64(row: &Value, camel: &str, snake: &str) -> Result<Option<u64>, String>
     optional_u64(row.get(camel).or_else(|| row.get(snake)))
 }
 
+fn row_enum_tag_is(row: &Value, column: &str, expected: &[&str]) -> bool {
+    row.get(column)
+        .and_then(Value::as_str)
+        .is_some_and(|tag| expected.contains(&tag))
+}
+
+fn identity_value_is(value: &Value, target_hex: &str) -> bool {
+    if let Some(hex) = value.as_str() {
+        return hex
+            .trim_start_matches("0x")
+            .trim_start_matches("0X")
+            .eq_ignore_ascii_case(target_hex);
+    }
+    if let Some(inner) = value.as_array().and_then(|items| items.first()) {
+        return identity_value_is(inner, target_hex);
+    }
+    value
+        .as_object()
+        .and_then(|object| object.get("some").or_else(|| object.get("Some")))
+        .is_some_and(|inner| identity_value_is(inner, target_hex))
+}
+
+fn row_identity_option_is(row: &Value, camel: &str, snake: &str, target_hex: &str) -> bool {
+    row.get(camel)
+        .or_else(|| row.get(snake))
+        .is_some_and(|value| identity_value_is(value, target_hex))
+}
+
 fn sort_rows_by_id_desc(rows: &mut [Value]) {
     rows.sort_by(|a, b| row_id_u64(b).cmp(&row_id_u64(a)));
+}
+
+fn enforce_requested_company(
+    allowed_company_id: u64,
+    requested_company_id: Option<u64>,
+    denied_message: &str,
+) -> Result<u64, ApiError> {
+    if requested_company_id.is_some_and(|requested| requested != allowed_company_id) {
+        return Err(ApiError::Forbidden(denied_message.into()));
+    }
+    Ok(allowed_company_id)
 }
 
 pub(crate) async fn company_ids_for_organization(
@@ -242,12 +292,11 @@ pub async fn resolve_crm_company_id(
             .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
     };
 
-    if requested_company_id.is_some_and(|requested| requested != allowed) {
-        return Err(ApiError::Forbidden(
-            "Cannot query another company's CRM data".into(),
-        ));
-    }
-    Ok(allowed)
+    enforce_requested_company(
+        allowed,
+        requested_company_id,
+        "Cannot query another company's CRM data",
+    )
 }
 
 /// Resolve the inventory company for the authenticated membership.
@@ -282,12 +331,11 @@ pub async fn resolve_inventory_company_id(
             .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
     };
 
-    if requested_company_id.is_some_and(|requested| requested != allowed) {
-        return Err(ApiError::Forbidden(
-            "Cannot query another company's inventory data".into(),
-        ));
-    }
-    Ok(allowed)
+    enforce_requested_company(
+        allowed,
+        requested_company_id,
+        "Cannot query another company's inventory data",
+    )
 }
 
 /// Resolve the only Purchasing company visible to the authenticated membership.
@@ -316,12 +364,11 @@ pub async fn resolve_purchasing_company_id(
             .await?
             .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
     };
-    if requested_company_id.is_some_and(|requested| requested != allowed) {
-        return Err(ApiError::Forbidden(
-            "Cannot query another company's Purchasing data".into(),
-        ));
-    }
-    Ok(allowed)
+    enforce_requested_company(
+        allowed,
+        requested_company_id,
+        "Cannot query another company's Purchasing data",
+    )
 }
 
 /// Resolve the only Accounting company visible to the authenticated membership.
@@ -356,12 +403,48 @@ pub async fn resolve_accounting_company_id(
             .await?
             .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
     };
-    if requested_company_id.is_some_and(|requested| requested != allowed) {
-        return Err(ApiError::Forbidden(
-            "Cannot query another company's accounting data".into(),
-        ));
-    }
-    Ok(allowed)
+    enforce_requested_company(
+        allowed,
+        requested_company_id,
+        "Cannot query another company's accounting data",
+    )
+}
+
+/// Resolve the only IoT company visible to this authenticated membership.
+///
+/// Every IoT table carries a required `company_id`, including pairing tokens.
+/// Organization-level memberships fall back to the default company; an explicit
+/// browser company remains actor intent and must match that server-derived scope.
+pub async fn resolve_iot_company_id(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+    requested_company_id: Option<u64>,
+) -> Result<u64, ApiError> {
+    let identity = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+    let sql = format!(
+        "SELECT id, organization_id, company_id, is_active FROM user_organization WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
+    );
+    let memberships = client
+        .query_sql(&sql)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let membership = memberships
+        .first()
+        .ok_or_else(|| ApiError::Forbidden("No active organization membership".into()))?;
+    let membership_company =
+        row_u64(membership, "companyId", "company_id").map_err(ApiError::Internal)?;
+    let allowed = match membership_company {
+        Some(company_id) if company_id > 0 => company_id,
+        _ => default_company_id(client, organization_id)
+            .await?
+            .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
+    };
+    enforce_requested_company(
+        allowed,
+        requested_company_id,
+        "Cannot query another company's IoT data",
+    )
 }
 
 pub(crate) fn crm_resource(resource: &str) -> bool {
@@ -466,9 +549,7 @@ pub(crate) fn purchasing_resource(resource: &str) -> bool {
 }
 
 /// Accounting resources backed by a table with a required (non-nullable)
-/// `company_id`. `account-account-types`, `account-payment-terms`, and
-/// `account-payment-term-lines` are deliberately excluded — those tables have
-/// no `company_id` column at all and are org-wide by design.
+/// `company_id`.
 pub(crate) fn accounting_resource(resource: &str) -> bool {
     matches!(
         resource,
@@ -482,10 +563,49 @@ pub(crate) fn accounting_resource(resource: &str) -> bool {
             | "account-periods"
             | "account-reconciliation-widgets"
             | "account-taxes"
+            | "amortization-lines"
+            | "amortization-schedules"
+            | "analytic-accounts"
+            | "analytic-distribution-models"
+            | "analytic-lines"
+            | "bank-statements"
             | "budgets"
             | "budget-lines"
             | "budget-posts"
+            | "consolidation-elimination-entries"
+            | "depreciation-lines"
             | "fiscal-years"
+            | "fixed-assets"
+            | "fx-revaluation-runs"
+            | "partner-credit-controls"
+            | "partner-credit-holds"
+            | "payment-accounts"
+            | "payment-fees"
+            | "payment-reconciliations"
+            | "payment-reversals"
+            | "payment-transactions"
+            | "tax-deadlines"
+            | "tax-groups"
+            | "tax-schedules"
+    )
+}
+
+/// Accounting resources whose rows are either owned by the selected company
+/// or explicitly shared inside the organization with a null `company_id`.
+pub(crate) fn optional_company_accounting_resource(resource: &str) -> bool {
+    matches!(resource, "account-account-types")
+}
+
+pub(crate) fn iot_resource(resource: &str) -> bool {
+    matches!(
+        resource,
+        "iot-actions"
+            | "iot-alerts"
+            | "iot-devices"
+            | "iot-hubs"
+            | "iot-pairing-tokens"
+            | "iot-telemetry"
+            | "iot-thresholds"
     )
 }
 
@@ -565,17 +685,22 @@ async fn manager_employee_id(
     organization_id: u64,
     identity_hex: &str,
 ) -> Result<Option<u64>, ApiError> {
-    let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
     let sql = format!(
-        "SELECT id FROM hr_employee WHERE organization_id = {organization_id} AND user_id = {id} AND is_active = true LIMIT 1"
+        "SELECT id, user_id FROM hr_employee WHERE organization_id = {organization_id} AND is_active = true"
     );
+    let target = identity_hex
+        .trim()
+        .trim_start_matches("0x")
+        .trim_start_matches("0X");
     let rows = client
         .query_sql(&sql)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(rows
-        .first()
-        .and_then(|r| r.get("id").and_then(|v| v.as_u64())))
+    rows.iter()
+        .find(|row| row_identity_option_is(row, "userId", "user_id", target))
+        .map(row_id_u64_strict)
+        .transpose()
+        .map_err(ApiError::Internal)
 }
 
 async fn maybe_log_hr_pii_read(
@@ -629,6 +754,99 @@ pub async fn execute_resource_query(
     .await
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AuthoritativeResourceScope {
+    Organization,
+    OrganizationAndCompany,
+    OrganizationOptionalCompany,
+}
+
+fn authoritative_resource_scope(resource: &str) -> Option<AuthoritativeResourceScope> {
+    match resource {
+        "products" => Some(AuthoritativeResourceScope::Organization),
+        "contacts" => Some(AuthoritativeResourceScope::OrganizationOptionalCompany),
+        "sale-orders" | "purchase-orders" | "tasks" | "account-moves" | "mrp-productions" => {
+            Some(AuthoritativeResourceScope::OrganizationAndCompany)
+        }
+        _ => None,
+    }
+}
+
+fn authoritative_record_sql(
+    resource: &str,
+    organization_id: u64,
+    company_id: u64,
+    record_id: u64,
+    field_access: Option<&FieldAccessContext>,
+) -> Result<(String, AuthoritativeResourceScope), ApiError> {
+    if record_id == 0 || organization_id == 0 || company_id == 0 {
+        return Err(ApiError::Unprocessable(
+            "organization, company, and record IDs must be positive".into(),
+        ));
+    }
+    if !has_resource_read_permission(field_access, resource) {
+        return Err(ApiError::NotFound(
+            "Authoritative resource not found".into(),
+        ));
+    }
+    let scope = authoritative_resource_scope(resource)
+        .ok_or_else(|| ApiError::NotFound("Authoritative resource not found".into()))?;
+    let registry = registry_get(resource)
+        .ok_or_else(|| ApiError::NotFound("Authoritative resource not found".into()))?;
+    let id_filter = format!(" AND id = {record_id}");
+    let sql = match scope {
+        AuthoritativeResourceScope::OrganizationAndCompany => select_org_and_company_scoped_sql(
+            resource,
+            &registry.table,
+            organization_id,
+            company_id,
+            field_access,
+            &id_filter,
+            " LIMIT 1",
+        ),
+        AuthoritativeResourceScope::Organization
+        | AuthoritativeResourceScope::OrganizationOptionalCompany => select_org_scoped_sql(
+            resource,
+            &registry.table,
+            organization_id,
+            field_access,
+            &id_filter,
+            " LIMIT 1",
+        ),
+    }
+    .map_err(ApiError::Internal)?;
+    Ok((sql, scope))
+}
+
+pub async fn execute_authorized_resource_record(
+    client: &StdbClient,
+    resource: &str,
+    organization_id: u64,
+    company_id: u64,
+    record_id: u64,
+    field_access: Option<&FieldAccessContext>,
+) -> Result<Option<Value>, ApiError> {
+    let (sql, scope) = authoritative_record_sql(
+        resource,
+        organization_id,
+        company_id,
+        record_id,
+        field_access,
+    )?;
+    let mut rows = client
+        .query_sql(&sql)
+        .await
+        .map_err(|error| ApiError::Internal(error.to_string()))?;
+
+    if scope == AuthoritativeResourceScope::OrganizationOptionalCompany {
+        rows.retain(|row| row_company_matches(row, company_id, true));
+    }
+    if resource == "contacts" {
+        filter_and_strip_soft_deleted(&mut rows);
+    }
+    Ok(rows.into_iter().next())
+}
+
 pub async fn execute_resource_query_for_company(
     client: &StdbClient,
     resource: &str,
@@ -638,6 +856,11 @@ pub async fn execute_resource_query_for_company(
     requested_company_id: Option<u64>,
 ) -> Result<Vec<Value>, ApiError> {
     let fa = field_access;
+    if iot_resource(resource) && !has_iot_read_permission(fa, resource) {
+        return Err(ApiError::Forbidden(format!(
+            "Read permission denied for IoT resource '{resource}'"
+        )));
+    }
     let crm_company_id = if crm_resource(resource) {
         Some(
             resolve_crm_company_id(client, organization_id, identity_hex, requested_company_id)
@@ -672,15 +895,24 @@ pub async fn execute_resource_query_for_company(
     } else {
         None
     };
-    let accounting_company_id = if accounting_resource(resource) {
-        Some(
-            resolve_accounting_company_id(
-                client,
-                organization_id,
-                identity_hex,
-                requested_company_id,
+    let accounting_company_id =
+        if accounting_resource(resource) || optional_company_accounting_resource(resource) {
+            Some(
+                resolve_accounting_company_id(
+                    client,
+                    organization_id,
+                    identity_hex,
+                    requested_company_id,
+                )
+                .await?,
             )
-            .await?,
+        } else {
+            None
+        };
+    let iot_company_id = if iot_resource(resource) {
+        Some(
+            resolve_iot_company_id(client, organization_id, identity_hex, requested_company_id)
+                .await?,
         )
     } else {
         None
@@ -891,17 +1123,44 @@ pub async fn execute_resource_query_for_company(
         // always rejected with a 400 — build the WHERE clause without it and
         // filter the None rows out here instead.
         "timesheets-to-validate" | "timesheets-unbilled" => {
-            let reg = registry_get(resource).ok_or_else(|| {
-                ApiError::NotFound(format!("Unknown resource: \"{resource}\""))
-            })?;
+            let reg = registry_get(resource)
+                .ok_or_else(|| ApiError::NotFound(format!("Unknown resource: \"{resource}\"")))?;
             let extra_where = if resource == "timesheets-to-validate" {
                 " AND validation_status = 'draft'"
             } else {
                 " AND validation_status = 'validated' AND timesheet_invoice_type = 'billable'"
             };
+            let sql =
+                select_org_scoped_sql(resource, &reg.table, organization_id, fa, extra_where, "")
+                    .map_err(ApiError::Internal)?;
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(|row| {
+                row_u64(row, "timesheetInvoiceId", "timesheet_invoice_id")
+                    .ok()
+                    .flatten()
+                    .is_none()
+            });
+            return Ok(rows);
+        }
+        "sale-orders-to-approve"
+        | "leaves-to-approve"
+        | "payslips-to-export"
+        | "expense-sheets-to-approve"
+        | "expenses-missing-receipt"
+        | "expense-policy-exceptions" => {
+            let registry = registry_get(resource)
+                .ok_or_else(|| ApiError::NotFound(format!("Unknown resource: \"{resource}\"")))?;
+            let extra_where = if resource == "expenses-missing-receipt" {
+                " AND has_receipt = false"
+            } else {
+                ""
+            };
             let sql = select_org_scoped_sql(
                 resource,
-                &reg.table,
+                &registry.table,
                 organization_id,
                 fa,
                 extra_where,
@@ -912,11 +1171,96 @@ pub async fn execute_resource_query_for_company(
                 .query_sql(&sql)
                 .await
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
+            let expected: &[&str] = match resource {
+                "sale-orders-to-approve" => &["ToApprove"],
+                "leaves-to-approve" => &["Confirm", "ValidatedOne"],
+                "payslips-to-export" => &["Verify"],
+                "expense-sheets-to-approve" => &["Submitted"],
+                "expenses-missing-receipt" => &["Draft"],
+                "expense-policy-exceptions" => &["Pending"],
+                _ => unreachable!(),
+            };
+            rows.retain(|row| row_enum_tag_is(row, "state", expected));
+            return Ok(rows);
+        }
+        "purchase-orders-to-approve" => {
+            let registry = registry_get(resource)
+                .ok_or_else(|| ApiError::NotFound(format!("Unknown resource: \"{resource}\"")))?;
+            let company_id = purchasing_company_id
+                .ok_or_else(|| ApiError::Internal("purchasing company id not resolved".into()))?;
+            let sql = select_org_and_company_scoped_sql(
+                resource,
+                &registry.table,
+                organization_id,
+                company_id,
+                fa,
+                "",
+                "",
+            )
+            .map_err(ApiError::Internal)?;
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(|row| row_enum_tag_is(row, "state", &["ToApprove"]));
+            return Ok(rows);
+        }
+        "partner-banks" => {
+            let registry = registry_get(resource)
+                .ok_or_else(|| ApiError::NotFound(format!("Unknown resource: \"{resource}\"")))?;
+            let company_id = purchasing_company_id
+                .ok_or_else(|| ApiError::Internal("purchasing company id not resolved".into()))?;
+            let sql = select_org_scoped_sql(resource, &registry.table, organization_id, fa, "", "")
+                .map_err(ApiError::Internal)?;
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            rows.retain(|row| row_company_matches(row, company_id, true));
+            return Ok(rows);
+        }
+        "landed-cost-lines" => {
+            let company_id = purchasing_company_id
+                .ok_or_else(|| ApiError::Internal("purchasing company id not resolved".into()))?;
+            let cost_rows = client
+                .query_sql(&format!(
+                    "SELECT id, company_id FROM stock_landed_cost WHERE organization_id = {organization_id} AND company_id = {company_id}"
+                ))
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+            let cost_ids: HashSet<u64> = cost_rows
+                .iter()
+                .map(row_id_u64)
+                .filter(|id| *id > 0)
+                .collect();
+            if cost_ids.is_empty() {
+                return Ok(Vec::new());
+            }
+            let registry = registry_get(resource)
+                .ok_or_else(|| ApiError::NotFound(format!("Unknown resource: \"{resource}\"")))?;
+            let sql = select_org_scoped_sql(resource, &registry.table, organization_id, fa, "", "")
+                .map_err(ApiError::Internal)?;
+            let mut rows = client
+                .query_sql(&sql)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
             rows.retain(|row| {
-                row_u64(row, "timesheetInvoiceId", "timesheet_invoice_id")
+                row_u64(row, "landedCostId", "landed_cost_id")
                     .ok()
                     .flatten()
-                    .is_none()
+                    .is_some_and(|id| cost_ids.contains(&id))
+            });
+            rows.sort_by(|a, b| {
+                let key = |row: &Value| {
+                    (
+                        row_u64(row, "landedCostId", "landed_cost_id")
+                            .ok()
+                            .flatten()
+                            .unwrap_or(0),
+                        row_id_u64(row),
+                    )
+                };
+                key(a).cmp(&key(b))
             });
             return Ok(rows);
         }
@@ -944,7 +1288,10 @@ pub async fn execute_resource_query_for_company(
         }
         "consolidation-accounts" => {
             let col = resolve_http_sql_columns(resource, fa).map_err(ApiError::Internal)?;
-            let sql = format!("SELECT {} FROM consolidation_account", col.join(", "));
+            let sql = format!(
+                "SELECT {} FROM consolidation_account WHERE organization_id = {organization_id}",
+                col.join(", ")
+            );
             return client
                 .query_sql(&sql)
                 .await
@@ -952,7 +1299,10 @@ pub async fn execute_resource_query_for_company(
         }
         "consolidation-journals" => {
             let col = resolve_http_sql_columns(resource, fa).map_err(ApiError::Internal)?;
-            let sql = format!("SELECT {} FROM consolidation_journal", col.join(", "));
+            let sql = format!(
+                "SELECT {} FROM consolidation_journal WHERE organization_id = {organization_id}",
+                col.join(", ")
+            );
             return client
                 .query_sql(&sql)
                 .await
@@ -960,8 +1310,13 @@ pub async fn execute_resource_query_for_company(
         }
         "consolidation-elimination-entries" => {
             let col = resolve_http_sql_columns(resource, fa).map_err(ApiError::Internal)?;
+            let company_id = accounting_company_id.ok_or_else(|| {
+                ApiError::Internal(
+                    "consolidation elimination entries require accounting company scope".into(),
+                )
+            })?;
             let sql = format!(
-                "SELECT {} FROM consolidation_elimination_entry",
+                "SELECT {} FROM consolidation_elimination_entry WHERE organization_id = {organization_id} AND company_id = {company_id}",
                 col.join(", ")
             );
             return client
@@ -1540,16 +1895,33 @@ pub async fn execute_resource_query_for_company(
     }
 
     if resource == "my-employee" {
-        let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+        let target = identity_hex
+            .trim()
+            .trim_start_matches("0x")
+            .trim_start_matches("0X");
         let cols = resolve_http_sql_columns("my-employee", fa).map_err(ApiError::Internal)?;
-        let col_part = cols.join(", ");
+        let needs_user_id = !cols.iter().any(|column| column == "user_id");
+        let mut fetch_cols = cols.clone();
+        if needs_user_id {
+            fetch_cols.push("user_id".to_string());
+        }
         let sql = format!(
-            "SELECT {col_part} FROM hr_employee WHERE organization_id = {organization_id} AND user_id = {id} AND is_active = true"
+            "SELECT {} FROM hr_employee WHERE organization_id = {organization_id} AND is_active = true",
+            fetch_cols.join(", ")
         );
-        let rows = client
+        let mut rows = client
             .query_sql(&sql)
             .await
             .map_err(|e| ApiError::Internal(e.to_string()))?;
+        rows.retain(|row| row_identity_option_is(row, "userId", "user_id", target));
+        if needs_user_id {
+            for row in &mut rows {
+                if let Value::Object(fields) = row {
+                    fields.remove("userId");
+                    fields.remove("user_id");
+                }
+            }
+        }
         let record_id = rows
             .first()
             .and_then(|r| r.get("id").and_then(|v| v.as_u64()))
@@ -1596,26 +1968,39 @@ pub async fn execute_resource_query_for_company(
 
     // H1: org-wide `employees` only for HR roles; others get self row only (same as my-employee).
     if resource == "employees" {
-        let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
         let cols = resolve_http_sql_columns("employees", fa).map_err(ApiError::Internal)?;
-        let col_part = cols.join(", ");
         let can_list_all = has_hr_permission(fa, "hr_employee", "read")
             || has_hr_permission(fa, "hr_employee", "create")
             || has_hr_permission(fa, "hr_employee", "update")
             || has_hr_permission(fa, "hr_employee", "view_pii");
-        let sql = if can_list_all {
-            format!(
-                "SELECT {col_part} FROM hr_employee WHERE organization_id = {organization_id} AND is_active = true"
-            )
-        } else {
-            format!(
-                "SELECT {col_part} FROM hr_employee WHERE organization_id = {organization_id} AND user_id = {id} AND is_active = true"
-            )
-        };
-        let rows = client
+        let needs_user_id = !can_list_all && !cols.iter().any(|column| column == "user_id");
+        let mut fetch_cols = cols.clone();
+        if needs_user_id {
+            fetch_cols.push("user_id".to_string());
+        }
+        let sql = format!(
+            "SELECT {} FROM hr_employee WHERE organization_id = {organization_id} AND is_active = true",
+            fetch_cols.join(", ")
+        );
+        let mut rows = client
             .query_sql(&sql)
             .await
             .map_err(|e| ApiError::Internal(e.to_string()))?;
+        if !can_list_all {
+            let target = identity_hex
+                .trim()
+                .trim_start_matches("0x")
+                .trim_start_matches("0X");
+            rows.retain(|row| row_identity_option_is(row, "userId", "user_id", target));
+            if needs_user_id {
+                for row in &mut rows {
+                    if let Value::Object(fields) = row {
+                        fields.remove("userId");
+                        fields.remove("user_id");
+                    }
+                }
+            }
+        }
         maybe_log_hr_pii_read(
             client,
             organization_id,
@@ -1691,8 +2076,10 @@ pub async fn execute_resource_query_for_company(
         "pricelist-items" => "",
         "pos-loyalty-programs" => " ORDER BY id DESC",
         "sale-commissions" | "sale-commissions-pending" => " ORDER BY id DESC",
-        "landed-costs" => " ORDER BY id DESC",
-        "landed-cost-lines" => " ORDER BY landed_cost_id ASC, id ASC",
+        // SpacetimeDB HTTP SQL rejects ORDER BY for this table; sort below.
+        "landed-costs" => "",
+        // Dedicated company-safe arm sorts these rows in Rust.
+        "landed-cost-lines" => "",
         "contact-tags" => "",
         "contact-categories" => "",
         "contact-segments" => "",
@@ -1722,7 +2109,12 @@ pub async fn execute_resource_query_for_company(
     } else if let Some(cid) = purchasing_company_id {
         extra_where_owned = format!("{extra_where_raw} AND company_id = {cid}");
         extra_where_owned.as_str()
+    } else if optional_company_accounting_resource(resource) {
+        extra_where_raw
     } else if let Some(cid) = accounting_company_id {
+        extra_where_owned = format!("{extra_where_raw} AND company_id = {cid}");
+        extra_where_owned.as_str()
+    } else if let Some(cid) = iot_company_id {
         extra_where_owned = format!("{extra_where_raw} AND company_id = {cid}");
         extra_where_owned.as_str()
     } else {
@@ -1760,6 +2152,15 @@ pub async fn execute_resource_query_for_company(
         rows.retain(|row| row_company_matches(row, company_id, false));
     }
     if let Some(company_id) = accounting_company_id {
+        rows.retain(|row| {
+            row_company_matches(
+                row,
+                company_id,
+                optional_company_accounting_resource(resource),
+            )
+        });
+    }
+    if let Some(company_id) = iot_company_id {
         rows.retain(|row| row_company_matches(row, company_id, false));
     }
 
@@ -1813,7 +2214,7 @@ pub async fn execute_resource_query_for_company(
                 asq.cmp(&bsq)
             });
         }
-        "activities" => {
+        "activities" | "landed-costs" => {
             rows.sort_by(|a, b| {
                 let ai = a.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
                 let bi = b.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
@@ -1854,6 +2255,90 @@ pub async fn execute_resource_query_for_company(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    fn authoritative_access(permission: &str) -> FieldAccessContext {
+        FieldAccessContext {
+            organization_id: 42,
+            role_id: 7,
+            role_name: "member".into(),
+            is_superuser: false,
+            role_permissions: vec![permission.into()],
+            identity_hex: "actor".into(),
+            field_permissions: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn authoritative_company_sql_is_bounded_by_scope_and_id() {
+        let access = authoritative_access("sale_order:read");
+        let (sql, scope) = authoritative_record_sql("sale-orders", 42, 7, 99, Some(&access))
+            .expect("authorized SQL");
+        assert_eq!(scope, AuthoritativeResourceScope::OrganizationAndCompany);
+        assert!(sql.contains("organization_id = 42"));
+        assert!(sql.contains("company_id = 7"));
+        assert!(sql.contains("id = 99"));
+        assert!(sql.ends_with("LIMIT 1"));
+    }
+
+    #[test]
+    fn authoritative_sql_fails_closed_without_read_permission() {
+        let access = authoritative_access("sale_order:write");
+        assert!(authoritative_record_sql("sale-orders", 42, 7, 99, Some(&access)).is_err());
+        assert!(authoritative_record_sql("sale-orders", 42, 7, 99, None).is_err());
+        assert!(authoritative_record_sql("unknown", 42, 7, 99, Some(&access)).is_err());
+    }
+
+    #[test]
+    fn company_bound_actor_cannot_request_another_company() {
+        assert!(enforce_requested_company(7, Some(8), "cross-company").is_err());
+        assert_eq!(
+            enforce_requested_company(7, Some(7), "cross-company").expect("same company"),
+            7
+        );
+    }
+
+    #[test]
+    fn enum_post_filter_matches_only_expected_sats_tags() {
+        assert!(row_enum_tag_is(
+            &json!({ "state": "ToApprove" }),
+            "state",
+            &["ToApprove"]
+        ));
+        assert!(row_enum_tag_is(
+            &json!({ "state": "ValidatedOne" }),
+            "state",
+            &["Confirm", "ValidatedOne"]
+        ));
+        assert!(!row_enum_tag_is(
+            &json!({ "state": "Approved" }),
+            "state",
+            &["ToApprove"]
+        ));
+    }
+
+    #[test]
+    fn identity_post_filter_accepts_sats_option_encodings() {
+        let target = "abcdef";
+        for row in [
+            json!({ "userId": ["0xABCDEF"] }),
+            json!({ "user_id": { "some": ["0xabcdef"] } }),
+            json!({ "userId": "ABCDEF" }),
+        ] {
+            assert!(row_identity_option_is(&row, "userId", "user_id", target));
+        }
+        assert!(!row_identity_option_is(
+            &json!({ "userId": { "none": [] } }),
+            "userId",
+            "user_id",
+            target
+        ));
+        assert!(!row_identity_option_is(
+            &json!({ "userId": ["0x123456"] }),
+            "userId",
+            "user_id",
+            target
+        ));
+    }
 
     #[test]
     fn row_not_soft_deleted_treats_missing_and_null_as_live() {
@@ -2123,10 +2608,30 @@ mod tests {
             "account-periods",
             "account-reconciliation-widgets",
             "account-taxes",
+            "amortization-lines",
+            "amortization-schedules",
+            "analytic-accounts",
+            "analytic-distribution-models",
+            "analytic-lines",
+            "bank-statements",
             "budgets",
             "budget-lines",
             "budget-posts",
+            "consolidation-elimination-entries",
+            "depreciation-lines",
             "fiscal-years",
+            "fixed-assets",
+            "fx-revaluation-runs",
+            "partner-credit-controls",
+            "partner-credit-holds",
+            "payment-accounts",
+            "payment-fees",
+            "payment-reconciliations",
+            "payment-reversals",
+            "payment-transactions",
+            "tax-deadlines",
+            "tax-groups",
+            "tax-schedules",
         ] {
             assert!(
                 accounting_resource(resource),
@@ -2136,11 +2641,17 @@ mod tests {
     }
 
     #[test]
-    fn accounting_resource_excludes_org_wide_tables_and_other_domains() {
-        // These accounting tables carry no company_id column at all — org-wide by design.
+    fn accounting_resource_distinguishes_optional_company_and_org_wide_tables() {
         assert!(!accounting_resource("account-account-types"));
+        assert!(optional_company_accounting_resource(
+            "account-account-types"
+        ));
+        // These tables carry no company_id column and remain org-wide.
         assert!(!accounting_resource("account-payment-terms"));
         assert!(!accounting_resource("account-payment-term-lines"));
+        assert!(!optional_company_accounting_resource(
+            "account-payment-terms"
+        ));
         // Sanity: not misclassified as another domain's resource.
         assert!(!accounting_resource("contacts"));
         assert!(!accounting_resource("stock-quants"));
@@ -2162,10 +2673,30 @@ mod tests {
             "account-periods",
             "account-reconciliation-widgets",
             "account-taxes",
+            "amortization-lines",
+            "amortization-schedules",
+            "analytic-accounts",
+            "analytic-distribution-models",
+            "analytic-lines",
+            "bank-statements",
             "budgets",
             "budget-lines",
             "budget-posts",
+            "consolidation-elimination-entries",
+            "depreciation-lines",
             "fiscal-years",
+            "fixed-assets",
+            "fx-revaluation-runs",
+            "partner-credit-controls",
+            "partner-credit-holds",
+            "payment-accounts",
+            "payment-fees",
+            "payment-reconciliations",
+            "payment-reversals",
+            "payment-transactions",
+            "tax-deadlines",
+            "tax-groups",
+            "tax-schedules",
         ] {
             let entry = registry_get(resource).expect("accounting resource must be registered");
             let projects_company_id = entry.mandatory.iter().any(|f| f == "company_id")
@@ -2179,6 +2710,103 @@ mod tests {
 
     #[test]
     fn accounting_company_scoped_rows_filtered_strictly_no_shared_fallback() {
+        let mut rows = vec![
+            json!({ "id": 1, "companyId": 7 }),
+            json!({ "id": 2, "companyId": null }),
+            json!({ "id": 3, "companyId": 8 }),
+        ];
+        rows.retain(|row| row_company_matches(row, 7, false));
+        assert_eq!(rows, vec![json!({ "id": 1, "companyId": 7 })]);
+    }
+
+    #[test]
+    fn accounting_optional_company_rows_include_selected_and_shared_only() {
+        let entry = registry_get("account-account-types")
+            .expect("optional-company accounting resource must be registered");
+        assert!(entry
+            .default_restricted
+            .iter()
+            .any(|field| field == "company_id"));
+
+        let mut rows = vec![
+            json!({ "id": 1, "companyId": 7 }),
+            json!({ "id": 2, "companyId": null }),
+            json!({ "id": 3, "companyId": 8 }),
+        ];
+        rows.retain(|row| row_company_matches(row, 7, true));
+        assert_eq!(
+            rows,
+            vec![
+                json!({ "id": 1, "companyId": 7 }),
+                json!({ "id": 2, "companyId": null }),
+            ]
+        );
+    }
+
+    #[test]
+    fn iot_resource_classification_covers_every_company_owned_table() {
+        for resource in [
+            "iot-actions",
+            "iot-alerts",
+            "iot-devices",
+            "iot-hubs",
+            "iot-pairing-tokens",
+            "iot-telemetry",
+            "iot-thresholds",
+        ] {
+            assert!(iot_resource(resource), "{resource} must be company-scoped");
+        }
+        assert!(!iot_resource("contacts"));
+        assert!(!iot_resource("pos-configs"));
+    }
+
+    #[test]
+    fn iot_read_permission_accepts_module_and_resource_permissions() {
+        let module_reader = authoritative_access("module:iot:read");
+        for resource in [
+            "iot-actions",
+            "iot-alerts",
+            "iot-devices",
+            "iot-hubs",
+            "iot-pairing-tokens",
+            "iot-telemetry",
+            "iot-thresholds",
+        ] {
+            assert!(
+                has_iot_read_permission(Some(&module_reader), resource),
+                "{resource} must accept the checked-in Manager module permission"
+            );
+        }
+
+        let resource_reader = authoritative_access("iot_hub:read");
+        assert!(has_iot_read_permission(Some(&resource_reader), "iot-hubs"));
+
+        let writer = authoritative_access("module:iot:write");
+        assert!(!has_iot_read_permission(Some(&writer), "iot-hubs"));
+        assert!(!has_iot_read_permission(None, "iot-hubs"));
+    }
+
+    #[test]
+    fn iot_resources_project_company_id_for_defense_in_depth() {
+        for resource in [
+            "iot-actions",
+            "iot-alerts",
+            "iot-devices",
+            "iot-hubs",
+            "iot-pairing-tokens",
+            "iot-telemetry",
+            "iot-thresholds",
+        ] {
+            let columns = resolve_http_sql_columns(resource, None).expect("IoT HTTP projection");
+            assert!(
+                columns.iter().any(|column| column == "company_id"),
+                "{resource} must project company_id for post-fetch verification"
+            );
+        }
+    }
+
+    #[test]
+    fn iot_company_scoped_rows_exclude_null_and_cross_company_values() {
         let mut rows = vec![
             json!({ "id": 1, "companyId": 7 }),
             json!({ "id": 2, "companyId": null }),

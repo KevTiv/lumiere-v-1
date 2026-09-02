@@ -88,6 +88,8 @@ export async function POST(request: NextRequest) {
     org_id: orgId,
     query,
     limit,
+    stdb_token: session.stdbToken,
+    identity_hex: session.identityHex,
   }
   const includeTypes = sanitizeIncludeTypes(body.include_types)
   const uiContext = sanitizeRagUiContext(body.ui_context)

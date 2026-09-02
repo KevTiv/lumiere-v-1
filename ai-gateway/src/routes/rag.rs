@@ -17,18 +17,18 @@ use crate::{
     },
     error::{AppError, AppResult},
     harness::{
-        fetch_live_snapshots, filter_entity_refs_by_allowed_types, format_live_context_block,
-        resolve_snapshot_candidates, LiveSnapshot, SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
+        fetch_authorized_live_snapshots, filter_entity_refs_by_allowed_types,
+        format_live_context_block, resolve_snapshot_candidates, ActorCredentials, LiveSnapshot,
+        SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
     },
     providers::llm::LlmMessage,
-    qdrant_client::SearchResult,
-    rig_agent::ContextHit,
+    retrieval_policy::optional_retrieval,
     state::AppState,
+    stdb_embed::company_belongs_to_organization,
 };
 
 const RAG_MAX_CONTEXT_CHUNKS: u64 = 20;
 const RAG_ORG_ACTIVITY_TOP_K: usize = 8;
-const RAG_ENTITY_MATCH_BOOST: f32 = 0.15;
 const RAG_MAX_INCLUDE_TYPES: usize = 8;
 
 #[derive(Clone, Deserialize, Default)]
@@ -58,6 +58,8 @@ pub struct RagRequest {
     pub ui_context: Option<UiContext>,
     pub agent_id: Option<u64>,
     pub team_member_id: Option<u64>,
+    pub stdb_token: String,
+    pub identity_hex: String,
     /// Optional BFF-provided entity allowlist for live snapshot reads.
     #[serde(default)]
     pub allowed_entity_types: Vec<String>,
@@ -101,12 +103,28 @@ pub struct RagSource {
 pub struct RagResponse {
     pub answer: String,
     pub sources: Vec<RagSource>,
+    pub retrieval_degraded: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agent_id: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+}
+
+fn no_relevant_information_response(retrieval_degraded: bool) -> RagResponse {
+    RagResponse {
+        answer: "No relevant information found for your query.".to_string(),
+        sources: Vec::new(),
+        retrieval_degraded,
+        agent_id: None,
+        provider: None,
+        model: None,
+    }
+}
+
+fn has_grounded_context(ranked: &[RankedSource], snapshots: &[LiveSnapshot]) -> bool {
+    !ranked.is_empty() || !snapshots.is_empty()
 }
 
 fn format_ui_context_block(ctx: &UiContext) -> Option<String> {
@@ -195,98 +213,6 @@ struct RankedSource {
     rag_source: RagSource,
 }
 
-fn parse_entity_id(entity_id: &str) -> u64 {
-    entity_id.parse().unwrap_or(0)
-}
-
-fn company_hit_to_ranked(hit: SearchResult) -> RankedSource {
-    let label = hit.content_type.clone();
-    let text = hit.text_snippet.clone();
-    RankedSource {
-        label: label.clone(),
-        text: text.clone(),
-        score: hit.score,
-        rag_source: RagSource {
-            kind: "memory".to_string(),
-            trust: "retrieved".to_string(),
-            content_type: hit.content_type,
-            content_id: hit.content_id,
-            entity_type: None,
-            entity_id: None,
-            score: hit.score,
-            text_snippet: text,
-            label: None,
-            field: None,
-            snapshot_at: None,
-        },
-    }
-}
-
-fn org_hit_to_ranked(hit: ContextHit) -> RankedSource {
-    let label = format!("org_activity:{}", hit.entity_type);
-    let text = hit.text.clone();
-    RankedSource {
-        label: label.clone(),
-        text: text.clone(),
-        score: hit.score,
-        rag_source: RagSource {
-            kind: "activity".to_string(),
-            trust: "retrieved".to_string(),
-            content_type: "org_activity".to_string(),
-            content_id: parse_entity_id(&hit.entity_id),
-            entity_type: Some(hit.entity_type),
-            entity_id: Some(hit.entity_id),
-            score: hit.score,
-            text_snippet: text,
-            label: None,
-            field: None,
-            snapshot_at: None,
-        },
-    }
-}
-
-fn entity_match_boost(ui: Option<&UiContext>, entity_type: &str, entity_id: &str) -> f32 {
-    let Some(ctx) = ui else {
-        return 0.0;
-    };
-    let Some(focus_type) = ctx.entity_type.as_deref().filter(|s| !s.is_empty()) else {
-        return 0.0;
-    };
-    if !focus_type.eq_ignore_ascii_case(entity_type) {
-        return 0.0;
-    }
-    match ctx.entity_id.as_deref().filter(|s| !s.is_empty()) {
-        Some(focus_id) if focus_id == entity_id => RAG_ENTITY_MATCH_BOOST,
-        None => RAG_ENTITY_MATCH_BOOST * 0.5,
-        _ => 0.0,
-    }
-}
-
-fn merge_retrieval_hits(
-    company_hits: Vec<SearchResult>,
-    org_hits: Vec<ContextHit>,
-    ui_context: Option<&UiContext>,
-) -> Vec<RankedSource> {
-    let mut merged: Vec<RankedSource> = company_hits
-        .into_iter()
-        .map(company_hit_to_ranked)
-        .chain(org_hits.into_iter().map(|hit| {
-            let boost = entity_match_boost(ui_context, &hit.entity_type, &hit.entity_id);
-            let mut ranked = org_hit_to_ranked(hit);
-            ranked.score += boost;
-            ranked.rag_source.score = ranked.score;
-            ranked
-        }))
-        .collect();
-
-    merged.sort_by(|a, b| {
-        b.score
-            .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    merged
-}
-
 fn snapshot_ui_from(ctx: Option<&UiContext>) -> Option<SnapshotUiContext> {
     ctx.map(|c| SnapshotUiContext {
         entity_type: c.entity_type.clone(),
@@ -356,6 +282,20 @@ pub async fn post_rag(
     if req.query.trim().is_empty() {
         return Err(AppError::BadRequest("query must not be empty".into()));
     }
+    let actor = ActorCredentials::new(req.stdb_token.clone(), req.identity_hex.clone())
+        .map_err(|error| AppError::Forbidden(error.to_string()))?;
+
+    let org_id = req
+        .org_id
+        .ok_or_else(|| AppError::BadRequest("org_id is required for RAG generation".into()))?;
+    let company_is_in_scope = company_belongs_to_organization(state.stdb.as_ref(), org_id, req.company_id)
+        .await
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+    if !company_is_in_scope {
+        return Err(AppError::Forbidden(
+            "company does not belong to organization".into(),
+        ));
+    }
 
     let ui_block = req
         .ui_context
@@ -372,57 +312,55 @@ pub async fn post_rag(
         .and_then(|c| c.module.as_deref())
         .unwrap_or("-");
 
-    // Embed the query (unified EmbedProvider)
-    let query_vector = state
-        .providers
-        .embedder
-        .embed(&req.query)
-        .await
-        .map_err(|e| AppError::Embedding(e.to_string()))?;
-
     // Retrieve relevant company-scoped chunks (optionally filtered by content type)
     let include_types = normalized_include_types(req.include_types.as_deref());
     let content_type_filter = (!include_types.is_empty()).then_some(include_types.as_slice());
-    let company_hits = state
-        .vector_store
-        .search_content_types(
-            query_vector,
-            req.company_id,
-            content_type_filter,
-            req.limit,
-            Some(0.65),
-        )
-        .await
-        .map_err(AppError::Qdrant)?;
+    let mut retrieval_degraded = false;
+    let company_result = match state.providers.embedder.embed(&req.query).await {
+        Ok(query_vector) => state
+            .vector_store
+            .search_content_types(
+                query_vector,
+                org_id,
+                req.company_id,
+                content_type_filter,
+                req.limit,
+                Some(0.65),
+            )
+            .await,
+        Err(error) => Err(error),
+    };
+    if let Err(error) = &company_result {
+        tracing::warn!(
+            org_id,
+            company_id = req.company_id,
+            error = %error,
+            "Primary semantic retrieval unavailable; continuing without vector candidates"
+        );
+    }
+    let company_outcome = optional_retrieval(company_result);
+    retrieval_degraded |= company_outcome.degraded;
+    let company_hits = company_outcome.value;
 
     let org_top_k = req.limit.clamp(1, RAG_ORG_ACTIVITY_TOP_K as u64) as usize;
-    let org_hits = if let Some(org_id) = req.org_id {
-        match state
-            .rig
-            .search_org(org_id, req.query.trim(), org_top_k)
-            .await
-        {
-            Ok(hits) => hits,
-            Err(err) => {
-                tracing::warn!(
-                    org_id,
-                    company_id = req.company_id,
-                    error = %err,
-                    "Org activity retrieval failed; continuing with company hits only"
-                );
-                Vec::new()
-            }
-        }
-    } else {
-        Vec::new()
-    };
+    let org_result = state
+        .rig
+        .search_scope(org_id, req.company_id, req.query.trim(), org_top_k)
+        .await;
+    if let Err(error) = &org_result {
+        tracing::warn!(
+            org_id,
+            company_id = req.company_id,
+            error = %error,
+            "Org activity retrieval unavailable; continuing with company hits only"
+        );
+    }
+    let org_outcome = optional_retrieval(org_result);
+    retrieval_degraded |= org_outcome.degraded;
+    let org_hits = org_outcome.value;
 
     let company_hit_count = company_hits.len();
     let org_hit_count = org_hits.len();
-
-    let org_id = req
-        .org_id
-        .ok_or_else(|| AppError::BadRequest("org_id is required for RAG generation".into()))?;
 
     let agent = resolve_agent(&state.stdb, org_id, req.agent_id, req.team_member_id)
         .await
@@ -441,17 +379,25 @@ pub async fn post_rag(
     );
 
     let live_snapshots = if agent_allows_live_read(&agent) {
-        fetch_live_snapshots(&state.stdb, org_id, req.company_id, &snapshot_candidates)
-            .await
-            .unwrap_or_else(|err| {
-                tracing::warn!(
-                    company_id = req.company_id,
-                    org_id,
-                    error = %err,
-                    "Live snapshot fetch failed; continuing with memory retrieval only"
-                );
-                Vec::new()
-            })
+        let snapshot_result = fetch_authorized_live_snapshots(
+            &state,
+            &actor,
+            org_id,
+            req.company_id,
+            &snapshot_candidates,
+        )
+        .await;
+        if let Err(error) = &snapshot_result {
+            tracing::warn!(
+                org_id,
+                company_id = req.company_id,
+                error = %error,
+                "Authoritative semantic candidates unavailable; continuing without them"
+            );
+        }
+        let snapshot_outcome = optional_retrieval(snapshot_result);
+        retrieval_degraded |= snapshot_outcome.degraded;
+        snapshot_outcome.value
     } else {
         tracing::debug!(
             agent_id = agent.agent_id,
@@ -461,9 +407,11 @@ pub async fn post_rag(
     };
 
     let live_snapshot_count = live_snapshots.len();
-    let ranked = merge_retrieval_hits(company_hits, org_hits, req.ui_context.as_ref());
+    // Qdrant hits rank candidates only; prompt text and citations come from
+    // scoped authoritative snapshots.
+    let ranked: Vec<RankedSource> = Vec::new();
 
-    if ranked.is_empty() && live_snapshots.is_empty() {
+    if !has_grounded_context(&ranked, &live_snapshots) {
         tracing::info!(
             company_id = req.company_id,
             org_id,
@@ -476,13 +424,7 @@ pub async fn post_rag(
             duration_ms = started.elapsed().as_millis() as u64,
             "RAG query answered (no hits)"
         );
-        return Ok(Json(RagResponse {
-            answer: "No relevant information found for your query.".to_string(),
-            sources: vec![],
-            agent_id: None,
-            provider: None,
-            model: None,
-        }));
+        return Ok(Json(no_relevant_information_response(retrieval_degraded)));
     }
 
     ensure_allowed_action(&agent, "chat").map_err(|e| AppError::Forbidden(e.to_string()))?;
@@ -566,6 +508,7 @@ pub async fn post_rag(
     Ok(Json(RagResponse {
         answer,
         sources,
+        retrieval_degraded,
         agent_id,
         provider,
         model,
@@ -592,6 +535,7 @@ pub async fn post_rag_stream(
                 "agent_id": response.agent_id,
                 "provider": response.provider,
                 "model": response.model,
+                "retrieval_degraded": response.retrieval_degraded,
             })
             .to_string(),
         ),
@@ -607,6 +551,16 @@ pub async fn post_rag_stream(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn degraded_empty_retrieval_returns_no_unverified_sources() {
+        let response = no_relevant_information_response(true);
+        assert!(response.retrieval_degraded);
+        assert!(response.sources.is_empty());
+        assert!(response.provider.is_none());
+        assert!(response.model.is_none());
+        assert!(!has_grounded_context(&[], &[]));
+    }
 
     #[test]
     fn ui_context_block_includes_route_and_module() {
@@ -645,57 +599,6 @@ mod tests {
         assert!(!prompt.contains("Live ERP snapshots"));
         assert!(!prompt.contains("Current ERP UI context"));
         assert!(prompt.contains("Question: What is this?"));
-    }
-
-    #[test]
-    fn merge_retrieval_orders_by_score_and_boosts_entity_match() {
-        let company = vec![SearchResult {
-            score: 0.7,
-            company_id: 1,
-            content_type: "invoice".into(),
-            content_id: 10,
-            stdb_embedding_id: 1,
-            text_snippet: "Company invoice".into(),
-        }];
-        let org = vec![ContextHit {
-            score: 0.68,
-            entity_type: "sale_order".into(),
-            entity_id: "42".into(),
-            text: "Order shipped".into(),
-            timestamp: 0,
-            source: "erp_activity".into(),
-        }];
-        let ui = UiContext {
-            entity_type: Some("sale_order".into()),
-            entity_id: Some("42".into()),
-            ..Default::default()
-        };
-        let merged = merge_retrieval_hits(company, org, Some(&ui));
-        assert_eq!(merged.len(), 2);
-        assert_eq!(
-            merged[0].rag_source.entity_type.as_deref(),
-            Some("sale_order")
-        );
-        assert!(merged[0].score >= 0.83);
-    }
-
-    #[test]
-    fn org_hit_maps_to_rag_source_with_parsed_entity_id() {
-        let ranked = org_hit_to_ranked(ContextHit {
-            score: 0.9,
-            entity_type: "sale_order".into(),
-            entity_id: "42".into(),
-            text: "Delayed picking".into(),
-            timestamp: 0,
-            source: "erp_activity".into(),
-        });
-        assert_eq!(ranked.rag_source.content_type, "org_activity");
-        assert_eq!(ranked.rag_source.entity_type.as_deref(), Some("sale_order"));
-        assert_eq!(ranked.rag_source.entity_id.as_deref(), Some("42"));
-        assert_eq!(ranked.rag_source.content_id, 42);
-        assert_eq!(ranked.rag_source.kind, "activity");
-        assert_eq!(ranked.rag_source.trust, "retrieved");
-        assert!(ranked.label.contains("org_activity"));
     }
 
     #[test]

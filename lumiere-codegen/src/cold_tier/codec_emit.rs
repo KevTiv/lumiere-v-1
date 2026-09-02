@@ -114,7 +114,7 @@ fn build_table_entry(schema: &GeneratedTableSchema, cold_table: &str) -> Value {
 }
 
 /// Map a `GeneratedType` to the Postgres DDL type string (must match pg_ddl_emit.rs).
-fn pg_type_for(ty: &GeneratedType) -> &'static str {
+pub(super) fn pg_type_for(ty: &GeneratedType) -> &'static str {
     match ty {
         GeneratedType::U64 => "NUMERIC(20,0)",
         GeneratedType::U8 | GeneratedType::U16 | GeneratedType::U32 => "BIGINT",

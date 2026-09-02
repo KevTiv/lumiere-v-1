@@ -1,3 +1,4 @@
+import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
@@ -364,7 +365,7 @@ test.describe("SAL-004: Full SO → Invoice creation flow", { tag: "@p0" }, () =
       const [invoiceRes] = await Promise.all([
         page.waitForResponse(
           (res) =>
-            res.url().includes("/api/call/create_invoice_from_sale_order") && res.ok(),
+            matchesOperationResponse(res, "create_invoice_from_sale_order") && res.ok(),
           { timeout: 30_000 },
         ),
         submitForm(page, "create-invoice-from-sale-order"),

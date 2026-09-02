@@ -2,13 +2,17 @@ use serde_json::{json, Value};
 
 use crate::{
     harness::snapshot::{
-        fetch_live_snapshots, filter_entity_refs_by_allowed_types, EntityRef,
+        fetch_authorized_live_snapshots, filter_entity_refs_by_allowed_types, EntityRef,
         HARNESS_MAX_LIVE_SNAPSHOTS,
     },
     tools::types::{live_snapshot_citation, ToolContext, ToolOutput, ToolResult},
 };
 
 pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
+    let actor = ctx
+        .actor
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("authenticated actor credentials are required"))?;
     let entity_type = input
         .get("entity_type")
         .and_then(|v| v.as_str())
@@ -42,8 +46,9 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
         anyhow::bail!("entity_type '{entity_type}' is not supported for snapshots");
     }
 
-    let snapshots = fetch_live_snapshots(
-        ctx.stdb.as_ref(),
+    let snapshots = fetch_authorized_live_snapshots(
+        &ctx.state,
+        actor,
         ctx.org_id,
         ctx.company_id,
         &candidates[..candidates.len().min(max)],

@@ -2,6 +2,15 @@
 
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import type {
+  AccountAccountTypeQueryRow,
+  AccountAccountQueryRow,
+  AccountJournalQueryRow,
+  AccountMoveLineQueryRow,
+  AccountMoveQueryRow,
+  AccountTaxQueryRow,
+} from "@lumiere/stdb/resource-reads"
+import { createStdbSdk } from "@lumiere/stdb/sdk"
 import { apiFetch } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
@@ -10,10 +19,7 @@ import {
 } from "@lumiere/erp-shared/accounting-create-params"
 import { stdbParamsToJson, encodeOptionalU64 } from "@lumiere/erp-shared/stdb-params-json"
 import type {
-  AccountAccount,
   AccountFiscalYear,
-  AccountJournal,
-  AccountMove,
   AccountPeriod,
   AddAccountMoveLineParams,
   AllocatePaymentParams,
@@ -49,8 +55,11 @@ import type {
   UpdateCrossoveredBudgetLineParams,
   UpdateCrossoveredBudgetParams,
 } from "@lumiere/stdb/types"
-import { accountingBffPost, type AccountingBffReducerKey } from "@lumiere/stdb/commands"
-import { invalidateStdbQueryResources, useStdbQuery } from "./stdb"
+import {
+  invalidateStdbQueryResources,
+  useCompanyScopedTypedQuery,
+  useTypedStdbQuery,
+} from "./stdb"
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
 
 function toScalarU64(v: bigint | number | string): bigint {
@@ -60,9 +69,7 @@ function toScalarU64(v: bigint | number | string): bigint {
 // ── Type Imports from @lumiere/stdb ─────────────────────────────────────────
 
 export type {
-  AccountAccount,
   AccountFiscalYear,
-  AccountMove,
   AccountMoveLine,
   AccountPeriod,
   AccountTax,
@@ -78,6 +85,15 @@ export type {
   CreateAccountBankStatementParams,
   CreateAccountJournalParams,
 } from "@lumiere/stdb/types"
+export type { AccountAccountQueryRow as AccountAccount } from "@lumiere/stdb/resource-reads"
+export type {
+  AccountAccountTypeQueryRow,
+  AccountJournalQueryRow,
+  AccountMoveLineQueryRow,
+  AccountMoveQueryRow,
+  AccountTaxQueryRow,
+} from "@lumiere/stdb/resource-reads"
+export type { AccountMoveQueryRow as AccountMove } from "@lumiere/stdb/resource-reads"
 
 // ── Query Hooks ───────────────────────────────────────────────────────────────
 
@@ -86,9 +102,18 @@ export type {
  */
 export function useAccountAccounts(
   organizationId: bigint,
-  options?: { staleTime?: number; enabled?: boolean; initialData?: AccountAccount[] },
+  options?: {
+    staleTime?: number
+    enabled?: boolean
+  },
 ) {
-  return useStdbQuery("account-accounts", organizationId, options)
+  const sdk = createStdbSdk(apiFetch)
+  return useCompanyScopedTypedQuery<AccountAccountQueryRow>(
+    "account-accounts",
+    organizationId,
+    (companyId) => sdk.forCompany(companyId).accounting.accounts.list(),
+    options,
+  )
 }
 
 /** Account types (chart classification / user types) for the organization. */
@@ -96,7 +121,13 @@ export function useAccountAccountTypes(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("account-account-types", organizationId, options)
+  const sdk = createStdbSdk(apiFetch)
+  return useCompanyScopedTypedQuery<AccountAccountTypeQueryRow>(
+    "account-account-types",
+    organizationId,
+    (companyId) => sdk.forCompany(companyId).accounting.accountTypes.list(),
+    options,
+  )
 }
 
 /** Account groups (hierarchy / code ranges) for the organization. */
@@ -104,7 +135,7 @@ export function useAccountGroups(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("account-groups", organizationId, options)
+  return useTypedStdbQuery("account-groups", organizationId, options)
 }
 
 /**
@@ -112,9 +143,15 @@ export function useAccountGroups(
  */
 export function useAccountMoves(
   organizationId: bigint,
-  options?: { staleTime?: number; enabled?: boolean; initialData?: AccountMove[] },
+  options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("account-moves", organizationId, options)
+  const sdk = createStdbSdk(apiFetch)
+  return useCompanyScopedTypedQuery<AccountMoveQueryRow>(
+    "account-moves",
+    organizationId,
+    (companyId) => sdk.forCompany(companyId).accounting.moves.list(),
+    options,
+  )
 }
 
 /**
@@ -124,7 +161,13 @@ export function useAccountMoveLines(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean }
 ) {
-  return useStdbQuery("account-move-lines", organizationId, options)
+  const sdk = createStdbSdk(apiFetch)
+  return useCompanyScopedTypedQuery<AccountMoveLineQueryRow>(
+    "account-move-lines",
+    organizationId,
+    (companyId) => sdk.forCompany(companyId).accounting.moveLines.list(),
+    options,
+  )
 }
 
 /**
@@ -134,7 +177,13 @@ export function useAccountTaxes(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean }
 ) {
-  return useStdbQuery("account-taxes", organizationId, options)
+  const sdk = createStdbSdk(apiFetch)
+  return useCompanyScopedTypedQuery<AccountTaxQueryRow>(
+    "account-taxes",
+    organizationId,
+    (companyId) => sdk.forCompany(companyId).accounting.taxes.list(),
+    options,
+  )
 }
 
 /**
@@ -144,7 +193,7 @@ export function useCrossoveredBudgets(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean; initialData?: CrossoveredBudget[] },
 ) {
-  return useStdbQuery("budgets", organizationId, options)
+  return useTypedStdbQuery("budgets", organizationId, options)
 }
 
 /** Fiscal years (TanStack scope = organization id, same key as other accounting `useStdbQuery` hooks). */
@@ -152,7 +201,7 @@ export function useAccountFiscalYears(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean; initialData?: AccountFiscalYear[] },
 ) {
-  return useStdbQuery("fiscal-years", organizationId, options)
+  return useTypedStdbQuery("fiscal-years", organizationId, options)
 }
 
 /** Accounting periods (TanStack scope = organization id). */
@@ -160,7 +209,7 @@ export function useAccountPeriods(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean; initialData?: AccountPeriod[] },
 ) {
-  return useStdbQuery("account-periods", organizationId, options)
+  return useTypedStdbQuery("account-periods", organizationId, options)
 }
 
 /**
@@ -170,7 +219,7 @@ export function useBudgetLines(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("budget-lines", organizationId, options)
+  return useTypedStdbQuery("budget-lines", organizationId, options)
 }
 
 /**
@@ -180,7 +229,7 @@ export function useBudgetPosts(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("budget-posts", organizationId, options)
+  return useTypedStdbQuery("budget-posts", organizationId, options)
 }
 
 /**
@@ -190,7 +239,7 @@ export function useAccountAnalyticAccounts(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean }
 ) {
-  return useStdbQuery("analytic-accounts", organizationId, options)
+  return useTypedStdbQuery("analytic-accounts", organizationId, options)
 }
 
 /**
@@ -200,7 +249,7 @@ export function useAccountBankStatements(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean }
 ) {
-  return useStdbQuery("bank-statements", organizationId, options)
+  return useTypedStdbQuery("bank-statements", organizationId, options)
 }
 
 /**
@@ -210,7 +259,7 @@ export function useAccountBankStatementLines(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("bank-statement-lines", organizationId, options)
+  return useTypedStdbQuery("bank-statement-lines", organizationId, options)
 }
 
 export type BankStatementImportWorkspace = {
@@ -240,7 +289,7 @@ export function useAccountFixedAssets(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean }
 ) {
-  return useStdbQuery("fixed-assets", organizationId, options)
+  return useTypedStdbQuery("fixed-assets", organizationId, options)
 }
 
 /** AP/AR payment terms for the organization. */
@@ -248,7 +297,7 @@ export function useAccountPaymentTerms(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("account-payment-terms", organizationId, options)
+  return useTypedStdbQuery("account-payment-terms", organizationId, options)
 }
 
 /** Installment lines for payment terms in this organization. */
@@ -256,7 +305,7 @@ export function useAccountPaymentTermLines(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("account-payment-term-lines", organizationId, options)
+  return useTypedStdbQuery("account-payment-term-lines", organizationId, options)
 }
 
 /** Customer/vendor payments (draft and posted). */
@@ -264,30 +313,30 @@ export function useAccountPayments(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("account-payments", organizationId, options)
+  return useTypedStdbQuery("account-payments", organizationId, options)
 }
 
 /** Operational cash, bank, and mobile-money accounts. */
 export function usePaymentAccounts(organizationId: bigint) {
-  return useStdbQuery("payment-accounts", organizationId)
+  return useTypedStdbQuery("payment-accounts", organizationId)
 }
 
 /** Provider and settlement fees recorded against operational payment transactions. */
 export function usePaymentFees(organizationId: bigint) {
-  return useStdbQuery("payment-fees", organizationId)
+  return useTypedStdbQuery("payment-fees", organizationId)
 }
 
 /** Draft, posted, and corrected operational payment transactions. */
 export function usePaymentTransactions(organizationId: bigint) {
-  return useStdbQuery("payment-transactions", organizationId)
+  return useTypedStdbQuery("payment-transactions", organizationId)
 }
 
 export function usePaymentReconciliations(organizationId: bigint) {
-  return useStdbQuery("payment-reconciliations", organizationId)
+  return useTypedStdbQuery("payment-reconciliations", organizationId)
 }
 
 export function usePaymentReversals(organizationId: bigint) {
-  return useStdbQuery("payment-reversals", organizationId)
+  return useTypedStdbQuery("payment-reversals", organizationId)
 }
 
 function invalidateOperationalPaymentQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
@@ -396,9 +445,15 @@ export function useCreatePaymentFee(organizationId: bigint) {
  */
 export function useAccountJournals(
   organizationId: bigint,
-  options?: { staleTime?: number; enabled?: boolean; initialData?: AccountJournal[] },
+  options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("account-journals", organizationId, options)
+  const sdk = createStdbSdk(apiFetch)
+  return useCompanyScopedTypedQuery<AccountJournalQueryRow>(
+    "account-journals",
+    organizationId,
+    (companyId) => sdk.forCompany(companyId).accounting.journals.list(),
+    options,
+  )
 }
 
 /**
@@ -408,7 +463,7 @@ export function useAccountAnalyticLines(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("analytic-lines", organizationId, options)
+  return useTypedStdbQuery("analytic-lines", organizationId, options)
 }
 
 /**
@@ -418,29 +473,10 @@ export function useAccountAnalyticDistributionModels(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("analytic-distribution-models", organizationId, options)
+  return useTypedStdbQuery("analytic-distribution-models", organizationId, options)
 }
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
-
-function useAccountingCallMutation(
-  reducer: AccountingBffReducerKey,
-  organizationId: bigint | number,
-  invalidateResources: readonly string[],
-) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (args: unknown[]) => {
-      const { urlPath, init } = accountingBffPost(reducer, args)
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) {
-        const json = (await r.json().catch(() => ({}))) as Record<string, unknown>
-        throw new Error((json.error as string | undefined) ?? `Reducer ${reducer} failed`)
-      }
-    },
-    onSuccess: () => invalidateStdbQueryResources(qc, organizationId, invalidateResources),
-  })
-}
 
 function invalidateBudgetQueries(qc: ReturnType<typeof useQueryClient>, organizationId: number) {
   // `stdbQueryKey` (hooks/stdb.ts) stringifies the organization id, so the invalidation key
@@ -453,10 +489,11 @@ function invalidateBudgetQueries(qc: ReturnType<typeof useQueryClient>, organiza
 }
 
 function invalidateChartStructureQueries(qc: ReturnType<typeof useQueryClient>, organizationId: number) {
-  const k = organizationId
-  void qc.invalidateQueries({ queryKey: ["stdb", "account-accounts", k] })
-  void qc.invalidateQueries({ queryKey: ["stdb", "account-account-types", k] })
-  void qc.invalidateQueries({ queryKey: ["stdb", "account-groups", k] })
+  invalidateStdbQueryResources(qc, organizationId, [
+    "account-accounts",
+    "account-account-types",
+    "account-groups",
+  ])
 }
 
 /** Account taxes + related tax master data (TanStack scope = organization id). */
@@ -471,13 +508,14 @@ function invalidateTaxQueries(qc: ReturnType<typeof useQueryClient>, organizatio
  */
 export function useCreateAccountAccount(organizationId: number) {
   const qc = useQueryClient()
+  const sdk = createStdbSdk(apiFetch)
   return useMutation({
     mutationFn: async (params: CreateAccountAccountParams) => {
-      const { urlPath, init } = stdbBffCommandPost("create_account_account", {
-        params: stdbParamsToJson(params as object, "CreateAccountAccountParams"),
-      })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
+      if (params.companyId == null) {
+        throw new Error("Account creation requires a company")
+      }
+      const { companyId, ...input } = params
+      await sdk.forCompany(companyId).accounting.accounts.create(input)
     },
     onSuccess: () =>
       invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("create_account_account")),
@@ -658,14 +696,10 @@ export function useDeleteAccountMoveLine(organizationId: number) {
  */
 export function useCreateAccountTax(organizationId: number) {
   const qc = useQueryClient()
+  const sdk = createStdbSdk(apiFetch)
   return useMutation({
     mutationFn: async (args: { companyId: bigint; params: CreateAccountTaxParams }) => {
-      const { urlPath, init } = stdbBffCommandPost("create_account_tax", {
-        companyId: args.companyId,
-        params: stdbParamsToJson(args.params as object, "CreateAccountTaxParams"),
-      })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
+      await sdk.forCompany(args.companyId).accounting.taxes.create(args.params)
     },
     onSuccess: () =>
       invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("create_account_tax")),
@@ -677,15 +711,10 @@ export function useCreateAccountTax(organizationId: number) {
  */
 export function useUpdateAccountTax(organizationId: number) {
   const qc = useQueryClient()
+  const sdk = createStdbSdk(apiFetch)
   return useMutation({
     mutationFn: async (args: { companyId: bigint; taxId: bigint; params: UpdateAccountTaxParams }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_account_tax", {
-        companyId: args.companyId,
-        taxId: args.taxId,
-        params: stdbParamsToJson(args.params as object, "UpdateAccountTaxParams"),
-      })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
+      await sdk.forCompany(args.companyId).accounting.taxes.update(args.taxId, args.params)
     },
     onSuccess: () =>
       invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("update_account_tax")),
@@ -963,17 +992,6 @@ export function useUpdateAccountBankStatement(organizationId: number) {
     onSuccess: () =>
       invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("update_account_bank_statement")),
   })
-}
-
-/**
- * Unreconcile a bank statement line.
- */
-export function useUnreconcileAccountBankStatementLine(organizationId: number) {
-  return useAccountingCallMutation(
-    "unreconciled_account_bank_statement_line",
-    organizationId,
-    stdbInvalidationFor("unreconciled_account_bank_statement_line"),
-  )
 }
 
 /**
@@ -1455,7 +1473,7 @@ export function useBankMatchCandidates(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("bank-match-candidates", organizationId, options)
+  return useTypedStdbQuery("bank-match-candidates", organizationId, options)
 }
 
 /**
@@ -1465,7 +1483,7 @@ export function useAccountReconciliationWidgets(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("account-reconciliation-widgets", organizationId, options)
+  return useTypedStdbQuery("account-reconciliation-widgets", organizationId, options)
 }
 
 export function useMatchBankLine(organizationId: number) {
@@ -1540,21 +1558,21 @@ export function useConsolidationAccounts(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("consolidation-accounts", organizationId, options)
+  return useTypedStdbQuery("consolidation-accounts", organizationId, options)
 }
 
 export function useConsolidationJournals(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("consolidation-journals", organizationId, options)
+  return useTypedStdbQuery("consolidation-journals", organizationId, options)
 }
 
 export function useConsolidationEliminationEntries(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("consolidation-elimination-entries", organizationId, options)
+  return useTypedStdbQuery("consolidation-elimination-entries", organizationId, options)
 }
 
 export function useCreateConsolidationAccount(organizationId: number) {
@@ -1736,7 +1754,7 @@ export function useDepreciationLines(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("depreciation-lines", organizationId, options)
+  return useTypedStdbQuery("depreciation-lines", organizationId, options)
 }
 
 export function useDeleteAccountAsset(organizationId: number, companyId: bigint) {
@@ -1824,7 +1842,7 @@ export function useIntercompanyRules(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("intercompany-rules", organizationId, options)
+  return useTypedStdbQuery("intercompany-rules", organizationId, options)
 }
 
 /** Intercompany transactions for the organization. */
@@ -1832,7 +1850,7 @@ export function useIntercompanyTransactions(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("intercompany-transactions", organizationId, options)
+  return useTypedStdbQuery("intercompany-transactions", organizationId, options)
 }
 
 /** Create intercompany rule — args `[organizationId, sourceCompanyId, destinationCompanyId, params]`. */
@@ -1978,9 +1996,7 @@ export function useRetryIntercompanyTransaction(organizationId: number, companyI
 // ── Moves / Payments ──────────────────────────────────────────────────────────
 
 function invalidateMoveQueries(qc: ReturnType<typeof useQueryClient>, organizationId: bigint | number) {
-  const k = organizationId
-  void qc.invalidateQueries({ queryKey: ["stdb", "account-moves", k] })
-  void qc.invalidateQueries({ queryKey: ["stdb", "account-move-lines", k] })
+  invalidateStdbQueryResources(qc, organizationId, ["account-moves", "account-move-lines"])
 }
 
 /** Recompute `amount_untaxed` / `amount_tax` / `amount_total` from lines (invoice/refund moves only). */
@@ -2205,7 +2221,7 @@ export function useAccountTaxGroups(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("tax-groups", organizationId, options)
+  return useTypedStdbQuery("tax-groups", organizationId, options)
 }
 
 /** Tax jurisdictions for the organization. */
@@ -2213,7 +2229,7 @@ export function useTaxJurisdictions(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("tax-jurisdictions", organizationId, options)
+  return useTypedStdbQuery("tax-jurisdictions", organizationId, options)
 }
 
 /** Tax schedules for the organization. */
@@ -2221,7 +2237,7 @@ export function useTaxSchedules(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("tax-schedules", organizationId, options)
+  return useTypedStdbQuery("tax-schedules", organizationId, options)
 }
 
 /** Tax deadlines for the organization. */
@@ -2229,7 +2245,7 @@ export function useTaxDeadlines(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("tax-deadlines", organizationId, options)
+  return useTypedStdbQuery("tax-deadlines", organizationId, options)
 }
 
 // ── Tax Groups ─────────────────────────────────────────────────────────────────
@@ -2509,7 +2525,7 @@ export function useFxRevaluationRuns(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("fx-revaluation-runs", organizationId, options)
+  return useTypedStdbQuery("fx-revaluation-runs", organizationId, options)
 }
 
 export function useRunFxRevaluation(organizationId: number, companyId: bigint) {
@@ -2564,7 +2580,7 @@ export function usePartnerCreditControls(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("partner-credit-controls", organizationId, options)
+  return useTypedStdbQuery("partner-credit-controls", organizationId, options)
 }
 
 /** Server-bounded: `partner_credit_control.payment_hold = true`. */
@@ -2572,7 +2588,7 @@ export function usePartnerCreditHolds(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("partner-credit-holds", organizationId, options)
+  return useTypedStdbQuery("partner-credit-holds", organizationId, options)
 }
 
 export function useUpsertPartnerCreditControl(organizationId: number, companyId: bigint) {
@@ -2609,14 +2625,14 @@ export function useAmortizationSchedules(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("amortization-schedules", organizationId, options)
+  return useTypedStdbQuery("amortization-schedules", organizationId, options)
 }
 
 export function useAmortizationLines(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
 ) {
-  return useStdbQuery("amortization-lines", organizationId, options)
+  return useTypedStdbQuery("amortization-lines", organizationId, options)
 }
 
 export function useCreateAmortizationSchedule(organizationId: number, companyId: bigint) {

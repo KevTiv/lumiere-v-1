@@ -22,6 +22,7 @@ pub struct RelationSnapshotSpec {
 #[derive(Clone, Copy, Debug)]
 pub struct EntitySnapshotSpec {
     pub entity_type: &'static str,
+    pub api_resource: &'static str,
     pub table: &'static str,
     pub id_column: &'static str,
     pub scope: ScopeKind,
@@ -71,6 +72,7 @@ const PURCHASE_ORDER_LINES: RelationSnapshotSpec = RelationSnapshotSpec {
 
 const SALE_ORDER: EntitySnapshotSpec = EntitySnapshotSpec {
     entity_type: "sale_order",
+    api_resource: "sale-orders",
     table: "sale_order",
     id_column: "id",
     scope: ScopeKind::Company,
@@ -95,6 +97,7 @@ const SALE_ORDER: EntitySnapshotSpec = EntitySnapshotSpec {
 
 const PURCHASE_ORDER: EntitySnapshotSpec = EntitySnapshotSpec {
     entity_type: "purchase_order",
+    api_resource: "purchase-orders",
     table: "purchase_order",
     id_column: "id",
     scope: ScopeKind::Company,
@@ -120,6 +123,7 @@ const PURCHASE_ORDER: EntitySnapshotSpec = EntitySnapshotSpec {
 
 const PROJECT_TASK: EntitySnapshotSpec = EntitySnapshotSpec {
     entity_type: "project_task",
+    api_resource: "tasks",
     table: "project_task",
     id_column: "id",
     scope: ScopeKind::Company,
@@ -147,6 +151,7 @@ const PROJECT_TASK: EntitySnapshotSpec = EntitySnapshotSpec {
 
 const ACCOUNT_MOVE: EntitySnapshotSpec = EntitySnapshotSpec {
     entity_type: "account_move",
+    api_resource: "account-moves",
     table: "account_move",
     id_column: "id",
     scope: ScopeKind::Company,
@@ -172,6 +177,7 @@ const ACCOUNT_MOVE: EntitySnapshotSpec = EntitySnapshotSpec {
 
 const MRP_PRODUCTION: EntitySnapshotSpec = EntitySnapshotSpec {
     entity_type: "mrp_production",
+    api_resource: "mrp-productions",
     table: "mrp_production",
     id_column: "id",
     scope: ScopeKind::Company,
@@ -197,6 +203,7 @@ const MRP_PRODUCTION: EntitySnapshotSpec = EntitySnapshotSpec {
 
 const PRODUCT: EntitySnapshotSpec = EntitySnapshotSpec {
     entity_type: "product",
+    api_resource: "products",
     table: "product",
     id_column: "id",
     scope: ScopeKind::Organization,
@@ -219,6 +226,7 @@ const PRODUCT: EntitySnapshotSpec = EntitySnapshotSpec {
 
 const CONTACT: EntitySnapshotSpec = EntitySnapshotSpec {
     entity_type: "contact",
+    api_resource: "contacts",
     table: "contact",
     id_column: "id",
     scope: ScopeKind::OrganizationOptionalCompany,
@@ -294,6 +302,7 @@ mod tests {
     fn lookup_sale_order_spec() {
         let spec = lookup_entity_spec("sale_order").expect("spec");
         assert_eq!(spec.table, "sale_order");
+        assert_eq!(spec.api_resource, "sale-orders");
         assert!(!spec.relations.is_empty());
     }
 

@@ -45,6 +45,7 @@ pub struct PurchaseRfq {
 #[spacetimedb::table(
     accessor = purchase_rfq_line,
     public,
+    index(accessor = purchase_rfq_line_by_organization, btree(columns = [organization_id])),
     index(accessor = purchase_rfq_line_by_rfq, btree(columns = [rfq_id]))
 )]
 pub struct PurchaseRfqLine {
@@ -64,6 +65,7 @@ pub struct PurchaseRfqLine {
 #[spacetimedb::table(
     accessor = purchase_rfq_bid,
     public,
+    index(accessor = purchase_rfq_bid_by_organization, btree(columns = [organization_id])),
     index(accessor = purchase_rfq_bid_by_rfq, btree(columns = [rfq_id]))
 )]
 pub struct PurchaseRfqBid {
@@ -295,7 +297,7 @@ pub fn create_purchase_rfq(
         )?;
     }
 
-    let name = next_doc_number(ctx, "RFQ");
+    let name = next_doc_number(ctx, organization_id, "RFQ");
     let rfq = ctx.db.purchase_rfq().insert(PurchaseRfq {
         id: 0,
         organization_id,

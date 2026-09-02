@@ -2,7 +2,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * POS mutations via Next.js BFF `POST /api/call/:reducer`.
+ * POS mutations via Next.js BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` pos hooks.
  */
 export const POS_BFF_REDUCERS = [
@@ -18,14 +18,6 @@ export const POS_BFF_REDUCERS = [
 ] as const;
 
 export type PosBffReducerKey = (typeof POS_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<PosBffReducerKey>();
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function posBffCallUrl(reducer: PosBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 const POS_HINT_OVERRIDES: Partial<Record<PosBffReducerKey, readonly string[]>> =
   {

@@ -14,16 +14,10 @@ import {
   deleteIntegration,
   deleteWhatsAppBusinessAccount,
   grantPermission,
-  recordGoogleDriveSync,
-  recordGoogleDriveSyncError,
-  recordWhatsAppHealthCheck,
-  recordWhatsAppMessageSent,
   revokePermission,
   setWhatsAppPrimaryAccount,
   updateGoogleDriveConnection,
-  updateIntegrationStatus,
   updateWhatsAppBusinessAccount,
-  updateWhatsAppVerificationStatus,
 } from "@lumiere/stdb/client-ui-bridge"
 import {
   useCreateAuditRule,
@@ -77,17 +71,11 @@ type SettingsAction =
   | "whatsappCredentials"
   | "createGoogleDriveConnection"
   | "updateGoogleDriveConnection"
-  | "recordGoogleDriveSync"
-  | "recordGoogleDriveSyncError"
-  | "updateIntegrationStatus"
   | "deleteIntegration"
   | "createWhatsappBusinessAccount"
   | "updateWhatsappBusinessAccount"
   | "deleteWhatsappBusinessAccount"
   | "setWhatsappPrimaryAccount"
-  | "updateWhatsappVerificationStatus"
-  | "recordWhatsappHealthCheck"
-  | "recordWhatsappMessageSent"
   | "grantPermission"
   | "revokePermission"
   | "archiveAiChatSession"
@@ -112,17 +100,11 @@ const INTEGRATION_SETTINGS_ACTIONS: SettingsAction[] = [
   "whatsappCredentials",
   "createGoogleDriveConnection",
   "updateGoogleDriveConnection",
-  "recordGoogleDriveSync",
-  "recordGoogleDriveSyncError",
-  "updateIntegrationStatus",
   "deleteIntegration",
   "createWhatsappBusinessAccount",
   "updateWhatsappBusinessAccount",
   "deleteWhatsappBusinessAccount",
   "setWhatsappPrimaryAccount",
-  "updateWhatsappVerificationStatus",
-  "recordWhatsappHealthCheck",
-  "recordWhatsappMessageSent",
 ]
 
 const syncDirectionOptions = [
@@ -134,35 +116,6 @@ const syncDirectionOptions = [
 const integrationTypeOptions = [
   { value: "GoogleDrive", label: "Google Drive" },
   { value: "WhatsAppBusiness", label: "WhatsApp Business" },
-]
-
-const integrationStatusOptions = [
-  { value: "Active", label: "Active" },
-  { value: "Inactive", label: "Inactive" },
-  { value: "Pending", label: "Pending" },
-  { value: "Suspended", label: "Suspended" },
-]
-
-const syncStatusOptions = [
-  { value: "Connected", label: "Connected" },
-  { value: "Disconnected", label: "Disconnected" },
-  { value: "Syncing", label: "Syncing" },
-  { value: "Error", label: "Error" },
-  { value: "PendingAuth", label: "Pending auth" },
-]
-
-const verificationStatusOptions = [
-  { value: "Pending", label: "Pending" },
-  { value: "Approved", label: "Approved" },
-  { value: "Rejected", label: "Rejected" },
-  { value: "Expired", label: "Expired" },
-  { value: "Revoked", label: "Revoked" },
-]
-
-const verificationLevelOptions = [
-  { value: "Unverified", label: "Unverified" },
-  { value: "BusinessPortfolio", label: "Business portfolio" },
-  { value: "BusinessVerified", label: "Business verified" },
 ]
 
 const permissionActionOptions = [
@@ -356,36 +309,6 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
       },
     ],
   },
-  recordGoogleDriveSync: {
-    id: "settings-record-google-drive-sync",
-    title: "Record Google Drive Sync",
-    submitLabel: "Record sync",
-    sections: [{ id: "sync", fields: [
-      { id: "connection-id", type: "number", name: "connectionId", label: "Connection ID", required: true, width: "1/2" },
-      { id: "next-sync", type: "datetime", name: "nextSyncAt", label: "Next sync at", width: "1/2" },
-    ] }],
-  },
-  recordGoogleDriveSyncError: {
-    id: "settings-record-google-drive-sync-error",
-    title: "Record Google Drive Sync Error",
-    submitLabel: "Record error",
-    sections: [{ id: "sync-error", fields: [
-      { id: "connection-id", type: "number", name: "connectionId", label: "Connection ID", required: true, width: "1/2" },
-      { id: "error", type: "textarea", name: "errorMessage", label: "Error message", required: true, rows: 3, width: "full" },
-    ] }],
-  },
-  updateIntegrationStatus: {
-    id: "settings-update-integration-status",
-    title: "Update Integration Status",
-    submitLabel: "Update status",
-    sections: [{ id: "status", fields: [
-      { id: "integration-id", type: "number", name: "integrationId", label: "Integration ID", required: true, width: "1/2" },
-      { id: "integration-type", type: "select", name: "integrationType", label: "Integration type", defaultValue: "GoogleDrive", options: integrationTypeOptions, width: "1/2" },
-      { id: "status", type: "select", name: "status", label: "Status", defaultValue: "Active", options: integrationStatusOptions, width: "1/2" },
-      { id: "sync-status", type: "select", name: "syncStatus", label: "Sync status", defaultValue: "Connected", options: syncStatusOptions, width: "1/2" },
-      { id: "error", type: "textarea", name: "errorMessage", label: "Error message", rows: 3, width: "full" },
-    ] }],
-  },
   deleteIntegration: {
     id: "settings-delete-integration",
     title: "Delete Integration",
@@ -459,31 +382,6 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
     title: "Set WhatsApp Primary Account",
     submitLabel: "Set primary",
     sections: [{ id: "account", fields: [{ id: "account-id", type: "number", name: "accountId", label: "Account ID", required: true }] }],
-  },
-  updateWhatsappVerificationStatus: {
-    id: "settings-update-whatsapp-verification-status",
-    title: "Update WhatsApp Verification Status",
-    submitLabel: "Update verification",
-    sections: [{ id: "verification", fields: [
-      { id: "account-id", type: "number", name: "accountId", label: "Account ID", required: true, width: "1/3" },
-      { id: "status", type: "select", name: "verificationStatus", label: "Status", defaultValue: "Pending", options: verificationStatusOptions, width: "1/3" },
-      { id: "level", type: "select", name: "verificationLevel", label: "Level", defaultValue: "Unverified", options: verificationLevelOptions, width: "1/3" },
-    ] }],
-  },
-  recordWhatsappHealthCheck: {
-    id: "settings-record-whatsapp-health-check",
-    title: "Record WhatsApp Health Check",
-    submitLabel: "Record health",
-    sections: [{ id: "health", fields: [
-      { id: "account-id", type: "number", name: "accountId", label: "Account ID", required: true, width: "1/2" },
-      { id: "healthy", type: "switch", name: "isHealthy", label: "Healthy", defaultValue: true, width: "1/2" },
-    ] }],
-  },
-  recordWhatsappMessageSent: {
-    id: "settings-record-whatsapp-message-sent",
-    title: "Record WhatsApp Message Sent",
-    submitLabel: "Record message",
-    sections: [{ id: "message", fields: [{ id: "account-id", type: "number", name: "accountId", label: "Account ID", required: true }] }],
   },
   grantPermission: {
     id: "settings-grant-permission",
@@ -947,19 +845,6 @@ function SettingsLoaded({
           syncFrequencyMinutes:
             formData.syncFrequencyMinutes === undefined || formData.syncFrequencyMinutes === "" ? undefined : Number(formData.syncFrequencyMinutes),
         })
-      } else if (activeAction === "recordGoogleDriveSync") {
-        await recordGoogleDriveSync(orgId, toBigIntId(formData.connectionId, "Connection ID"), optionalTimestamp(formData.nextSyncAt))
-      } else if (activeAction === "recordGoogleDriveSyncError") {
-        await recordGoogleDriveSyncError(orgId, toBigIntId(formData.connectionId, "Connection ID"), String(formData.errorMessage ?? ""))
-      } else if (activeAction === "updateIntegrationStatus") {
-        await updateIntegrationStatus(
-          orgId,
-          toBigIntId(formData.integrationId, "Integration ID"),
-          String(formData.integrationType ?? "GoogleDrive") as "GoogleDrive" | "WhatsAppBusiness",
-          String(formData.status ?? "Active") as "Active" | "Inactive" | "Pending" | "Suspended",
-          String(formData.syncStatus ?? "Connected") as "Connected" | "Disconnected" | "Syncing" | "Error" | "PendingAuth",
-          optionalText(formData.errorMessage),
-        )
       } else if (activeAction === "deleteIntegration") {
         if (!confirm("Delete this integration?")) return
         await deleteIntegration(
@@ -994,17 +879,6 @@ function SettingsLoaded({
         await deleteWhatsAppBusinessAccount(orgId, toBigIntId(formData.accountId, "Account ID"))
       } else if (activeAction === "setWhatsappPrimaryAccount") {
         await setWhatsAppPrimaryAccount(orgId, toBigIntId(formData.accountId, "Account ID"))
-      } else if (activeAction === "updateWhatsappVerificationStatus") {
-        await updateWhatsAppVerificationStatus(
-          orgId,
-          toBigIntId(formData.accountId, "Account ID"),
-          String(formData.verificationStatus ?? "Pending") as "Pending" | "Approved" | "Rejected" | "Expired" | "Revoked",
-          String(formData.verificationLevel ?? "Unverified") as "Unverified" | "BusinessPortfolio" | "BusinessVerified",
-        )
-      } else if (activeAction === "recordWhatsappHealthCheck") {
-        await recordWhatsAppHealthCheck(orgId, toBigIntId(formData.accountId, "Account ID"), Boolean(formData.isHealthy))
-      } else if (activeAction === "recordWhatsappMessageSent") {
-        await recordWhatsAppMessageSent(orgId, toBigIntId(formData.accountId, "Account ID"))
       } else if (activeAction === "grantPermission") {
         const subjectType = String(formData.subjectType ?? "Role") as "Role" | "User"
         await grantPermission(orgId, {
@@ -1156,17 +1030,11 @@ function SettingsLoaded({
     { id: "whatsappCredentials", title: "WhatsApp", description: "Update integration credentials." },
     { id: "createGoogleDriveConnection", title: "Create Google Drive", description: "Create a Google Drive connection record." },
     { id: "updateGoogleDriveConnection", title: "Update Google Drive", description: "Patch Google Drive sync and webhook settings." },
-    { id: "recordGoogleDriveSync", title: "Google Drive sync", description: "Record a successful sync timestamp." },
-    { id: "recordGoogleDriveSyncError", title: "Google Drive error", description: "Record the latest sync error." },
-    { id: "updateIntegrationStatus", title: "Integration status", description: "Update status for a supported integration." },
     { id: "deleteIntegration", title: "Delete integration", description: "Soft-delete a supported integration." },
     { id: "createWhatsappBusinessAccount", title: "Create WhatsApp account", description: "Create a WhatsApp Business connection." },
     { id: "updateWhatsappBusinessAccount", title: "Update WhatsApp account", description: "Patch WhatsApp Business settings." },
     { id: "deleteWhatsappBusinessAccount", title: "Delete WhatsApp account", description: "Soft-delete a WhatsApp Business account." },
     { id: "setWhatsappPrimaryAccount", title: "Primary WhatsApp account", description: "Set the organization primary account." },
-    { id: "updateWhatsappVerificationStatus", title: "WhatsApp verification", description: "Update Meta verification state." },
-    { id: "recordWhatsappHealthCheck", title: "WhatsApp health", description: "Record the latest health check result." },
-    { id: "recordWhatsappMessageSent", title: "WhatsApp sent count", description: "Increment the sent-message quota counter." },
     { id: "grantPermission", title: "Grant permission", description: "Create a role or user permission grant." },
     { id: "revokePermission", title: "Revoke permission", description: "Delete an organization permission by ID." },
     { id: "archiveAiChatSession", title: "AI chat archive", description: "Archive or restore an AI chat session." },

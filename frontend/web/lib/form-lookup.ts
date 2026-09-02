@@ -3,6 +3,15 @@
  */
 
 import { expenseVariantTag } from './expense-state'
+
+type JournalLookupRow = {
+  id?: unknown
+  code?: unknown
+  name?: unknown
+  type?: unknown
+  type_?: unknown
+}
+
 /** Chart of accounts — code + name for GL pickers. */
 export function accountAccountRowsToSelectOptions(
   rows: Record<string, unknown>[],
@@ -18,7 +27,7 @@ export function accountAccountRowsToSelectOptions(
 }
 
 export function accountJournalRowsToSelectOptions(
-  rows: Record<string, unknown>[],
+  rows: readonly JournalLookupRow[],
 ): Array<{ value: string; label: string }> {
   return rows.map((row) => {
     const id = row.id
@@ -28,6 +37,18 @@ export function accountJournalRowsToSelectOptions(
       code && name ? `${code} — ${name}` : name || code || (id != null ? String(id) : "?")
     return { value: String(id), label }
   })
+}
+
+/** Journals accepted by `create_payment`; keep invalid journal types out of the picker. */
+export function paymentJournalRowsToSelectOptions(
+  rows: Parameters<typeof accountJournalRowsToSelectOptions>[0],
+): Array<{ value: string; label: string }> {
+  const allowedTypes = new Set(["bank", "cash", "check"])
+  return accountJournalRowsToSelectOptions(
+    rows.filter((row) =>
+      allowedTypes.has(expenseVariantTag(row.type ?? row.type_).toLowerCase()),
+    ),
+  )
 }
 
 function isTruthyFlag(v: unknown): boolean {

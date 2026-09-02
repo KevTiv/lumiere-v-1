@@ -17,6 +17,17 @@
   },
   "reducers": [
     {
+      "name": "create_account_account",
+      "company_paths": [
+        {
+          "path": ["params", "company_id"],
+          "required": true,
+          "nullable": false,
+          "meaning": "selected legal entity for the account"
+        }
+      ]
+    },
+    {
       "name": "create_contact",
       "company_paths": [
         {
@@ -41,6 +52,17 @@
           "required": false,
           "nullable": true,
           "meaning": "selected legal entity for the opportunity"
+        }
+      ]
+    },
+    {
+      "name": "create_whatsapp_business_account",
+      "company_paths": [
+        {
+          "path": ["params", "company_id"],
+          "required": false,
+          "nullable": true,
+          "meaning": "optional legal entity for the WhatsApp Business account"
         }
       ]
     },

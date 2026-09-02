@@ -2141,6 +2141,7 @@
     "metadata"
   ],
   "CreateWhatsAppBusinessAccountParams": [
+    "company_id",
     "webhook_url",
     "template_namespace",
     "media_provider",

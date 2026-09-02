@@ -110,6 +110,7 @@ pub struct StockLandedCostApplication {
 #[spacetimedb::table(
     accessor = stock_landed_cost_allocation,
     public,
+    index(accessor = landed_cost_allocation_by_organization, btree(columns = [organization_id])),
     index(accessor = landed_cost_allocation_by_application, btree(columns = [application_id])),
     index(accessor = landed_cost_allocation_by_landed_cost, btree(columns = [landed_cost_id]))
 )]

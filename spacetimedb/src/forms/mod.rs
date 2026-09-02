@@ -24,8 +24,8 @@ use crate::crm::contacts::contact;
 use crate::crm::leads::lead;
 use crate::expenses::expenses::{expense_sheet, hr_expense};
 use crate::fleet::fleet::fleet_vehicle;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::helpdesk::tickets::helpdesk_ticket;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::contracts::hr_contract;
 use crate::hr::employees::hr_employee;
 use crate::hr::payroll::hr_payslip;
@@ -270,7 +270,11 @@ pub struct PublishFormConfigurationParams {
 // ═════════════════════════════════════════════════════════════════════════════
 
 /// Form configuration - defines a configurable form for an organization
-#[spacetimedb::table(public, accessor = form_config)]
+#[spacetimedb::table(
+    public,
+    accessor = form_config,
+    index(accessor = form_config_by_organization, btree(columns = [organization_id]))
+)]
 pub struct FormConfig {
     #[primary_key]
     #[auto_inc]
@@ -291,11 +295,16 @@ pub struct FormConfig {
 }
 
 /// Form configuration field - individual fields within a form
-#[spacetimedb::table(public, accessor = form_config_field)]
+#[spacetimedb::table(
+    public,
+    accessor = form_config_field,
+    index(accessor = form_config_field_by_organization, btree(columns = [organization_id]))
+)]
 pub struct FormConfigField {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     #[index(btree)]
     pub configuration_id: u64,
     pub field_id: String,
@@ -322,11 +331,16 @@ pub struct FormConfigField {
 }
 
 /// Localized label override for a form config field row
-#[spacetimedb::table(public, accessor = form_field_label)]
+#[spacetimedb::table(
+    public,
+    accessor = form_field_label,
+    index(accessor = form_field_label_by_organization, btree(columns = [organization_id]))
+)]
 pub struct FormFieldLabel {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     #[index(btree)]
     pub field_row_id: u64, // form_config_field.id
     pub locale: String, // e.g. "en", "pt-BR"
@@ -335,11 +349,16 @@ pub struct FormFieldLabel {
 }
 
 /// Role-based form configuration - defines which fields are visible/required per role
-#[spacetimedb::table(public, accessor = form_role_config)]
+#[spacetimedb::table(
+    public,
+    accessor = form_role_config,
+    index(accessor = form_role_config_by_organization, btree(columns = [organization_id]))
+)]
 pub struct FormRoleConfig {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     #[index(btree)]
     pub configuration_id: u64,
     pub role_id: String,
@@ -644,9 +663,20 @@ fn form_field_json_payload(params: &CreateFormFieldParams) -> (String, String, S
 
 fn insert_or_update_form_field_row(
     ctx: &ReducerContext,
+    organization_id: u64,
     configuration_id: u64,
     params: &CreateFormFieldParams,
 ) -> Result<(), String> {
+    let config = ctx
+        .db
+        .form_config()
+        .id()
+        .find(&configuration_id)
+        .ok_or("Configuration not found")?;
+    if config.organization_id != organization_id {
+        return Err("Configuration does not belong to organization".to_string());
+    }
+
     let existing = ctx
         .db
         .form_config_field()
@@ -662,6 +692,9 @@ fn insert_or_update_form_field_row(
 
     match existing {
         Some(field) => {
+            if field.organization_id != config.organization_id {
+                return Err("Form field does not belong to configuration organization".to_string());
+            }
             let visibility_json = params
                 .visibility_json
                 .clone()
@@ -691,6 +724,7 @@ fn insert_or_update_form_field_row(
         None => {
             ctx.db.form_config_field().insert(FormConfigField {
                 id: 0,
+                organization_id: config.organization_id,
                 configuration_id,
                 field_id: params.field_id.clone(),
                 name: params.name.clone(),
@@ -830,6 +864,7 @@ pub fn add_form_field(
 
     let field = FormConfigField {
         id: 0,
+        organization_id: config.organization_id,
         configuration_id,
         field_id: params.field_id.clone(),
         name: params.name,
@@ -908,6 +943,9 @@ pub fn update_form_field(
 
     if config.organization_id != organization_id {
         return Err("Configuration does not belong to organization".to_string());
+    }
+    if field.organization_id != config.organization_id {
+        return Err("Form field does not belong to configuration organization".to_string());
     }
 
     ensure_expected_updated_at(
@@ -1001,6 +1039,9 @@ pub fn delete_form_field(
     if config.organization_id != organization_id {
         return Err("Configuration does not belong to organization".to_string());
     }
+    if field.organization_id != config.organization_id {
+        return Err("Form field does not belong to configuration organization".to_string());
+    }
 
     let label_ids: Vec<_> = ctx
         .db
@@ -1010,6 +1051,17 @@ pub fn delete_form_field(
         .map(|l| l.id)
         .collect();
     for label_id in label_ids {
+        let label = ctx
+            .db
+            .form_field_label()
+            .id()
+            .find(&label_id)
+            .ok_or("Form field label not found")?;
+        if label.organization_id != config.organization_id {
+            return Err(
+                "Form field label does not belong to configuration organization".to_string(),
+            );
+        }
         ctx.db.form_field_label().id().delete(&label_id);
     }
 
@@ -1061,7 +1113,7 @@ pub fn set_form_role_config(
         return Err("Configuration does not belong to organization".to_string());
     }
 
-    upsert_form_role_config_row(ctx, configuration_id, &params);
+    upsert_form_role_config_row(ctx, organization_id, configuration_id, &params)?;
 
     ctx.db.form_config().id().update(FormConfig {
         updated_at: ctx.timestamp,
@@ -1118,6 +1170,9 @@ pub fn set_form_field_label(
     if config.organization_id != organization_id {
         return Err("Field does not belong to organization".to_string());
     }
+    if field.organization_id != config.organization_id {
+        return Err("Field does not belong to configuration organization".to_string());
+    }
 
     let existing = ctx
         .db
@@ -1126,6 +1181,9 @@ pub fn set_form_field_label(
         .find(|l| l.field_row_id == field_row_id && l.locale == params.locale);
 
     let record_id = if let Some(row) = existing {
+        if row.organization_id != config.organization_id {
+            return Err("Field label does not belong to configuration organization".to_string());
+        }
         let id = row.id;
         ctx.db.form_field_label().id().update(FormFieldLabel {
             label: params.label.clone(),
@@ -1138,6 +1196,7 @@ pub fn set_form_field_label(
             .form_field_label()
             .insert(FormFieldLabel {
                 id: 0,
+                organization_id: config.organization_id,
                 field_row_id,
                 locale: params.locale.clone(),
                 label: params.label.clone(),
@@ -1241,7 +1300,7 @@ pub fn add_user_custom_field(
         updated_at: ctx.timestamp,
     };
 
-    ctx.db.user_custom_field().insert(custom_field);
+    let custom_field = ctx.db.user_custom_field().insert(custom_field);
 
     write_audit_log_v2(
         ctx,
@@ -1249,7 +1308,7 @@ pub fn add_user_custom_field(
         AuditLogParams {
             company_id: None,
             table_name: "user_custom_field",
-            record_id: params.configuration_id,
+            record_id: custom_field.id,
             action: "create",
             old_values: None,
             new_values: None,
@@ -1268,6 +1327,8 @@ pub fn delete_user_custom_field(
     organization_id: u64,
     custom_field_id: u64,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "form_configuration", "delete")?;
+
     let field = ctx
         .db
         .user_custom_field()
@@ -1522,9 +1583,20 @@ pub fn delete_record_custom_field_values(
 
 fn upsert_form_role_config_row(
     ctx: &ReducerContext,
+    organization_id: u64,
     configuration_id: u64,
     params: &CreateRoleConfigParams,
-) {
+) -> Result<(), String> {
+    let config = ctx
+        .db
+        .form_config()
+        .id()
+        .find(&configuration_id)
+        .ok_or("Configuration not found")?;
+    if config.organization_id != organization_id {
+        return Err("Configuration does not belong to organization".to_string());
+    }
+
     let enabled_fields_json = serde_json::to_string(&params.enabled_fields).unwrap_or_default();
     let required_fields_json = serde_json::to_string(&params.required_fields).unwrap_or_default();
     let default_prompts_json = serde_json::to_string(&params.default_prompts).unwrap_or_default();
@@ -1536,6 +1608,11 @@ fn upsert_form_role_config_row(
         .find(|r| r.configuration_id == configuration_id && r.role_id == params.role_id);
 
     if let Some(existing_config) = existing {
+        if existing_config.organization_id != config.organization_id {
+            return Err(
+                "Role configuration does not belong to configuration organization".to_string(),
+            );
+        }
         ctx.db.form_role_config().id().update(FormRoleConfig {
             enabled_fields_json,
             required_fields_json,
@@ -1546,6 +1623,7 @@ fn upsert_form_role_config_row(
     } else {
         ctx.db.form_role_config().insert(FormRoleConfig {
             id: 0,
+            organization_id: config.organization_id,
             configuration_id,
             role_id: params.role_id.clone(),
             enabled_fields_json,
@@ -1556,6 +1634,7 @@ fn upsert_form_role_config_row(
             updated_at: ctx.timestamp,
         });
     }
+    Ok(())
 }
 
 /// Publish a full form configuration (identity + fields + roles) in one transaction.
@@ -1642,19 +1721,25 @@ pub fn publish_form_configuration(
         params.fields.iter().map(|f| f.field_id.as_str()).collect();
 
     for field in &params.fields {
-        insert_or_update_form_field_row(ctx, configuration_id, field)?;
+        insert_or_update_form_field_row(ctx, organization_id, configuration_id, field)?;
     }
 
     if params.replace_missing_fields {
-        let to_delete: Vec<_> = ctx
+        let configuration_fields: Vec<_> = ctx
             .db
             .form_config_field()
             .iter()
-            .filter(|f| {
-                f.configuration_id == configuration_id
-                    && !f.is_system
-                    && !published_ids.contains(f.field_id.as_str())
-            })
+            .filter(|f| f.configuration_id == configuration_id)
+            .collect();
+        if configuration_fields
+            .iter()
+            .any(|field| field.organization_id != organization_id)
+        {
+            return Err("Form field does not belong to configuration organization".to_string());
+        }
+        let to_delete: Vec<_> = configuration_fields
+            .iter()
+            .filter(|f| !f.is_system && !published_ids.contains(f.field_id.as_str()))
             .map(|f| f.id)
             .collect();
         for id in to_delete {
@@ -1666,6 +1751,18 @@ pub fn publish_form_configuration(
                 .map(|l| l.id)
                 .collect();
             for label_id in label_ids {
+                let label = ctx
+                    .db
+                    .form_field_label()
+                    .id()
+                    .find(&label_id)
+                    .ok_or("Form field label not found")?;
+                if label.organization_id != organization_id {
+                    return Err(
+                        "Form field label does not belong to configuration organization"
+                            .to_string(),
+                    );
+                }
                 ctx.db.form_field_label().id().delete(&label_id);
             }
             ctx.db.form_config_field().id().delete(&id);
@@ -1673,7 +1770,7 @@ pub fn publish_form_configuration(
     }
 
     for role in &params.role_configs {
-        upsert_form_role_config_row(ctx, configuration_id, role);
+        upsert_form_role_config_row(ctx, organization_id, configuration_id, role)?;
     }
 
     if let Some(config) = ctx.db.form_config().id().find(&configuration_id) {
@@ -1884,6 +1981,7 @@ fn init_journal_form_config(ctx: &ReducerContext, organization_id: u64) -> Resul
     for (field_id, label, field_type, is_system, order) in fields {
         let field = FormConfigField {
             id: 0,
+            organization_id: inserted.organization_id,
             configuration_id: inserted.id,
             field_id: field_id.to_string(),
             name: field_id.to_string(),
@@ -2063,6 +2161,7 @@ fn init_forensic_form_config(ctx: &ReducerContext, organization_id: u64) -> Resu
     for (field_id, label, field_type, is_system, order) in fields {
         let field = FormConfigField {
             id: 0,
+            organization_id: inserted.organization_id,
             configuration_id: inserted.id,
             field_id: field_id.to_string(),
             name: field_id.to_string(),

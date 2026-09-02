@@ -861,7 +861,7 @@ pub fn create_purchase_order(
     let order = ctx.db.purchase_order().insert(PurchaseOrder {
         id: 0,
         organization_id,
-        name: Some(next_doc_number(ctx, "PO")),
+        name: Some(next_doc_number(ctx, organization_id, "PO")),
         origin: params.origin,
         partner_ref: params.partner_ref,
         state: PoState::Draft,

@@ -9,8 +9,6 @@ import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import {
   addUserCustomField,
   deleteUserCustomField,
-  getFormConfiguration,
-  getOrganizationFormConfigs,
 } from "@lumiere/stdb/client-ui-bridge"
 import type {
   FieldType as StdbFieldType,
@@ -593,9 +591,6 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
           },
         })
 
-        void getFormConfiguration(BigInt(organizationId), moduleId, formId).catch(() => {
-          /* no-op: legacy reducer; HTTP load is source of truth */
-        })
       } catch {
         if (cancelled) return
         if (useDefaultIfMissing) loadDefaultConfig()
@@ -700,7 +695,6 @@ export function useOrganizationFormConfigs(organizationId: number): {
             }),
           ),
         )
-        void getOrganizationFormConfigs(BigInt(organizationId)).catch(() => {})
       } catch {
         if (!cancelled) setConfigs([])
       } finally {

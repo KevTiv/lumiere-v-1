@@ -45,8 +45,12 @@ function rustApiRewrites() {
       destination: `${base}/v1/query/:path*`,
     },
     {
-      source: '/api/call/:path*',
-      destination: `${base}/v1/call/:path*`,
+      source: '/api/compat/reducer/:path*',
+      destination: `${base}/v1/compat/reducer/:path*`,
+    },
+    {
+      source: '/api/operations/:path*',
+      destination: `${base}/v1/operations/:path*`,
     },
   ]
 }

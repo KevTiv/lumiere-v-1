@@ -11,10 +11,12 @@ pub use erp_subscriptions::{
 };
 pub use field_policy::{
     apply_hr_field_policy, assert_safe_sql_identifiers, company_ids_dual_field_or_clause,
-    company_ids_equality_or_clause, has_hr_permission, hr_fields_require_read_audit,
+    company_ids_equality_or_clause, has_hr_permission, has_resource_read_permission,
+    hr_fields_require_read_audit,
     identity_sql_literal, is_hr_pii_resource, purpose_for_hr_resource, resolve_http_sql_columns,
-    select_company_scoped_sql, select_field_permissions_for_org_sql, select_org_scoped_sql,
-    select_roles_active_sql, select_user_organization_for_identity_sql,
+    select_company_scoped_sql, select_field_permissions_for_org_sql,
+    select_org_and_company_scoped_sql, select_org_scoped_sql, select_roles_active_sql,
+    select_user_organization_for_identity_sql,
     select_user_profile_by_identity_sql, select_user_role_assignments_for_identity_sql,
     sql_column_list_for_generated_type, FieldAccessContext, FieldPermissionLike,
 };

@@ -1,3 +1,4 @@
+import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
@@ -45,7 +46,7 @@ async function createConfirmedPoWithLine(
   await fillField(page, "origin", origin)
   const [createPoRes] = await Promise.all([
     page.waitForResponse(
-      (res) => res.url().includes("/api/call/create_purchase_order") && res.ok(),
+      (res) => matchesOperationResponse(res, "create_purchase_order") && res.ok(),
       { timeout: 30_000 },
     ),
     submitForm(page, "new-purchase-order"),
@@ -65,7 +66,7 @@ async function createConfirmedPoWithLine(
   await fillField(page, "priceUnit", "500")
   const [lineRes] = await Promise.all([
     page.waitForResponse(
-      (res) => res.url().includes("/api/call/add_purchase_order_line") && res.ok(),
+      (res) => matchesOperationResponse(res, "add_purchase_order_line") && res.ok(),
       { timeout: 30_000 },
     ),
     submitForm(page, "add-purchase-order-line"),
@@ -94,7 +95,7 @@ async function receivePoLineQty(
   await fillField(page, "qty", qty)
   const [receiveRes] = await Promise.all([
     page.waitForResponse(
-      (res) => res.url().includes("/api/call/receive_po_line") && res.ok(),
+      (res) => matchesOperationResponse(res, "receive_po_line") && res.ok(),
       { timeout: 30_000 },
     ),
     submitForm(page, "receive-purchase-order-line"),
@@ -120,7 +121,7 @@ async function createBillFromPo(page: import("@playwright/test").Page, orderId: 
   const [billRes] = await Promise.all([
     page.waitForResponse(
       (res) =>
-        res.url().includes("/api/call/create_bill_from_purchase_order") && res.ok(),
+        matchesOperationResponse(res, "create_bill_from_purchase_order") && res.ok(),
       { timeout: 30_000 },
     ),
     submitForm(page, "create-bill-from-purchase-order"),

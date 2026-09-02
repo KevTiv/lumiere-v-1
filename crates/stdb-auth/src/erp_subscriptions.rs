@@ -31,7 +31,6 @@ struct ErpOrgRow {
     resource_key: String,
     table: String,
     extra_where: String,
-    order_by: String,
 }
 
 static ERP_ORG_ROWS: Lazy<Vec<ErpOrgRow>> = Lazy::new(|| {
@@ -73,10 +72,6 @@ static AUTH_SINGLE: Lazy<HashMap<String, String>> = Lazy::new(|| {
     m
 });
 
-fn sql_quote_str(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "''"))
-}
-
 fn is_narrow_identity_hex(s: &str) -> bool {
     let s = s.trim();
     s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit())
@@ -85,22 +80,13 @@ fn is_narrow_identity_hex(s: &str) -> bool {
 /// Port of `authSubscriptions` from `queries/auth.ts` (uses `SELECT *`).
 pub fn auth_subscriptions(
     identity_hex: Option<&str>,
-    role_names: Option<&[String]>,
+    _role_names: Option<&[String]>,
     organization_id: Option<u64>,
 ) -> Vec<String> {
     let id = identity_hex
         .map(str::trim)
         .filter(|s| is_narrow_identity_hex(s))
         .map(|s| s.to_ascii_lowercase());
-
-    let roles: Vec<&str> = role_names
-        .map(|v| {
-            v.iter()
-                .map(|s| s.as_str())
-                .filter(|r| !r.is_empty() && r.len() < 256)
-                .collect()
-        })
-        .unwrap_or_default();
 
     let user_profile_sql = if let Some(ref hex) = id {
         format!("SELECT * FROM user_profile WHERE identity = 0x{hex}")
@@ -220,6 +206,56 @@ fn subscription_sql_for_company_scoped(
             )]))
         }
         "depreciation-lines" => Ok(CompanyScoped::MissingContext),
+        // `organization_id` is `Option<u64>` on account_fiscal_year, account_period,
+        // and consolidation_elimination_entry — SpacetimeDB SQL rejects `=` against
+        // it in every casing. `company.id` is a single global auto-increment
+        // primary key, so the company filter alone is equally precise (see the
+        // matching fix in `frontend/packages/stdb/src/queries/erp-subscriptions.ts`).
+        "fiscal-years" => {
+            let Some(list_ids) = ids else {
+                return Ok(CompanyScoped::MissingContext);
+            };
+            let c = resolve_http_sql_columns("fiscal-years", fa)?.join(", ");
+            let filter = company_ids_equality_or_clause("company_id", list_ids)?;
+            Ok(CompanyScoped::Queries(vec![format!(
+                "SELECT {c} FROM account_fiscal_year WHERE {filter}"
+            )]))
+        }
+        "account-periods" => {
+            let Some(list_ids) = ids else {
+                return Ok(CompanyScoped::MissingContext);
+            };
+            let c = resolve_http_sql_columns("account-periods", fa)?.join(", ");
+            let filter = company_ids_equality_or_clause("company_id", list_ids)?;
+            Ok(CompanyScoped::Queries(vec![format!(
+                "SELECT {c} FROM account_period WHERE {filter}"
+            )]))
+        }
+        "consolidation-elimination-entries" => {
+            let Some(list_ids) = ids else {
+                return Ok(CompanyScoped::MissingContext);
+            };
+            let c = resolve_http_sql_columns("consolidation-elimination-entries", fa)?.join(", ");
+            let filter = company_ids_equality_or_clause("company_id", list_ids)?;
+            Ok(CompanyScoped::Queries(vec![format!(
+                "SELECT {c} FROM consolidation_elimination_entry WHERE {filter}"
+            )]))
+        }
+        // These tables expose only unfilterable optional/vector tenant fields.
+        // Keep them on the authorized HTTP path rather than subscribing across
+        // organizations.
+        "consolidation-journals" | "consolidation-accounts" => Ok(CompanyScoped::MissingContext),
+        // `res_partner_bank.company_id` is `Option<u64>`; only `organization_id`
+        // (required here) can be filtered at the SQL level.
+        "partner-banks" => {
+            let Some(org) = ctx.organization_id else {
+                return Ok(CompanyScoped::MissingContext);
+            };
+            let c = resolve_http_sql_columns("partner-banks", fa)?.join(", ");
+            Ok(CompanyScoped::Queries(vec![format!(
+                "SELECT {c} FROM res_partner_bank WHERE organization_id = {org}"
+            )]))
+        }
         _ => Ok(CompanyScoped::NotApplicable),
     }
 }
@@ -233,13 +269,18 @@ fn erp_org_line(
         return Ok(None);
     };
     let ent = &ERP_ORG_ROWS[idx];
+    // Realtime subscriptions only drive cache invalidation. Queue/view predicates
+    // (enum state, status, receipt flags, and ordering) are reapplied by the
+    // authorized HTTP read after invalidation, while SpacetimeDB subscriptions do
+    // not support those predicates or ORDER BY. Keep the authenticated tenant
+    // predicate here and deliberately broaden only the invalidation signal.
     Ok(Some(select_org_scoped_sql(
         &ent.resource_key,
         &ent.table,
         org,
         fa,
-        &ent.extra_where,
-        &ent.order_by,
+        "",
+        "",
     )?))
 }
 
@@ -277,6 +318,13 @@ pub fn subscription_queries_for_resource(
         return Ok(Some(vec![sql.clone()]));
     }
 
+    // These resources require BFF-side company filtering that subscription SQL
+    // cannot express: partner banks have optional company ownership and landed
+    // cost lines inherit ownership from their parent.
+    if matches!(r, "partner-banks" | "landed-cost-lines") {
+        return Ok(None);
+    }
+
     if r == "roles" {
         return Ok(Some(vec![select_roles_active_sql(ctx.field_access)?]));
     }
@@ -304,41 +352,23 @@ pub fn subscription_queries_for_resource(
     }
 
     if r == "my-employee" {
-        let Some(org) = ctx.organization_id else {
-            return Ok(None);
-        };
-        let Some(id) = ctx.identity_hex.filter(|s| *s != "unknown") else {
-            return Ok(None);
-        };
-        let id_lit = crate::field_policy::identity_sql_literal(id)?;
-        let cols = resolve_http_sql_columns("my-employee", ctx.field_access)?.join(", ");
-        return Ok(Some(vec![format!(
-            "SELECT {cols} FROM hr_employee WHERE organization_id = {org} AND user_id = {id_lit} AND is_active = true"
-        )]));
+        // `hr_employee.user_id` is Option<Identity>; the live subscription
+        // dialect rejects equality against an identity literal. Do not broaden a
+        // self-only authorization predicate to organization scope.
+        return Ok(None);
     }
 
     if r == "direct-reports" {
-        let Some(org) = ctx.organization_id else {
-            return Ok(None);
-        };
-        let Some(manager_id) = ctx.manager_employee_id.filter(|&id| id > 0) else {
-            return Ok(None);
-        };
-        let cols = resolve_http_sql_columns("direct-reports", ctx.field_access)?.join(", ");
-        return Ok(Some(vec![format!(
-            "SELECT {cols} FROM hr_employee WHERE organization_id = {org} AND parent_id = {manager_id} AND is_active = true"
-        )]));
+        // `parent_id` is optional and cannot be compared by the live
+        // subscription dialect. Direct-report ownership is security-sensitive.
+        return Ok(None);
     }
 
-    // H1: org-wide employees only for HR roles; others get self (same SQL as my-employee).
+    // H1: org-wide employees only for HR roles; others stay on authorized HTTP.
     if r == "employees" {
         let Some(org) = ctx.organization_id else {
             return Ok(None);
         };
-        let Some(id) = ctx.identity_hex.filter(|s| *s != "unknown") else {
-            return Ok(None);
-        };
-        let id_lit = crate::field_policy::identity_sql_literal(id)?;
         let cols = resolve_http_sql_columns("employees", ctx.field_access)?.join(", ");
         let can_list_all =
             crate::field_policy::has_hr_permission(ctx.field_access, "hr_employee", "read")
@@ -357,16 +387,14 @@ pub fn subscription_queries_for_resource(
                     "hr_employee",
                     "view_pii",
                 );
-        let sql = if can_list_all {
-            format!(
-                "SELECT {cols} FROM hr_employee WHERE organization_id = {org} AND is_active = true"
-            )
-        } else {
-            format!(
-                "SELECT {cols} FROM hr_employee WHERE organization_id = {org} AND user_id = {id_lit} AND is_active = true"
-            )
-        };
-        return Ok(Some(vec![sql]));
+        if !can_list_all {
+            // Non-HR users are self-only, which requires the unsupported
+            // Option<Identity> predicate above. Keep them on authorized HTTP.
+            return Ok(None);
+        }
+        return Ok(Some(vec![format!(
+            "SELECT {cols} FROM hr_employee WHERE organization_id = {org} AND is_active = true"
+        )]));
     }
 
     if r == "employee-documents" {
@@ -376,7 +404,7 @@ pub fn subscription_queries_for_resource(
         let cols = resolve_http_sql_columns("employee-documents", ctx.field_access)?.join(", ");
         let mut extra = String::from(" AND active = true");
         if !crate::field_policy::has_hr_permission(ctx.field_access, "hr_employee", "view_pii") {
-            extra.push_str(" AND purpose NOT IN ('tax_id', 'identity')");
+            extra.push_str(" AND purpose != 'tax_id' AND purpose != 'identity'");
         }
         return Ok(Some(vec![format!(
             "SELECT {cols} FROM hr_employee_document WHERE organization_id = {org}{extra}"
@@ -551,6 +579,91 @@ mod tests {
                     .all(|query| query.contains("organization_id = 42")),
                 "{} was not scoped to the authenticated organization: {queries:?}",
                 row.resource_key
+            );
+        }
+    }
+
+    #[test]
+    fn inherited_and_optional_company_resources_fail_closed() {
+        let company_ids = [7];
+        let context = SubscriptionQueryContext {
+            organization_id: Some(42),
+            company_ids: Some(&company_ids),
+            ..SubscriptionQueryContext::default()
+        };
+
+        for resource in [
+            "partner-banks",
+            "landed-cost-lines",
+            "depreciation-lines",
+            "consolidation-journals",
+            "consolidation-accounts",
+        ] {
+            assert_eq!(
+                subscription_queries_for_resource(resource, &context)
+                    .expect("subscription SQL generation should not fail"),
+                None,
+                "{resource} must remain behind BFF company filtering"
+            );
+        }
+    }
+
+    #[test]
+    fn employee_documents_avoid_unsupported_not_in_expression() {
+        let context = SubscriptionQueryContext {
+            organization_id: Some(42),
+            ..SubscriptionQueryContext::default()
+        };
+        let queries = subscription_queries_for_resource("employee-documents", &context)
+            .expect("subscription SQL generation should not fail")
+            .expect("employee documents should resolve with organization context");
+        assert_eq!(queries.len(), 1);
+        assert!(!queries[0].contains("NOT IN"));
+        assert!(queries[0].contains("purpose != 'tax_id'"));
+        assert!(queries[0].contains("purpose != 'identity'"));
+    }
+
+    #[test]
+    fn generated_invalidation_queries_omit_view_filters_and_ordering() {
+        let context = SubscriptionQueryContext {
+            organization_id: Some(42),
+            ..SubscriptionQueryContext::default()
+        };
+
+        for resource in [
+            "sale-orders-to-approve",
+            "inventory-exceptions-open-qc",
+            "purchase-orders-to-approve",
+            "payslips-to-export",
+            "expense-policy-exceptions",
+        ] {
+            let queries = subscription_queries_for_resource(resource, &context)
+                .expect("subscription SQL generation should not fail")
+                .unwrap_or_else(|| panic!("{resource} should resolve"));
+            assert_eq!(queries.len(), 1);
+            assert!(queries[0].contains("organization_id = 42"), "{queries:?}");
+            assert!(!queries[0].contains(" ORDER BY "), "{queries:?}");
+            assert!(!queries[0].contains("state = '"), "{queries:?}");
+            assert!(!queries[0].contains("status = '"), "{queries:?}");
+            assert!(!queries[0].contains("exception_type = '"), "{queries:?}");
+        }
+    }
+
+    #[test]
+    fn option_scoped_employee_subscriptions_fail_closed() {
+        let context = SubscriptionQueryContext {
+            organization_id: Some(42),
+            identity_hex: Some("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+            manager_employee_id: Some(7),
+            ..SubscriptionQueryContext::default()
+        };
+
+        for resource in ["my-employee", "direct-reports", "employees"] {
+            assert_eq!(
+                subscription_queries_for_resource(resource, &context)
+                    .expect("subscription SQL generation should not fail"),
+                None,
+                "{resource} must stay on authorized HTTP when optional predicates are required"
             );
         }
     }

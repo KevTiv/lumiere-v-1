@@ -547,16 +547,29 @@ Use proposal/document/opportunity presence and prove subscriptions are record/se
 
 ### Phase SQ-0 — exhaustive subscription census + failure capture
 
-- [ ] enumerate every `SUBSCRIPTION_RESOURCE_KEYS` entry;
-- [ ] classify standard/company/identity/field-policy/private/derived/presence/projection-backed resources;
+- [x] enumerate every `SUBSCRIPTION_RESOURCE_KEYS` entry;
+- [x] classify standard/company/identity/field-policy/private/derived/presence/projection-backed resources;
 - [ ] capture current failing subscription queries as regression fixtures;
 - [ ] identify SQL branches duplicated from generated query metadata;
 - [ ] document any STDB syntax/feature limitations currently handled manually;
-- [ ] map each realtime resource to its source table/read model;
+- [x] map each realtime resource to its source table/read model;
 - [ ] map each realtime resource to concrete frontend consumers/routes;
-- [ ] declare expected cardinality, latency class, update fanout, source class, and reconnect class;
+- [x] declare expected cardinality, latency class, update fanout, source class, and reconnect class;
 - [ ] map each interactive subscription to a declared STDB access path or explicit exception;
 - [ ] identify broad subscriptions whose actual consumer needs only a filtered queue, record set, or summary projection.
+
+The checked-in [`subscription-census.json`](../../crates/stdb-auth/assets/subscription-census.json)
+is the SQ-0 census foundation and contains one entry for each of the 273 TypeScript
+`SUBSCRIPTION_RESOURCE_KEYS`. Consumer evidence is explicitly marked observed or
+pending; route-level consumer mapping, access-path mapping, and live failure capture
+remain open work.
+`node scripts/validate-subscription-census.mjs` validates deterministic key/order
+parity, required classification fields, fail-closed delivery/access metadata, and
+the live-subscription API regression boundary. The Rust resource lists are recorded
+as compatibility metadata rather than treated as authoritative: they currently omit
+111 frontend keys and contain four Rust-only full-client/list keys. Each entry marks
+live `subscriptionBuilder().subscribe(...)` acceptance as pending; `spacetime sql`
+string validation is explicitly not considered equivalent.
 
 **SQ-0 exit gate:**
 

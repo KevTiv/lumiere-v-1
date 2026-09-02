@@ -230,7 +230,7 @@ export function AccountGlDrilldownPanel({
                 </div>
                 <div>
                   <p className="text-muted-foreground">{t("accounting.journalEntries.total")}</p>
-                  <p className="font-medium">{formatCurrency(selectedMove.amountTotal)}</p>
+                  <p className="font-medium">{formatCurrency(selectedMove.amountTotal ?? 0)}</p>
                 </div>
               </div>
             </>

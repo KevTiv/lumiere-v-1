@@ -38,12 +38,14 @@ pub struct ImportJob {
 #[spacetimedb::table(
     accessor = import_job_error,
     public,
-    index(accessor = import_error_by_job, btree(columns = [job_id]))
+    index(accessor = import_error_by_job, btree(columns = [job_id])),
+    index(accessor = import_error_by_organization, btree(columns = [organization_id]))
 )]
 pub struct ImportJobError {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub job_id: u64,
     pub row_number: u32,
     pub field_name: Option<String>,
@@ -55,12 +57,14 @@ pub struct ImportJobError {
 #[spacetimedb::table(
     accessor = import_job_record,
     public,
-    index(accessor = import_record_by_job, btree(columns = [job_id]))
+    index(accessor = import_record_by_job, btree(columns = [job_id])),
+    index(accessor = import_record_by_organization, btree(columns = [organization_id]))
 )]
 pub struct ImportJobRecord {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub job_id: u64,
     pub table_name: String,
     pub record_id: u64,
@@ -104,13 +108,11 @@ pub fn record_import_error(
     raw_value: Option<&str>,
     error_message: &str,
 ) {
-    let entity = ctx
-        .db
-        .import_job()
-        .id()
-        .find(&job_id)
-        .map(|job| job.table_name)
-        .unwrap_or_else(|| "unknown".to_string());
+    let Some(job) = ctx.db.import_job().id().find(&job_id) else {
+        log::error!("Cannot record import error for unknown job_id={}", job_id);
+        return;
+    };
+    let entity = job.table_name.clone();
     log::warn!(
         "Import row rejected: entity={} job_id={} row={} field={:?} error={}",
         entity,
@@ -121,6 +123,7 @@ pub fn record_import_error(
     );
     ctx.db.import_job_error().insert(ImportJobError {
         id: 0,
+        organization_id: job.organization_id,
         job_id,
         row_number,
         field_name: field_name.map(|s| s.to_string()),
@@ -138,8 +141,13 @@ pub fn record_import_created_id(
     record_id: u64,
     row_number: u32,
 ) {
+    let Some(job) = ctx.db.import_job().id().find(&job_id) else {
+        log::error!("Cannot record import row for unknown job_id={}", job_id);
+        return;
+    };
     ctx.db.import_job_record().insert(ImportJobRecord {
         id: 0,
+        organization_id: job.organization_id,
         job_id,
         table_name: table_name.to_string(),
         record_id,
@@ -271,6 +279,9 @@ pub fn rollback_import_job(
     let table_name = job.table_name.clone();
     let mut deleted_count = 0u32;
     for record in &records {
+        if record.organization_id != job.organization_id {
+            return Err("Import record does not belong to the import job organization".to_string());
+        }
         rollback_delete_record(ctx, organization_id, &record.table_name, record.record_id)?;
         ctx.db.import_job_record().id().delete(&record.id);
         deleted_count += 1;

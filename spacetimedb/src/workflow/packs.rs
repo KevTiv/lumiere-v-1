@@ -771,7 +771,7 @@ fn resolve_timer_calendar_deadline(
         ));
     }
 
-    let version = latest_calendar_version(ctx, calendar_key)?;
+    let version = latest_calendar_version(ctx, timer.organization_id, calendar_key)?;
     let exceptions: Vec<_> = ctx
         .db
         .workflow_calendar_exception()
@@ -789,19 +789,39 @@ fn resolve_timer_calendar_deadline(
 
 fn latest_calendar_version(
     ctx: &ReducerContext,
+    organization_id: u64,
     calendar_key: &str,
 ) -> Result<WorkflowCalendarVersion, String> {
+    let calendar_key_owned = calendar_key.to_string();
     let calendar = ctx
         .db
         .workflow_calendar()
-        .workflow_calendar_by_key()
-        .filter(&calendar_key.to_string())
+        .workflow_calendar_by_organization_and_key()
+        .filter((&organization_id, &calendar_key_owned))
         .next()
         .ok_or_else(|| format!("calendar '{calendar_key}' not found"))?;
-    ctx.db
+    let version = ctx
+        .db
         .workflow_calendar_version()
         .workflow_calendar_version_by_calendar()
         .filter(&calendar.id)
         .max_by_key(|version| (version.version_number, version.id))
-        .ok_or_else(|| format!("calendar '{calendar_key}' has no versions"))
+        .ok_or_else(|| format!("calendar '{calendar_key}' has no versions"))?;
+    if version.organization_id != calendar.organization_id
+        || version.organization_id != organization_id
+    {
+        return Err("calendar version does not belong to calendar organization".to_string());
+    }
+    if ctx
+        .db
+        .workflow_calendar_exception()
+        .workflow_calendar_exception_by_version()
+        .filter(&version.id)
+        .any(|exception| exception.organization_id != version.organization_id)
+    {
+        return Err(
+            "calendar exception does not belong to calendar version organization".to_string(),
+        );
+    }
+    Ok(version)
 }

@@ -1,3 +1,4 @@
+import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
@@ -29,7 +30,7 @@ test.describe("CRM duplicate merge", { tag: ["@phase-4", "@crm"] }, () => {
     await fillField(page, "email", email)
     const [createARes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_contact") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_contact") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-contact"),
@@ -42,7 +43,7 @@ test.describe("CRM duplicate merge", { tag: ["@phase-4", "@crm"] }, () => {
     await fillField(page, "email", email)
     const [createBRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_contact") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_contact") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-contact"),
@@ -71,7 +72,7 @@ test.describe("CRM duplicate merge", { tag: ["@phase-4", "@crm"] }, () => {
 
     const [mergeRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/merge_contacts") && res.ok(),
+        (res) => matchesOperationResponse(res, "merge_contacts") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "merge-contacts"),

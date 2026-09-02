@@ -3,7 +3,7 @@
 /**
  * Generic SpacetimeDB hooks
  *
- * useStdbReducer  — call any reducer via POST /api/call/:reducer
+ * useStdbReducer  — call any named operation via POST /api/operations/:operation
  * useStdbQuery    — fetch any resource via GET /api/query/:resource
  *
  * These provide access to the full SpacetimeDB surface area without
@@ -21,7 +21,13 @@ import {
 } from "@lumiere/stdb/commands"
 import type { OperationInputMap } from "@lumiere/contracts/generated/operation-inputs"
 import { isSubscriptionReady, useSubscriptionCache } from "@lumiere/stdb/live"
+import type { QueryResourceKey } from "@lumiere/stdb/generated/query-registry"
 import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
+import {
+  decodeTypedResourceQueryResponse,
+  type ResourceQueryRowMap,
+  type TypedResourceReadKey,
+} from "@lumiere/stdb/resource-reads"
 
 import { apiFetch, coalesceQueryInitialData } from "../http"
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
@@ -34,6 +40,21 @@ export function stdbQueryKey(
   return companyId != null && companyId > 0
     ? (['stdb', resource, organizationId.toString(), 'company', companyId] as const)
     : (['stdb', resource, organizationId.toString()] as const)
+}
+
+/** Cache namespace for rows that passed a generated HTTP projection decoder. */
+export function typedStdbQueryKey(
+  resource: string,
+  organizationId: bigint | number,
+  companyId?: number | null,
+) {
+  return companyId != null && companyId > 0
+    ? (['typed-stdb', resource, organizationId.toString(), 'company', companyId] as const)
+    : (['typed-stdb', resource, organizationId.toString()] as const)
+}
+
+function hasPositiveOrganizationId(value: bigint | number): boolean {
+  return typeof value === 'bigint' ? value > 0n : value > 0
 }
 
 /**
@@ -107,8 +128,13 @@ export function invalidateStdbQueryResources(
   organizationId: bigint | number,
   resources: readonly string[],
 ) {
-  if (isSubscriptionReady()) return
   for (const resource of resources) {
+    // Typed HTTP rows use a separate namespace so the opt-in legacy direct-row
+    // cache can never populate them with unprojected SDK entities.
+    void qc.invalidateQueries({
+      queryKey: typedStdbQueryKey(resource, organizationId),
+    })
+    if (isSubscriptionReady()) continue
     for (const queryKey of realtimeQueryKeysForResource(resource, organizationId)) {
       void qc.invalidateQueries({ queryKey })
     }
@@ -116,7 +142,7 @@ export function invalidateStdbQueryResources(
 }
 
 /**
- * POST `/api/call/:reducer` and invalidate listed `stdb` query resources on success.
+ * POST `/api/operations/:operation` and invalidate listed `stdb` query resources on success.
  * When `invalidateResources` is omitted or empty, uses `STDB_REDUCER_INVALIDATION` from codegen manifest.
  */
 type NamedReducerKey = Extract<StdbBffReducerKey, keyof OperationInputMap>
@@ -220,6 +246,76 @@ export function useStdbQuery<K extends string>(
     refetchOnMount: !subscriptionReady,
     refetchOnWindowFocus: !subscriptionReady,
     enabled: options?.enabled,
+    initialData: coalesceQueryInitialData(options?.initialData),
+  })
+}
+
+/**
+ * Fetch a company-scoped resource through a generated projection decoder.
+ * The loader owns transport and decoding; this hook owns selected-company
+ * readiness, cache identity, and React Query lifecycle only.
+ */
+export function useCompanyScopedTypedQuery<Row>(
+  resource: QueryResourceKey,
+  organizationId: bigint | number,
+  loadRows: (companyId: bigint) => Promise<Row[]>,
+  options?: {
+    staleTime?: number
+    enabled?: boolean
+  },
+) {
+  const { activeCompanyId, activeCompanyReady } = useErpSession()
+  const companyId = activeCompanyReady ? activeCompanyId : null
+  return useQuery<Row[]>({
+    queryKey: typedStdbQueryKey(resource, organizationId, companyId),
+    queryFn: () => {
+      if (companyId == null || companyId <= 0) {
+        throw new Error(`An active company is required to query ${resource}`)
+      }
+      return loadRows(BigInt(companyId))
+    },
+    enabled:
+      (options?.enabled ?? true) &&
+      hasPositiveOrganizationId(organizationId) &&
+      companyId != null &&
+      companyId > 0,
+    staleTime: options?.staleTime ?? 30_000,
+  })
+}
+
+/** Fetch and decode any resource in the reviewed generated typed-read set. */
+export function useTypedStdbQuery<Resource extends TypedResourceReadKey>(
+  resource: Resource,
+  organizationId: bigint | number,
+  options?: {
+    staleTime?: number
+    enabled?: boolean
+    initialData?: ResourceQueryRowMap[Resource][]
+  },
+) {
+  const { activeCompanyId, activeCompanyReady } = useErpSession()
+  const companyId = activeCompanyReady ? activeCompanyId : null
+  return useQuery<ResourceQueryRowMap[Resource][]>({
+    queryKey: typedStdbQueryKey(resource, organizationId, companyId),
+    queryFn: async () => {
+      if (companyId == null || companyId <= 0) {
+        throw new Error(`An active company is required to query ${resource}`)
+      }
+      const companyQuery = `?companyId=${encodeURIComponent(String(companyId))}`
+      const response = await apiFetch(`/api/query/${resource}${companyQuery}`)
+      if (!response.ok) {
+        const json = await response.json().catch(() => ({})) as Record<string, unknown>
+        throw new Error((json.error as string | undefined) ?? `Query ${resource} failed`)
+      }
+      return decodeTypedResourceQueryResponse(resource, await response.json())
+    },
+    enabled:
+      (options?.enabled ?? true) &&
+      hasPositiveOrganizationId(organizationId) &&
+      activeCompanyReady &&
+      companyId != null &&
+      companyId > 0,
+    staleTime: options?.staleTime ?? 30_000,
     initialData: coalesceQueryInitialData(options?.initialData),
   })
 }

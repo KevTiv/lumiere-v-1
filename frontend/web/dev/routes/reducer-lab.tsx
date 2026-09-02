@@ -18,7 +18,6 @@ function ReducerLabPage() {
 
   const [reducerName, setReducerName] = useState(preselectedReducer)
   const [args, setArgs] = useState<string>('[]')
-  const [withCompany, setWithCompany] = useState(false)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ success?: boolean; message?: string; response?: unknown } | null>(null)
   const [recentCalls, setRecentCalls] = useState<Array<{ reducer: string; args: string; timestamp: number }>>([])
@@ -68,9 +67,7 @@ function ReducerLabPage() {
     setResult(null)
     try {
       const parsedArgs = JSON.parse(args)
-      const url = withCompany
-        ? `/api/call/${reducerName}?withCompany=true`
-        : `/api/call/${reducerName}`
+      const url = `/api/compat/reducer/${reducerName}`
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -105,7 +102,7 @@ function ReducerLabPage() {
   const setPresetArgs = (preset: string) => {
     switch (preset) {
       case 'org-only': setArgs('["1"]'); break
-      case 'org-with-company': setArgs('[]'); setWithCompany(true); break
+      case 'org-with-company': setArgs('["1", "1"]'); break
       case 'org-and-params': setArgs('["1", {"name": "Test"}]'); break
       case 'empty': setArgs('[]'); break
     }
@@ -179,7 +176,7 @@ function ReducerLabPage() {
             <div className="mt-2 flex flex-wrap gap-2">
               {[
                 { key: 'org-only', label: '[orgId]' },
-                { key: 'org-with-company', label: '[withCompany]' },
+                { key: 'org-with-company', label: '[orgId, companyId]' },
                 { key: 'org-and-params', label: '[orgId, params]' },
                 { key: 'empty', label: '[]' },
               ].map(({ key, label }) => (
@@ -192,18 +189,6 @@ function ReducerLabPage() {
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={withCompany}
-                onChange={(e) => setWithCompany(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <span className="text-sm">withCompany=true</span>
-            </label>
           </div>
 
           <button
@@ -269,7 +254,7 @@ function ReducerLabPage() {
             <h3 className="mb-3 text-sm font-semibold">Tips</h3>
             <ul className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
               <li>• Most reducers need [organizationId, ...args]</li>
-              <li>• Use withCompany for company-scoped reducers</li>
+              <li>• Supply organization and company arguments explicitly</li>
               <li>• Check browser Network tab for full details</li>
               <li>• URL updates when you call a reducer — bookmark it!</li>
             </ul>

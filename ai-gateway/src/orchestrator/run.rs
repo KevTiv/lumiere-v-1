@@ -11,6 +11,7 @@ use crate::{
     },
     orchestrator::skill_loader::{complete_run, create_run, load_skill, LoadedSkill},
     providers::llm::LlmMessage,
+    harness::ActorCredentials,
     state::AppState,
     tools::{
         registry::ToolRegistry,
@@ -100,6 +101,11 @@ pub async fn run_skill_unlocked(
         anyhow::bail!("skill_key is required");
     }
 
+    let actor = req
+        .stdb_token
+        .as_ref()
+        .zip(req.triggered_by_hex.as_ref())
+        .and_then(|(token, identity)| ActorCredentials::new(token.clone(), identity.clone()).ok());
     let stdb = req
         .stdb_token
         .as_ref()
@@ -157,6 +163,7 @@ pub async fn run_skill_unlocked(
         config_json: skill.config_json.clone(),
         inputs: req.inputs.clone(),
         allowed_action_drafts: skill.allowed_action_drafts.clone(),
+        actor,
     };
 
     let max_steps = req

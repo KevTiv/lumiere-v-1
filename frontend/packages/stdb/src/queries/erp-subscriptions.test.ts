@@ -68,13 +68,21 @@ describe("CRM-RI-007: company-scoped live subscriptions", () => {
 })
 
 describe("PUR-RI-017: company-scoped Purchasing subscriptions", () => {
+  it("projects landed-cost lifecycle state without server-side ordering", () => {
+    const sql = subscriptionQueriesForResource("landed-costs", {
+      organizationId: 42,
+      companyIds: [7],
+    })
+    assert.ok(sql)
+    assert.match(sql![0], /\bstate\b/)
+    assert.doesNotMatch(sql![0], /\bORDER BY\b/i)
+  })
+
   it("filters every direct Purchasing table to the single allowed company", () => {
     for (const resource of [
       "purchase-orders",
       "purchase-order-lines",
       "landed-costs",
-      "landed-cost-lines",
-      "partner-banks",
       "purchase-requisitions",
       "purchase-requisition-lines",
       "purchase-rfqs",
@@ -90,6 +98,25 @@ describe("PUR-RI-017: company-scoped Purchasing subscriptions", () => {
       assert.ok(sql, `${resource} should produce company-scoped SQL`)
       assert.match(sql![0], /organization_id\s*=\s*42/)
       assert.match(sql![0], /company_id\s*=\s*7/)
+    }
+  })
+
+  it("keeps inherited and optional company ownership behind the BFF", () => {
+    for (const resource of [
+      "landed-cost-lines",
+      "partner-banks",
+      "depreciation-lines",
+      "consolidation-journals",
+      "consolidation-accounts",
+    ]) {
+      assert.equal(
+        subscriptionQueriesForResource(resource, {
+          organizationId: 42,
+          companyIds: [7],
+        }),
+        null,
+        `${resource} must not widen the realtime cache to organization scope`,
+      )
     }
   })
 
@@ -129,5 +156,32 @@ describe("PUR-RI-017: company-scoped Purchasing subscriptions", () => {
       }),
       null,
     )
+  })
+})
+
+describe("HR subscription SQL dialect", () => {
+  it("fails closed when employee authorization needs optional-field comparisons", () => {
+    const context = {
+      organizationId: 42,
+      identityHex: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      managerEmployeeId: 7,
+    }
+    for (const resource of ["my-employee", "direct-reports", "employees"]) {
+      assert.equal(
+        subscriptionQueriesForResource(resource, context),
+        null,
+        `${resource} must use authorized HTTP`,
+      )
+    }
+  })
+
+  it("rewrites unsupported NOT IN for employee document purpose", () => {
+    const sql = subscriptionQueriesForResource("employee-documents", {
+      organizationId: 42,
+    })
+    assert.ok(sql)
+    assert.doesNotMatch(sql![0], /\bNOT IN\b/i)
+    assert.match(sql![0], /purpose\s*!=\s*'tax_id'/)
+    assert.match(sql![0], /purpose\s*!=\s*'identity'/)
   })
 })

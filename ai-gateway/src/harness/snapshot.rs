@@ -13,7 +13,28 @@ use crate::{
     },
     qdrant_client::SearchResult,
     rig_agent::ContextHit,
+    state::AppState,
 };
+
+#[derive(Clone, Debug)]
+pub struct ActorCredentials {
+    pub stdb_token: String,
+    pub identity_hex: String,
+}
+
+impl ActorCredentials {
+    pub fn new(stdb_token: impl Into<String>, identity_hex: impl Into<String>) -> Result<Self> {
+        let stdb_token = stdb_token.into().trim().to_string();
+        let identity_hex = identity_hex.into().trim().to_string();
+        if stdb_token.is_empty() || identity_hex.is_empty() || identity_hex == "unknown" {
+            anyhow::bail!("authenticated actor credentials are required");
+        }
+        Ok(Self {
+            stdb_token,
+            identity_hex,
+        })
+    }
+}
 
 /// UI focus metadata forwarded from the BFF (mirrors `routes/rag::UiContext`).
 #[derive(Clone, Deserialize, Default)]
@@ -24,6 +45,20 @@ pub struct SnapshotUiContext {
 
 pub const RAG_MAX_LIVE_SNAPSHOTS: usize = 3;
 pub const HARNESS_MAX_LIVE_SNAPSHOTS: usize = 5;
+const AUTHORITATIVE_RESOLVER_UNAVAILABLE: &str = "authoritative resolver unavailable";
+
+fn resolver_unavailable_error() -> anyhow::Error {
+    anyhow::anyhow!(AUTHORITATIVE_RESOLVER_UNAVAILABLE)
+}
+
+fn resolver_status_hides_candidate(status: reqwest::StatusCode) -> bool {
+    matches!(
+        status,
+        reqwest::StatusCode::UNAUTHORIZED
+            | reqwest::StatusCode::FORBIDDEN
+            | reqwest::StatusCode::NOT_FOUND
+    )
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct EntityRef {
@@ -84,29 +119,38 @@ pub fn resolve_snapshot_candidates(
     }
 
     for hit in org_hits {
-        if lookup_entity_spec(&hit.entity_type).is_none() {
+        let entity_type = &hit.record.semantic.resource_kind;
+        if lookup_entity_spec(entity_type).is_none() {
             continue;
         }
-        let Some(id) = hit.entity_id.parse::<u64>().ok().filter(|id| *id > 0) else {
+        let Some(id) = hit
+            .record
+            .semantic
+            .resource_id
+            .parse::<u64>()
+            .ok()
+            .filter(|id| *id > 0)
+        else {
             continue;
         };
         candidates.push(EntityRef {
-            entity_type: hit.entity_type.clone(),
+            entity_type: entity_type.clone(),
             entity_id: id,
             priority: hit.score,
         });
     }
 
     for hit in company_hits {
-        let Some(entity_type) = content_type_to_entity(&hit.content_type) else {
+        let Some(entity_type) = content_type_to_entity(&hit.record.resource_kind) else {
             continue;
         };
-        if hit.content_id == 0 {
+        let Some(entity_id) = hit.record.resource_id.parse::<u64>().ok().filter(|id| *id > 0)
+        else {
             continue;
-        }
+        };
         candidates.push(EntityRef {
             entity_type: entity_type.to_string(),
-            entity_id: hit.content_id,
+            entity_id,
             priority: hit.score * 0.9,
         });
     }
@@ -130,6 +174,119 @@ pub fn resolve_snapshot_candidates(
     }
 
     deduped
+}
+
+pub async fn fetch_authorized_live_snapshots(
+    state: &AppState,
+    actor: &ActorCredentials,
+    org_id: u64,
+    company_id: u64,
+    candidates: &[EntityRef],
+) -> Result<Vec<LiveSnapshot>> {
+    if candidates.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let api_base = state
+        .config
+        .api_server_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            anyhow::anyhow!("LUMIERE_API_SERVER_URL is required for authoritative snapshots")
+        })?
+        .trim_end_matches('/');
+    let snapshot_at = utc_now_rfc3339();
+    let mut snapshots = Vec::new();
+
+    for candidate in candidates {
+        let Some(spec) = lookup_entity_spec(&candidate.entity_type) else {
+            continue;
+        };
+        let url = format!(
+            "{api_base}/v1/authoritative/{}/{}",
+            spec.api_resource, candidate.entity_id
+        );
+        let response = state
+            .http
+            .get(url)
+            .bearer_auth(actor.stdb_token.trim())
+            .header("x-stdb-identity", actor.identity_hex.trim())
+            .query(&[("companyId", company_id)])
+            .send()
+            .await
+            .map_err(|error| {
+                tracing::warn!(
+                    entity_type = spec.entity_type,
+                    entity_id = candidate.entity_id,
+                    error = %error,
+                    "Authoritative resolver request failed"
+                );
+                resolver_unavailable_error()
+            })?;
+
+        if resolver_status_hides_candidate(response.status()) {
+            continue;
+        }
+        if !response.status().is_success() {
+            tracing::warn!(
+                entity_type = spec.entity_type,
+                entity_id = candidate.entity_id,
+                status = %response.status(),
+                "Authoritative resolver returned an unavailable response"
+            );
+            return Err(resolver_unavailable_error());
+        }
+        let envelope: Value = response.json().await.map_err(|error| {
+            tracing::warn!(
+                entity_type = spec.entity_type,
+                entity_id = candidate.entity_id,
+                error = %error,
+                "Authoritative resolver returned invalid JSON"
+            );
+            resolver_unavailable_error()
+        })?;
+        let Some(row) = envelope.get("data") else {
+            tracing::warn!(
+                entity_type = spec.entity_type,
+                entity_id = candidate.entity_id,
+                "Authoritative resolver response is missing data"
+            );
+            return Err(resolver_unavailable_error());
+        };
+        let row_id = json_u64(row.get(spec.id_column).or_else(|| row.get("id")));
+        let row_org = spec.org_column.and_then(|column| {
+            let camel = snake_to_camel(column);
+            json_u64(row.get(column).or_else(|| row.get(&camel)))
+        });
+        if row_id != Some(candidate.entity_id) || row_org != Some(org_id) {
+            tracing::warn!(
+                entity_type = spec.entity_type,
+                entity_id = candidate.entity_id,
+                org_id,
+                company_id,
+                "Authoritative resolver returned mismatched resource scope"
+            );
+            return Err(resolver_unavailable_error());
+        }
+        if !row_matches_scope(spec, row, org_id, company_id) {
+            continue;
+        }
+
+        snapshots.push(LiveSnapshot {
+            entity_type: spec.entity_type.to_string(),
+            entity_id: candidate.entity_id,
+            label: format_snapshot_label(spec.label_template, candidate.entity_id),
+            snapshot_at: snapshot_at.clone(),
+            row: filter_prompt_fields(row, spec.prompt_fields),
+            // Relation policies are resource-specific; omit them until each relation
+            // has an actor-authorized resolver contract.
+            relations: Vec::new(),
+        });
+    }
+
+    Ok(snapshots)
 }
 
 pub async fn fetch_live_snapshots(
@@ -481,20 +638,61 @@ mod tests {
     use super::*;
 
     #[test]
+    fn unauthorized_resolver_statuses_hide_candidates() {
+        assert!(resolver_status_hides_candidate(reqwest::StatusCode::UNAUTHORIZED));
+        assert!(resolver_status_hides_candidate(reqwest::StatusCode::FORBIDDEN));
+        assert!(resolver_status_hides_candidate(reqwest::StatusCode::NOT_FOUND));
+        assert!(!resolver_status_hides_candidate(
+            reqwest::StatusCode::INTERNAL_SERVER_ERROR
+        ));
+    }
+
+    #[test]
+    fn public_resolver_error_does_not_expose_candidate_metadata() {
+        let error = resolver_unavailable_error().to_string();
+        assert_eq!(error, AUTHORITATIVE_RESOLVER_UNAVAILABLE);
+        assert!(!error.contains("sale_order"));
+        assert!(!error.contains("42"));
+        assert!(!error.contains("token"));
+    }
+
+    fn context_hit(entity_type: &str, entity_id: &str, score: f32) -> ContextHit {
+        ContextHit {
+            score,
+            record: crate::rig_agent::ActivityIndexRecord {
+                semantic: crate::qdrant_client::SemanticIndexRecord {
+                    organization_id: 1,
+                    company_id: 10,
+                    resource_kind: entity_type.into(),
+                    resource_id: entity_id.into(),
+                    resource_version: "1".into(),
+                    source_fingerprint: "sha256:test".into(),
+                    embedding_model: "test".into(),
+                    indexed_at: "2026-08-25T00:00:00Z".into(),
+                    tags: vec!["activity".into()],
+                },
+                activity_timestamp: 1,
+            },
+        }
+    }
+
+    #[test]
+    fn actor_credentials_are_trimmed_and_reject_placeholder_identity() {
+        let actor = ActorCredentials::new(" token ", " abc123 ").expect("valid actor");
+        assert_eq!(actor.stdb_token, "token");
+        assert_eq!(actor.identity_hex, "abc123");
+        assert!(ActorCredentials::new("", "abc123").is_err());
+        assert!(ActorCredentials::new("token", " unknown ").is_err());
+    }
+
+    #[test]
     fn candidates_prioritize_ui_focus() {
         let ui = SnapshotUiContext {
             entity_type: Some("sale_order".into()),
             entity_id: Some("42".into()),
             ..Default::default()
         };
-        let org = vec![ContextHit {
-            score: 0.95,
-            entity_type: "product".into(),
-            entity_id: "7".into(),
-            text: String::new(),
-            timestamp: 0,
-            source: String::new(),
-        }];
+        let org = vec![context_hit("product", "7", 0.95)];
         let refs = resolve_snapshot_candidates(Some(&ui), &[], &org, 3);
         assert_eq!(refs[0].entity_type, "sale_order");
         assert_eq!(refs[0].entity_id, 42);
@@ -507,14 +705,7 @@ mod tests {
             entity_id: Some("5".into()),
             ..Default::default()
         };
-        let org = vec![ContextHit {
-            score: 0.8,
-            entity_type: "contact".into(),
-            entity_id: "5".into(),
-            text: String::new(),
-            timestamp: 0,
-            source: String::new(),
-        }];
+        let org = vec![context_hit("contact", "5", 0.8)];
         let refs = resolve_snapshot_candidates(Some(&ui), &[], &org, 3);
         assert_eq!(refs.len(), 1);
     }

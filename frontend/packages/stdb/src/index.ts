@@ -14,10 +14,10 @@
  * existing `@lumiere/stdb/generated/*` import specifiers keep working; new
  * code should import from `@lumiere/contracts/generated/*` directly instead.
  *
- * For the HTTP gateway stack (Next.js, cookies, `/api/query/*`, `/api/call/*`):
+ * For the HTTP gateway stack (Next.js, cookies, `/api/query/*`, `/api/operations/*`):
  * - `@lumiere/query-hooks/hooks/*` — React Query hooks (api-server via `LumiereApiProvider`)
  * - `@lumiere/stdb/server` — `stdbSql` + entity types for Next.js API routes (not RSC reads)
- * - `@lumiere/stdb/browser-http` — `stdbBrowserCall` / `stdbBrowserQuery` when the provider is mounted
+ * - `@lumiere/stdb/browser-http` — immutable operations, domain SDK construction, and queries
  * - `@lumiere/stdb/client-ui-bridge` — minimal mutation helpers for `@lumiere/ui`
  *
  * Web: realtime invalidation uses `@lumiere/query-hooks/hooks/realtime` (`useLumiereRealtime`); optional native `StdbConnectionProvider` + `createClientSubscriptions` for non-web or legacy.
@@ -29,6 +29,10 @@ export * from './context';
 export * from './queries/auth';
 export * from './queries/erp-subscriptions';
 export * from './warehouse-3d-types';
+export {
+  createStdbSdk,
+  type StdbSdk,
+} from './sdk';
 
 /** Form config enums / structs live in `generated/types.ts`, not the SpacetimeDB `generated/index` barrel. */
 export { FieldType, FieldWidth, FieldOption, FieldValidation } from './generated/types';

@@ -40,7 +40,10 @@ import type {
 } from '@lumiere/stdb/types'
 import type { Timestamp } from "spacetimedb"
 
-import { userTypeIdFromAccountTypes } from "./accounting-defaults"
+import {
+  userTypeIdFromAccountTypes,
+  type AccountTypeLookupRow,
+} from "./accounting-defaults"
 import {
   formValue as field,
   optionalBigIntU64,
@@ -146,7 +149,7 @@ function toInternalGroup(
 
 export function toCreateAccountAccountParams(
   formData: Record<string, unknown>,
-  opts: { companyId: bigint; accountTypes?: ReadonlyArray<Record<string, unknown>> },
+  opts: { companyId: bigint; accountTypes?: ReadonlyArray<AccountTypeLookupRow> },
 ): CreateAccountAccountParams | null {
   const rawUt = formData.userTypeId
   let userTypeId: bigint | null =
@@ -858,6 +861,7 @@ export function toCreatePaymentParamsFromManualForm(
   const journalId = optionalBigIntU64(formData.journalId)
   const partnerId = optionalBigIntU64(formData.partnerId)
   const currencyId = optionalBigIntU64(formData.currencyId)
+  const date = timestampFromFormDate(formData.date)
   const amount = Number(formData.amount)
   if (!journalId || !partnerId || !currencyId || !Number.isFinite(amount) || amount <= 0) return null
   const pt = String(formData.paymentType ?? 'InBound').trim()
@@ -870,7 +874,7 @@ export function toCreatePaymentParamsFromManualForm(
     partnerId,
     amount,
     currencyId,
-    date: undefined,
+    date,
     journalId,
     ref: optionalTrimmedString(formData.ref),
     memo: optionalTrimmedString(formData.memo),

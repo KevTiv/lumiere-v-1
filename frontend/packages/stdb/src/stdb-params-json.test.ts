@@ -246,6 +246,22 @@ describe("stdbParamsToJson", () => {
     )
   })
 
+  it("wraps present optional timestamps using SATS Option JSON", () => {
+    assert.deepEqual(
+      stdbParamsToJson(
+        {
+          date: { microsSinceUnixEpoch: 1_700_000_000_000_000n },
+        },
+        "CreatePaymentParams",
+      ).date,
+      {
+        some: {
+          __timestamp_micros_since_unix_epoch__: 1_700_000_000_000_000,
+        },
+      },
+    )
+  })
+
   it("encodeReducerCallArgs SATS-encodes update_sale_order params", () => {
     const encoded = encodeReducerCallArgs("update_sale_order", [
       42,

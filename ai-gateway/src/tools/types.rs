@@ -4,7 +4,10 @@ use std::sync::Arc;
 use stdb_client::StdbClient;
 
 use crate::{
-    harness::LiveSnapshot, providers::Providers, qdrant_client::VectorStore, rig_agent::RigContext,
+    harness::{ActorCredentials, LiveSnapshot},
+    providers::Providers,
+    qdrant_client::VectorStore,
+    rig_agent::RigContext,
     state::AppState,
 };
 
@@ -19,6 +22,7 @@ pub struct ToolContext {
     pub config_json: Value,
     pub inputs: Value,
     pub allowed_action_drafts: Vec<String>,
+    pub actor: Option<ActorCredentials>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

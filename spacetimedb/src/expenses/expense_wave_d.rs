@@ -88,6 +88,7 @@ pub struct HrExpenseAdvance {
 #[spacetimedb::table(
     accessor = hr_expense_advance_application,
     public,
+    index(accessor = advance_app_by_organization, btree(columns = [organization_id])),
     index(accessor = advance_app_by_sheet, btree(columns = [sheet_id])),
     index(accessor = advance_app_by_advance, btree(columns = [advance_id]))
 )]
@@ -818,7 +819,7 @@ pub fn create_expense_advance(
     let amount = params.amount;
     let currency_id = params.currency_id;
     let origin = format!("ADV-{}", params.employee_id);
-    let move_name = next_doc_number(ctx, "ADV");
+    let move_name = next_doc_number(ctx, organization_id, "ADV");
 
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,

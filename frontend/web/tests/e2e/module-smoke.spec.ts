@@ -1,3 +1,4 @@
+import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
@@ -68,7 +69,7 @@ test.describe("ERP module smoke", () => {
     await fillField(page, "value", "5000")
     const [createProposalRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_proposal") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_proposal") && res.ok(),
         { timeout: 30_000 },
       ),
       page.getByTestId("form-submit-new-proposal").click(),

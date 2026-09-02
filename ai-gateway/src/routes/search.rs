@@ -4,11 +4,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::{AppError, AppResult},
+    qdrant_client::SemanticIndexRecord,
     state::AppState,
+    stdb_embed::company_belongs_to_organization,
 };
 
 #[derive(Deserialize)]
 pub struct SearchRequest {
+    pub org_id: u64,
     pub company_id: u64,
     pub query: String,
     /// Optional: filter to a specific content type (product, contact, document, etc.)
@@ -26,16 +29,14 @@ fn default_limit() -> u64 {
 #[derive(Serialize)]
 pub struct SearchHit {
     pub score: f32,
-    pub company_id: u64,
-    pub content_type: String,
-    pub content_id: u64,
-    pub stdb_embedding_id: u64,
-    pub text_snippet: String,
+    #[serde(flatten)]
+    pub record: SemanticIndexRecord,
 }
 
 #[derive(Serialize)]
 pub struct SearchResponse {
     pub query: String,
+    pub org_id: u64,
     pub company_id: u64,
     pub results: Vec<SearchHit>,
 }
@@ -46,6 +47,19 @@ pub async fn post_search(
 ) -> AppResult<Json<SearchResponse>> {
     if req.query.trim().is_empty() {
         return Err(AppError::BadRequest("query must not be empty".into()));
+    }
+
+    let company_is_in_scope = company_belongs_to_organization(
+        state.stdb.as_ref(),
+        req.org_id,
+        req.company_id,
+    )
+    .await
+    .map_err(|error| AppError::Internal(error.to_string()))?;
+    if !company_is_in_scope {
+        return Err(AppError::Forbidden(
+            "company does not belong to organization".into(),
+        ));
     }
 
     // Embed the query text
@@ -61,6 +75,7 @@ pub async fn post_search(
         .vector_store
         .search(
             query_vector,
+            req.org_id,
             req.company_id,
             req.content_type.as_deref(),
             req.limit,
@@ -71,17 +86,14 @@ pub async fn post_search(
 
     let results: Vec<SearchHit> = hits
         .into_iter()
-        .map(|h| SearchHit {
-            score: h.score,
-            company_id: h.company_id,
-            content_type: h.content_type,
-            content_id: h.content_id,
-            stdb_embedding_id: h.stdb_embedding_id,
-            text_snippet: h.text_snippet,
+        .map(|hit| SearchHit {
+            score: hit.score,
+            record: hit.record,
         })
         .collect();
 
     tracing::info!(
+        org_id = req.org_id,
         company_id = req.company_id,
         result_count = results.len(),
         "Semantic search completed"
@@ -89,6 +101,7 @@ pub async fn post_search(
 
     Ok(Json(SearchResponse {
         query: req.query,
+        org_id: req.org_id,
         company_id: req.company_id,
         results,
     }))

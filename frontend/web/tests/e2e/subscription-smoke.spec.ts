@@ -1,3 +1,4 @@
+import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
@@ -33,7 +34,7 @@ test.describe("STDB subscription cache", { tag: "@phase-11" }, () => {
 
     const mutationRes = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_contact") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_contact") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-contact"),

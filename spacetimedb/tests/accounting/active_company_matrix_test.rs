@@ -643,7 +643,7 @@ pub fn test_active_company_a2_create_persist_matrix(ctx: &ReducerContext) -> Res
         ctx.db
             .account_asset()
             .iter()
-            .find(|a| a.organization_id == Some(org_id) && a.code == asset_code)
+            .find(|a| a.organization_id == org_id && a.code == asset_code)
             .map(|a| a.company_id)
             .ok_or("A2 asset missing")?,
     )?;

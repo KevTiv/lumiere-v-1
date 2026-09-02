@@ -21,7 +21,7 @@ pub struct AppState {
     pub rig: Arc<RigContext>,
     pub stdb: Arc<StdbClient>,
     pub http: Arc<reqwest::Client>,
-    /// In-memory activity ingestion watermarks keyed by `org_id:table_name`.
+    /// In-memory activity ingestion watermarks keyed by `org_id:company_id:table_name`.
     pub activity_watermarks: Arc<DashMap<String, i64>>,
     /// In-flight and completed Kaggle download jobs (job_id → status).
     pub download_jobs: Arc<DashMap<String, DownloadJobStatus>>,

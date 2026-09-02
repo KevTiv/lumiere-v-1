@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url"
 import { expect, type Page } from "@playwright/test"
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { encodeReducerCallArgs } from "@lumiere/erp-shared/stdb-params-json"
+import { matchesOperationResponse } from "./operation-response"
+import type { StdbBffReducerKey } from "@lumiere/stdb/commands"
 
 export const TEST_EMAIL = process.env.E2E_TEST_EMAIL ?? "test@email.com"
 export const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD ?? "Password123$"
@@ -574,24 +576,31 @@ export async function chooseSelectOptionByValue(
   value: string | number | bigint,
 ) {
   const v = String(value)
-  await page.getByTestId(`form-field-${name}`).click()
-  const listbox = page.locator('[role="listbox"]')
-  await expect(listbox).toBeVisible({ timeout: 15_000 })
-  const byData = listbox.locator(`[role="option"][data-value="${v}"]`).first()
+  const field = page.getByTestId(`form-field-${name}`)
+  const nativeOptions = field.locator(
+    'xpath=following-sibling::select[@aria-hidden="true"][1]/option',
+  )
+  let optionLabel = ""
+
   await expect
-    .poll(async () => {
-      if ((await byData.count()) > 0) return "data-value"
-      if ((await listbox.getByRole("option", { name: new RegExp(`\\b${v}\\b`) }).count()) > 0) {
-        return "label"
-      }
-      return ""
-    }, { timeout: 30_000 })
+    .poll(
+      async () => {
+        optionLabel = await nativeOptions.evaluateAll((options, expectedValue) => {
+          const match = options.find(
+            (option) => (option as HTMLOptionElement).value === expectedValue,
+          )
+          return match?.textContent?.trim() ?? ""
+        }, v)
+        return optionLabel
+      },
+      { timeout: 30_000 },
+    )
     .not.toBe("")
-  if ((await byData.count()) > 0) {
-    await byData.click()
-    return
-  }
-  await listbox.getByRole("option", { name: new RegExp(`\\b${v}\\b`) }).first().click()
+
+  await field.click()
+  const listbox = page.locator('[role="listbox"]:visible')
+  await expect(listbox).toBeVisible({ timeout: 15_000 })
+  await listbox.getByRole("option", { name: optionLabel, exact: true }).click()
 }
 
 /** Pick a select option by visible label text (Radix Select shows labels, not raw ids). */
@@ -719,14 +728,14 @@ export async function waitForEntityActionEnabled(page: Page, actionTestId: strin
 export async function clickEntityActionAndWaitForReducer(
   page: Page,
   actionTestId: string,
-  reducerName: string,
+  reducerName: StdbBffReducerKey,
   options?: { timeoutMs?: number },
 ) {
   await waitForEntityActionEnabled(page, actionTestId)
   const timeout = options?.timeoutMs ?? 30_000
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes(`/api/call/${reducerName}`) && r.ok(),
+      (r) => matchesOperationResponse(r, reducerName) && r.ok(),
       { timeout },
     ),
     page.getByTestId(actionTestId).click(),
@@ -749,14 +758,13 @@ export async function fetchSessionOrganizationId(page: Page): Promise<number> {
   return Number(id)
 }
 
-/** Authenticated BFF reducer call (same-origin `/api/call`). */
+/** Authenticated fixture-only positional call through the explicit compatibility route. */
 export async function callReducerBff(
   page: Page,
   reducer: string,
   args: unknown[],
-  options?: { withCompany?: boolean },
 ) {
-  const result = await callReducerBffResult(page, reducer, args, options)
+  const result = await callReducerBffResult(page, reducer, args)
   if (!result.ok) {
     throw new Error(result.error ?? `Reducer ${reducer} failed (${result.status})`)
   }
@@ -767,11 +775,9 @@ export async function callReducerBffResult(
   page: Page,
   reducer: string,
   args: unknown[],
-  options?: { withCompany?: boolean },
 ): Promise<{ ok: boolean; status: number; error?: string }> {
-  const qs = options?.withCompany ? "?withCompany=true" : ""
   const encodedArgs = encodeReducerCallArgs(reducer, args)
-  const res = await page.request.post(`/api/call/${reducer}${qs}`, {
+  const res = await page.request.post(`/api/compat/reducer/${reducer}`, {
     data: JSON.parse(stringifyReducerCallBody(encodedArgs)),
     headers: { "Content-Type": "application/json" },
   })
@@ -821,9 +827,8 @@ export async function expectReducerPermissionDenied(
   page: Page,
   reducer: string,
   args: unknown[],
-  options?: { withCompany?: boolean },
 ) {
-  const result = await callReducerBffResult(page, reducer, args, options)
+  const result = await callReducerBffResult(page, reducer, args)
   expect(result.ok).toBe(false)
   const detail = result.error ?? ""
   const denied =
@@ -1027,7 +1032,7 @@ export function scalarQueryId(value: unknown): number | null {
   return null
 }
 
-function scalarQueryString(value: unknown): string {
+export function scalarQueryString(value: unknown): string {
   if (value == null) return ""
   if (typeof value === "string") return value
   if (typeof value === "number" || typeof value === "bigint") return String(value)
@@ -1725,7 +1730,7 @@ export async function postDraftCreditNoteViaGl(page: Page, partnerName: string):
         if (await postBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
           const [postRes] = await Promise.all([
             page.waitForResponse(
-              (res) => res.url().includes("/api/call/post_invoice") && res.ok(),
+              (res) => matchesOperationResponse(res, "post_invoice") && res.ok(),
               { timeout: 30_000 },
             ),
             postBtn.click(),
@@ -1841,7 +1846,7 @@ export async function postDraftInvoiceViaUi(page: Page, partnerName: string): Pr
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
-      (res) => res.url().includes("/api/call/post_invoice") && res.ok(),
+      (res) => matchesOperationResponse(res, "post_invoice") && res.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId("invoice-detail-post-draft").click(),
@@ -1873,7 +1878,7 @@ export async function postDraftBillViaUi(page: Page, vendorName: string): Promis
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
-      (res) => res.url().includes("/api/call/post_invoice"),
+      (res) => matchesOperationResponse(res, "post_invoice"),
       { timeout: 30_000 },
     ),
     page.getByTestId("invoice-detail-post-draft").click(),
@@ -1895,7 +1900,7 @@ export async function expectPostDraftBillRejected(
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
-      (res) => res.url().includes("/api/call/post_invoice"),
+      (res) => matchesOperationResponse(res, "post_invoice"),
       { timeout: 30_000 },
     ),
     page.getByTestId("invoice-detail-post-draft").click(),
@@ -1955,10 +1960,14 @@ export async function createAiActionDraftTask(
   page: Page,
   taskName: string,
 ): Promise<number> {
+  const organizationId = await fetchSessionOrganizationId(page)
+  const companyId = await fetchDefaultCompanyId(page)
   await callReducerBff(
     page,
     "create_ai_action_draft",
     [
+      organizationId,
+      companyId,
       {
         reducer_name: "create_task",
         params_json: JSON.stringify({ name: taskName }),
@@ -1972,7 +1981,6 @@ export async function createAiActionDraftTask(
         metadata: null,
       },
     ],
-    { withCompany: true },
   )
 
   let draftId = 0
@@ -2108,7 +2116,7 @@ export async function rejectApprovalRequestViaUi(
   await page.getByTestId(`approval-reject-reason-${requestId}`).fill(reason)
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/decide_workflow_human_task") && r.ok(),
+      (r) => matchesOperationResponse(r, "decide_workflow_human_task") && r.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId(`approval-reject-confirm-${requestId}`).click(),
@@ -2145,7 +2153,7 @@ export async function grantPermissionViaSettings(
   }
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/grant_permission") && r.ok(),
+      (r) => matchesOperationResponse(r, "grant_permission") && r.ok(),
       { timeout: 30_000 },
     ),
     submitForm(page, "settings-grant-permission"),
@@ -2221,7 +2229,7 @@ export async function revokePermissionViaSettings(page: Page, permissionId: numb
   await fillField(page, "permissionId", String(permissionId))
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/revoke_permission") && r.ok(),
+      (r) => matchesOperationResponse(r, "revoke_permission") && r.ok(),
       { timeout: 30_000 },
     ),
     submitForm(page, "settings-revoke-permission"),
@@ -2261,8 +2269,8 @@ export async function ensureFormConfigDbFromRegistry(page: Page) {
     await Promise.all([
       page.waitForResponse(
         (r) =>
-          r.url().includes("/api/call/create_form_configuration") ||
-          r.url().includes("/api/call/add_form_field"),
+          matchesOperationResponse(r, "create_form_configuration") ||
+          matchesOperationResponse(r, "add_form_field"),
         { timeout: 90_000 },
       ),
       pushBtn.click(),
@@ -2374,7 +2382,7 @@ export async function addCustomFormFieldViaSettings(
   await page.getByRole("dialog").getByLabel(/label/i).fill(options.fieldLabel)
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/add_form_field") && r.ok(),
+      (r) => matchesOperationResponse(r, "add_form_field") && r.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId("form-config-save-field").click(),
@@ -2399,7 +2407,7 @@ export async function deleteCustomFormFieldViaSettings(page: Page, fieldId: stri
   await row.locator("button").nth(1).click()
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/delete_form_field") && r.ok(),
+      (r) => matchesOperationResponse(r, "delete_form_field") && r.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId(`form-config-delete-field-${fieldId}`).click(),
@@ -2418,7 +2426,7 @@ export async function postChatterNote(page: Page, body: string) {
   await page.getByTestId("record-chatter-note").fill(body)
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/post_message") && r.ok(),
+      (r) => matchesOperationResponse(r, "post_message") && r.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId("record-chatter-post").click(),
@@ -2469,7 +2477,7 @@ export async function savePivotReportViaUi(page: Page, name: string) {
   await expect(saveBtn).toBeEnabled({ timeout: 15_000 })
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/create_saved_report"),
+      (r) => matchesOperationResponse(r, "create_saved_report"),
       { timeout: 60_000 },
     ),
     saveBtn.click(),
@@ -2549,7 +2557,7 @@ export async function deletePivotReportViaUi(page: Page, reportName: string) {
   await expect(page.getByTestId("pivot-delete-definition")).toBeVisible({ timeout: 10_000 })
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/delete_saved_report") && r.ok(),
+      (r) => matchesOperationResponse(r, "delete_saved_report") && r.ok(),
       { timeout: 30_000 },
     ),
     page.getByTestId("pivot-delete-definition").click(),
@@ -2572,7 +2580,7 @@ export async function generateVatReportViaUi(
   await page.locator('input[type="date"]').nth(1).fill(options.dateTo)
   const [res] = await Promise.all([
     page.waitForResponse(
-      (r) => r.url().includes("/api/call/generate_eu_vat_report") && r.ok(),
+      (r) => matchesOperationResponse(r, "generate_eu_vat_report") && r.ok(),
       { timeout: 60_000 },
     ),
     page.getByTestId("vat-report-generate").click(),

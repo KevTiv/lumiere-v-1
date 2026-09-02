@@ -311,6 +311,7 @@ import {
 import { useFinancialReports } from "@lumiere/query-hooks/hooks/reports"
 import {
   accountJournalRowsToSelectOptions,
+  paymentJournalRowsToSelectOptions,
   accountMoveRowsToSelectOptions,
   saleOrderRowsToSelectOptions,
   contactRowsToPartnerSelectOptions,
@@ -322,13 +323,10 @@ import {
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { useToast } from "@/hooks/use-toast"
 import type {
-  AccountAccount as AccountAccountRow,
   AccountAnalyticAccount,
   AccountFiscalYear,
-  AccountJournal,
   AccountMove,
   AccountPeriod,
-  AccountTax,
   CrossoveredBudget,
 } from "@lumiere/query-hooks/hooks/accounting"
 import {
@@ -580,7 +578,7 @@ function moveLineIdsFromRow(line: Record<string, unknown>): bigint[] {
 /** Resolve journal for `create_account_move` from modal payload or first loaded journal. */
 function journalIdFromInvoiceModalSave(
   params: unknown,
-  journals: Record<string, unknown>[],
+  journals: readonly { id?: unknown }[],
 ): bigint | null {
   const j = (params as { journalId?: unknown }).journalId
   if (j != null) {
@@ -600,12 +598,8 @@ type AccountingCsvImportKind =
   | "analytic"
 
 interface AccountingClientProps {
-  initialAccounts?: AccountAccountRow[]
-  initialMoves?: AccountMove[]
-  initialTaxes?: AccountTax[]
   initialBudgets?: CrossoveredBudget[]
   initialAnalytic?: AccountAnalyticAccount[]
-  initialJournals?: AccountJournal[]
   initialFiscalYears?: AccountFiscalYear[]
   initialAccountPeriods?: AccountPeriod[]
   organizationId?: number
@@ -639,12 +633,8 @@ function AccountingClientLoaded(props: AccountingClientLoadedProps) {
 }
 
 function AccountingClientReady({
-  initialAccounts,
-  initialMoves,
-  initialTaxes,
   initialBudgets,
   initialAnalytic,
-  initialJournals,
   initialFiscalYears,
   initialAccountPeriods,
   organizationId,
@@ -736,11 +726,9 @@ function AccountingClientReady({
   // ── Data hooks ──────────────────────────────────────────────────────────────
   const { data: accounts = [] } = useAccountAccounts(orgId, {
     enabled: organizationId > 0,
-    initialData: initialAccounts,
   })
   const { data: allMoves = [], isLoading: movesLoading } = useAccountMoves(orgId, {
     enabled: organizationId > 0,
-    initialData: initialMoves,
   })
   const { data: accountMoveLines = [] } = useAccountMoveLines(orgId, { enabled: organizationId > 0 })
   const { data: taxes = [] } = useAccountTaxes(orgId, { enabled: organizationId > 0 })
@@ -928,6 +916,12 @@ function AccountingClientReady({
     return [{ value: "", label: t("common.lookup.noJournals"), disabled: true }]
   }, [journalRowsAsSelectOptions, t])
 
+  const paymentJournalFieldOptions = useMemo(() => {
+    const options = paymentJournalRowsToSelectOptions(journals)
+    if (options.length > 0) return options
+    return [{ value: "", label: t("common.lookup.noJournals"), disabled: true }]
+  }, [journals, t])
+
   const glAccountSelectOptions = useMemo(
     () =>
       accounts.map((a) => ({
@@ -1011,10 +1005,10 @@ function AccountingClientReady({
     const merged = mergeSelectOptionsForFields(newAccountPaymentForm(t), {
       partnerId: partnerSelectOptions,
       currencyId: currencySelectOptions,
-      journalId: journalFieldOptionsForModularForm,
+      journalId: paymentJournalFieldOptions,
     })
     return mergeFieldDefaultValues(merged, { currencyId: String(defaultCurrencyId) })
-  }, [t, partnerSelectOptions, currencySelectOptions, journalFieldOptionsForModularForm, defaultCurrencyId])
+  }, [t, partnerSelectOptions, currencySelectOptions, paymentJournalFieldOptions, defaultCurrencyId])
 
   // Relation-aware labels: build Maps once from subscribed rows (ACC-RI-016).
   // Invoice partner display keeps `invoicePartnerDisplayName` snapshots on moves;
@@ -1024,7 +1018,7 @@ function AccountingClientReady({
     [contacts],
   )
   const journalLabelMap = useMemo(
-    () => buildJournalLabelMap(journals as Record<string, unknown>[]),
+    () => buildJournalLabelMap(journals),
     [journals],
   )
   const accountLabelMap = useMemo(
@@ -1180,8 +1174,8 @@ function AccountingClientReady({
           label: t("accounting.tabs.moveLines"),
           content: (record) => {
             const moveId = String(record.id ?? "")
-            const lines = (accountMoveLines as Record<string, unknown>[]).filter(
-              (line) => String(line.moveId ?? line.move_id) === moveId,
+            const lines = accountMoveLines.filter(
+              (line) => String(line.moveId ?? "") === moveId,
             )
             return (
               <EntityView
@@ -2841,7 +2835,8 @@ function AccountingClientReady({
           const nowMs = Date.now()
           const oldestDays = overdueInvoices.reduce((max, m) => {
             if (!m.invoiceDateDue) return max
-            const dueMs = Number(m.invoiceDateDue) / 1000
+            const dueMs = flexibleTimestampMs(m.invoiceDateDue)
+            if (dueMs == null) return max
             const days = Math.max(0, Math.round((nowMs - dueMs) / 86400000))
             return Math.max(max, days)
           }, 0)
@@ -2992,7 +2987,7 @@ function AccountingClientReady({
     if (action === "createAccount") {
       const p = toCreateAccountAccountParams(formData, {
         companyId: operatingCompanyId,
-        accountTypes: accountTypes as Record<string, unknown>[],
+        accountTypes,
       })
       if (p) await createAccount.mutateAsync(p)
     } else if (action === "createMove") {
@@ -3133,10 +3128,7 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <InvoiceListView
-                    invoices={
-                      // ACC-RI-018 rationale: safe because this BFF resource selects all AccountMove view fields.
-                      invoices as unknown as AccountMove[]
-                    }
+                    invoices={invoices}
                     onSelectInvoice={(invoice) =>
                       // ACC-RI-018 rationale: safe because this sheet receives only InvoiceListView AccountMove rows.
                       setInvoiceSheetRecord(invoice as unknown as Record<string, unknown>)
@@ -3156,10 +3148,7 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <BillsListView
-                    bills={
-                      // ACC-RI-018 rationale: safe because this BFF resource selects all AccountMove view fields.
-                      bills as unknown as AccountMove[]
-                    }
+                    bills={bills}
                     onCreateBill={() => setShowCreateBill(true)}
                     onSelectBill={(bill) =>
                       // ACC-RI-018 rationale: safe because this sheet receives only BillsListView AccountMove rows.
@@ -3179,17 +3168,14 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <ChartOfAccountsView
-                    accounts={
-                      // ACC-RI-018 rationale: safe because this resource selects every AccountAccount view field.
-                      accounts as unknown as Parameters<typeof ChartOfAccountsView>[0]["accounts"]
-                    }
+                    accounts={accounts}
                     chartStructureContent={chartStructurePanel}
                     onImportAccountsCsv={() => setCsvKind("account")}
                     onAccountClick={(account) => setGlDrilldownAccount(account)}
                     onCreate={async (data) => {
                       const p = toCreateAccountAccountParams(data as Record<string, unknown>, {
                         companyId: operatingCompanyId,
-                        accountTypes: accountTypes as Record<string, unknown>[],
+                        accountTypes,
                       })
                       if (p) await createAccount.mutateAsync(p)
                     }}
@@ -3205,10 +3191,7 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <GeneralLedgerView
-                    moves={
-                      // ACC-RI-018 rationale: safe because this BFF resource selects all AccountMove view fields.
-                      allMoves as unknown as AccountMove[]
-                    }
+                    moves={allMoves}
                     onImportMovesCsv={() => setCsvKind("accountMove")}
                     onImportMoveLinesCsv={() => setCsvKind("accountMoveLine")}
                     onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
@@ -3415,7 +3398,7 @@ function AccountingClientReady({
                     journalOptions={journalFieldOptionsForModularForm}
                     glAccountOptions={glAccountFieldOptions}
                     partnerOptions={partnerSelectOptions}
-                    moveLines={accountMoveLines as Record<string, unknown>[]}
+                    moveLines={accountMoveLines}
                   />
                 ),
               }
@@ -3902,11 +3885,8 @@ function AccountingClientReady({
 
       <AccountGlDrilldownPanel
         account={glDrilldownAccount}
-        moveLines={accountMoveLines as Record<string, unknown>[]}
-        moves={
-          // ACC-RI-018 rationale: safe because this BFF resource selects all AccountMove view fields.
-          allMoves as unknown as AccountMove[]
-        }
+        moveLines={accountMoveLines}
+        moves={allMoves}
         open={glDrilldownAccount != null}
         onOpenChange={(open) => {
           if (!open) setGlDrilldownAccount(null)
@@ -4119,7 +4099,7 @@ function AccountingClientReady({
             })
             return
           }
-          const jid = journalIdFromInvoiceModalSave(params, journals as Record<string, unknown>[])
+          const jid = journalIdFromInvoiceModalSave(params, journals)
           if (jid == null) {
             toast({
               variant: "destructive",
@@ -4160,7 +4140,7 @@ function AccountingClientReady({
             })
             return
           }
-          const jid = journalIdFromInvoiceModalSave(params, journals as Record<string, unknown>[])
+          const jid = journalIdFromInvoiceModalSave(params, journals)
           if (jid == null) {
             toast({
               variant: "destructive",

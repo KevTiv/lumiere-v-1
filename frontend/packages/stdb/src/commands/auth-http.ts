@@ -2,7 +2,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Auth / session / RBAC mutations via Next.js BFF `POST /api/call/:reducer`.
+ * Auth / session / RBAC mutations via Next.js BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` auth hooks.
  * (User invites use `POST /api/auth/invite` — not included here.)
  */
@@ -33,14 +33,6 @@ export const AUTH_BFF_REDUCERS = [
 ] as const;
 
 export type AuthBffReducerKey = (typeof AUTH_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<AuthBffReducerKey>();
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function authBffCallUrl(reducer: AuthBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 const AUTH_HINT_OVERRIDES: Partial<Record<AuthBffReducerKey, readonly string[]>> = {
   assign_role: ["auth", "user-roles", "roles"],

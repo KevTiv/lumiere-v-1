@@ -108,6 +108,12 @@ function getDisplayGroup(account: AccountAccount): DisplayGroup {
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v)
 
+function accountOpeningBalance(account: AccountAccount): number {
+  return typeof account.openingBalance === "number" && Number.isFinite(account.openingBalance)
+    ? account.openingBalance
+    : 0
+}
+
 type TFunction = ReturnType<typeof useTranslation>["t"]
 
 interface AccountsTableProps {
@@ -145,8 +151,8 @@ function AccountsTable({ accounts, t, onAccountClick }: AccountsTableProps) {
               <TableCell>
                 <div className="flex items-center gap-2">
                   {account.name}
-                  {account.isBankAccount && <Badge variant="outline" className="text-xs">{t("accounting.accounts.badges.bank")}</Badge>}
-                  {!account.used && <Badge variant="outline" className="text-xs text-muted-foreground">{t("accounting.accounts.badges.unused")}</Badge>}
+                  {account.isBankAccount === true && <Badge variant="outline" className="text-xs">{t("accounting.accounts.badges.bank")}</Badge>}
+                  {account.used === false && <Badge variant="outline" className="text-xs text-muted-foreground">{t("accounting.accounts.badges.unused")}</Badge>}
                 </div>
               </TableCell>
               <TableCell>
@@ -154,12 +160,12 @@ function AccountsTable({ accounts, t, onAccountClick }: AccountsTableProps) {
                   {conf.icon}{t(conf.labelKey as any)}
                 </Badge>
               </TableCell>
-              <TableCell className={cn("font-medium", account.openingBalance < 0 ? "text-destructive" : "")}>
-                {formatCurrency(account.openingBalance)}
+              <TableCell className={cn("font-medium", accountOpeningBalance(account) < 0 ? "text-destructive" : "")}>
+                {formatCurrency(accountOpeningBalance(account))}
               </TableCell>
               <TableCell>
-                <Badge variant={account.deprecated ? "secondary" : "default"}>
-                  {account.deprecated ? t("accounting.accounts.badges.deprecated") : t("accounting.accounts.badges.active")}
+                <Badge variant={account.deprecated === true ? "secondary" : "default"}>
+                  {account.deprecated === true ? t("accounting.accounts.badges.deprecated") : t("accounting.accounts.badges.active")}
                 </Badge>
               </TableCell>
               <TableCell>
@@ -202,19 +208,19 @@ export function ChartOfAccountsView({
   const [newOpening, setNewOpening] = useState("")
 
   const filtered = accounts.filter((a) =>
-    a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    a.code.includes(searchQuery)
+    String(a.name ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+    String(a.code ?? "").includes(searchQuery)
   )
 
   const byGroup = (g: DisplayGroup) => accounts.filter((a) => getDisplayGroup(a) === g)
 
   const totals = {
-    asset: byGroup("asset").reduce((s, a) => s + a.openingBalance, 0),
-    liability: byGroup("liability").reduce((s, a) => s + a.openingBalance, 0),
-    equity: byGroup("equity").reduce((s, a) => s + a.openingBalance, 0),
-    income: byGroup("income").reduce((s, a) => s + a.openingBalance, 0),
-    expense: byGroup("expense").reduce((s, a) => s + a.openingBalance, 0),
-    other: byGroup("other").reduce((s, a) => s + a.openingBalance, 0),
+    asset: byGroup("asset").reduce((s, a) => s + accountOpeningBalance(a), 0),
+    liability: byGroup("liability").reduce((s, a) => s + accountOpeningBalance(a), 0),
+    equity: byGroup("equity").reduce((s, a) => s + accountOpeningBalance(a), 0),
+    income: byGroup("income").reduce((s, a) => s + accountOpeningBalance(a), 0),
+    expense: byGroup("expense").reduce((s, a) => s + accountOpeningBalance(a), 0),
+    other: byGroup("other").reduce((s, a) => s + accountOpeningBalance(a), 0),
   }
 
   const tabGroups: { value: string; label: string; accounts: AccountAccount[] }[] = [

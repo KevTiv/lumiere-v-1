@@ -1,13 +1,11 @@
 /**
- * Compile-only — Proposals BFF reducer keys stay aligned with `proposalsBffCallUrl`.
+ * Compile-only — Proposals BFF reducer keys stay aligned with command metadata.
  */
 import {
   PROPOSALS_BFF_REDUCERS,
-  proposalsBffCallUrl,
   proposalsCommandContract,
 } from "../commands/proposals-http";
 
 for (const k of PROPOSALS_BFF_REDUCERS) {
-  void proposalsBffCallUrl(k);
   void proposalsCommandContract(k);
 }

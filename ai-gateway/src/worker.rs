@@ -10,9 +10,13 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use anyhow::Context;
+
 use crate::{
     config::Config, providers::EmbedProvider, qdrant_client::VectorStore,
-    stdb_embed::LumiereStdbExt,
+    stdb_embed::{
+        authoritative_embedding_for_resource, company_belongs_to_organization, LumiereStdbExt,
+    },
 };
 use stdb_client::StdbClient;
 
@@ -71,7 +75,46 @@ async fn process_batch(
             continue;
         }
 
-        let result = process_job(embedder, vector_store, &payload).await;
+        let result = match company_belongs_to_organization(stdb, org_id, payload.company_id).await {
+            Ok(true) => match authoritative_embedding_for_resource(
+                stdb, org_id, payload.company_id, &payload.content_type, payload.content_id,
+            ).await {
+                Ok(Some(embedding)) => {
+                    if embedding.text != payload.text {
+                        Err(anyhow::anyhow!(
+                            "queued embedding source is stale for {} #{}",
+                            payload.content_type,
+                            payload.content_id
+                        ))
+                    } else {
+                        let fingerprint = embedding
+                            .embedding_hash
+                            .unwrap_or_else(|| job.input_hash.clone());
+                        process_job(
+                            embedder,
+                            vector_store,
+                            org_id,
+                            embedding.id,
+                            &fingerprint,
+                            &model,
+                            &payload,
+                        )
+                        .await
+                    }
+                }
+                Ok(None) => Err(anyhow::anyhow!(
+                    "authoritative SearchEmbedding is missing for {} #{}",
+                    payload.content_type, payload.content_id
+                )),
+                Err(error) => Err(error.context("failed to resolve authoritative embedding")),
+            },
+            Ok(false) => Err(anyhow::anyhow!(
+                "embedding job company {} does not belong to organization {}",
+                payload.company_id,
+                org_id
+            )),
+            Err(error) => Err(error.context("failed to validate embedding job scope")),
+        };
 
         match result {
             Ok((embedding_id, dim)) => {
@@ -111,25 +154,38 @@ async fn process_batch(
 async fn process_job(
     embedder: &dyn EmbedProvider,
     vector_store: &VectorStore,
+    organization_id: u64,
+    embedding_id: u64,
+    source_fingerprint: &str,
+    embedding_model: &str,
     payload: &crate::stdb_embed::EmbedJobPayload,
 ) -> anyhow::Result<(u64, u32)> {
     if payload.text.trim().is_empty() {
         anyhow::bail!("Job text is empty — skipping");
     }
 
-    let snippet: String = payload.text.chars().take(200).collect();
+    if source_fingerprint.trim().is_empty() {
+        anyhow::bail!("embedding source fingerprint is missing");
+    }
 
     let vector = embedder.embed(&payload.text).await?;
     let dim = vector.len() as u32;
 
     vector_store
         .upsert(crate::qdrant_client::EmbedPoint {
-            id: payload.content_id,
+            id: embedding_id,
             vector,
-            company_id: payload.company_id,
-            content_type: payload.content_type.clone(),
-            content_id: payload.content_id,
-            text_snippet: snippet,
+            record: crate::qdrant_client::SemanticIndexRecord {
+                organization_id,
+                company_id: payload.company_id,
+                resource_kind: payload.content_type.clone(),
+                resource_id: payload.content_id.to_string(),
+                resource_version: source_fingerprint.to_string(),
+                source_fingerprint: source_fingerprint.to_string(),
+                embedding_model: embedding_model.to_string(),
+                indexed_at: chrono::Utc::now().to_rfc3339(),
+                tags: vec![payload.content_type.clone()],
+            },
         })
         .await?;
 
@@ -141,5 +197,5 @@ async fn process_job(
         "Worker: embedding upserted"
     );
 
-    Ok((payload.content_id, dim))
+    Ok((embedding_id, dim))
 }

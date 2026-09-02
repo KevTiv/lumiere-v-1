@@ -140,12 +140,17 @@ pub struct AiAgentRun {
 #[spacetimedb::table(
     accessor = ai_agent_run_step,
     public,
-    index(accessor = ai_agent_run_step_by_run, btree(columns = [run_id]))
+    index(accessor = ai_agent_run_step_by_run, btree(columns = [run_id])),
+    index(
+        accessor = ai_agent_run_step_by_organization,
+        btree(columns = [organization_id])
+    )
 )]
 pub struct AiAgentRunStep {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
     pub run_id: u64,
     pub step_no: u32,
     pub tool_name: String,
@@ -810,6 +815,7 @@ pub fn append_ai_agent_run_step(
 
     ctx.db.ai_agent_run_step().insert(AiAgentRunStep {
         id: 0,
+        organization_id: run.organization_id,
         run_id,
         step_no: params.step_no,
         tool_name: params.tool_name.clone(),

@@ -42,6 +42,8 @@ pub struct CompanyScopePath {
 #[derive(Clone, Copy, Debug)]
 pub struct ReducerContract {
     pub name: &'static str,
+    /// Immutable contract identity used by typed API dispatch.
+    pub contract_operation_id: &'static str,
     pub params: &'static [ReducerParam],
     pub lifecycle: &'static str,
     pub exposure: Exposure,
@@ -240,6 +242,23 @@ pub fn reducer_contract(name: &str) -> Option<&'static ReducerContract> {
         .map(|index| &REDUCER_CONTRACTS[index])
 }
 
+/// Resolve a typed API operation through generated contract metadata.
+///
+/// Operation identifiers are intentionally distinct from reducer names so the
+/// public API does not make the storage transport name its compatibility
+/// contract.
+pub fn reducer_contract_by_operation_id(
+    contract_operation_id: &str,
+) -> Option<&'static ReducerContract> {
+    // REDUCER_CONTRACTS is name-sorted, not identity-sorted.  A rename may
+    // intentionally retain an older identity, so binary search by identity
+    // would silently fail; the generated table is small and this lookup is a
+    // boundary operation rather than a hot path.
+    REDUCER_CONTRACTS
+        .iter()
+        .find(|contract| contract.contract_operation_id == contract_operation_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -269,6 +288,15 @@ mod tests {
             ReducerCall::from_name("create_lead", json!([1])),
             Err(ReducerContractError::WrongArity { .. })
         ));
+    }
+
+    #[test]
+    fn resolves_the_locked_contract_identity_without_a_name_map() {
+        let contract =
+            reducer_contract_by_operation_id("erp.assign_role").expect("locked operation identity");
+        assert_eq!(contract.name, "assign_role");
+        assert_eq!(contract.contract_operation_id, "erp.assign_role");
+        assert!(reducer_contract_by_operation_id("erp.not_a_reducer").is_none());
     }
 
     #[test]

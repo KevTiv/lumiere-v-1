@@ -406,7 +406,7 @@ function ProjectsClientLoaded({
   }, [uoms, t])
 
   const journalFieldOptions = useMemo(() => {
-    const fromApi = accountJournalRowsToSelectOptions(accountJournals as Record<string, unknown>[])
+    const fromApi = accountJournalRowsToSelectOptions(accountJournals)
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noJournals"), disabled: true }]
   }, [accountJournals, t])

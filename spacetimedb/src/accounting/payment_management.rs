@@ -419,7 +419,7 @@ fn post_ledger_payment(
         create_uid: ctx.sender(),
     });
 
-    let name = next_doc_number(ctx, "PAY");
+    let name = next_doc_number(ctx, organization_id, "PAY");
     let amount = transaction.settlement_amount;
 
     // Draft first — never flip Posted with empty lines.
@@ -1405,7 +1405,7 @@ fn post_write_off_move(
     amount: f64,
     reconciliation_id: u64,
 ) -> Result<u64, String> {
-    let name = next_doc_number(ctx, "PAYWO");
+    let name = next_doc_number(ctx, payment.organization_id, "PAYWO");
     let write_off_move = ctx.db.account_move().insert(AccountMove {
         id: 0,
         name: name.clone(),
@@ -1519,7 +1519,7 @@ fn reverse_write_off_move(
         return Err("write-off move must have exactly two lines".to_string());
     }
 
-    let name = next_doc_number(ctx, "PAYWOR");
+    let name = next_doc_number(ctx, payment.organization_id, "PAYWOR");
     let reversal = ctx.db.account_move().insert(AccountMove {
         id: 0,
         name,

@@ -74,6 +74,25 @@ static HTTP_SQL_EXCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         ["requirements"].into_iter().map(String::from).collect(),
     );
     m.insert(
+        "iot-actions".to_string(),
+        ["payload", "result_payload", "error"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    );
+    m.insert(
+        "iot-alerts".to_string(),
+        ["resolved_by"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
+        "iot-pairing-tokens".to_string(),
+        ["created_by"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
+        "iot-telemetry".to_string(),
+        ["raw_value"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
         "roles".to_string(),
         ["permissions"].into_iter().map(String::from).collect(),
     );
@@ -208,6 +227,40 @@ fn field_permission_applies(rule: &FieldPermissionLike, ctx: &FieldAccessContext
     }
     // Fallback: denormalized role_id column.
     rule.role_id == Some(ctx.role_id)
+}
+
+pub fn has_resource_read_permission(
+    field_access: Option<&FieldAccessContext>,
+    resource_key: &str,
+) -> bool {
+    let Some(access) = field_access else {
+        return false;
+    };
+    if access.is_superuser
+        || access
+            .role_permissions
+            .iter()
+            .any(|permission| permission == "*:*")
+    {
+        return true;
+    }
+    let Some(resource) = registry_get(resource_key) else {
+        return false;
+    };
+
+    access.role_permissions.iter().any(|permission| {
+        let Some((configured_resource, action)) = permission.rsplit_once(':') else {
+            return false;
+        };
+        if action != "read" && action != "*" {
+            return false;
+        }
+        field_resource_matches(configured_resource, resource_key)
+            || resource.aliases.iter().any(|alias| {
+                alias == configured_resource
+                    || alias.replace('-', "_") == configured_resource.replace('-', "_")
+            })
+    })
 }
 
 /// `None` = full row access; `Some(cols)` = explicit snake_case columns.
@@ -400,7 +453,37 @@ pub fn resolve_http_sql_columns(
         merged.extend_from_slice(&reg.default_restricted);
         assert_safe_sql_identifiers(&unique_preserve_order(&merged))?
     };
-    let cols = apply_hr_field_policy(resource_key, cols, field_access)?;
+    let mut cols = apply_hr_field_policy(resource_key, cols, field_access)?;
+    // The v0.3.4 registry projection predates the landed-cost lifecycle UI.
+    // State is a non-sensitive operational field required for action gating
+    // and authoritative lifecycle reads.
+    if resource_key == "landed-costs" && !cols.iter().any(|column| column == "state") {
+        cols.push("state".to_string());
+    }
+    // `company_id` is an authorization scope column, not an optional business
+    // field. Keep it in custom projections whenever the canonical default
+    // projection exposes it so api-server post-filters can verify SQL scope.
+    let company_id_is_scope_metadata = reg
+        .mandatory
+        .iter()
+        .chain(reg.default_restricted.iter())
+        .any(|column| column == "company_id");
+    if company_id_is_scope_metadata && !cols.iter().any(|column| column == "company_id") {
+        cols.push("company_id".to_string());
+    }
+    if matches!(
+        resource_key,
+        "iot-actions"
+            | "iot-alerts"
+            | "iot-devices"
+            | "iot-hubs"
+            | "iot-pairing-tokens"
+            | "iot-telemetry"
+            | "iot-thresholds"
+    ) && !cols.iter().any(|column| column == "company_id")
+    {
+        cols.push("company_id".to_string());
+    }
     assert_safe_sql_identifiers(&filter_http_sql_unsafe_columns(&cols, Some(resource_key)))
 }
 
@@ -564,6 +647,50 @@ pub fn sql_column_list_for_generated_type(type_name: &str) -> Result<Vec<String>
 mod tests {
     use super::*;
 
+    fn field_access(permissions: &[&str]) -> FieldAccessContext {
+        FieldAccessContext {
+            organization_id: 7,
+            role_id: 9,
+            role_name: "member".into(),
+            is_superuser: false,
+            role_permissions: permissions
+                .iter()
+                .map(|value| (*value).to_string())
+                .collect(),
+            identity_hex: "actor".into(),
+            field_permissions: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn resource_read_permission_accepts_alias_and_wildcards() {
+        assert!(has_resource_read_permission(
+            Some(&field_access(&["sale_order:read"])),
+            "sale-orders"
+        ));
+        assert!(has_resource_read_permission(
+            Some(&field_access(&["contacts:*"])),
+            "contacts"
+        ));
+        assert!(has_resource_read_permission(
+            Some(&field_access(&["*:*"])),
+            "products"
+        ));
+    }
+
+    #[test]
+    fn resource_read_permission_fails_closed() {
+        assert!(!has_resource_read_permission(None, "contacts"));
+        assert!(!has_resource_read_permission(
+            Some(&field_access(&["contacts:write"])),
+            "contacts"
+        ));
+        assert!(!has_resource_read_permission(
+            Some(&field_access(&["contacts:read"])),
+            "unknown-resource"
+        ));
+    }
+
     #[test]
     fn resolve_http_sql_columns_includes_deleted_at_for_leads() {
         let cols = resolve_http_sql_columns("leads", None).expect("leads columns");
@@ -605,6 +732,57 @@ mod tests {
     }
 
     #[test]
+    fn selective_accounting_field_policies_keep_company_scope_metadata() {
+        for resource in ["account-accounts", "account-journals", "account-taxes"] {
+            let mut access = field_access(&[&format!("{resource}:read")]);
+            access.field_permissions.push(FieldPermissionLike {
+                id: Some(1),
+                organization_id: Some(7),
+                role_id: Some(9),
+                resource: resource.to_string(),
+                action: "read".to_string(),
+                allowed_fields: vec!["name".to_string()],
+                subject_user_hex: None,
+                subject_role_id: Some(9),
+            });
+
+            let cols = resolve_http_sql_columns(resource, Some(&access))
+                .expect("selective accounting columns");
+            assert!(cols.iter().any(|column| column == "company_id"));
+            assert!(cols.iter().any(|column| column == "id"));
+            assert!(cols.iter().any(|column| column == "organization_id"));
+            assert!(cols.iter().any(|column| column == "name"));
+        }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_exposes_helpdesk_lifecycle_without_customer_pii() {
+        let cols =
+            resolve_http_sql_columns("helpdesk-tickets", None).expect("helpdesk-tickets columns");
+        for field in ["state", "priority"] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in helpdesk-tickets projection, got: {cols:?}"
+            );
+        }
+        for field in ["description", "partner_name", "partner_email", "user_id"] {
+            assert!(
+                !cols.iter().any(|column| column == field),
+                "{field} must remain excluded from the default helpdesk projection: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_exposes_landed_cost_state() {
+        let cols = resolve_http_sql_columns("landed-costs", None).expect("landed-costs columns");
+        assert!(
+            cols.iter().any(|column| column == "state"),
+            "expected state in landed-costs projection, got: {cols:?}"
+        );
+    }
+
+    #[test]
     fn resolve_http_sql_columns_excludes_requirements_for_opportunity_stages() {
         let cols = resolve_http_sql_columns("opportunity-stages", None)
             .expect("opportunity-stages columns");
@@ -621,6 +799,42 @@ mod tests {
         assert!(
             !cols.iter().any(|c| c == "domain"),
             "domain must be excluded from HTTP SQL, got: {cols:?}"
+        );
+    }
+
+    #[test]
+    fn iot_http_projections_include_scope_and_hard_exclude_sensitive_payloads() {
+        for resource in [
+            "iot-actions",
+            "iot-alerts",
+            "iot-devices",
+            "iot-hubs",
+            "iot-pairing-tokens",
+            "iot-telemetry",
+            "iot-thresholds",
+        ] {
+            let cols = resolve_http_sql_columns(resource, None).expect("IoT columns");
+            assert!(
+                cols.iter().any(|column| column == "company_id"),
+                "{resource} must include company_id: {cols:?}"
+            );
+        }
+
+        let action_cols = resolve_http_sql_columns("iot-actions", None).expect("action columns");
+        for field in ["payload", "result_payload", "error"] {
+            assert!(!action_cols.iter().any(|column| column == field));
+        }
+        let telemetry_cols =
+            resolve_http_sql_columns("iot-telemetry", None).expect("telemetry columns");
+        assert!(!telemetry_cols.iter().any(|column| column == "raw_value"));
+        let alert_cols = resolve_http_sql_columns("iot-alerts", None).expect("alert columns");
+        assert!(!alert_cols.iter().any(|column| column == "resolved_by"));
+        let pairing_cols =
+            resolve_http_sql_columns("iot-pairing-tokens", None).expect("pairing columns");
+        assert!(!pairing_cols.iter().any(|column| column == "created_by"));
+        assert!(
+            pairing_cols.iter().any(|column| column == "token"),
+            "the current operator pairing flow reads the newly generated token"
         );
     }
 }

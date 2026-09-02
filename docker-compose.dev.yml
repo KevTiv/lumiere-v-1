@@ -58,6 +58,7 @@ services:
       dockerfile: Dockerfile.qdrant-health
     ports:
       - "6333:6333"
+      - "6334:6334"
     volumes:
       - qdrant-data:/qdrant/storage
     healthcheck:
@@ -118,8 +119,10 @@ services:
       PORT: 8080
       RUST_LOG: ${RUST_LOG:-ai_gateway=debug,tower_http=info}
       LUMIERE_AI_GATEWAY_INTERNAL_SECRET: ${LUMIERE_AI_GATEWAY_INTERNAL_SECRET:?set LUMIERE_AI_GATEWAY_INTERNAL_SECRET in .env.docker}
-      QDRANT_URL: http://qdrant:6333
+      QDRANT_URL: http://qdrant:6334
+      QDRANT_ACTIVITY_REFS_COLLECTION: ${QDRANT_ACTIVITY_REFS_COLLECTION:-lumiere_erp_activity_refs_v1}
       STDB_HOST: http://spacetimedb:3000
+      LUMIERE_API_SERVER_URL: http://api-server:8082
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
       STDB_TOKEN: ${STDB_TOKEN:?set STDB_TOKEN in .env.docker}
       AI_CERTIFICATION_STDB_TOKEN: ${AI_CERTIFICATION_STDB_TOKEN:-}

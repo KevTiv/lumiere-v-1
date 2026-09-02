@@ -1,3 +1,4 @@
+import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
@@ -46,7 +47,7 @@ test.describe("Accounting update mutations", { tag: ["@p0", "@phase-3"] }, () =>
 
     const [createTaxRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_account_tax") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_account_tax") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-tax"),
@@ -86,7 +87,7 @@ test.describe("Accounting update mutations", { tag: ["@p0", "@phase-3"] }, () =>
     await fillField(page, "name", termName)
     const [createTermRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_payment_term") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_payment_term") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-payment-term"),
@@ -99,7 +100,7 @@ test.describe("Accounting update mutations", { tag: ["@p0", "@phase-3"] }, () =>
 
     const [updateTermRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/update_payment_term") && res.ok(),
+        (res) => matchesOperationResponse(res, "update_payment_term") && res.ok(),
         { timeout: 30_000 },
       ),
       page.getByTestId("entity-action-pt-deactivate").click(),

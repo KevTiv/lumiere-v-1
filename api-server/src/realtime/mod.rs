@@ -20,11 +20,13 @@ use crate::error::ApiError;
 use crate::query_exec::{company_ids_for_organization, crm_resource, resolve_crm_company_id};
 use crate::session::{resolve_api_session, ApiSession};
 use crate::state::AppState;
-use lumiere_contracts::bindings::DbConnection;
 use crate::web_session::stdb_identity_hex_hint;
+use lumiere_contracts::bindings::DbConnection;
 use spacetimedb_sdk::DbContext;
 use stdb_auth::{
-    create_client_subscriptions, subscription_resource_keys_vec, SubscriptionQueryContext,
+    create_client_subscriptions, full_client_subscription_resources_vec,
+    has_resource_read_permission, subscription_resource_keys_vec, FieldAccessContext,
+    SubscriptionQueryContext,
 };
 
 #[derive(Debug, Deserialize)]
@@ -88,7 +90,10 @@ fn subscription_select_all(sql: &str) -> Result<String, ApiError> {
 }
 
 fn validate_resources(requested: &[String]) -> Result<(), ApiError> {
-    let allowed: HashSet<String> = subscription_resource_keys_vec().into_iter().collect();
+    let allowed: HashSet<String> = subscription_resource_keys_vec()
+        .into_iter()
+        .chain(full_client_subscription_resources_vec())
+        .collect();
     for r in requested {
         let t = r.trim();
         if t.is_empty() || !allowed.contains(t) {
@@ -98,6 +103,39 @@ fn validate_resources(requested: &[String]) -> Result<(), ApiError> {
         }
     }
     Ok(())
+}
+
+fn bootstrap_realtime_resource(resource: &str) -> bool {
+    matches!(
+        resource,
+        "auth"
+            | "user-profile"
+            | "user-role-assignment"
+            | "auth-role-table"
+            | "user-organization"
+            | "field-permissions"
+            | "org-permissions"
+            | "policy-snapshots"
+            | "roles"
+            | "user-roles"
+            | "form-configuration"
+    )
+}
+
+fn authorized_resources(
+    requested: &[String],
+    field_access: Option<&FieldAccessContext>,
+) -> Result<Vec<String>, ApiError> {
+    validate_resources(requested)?;
+    Ok(requested
+        .iter()
+        .map(|resource| resource.trim())
+        .filter(|resource| {
+            bootstrap_realtime_resource(resource)
+                || has_resource_read_permission(field_access, resource)
+        })
+        .map(str::to_owned)
+        .collect())
 }
 
 pub async fn realtime_ws_upgrade(
@@ -176,18 +214,18 @@ async fn handle_realtime_socket(
         return;
     }
 
-    if let Err(e) = validate_resources(&sub.resources) {
-        let msg = match e {
-            ApiError::BadRequest(m) => m,
-            _ => "validation failed".to_string(),
-        };
-        let _ = socket
-            .send(Message::Text(
-                json!({ "type": "error", "error": msg }).to_string(),
-            ))
-            .await;
-        return;
-    }
+    let resources = match authorized_resources(&sub.resources, session.field_access.as_ref()) {
+        Ok(resources) => resources,
+        Err(ApiError::BadRequest(message)) => {
+            let _ = socket
+                .send(Message::Text(
+                    json!({ "type": "error", "error": message }).to_string(),
+                ))
+                .await;
+            return;
+        }
+        Err(_) => unreachable!("resource authorization only returns bad requests"),
+    };
 
     let session_client = state.client_with_token(&session.stdb_token);
     let organization_company_ids = match company_ids_for_organization(
@@ -233,14 +271,12 @@ async fn handle_realtime_socket(
         field_access: session.field_access.as_ref(),
     };
 
-    let crm_resources: Vec<String> = sub
-        .resources
+    let crm_resources: Vec<String> = resources
         .iter()
         .filter(|resource| crm_resource(resource.trim()))
         .cloned()
         .collect();
-    let non_crm_resources: Vec<String> = sub
-        .resources
+    let non_crm_resources: Vec<String> = resources
         .iter()
         .filter(|resource| !crm_resource(resource.trim()))
         .cloned()
@@ -280,25 +316,8 @@ async fn handle_realtime_socket(
                     match create_client_subscriptions(std::slice::from_ref(resource), &crm_ctx) {
                         Ok(crm_queries) => {
                             for query in crm_queries {
-                                match subscription_select_all(&query) {
-                                    Ok(query) => {
-                                        crm_subscription_tables
-                                            .extend(parse_tables_from_sql(&query));
-                                        queries.push(query);
-                                    }
-                                    Err(ApiError::BadRequest(message)) => {
-                                        let _ = socket
-                                            .send(Message::Text(
-                                                json!({ "type": "error", "error": message })
-                                                    .to_string(),
-                                            ))
-                                            .await;
-                                        return;
-                                    }
-                                    Err(_) => unreachable!(
-                                        "subscription projection rewrite only returns bad requests"
-                                    ),
-                                }
+                                crm_subscription_tables.extend(parse_tables_from_sql(&query));
+                                queries.push(query);
                             }
                         }
                         Err(e) => {
@@ -326,6 +345,28 @@ async fn handle_realtime_socket(
         }
     };
 
+    // The Rust SDK subscription parser accepts complete rows only and rejects
+    // ORDER BY. This owner-side bridge never forwards row payloads: callbacks
+    // emit resource invalidations and the browser refetches through authorized
+    // HTTP. Widen every internal projection, not just CRM, while retaining the
+    // authenticated row predicate produced above.
+    let queries = match queries
+        .iter()
+        .map(|query| subscription_select_all(query))
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(queries) => queries,
+        Err(ApiError::BadRequest(message)) => {
+            let _ = socket
+                .send(Message::Text(
+                    json!({ "type": "error", "error": message }).to_string(),
+                ))
+                .await;
+            return;
+        }
+        Err(_) => unreachable!("subscription projection rewrite only returns bad requests"),
+    };
+
     if queries.is_empty() {
         let _ = socket
             .send(Message::Text(
@@ -341,7 +382,7 @@ async fn handle_realtime_socket(
         tables.extend(parse_tables_from_sql(q));
     }
 
-    let resources_vec: Vec<String> = sub.resources.iter().map(|s| s.trim().to_string()).collect();
+    let resources_vec = resources;
     let (sdk_tx, mut sdk_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
 
     let stdb_uri = state.config.stdb_host.clone();
@@ -483,6 +524,50 @@ mod tests {
         assert_eq!(
             subscription_select_all(sql).expect("valid subscription SQL"),
             "SELECT * FROM contact WHERE organization_id = 7 AND company_id = 11"
+        );
+    }
+
+    #[test]
+    fn full_invalidation_set_uses_supported_subscription_shape() {
+        let company_ids = [11];
+        let context = SubscriptionQueryContext {
+            organization_id: Some(7),
+            company_ids: Some(&company_ids),
+            identity_hex: Some("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+            ..SubscriptionQueryContext::default()
+        };
+        let resources = stdb_auth::full_client_subscription_resources_vec();
+        let raw = create_client_subscriptions(&resources, &context)
+            .expect("full invalidation subscriptions should resolve");
+
+        assert!(!raw.is_empty());
+        for query in raw {
+            let query = subscription_select_all(&query).expect("subscription SQL should rewrite");
+            assert!(query.starts_with("SELECT * FROM "), "{query}");
+            assert!(!query.contains(" ORDER BY "), "{query}");
+            assert!(!query.contains("state = '"), "{query}");
+            assert!(!query.contains("status = '"), "{query}");
+        }
+    }
+
+    #[test]
+    fn full_client_resources_are_valid_realtime_keys() {
+        let resources = full_client_subscription_resources_vec();
+        validate_resources(&resources).expect("generated full-client resources must be accepted");
+        assert!(resources
+            .iter()
+            .any(|resource| resource == "form-configuration"));
+        assert!(resources
+            .iter()
+            .any(|resource| resource == "pricelist-items"));
+    }
+
+    #[test]
+    fn realtime_authorization_keeps_bootstrap_and_drops_ungranted_domain_resources() {
+        let requested = vec!["auth".to_string(), "contacts".to_string()];
+        assert_eq!(
+            authorized_resources(&requested, None).expect("known resources should validate"),
+            vec!["auth".to_string()]
         );
     }
 }

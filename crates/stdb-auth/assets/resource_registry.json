@@ -982,7 +982,8 @@
       "debit",
       "credit",
       "elimination_type",
-      "is_matched"
+      "is_matched",
+      "company_id"
     ],
     "mandatory": [
       "id",
@@ -1526,7 +1527,8 @@
       "amount",
       "depreciation_date",
       "remaining_value",
-      "depreciated_value"
+      "depreciated_value",
+      "company_id"
     ],
     "mandatory": [
       "id",
@@ -2185,7 +2187,9 @@
     "default_restricted": [
       "name",
       "partner_id",
-      "stage_id"
+      "stage_id",
+      "priority",
+      "state"
     ],
     "mandatory": [
       "id",
@@ -6087,7 +6091,7 @@
       "id",
       "organization_id"
     ],
-    "table": "warehouse_3d_zone"
+    "table": "warehouse_3_d_zone"
   },
   "vendor-risk-flags": {
     "aliases": ["vendor-risk-flags", "vendor_risk_flag"],

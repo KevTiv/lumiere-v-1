@@ -4,17 +4,23 @@
 import { type NextRequest, NextResponse } from 'next/server'
 
 import { fetchAiGateway } from '@/lib/ai-gateway-server'
-import { requireAiRouteContext } from '../../_lib/route-helpers'
+import {
+  positiveInteger,
+  requireAiRouteContext,
+  validateCompanyScope,
+} from '../../_lib/route-helpers'
 
 interface Body {
   query?: unknown
   top_k?: unknown
+  companyId?: unknown
+  company_id?: unknown
 }
 
 export async function POST(request: NextRequest) {
   const contextResult = await requireAiRouteContext(request)
   if (!contextResult.ok) return contextResult.response
-  const { orgId } = contextResult.context
+  const { orgId, session } = contextResult.context
 
   let body: Body
   try {
@@ -28,6 +34,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'query is required' }, { status: 400 })
   }
 
+  const companyId = positiveInteger(body.companyId ?? body.company_id)
+  const companyError = await validateCompanyScope(session, companyId)
+  if (companyError) return companyError
+
   const rawTop = body.top_k
   let top_k = typeof rawTop === 'number' && Number.isFinite(rawTop) ? Math.floor(rawTop) : 8
   if (typeof rawTop === 'string' && rawTop.trim() !== '') {
@@ -38,8 +48,11 @@ export async function POST(request: NextRequest) {
 
   const gwBody = JSON.stringify({
     org_id: orgId,
+    company_id: companyId,
     query,
     top_k,
+    stdb_token: session.stdbToken,
+    identity_hex: session.identityHex,
   })
 
   try {

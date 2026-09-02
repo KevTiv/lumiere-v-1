@@ -2,7 +2,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Revenue/subscription mutations via Next.js BFF `POST /api/call/:reducer`.
+ * Revenue/subscription mutations via Next.js BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` subscriptions hooks.
  * (Not to be confused with SpacetimeDB subscription workspace resources.)
  */
@@ -52,16 +52,6 @@ export const SUBSCRIPTIONS_BFF_REDUCERS = [
 
 export type SubscriptionsBffReducerKey =
   (typeof SUBSCRIPTIONS_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<SubscriptionsBffReducerKey>();
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function subscriptionsBffCallUrl(
-  reducer: SubscriptionsBffReducerKey,
-): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 const SUBSCRIPTIONS_HINT_OVERRIDES: Partial<
   Record<SubscriptionsBffReducerKey, readonly string[]>

@@ -29,6 +29,7 @@ use crate::{
         policy_engine::PolicyEngine,
         release_registry::load_active_manifest,
         skill_registry::SkillRegistry,
+        ActorCredentials,
     },
     state::AppState,
 };
@@ -141,7 +142,7 @@ pub struct GatewayDailyBriefingRequest {
     pub activity_query: Option<String>,
     pub top_k: Option<usize>,
     pub stdb_token: String,
-    pub identity_hex: Option<String>,
+    pub identity_hex: String,
     #[serde(default)]
     pub org_privacy_policy: OrgPrivacyPolicy,
 }
@@ -151,7 +152,8 @@ pub async fn post_daily_briefing(
     Json(req): Json<GatewayDailyBriefingRequest>,
 ) -> AppResult<Json<DailyBriefingResult>> {
     validate_scope(req.org_id, req.company_id, &req.stdb_token)?;
-    let identity_hex = identity_or(req.identity_hex, "daily-briefing");
+    let actor = ActorCredentials::new(req.stdb_token.clone(), req.identity_hex)
+        .map_err(|error| AppError::Forbidden(error.to_string()))?;
     let policy = policy_for(
         &state,
         req.org_id,
@@ -161,9 +163,10 @@ pub async fn post_daily_briefing(
     )
     .await?;
     let result = run_daily_briefing(
-        state.rig.as_ref(),
+        &state,
+        &actor,
         req.org_id,
-        &identity_hex,
+        &actor.identity_hex,
         DailyBriefingInput {
             since_micros: req.since_micros,
             until_micros: req.until_micros,

@@ -40,12 +40,12 @@ function reducerArgsReplacer(_key: string, value: unknown): unknown {
   return Number(value)
 }
 
-/** JSON body for `POST /api/call/:reducer` (and direct STDB HTTP call) — bigints → numbers when safe. */
+/** JSON body for legacy positional reducer calls — bigints → numbers when safe. */
 export function stringifyReducerCallBody(args: unknown[]): string {
   return JSON.stringify(args.map(coerceTopLevelU64Like), reducerArgsReplacer)
 }
 
-/** Named JSON body for the contract-aware `/api/call/:reducer` endpoint. */
+/** Named JSON body for the typed operation endpoint. */
 export function stringifyReducerCommandBody(input: Record<string, unknown>): string {
   return JSON.stringify(input, reducerArgsReplacer)
 }
@@ -62,22 +62,4 @@ export async function queryStdbList(
   }
   const json = (await r.json()) as { data?: Record<string, unknown>[] }
   return json.data ?? []
-}
-
-/** POST `/api/call/:reducer` with JSON body (safe bigints as JSON numbers for u64). */
-export async function callStdbReducer(
-  apiFetch: LumiereHttpFetch,
-  reducer: string,
-  args: unknown[],
-): Promise<void> {
-  const body = stringifyReducerCallBody(args)
-  const r = await apiFetch(`/api/call/${encodeURIComponent(reducer)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body,
-  })
-  if (!r.ok) {
-    const json = (await r.json().catch(() => ({}))) as Record<string, unknown>
-    throw new Error((json.error as string | undefined) ?? `Reducer ${reducer} failed`)
-  }
 }

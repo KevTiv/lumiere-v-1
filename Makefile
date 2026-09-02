@@ -102,7 +102,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	e2e-crm-isolation \
 	init-stack docker-dev docker-dev-iot \
-	codegen check-codegen check-contract-ir check-reducer-contracts-drift check-contracts-drift \
+	codegen check-codegen check-contract-ir check-tenant-ownership check-storage-policy check-reducer-contracts-drift check-contracts-drift \
 	clean-contracts-live-staging lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
@@ -148,6 +148,8 @@ help-legacy:
 	@echo "  codegen                 Extract canonical contract IR plus local runtime/audit artifacts"
 	@echo "  check-codegen           Fail if generated artifacts drift from sources (CI). Requires .contracts-staging/ (see contracts-staging-from-pinned)"
 	@echo "  check-contract-ir       Validate the versioned IR envelope and both SHA-256 hashes"
+	@echo "  check-tenant-ownership  Validate C0 direct organization ownership (required by check-codegen)"
+	@echo "  check-storage-policy    Validate C1 all-table storage census (required by check-codegen)"
 	@echo "  check-reducer-contracts-drift  CI-safe live-schema drift check for reducer-manifest.json"
 	@echo "  check-contracts-drift   Full bindings/manifests drift check (requires spacetime CLI)"
 	@echo "  publish-contracts VERSION=x.y.z  Transitional release: publish canonical IR plus current generated packages"
@@ -881,12 +883,20 @@ codegen: schema-snapshot
 	cargo run -p lumiere-codegen
 
 check-contract-ir: codegen
-	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v1.json
+	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json
+	python3 lumiere-codegen/tests/test_contract_ir_pin.py
 
-check-codegen: codegen check-contract-ir lint-reducer-call-literals
+check-tenant-ownership:
+	python3 scripts/verify-tenant-ownership.py .contracts-staging/manifests/lumiere-schema-manifest.json
+	python3 lumiere-codegen/tests/test_tenant_ownership.py
+
+check-storage-policy: codegen
+	node scripts/bootstrap-storage-policies.mjs --check
+
+check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-policy lint-reducer-call-literals
+	@node scripts/validate-subscription-census.mjs --check
 	@git add -N \
 		frontend/packages/stdb/src/query-resource-row-type.json \
-		frontend/packages/stdb/src/commands/generated-stdb-bff-reducers.ts \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
 		crates/stdb-auth/assets/query_exec_non_registry.json \
@@ -894,7 +904,6 @@ check-codegen: codegen check-contract-ir lint-reducer-call-literals
 		2>/dev/null || true
 	@git diff --exit-code -- \
 		frontend/packages/stdb/src/query-resource-row-type.json \
-		frontend/packages/stdb/src/commands/generated-stdb-bff-reducers.ts \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
 		crates/stdb-auth/assets/query_exec_non_registry.json \
@@ -918,11 +927,22 @@ contracts-staging-from-pinned:
 		echo "contracts-staging-from-pinned: $$CHECKOUT/packages/contracts/src/generated missing — pinned tag predates the TS package" >&2; \
 		exit 1; \
 	fi; \
+	for generated in query-registry.ts operation-inputs.ts operation-descriptors.ts; do \
+		if [ ! -f "$$CHECKOUT/packages/contracts/src/generated/$$generated" ]; then \
+			echo "contracts-staging-from-pinned: $$generated missing from pinned contracts package" >&2; \
+			exit 1; \
+		fi; \
+	done; \
 	rm -rf .contracts-staging; \
 	mkdir -p .contracts-staging/bindings .contracts-staging/manifests .contracts-staging/ts/generated .contracts-staging/ir; \
 	cp -R "$$CHECKOUT/crates/lumiere-contracts/src/bindings/." .contracts-staging/bindings/; \
 	cp "$$CHECKOUT/manifests/"*.json .contracts-staging/manifests/; \
 	if [ -d "$$CHECKOUT/ir" ]; then cp -R "$$CHECKOUT/ir/." .contracts-staging/ir/; fi; \
+	V2_PIN="$$CHECKOUT/ir/PIN-v2.json"; \
+	if [ ! -f "$$V2_PIN" ]; then V2_PIN="$$CHECKOUT/ir/PIN.json"; fi; \
+	python3 scripts/verify-contract-ir.py \
+		"$$CHECKOUT/ir/lumiere-contract-ir-v2.json" \
+		--require-clean --allow-legacy-v2 --expect-pin-from "$$V2_PIN"; \
 	cp -R "$$CHECKOUT/packages/contracts/src/generated/." .contracts-staging/ts/generated/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" .contracts-staging/ts/; \
@@ -956,11 +976,17 @@ check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-std
 		echo "check-contracts-drift: could not resolve the pinned lumiere-contracts checkout (run cargo fetch first); skipping" >&2; \
 		exit 0; \
 	fi; \
+	V2_PIN="$$CHECKOUT/ir/PIN-v2.json"; \
+	if [ ! -f "$$V2_PIN" ]; then V2_PIN="$$CHECKOUT/ir/PIN.json"; fi; \
 	diff -rq "$$CHECKOUT/crates/lumiere-contracts/src/bindings" .contracts-staging/bindings && \
 	for manifest in .contracts-staging/manifests/*.json; do diff "$$CHECKOUT/manifests/$$(basename "$$manifest")" "$$manifest" || exit 1; done && \
-	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v1.json --require-clean --expect-schema-hash-from "$$CHECKOUT/ir/lumiere-contract-ir-v1.json" && \
+	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean --expect-schema-hash-from "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" && \
+	python3 scripts/verify-contract-ir.py "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" --require-clean --expect-pin-from "$$V2_PIN" && \
 	python3 "$$CHECKOUT/scripts/generate-from-ir.py" --check && \
-	diff -rq -x query-registry.ts -x operation-inputs.ts "$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
+	diff -rq \
+		-x query-registry.ts -x operation-inputs.ts -x operation-descriptors.ts \
+		-x operations.ts -x resources.ts -x resource-codecs.ts -x wire-codecs.ts \
+		"$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
 	diff "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/stdb-generated-sql-columns.json && \
 	echo "check-contracts-drift: staging matches pinned lumiere-contracts release" || \
 	(echo "Local generation drifted from the pinned lumiere-contracts tag. Run: make publish-contracts VERSION=x.y.z" && exit 1)

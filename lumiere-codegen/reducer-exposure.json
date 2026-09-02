@@ -77,6 +77,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "add_helpdesk_team_member",
+      "exposure": "session",
+      "reason": "required by the session-exposed ticket assignment workflow"
+    },
+    {
       "name": "add_landed_cost_line",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -130,6 +135,11 @@
       "name": "add_rule_to_nomenclature",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "add_user_custom_field",
+      "exposure": "session",
+      "reason": "reviewed form customization reducer: requires create permission, verifies parent configuration organization ownership, and binds the custom field to the authenticated sender"
     },
     {
       "name": "add_user_to_organization",
@@ -282,6 +292,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "archive_ai_chat_session",
+      "exposure": "session",
+      "reason": "reviewed interactive AI session action guarded by reducer permission and organization/company ownership checks"
+    },
+    {
       "name": "archive_contact_category",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -390,6 +405,11 @@
       "name": "cancel_account_move",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "cancel_ai_agent_run",
+      "exposure": "session",
+      "reason": "AI Skills UI action guarded by reducer-side write permission and organization/company ownership checks"
     },
     {
       "name": "cancel_budget",
@@ -1181,6 +1201,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_google_drive_connection",
+      "exposure": "session",
+      "reason": "reviewed interactive integration action guarded by reducer permission and organization/company ownership checks"
+    },
+    {
       "name": "create_helpdesk_sla",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -1868,6 +1893,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_whatsapp_business_account",
+      "exposure": "session",
+      "reason": "reviewed interactive integration action guarded by reducer permission and organization/company ownership checks"
+    },
+    {
       "name": "create_work_schedule",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2011,6 +2041,11 @@
       "name": "delete_form_field",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "delete_integration",
+      "exposure": "session",
+      "reason": "reviewed interactive integration action guarded by reducer delete permission and organization ownership checks"
     },
     {
       "name": "delete_record_custom_field_values",
@@ -2173,6 +2208,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "delete_user_custom_field",
+      "exposure": "session",
+      "reason": "reviewed form customization reducer: requires delete permission and verifies authenticated-sender plus organization ownership before deleting"
+    },
+    {
       "name": "delete_warehouse",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2181,6 +2221,11 @@
       "name": "delete_warehouse_3_d_zone",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "delete_whatsapp_business_account",
+      "exposure": "session",
+      "reason": "reviewed interactive integration action guarded by reducer delete permission and organization ownership checks"
     },
     {
       "name": "deprecate_account_account",
@@ -3525,6 +3570,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "set_whatsapp_primary_account",
+      "exposure": "session",
+      "reason": "reviewed interactive integration action guarded by reducer permission and validated target ownership"
+    },
+    {
       "name": "set_workflow_migration_plan_active",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3998,6 +4048,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "update_google_drive_connection",
+      "exposure": "session",
+      "reason": "reviewed interactive integration action guarded by reducer permission and organization ownership checks"
+    },
+    {
       "name": "update_google_drive_credentials",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -4352,6 +4407,21 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "update_utm_campaign",
+      "exposure": "session",
+      "reason": "reviewed CRM UTM reducer: requires utm update permission and verifies the campaign belongs to the authenticated organization before writing"
+    },
+    {
+      "name": "update_utm_medium",
+      "exposure": "session",
+      "reason": "reviewed CRM UTM reducer: requires utm update permission and verifies the medium belongs to the authenticated organization before writing"
+    },
+    {
+      "name": "update_utm_source",
+      "exposure": "session",
+      "reason": "reviewed CRM UTM reducer: requires utm update permission and verifies the source belongs to the authenticated organization before writing"
+    },
+    {
       "name": "update_user_email",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site",
@@ -4394,6 +4464,11 @@
       "name": "update_warehouse_task_status",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "update_whatsapp_business_account",
+      "exposure": "session",
+      "reason": "reviewed interactive integration action guarded by reducer permission and organization ownership checks"
     },
     {
       "name": "update_whatsapp_credentials",

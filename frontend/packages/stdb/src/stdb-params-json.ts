@@ -187,7 +187,11 @@ function encodeValue(
   if (value === undefined) return undefined
 
   if (isTimestampLike(value)) {
-    return encodeTimestamp(value)
+    const encoded = encodeTimestamp(value)
+    if (fieldKey && optionFields?.has(fieldKey)) {
+      return { some: encoded }
+    }
+    return encoded
   }
 
   if (isTaggedPayloadEnum(value)) {
@@ -289,7 +293,7 @@ export function encodeOptionalBool(
 }
 
 /** SpacetimeDB HTTP Identity (U256) JSON for flat reducer args. */
-export function encodeIdentity(value: unknown): Record<string, string> {
+export function encodeIdentity(value: unknown): { __identity__: string } {
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
     const obj = value as Record<string, unknown>
     if ("__identity__" in obj && typeof obj.__identity__ === "string") {
@@ -333,7 +337,7 @@ export function encodeOptionalTimestamp(
 }
 
 /**
- * Encode generated TS reducer param structs for `POST /api/call/:reducer`.
+ * Encode generated TS operation parameter structs for the immutable-ID endpoint.
  *
  * @param structName - Generated params type name (e.g. `CreateLeadParams`) so
  *   `Option<T>` fields are wrapped as `{ some: v }` / `{ none: [] }`.
@@ -381,7 +385,7 @@ export function stdbParamsToJson(
   return out
 }
 
-/** Last-arg struct names for `POST /api/call/:reducer` bodies in Playwright / scripts. */
+/** Last-argument struct names retained for explicit compatibility fixtures. */
 const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & string>> = {
   create_ai_insight: "CreateAiInsightParams",
   create_dashboard_widget: "CreateDashboardWidgetParams",

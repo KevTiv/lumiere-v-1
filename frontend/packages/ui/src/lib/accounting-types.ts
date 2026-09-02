@@ -8,13 +8,13 @@ export interface Timestamp {
 export interface AccountMove {
   id: bigint | number | string
   name?: string | null
-  state: unknown          // stringified: "Draft" | "Posted" | "Cancelled"
-  paymentState: unknown   // stringified: "Paid" | "InPayment" | "Partial" | "NotPaid"
-  moveType: unknown       // stringified: "OutInvoice" | "InInvoice" | etc.
-  amountTotal: number
-  amountResidual: number
-  amountUntaxed: number
-  amountTax: number
+  state?: unknown          // stringified: "Draft" | "Posted" | "Cancelled"
+  paymentState?: unknown   // stringified: "Paid" | "InPayment" | "Partial" | "NotPaid"
+  moveType?: unknown       // stringified: "OutInvoice" | "InInvoice" | etc.
+  amountTotal?: number
+  amountResidual?: number
+  amountUntaxed?: number
+  amountTax?: number
   invoiceDate?: Timestamp | null
   invoiceDateDue?: Timestamp | null
   invoicePartnerDisplayName?: string | null
@@ -27,13 +27,13 @@ export interface AccountMove {
 
 export interface AccountAccount {
   id: bigint | number | string
-  code: string
-  name: string
+  code?: string
+  name?: string
   internalGroup?: unknown  // stringified: "Asset" | "Liability" | "Equity" | "Income" | "Expense"
-  isBankAccount: boolean
-  used: boolean
-  deprecated: boolean
-  openingBalance: number
+  isBankAccount?: boolean
+  used?: boolean
+  deprecated?: boolean
+  openingBalance?: number
 }
 
 export interface CreateAccountMoveParams {

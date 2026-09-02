@@ -41,7 +41,10 @@ pub struct UserCredential {
     pub updated_at: Timestamp,
 }
 
-#[spacetimedb::table(accessor = user_invite)]
+#[spacetimedb::table(
+    accessor = user_invite,
+    index(accessor = user_invite_by_organization, btree(columns = [organization_id]))
+)]
 pub struct UserInvite {
     #[primary_key]
     #[auto_inc]

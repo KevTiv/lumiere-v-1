@@ -5,7 +5,6 @@ import { useTranslation } from "@lumiere/i18n"
 import { toast } from "sonner"
 import { useErpSession } from "@lumiere/erp-session"
 import {
-  seedOrganizationFormConfigs,
   addFormField,
   setFormRoleConfig,
   updateFormField,
@@ -362,23 +361,6 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
     }
   }, [roleKeysForPreview, previewRoleId])
 
-  const handleSeed = useCallback(async () => {
-    if (!organizationId) {
-      toast.error(t("settings.formConfig.noOrganization"))
-      return
-    }
-    try {
-      setIsSaving(true)
-      await seedOrganizationFormConfigs(BigInt(organizationId))
-      toast.success(t("settings.formConfig.seedSuccess"))
-      refetch()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t("settings.formConfig.seedError"))
-    } finally {
-      setIsSaving(false)
-    }
-  }, [organizationId, refetch, t])
-
   const handlePushRegistry = useCallback(async () => {
     if (!organizationId) {
       toast.error(t("settings.formConfig.noOrganization"))
@@ -565,10 +547,6 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
               >
                 <Save className={cn("h-4 w-4", isSaving && "animate-spin")} />
                 {t("settings.formConfig.createFromRegistry")}
-              </Button>
-              <Button variant="outline" size="sm" className="gap-2" disabled={isSaving || !connected} onClick={() => void handleSeed()}>
-                <RefreshCw className={cn("h-4 w-4", isSaving && "animate-spin")} />
-                {t("settings.formConfig.seedDatabase")}
               </Button>
               <Button
                 variant="outline"

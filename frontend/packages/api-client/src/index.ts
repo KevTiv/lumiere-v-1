@@ -3,11 +3,16 @@ export {
   type LumiereApiClient,
   type LumiereApiClientConfig,
 } from "./create-client"
-export { parseQueryListResponse, type QueryRow, type QueryRows } from "./query-list"
+export {
+  QueryResponseDecodeError,
+  decodeQueryListResponse,
+  parseQueryListResponse,
+  type QueryRow,
+  type QueryRows,
+} from "./query-list"
 export { resolveApiUrl, resolveRequestUrl } from "./resolve-url"
 export {
   queryStdbList,
-  callStdbReducer,
   stringifyReducerCallBody,
   stringifyReducerCommandBody,
   type LumiereHttpFetch,

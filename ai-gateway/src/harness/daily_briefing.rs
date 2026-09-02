@@ -15,8 +15,9 @@ use super::{
     policy_engine::PolicyEngine,
 };
 use crate::{
-    rig_agent::RigContext,
+    harness::ActorCredentials,
     skills::{collect_briefing_context, BriefingContext, BriefingContextRequest},
+    state::AppState,
 };
 
 pub const DAILY_BRIEFING_SKILL_KEY: &str = "daily_briefing";
@@ -76,6 +77,7 @@ pub fn manifest() -> SkillManifest {
             "sources",
             "activity_query",
             "source_count",
+            "retrieval_degraded",
         ]),
     }
 }
@@ -98,7 +100,8 @@ fn validate_input(value: &Value) -> Result<(), String> {
 }
 
 pub async fn run_daily_briefing(
-    rig: &RigContext,
+    state: &AppState,
+    actor: &ActorCredentials,
     organization_id: u64,
     identity_hex: &str,
     input: DailyBriefingInput,
@@ -109,10 +112,11 @@ pub async fn run_daily_briefing(
     validate_input(&input_value)?;
 
     let briefing = collect_briefing_context(
-        rig,
+        state,
+        actor,
         BriefingContextRequest {
             org_id: organization_id,
-            company_id: Some(company_id),
+            company_id,
             since_micros: input.since_micros,
             until_micros: input.until_micros,
             allowed_modules: input.allowed_modules.clone(),
@@ -120,7 +124,7 @@ pub async fn run_daily_briefing(
             top_k: input.top_k,
         },
     )
-    .await;
+    .await?;
 
     let outcome = execute_named_read(
         &policy,
@@ -169,5 +173,19 @@ fn empty_briefing() -> BriefingContext {
         sources: Vec::new(),
         activity_query: String::new(),
         source_count: 0,
+        retrieval_degraded: false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn manifest_allows_degraded_status_in_output_contract() {
+        assert!(manifest()
+            .privacy
+            .allowed_fields
+            .contains(&"retrieval_degraded".to_string()));
     }
 }

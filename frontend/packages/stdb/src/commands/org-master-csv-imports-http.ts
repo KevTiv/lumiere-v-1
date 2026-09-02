@@ -2,7 +2,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Org-scoped master-data CSV import reducers via Next.js BFF `POST /api/call/:reducer`.
+ * Org-scoped master-data CSV import reducers via Next.js BFF `POST /api/operations/:operation`.
  * Keys match SpacetimeDB reducer snake_case names used by `@lumiere/query-hooks` org-master-csv-imports hooks.
  * All reducers take `(organization_id, csv_data)` — no company scope.
  */
@@ -17,16 +17,6 @@ export const ORG_MASTER_CSV_IMPORTS_BFF_REDUCERS = [
 
 export type OrgMasterCsvImportsBffReducerKey =
   (typeof ORG_MASTER_CSV_IMPORTS_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<OrgMasterCsvImportsBffReducerKey>();
-
-/** Same-origin path used by `apiFetch` in the web app. */
-export function orgMasterCsvImportsBffCallUrl(
-  reducer: OrgMasterCsvImportsBffReducerKey,
-): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
 
 const ORG_MASTER_CSV_IMPORTS_HINT_OVERRIDES: Partial<
   Record<OrgMasterCsvImportsBffReducerKey, readonly string[]>

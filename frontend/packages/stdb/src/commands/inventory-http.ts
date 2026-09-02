@@ -1,9 +1,7 @@
-import { stringifyReducerCallBody } from "@lumiere/api-client";
-
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * Inventory mutations via Next.js BFF POST /api/call/:reducer.
+ * Inventory mutations via Next.js BFF POST /api/operations/:operation.
  * Keys match SpacetimeDB reducer snake_case names used by @lumiere/query-hooks inventory hooks.
  * Only real module reducers — no forward-compat phantoms.
  */
@@ -154,42 +152,6 @@ export const INVENTORY_BFF_REDUCERS = [
 ] as const;
 
 export type InventoryBffReducerKey = (typeof INVENTORY_BFF_REDUCERS)[number];
-
-const WITH_COMPANY_QUERY = new Set<InventoryBffReducerKey>([
-  "create_warehouse",
-  "update_warehouse",
-  "delete_warehouse",
-  "create_cycle_count_plan",
-  "start_cycle_count_session",
-  "record_cycle_count_line",
-  "validate_cycle_count",
-  "post_cycle_count_adjustments",
-  "start_quality_check",
-  "open_quality_alert",
-  "solve_quality_alert",
-  "execute_replenishment_rule",
-  "update_warehouse_task_status",
-]);
-
-/** Same-origin path used by apiFetch in the web app. */
-export function inventoryBffCallUrl(reducer: InventoryBffReducerKey): string {
-  const base = `/api/call/${reducer}`;
-  return WITH_COMPANY_QUERY.has(reducer) ? `${base}?withCompany=true` : base;
-}
-
-export function inventoryBffPost(
-  reducer: InventoryBffReducerKey,
-  args: unknown[],
-): { urlPath: string; init: RequestInit } {
-  return {
-    urlPath: inventoryBffCallUrl(reducer),
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: stringifyReducerCallBody(args),
-    },
-  };
-}
 
 function inventoryReducerHints(): Record<InventoryBffReducerKey, readonly string[]> {
   const o = {} as Record<InventoryBffReducerKey, readonly string[]>;

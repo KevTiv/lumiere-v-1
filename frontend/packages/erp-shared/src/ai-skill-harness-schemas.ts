@@ -61,6 +61,7 @@ export interface DailyBriefingResult {
     sources: unknown[]
     activity_query: string
     source_count: number
+    retrieval_degraded: boolean
   }
   audit: HarnessAuditTrail
 }

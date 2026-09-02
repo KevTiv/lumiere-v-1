@@ -53,11 +53,23 @@ No contracts build may clone or inspect mutable application source. This avoids
 two repositories independently deciding what Rust/STDB means.
 
 Current implementation emits
-`.contracts-staging/ir/lumiere-contract-ir-v1.json` and a SHA-256 sidecar.
+`.contracts-staging/ir/lumiere-contract-ir-v2.json` and a SHA-256 sidecar.
 `make check-contract-ir` validates the envelope, ordering, cross-links,
 semantic hash, and artifact checksum.
 
-Generated PG DDL stays local for now: `api-server/src/cold_tier/migrate.rs:20-29` consumes it via `include_str!` as a build intermediate, not as a released contract artifact. It qualifies as *Investigate* under the scope rule and does not need to move to unblock the IR work.
+IR v2 is the sole emitted and accepted handoff. Releases publish
+`ir/PIN-v2.json`; `ir/PIN.json` contains the same immutable pointer for tools
+that do not use a versioned pin name. Publisher and drift checks validate the
+pin against the artifact bytes, semantic hash, IR version, and source commit.
+
+IR v2 includes a hashed `persistence` contract. Its authority declaration
+keeps business logic and the business system of record in SpacetimeDB,
+forbids direct PostgreSQL business writes, and classifies PostgreSQL as a
+derived projection finalized through reducers. The complete C1 storage census,
+active archive projections, and STDB-to-PostgreSQL codec mappings are embedded
+in that contract. Generated PG DDL remains a local runtime build intermediate;
+C2 must derive it from the v2 persistence contract rather than establishing a
+second business schema.
 
 ---
 
@@ -82,7 +94,7 @@ generates every target solely from that pinned IR.
 ```text
 lumiere-v-1 module source
         ↓ spacetime generate --lang rust
-.contracts-staging/ir/lumiere-contract-ir-v1.json
+.contracts-staging/ir/lumiere-contract-ir-v2.json
         ↓ publish immutable artifact + checksum
 lumiere-contracts pins digest and runs target-owned emitters
         ↓ validate + compatibility check
@@ -99,6 +111,7 @@ stdb-auth / api-server compile against the crate
 | Asset | Origin | Moves? |
 |---|---|---|
 | `lumiere-schema-manifest.json` (1.4 MB) | generated | Yes |
+| `storage-policy-manifest.json` | generated | Yes |
 | `stdb-generated-sql-columns.json` (290 KB) | generated | Yes |
 | `erp-org-sql.json` (48 KB) | generated | Yes |
 | `codec-manifest.json` | generated | Yes |
@@ -204,7 +217,7 @@ Release rules:
 ### 5.4 Release automation
 
 - [x] transitional `make publish-contracts` — validate canonical IR, copy IR
-  plus current generated targets, push, and tag;
+  plus current generated targets, write the v2 provenance pin, push, and tag;
 - [x] add a contracts-owned `generate-from-ir` entry point for the first four
   IR-derived targets;
 - [ ] replace the remaining transitional direct-copy portions after the SDK

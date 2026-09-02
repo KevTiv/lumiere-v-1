@@ -1,3 +1,4 @@
+import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
@@ -5,6 +6,8 @@ import {
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   expectNoAppError,
+  fetchDefaultCompanyId,
+  fetchSessionOrganizationId,
   fillField,
   gotoModule,
   scalarQueryId,
@@ -52,7 +55,7 @@ test.describe("Sales update mutations", { tag: ["@p0", "@phase-3"] }, () => {
 
     const [createOrderRes] = await Promise.all([
       page.waitForResponse(
-        (res) => res.url().includes("/api/call/create_sale_order") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_sale_order") && res.ok(),
         { timeout: 30_000 },
       ),
       submitForm(page, "new-sale-order"),
@@ -85,11 +88,12 @@ test.describe("Sales update mutations", { tag: ["@p0", "@phase-3"] }, () => {
       )
       .toBeGreaterThan(0)
 
+    const organizationId = await fetchSessionOrganizationId(page)
+    const companyId = await fetchDefaultCompanyId(page)
     await callReducerBff(
       page,
       "update_sale_order",
-      [orderId, { clientOrderRef: updatedRef }],
-      { withCompany: true },
+      [organizationId, companyId, orderId, { clientOrderRef: updatedRef }],
     )
 
     await expect

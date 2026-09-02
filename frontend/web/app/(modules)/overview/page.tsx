@@ -4,7 +4,6 @@ import { OverviewClient } from "./overview-client"
 
 const SSR_RESOURCES = [
   "sale-orders",
-  "account-moves",
   "stock-quants",
   "products",
   "tasks",
@@ -21,7 +20,6 @@ export default async function OverviewPage() {
 
   const [
     orders,
-    moves,
     stockQuants,
     products,
     tasks,
@@ -34,7 +32,6 @@ export default async function OverviewPage() {
     <OverviewClient
       organizationId={session.organizationId}
       initialOrders={orders}
-      initialMoves={moves}
       initialStockQuants={stockQuants}
       initialProducts={products}
       initialTasks={tasks}

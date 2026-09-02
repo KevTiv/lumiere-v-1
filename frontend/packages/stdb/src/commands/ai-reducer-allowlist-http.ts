@@ -2,7 +2,7 @@
 import type { ReducerCommandContractMeta } from "./types";
 
 /**
- * AI reducer allowlist mutations via Next.js BFF `POST /api/call/:reducer`.
+ * AI reducer allowlist mutations via Next.js BFF `POST /api/operations/:operation`.
  */
 export const AI_REDUCER_ALLOWLIST_BFF_REDUCERS = [
   "create_ai_reducer_allowlist",
@@ -13,12 +13,6 @@ export const AI_REDUCER_ALLOWLIST_BFF_REDUCERS = [
 
 export type AiReducerAllowlistBffReducerKey =
   (typeof AI_REDUCER_ALLOWLIST_BFF_REDUCERS)[number];
-
-export function aiReducerAllowlistBffCallUrl(
-  reducer: AiReducerAllowlistBffReducerKey,
-): string {
-  return `/api/call/${reducer}`;
-}
 
 const HINT_OVERRIDES: Partial<
   Record<AiReducerAllowlistBffReducerKey, readonly string[]>

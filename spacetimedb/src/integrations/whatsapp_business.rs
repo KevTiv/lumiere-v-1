@@ -220,6 +220,26 @@ pub fn create_whatsapp_business_account(
         require_company_in_organization(ctx, organization_id, cid)?;
     }
 
+    if params.is_primary {
+        let existing_primary: Vec<_> = ctx
+            .db
+            .whatsapp_business_account()
+            .wa_account_by_org()
+            .filter(&organization_id)
+            .filter(|account| account.is_primary && account.deleted_at.is_none())
+            .collect();
+        for account in existing_primary {
+            ctx.db
+                .whatsapp_business_account()
+                .id()
+                .update(WhatsAppBusinessAccount {
+                    is_primary: false,
+                    updated_at: ctx.timestamp,
+                    ..account
+                });
+        }
+    }
+
     let account = ctx
         .db
         .whatsapp_business_account()
@@ -725,6 +745,20 @@ pub fn set_whatsapp_primary_account(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "integrations", "write")?;
 
+    let account = ctx
+        .db
+        .whatsapp_business_account()
+        .id()
+        .find(&account_id)
+        .ok_or("WhatsApp Business account not found")?;
+
+    if account.organization_id != organization_id {
+        return Err("Account does not belong to this organization".to_string());
+    }
+    if account.deleted_at.is_some() || !account.is_active {
+        return Err("Cannot make a deleted or inactive account primary".to_string());
+    }
+
     // First, unset any existing primary accounts
     let existing_primary: Vec<_> = ctx
         .db
@@ -745,18 +779,6 @@ pub fn set_whatsapp_primary_account(
                     ..account
                 });
         }
-    }
-
-    // Set the new primary account
-    let account = ctx
-        .db
-        .whatsapp_business_account()
-        .id()
-        .find(&account_id)
-        .ok_or("WhatsApp Business account not found")?;
-
-    if account.organization_id != organization_id {
-        return Err("Account does not belong to this organization".to_string());
     }
 
     let account_company_id = account.company_id;
