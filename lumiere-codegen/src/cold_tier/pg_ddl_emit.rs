@@ -34,7 +34,8 @@
 
 use anyhow::Result;
 
-use crate::cold_tier::schema_ir::{GeneratedTableSchema, GeneratedType, LumiereSchemaManifest};
+use crate::cold_tier::codec_emit::pg_type_for;
+use crate::cold_tier::schema_ir::{GeneratedTableSchema, LumiereSchemaManifest};
 
 /// Config for one archive candidate (from `archive-candidates.json`).
 #[derive(Debug)]
@@ -146,30 +147,6 @@ fn render_ddl(schema: &GeneratedTableSchema, cold_table: &str) -> String {
     ));
 
     out
-}
-
-/// Map a `GeneratedType` to the Postgres DDL type string.
-fn pg_type_for(ty: &GeneratedType) -> &'static str {
-    match ty {
-        // Full unsigned 64-bit: use NUMERIC(20,0) to preserve the full domain.
-        GeneratedType::U64 => "NUMERIC(20,0)",
-        // Smaller unsigned integers fit safely in BIGINT (positive signed range).
-        GeneratedType::U8 | GeneratedType::U16 | GeneratedType::U32 => "BIGINT",
-        GeneratedType::I64 => "BIGINT",
-        GeneratedType::I8 | GeneratedType::I16 | GeneratedType::I32 => "INTEGER",
-        GeneratedType::F64 => "DOUBLE PRECISION",
-        GeneratedType::F32 => "REAL",
-        GeneratedType::Bool => "BOOLEAN",
-        GeneratedType::String => "TEXT",
-        // Timestamp = signed µs since Unix epoch; BIGINT preserves sign + precision.
-        GeneratedType::Timestamp => "BIGINT",
-        // Identity = 32-byte opaque blob.
-        GeneratedType::Identity => "BYTEA",
-        // Arrays and nested structs stored as JSONB.
-        GeneratedType::Vec(_) | GeneratedType::Struct(_) => "JSONB",
-        // Enums stored as their canonical variant name.
-        GeneratedType::Enum(_) => "TEXT",
-    }
 }
 
 // ---------------------------------------------------------------------------

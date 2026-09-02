@@ -18,13 +18,6 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STAGING="$ROOT/.contracts-staging"
 CONTRACTS_REPO="${LUMIERE_CONTRACTS_REPO:-git@github.com:KevTiv/lumiere-contracts.git}"
 VERSION="${1:?usage: publish-contracts.sh <version, e.g. 0.1.0>}"
-ACTIVE_IR_VERSION="${LUMIERE_CONTRACT_IR_VERSION:-2}"
-
-if [[ "$ACTIVE_IR_VERSION" != "1" && "$ACTIVE_IR_VERSION" != "2" ]]; then
-  echo "error: LUMIERE_CONTRACT_IR_VERSION must be 1 or 2" >&2
-  exit 1
-fi
-
 if [[ ! -d "$STAGING/bindings" || ! -d "$STAGING/manifests" ]]; then
   echo "error: $STAGING/{bindings,manifests} missing — run make generate-stdb-rust-sdk && make codegen first" >&2
   exit 1
@@ -33,37 +26,20 @@ if [[ ! -d "$STAGING/ts/generated" ]]; then
   echo "error: $STAGING/ts/generated missing — run make generate-stdb-ts-sdk && make codegen first" >&2
   exit 1
 fi
-if [[ ! -f "$STAGING/ir/lumiere-contract-ir-v1.json" \
-  || ! -f "$STAGING/ir/lumiere-contract-ir-v1.json.sha256" \
-  || ! -f "$STAGING/ir/lumiere-contract-ir-v2.json" \
+if [[ ! -f "$STAGING/ir/lumiere-contract-ir-v2.json" \
   || ! -f "$STAGING/ir/lumiere-contract-ir-v2.json.sha256" ]]; then
-  echo "error: canonical contract IR v1/v2 artifacts missing — run make codegen first" >&2
+  echo "error: canonical contract IR v2 artifact missing — run make codegen first" >&2
   exit 1
 fi
 
 python3 "$ROOT/scripts/verify-contract-ir.py" \
-  "$STAGING/ir/lumiere-contract-ir-v1.json" --require-clean
-python3 "$ROOT/scripts/verify-contract-ir.py" \
   "$STAGING/ir/lumiere-contract-ir-v2.json" --require-clean
-python3 - \
-  "$STAGING/ir/lumiere-contract-ir-v1.json" \
-  "$STAGING/ir/lumiere-contract-ir-v2.json" <<'PY'
-import json
-import sys
-
-with open(sys.argv[1], encoding="utf-8") as source:
-    v1 = json.load(source)
-with open(sys.argv[2], encoding="utf-8") as source:
-    v2 = json.load(source)
-if v1["source_commit"] != v2["source_commit"]:
-    raise SystemExit("error: contract IR v1/v2 source commits do not match")
-PY
 
 SOURCE_REPO="$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)"
 if [[ -z "$SOURCE_REPO" ]]; then
   SOURCE_REPO="$(git -C "$ROOT" rev-parse --show-toplevel)"
 fi
-readarray -t IR_METADATA < <(python3 - "$STAGING/ir/lumiere-contract-ir-v1.json" <<'PY'
+readarray -t IR_METADATA < <(python3 - "$STAGING/ir/lumiere-contract-ir-v2.json" <<'PY'
 import json
 import sys
 
@@ -89,8 +65,7 @@ cd "$WORK/repo"
 # Immutable source handoff. Downstream emitters must eventually consume only
 # this file selected by its sidecar digest; they must not inspect lumiere-v-1.
 mkdir -p ir
-cp "$STAGING/ir/lumiere-contract-ir-v1.json" ir/
-cp "$STAGING/ir/lumiere-contract-ir-v1.json.sha256" ir/
+rm -f ir/lumiere-contract-ir-v1.json ir/lumiere-contract-ir-v1.json.sha256 ir/PIN-v1.json
 cp "$STAGING/ir/lumiere-contract-ir-v2.json" ir/
 cp "$STAGING/ir/lumiere-contract-ir-v2.json.sha256" ir/
 
@@ -98,25 +73,7 @@ cp "$STAGING/ir/lumiere-contract-ir-v2.json.sha256" ir/
 # active-generation pointer consumed by downstream emitters. The source commit
 # comes from each IR itself so a pin cannot accidentally describe a different
 # checkout than the artifact that produced it.
-readarray -t IR_V2_METADATA < <(python3 - "$STAGING/ir/lumiere-contract-ir-v2.json" <<'PY'
-import hashlib
-import json
-import sys
-
-with open(sys.argv[1], encoding="utf-8") as source:
-    ir = json.load(source)
-print(ir["source_commit"])
-print(ir["ir_version"])
-print(ir["schema_hash"])
-print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())
-PY
-)
-V2_SOURCE_COMMIT="${IR_V2_METADATA[0]}"
-V2_IR_VERSION="${IR_V2_METADATA[1]}"
-V2_SCHEMA_HASH="${IR_V2_METADATA[2]}"
-V2_IR_SHA256="${IR_V2_METADATA[3]}"
-
-python3 - "$SOURCE_REPO" "$SOURCE_COMMIT" "$IR_SHA256" "$IR_VERSION" "$SCHEMA_HASH" "$V2_SOURCE_COMMIT" "$V2_IR_SHA256" "$V2_IR_VERSION" "$V2_SCHEMA_HASH" "$ACTIVE_IR_VERSION" <<'PY'
+python3 - "$SOURCE_REPO" "$SOURCE_COMMIT" "$IR_SHA256" "$IR_VERSION" "$SCHEMA_HASH" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -139,15 +96,10 @@ def write_pin(path, source_commit, artifact_sha256, ir_version, schema_hash, art
     )
 
 write_pin(
-    "ir/PIN-v1.json", sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5],
-    "lumiere-contract-ir-v1.json",
-)
-write_pin(
-    "ir/PIN-v2.json", sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9],
+    "ir/PIN-v2.json", sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5],
     "lumiere-contract-ir-v2.json",
 )
-active = Path(f"ir/PIN-v{sys.argv[10]}.json").read_text(encoding="utf-8")
-Path("ir/PIN.json").write_text(active, encoding="utf-8")
+Path("ir/PIN.json").write_text(Path("ir/PIN-v2.json").read_text(encoding="utf-8"), encoding="utf-8")
 PY
 
 rm -rf crates/lumiere-contracts/src/bindings
@@ -169,12 +121,10 @@ python3 scripts/generate-from-ir.py
   echo
   echo '#[cfg(feature = "bindings")]'
   echo "pub mod bindings;"
-  if [[ "$ACTIVE_IR_VERSION" == "2" ]]; then
-    echo
-    echo "/// Compact canonical descriptors generated from the active IR v2 pin."
-    echo '#[cfg(feature = "v2")]'
-    echo "pub mod generated;"
-  fi
+  echo
+  echo "/// Compact canonical descriptors generated from the IR v2 pin."
+  echo '#[cfg(feature = "v2")]'
+  echo "pub mod generated;"
   echo
   echo "pub mod manifests {"
   for f in manifests/*.json; do

@@ -35,7 +35,7 @@ interact with the ERP contract surface.
 lumiere-v-1: Rust/STDB source + application annotations
         │
         ▼ authoritative extraction and normalization
-canonical lumiere-contract-ir-v1.json + .sha256
+canonical lumiere-contract-ir-v2.json + .sha256
         │ immutable artifact pinned by checksum
         ▼
 lumiere-contracts: target-specific emitters + packaging
@@ -95,8 +95,8 @@ The extractor writes:
 
 ```text
 .contracts-staging/ir/
-├── lumiere-contract-ir-v1.json
-└── lumiere-contract-ir-v1.json.sha256
+├── lumiere-contract-ir-v2.json
+└── lumiere-contract-ir-v2.json.sha256
 ```
 
 The envelope records `ir_version`, `source_commit`, `source_dirty`, a semantic
@@ -119,7 +119,7 @@ lumiere-contracts/
 ├── CONTRACT_VERSION
 ├── ir/
 │   ├── PIN.json
-│   └── lumiere-contract-ir-v1.json
+│   └── lumiere-contract-ir-v2.json
 ├── packages/
 │   ├── contracts/
 │   │   ├── package.json

@@ -53,22 +53,23 @@ No contracts build may clone or inspect mutable application source. This avoids
 two repositories independently deciding what Rust/STDB means.
 
 Current implementation emits
-`.contracts-staging/ir/lumiere-contract-ir-v1.json` and a SHA-256 sidecar.
+`.contracts-staging/ir/lumiere-contract-ir-v2.json` and a SHA-256 sidecar.
 `make check-contract-ir` validates the envelope, ordering, cross-links,
 semantic hash, and artifact checksum.
 
-The additive v2 handoff is emitted beside v1 as
-`.contracts-staging/ir/lumiere-contract-ir-v2.json`. A future contracts
-release must retain both artifacts and publish one provenance pin for each:
-`ir/PIN-v1.json` identifies v1 and `ir/PIN-v2.json` identifies v2.
-`ir/PIN.json` is the active-generation pointer consumed by downstream
-generators; it initially identifies v1 and moves to v2 only when the companion
-consumer is released. The publisher and drift checks
-validate each pin against the artifact bytes, semantic hash, IR version,
-and source commit. A v1-only pinned release remains valid; once a v2 artifact
-appears in a pinned checkout, its v2 pin is mandatory.
+IR v2 is the sole emitted and accepted handoff. Releases publish
+`ir/PIN-v2.json`; `ir/PIN.json` contains the same immutable pointer for tools
+that do not use a versioned pin name. Publisher and drift checks validate the
+pin against the artifact bytes, semantic hash, IR version, and source commit.
 
-Generated PG DDL stays local for now: `api-server/src/cold_tier/migrate.rs:20-29` consumes it via `include_str!` as a build intermediate, not as a released contract artifact. It qualifies as *Investigate* under the scope rule and does not need to move to unblock the IR work.
+IR v2 includes a hashed `persistence` contract. Its authority declaration
+keeps business logic and the business system of record in SpacetimeDB,
+forbids direct PostgreSQL business writes, and classifies PostgreSQL as a
+derived projection finalized through reducers. The complete C1 storage census,
+active archive projections, and STDB-to-PostgreSQL codec mappings are embedded
+in that contract. Generated PG DDL remains a local runtime build intermediate;
+C2 must derive it from the v2 persistence contract rather than establishing a
+second business schema.
 
 ---
 
@@ -93,7 +94,7 @@ generates every target solely from that pinned IR.
 ```text
 lumiere-v-1 module source
         ↓ spacetime generate --lang rust
-.contracts-staging/ir/lumiere-contract-ir-v1.json
+.contracts-staging/ir/lumiere-contract-ir-v2.json
         ↓ publish immutable artifact + checksum
 lumiere-contracts pins digest and runs target-owned emitters
         ↓ validate + compatibility check
@@ -216,7 +217,7 @@ Release rules:
 ### 5.4 Release automation
 
 - [x] transitional `make publish-contracts` — validate canonical IR, copy IR
-  plus current generated targets, write v1/v2 provenance pins, push, and tag;
+  plus current generated targets, write the v2 provenance pin, push, and tag;
 - [x] add a contracts-owned `generate-from-ir` entry point for the first four
   IR-derived targets;
 - [ ] replace the remaining transitional direct-copy portions after the SDK

@@ -28,11 +28,11 @@ def _find_ir():
         candidates.append(Path(configured))
     candidates.extend(
         [
-            CODEGEN_DIR.parent / ".contracts-staging" / "ir" / "lumiere-contract-ir-v1.json",
+            CODEGEN_DIR.parent / ".contracts-staging" / "ir" / "lumiere-contract-ir-v2.json",
             CODEGEN_DIR.parent.parent
             / "lumiere-contracts"
             / "ir"
-            / "lumiere-contract-ir-v1.json",
+            / "lumiere-contract-ir-v2.json",
         ]
     )
     return next((path for path in candidates if path.is_file()), None)
