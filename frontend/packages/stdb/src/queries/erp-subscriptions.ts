@@ -932,7 +932,7 @@ const ERP_ORG_SQL: Record<string, (organizationId: number, fa?: FieldAccessConte
   "warehouse-tasks": (id, fa) =>
     selectOrgScopedSql("warehouse-tasks", "warehouse_task", id, fa, ""),
   "warehouse-3d-zones": (id, fa) =>
-    selectOrgScopedSql("warehouse-3d-zones", "warehouse_3d_zone", id, fa, ""),
+    selectOrgScopedSql("warehouse-3d-zones", "warehouse_3_d_zone", id, fa, ""),
   "quality-checks": (id, fa) =>
     selectOrgScopedSql("quality-checks", "quality_check", id, fa, ""),
   "quality-alerts": (id, fa) =>

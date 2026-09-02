@@ -102,7 +102,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	e2e-crm-isolation \
 	init-stack docker-dev docker-dev-iot \
-	codegen check-codegen check-contract-ir check-tenant-ownership check-reducer-contracts-drift check-contracts-drift \
+	codegen check-codegen check-contract-ir check-tenant-ownership check-storage-policy check-reducer-contracts-drift check-contracts-drift \
 	clean-contracts-live-staging lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
@@ -149,6 +149,7 @@ help-legacy:
 	@echo "  check-codegen           Fail if generated artifacts drift from sources (CI). Requires .contracts-staging/ (see contracts-staging-from-pinned)"
 	@echo "  check-contract-ir       Validate the versioned IR envelope and both SHA-256 hashes"
 	@echo "  check-tenant-ownership  Validate C0 direct organization ownership (required by check-codegen)"
+	@echo "  check-storage-policy    Validate C1 all-table storage census (required by check-codegen)"
 	@echo "  check-reducer-contracts-drift  CI-safe live-schema drift check for reducer-manifest.json"
 	@echo "  check-contracts-drift   Full bindings/manifests drift check (requires spacetime CLI)"
 	@echo "  publish-contracts VERSION=x.y.z  Transitional release: publish canonical IR plus current generated packages"
@@ -890,7 +891,10 @@ check-tenant-ownership:
 	python3 scripts/verify-tenant-ownership.py .contracts-staging/manifests/lumiere-schema-manifest.json
 	python3 lumiere-codegen/tests/test_tenant_ownership.py
 
-check-codegen: codegen check-contract-ir check-tenant-ownership lint-reducer-call-literals
+check-storage-policy: codegen
+	node scripts/bootstrap-storage-policies.mjs --check
+
+check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-policy lint-reducer-call-literals
 	@node scripts/validate-subscription-census.mjs --check
 	@git add -N \
 		frontend/packages/stdb/src/query-resource-row-type.json \

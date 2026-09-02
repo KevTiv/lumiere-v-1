@@ -6091,7 +6091,7 @@
       "id",
       "organization_id"
     ],
-    "table": "warehouse_3d_zone"
+    "table": "warehouse_3_d_zone"
   },
   "vendor-risk-flags": {
     "aliases": ["vendor-risk-flags", "vendor_risk_flag"],
