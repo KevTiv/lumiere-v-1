@@ -110,6 +110,7 @@ stdb-auth / api-server compile against the crate
 | Asset | Origin | Moves? |
 |---|---|---|
 | `lumiere-schema-manifest.json` (1.4 MB) | generated | Yes |
+| `storage-policy-manifest.json` | generated | Yes |
 | `stdb-generated-sql-columns.json` (290 KB) | generated | Yes |
 | `erp-org-sql.json` (48 KB) | generated | Yes |
 | `codec-manifest.json` | generated | Yes |
