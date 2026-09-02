@@ -541,12 +541,12 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
     {
         return Err("quarantined intercompany rule remained mutable".to_string());
     }
-    if update_consolidation_account(
+    update_consolidation_account(
         ctx,
         fixture.organization_id,
         consolidation_account_id,
         UpdateConsolidationAccountParams {
-            name: Some("must remain quarantined".to_string()),
+            name: Some("valid owned consolidation account".to_string()),
             code: None,
             account_type: None,
             company_ids: None,
@@ -558,10 +558,17 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
             notes: None,
             metadata: None,
         },
-    )
-    .is_ok()
+    )?;
+    let updated_consolidation_account = ctx
+        .db
+        .consolidation_account()
+        .id()
+        .find(&consolidation_account_id)
+        .ok_or("updated consolidation account not found")?;
+    if updated_consolidation_account.organization_id != fixture.organization_id
+        || updated_consolidation_account.name != "valid owned consolidation account"
     {
-        return Err("quarantined consolidation account remained mutable".to_string());
+        return Err("valid consolidation account ownership was not preserved".to_string());
     }
 
     Ok(())
