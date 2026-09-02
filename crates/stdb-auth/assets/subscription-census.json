@@ -5393,7 +5393,7 @@
     {
       "resource": "warehouse-3d-zones",
       "source": {
-        "table": "warehouse_3d_zone",
+        "table": "warehouse_3_d_zone",
         "readModel": "Warehouse3DZone"
       },
       "scope": "organization",
