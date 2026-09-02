@@ -353,7 +353,10 @@ pub struct OpportunityStage {
     pub metadata: Option<String>,
 }
 
-#[spacetimedb::table(accessor = opportunity_line)]
+#[spacetimedb::table(
+    accessor = opportunity_line,
+    index(accessor = opportunity_line_by_organization, btree(columns = [organization_id]))
+)]
 pub struct OpportunityLine {
     #[primary_key]
     #[auto_inc]

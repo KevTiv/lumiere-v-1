@@ -18,6 +18,7 @@ pub struct ImportMappingTemplate {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    #[index(btree)]
     pub organization_id: u64,
     /// Target entity / import job table name (e.g. "contact", "sale_order").
     pub table_name: String,

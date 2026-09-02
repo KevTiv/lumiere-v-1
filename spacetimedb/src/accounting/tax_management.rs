@@ -9,7 +9,7 @@ use std::collections::HashSet;
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::relations::require_active_account;
-use crate::core::organization::require_company_in_organization;
+use crate::core::organization::{organization, require_company_in_organization};
 use crate::core::reference::country;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{
@@ -188,6 +188,7 @@ pub struct TaxDeadline {
 #[spacetimedb::table(
     accessor = tax_deadline_reminder,
     public,
+    index(accessor = reminder_by_organization, btree(columns = [organization_id])),
     index(accessor = reminder_by_deadline, btree(columns = [tax_deadline_id])),
     index(accessor = reminder_by_status, btree(columns = [status]))
 )]
@@ -211,13 +212,18 @@ pub struct TaxDeadlineReminder {
 ///
 /// This scheduled reducer runs daily to flip `upcoming → overdue` for deadlines
 /// that have passed their due date.
-#[spacetimedb::table(accessor = tax_deadline_status_job, scheduled(update_tax_deadlines))]
+#[spacetimedb::table(
+    accessor = tax_deadline_status_job,
+    scheduled(update_tax_deadlines),
+    index(accessor = tax_deadline_status_job_by_org, btree(columns = [organization_id]))
+)]
 pub struct TaxDeadlineStatusJob {
     #[primary_key]
     #[auto_inc]
     pub scheduled_id: u64,
     pub scheduled_at: ScheduleAt,
-    pub organization_id: Option<u64>, // If None, processes all orgs
+    #[unique]
+    pub organization_id: u64,
 }
 
 // ── Input Params ─────────────────────────────────────────────────────────────
@@ -1129,33 +1135,33 @@ pub fn update_tax_schedule(
 pub fn update_tax_deadlines(ctx: &ReducerContext, job: TaxDeadlineStatusJob) {
     log::info!("Running scheduled tax deadline status update");
 
+    let Some(organization) = ctx.db.organization().id().find(&job.organization_id) else {
+        log::error!(
+            "Skipping tax deadline status update for unknown organization {}",
+            job.organization_id
+        );
+        return;
+    };
+    if organization.organization_id != organization.id {
+        log::error!(
+            "Skipping tax deadline status update for invalid organization root {}",
+            organization.id
+        );
+        return;
+    }
+
     let now = ctx.timestamp;
     let mut updated_count: u64 = 0;
 
-    // Update deadlines based on organization filter
-    let deadlines_to_update: Vec<TaxDeadline> = if let Some(org_id) = job.organization_id {
-        ctx.db
-            .tax_deadline()
-            .deadline_by_org()
-            .filter(&org_id)
-            .filter(|d| {
-                d.status == TaxDeadlineStatus::Upcoming
-                    && d.due_date < now
-                    && d.deleted_at.is_none()
-            })
-            .collect()
-    } else {
-        // Process all organizations
-        ctx.db
-            .tax_deadline()
-            .iter()
-            .filter(|d| {
-                d.status == TaxDeadlineStatus::Upcoming
-                    && d.due_date < now
-                    && d.deleted_at.is_none()
-            })
-            .collect()
-    };
+    let deadlines_to_update: Vec<TaxDeadline> = ctx
+        .db
+        .tax_deadline()
+        .deadline_by_org()
+        .filter(&job.organization_id)
+        .filter(|d| {
+            d.status == TaxDeadlineStatus::Upcoming && d.due_date < now && d.deleted_at.is_none()
+        })
+        .collect();
 
     for deadline in deadlines_to_update {
         ctx.db.tax_deadline().id().update(TaxDeadline {
@@ -1171,30 +1177,18 @@ pub fn update_tax_deadlines(ctx: &ReducerContext, job: TaxDeadlineStatusJob) {
     let due_soon_threshold = now + std::time::Duration::from_secs(7 * 24 * 60 * 60);
     let mut due_soon_count: u64 = 0;
 
-    let deadlines_for_due_soon: Vec<TaxDeadline> = if let Some(org_id) = job.organization_id {
-        ctx.db
-            .tax_deadline()
-            .deadline_by_org()
-            .filter(&org_id)
-            .filter(|d| {
-                d.status == TaxDeadlineStatus::Upcoming
-                    && d.due_date <= due_soon_threshold
-                    && d.due_date > now
-                    && d.deleted_at.is_none()
-            })
-            .collect()
-    } else {
-        ctx.db
-            .tax_deadline()
-            .iter()
-            .filter(|d| {
-                d.status == TaxDeadlineStatus::Upcoming
-                    && d.due_date <= due_soon_threshold
-                    && d.due_date > now
-                    && d.deleted_at.is_none()
-            })
-            .collect()
-    };
+    let deadlines_for_due_soon: Vec<TaxDeadline> = ctx
+        .db
+        .tax_deadline()
+        .deadline_by_org()
+        .filter(&job.organization_id)
+        .filter(|d| {
+            d.status == TaxDeadlineStatus::Upcoming
+                && d.due_date <= due_soon_threshold
+                && d.due_date > now
+                && d.deleted_at.is_none()
+        })
+        .collect();
 
     for deadline in deadlines_for_due_soon {
         ctx.db.tax_deadline().id().update(TaxDeadline {
@@ -1216,10 +1210,10 @@ pub fn update_tax_deadlines(ctx: &ReducerContext, job: TaxDeadlineStatusJob) {
     let next_run = now + std::time::Duration::from_secs(24 * 60 * 60);
     ctx.db
         .tax_deadline_status_job()
-        .insert(TaxDeadlineStatusJob {
-            scheduled_id: 0, // Auto-increment
+        .scheduled_id()
+        .update(TaxDeadlineStatusJob {
             scheduled_at: ScheduleAt::Time(next_run),
-            organization_id: job.organization_id,
+            ..job
         });
 }
 
@@ -1311,20 +1305,42 @@ pub fn refresh_tax_deadline_statuses(
 
 /// Schedule the tax deadline status update job
 ///
-/// Call this reducer to start the daily scheduled updates.
-/// If a job already exists, it will be replaced.
+/// Call this reducer once per organization to start its daily scheduled update.
+/// A platform dispatcher that has authority for multiple organizations must call
+/// this reducer separately for each existing organization; no global or sentinel
+/// organization job is used. If a job already exists, it will be replaced.
 #[spacetimedb::reducer]
 pub fn schedule_tax_deadline_updates(
     ctx: &ReducerContext,
-    organization_id: Option<u64>,
+    organization_id: u64,
 ) -> Result<(), String> {
-    // Permission check - only admins can schedule system jobs
-    if let Some(org_id) = organization_id {
-        check_permission(ctx, org_id, "tax_deadline", "admin")?;
+    let organization = ctx
+        .db
+        .organization()
+        .id()
+        .find(&organization_id)
+        .ok_or("Organization not found")?;
+    if organization.organization_id != organization.id {
+        return Err("Organization root ownership is invalid".to_string());
     }
+
+    // Permission check - only admins can schedule system jobs.
+    check_permission(ctx, organization_id, "tax_deadline", "admin")?;
 
     // Schedule the first run for 1 minute from now
     let first_run = ctx.timestamp + std::time::Duration::from_secs(60);
+
+    if let Some(existing_job) = ctx
+        .db
+        .tax_deadline_status_job()
+        .organization_id()
+        .find(&organization_id)
+    {
+        ctx.db
+            .tax_deadline_status_job()
+            .scheduled_id()
+            .delete(&existing_job.scheduled_id);
+    }
 
     ctx.db
         .tax_deadline_status_job()

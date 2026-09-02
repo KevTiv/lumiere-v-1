@@ -24,6 +24,7 @@ use crate::types::{AccountMoveState, MoveType, PaymentState};
 #[spacetimedb::table(
     accessor = return_order,
     public,
+    index(accessor = return_order_by_organization, btree(columns = [organization_id])),
     index(accessor = return_order_by_company, btree(columns = [company_id]))
 )]
 pub struct ReturnOrder {
@@ -49,6 +50,7 @@ pub struct ReturnOrder {
 #[spacetimedb::table(
     accessor = return_order_line,
     public,
+    index(accessor = return_line_by_organization, btree(columns = [organization_id])),
     index(accessor = return_line_by_order, btree(columns = [return_order_id]))
 )]
 pub struct ReturnOrderLine {
@@ -399,7 +401,7 @@ pub fn create_return_order(
         validate_return_lines_against_sale_order(ctx, so_id, &params.lines, None)?;
     }
 
-    let name = next_doc_number(ctx, "RMA");
+    let name = next_doc_number(ctx, organization_id, "RMA");
 
     let return_order = ctx.db.return_order().insert(ReturnOrder {
         id: 0,
@@ -514,12 +516,7 @@ pub fn confirm_return_order(
                 lot_id: l.lot_id,
             })
             .collect();
-        validate_return_lines_against_sale_order(
-            ctx,
-            so_id,
-            &line_params,
-            Some(return_order_id),
-        )?;
+        validate_return_lines_against_sale_order(ctx, so_id, &line_params, Some(return_order_id))?;
     }
 
     let picking_id =

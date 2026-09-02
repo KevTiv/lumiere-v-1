@@ -12,6 +12,7 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = document_retention_purge_job,
+    index(accessor = document_retention_purge_job_by_organization, btree(columns = [organization_id])),
     scheduled(run_document_retention_purge)
 )]
 pub struct DocumentRetentionPurgeJob {

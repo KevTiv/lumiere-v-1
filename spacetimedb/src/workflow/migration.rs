@@ -105,6 +105,7 @@ pub struct WorkflowMigrationPlan {
 #[derive(Clone, Debug)]
 #[spacetimedb::table(
     accessor = workflow_migration_preflight,
+    index(accessor = migration_preflight_by_organization, btree(columns = [organization_id])),
     public,
     index(accessor = migration_preflight_by_plan, btree(columns = [plan_id])),
     index(accessor = migration_preflight_by_instance, btree(columns = [instance_id]))
@@ -128,6 +129,7 @@ pub struct WorkflowMigrationPreflight {
 #[derive(Clone, Debug)]
 #[spacetimedb::table(
     accessor = workflow_migration_instance_result,
+    index(accessor = migration_result_by_organization, btree(columns = [organization_id])),
     public,
     index(accessor = migration_result_by_plan, btree(columns = [plan_id])),
     index(accessor = migration_result_by_instance, btree(columns = [instance_id]))

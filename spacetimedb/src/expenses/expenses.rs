@@ -2106,7 +2106,7 @@ pub fn post_expense_sheet(
     let card_credit_with_fee = card_company + fx_fee_company;
 
     let origin = format!("EXP{sheet_id}");
-    let name = next_doc_number(ctx, "EXP");
+    let name = next_doc_number(ctx, organization_id, "EXP");
     let currency_id = sheet.currency_id;
 
     let move_record = ctx.db.account_move().insert(AccountMove {
@@ -2440,7 +2440,7 @@ pub fn create_expense_reimbursement_payment(
         .partner_id
         .or_else(|| employee_remittance_partner(ctx, sheet.employee_id));
 
-    let name = next_doc_number(ctx, "REIM");
+    let name = next_doc_number(ctx, organization_id, "REIM");
     let origin = format!("EXP{sheet_id}-REIM");
     let currency_id = source_move.currency_id;
     let company_currency_id = source_move.company_currency_id;

@@ -13,7 +13,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::{
     accounting_ownership_backfill_issue, accounting_ownership_backfill_run, record_ownership_issue,
-    AccountingOwnershipBackfillRun,
+    require_single_backfill_organization, AccountingOwnershipBackfillRun,
 };
 use crate::accounting::journal_entries::account_move;
 use crate::accounting::relations::{require_active_account, require_active_journal};
@@ -89,8 +89,7 @@ pub struct IntercompanyTransaction {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    /// Nullable only during the legacy ownership backfill.
-    pub organization_id: Option<u64>,
+    pub organization_id: u64,
     pub name: String,
     pub origin_company_id: u64,
     pub destination_company_id: u64,
@@ -128,8 +127,7 @@ pub struct IntercompanyRule {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    /// Nullable only during the legacy ownership backfill.
-    pub organization_id: Option<u64>,
+    pub organization_id: u64,
     pub name: String,
     pub rule_type: RuleType,
     pub source_company_id: u64,
@@ -240,7 +238,7 @@ fn load_intercompany_rule_in_scope(
         .id()
         .find(&rule_id)
         .ok_or("intercompany rule not found")?;
-    if rule.organization_id != Some(organization_id) {
+    if rule.organization_id != organization_id {
         return Err("intercompany rule does not belong to this organization".to_string());
     }
     validate_intercompany_companies(
@@ -268,7 +266,7 @@ fn load_intercompany_transaction_in_scope(
         .id()
         .find(&transaction_id)
         .ok_or("intercompany transaction not found")?;
-    if transaction.organization_id != Some(organization_id) {
+    if transaction.organization_id != organization_id {
         return Err("intercompany transaction does not belong to this organization".to_string());
     }
     validate_intercompany_companies(
@@ -319,7 +317,7 @@ pub fn create_intercompany_rule(
 
     let rule = ctx.db.intercompany_rule().insert(IntercompanyRule {
         id: 0,
-        organization_id: Some(organization_id),
+        organization_id,
         name: params.name.clone(),
         rule_type: params.rule_type.clone(),
         source_company_id,
@@ -615,7 +613,7 @@ pub fn create_intercompany_transaction(
         .intercompany_rule_by_source()
         .filter(&origin_company_id)
         .filter(|r| {
-            r.organization_id == Some(organization_id)
+            r.organization_id == organization_id
                 && r.destination_company_id == params.destination_company_id
                 && r.rule_type == params.transaction_type
                 && r.is_active
@@ -645,7 +643,7 @@ pub fn create_intercompany_transaction(
         .intercompany_transaction()
         .insert(IntercompanyTransaction {
             id: 0,
-            organization_id: Some(organization_id),
+            organization_id,
             name: transaction_name,
             origin_company_id,
             destination_company_id: params.destination_company_id,
@@ -1098,6 +1096,7 @@ pub fn backfill_intercompany_organization_ownership(ctx: &ReducerContext) -> Res
     if !user.is_superuser {
         return Err("only superusers may backfill accounting ownership".to_string());
     }
+    let backfill_organization_id = require_single_backfill_organization(ctx)?;
 
     let stale_issue_ids: Vec<_> = ctx
         .db
@@ -1117,7 +1116,7 @@ pub fn backfill_intercompany_organization_ownership(ctx: &ReducerContext) -> Res
     }
 
     let mut scanned_rows = 0_u64;
-    let mut backfilled_rows = 0_u64;
+    let backfilled_rows = 0_u64;
     let mut unresolved_rows = 0_u64;
 
     let rules: Vec<_> = ctx.db.intercompany_rule().iter().collect();
@@ -1137,33 +1136,25 @@ pub fn backfill_intercompany_organization_ownership(ctx: &ReducerContext) -> Res
         };
 
         match derived {
-            Ok(organization_id) if rule.organization_id == Some(organization_id) => {}
-            Ok(organization_id) if rule.organization_id.is_none() => {
-                ctx.db.intercompany_rule().id().update(IntercompanyRule {
-                    organization_id: Some(organization_id),
-                    ..rule
-                });
-                backfilled_rows += 1;
-            }
+            Ok(organization_id) if rule.organization_id == organization_id => {}
             Ok(_) | Err(_) => {
                 unresolved_rows += 1;
                 let issue = derived
                     .err()
                     .unwrap_or("stored organization conflicts with company organizations");
-                if rule.organization_id.is_some() {
-                    ctx.db.intercompany_rule().id().update(IntercompanyRule {
-                        organization_id: None,
-                        ..rule.clone()
-                    });
-                }
                 record_ownership_issue(
                     ctx,
+                    ctx.db
+                        .company()
+                        .id()
+                        .find(&rule.source_company_id)
+                        .map(|company| company.organization_id),
                     "intercompany_rule",
                     rule.id,
                     Some(rule.source_company_id),
                     Some(rule.destination_company_id),
                     issue,
-                );
+                )?;
             }
         }
     }
@@ -1189,39 +1180,25 @@ pub fn backfill_intercompany_organization_ownership(ctx: &ReducerContext) -> Res
         };
 
         match derived {
-            Ok(organization_id) if transaction.organization_id == Some(organization_id) => {}
-            Ok(organization_id) if transaction.organization_id.is_none() => {
-                ctx.db
-                    .intercompany_transaction()
-                    .id()
-                    .update(IntercompanyTransaction {
-                        organization_id: Some(organization_id),
-                        ..transaction
-                    });
-                backfilled_rows += 1;
-            }
+            Ok(organization_id) if transaction.organization_id == organization_id => {}
             Ok(_) | Err(_) => {
                 unresolved_rows += 1;
                 let issue = derived
                     .err()
                     .unwrap_or("stored organization conflicts with company organizations");
-                if transaction.organization_id.is_some() {
-                    ctx.db
-                        .intercompany_transaction()
-                        .id()
-                        .update(IntercompanyTransaction {
-                            organization_id: None,
-                            ..transaction.clone()
-                        });
-                }
                 record_ownership_issue(
                     ctx,
+                    ctx.db
+                        .company()
+                        .id()
+                        .find(&transaction.origin_company_id)
+                        .map(|company| company.organization_id),
                     "intercompany_transaction",
                     transaction.id,
                     Some(transaction.origin_company_id),
                     Some(transaction.destination_company_id),
                     issue,
-                );
+                )?;
             }
         }
     }
@@ -1230,6 +1207,7 @@ pub fn backfill_intercompany_organization_ownership(ctx: &ReducerContext) -> Res
         .accounting_ownership_backfill_run()
         .insert(AccountingOwnershipBackfillRun {
             id: 0,
+            organization_id: backfill_organization_id,
             scope: "intercompany".to_string(),
             scanned_rows,
             backfilled_rows,

@@ -14,6 +14,7 @@ use crate::helpers::check_permission;
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = opportunity_presence,
+    index(accessor = opp_presence_by_organization, btree(columns = [organization_id])),
     index(accessor = opp_presence_by_opportunity, btree(columns = [opportunity_id])),
     index(accessor = opp_presence_by_user, btree(columns = [user_id]))
 )]

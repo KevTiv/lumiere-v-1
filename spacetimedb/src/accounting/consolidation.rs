@@ -16,7 +16,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 use crate::accounting::chart_of_accounts::account_account;
 use crate::accounting::fiscal_periods::{
     account_period, accounting_ownership_backfill_issue, accounting_ownership_backfill_run,
-    record_ownership_issue, AccountingOwnershipBackfillRun,
+    record_ownership_issue, require_single_backfill_organization, AccountingOwnershipBackfillRun,
 };
 use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::core::organization::{company, require_company_in_organization};
@@ -39,8 +39,7 @@ pub struct ConsolidationAccount {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    /// Nullable only during the legacy ownership backfill.
-    pub organization_id: Option<u64>,
+    pub organization_id: u64,
     pub name: String,
     pub code: String,
     pub account_type: String, // "asset", "liability", "equity", "income", "expense"
@@ -72,8 +71,7 @@ pub struct ConsolidationJournal {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    /// Nullable only during the legacy ownership backfill.
-    pub organization_id: Option<u64>,
+    pub organization_id: u64,
     pub name: String,
     pub period_id: u64,
     pub period_name: String,
@@ -113,8 +111,7 @@ pub struct ConsolidationEliminationEntry {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    /// Nullable only during the legacy ownership backfill.
-    pub organization_id: Option<u64>,
+    pub organization_id: u64,
     pub journal_id: u64,
     pub sequence: u32,
     pub name: String,
@@ -149,8 +146,7 @@ pub struct ConsolidationCompanyRate {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    /// Nullable only during the legacy ownership backfill.
-    pub organization_id: Option<u64>,
+    pub organization_id: u64,
     pub company_id: u64,
     pub period_id: u64,
     pub currency_id: u64,
@@ -293,7 +289,7 @@ fn load_consolidation_account_in_scope(
         .id()
         .find(&account_id)
         .ok_or("consolidation account not found")?;
-    if account.organization_id != Some(organization_id) {
+    if account.organization_id != organization_id {
         return Err("consolidation account does not belong to this organization".to_string());
     }
     validate_consolidation_companies(ctx, organization_id, &account.company_ids)?;
@@ -311,7 +307,7 @@ fn load_consolidation_journal_in_scope(
         .id()
         .find(&journal_id)
         .ok_or("consolidation journal not found")?;
-    if journal.organization_id != Some(organization_id) {
+    if journal.organization_id != organization_id {
         return Err("consolidation journal does not belong to this organization".to_string());
     }
     validate_consolidation_companies(ctx, organization_id, &journal.company_ids)?;
@@ -329,7 +325,7 @@ fn load_elimination_entry_in_scope(
         .id()
         .find(&entry_id)
         .ok_or("consolidation elimination entry not found")?;
-    if entry.organization_id != Some(organization_id) {
+    if entry.organization_id != organization_id {
         return Err(
             "consolidation elimination entry does not belong to this organization".to_string(),
         );
@@ -386,7 +382,7 @@ pub fn create_consolidation_account(
 
     let account = ctx.db.consolidation_account().insert(ConsolidationAccount {
         id: 0,
-        organization_id: Some(organization_id),
+        organization_id,
         name: params.name.clone(),
         code: params.code.clone(),
         account_type: params.account_type.clone(),
@@ -572,14 +568,14 @@ pub fn create_consolidation_journal(
         .id()
         .find(&params.period_id)
         .ok_or("consolidation period not found")?;
-    if period.organization_id != Some(organization_id) {
+    if period.organization_id != organization_id {
         return Err("consolidation period does not belong to this organization".to_string());
     }
     let period_name = period.name.clone();
 
     let journal = ctx.db.consolidation_journal().insert(ConsolidationJournal {
         id: 0,
-        organization_id: Some(organization_id),
+        organization_id,
         name: params.name.clone(),
         period_id: params.period_id,
         period_name,
@@ -699,7 +695,7 @@ pub fn create_elimination_entry(
         .consolidation_elimination_entry()
         .elimination_by_journal()
         .filter(&params.journal_id)
-        .filter(|entry| entry.organization_id == Some(organization_id))
+        .filter(|entry| entry.organization_id == organization_id)
         .count() as u32
         + 1;
 
@@ -708,7 +704,7 @@ pub fn create_elimination_entry(
         .consolidation_elimination_entry()
         .insert(ConsolidationEliminationEntry {
             id: 0,
-            organization_id: Some(organization_id),
+            organization_id,
             journal_id: params.journal_id,
             sequence,
             name: params.name.clone(),
@@ -952,7 +948,7 @@ pub fn set_consolidation_company_rate(
         .next();
 
     let rate = if let Some(mut existing_rate) = existing {
-        if existing_rate.organization_id != Some(organization_id) {
+        if existing_rate.organization_id != organization_id {
             return Err(
                 "consolidation company rate does not belong to this organization".to_string(),
             );
@@ -971,7 +967,7 @@ pub fn set_consolidation_company_rate(
             .consolidation_company_rate()
             .insert(ConsolidationCompanyRate {
                 id: 0,
-                organization_id: Some(organization_id),
+                organization_id,
                 company_id: params.company_id,
                 period_id: params.period_id,
                 currency_id: params.currency_id,
@@ -1123,6 +1119,7 @@ pub fn backfill_consolidation_organization_ownership(ctx: &ReducerContext) -> Re
     if !user.is_superuser {
         return Err("only superusers may backfill accounting ownership".to_string());
     }
+    let backfill_organization_id = require_single_backfill_organization(ctx)?;
 
     let stale_issue_ids: Vec<_> = ctx
         .db
@@ -1147,7 +1144,7 @@ pub fn backfill_consolidation_organization_ownership(ctx: &ReducerContext) -> Re
     }
 
     let mut scanned_rows = 0_u64;
-    let mut backfilled_rows = 0_u64;
+    let backfilled_rows = 0_u64;
     let mut unresolved_rows = 0_u64;
 
     let accounts: Vec<_> = ctx.db.consolidation_account().iter().collect();
@@ -1155,39 +1152,27 @@ pub fn backfill_consolidation_organization_ownership(ctx: &ReducerContext) -> Re
         scanned_rows += 1;
         let derived = derive_organization_from_company_ids(ctx, &account.company_ids);
         match derived {
-            Ok(organization_id) if account.organization_id == Some(organization_id) => {}
-            Ok(organization_id) if account.organization_id.is_none() => {
-                ctx.db
-                    .consolidation_account()
-                    .id()
-                    .update(ConsolidationAccount {
-                        organization_id: Some(organization_id),
-                        ..account
-                    });
-                backfilled_rows += 1;
-            }
+            Ok(organization_id) if account.organization_id == organization_id => {}
             Ok(_) | Err(_) => {
                 unresolved_rows += 1;
                 let issue = derived
                     .err()
                     .unwrap_or("stored organization conflicts with company set");
-                if account.organization_id.is_some() {
-                    ctx.db
-                        .consolidation_account()
-                        .id()
-                        .update(ConsolidationAccount {
-                            organization_id: None,
-                            ..account.clone()
-                        });
-                }
                 record_ownership_issue(
                     ctx,
+                    account.company_ids.first().and_then(|company_id| {
+                        ctx.db
+                            .company()
+                            .id()
+                            .find(company_id)
+                            .map(|company| company.organization_id)
+                    }),
                     "consolidation_account",
                     account.id,
                     account.company_ids.first().copied(),
                     None,
                     issue,
-                );
+                )?;
             }
         }
     }
@@ -1197,39 +1182,27 @@ pub fn backfill_consolidation_organization_ownership(ctx: &ReducerContext) -> Re
         scanned_rows += 1;
         let derived = derive_organization_from_company_ids(ctx, &journal.company_ids);
         match derived {
-            Ok(organization_id) if journal.organization_id == Some(organization_id) => {}
-            Ok(organization_id) if journal.organization_id.is_none() => {
-                ctx.db
-                    .consolidation_journal()
-                    .id()
-                    .update(ConsolidationJournal {
-                        organization_id: Some(organization_id),
-                        ..journal
-                    });
-                backfilled_rows += 1;
-            }
+            Ok(organization_id) if journal.organization_id == organization_id => {}
             Ok(_) | Err(_) => {
                 unresolved_rows += 1;
                 let issue = derived
                     .err()
                     .unwrap_or("stored organization conflicts with company set");
-                if journal.organization_id.is_some() {
-                    ctx.db
-                        .consolidation_journal()
-                        .id()
-                        .update(ConsolidationJournal {
-                            organization_id: None,
-                            ..journal.clone()
-                        });
-                }
                 record_ownership_issue(
                     ctx,
+                    journal.company_ids.first().and_then(|company_id| {
+                        ctx.db
+                            .company()
+                            .id()
+                            .find(company_id)
+                            .map(|company| company.organization_id)
+                    }),
                     "consolidation_journal",
                     journal.id,
                     journal.company_ids.first().copied(),
                     None,
                     issue,
-                );
+                )?;
             }
         }
     }
@@ -1244,9 +1217,6 @@ pub fn backfill_consolidation_organization_ownership(ctx: &ReducerContext) -> Re
             .map(|company_id| ctx.db.company().id().find(&company_id));
         let derived = match (journal, company, counterparty) {
             (None, _, _) => Err("parent consolidation journal not found"),
-            (Some(journal), _, _) if journal.organization_id.is_none() => {
-                Err("parent consolidation journal ownership is unresolved")
-            }
             (Some(_), None, _) => Err("entry company not found"),
             (Some(_), Some(_), Some(None)) => Err("counterparty company not found"),
             (Some(journal), Some(company), _)
@@ -1260,52 +1230,38 @@ pub fn backfill_consolidation_organization_ownership(ctx: &ReducerContext) -> Re
                 Err("counterparty company is not in parent consolidation journal")
             }
             (Some(journal), Some(company), _)
-                if journal.organization_id != Some(company.organization_id) =>
+                if journal.organization_id != company.organization_id =>
             {
                 Err("entry company organization conflicts with parent journal")
             }
             (Some(journal), Some(_), Some(Some(counterparty)))
-                if journal.organization_id != Some(counterparty.organization_id) =>
+                if journal.organization_id != counterparty.organization_id =>
             {
                 Err("counterparty organization conflicts with parent journal")
             }
-            (Some(journal), Some(_), _) => journal
-                .organization_id
-                .ok_or("parent consolidation journal ownership is unresolved"),
+            (Some(journal), Some(_), _) => Ok(journal.organization_id),
         };
 
         match derived {
-            Ok(organization_id) if entry.organization_id == Some(organization_id) => {}
-            Ok(organization_id) if entry.organization_id.is_none() => {
-                ctx.db.consolidation_elimination_entry().id().update(
-                    ConsolidationEliminationEntry {
-                        organization_id: Some(organization_id),
-                        ..entry
-                    },
-                );
-                backfilled_rows += 1;
-            }
+            Ok(organization_id) if entry.organization_id == organization_id => {}
             Ok(_) | Err(_) => {
                 unresolved_rows += 1;
                 let issue = derived
                     .err()
                     .unwrap_or("stored organization conflicts with parent journal");
-                if entry.organization_id.is_some() {
-                    ctx.db.consolidation_elimination_entry().id().update(
-                        ConsolidationEliminationEntry {
-                            organization_id: None,
-                            ..entry.clone()
-                        },
-                    );
-                }
                 record_ownership_issue(
                     ctx,
+                    ctx.db
+                        .company()
+                        .id()
+                        .find(&entry.company_id)
+                        .map(|company| company.organization_id),
                     "consolidation_elimination_entry",
                     entry.id,
                     Some(entry.company_id),
                     Some(entry.journal_id),
                     issue,
-                );
+                )?;
             }
         }
     }
@@ -1321,39 +1277,25 @@ pub fn backfill_consolidation_organization_ownership(ctx: &ReducerContext) -> Re
             .map(|company| company.organization_id)
             .ok_or("company not found");
         match derived {
-            Ok(organization_id) if rate.organization_id == Some(organization_id) => {}
-            Ok(organization_id) if rate.organization_id.is_none() => {
-                ctx.db
-                    .consolidation_company_rate()
-                    .id()
-                    .update(ConsolidationCompanyRate {
-                        organization_id: Some(organization_id),
-                        ..rate
-                    });
-                backfilled_rows += 1;
-            }
+            Ok(organization_id) if rate.organization_id == organization_id => {}
             Ok(_) | Err(_) => {
                 unresolved_rows += 1;
                 let issue = derived
                     .err()
                     .unwrap_or("stored organization conflicts with company organization");
-                if rate.organization_id.is_some() {
-                    ctx.db
-                        .consolidation_company_rate()
-                        .id()
-                        .update(ConsolidationCompanyRate {
-                            organization_id: None,
-                            ..rate.clone()
-                        });
-                }
                 record_ownership_issue(
                     ctx,
+                    ctx.db
+                        .company()
+                        .id()
+                        .find(&rate.company_id)
+                        .map(|company| company.organization_id),
                     "consolidation_company_rate",
                     rate.id,
                     Some(rate.company_id),
                     None,
                     issue,
-                );
+                )?;
             }
         }
     }
@@ -1362,6 +1304,7 @@ pub fn backfill_consolidation_organization_ownership(ctx: &ReducerContext) -> Re
         .accounting_ownership_backfill_run()
         .insert(AccountingOwnershipBackfillRun {
             id: 0,
+            organization_id: backfill_organization_id,
             scope: "consolidation".to_string(),
             scanned_rows,
             backfilled_rows,

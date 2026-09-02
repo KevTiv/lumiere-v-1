@@ -1,12 +1,12 @@
 //! Inventory period close — snapshot quants, lock stock mutations, optional GL valuation.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, AccountMove, AccountMoveLine,
 };
 use crate::accounting::relations::{require_active_account, require_active_journal};
-use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::core::organization::{company, require_company_in_organization};
 use crate::core::reference::require_active_currency_by_id;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
@@ -262,7 +262,7 @@ fn post_close_valuation_move(
     )?;
 
     let amount = total_value.abs();
-    let name = next_doc_number(ctx, "INVCLS");
+    let name = next_doc_number(ctx, organization_id, "INVCLS");
     let company = ctx
         .db
         .company()

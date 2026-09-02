@@ -12,10 +12,6 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::analytic_accounting::account_analytic_account;
-use crate::accounting::fiscal_periods::{
-    accounting_ownership_backfill_issue, accounting_ownership_backfill_run, record_ownership_issue,
-    AccountingOwnershipBackfillRun,
-};
 use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::journal_entries::account_move;
 use crate::accounting::relations::{
@@ -46,8 +42,7 @@ pub struct AccountAsset {
     pub code: String,
     pub name: String,
     pub active: bool,
-    /// Nullable only during the legacy ownership backfill.
-    pub organization_id: Option<u64>,
+    pub organization_id: u64,
     pub company_id: u64,
     pub state: AssetState,
     pub asset_type: AssetType,
@@ -115,9 +110,8 @@ pub struct AccountAssetDepreciationLine {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    /// Nullable only during the legacy ownership backfill.
-    pub organization_id: Option<u64>,
-    /// Derived from the parent asset; nullable only during the legacy ownership backfill.
+    pub organization_id: u64,
+    /// Derived from the parent asset and required for tenant isolation.
     pub company_id: Option<u64>,
     pub asset_id: u64,
     pub name: Option<String>,
@@ -236,7 +230,7 @@ fn validate_asset_parent(
         .id()
         .find(&parent_id)
         .ok_or("parent asset not found")?;
-    if parent.organization_id != Some(organization_id) {
+    if parent.organization_id != organization_id {
         return Err("parent asset does not belong to this organization".to_string());
     }
     if parent.company_id != company_id {
@@ -273,7 +267,7 @@ fn load_asset_in_scope(
         .id()
         .find(&asset_id)
         .ok_or("asset not found")?;
-    if asset.organization_id != Some(organization_id) {
+    if asset.organization_id != organization_id {
         return Err("asset does not belong to this organization".to_string());
     }
     if asset.company_id != company_id {
@@ -295,9 +289,10 @@ fn load_depreciation_lines_in_scope(
         .depreciation_line_by_asset()
         .filter(&asset_id)
         .collect();
-    if lines.iter().any(|line| {
-        line.organization_id != Some(organization_id) || line.company_id != Some(company_id)
-    }) {
+    if lines
+        .iter()
+        .any(|line| line.organization_id != organization_id || line.company_id != Some(company_id))
+    {
         return Err("asset depreciation line scope conflicts with parent".to_string());
     }
     Ok(lines)
@@ -429,7 +424,7 @@ pub fn create_account_asset(
         code: params.code.clone(),
         name: params.name.clone(),
         active: params.active,
-        organization_id: Some(organization_id),
+        organization_id,
         company_id,
         state: AssetState::Draft,
         asset_type: params.asset_type,
@@ -1024,7 +1019,7 @@ pub fn create_depreciation_line(
         .account_asset_depreciation_line()
         .insert(AccountAssetDepreciationLine {
             id: 0,
-            organization_id: Some(organization_id),
+            organization_id,
             company_id: Some(company_id),
             asset_id: params.asset_id,
             name: Some(line_name),
@@ -1169,7 +1164,7 @@ pub fn compute_depreciation_board(
             .account_asset_depreciation_line()
             .insert(AccountAssetDepreciationLine {
                 id: 0,
-                organization_id: Some(organization_id),
+                organization_id,
                 company_id: Some(company_id),
                 asset_id,
                 name: Some(format!("Depreciation {}/{}", asset.code, sequence)),
@@ -1314,10 +1309,7 @@ pub fn set_asset_active(
     Ok(())
 }
 
-/// Backfill fixed-asset ownership from company and parent relations.
-///
-/// Rows with missing or conflicting provenance remain at `organization_id = None`.
-/// Every mutation loader rejects those quarantined rows.
+/// Validate fixed-asset ownership from company and parent relations.
 #[spacetimedb::reducer]
 pub fn backfill_fixed_asset_organization_ownership(ctx: &ReducerContext) -> Result<(), String> {
     let user = ctx
@@ -1329,151 +1321,48 @@ pub fn backfill_fixed_asset_organization_ownership(ctx: &ReducerContext) -> Resu
     if !user.is_superuser {
         return Err("only superusers may backfill accounting ownership".to_string());
     }
-
-    let stale_issue_ids: Vec<_> = ctx
-        .db
-        .accounting_ownership_backfill_issue()
-        .iter()
-        .filter(|issue| {
-            issue.table_name == "account_asset"
-                || issue.table_name == "account_asset_depreciation_line"
-        })
-        .map(|issue| issue.id)
-        .collect();
-    for issue_id in stale_issue_ids {
-        ctx.db
-            .accounting_ownership_backfill_issue()
+    for asset in ctx.db.account_asset().iter() {
+        let company = ctx
+            .db
+            .company()
             .id()
-            .delete(&issue_id);
-    }
-
-    let mut scanned_rows = 0_u64;
-    let mut backfilled_rows = 0_u64;
-    let mut unresolved_rows = 0_u64;
-
-    let mut assets: Vec<_> = ctx.db.account_asset().iter().collect();
-    assets.sort_by_key(|asset| asset.id);
-    for asset in assets {
-        scanned_rows += 1;
-        let company = ctx.db.company().id().find(&asset.company_id);
-        let parent = asset
-            .parent_id
-            .and_then(|parent_id| ctx.db.account_asset().id().find(&parent_id));
-
-        let derived_organization_id = match (company, asset.parent_id, parent) {
-            (None, _, _) => Err("company not found"),
-            (Some(_), Some(_), None) => Err("parent asset not found"),
-            (Some(_), Some(_), Some(parent)) if parent.company_id != asset.company_id => {
-                Err("asset company conflicts with parent asset company")
-            }
-            (Some(company), Some(_), Some(parent))
-                if parent.organization_id != Some(company.organization_id) =>
+            .find(&asset.company_id)
+            .ok_or_else(|| format!("asset {} references a missing company", asset.id))?;
+        if asset.organization_id != company.organization_id {
+            return Err(format!(
+                "asset {} organization conflicts with company",
+                asset.id
+            ));
+        }
+        if let Some(parent_id) = asset.parent_id {
+            let parent = ctx
+                .db
+                .account_asset()
+                .id()
+                .find(&parent_id)
+                .ok_or_else(|| format!("asset {} references a missing parent", asset.id))?;
+            if parent.company_id != asset.company_id
+                || parent.organization_id != asset.organization_id
             {
-                Err("parent asset ownership is unresolved or conflicts with company organization")
-            }
-            (Some(company), _, _) => Ok(company.organization_id),
-        };
-
-        match derived_organization_id {
-            Ok(organization_id) if asset.organization_id == Some(organization_id) => {}
-            Ok(organization_id) if asset.organization_id.is_none() => {
-                ctx.db.account_asset().id().update(AccountAsset {
-                    organization_id: Some(organization_id),
-                    ..asset
-                });
-                backfilled_rows += 1;
-            }
-            Ok(_) | Err(_) => {
-                unresolved_rows += 1;
-                let issue = derived_organization_id
-                    .err()
-                    .unwrap_or("stored organization conflicts with derived organization");
-                if asset.organization_id.is_some() {
-                    ctx.db.account_asset().id().update(AccountAsset {
-                        organization_id: None,
-                        ..asset.clone()
-                    });
-                }
-                record_ownership_issue(
-                    ctx,
-                    "account_asset",
-                    asset.id,
-                    Some(asset.company_id),
-                    asset.parent_id,
-                    issue,
-                );
+                return Err(format!("asset {} parent ownership conflicts", asset.id));
             }
         }
     }
-
-    let depreciation_lines: Vec<_> = ctx.db.account_asset_depreciation_line().iter().collect();
-    for line in depreciation_lines {
-        scanned_rows += 1;
-        let asset = ctx.db.account_asset().id().find(&line.asset_id);
-        let derived_scope = match asset {
-            None => Err("parent asset not found"),
-            Some(asset) => asset
-                .organization_id
-                .map(|organization_id| (organization_id, asset.company_id))
-                .ok_or("parent asset ownership is unresolved"),
-        };
-
-        match derived_scope {
-            Ok((organization_id, company_id))
-                if line.organization_id == Some(organization_id)
-                    && line.company_id == Some(company_id) => {}
-            Ok((organization_id, company_id))
-                if line.organization_id.is_none() || line.company_id.is_none() =>
-            {
-                ctx.db.account_asset_depreciation_line().id().update(
-                    AccountAssetDepreciationLine {
-                        organization_id: Some(organization_id),
-                        company_id: Some(company_id),
-                        ..line
-                    },
-                );
-                backfilled_rows += 1;
-            }
-            Ok(_) | Err(_) => {
-                unresolved_rows += 1;
-                let issue = derived_scope
-                    .err()
-                    .unwrap_or("stored scope conflicts with parent asset scope");
-                if line.organization_id.is_some() || line.company_id.is_some() {
-                    ctx.db.account_asset_depreciation_line().id().update(
-                        AccountAssetDepreciationLine {
-                            organization_id: None,
-                            company_id: None,
-                            ..line.clone()
-                        },
-                    );
-                }
-                record_ownership_issue(
-                    ctx,
-                    "account_asset_depreciation_line",
-                    line.id,
-                    line.company_id,
-                    Some(line.asset_id),
-                    issue,
-                );
-            }
+    for line in ctx.db.account_asset_depreciation_line().iter() {
+        let asset = ctx
+            .db
+            .account_asset()
+            .id()
+            .find(&line.asset_id)
+            .ok_or_else(|| format!("depreciation line {} references a missing asset", line.id))?;
+        if line.organization_id != asset.organization_id
+            || line.company_id != Some(asset.company_id)
+        {
+            return Err(format!(
+                "depreciation line {} ownership conflicts with asset",
+                line.id
+            ));
         }
     }
-
-    ctx.db
-        .accounting_ownership_backfill_run()
-        .insert(AccountingOwnershipBackfillRun {
-            id: 0,
-            scope: "fixed_assets".to_string(),
-            scanned_rows,
-            backfilled_rows,
-            unresolved_rows,
-            completed_at: ctx.timestamp,
-            completed_by: ctx.sender(),
-        });
-
-    log::info!(
-        "accounting fixed asset ownership backfill: scanned={scanned_rows} backfilled={backfilled_rows} unresolved={unresolved_rows}"
-    );
     Ok(())
 }

@@ -29,6 +29,7 @@ pub struct ContactDuplicateCandidate {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    #[index(btree)]
     pub organization_id: u64,
     pub company_id: u64,
     pub contact_id_a: u64,

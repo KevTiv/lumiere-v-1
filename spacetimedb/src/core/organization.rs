@@ -164,11 +164,22 @@ pub(crate) fn new_external_id(ctx: &ReducerContext) -> String {
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
-#[spacetimedb::table(accessor = organization, public)]
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = organization,
+    public,
+    index(
+        accessor = organization_by_organization_id,
+        btree(columns = [organization_id])
+    )
+)]
 pub struct Organization {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// The organization root owns itself; this is populated immediately after
+    /// the auto-incremented row is inserted.
+    pub organization_id: u64,
     /// Opaque token for APIs; never enumerate internal `id`.
     pub external_id: String,
     pub name: String,
@@ -188,7 +199,11 @@ pub struct Organization {
     pub metadata: Option<String>,
 }
 
-#[spacetimedb::table(accessor = organization_settings, public)]
+#[spacetimedb::table(
+    accessor = organization_settings,
+    public,
+    index(accessor = organization_settings_by_organization, btree(columns = [organization_id]))
+)]
 pub struct OrganizationSettings {
     #[primary_key]
     #[auto_inc]
@@ -275,6 +290,9 @@ pub(crate) fn insert_organization_with_owner(
 
     let org = ctx.db.organization().insert(Organization {
         id: 0,
+        // SpacetimeDB assigns the auto-incremented id on insert. The row is
+        // repaired to the self-owning value immediately below.
+        organization_id: 0,
         external_id: new_external_id(ctx),
         name: params.name,
         code: params.code,
@@ -292,6 +310,12 @@ pub(crate) fn insert_organization_with_owner(
         updated_at: ctx.timestamp,
         metadata: params.metadata,
     });
+
+    let org = Organization {
+        organization_id: org.id,
+        ..org
+    };
+    ctx.db.organization().id().update(org.clone());
 
     let owner_role = ctx.db.role().insert(Role {
         id: 0,

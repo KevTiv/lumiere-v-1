@@ -287,7 +287,7 @@ pub fn create_bad_debt_write_off(
         return Err("bad-debt write-off account must be an expense account".to_string());
     }
 
-    let name = next_doc_number(ctx, "BDEBT");
+    let name = next_doc_number(ctx, organization_id, "BDEBT");
     let currency_id = source.currency_id;
     let amount = params.amount;
 

@@ -151,6 +151,7 @@ pub struct WorkflowCandidateGroupMember {
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = workflow_human_task_candidate,
+    index(accessor = human_task_candidate_by_organization, btree(columns = [organization_id])),
     index(accessor = human_task_candidate_by_task, btree(columns = [task_id])),
     index(accessor = human_task_candidate_by_identity, btree(columns = [candidate_identity]))
 )]
@@ -208,6 +209,7 @@ pub struct WorkflowHumanTaskEvent {
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = workflow_human_task_receipt,
+    index(accessor = human_task_receipt_by_organization, btree(columns = [organization_id])),
     index(accessor = human_task_receipt_by_task, btree(columns = [task_id]))
 )]
 pub struct WorkflowHumanTaskReceipt {

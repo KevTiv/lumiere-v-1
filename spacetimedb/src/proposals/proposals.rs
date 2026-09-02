@@ -246,6 +246,7 @@ pub struct ProposalSourceDoc {
 #[spacetimedb::table(
     accessor = proposal_line_item,
     public,
+    index(accessor = line_item_by_organization, btree(columns = [organization_id])),
     index(accessor = line_item_by_proposal, btree(columns = [proposal_id])),
     index(accessor = line_item_by_section, btree(columns = [section_id]))
 )]
@@ -276,6 +277,7 @@ pub struct ProposalLineItem {
 #[spacetimedb::table(
     accessor = proposal_presence,
     public,
+    index(accessor = presence_by_organization, btree(columns = [organization_id])),
     index(accessor = presence_by_proposal, btree(columns = [proposal_id])),
     index(accessor = presence_by_user, btree(columns = [user_id]))
 )]
@@ -296,6 +298,7 @@ pub struct ProposalPresence {
 #[spacetimedb::table(
     accessor = proposal_comment,
     public,
+    index(accessor = comment_by_organization, btree(columns = [organization_id])),
     index(accessor = comment_by_proposal, btree(columns = [proposal_id])),
     index(accessor = comment_by_section, btree(columns = [section_id]))
 )]

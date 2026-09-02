@@ -9,6 +9,7 @@ use crate::documents::knowledge::knowledge_article;
 #[spacetimedb::table(
     accessor = document_presence,
     public,
+    index(accessor = doc_presence_by_organization, btree(columns = [organization_id])),
     index(accessor = doc_presence_by_document, btree(columns = [document_id])),
     index(accessor = doc_presence_by_user, btree(columns = [user_id]))
 )]
@@ -27,6 +28,7 @@ pub struct DocumentPresence {
 #[spacetimedb::table(
     accessor = knowledge_article_presence,
     public,
+    index(accessor = article_presence_by_organization, btree(columns = [organization_id])),
     index(accessor = article_presence_by_article, btree(columns = [article_id])),
     index(accessor = article_presence_by_user, btree(columns = [user_id]))
 )]
