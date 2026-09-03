@@ -149,7 +149,13 @@ def verify_operation_history(root: Path, contracts: Path, manifest: dict[str, An
     verifier = root / "scripts" / "verify-operation-history.py"
     require(verifier.is_file(), "operation history verifier is missing")
     result = subprocess.run(
-        [sys.executable, str(verifier), str(ir_path), str(history_path)],
+        [
+            sys.executable,
+            str(verifier),
+            str(ir_path),
+            str(history_path),
+            "--allow-previous-compatibility",
+        ],
         cwd=root,
         capture_output=True,
         text=True,

@@ -212,7 +212,12 @@ def _validate_history(history: dict[str, Any]) -> None:
             fail(f"compatibility exception {index} reason must be non-empty")
 
 
-def verify(ir_path: Path, history_path: Path) -> None:
+def verify(
+    ir_path: Path,
+    history_path: Path,
+    *,
+    allow_previous_compatibility: bool = False,
+) -> None:
     """Verify ``history_path`` against the pinned IR at ``ir_path``."""
 
     ir = _load_json(ir_path, "IR")
@@ -267,7 +272,15 @@ def verify(ir_path: Path, history_path: Path) -> None:
         if actual == expected:
             if operation_id in exceptions:
                 exception = exceptions[operation_id]
-                if exception["previous_fingerprint"] != expected or exception["current_fingerprint"] != actual:
+                is_previous_release = (
+                    allow_previous_compatibility
+                    and exception["previous_fingerprint"] == actual
+                    and exception["current_fingerprint"] != actual
+                )
+                if not is_previous_release and (
+                    exception["previous_fingerprint"] != expected
+                    or exception["current_fingerprint"] != actual
+                ):
                     fail(f"compatibility exception for {operation_id} does not match the recorded shape")
             continue
         exception = exceptions.get(operation_id)
@@ -320,13 +333,22 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="write a deterministic history from the IR before verifying it",
     )
+    parser.add_argument(
+        "--allow-previous-compatibility",
+        action="store_true",
+        help="allow a pinned release IR to match the previous side of an explicit compatibility exception",
+    )
     args = parser.parse_args(argv)
     try:
         if args.write_history:
             args.history.write_text(
                 json.dumps(build_history(args.ir), indent=2) + "\n", encoding="utf-8"
             )
-        verify(args.ir, args.history)
+        verify(
+            args.ir,
+            args.history,
+            allow_previous_compatibility=args.allow_previous_compatibility,
+        )
     except (OperationHistoryError, OSError) as error:
         print(error, file=sys.stderr)
         return 1

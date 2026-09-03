@@ -46,6 +46,41 @@ use crate::state::AppState;
 const CODEC_MANIFEST_JSON: &str = lumiere_contracts::manifests::CODEC_MANIFEST;
 const TABLE: &str = "pos_order";
 const COLD_TABLE: &str = "cold_pos_order";
+const COLD_ROW_PROOF_SQL: &str = "SELECT archive_version::TEXT, payload_checksum \
+     FROM cold_pos_order \
+     WHERE organization_id = $1::TEXT::NUMERIC \
+       AND id = $2::TEXT::NUMERIC";
+const DURABILITY_PROOF_SQL: &str =
+    "SELECT projected.archive_version::TEXT, projected.cold_eligible_at, \
+     change.commit_sequence::TEXT, watermark.applied_sequence::TEXT, \
+     envelope.change_schema_version, envelope.contract_version \
+     FROM pos_order projected \
+     JOIN LATERAL ( \
+         SELECT organization_id, commit_sequence \
+         FROM organization_row_change \
+         WHERE organization_id = $1::TEXT::NUMERIC \
+           AND table_name = 'pos_order' \
+           AND row_identity_json = $3::JSONB \
+           AND change_kind = 'upsert' \
+         ORDER BY commit_sequence DESC \
+         LIMIT 1 \
+     ) change ON TRUE \
+     JOIN organization_projection_watermark watermark \
+       ON watermark.organization_id = projected.organization_id \
+      AND watermark.applied_sequence >= change.commit_sequence \
+     JOIN organization_commit envelope \
+       ON envelope.organization_id = change.organization_id \
+      AND envelope.sequence = change.commit_sequence \
+     WHERE projected.organization_id = $1::TEXT::NUMERIC \
+       AND projected.id = $2::TEXT::NUMERIC";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DurableProjectionProof {
+    row_commit_sequence: u64,
+    durable_watermark: u64,
+    change_schema_version: u32,
+    contract_version: String,
+}
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct DrainStats {
@@ -118,14 +153,41 @@ async fn drain_one(
     let values = pg_codec::decode_row(columns, raw)?;
     let checksum = pg_codec::checksum_for(columns, &values);
 
+    let durability = verify_durable_projection(
+        pool,
+        organization_id,
+        id,
+        archive_version,
+        cold_eligible_at_micros,
+    )
+    .await?;
+
     {
         let client = pool
             .get()
             .await
             .context("get PG client for cold_pos_order upsert")?;
-        pg_codec::upsert_row(&client, COLD_TABLE, columns, &values, &checksum)
+        let affected = pg_codec::upsert_row(&client, COLD_TABLE, columns, &values, &checksum)
             .await
             .context("upsert cold_pos_order")?;
+        if affected == 0 {
+            let organization_id = organization_id.to_string();
+            let id_text = id.to_string();
+            let archived = client
+                .query_opt(COLD_ROW_PROOF_SQL, &[&organization_id, &id_text])
+                .await
+                .context("verify existing cold_pos_order retry")?
+                .ok_or_else(|| {
+                    anyhow!("pos_order {id}: cold UPSERT was a no-op but no archived row exists")
+                })?;
+            let archived_version: String = archived.get(0);
+            let archived_checksum: String = archived.get(1);
+            if archived_version != archive_version.to_string() || archived_checksum != checksum {
+                return Err(anyhow!(
+                    "pos_order {id}: cold UPSERT was a no-op without an exact version/checksum match"
+                ));
+            }
+        }
     }
 
     ledger::record_transfer(
@@ -141,7 +203,15 @@ async fn drain_one(
 
     stdb.call_reducer(stdb_client::reducer_call!(
         "finalize_pos_order_archive",
-        json!([id, archive_version, cold_eligible_at_micros]),
+        json!([
+            id,
+            archive_version,
+            cold_eligible_at_micros,
+            durability.row_commit_sequence,
+            durability.durable_watermark,
+            durability.change_schema_version,
+            durability.contract_version
+        ]),
     ))
     .await
     .context("call finalize_pos_order_archive")?;
@@ -151,6 +221,60 @@ async fn drain_one(
         .context("mark archive_transfer finalized")?;
 
     Ok(())
+}
+
+/// Prove that the generalized projector has durably applied the exact row
+/// version before the archive worker is allowed to ask STDB to delete it.
+///
+/// The latest matching row change supplies the source commit sequence; the
+/// organization watermark proves that commit and its projected row landed in
+/// one PG transaction. Rows created before ordered commit capture deliberately
+/// remain hot because there is no exact durability proof for them.
+async fn verify_durable_projection(
+    pool: &Pool,
+    organization_id: u64,
+    id: u64,
+    archive_version: u64,
+    cold_eligible_at_micros: i64,
+) -> Result<DurableProjectionProof> {
+    let client = pool
+        .get()
+        .await
+        .context("get PG client for pos_order durability proof")?;
+    let identity = json!({"id": id}).to_string();
+    let organization_id = organization_id.to_string();
+    let id = id.to_string();
+    let archive_version = archive_version.to_string();
+    let row = client
+        .query_opt(DURABILITY_PROOF_SQL, &[&organization_id, &id, &identity])
+        .await
+        .context("query pos_order durable projection proof")?
+        .ok_or_else(|| {
+            anyhow!("pos_order {id}: exact durable projection and watermark are not yet available")
+        })?;
+    let durable_version: String = row.get(0);
+    let durable_eligible_at: Option<i64> = row.get(1);
+    let durable_sequence: String = row.get(2);
+    if durable_version != archive_version || durable_eligible_at != Some(cold_eligible_at_micros) {
+        return Err(anyhow!(
+            "pos_order {id}: durable version mismatch at commit {durable_sequence}; expected version {archive_version} and eligibility {cold_eligible_at_micros}, found version {durable_version} and eligibility {durable_eligible_at:?}"
+        ));
+    }
+    let durable_watermark: String = row.get(3);
+    let change_schema_version: i32 = row.get(4);
+    let contract_version: String = row.get(5);
+    Ok(DurableProjectionProof {
+        row_commit_sequence: durable_sequence
+            .parse()
+            .context("parse durable row commit sequence")?,
+        durable_watermark: durable_watermark
+            .parse()
+            .context("parse durable projection watermark")?,
+        change_schema_version: change_schema_version
+            .try_into()
+            .context("durable change schema version is negative")?,
+        contract_version,
+    })
 }
 
 fn require_u64(row: &Value, field: &str) -> Result<u64> {
@@ -266,5 +390,21 @@ mod tests {
     fn require_u64_rejects_missing_field_instead_of_defaulting() {
         let err = require_u64(&json!({}), "id").unwrap_err();
         assert!(err.to_string().contains("pos_order.id"));
+    }
+
+    #[test]
+    fn durability_proof_requires_exact_identity_version_and_watermark() {
+        assert!(DURABILITY_PROOF_SQL.contains("row_identity_json = $3::JSONB"));
+        assert!(
+            DURABILITY_PROOF_SQL.contains("watermark.applied_sequence >= change.commit_sequence")
+        );
+        assert!(DURABILITY_PROOF_SQL.contains("envelope.sequence = change.commit_sequence"));
+        assert!(DURABILITY_PROOF_SQL.contains("envelope.change_schema_version"));
+        assert!(DURABILITY_PROOF_SQL.contains("envelope.contract_version"));
+        assert!(DURABILITY_PROOF_SQL.contains("projected.organization_id = $1::TEXT::NUMERIC"));
+        assert!(DURABILITY_PROOF_SQL.contains("projected.id = $2::TEXT::NUMERIC"));
+        assert!(COLD_ROW_PROOF_SQL.contains("archive_version::TEXT"));
+        assert!(COLD_ROW_PROOF_SQL.contains("payload_checksum"));
+        assert!(COLD_ROW_PROOF_SQL.contains("organization_id = $1::TEXT::NUMERIC"));
     }
 }

@@ -2638,6 +2638,10 @@ const PARAMS_561: &[ReducerParam] = &[
     ReducerParam { name: "id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "expected_archive_version", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "expected_cold_eligible_at_micros", kind: ScalarKind::SignedInteger, ref_target: None },
+    ReducerParam { name: "row_commit_sequence", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "durable_watermark", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "durable_change_schema_version", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "durable_contract_version", kind: ScalarKind::String, ref_target: None },
 ];
 const PARAMS_562: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },

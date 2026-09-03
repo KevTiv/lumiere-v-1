@@ -13,8 +13,9 @@
 //! 6. Mark the ledger row finalized.
 //!
 //! Because `audit_log` rows are immutable and append-only, there is no
-//! version-aware UPSERT here (`ON CONFLICT (id) DO NOTHING` is correct — the
-//! row can never change after insert, so a retry writes the identical row).
+//! business-version counter. Retries overwrite the complete archived payload
+//! and return its checksum, so a pre-existing partial or corrupt row cannot be
+//! mistaken for exact durability.
 //! A crash at any point before step 5 is safe to retry: the STDB row is
 //! still there, the UPSERT is idempotent, and `record_transfer` overwrites
 //! its own prior attempt. A crash between step 5 and 6 is also safe: the
@@ -55,6 +56,32 @@ use super::{conventions, ledger, migrate, pg_pool};
 use crate::config::Config;
 use crate::metrics;
 use crate::state::AppState;
+
+const UPSERT_COLD_AUDIT_LOG_SQL: &str = "INSERT INTO cold_audit_log \
+        (id, organization_id, company_id, table_name, record_id, action, \
+         old_values, new_values, changed_fields, user_identity, session_id, \
+         ip_address, user_agent, timestamp, metadata, payload_checksum) \
+     VALUES \
+        ($1::NUMERIC, $2::NUMERIC, $3::NUMERIC, $4, $5::NUMERIC, $6, \
+         $7, $8, $9::JSONB, $10, $11::NUMERIC, \
+         $12, $13, $14, $15, $16) \
+     ON CONFLICT (id) DO UPDATE SET \
+        organization_id = EXCLUDED.organization_id, \
+        company_id = EXCLUDED.company_id, \
+        table_name = EXCLUDED.table_name, \
+        record_id = EXCLUDED.record_id, \
+        action = EXCLUDED.action, \
+        old_values = EXCLUDED.old_values, \
+        new_values = EXCLUDED.new_values, \
+        changed_fields = EXCLUDED.changed_fields, \
+        user_identity = EXCLUDED.user_identity, \
+        session_id = EXCLUDED.session_id, \
+        ip_address = EXCLUDED.ip_address, \
+        user_agent = EXCLUDED.user_agent, \
+        timestamp = EXCLUDED.timestamp, \
+        metadata = EXCLUDED.metadata, \
+        payload_checksum = EXCLUDED.payload_checksum \
+     RETURNING payload_checksum";
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct DrainStats {
@@ -179,17 +206,9 @@ async fn upsert_cold_audit_log(pool: &Pool, row: &AuditRow) -> Result<()> {
         .get()
         .await
         .context("get PG client for cold_audit_log upsert")?;
-    client
-        .execute(
-            "INSERT INTO cold_audit_log \
-                (id, organization_id, company_id, table_name, record_id, action, \
-                 old_values, new_values, changed_fields, user_identity, session_id, \
-                 ip_address, user_agent, timestamp, metadata, payload_checksum) \
-             VALUES \
-                ($1::NUMERIC, $2::NUMERIC, $3::NUMERIC, $4, $5::NUMERIC, $6, \
-                 $7, $8, $9::JSONB, $10, $11::NUMERIC, \
-                 $12, $13, $14, $15, $16) \
-             ON CONFLICT (id) DO NOTHING",
+    let archived = client
+        .query_one(
+            UPSERT_COLD_AUDIT_LOG_SQL,
             &[
                 &row.id,
                 &row.organization_id,
@@ -211,6 +230,13 @@ async fn upsert_cold_audit_log(pool: &Pool, row: &AuditRow) -> Result<()> {
         )
         .await
         .context("upsert cold_audit_log")?;
+    let archived_checksum: String = archived.get(0);
+    if archived_checksum != row.checksum {
+        return Err(anyhow!(
+            "cold_audit_log {}: returned checksum does not match the exact source payload",
+            row.id
+        ));
+    }
     Ok(())
 }
 
@@ -645,5 +671,30 @@ mod tests {
         let b = parse_audit_row(&as_hex).unwrap();
         assert_eq!(a.identity_bytes, b.identity_bytes);
         assert_eq!(a.checksum, b.checksum);
+    }
+
+    #[test]
+    fn archive_retry_replaces_the_complete_payload_and_returns_checksum() {
+        assert!(UPSERT_COLD_AUDIT_LOG_SQL.contains("ON CONFLICT (id) DO UPDATE SET"));
+        for column in [
+            "organization_id",
+            "company_id",
+            "table_name",
+            "record_id",
+            "action",
+            "old_values",
+            "new_values",
+            "changed_fields",
+            "user_identity",
+            "session_id",
+            "ip_address",
+            "user_agent",
+            "timestamp",
+            "metadata",
+            "payload_checksum",
+        ] {
+            assert!(UPSERT_COLD_AUDIT_LOG_SQL.contains(&format!("{column} = EXCLUDED.{column}")));
+        }
+        assert!(UPSERT_COLD_AUDIT_LOG_SQL.contains("RETURNING payload_checksum"));
     }
 }

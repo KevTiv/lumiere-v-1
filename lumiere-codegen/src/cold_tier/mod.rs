@@ -3,13 +3,13 @@
 //! hydration manifest.
 //!
 //! Steps run strictly in order because each later step consumes the schema
-//! manifest (or the archive candidate list) produced/validated by an earlier
-//! one:
+//! manifest or the total storage-policy census produced/validated by an
+//! earlier one:
 //!
 //! 1. `stdb_bindings_parse` — bindings → [`schema_ir::LumiereSchemaManifest`]
 //! 2. `storage_policy_manifest_emit` — validate the C1 all-table census
-//! 3. `archive_manifest_emit` — validate `archive-candidates.json` against
-//!    the schema manifest, emit `archive-manifest.json`
+//! 3. `archive_manifest_emit` — generate the cooling-eligible archive subset
+//!    from the storage-policy census and validate it against the schema IR
 //! 4. `pg_ddl_emit` — one cold-table `CREATE TABLE` per active candidate
 //! 5. `codec_emit` — STDB ↔ PG type-mapping manifests for archive candidates
 //!    and all projection tables
@@ -112,19 +112,20 @@ pub fn run(paths: &Paths) -> Result<()> {
     );
     println!("Wrote {}", paths.storage_policy_manifest_out.display());
 
-    // ── 2. Archive manifest: validate candidates + emit archive-manifest.json
+    // ── 2. Archive manifest: generate the policy-derived eligible subset
 
-    let candidates_json = read_to_string(&paths.archive_candidates_json)?;
-    let archive_manifest_json =
-        archive_manifest_emit::emit_archive_manifest(&candidates_json, &schema_manifest)
-            .context("generating archive manifest")?;
+    let archive_manifest_json = archive_manifest_emit::emit_archive_manifest_from_storage_policy(
+        &storage_policy_json,
+        &schema_manifest,
+    )
+    .context("generating archive manifest")?;
     write_file(&paths.archive_manifest_out, &archive_manifest_json)?;
 
-    let candidates_value: Value = serde_json::from_str(&candidates_json)
-        .context("re-parse archive-candidates.json for DDL step")?;
+    let candidates_value: Value = serde_json::from_str(&archive_manifest_json)
+        .context("re-parse generated archive manifest for DDL step")?;
     let candidates_arr = candidates_value["candidates"]
         .as_array()
-        .context("archive-candidates.json: 'candidates' must be an array")?;
+        .context("generated archive-manifest.json: 'candidates' must be an array")?;
 
     // ── 3. PG DDL: one SQL file per active archive candidate ───────────────
 
@@ -138,13 +139,14 @@ pub fn run(paths: &Paths) -> Result<()> {
 
     // ── 4. Codec manifest: STDB ↔ PG type mapping per archive candidate ────
 
-    let codec_manifest_json = codec_emit::emit_codec_manifest(&candidates_json, &schema_manifest)
-        .context("generating codec manifest")?;
+    let codec_manifest_json =
+        codec_emit::emit_codec_manifest(&archive_manifest_json, &schema_manifest)
+            .context("generating codec manifest")?;
     write_file(&paths.codec_manifest_out, &codec_manifest_json)?;
     println!("Wrote {}", paths.codec_manifest_out.display());
 
     let projection_codec_manifest_json = codec_emit::emit_projection_codec_manifest(
-        &candidates_json,
+        &archive_manifest_json,
         &schema_manifest,
         &storage_policy_manifest,
     )
@@ -193,10 +195,14 @@ pub fn run(paths: &Paths) -> Result<()> {
         .filter_map(|c| c["table"].as_str().map(String::from))
         .collect();
     let hydration_policies_json = read_to_string(&paths.hydration_policies_json)?;
-    let hydration_manifest_json = hydration_manifest_emit::emit_hydration_manifest(
+    let durable_schema_manifest: Value = serde_json::from_str(&durable_migration.manifest)
+        .context("re-parse generated durable schema manifest for hydration")?;
+    let hydration_manifest_json = hydration_manifest_emit::emit_hydration_manifest_with_contracts(
         &hydration_policies_json,
         &schema_manifest,
         &archive_tables,
+        &storage_policy_manifest,
+        &durable_schema_manifest,
     )
     .context("generating hydration manifest")?;
     write_file(&paths.hydration_manifest_out, &hydration_manifest_json)?;
@@ -219,7 +225,9 @@ pub fn run(paths: &Paths) -> Result<()> {
             })
             .unwrap_or_else(|| "ownership not verified (gate disabled)".to_string())
     );
-    println!("lumiere-codegen: {ddl_file_count} cold PG DDL file(s) from archive-candidates.json");
+    println!(
+        "lumiere-codegen: {ddl_file_count} cold PG DDL file(s) from storage-policy-manifest.json"
+    );
     println!("Wrote {}", paths.schema_manifest_out.display());
     println!("Wrote {}", paths.archive_manifest_out.display());
 
@@ -232,12 +240,17 @@ fn emit_ddl(
     candidates_arr: &[Value],
 ) -> Result<usize> {
     let mut ddl_count = 0;
-    for cand in candidates_arr {
-        let table = cand["table"].as_str().unwrap_or_default();
-        let cold_table = cand["cold_table"].as_str().unwrap_or_default();
-        if table.is_empty() || cold_table.is_empty() {
-            continue;
-        }
+    for (index, cand) in candidates_arr.iter().enumerate() {
+        let table = cand["table"]
+            .as_str()
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("archive candidates[{index}].table is missing or empty"))?;
+        let cold_table = cand["cold_table"]
+            .as_str()
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| {
+                format!("archive candidates[{index}].cold_table is missing or empty")
+            })?;
         let cfg = pg_ddl_emit::ArchiveCandidateConfig { table, cold_table };
         let ddl = pg_ddl_emit::emit_cold_table_ddl(schema_manifest, &cfg)
             .with_context(|| format!("generating DDL for '{table}' → '{cold_table}'"))?;

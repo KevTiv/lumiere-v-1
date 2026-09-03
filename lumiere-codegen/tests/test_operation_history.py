@@ -129,6 +129,30 @@ class OperationHistoryTests(unittest.TestCase):
         }]
         self.verify_value(changed, history)
 
+    def test_release_snapshot_may_match_previous_side_only_when_explicit(self):
+        previous = ir_with(operation())
+        history = MODULE.build_history_from_value(previous)
+        changed = ir_with(operation(application={"params": [{"name": "order_id", "kind": "u64"}]}))
+        history["compatibility_exceptions"] = [{
+            "operation_id": "erp.create_order",
+            "previous_fingerprint": history["operations"]["erp.create_order"]["shape_fingerprint"],
+            "current_fingerprint": MODULE.shape_fingerprint(changed["operations"][0]),
+            "reason": "approved parameter shape migration",
+        }]
+        with self.assertRaisesRegex(MODULE.OperationHistoryError, "does not match"):
+            self.verify_value(previous, history)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ir_path = root / "ir.json"
+            history_path = root / "history.json"
+            ir_path.write_text(json.dumps(previous), encoding="utf-8")
+            history_path.write_text(json.dumps(history), encoding="utf-8")
+            MODULE.verify(
+                ir_path,
+                history_path,
+                allow_previous_compatibility=True,
+            )
+
     def verify_value(self, ir, history):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

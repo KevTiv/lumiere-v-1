@@ -14,6 +14,10 @@
 ///   - Loyalty point tracking
 use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::cold_tier::{
+    finalize_cooling, prove_durable_row, AggregateChildRef, AggregateFinalizationPlan,
+    AggregateRootRef, CoolingEligibilityFacts,
+};
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::iot::actions::{iot_action, queue_action_internal};
@@ -1050,6 +1054,10 @@ pub fn finalize_pos_order_archive(
     id: u64,
     expected_archive_version: u64,
     expected_cold_eligible_at_micros: i64,
+    row_commit_sequence: u64,
+    durable_watermark: u64,
+    durable_change_schema_version: u32,
+    durable_contract_version: String,
 ) -> Result<(), String> {
     if !crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
         ctx,
@@ -1066,6 +1074,10 @@ pub fn finalize_pos_order_archive(
         id,
         expected_archive_version,
         expected_cold_eligible_at_micros,
+        row_commit_sequence,
+        durable_watermark,
+        durable_change_schema_version,
+        &durable_contract_version,
     )
 }
 
@@ -1078,6 +1090,10 @@ pub(crate) fn finalize_pos_order_archive_checked(
     id: u64,
     expected_archive_version: u64,
     expected_cold_eligible_at_micros: i64,
+    row_commit_sequence: u64,
+    durable_watermark: u64,
+    durable_change_schema_version: u32,
+    durable_contract_version: &str,
 ) -> Result<(), String> {
     let Some(row) = ctx.db.pos_order().id().find(id) else {
         // Already finalized by a prior/racing call.
@@ -1103,8 +1119,142 @@ pub(crate) fn finalize_pos_order_archive_checked(
         ));
     }
 
-    ctx.db.pos_order().id().delete(&id);
-    Ok(())
+    let root_commit = prove_durable_row(
+        ctx,
+        row.organization_id,
+        "pos_order",
+        &serde_json::json!({"id": row.id}).to_string(),
+        durable_watermark,
+    )?;
+    if root_commit.row_commit_sequence != row_commit_sequence
+        || root_commit.change_schema_version != durable_change_schema_version
+        || root_commit.contract_version != durable_contract_version
+    {
+        return Err(format!(
+            "pos_order {id}: worker durability proof disagrees with the authoritative STDB commit"
+        ));
+    }
+
+    let mut lines: Vec<_> = ctx
+        .db
+        .pos_order_line()
+        .pos_line_by_order()
+        .filter(id)
+        .collect();
+    lines.sort_by_key(|line| line.id);
+    let mut payments: Vec<_> = ctx
+        .db
+        .pos_payment()
+        .iter()
+        .filter(|payment| payment.order_id == id)
+        .collect();
+    payments.sort_by_key(|payment| payment.id);
+
+    let actual_line_ids = lines.iter().map(|line| line.id).collect::<Vec<_>>();
+    let actual_payment_ids = payments
+        .iter()
+        .map(|payment| payment.id)
+        .collect::<Vec<_>>();
+    let aggregate_membership_matches = actual_line_ids == row.lines
+        && actual_payment_ids == row.statement_ids
+        && lines
+            .iter()
+            .all(|line| line.organization_id == row.organization_id)
+        && payments.iter().all(|payment| {
+            payment.organization_id == row.organization_id && payment.company_id == row.company_id
+        });
+
+    for line in &lines {
+        prove_durable_row(
+            ctx,
+            row.organization_id,
+            "pos_order_line",
+            &serde_json::json!({"id": line.id}).to_string(),
+            durable_watermark,
+        )?;
+    }
+    for payment in &payments {
+        prove_durable_row(
+            ctx,
+            row.organization_id,
+            "pos_payment",
+            &serde_json::json!({"id": payment.id}).to_string(),
+            durable_watermark,
+        )?;
+    }
+
+    let payments_terminal = payments.iter().all(|payment| {
+        matches!(
+            payment.payment_status,
+            PaymentStatus::Done | PaymentStatus::Reversed | PaymentStatus::Cancelled
+        )
+    });
+    let terminal_state = matches!(
+        &row.state,
+        PosOrderState::Paid
+            | PosOrderState::Done
+            | PosOrderState::Invoiced
+            | PosOrderState::Cancelled
+    );
+    let is_cancelled = matches!(&row.state, PosOrderState::Cancelled);
+    let open_obligation = !is_cancelled
+        && (row.is_partially_paid
+            || row.amount_paid + 0.000_001 < row.amount_total
+            || !payments_terminal);
+    let active_workflow = row.to_invoice && row.account_move.is_none();
+    let facts = CoolingEligibilityFacts {
+        resource_policy_allows_cooling: true,
+        cold_eligible_at_micros: actual,
+        now_micros: ctx.timestamp.to_micros_since_unix_epoch(),
+        // `cold_eligible_at` is the reviewed eligibility instant, rather than
+        // the transaction creation timestamp. The worker may retain an
+        // eligible row longer, but it must never cool it before this instant.
+        minimum_age_micros: 0,
+        terminal_state,
+        open_obligation,
+        active_workflow,
+        hot_dependency: !aggregate_membership_matches,
+        projection_rebuildable: true,
+    };
+    let durable = root_commit.with_archive_version(row.archive_version, expected_archive_version);
+    let mut children = Vec::with_capacity(lines.len() + payments.len());
+    children.extend(lines.iter().map(|line| AggregateChildRef {
+        table_name: "pos_order_line".to_string(),
+        row_id: line.id,
+        parent_id: id,
+        organization_id: line.organization_id,
+    }));
+    children.extend(payments.iter().map(|payment| AggregateChildRef {
+        table_name: "pos_payment".to_string(),
+        row_id: payment.id,
+        parent_id: id,
+        organization_id: payment.organization_id,
+    }));
+    let plan = AggregateFinalizationPlan {
+        root: AggregateRootRef {
+            table_name: "pos_order".to_string(),
+            row_id: id,
+            organization_id: row.organization_id,
+        },
+        children,
+    };
+    finalize_cooling(&facts, &durable, &plan, |target| {
+        match target.table_name.as_str() {
+            "pos_order_line" => {
+                ctx.db.pos_order_line().id().delete(&target.row_id);
+                Ok(())
+            }
+            "pos_payment" => {
+                ctx.db.pos_payment().id().delete(&target.row_id);
+                Ok(())
+            }
+            "pos_order" => {
+                ctx.db.pos_order().id().delete(&target.row_id);
+                Ok(())
+            }
+            _ => Err("pos_order finalization plan contains an unsupported table".to_string()),
+        }
+    })
 }
 
 #[reducer]

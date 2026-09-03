@@ -7,7 +7,10 @@
 //! for why the two protocols differ.
 use spacetimedb::{ReducerContext, Table};
 
-use crate::core::persistence::{organization_commit, organization_row_change};
+use crate::core::persistence::{
+    organization_commit, organization_row_change, record_organization_commit,
+    OrganizationCommitInput, RowChange, CHANGE_SCHEMA_VERSION, CONTRACT_VERSION,
+};
 use crate::iot::actions::iot_action;
 use crate::iot::registry::{iot_device, IoTDevice};
 use crate::sales::pos_config::{
@@ -78,6 +81,22 @@ fn insert_test_order(ctx: &ReducerContext, fixture: &OrgFixture, uid: &str) -> P
     })
 }
 
+fn record_test_order_commit(ctx: &ReducerContext, order: &PosOrder) -> Result<u64, String> {
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id: order.organization_id,
+            operation_id: "erp.test_finalize_pos_order".to_string(),
+            correlation_id: format!("test-pos-order:{}", order.id),
+            changes: vec![RowChange::upsert_stdb_row(
+                "pos_order",
+                serde_json::json!({"id": order.id}),
+                order,
+            )?],
+        },
+    )
+}
+
 #[spacetimedb::reducer]
 pub fn test_pos_order_finalize_deletes_on_version_match(
     ctx: &ReducerContext,
@@ -88,8 +107,18 @@ pub fn test_pos_order_finalize_deletes_on_version_match(
         .cold_eligible_at
         .ok_or("cold_eligible_at should be set")?
         .to_micros_since_unix_epoch();
+    let sequence = record_test_order_commit(ctx, &order)?;
 
-    finalize_pos_order_archive_checked(ctx, order.id, order.archive_version, expected_micros)?;
+    finalize_pos_order_archive_checked(
+        ctx,
+        order.id,
+        order.archive_version,
+        expected_micros,
+        sequence,
+        sequence,
+        CHANGE_SCHEMA_VERSION,
+        CONTRACT_VERSION,
+    )?;
 
     if ctx.db.pos_order().id().find(order.id).is_some() {
         return Err("row should have been deleted on version match".to_string());
@@ -115,6 +144,10 @@ pub fn test_pos_order_finalize_refuses_on_version_mismatch(
         order.id,
         order.archive_version + 1,
         expected_micros,
+        0,
+        0,
+        CHANGE_SCHEMA_VERSION,
+        CONTRACT_VERSION,
     );
     if result.is_ok() {
         return Err("finalize should reject a stale archive_version".to_string());
@@ -134,7 +167,16 @@ pub fn test_pos_order_finalize_refuses_on_cold_eligible_at_mismatch(
 
     // Wrong expected cold_eligible_at — simulates a rehydrate-then-re-archive
     // race where the worker's stale read no longer matches the row.
-    let result = finalize_pos_order_archive_checked(ctx, order.id, order.archive_version, 1);
+    let result = finalize_pos_order_archive_checked(
+        ctx,
+        order.id,
+        order.archive_version,
+        1,
+        0,
+        0,
+        CHANGE_SCHEMA_VERSION,
+        CONTRACT_VERSION,
+    );
     if result.is_ok() {
         return Err("finalize should reject a stale cold_eligible_at".to_string());
     }
@@ -154,10 +196,29 @@ pub fn test_pos_order_finalize_is_idempotent_when_already_gone(
         .cold_eligible_at
         .ok_or("cold_eligible_at should be set")?
         .to_micros_since_unix_epoch();
+    let sequence = record_test_order_commit(ctx, &order)?;
 
-    finalize_pos_order_archive_checked(ctx, order.id, order.archive_version, expected_micros)?;
+    finalize_pos_order_archive_checked(
+        ctx,
+        order.id,
+        order.archive_version,
+        expected_micros,
+        sequence,
+        sequence,
+        CHANGE_SCHEMA_VERSION,
+        CONTRACT_VERSION,
+    )?;
     // Second call for the same (now-deleted) id must succeed, not error.
-    finalize_pos_order_archive_checked(ctx, order.id, order.archive_version, expected_micros)?;
+    finalize_pos_order_archive_checked(
+        ctx,
+        order.id,
+        order.archive_version,
+        expected_micros,
+        sequence,
+        sequence,
+        CHANGE_SCHEMA_VERSION,
+        CONTRACT_VERSION,
+    )?;
 
     Ok(())
 }
@@ -176,7 +237,16 @@ pub fn test_pos_order_finalize_rejects_unregistered_caller(
     // The test-runner identity is never registered as the
     // pos_order_cold_drainer service identity, so the public reducer must
     // refuse the call even though version/eligibility match.
-    let result = finalize_pos_order_archive(ctx, order.id, order.archive_version, expected_micros);
+    let result = finalize_pos_order_archive(
+        ctx,
+        order.id,
+        order.archive_version,
+        expected_micros,
+        1,
+        1,
+        CHANGE_SCHEMA_VERSION,
+        CONTRACT_VERSION.to_string(),
+    );
     if result.is_ok() {
         return Err(
             "finalize_pos_order_archive should reject a caller that isn't the registered drainer identity"

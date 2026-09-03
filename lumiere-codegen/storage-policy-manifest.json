@@ -1,6 +1,40 @@
 {
   "_comment": "Checked-in C1 storage-policy source. Bootstrap defaults are deterministic; reviewed policy entries may be hand-edited and must pass --check.",
   "version": 1,
+  "reviewed_fixtures": [
+    { "table": "account_account", "module": "accounting", "storage_class": "always_hot", "reviewed": true },
+    { "table": "ai_action_draft", "module": "ai", "storage_class": "always_hot", "reviewed": true },
+    { "table": "ai_agent_run_policy_snapshot", "module": "ai", "storage_class": "projection_only", "reviewed": true },
+    { "table": "analytics_metric", "module": "analytics", "storage_class": "always_hot", "reviewed": true },
+    { "table": "audit_rule", "module": "core", "storage_class": "always_hot", "reviewed": true },
+    { "table": "audit_log", "module": "core", "storage_class": "pg_first", "reviewed": true },
+    { "table": "country", "module": "core", "storage_class": "external_reference", "reviewed": true },
+    { "table": "policy_snapshot", "module": "core", "storage_class": "projection_only", "reviewed": true },
+    { "table": "contact", "module": "crm", "storage_class": "always_hot", "reviewed": true },
+    { "table": "contact_identity_verification_authority", "module": "crm", "storage_class": "external_reference", "reviewed": true },
+    { "table": "crm_forecast_snapshot", "module": "crm", "storage_class": "projection_only", "reviewed": true },
+    { "table": "import_job", "module": "data_ops", "storage_class": "always_hot", "reviewed": true },
+    { "table": "doc_folder", "module": "documents", "storage_class": "always_hot", "reviewed": true },
+    { "table": "expense_card_statement_line", "module": "expenses", "storage_class": "always_hot", "reviewed": true },
+    { "table": "fleet_vehicle", "module": "fleet", "storage_class": "always_hot", "reviewed": true },
+    { "table": "form_config", "module": "forms", "storage_class": "always_hot", "reviewed": true },
+    { "table": "helpdesk_sla", "module": "helpdesk", "storage_class": "always_hot", "reviewed": true },
+    { "table": "hr_applicant", "module": "hr", "storage_class": "always_hot", "reviewed": true },
+    { "table": "hr_country_pack_leave_default", "module": "hr", "storage_class": "external_reference", "reviewed": true },
+    { "table": "hr_labor_cost_snapshot", "module": "hr", "storage_class": "projection_only", "reviewed": true },
+    { "table": "google_drive_connection", "module": "integrations", "storage_class": "always_hot", "reviewed": true },
+    { "table": "barcode_nomenclature", "module": "inventory", "storage_class": "always_hot", "reviewed": true },
+    { "table": "iot_action", "module": "iot", "storage_class": "always_hot", "reviewed": true },
+    { "table": "bom_explosion_result", "module": "manufacturing", "storage_class": "always_hot", "reviewed": true },
+    { "table": "capacity_forecast_snapshot", "module": "projects", "storage_class": "projection_only", "reviewed": true },
+    { "table": "project_baseline", "module": "projects", "storage_class": "always_hot", "reviewed": true },
+    { "table": "proposal", "module": "proposals", "storage_class": "always_hot", "reviewed": true },
+    { "table": "consignment_agreement", "module": "purchasing", "storage_class": "always_hot", "reviewed": true },
+    { "table": "delivery_carrier", "module": "sales", "storage_class": "always_hot", "reviewed": true },
+    { "table": "pos_order", "module": "sales", "storage_class": "terminal_window", "reviewed": true },
+    { "table": "billing_account", "module": "subscriptions", "storage_class": "always_hot", "reviewed": true },
+    { "table": "activity", "module": "workflow", "storage_class": "always_hot", "reviewed": true }
+  ],
   "policies": [
     {
       "table": "account_account",
@@ -1838,13 +1872,29 @@
         "version_strategy": "none"
       },
       "projection_mode": "append-history",
-      "hot_retention": "time_window",
+      "hot_retention": "none",
       "cooling_eligibility": "policy",
-      "cooling_eligibility_source": "archive-candidates.json:audit_log.finalize_audit_log_archive",
+      "cooling_eligibility_source": "reviewed:cold-tier/audit-log",
       "dependency_behavior": "independent",
       "hydration_policy": "not_applicable",
       "delete_behavior": "append_only",
-      "postgres_access_path": "organization_partition"
+      "postgres_access_path": "organization_partition",
+      "semantic_eligibility": {
+        "state": "immutable after creation",
+        "age_window": "eligible immediately after exact append-only PG archive proof",
+        "open_obligations": "must_be_clear",
+        "workflow_state": "must_not_be_active",
+        "durable_watermark": "append-only archive checksum proof",
+        "exact_durable_version": "canonical payload checksum must match",
+        "hot_dependencies": "must_be_clear"
+      },
+      "archive": {
+        "cold_table": "cold_audit_log",
+        "mode": "append_only",
+        "scope": { "organization_id": "organization_id", "company_id": "company_id" },
+        "finalize_reducer": "finalize_audit_log_archive",
+        "order_by": [{ "column": "id", "direction": "ASC" }]
+      }
     },
     {
       "table": "audit_rule",
@@ -8445,7 +8495,7 @@
     {
       "table": "pos_order",
       "module": "sales",
-      "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
+      "rationale": "POS transaction aggregate root; lines and payments cool and hydrate atomically with the order.",
       "authoritative_resources": [],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
@@ -8467,11 +8517,27 @@
       "projection_mode": "upsert-current",
       "hot_retention": "terminal_window",
       "cooling_eligibility": "policy",
-      "cooling_eligibility_source": "archive-candidates.json:pos_order.finalize_pos_order_archive",
-      "dependency_behavior": "independent",
+      "cooling_eligibility_source": "reviewed:cold-tier/pos-order",
+      "dependency_behavior": "block_parent_cooling",
       "hydration_policy": "full_row",
       "delete_behavior": "tombstone",
-      "postgres_access_path": "organization_partition"
+      "postgres_access_path": "organization_partition",
+      "semantic_eligibility": {
+        "state": "Paid or otherwise terminal; domain reducer validates state",
+        "age_window": "cold_eligible_at is the reviewed terminal-window eligibility boundary and must be reached",
+        "open_obligations": "must_be_clear",
+        "workflow_state": "must_not_be_active",
+        "durable_watermark": "required",
+        "exact_durable_version": "archive_version must match",
+        "hot_dependencies": "all required child rows must be eligible"
+      },
+      "archive": {
+        "cold_table": "cold_pos_order",
+        "mode": "versioned",
+        "scope": { "organization_id": "organization_id", "company_id": "company_id" },
+        "finalize_reducer": "finalize_pos_order_archive",
+        "order_by": [{ "column": "id", "direction": "ASC" }]
+      }
     },
     {
       "table": "pos_order_line",
@@ -8501,13 +8567,22 @@
         "version_strategy": "none"
       },
       "projection_mode": "upsert-current",
-      "hot_retention": "always",
-      "cooling_eligibility": "never",
-      "cooling_eligibility_source": "not eligible until a reviewed cooling policy is declared",
+      "hot_retention": "terminal_window",
+      "cooling_eligibility": "parent",
+      "cooling_eligibility_source": "reviewed:cold-tier/pos-order aggregate membership",
       "dependency_behavior": "follow_parent",
-      "hydration_policy": "not_applicable",
+      "hydration_policy": "parent",
       "delete_behavior": "tombstone",
-      "postgres_access_path": "organization_index"
+      "postgres_access_path": "organization_index",
+      "semantic_eligibility": {
+        "state": "inherited from terminal pos_order parent",
+        "age_window": "inherited from pos_order.cold_eligible_at",
+        "open_obligations": "inherited from parent aggregate",
+        "workflow_state": "inherited from parent aggregate",
+        "durable_watermark": "required for exact child row image",
+        "exact_durable_version": "latest child commit must be covered",
+        "hot_dependencies": "must remain in the same aggregate as pos_order"
+      }
     },
     {
       "table": "pos_payment",
@@ -8536,13 +8611,22 @@
         "version_strategy": "none"
       },
       "projection_mode": "upsert-current",
-      "hot_retention": "always",
-      "cooling_eligibility": "never",
-      "cooling_eligibility_source": "not eligible until a reviewed cooling policy is declared",
+      "hot_retention": "terminal_window",
+      "cooling_eligibility": "parent",
+      "cooling_eligibility_source": "reviewed:cold-tier/pos-order aggregate membership",
       "dependency_behavior": "follow_parent",
-      "hydration_policy": "not_applicable",
+      "hydration_policy": "parent",
       "delete_behavior": "tombstone",
-      "postgres_access_path": "organization_index"
+      "postgres_access_path": "organization_index",
+      "semantic_eligibility": {
+        "state": "inherited from terminal pos_order parent",
+        "age_window": "inherited from pos_order.cold_eligible_at",
+        "open_obligations": "payment_status must be terminal and parent must have no balance due",
+        "workflow_state": "inherited from parent aggregate",
+        "durable_watermark": "required for exact child row image",
+        "exact_durable_version": "latest child commit must be covered",
+        "hot_dependencies": "must remain in the same aggregate as pos_order"
+      }
     },
     {
       "table": "pos_payment_method",

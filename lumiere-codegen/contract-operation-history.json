@@ -5260,5 +5260,12 @@
     }
   },
   "retired_ids": [],
-  "compatibility_exceptions": []
+  "compatibility_exceptions": [
+    {
+      "operation_id": "erp.finalize_pos_order_archive",
+      "previous_fingerprint": "sha256:23aa5e2bd9f9e31f2b6be6feaf3ce9164f904e2966d729e01892f41258d77097",
+      "current_fingerprint": "sha256:6b528383d6bbd6638d132b2f8f81199a007d821ba98d7f726907ac6cf29b4311",
+      "reason": "Denied internal cold-tier reducer now requires exact durable projection commit, watermark, schema, and contract proof before aggregate deletion."
+    }
+  ]
 }
