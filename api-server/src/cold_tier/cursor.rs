@@ -151,6 +151,9 @@ where
 /// Errors that can occur while decoding a cursor.
 #[derive(Debug, thiserror::Error)]
 pub enum CursorError {
+    /// The read plan is not an allowlisted, bounded archive read.
+    #[error("invalid resource read plan: {0}")]
+    InvalidPlan(String),
     /// The `order` list is empty; a cursor requires at least one order key.
     #[error("cursor requires a non-empty order list")]
     EmptyOrder,

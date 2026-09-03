@@ -206,7 +206,9 @@ pub fn run(paths: &Paths) -> Result<()> {
     )
     .context("generating hydration manifest")?;
     write_file(&paths.hydration_manifest_out, &hydration_manifest_json)?;
+    write_file(&paths.hydration_manifest_api_out, &hydration_manifest_json)?;
     println!("Wrote {}", paths.hydration_manifest_out.display());
+    println!("Wrote {}", paths.hydration_manifest_api_out.display());
 
     println!(
         "lumiere-codegen: {} tables in schema IR ({} enum types) from {}",

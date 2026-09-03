@@ -577,6 +577,7 @@
     "grant_field_permission": "erp.grant_field_permission",
     "grant_permission": "erp.grant_permission",
     "grant_subscription_entitlement": "erp.grant_subscription_entitlement",
+    "hydrate_pos_order_aggregate": "erp.hydrate_pos_order_aggregate",
     "hold_supplier_intake": "erp.hold_supplier_intake",
     "identity_connected": "erp.identity_connected",
     "identity_disconnected": "erp.identity_disconnected",

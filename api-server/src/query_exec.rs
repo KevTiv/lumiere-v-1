@@ -271,6 +271,42 @@ pub async fn resolve_crm_company_id(
     identity_hex: &str,
     requested_company_id: Option<u64>,
 ) -> Result<u64, ApiError> {
+    resolve_membership_company_id(
+        client,
+        organization_id,
+        identity_hex,
+        requested_company_id,
+        "Cannot query another company's CRM data",
+    )
+    .await
+}
+
+/// Resolve the POS/sales company from the authenticated membership before a
+/// hot or durable read is planned. Browser company selection is actor intent,
+/// never durable-store scope authority.
+pub async fn resolve_sales_company_id(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+    requested_company_id: Option<u64>,
+) -> Result<u64, ApiError> {
+    resolve_membership_company_id(
+        client,
+        organization_id,
+        identity_hex,
+        requested_company_id,
+        "Cannot query another company's sales data",
+    )
+    .await
+}
+
+async fn resolve_membership_company_id(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+    requested_company_id: Option<u64>,
+    denied_message: &str,
+) -> Result<u64, ApiError> {
     let identity = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
     let sql = format!(
         "SELECT id, organization_id, company_id, is_active FROM user_organization WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
@@ -292,11 +328,7 @@ pub async fn resolve_crm_company_id(
             .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
     };
 
-    enforce_requested_company(
-        allowed,
-        requested_company_id,
-        "Cannot query another company's CRM data",
-    )
+    enforce_requested_company(allowed, requested_company_id, denied_message)
 }
 
 /// Resolve the inventory company for the authenticated membership.

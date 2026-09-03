@@ -14,18 +14,31 @@
 //! plan's invariant that "existing callers remain unchanged" (frontend
 //! compatibility is non-negotiable, not just a nice-to-have).
 
-use std::collections::HashSet;
-
 use serde_json::{json, Value};
 use stdb_client::StdbClient;
 
 use crate::error::ApiError;
 use crate::metrics;
 
-use super::pg_pool;
+use super::{
+    pg_codec, pg_pool, scalar_binds_to_pg, OrderDirection, PageSpec, ReadOrder, ResourceReadPlan,
+};
 
-const HOT_COLUMNS: &str = "id, organization_id, company_id, table_name, record_id, action, \
-                            old_values, new_values, session_id, ip_address, user_agent, timestamp";
+const CODEC_MANIFEST_JSON: &str = lumiere_contracts::manifests::CODEC_MANIFEST;
+const READ_COLUMNS: &[&str] = &[
+    "id",
+    "organization_id",
+    "company_id",
+    "table_name",
+    "record_id",
+    "action",
+    "old_values",
+    "new_values",
+    "session_id",
+    "ip_address",
+    "user_agent",
+    "timestamp",
+];
 
 /// Merge cold + hot audit-log rows for `organization_id`, in the same shape
 /// and bound (`id DESC`, top 500) the hot-only endpoint has always returned.
@@ -35,16 +48,36 @@ const HOT_COLUMNS: &str = "id, organization_id, company_id, table_name, record_i
 /// the failure is observable (alertable) without silently claiming the
 /// result is complete history the way a swallowed error would.
 pub async fn merged_rows(stdb: &StdbClient, organization_id: u64) -> Result<Vec<Value>, ApiError> {
-    let hot_sql =
-        format!("SELECT {HOT_COLUMNS} FROM audit_log WHERE organization_id = {organization_id}");
+    let all_columns = pg_codec::load_columns(CODEC_MANIFEST_JSON, "audit_log")
+        .map_err(|e| ApiError::Internal(format!("load audit_log codec columns: {e}")))?;
+    let columns: Vec<pg_codec::ColumnCodec> = all_columns
+        .into_iter()
+        .filter(|column| READ_COLUMNS.contains(&column.name.as_str()))
+        .collect();
+    let plan = ResourceReadPlan {
+        resource: "audit-log".into(),
+        table: "audit_log".into(),
+        projection: pg_codec::projection_with_pg_casts(&columns),
+        organization_id,
+        company_id: None,
+        predicates: vec![],
+        order: vec![ReadOrder {
+            column: "id".into(),
+            direction: OrderDirection::Desc,
+        }],
+        page: PageSpec {
+            limit: PageSpec::AUDIT_LOG_DEFAULT_LIMIT,
+            cursor: None,
+        },
+    };
+    let (hot_sql, hot_binds) =
+        super::compile_stdb_sql(&plan).map_err(|e| ApiError::Internal(e.to_string()))?;
     let hot_rows = stdb
-        .query_sql(&hot_sql)
+        .query_sql(&super::inline_stdb_literals(&hot_sql, &hot_binds))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let hot_ids: HashSet<u64> = hot_rows.iter().filter_map(hot_row_id).collect();
-
-    let mut cold_rows = match query_cold_rows(organization_id).await {
+    let cold_rows = match query_cold_rows(&columns, &plan).await {
         Ok(rows) => rows,
         Err(error) => {
             metrics::inc_audit_cold_read_failure();
@@ -55,71 +88,33 @@ pub async fn merged_rows(stdb: &StdbClient, organization_id: u64) -> Result<Vec<
     // The finalize race window (drainer UPSERTed to PG, STDB row not yet
     // deleted) can put the same id in both stores briefly; prefer hot, since
     // it's the current authoritative copy until finalize completes.
-    cold_rows.retain(|row| !hot_ids.contains(&hot_row_id(row).unwrap_or(u64::MAX)));
-
-    let mut merged = hot_rows;
-    merged.extend(cold_rows);
-    merged.sort_by(|a, b| hot_row_id(b).cmp(&hot_row_id(a)));
-    merged.truncate(500);
-
+    let (merged, _) = super::merge_hot_cold_u64(
+        hot_rows,
+        cold_rows,
+        "id",
+        OrderDirection::Desc,
+        PageSpec::AUDIT_LOG_DEFAULT_LIMIT,
+    )
+    .map_err(|error| ApiError::Internal(error.to_string()))?;
     Ok(merged)
 }
 
-fn hot_row_id(row: &Value) -> Option<u64> {
-    row.get("id").and_then(|v| v.as_u64())
-}
-
-async fn query_cold_rows(organization_id: u64) -> anyhow::Result<Vec<Value>> {
+async fn query_cold_rows(
+    columns: &[pg_codec::ColumnCodec],
+    plan: &ResourceReadPlan,
+) -> anyhow::Result<Vec<Value>> {
     let Some(pool) = pg_pool::shared_pool() else {
         return Ok(Vec::new());
     };
     let client = pool.get().await?;
-    let sql = format!(
-        "SELECT id::TEXT, organization_id::TEXT, company_id::TEXT, table_name, record_id::TEXT, \
-                action, old_values, new_values, session_id::TEXT, ip_address, user_agent, timestamp \
-         FROM cold_audit_log WHERE organization_id = $1::NUMERIC ORDER BY id DESC LIMIT 500"
-    );
-    let rows = client.query(&sql, &[&organization_id.to_string()]).await?;
-
-    let mut out = Vec::with_capacity(rows.len());
-    for row in &rows {
-        let id: String = row.try_get("id")?;
-        let organization_id: String = row.try_get("organization_id")?;
-        let company_id: Option<String> = row.try_get("company_id")?;
-        let table_name: String = row.try_get("table_name")?;
-        let record_id: String = row.try_get("record_id")?;
-        let action: String = row.try_get("action")?;
-        let old_values: Option<String> = row.try_get("old_values")?;
-        let new_values: Option<String> = row.try_get("new_values")?;
-        let session_id: Option<String> = row.try_get("session_id")?;
-        let ip_address: Option<String> = row.try_get("ip_address")?;
-        let user_agent: Option<String> = row.try_get("user_agent")?;
-        let timestamp_micros: i64 = row.try_get("timestamp")?;
-
-        out.push(json!({
-            "id": decimal_str_to_u64_json(&id)?,
-            "organizationId": decimal_str_to_u64_json(&organization_id)?,
-            "companyId": company_id.map(|v| decimal_str_to_u64_json(&v)).transpose()?,
-            "tableName": table_name,
-            "recordId": decimal_str_to_u64_json(&record_id)?,
-            "action": action,
-            "oldValues": old_values,
-            "newValues": new_values,
-            "sessionId": session_id.map(|v| decimal_str_to_u64_json(&v)).transpose()?,
-            "ipAddress": ip_address,
-            "userAgent": user_agent,
-            "timestamp": { "microsSinceUnixEpoch": timestamp_micros },
-        }));
-    }
-    Ok(out)
-}
-
-/// Parse a NUMERIC(20,0)-as-text column back into a JSON number, matching
-/// the raw-number shape `query_sql` produces for hot u64 columns. Errors
-/// loudly on anything that doesn't parse rather than defaulting to `0`.
-fn decimal_str_to_u64_json(s: &str) -> anyhow::Result<Value> {
-    let n: u64 = s.parse()?;
-    Ok(json!(n))
+    let (sql, binds) = super::compile_pg_sql(plan)?;
+    let owned_binds = scalar_binds_to_pg(&binds);
+    let params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> =
+        owned_binds.iter().map(|bind| bind.as_sql()).collect();
+    let rows = client.query(&sql, &params).await?;
+    rows.iter()
+        .map(|row| pg_codec::row_to_hot_json(columns, row))
+        .collect()
 }
 
 #[cfg(test)]
@@ -127,21 +122,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn decimal_str_parses_to_number() {
-        assert_eq!(decimal_str_to_u64_json("42").unwrap(), json!(42));
-    }
-
-    #[test]
-    fn decimal_str_rejects_garbage_instead_of_defaulting() {
-        assert!(decimal_str_to_u64_json("not-a-number").is_err());
-    }
-
-    #[test]
     fn hot_ids_are_preferred_over_cold_duplicates() {
         let hot = vec![json!({"id": 5}), json!({"id": 3})];
-        let hot_ids: HashSet<u64> = hot.iter().filter_map(hot_row_id).collect();
-        let mut cold = vec![json!({"id": 5}), json!({"id": 1})];
-        cold.retain(|row| !hot_ids.contains(&hot_row_id(row).unwrap_or(u64::MAX)));
-        assert_eq!(cold, vec![json!({"id": 1})]);
+        let (merged, _) = crate::cold_tier::merge_hot_cold_u64(
+            hot,
+            vec![json!({"id": 5}), json!({"id": 1})],
+            "id",
+            OrderDirection::Desc,
+            10,
+        )
+        .unwrap();
+        assert_eq!(merged, vec![json!({"id": 5}), json!({"id": 3}), json!({"id": 1})]);
     }
 }

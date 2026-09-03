@@ -27,6 +27,7 @@ use crate::metrics;
 use crate::middleware::metrics::track_http_metrics;
 use crate::query_exec::{
     execute_authorized_resource_record, execute_resource_query_for_company, resolve_crm_company_id,
+    resolve_sales_company_id,
 };
 use crate::routes;
 use crate::session::resolve_api_session;
@@ -126,10 +127,13 @@ async fn get_query(
     // rather than folded into `execute_resource_query_for_company`, whose
     // signature is shared by ~40 resources that don't need a cursor.
     if resource == "pos-orders" {
+        let company_id =
+            resolve_sales_company_id(&state.stdb, org_id, &session.identity_hex, q.company_id)
+                .await?;
         let page = crate::cold_tier::pos_order_read::merged_page(
             &client,
             org_id,
-            q.company_id,
+            Some(company_id),
             q.cursor.clone(),
             q.limit,
         )

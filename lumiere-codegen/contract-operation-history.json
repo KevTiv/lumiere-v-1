@@ -2252,7 +2252,7 @@
     },
     "erp.finalize_pos_order_archive": {
       "name": "finalize_pos_order_archive",
-      "shape_fingerprint": "sha256:23aa5e2bd9f9e31f2b6be6feaf3ce9164f904e2966d729e01892f41258d77097"
+      "shape_fingerprint": "sha256:6b528383d6bbd6638d132b2f8f81199a007d821ba98d7f726907ac6cf29b4311"
     },
     "erp.find_duplicate_contacts": {
       "name": "find_duplicate_contacts",
@@ -2313,6 +2313,10 @@
     "erp.hold_supplier_intake": {
       "name": "hold_supplier_intake",
       "shape_fingerprint": "sha256:f108f670e3a01399b4db9c039b6d269394d5f6652346c457107f34e669d1abbf"
+    },
+    "erp.hydrate_pos_order_aggregate": {
+      "name": "hydrate_pos_order_aggregate",
+      "shape_fingerprint": "sha256:c3bd7219825ef5bd292b7cb3345c7c284f5d8f77e2c3442d1345fad6e45903ba"
     },
     "erp.identity_connected": {
       "name": "identity_connected",
@@ -5260,12 +5264,5 @@
     }
   },
   "retired_ids": [],
-  "compatibility_exceptions": [
-    {
-      "operation_id": "erp.finalize_pos_order_archive",
-      "previous_fingerprint": "sha256:23aa5e2bd9f9e31f2b6be6feaf3ce9164f904e2966d729e01892f41258d77097",
-      "current_fingerprint": "sha256:6b528383d6bbd6638d132b2f8f81199a007d821ba98d7f726907ac6cf29b4311",
-      "reason": "Denied internal cold-tier reducer now requires exact durable projection commit, watermark, schema, and contract proof before aggregate deletion."
-    }
-  ]
+  "compatibility_exceptions": []
 }

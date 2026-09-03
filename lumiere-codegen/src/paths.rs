@@ -47,6 +47,7 @@ pub struct Paths {
     pub durable_migration_manifest_api_out: PathBuf,
     pub hydration_policies_json: PathBuf,
     pub hydration_manifest_out: PathBuf,
+    pub hydration_manifest_api_out: PathBuf,
 
     // ── reducer_contract ─────────────────────────────────────────────────
     pub module_schema_json: PathBuf,
@@ -137,6 +138,8 @@ impl Paths {
                 .join("api-server/src/generated/pg_ddl/durable-pg-schema-manifest.json"),
             hydration_policies_json: manifest_dir.join("hydration-policies.json"),
             hydration_manifest_out: staging_manifests.join("hydration-manifest.json"),
+            hydration_manifest_api_out: repo_root
+                .join("api-server/src/generated/hydration-manifest.json"),
 
             module_schema_json: contracts_staging_dir.join("module-schema.json"),
             reducer_exposure_json: manifest_dir.join("reducer-exposure.json"),

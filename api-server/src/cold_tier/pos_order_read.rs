@@ -13,8 +13,6 @@
 //! is what determines whether a `nextCursor` is returned — the row that
 //! completes the requested page could come from either store.
 
-use std::collections::HashSet;
-
 use serde_json::Value;
 use stdb_client::StdbClient;
 
@@ -89,17 +87,14 @@ pub async fn merged_page(
         }
     };
 
-    let hot_ids: HashSet<u64> = hot_rows.iter().filter_map(row_id).collect();
-    let mut merged = hot_rows;
-    merged.extend(
-        cold_rows
-            .into_iter()
-            .filter(|row| !hot_ids.contains(&row_id(row).unwrap_or(u64::MAX))),
-    );
-    merged.sort_by(|a, b| row_id(b).cmp(&row_id(a)));
-
-    let has_more = merged.len() as u32 > limit;
-    merged.truncate(limit as usize);
+    let (merged, has_more) = super::merge_hot_cold_u64(
+        hot_rows,
+        cold_rows,
+        "id",
+        OrderDirection::Desc,
+        limit,
+    )
+    .map_err(|error| ApiError::Internal(error.to_string()))?;
 
     let next_cursor = if has_more {
         merged
@@ -114,6 +109,23 @@ pub async fn merged_page(
         rows: merged,
         next_cursor,
     })
+}
+
+/// Merge the bounded results from the hot and cold stores in the resource's
+/// declared `id DESC` order.
+///
+/// The source queries both use `limit + 1`, so taking the first `limit + 1`
+/// rows after this union is sufficient to determine whether another page
+/// exists.  Hot rows win when the finalize race leaves the same primary key in
+/// both stores; this keeps the authoritative current representation visible
+/// until the hot delete completes.
+fn merge_hot_cold_rows(
+    hot_rows: Vec<Value>,
+    cold_rows: Vec<Value>,
+    limit: u32,
+) -> (Vec<Value>, bool) {
+    super::merge_hot_cold_u64(hot_rows, cold_rows, "id", OrderDirection::Desc, limit)
+        .expect("test rows must carry valid u64 IDs")
 }
 
 fn row_id(row: &Value) -> Option<u64> {
@@ -163,9 +175,97 @@ mod tests {
     #[test]
     fn hot_ids_win_on_dedupe_like_audit_read() {
         let hot = vec![json!({"id": 5}), json!({"id": 3})];
-        let hot_ids: HashSet<u64> = hot.iter().filter_map(row_id).collect();
-        let mut cold = vec![json!({"id": 5}), json!({"id": 1})];
-        cold.retain(|row| !hot_ids.contains(&row_id(row).unwrap_or(u64::MAX)));
-        assert_eq!(cold, vec![json!({"id": 1})]);
+        let (merged, _) = merge_hot_cold_rows(
+            hot,
+            vec![json!({"id": 5}), json!({"id": 1})],
+            10,
+        );
+        assert_eq!(merged, vec![json!({"id": 5}), json!({"id": 3}), json!({"id": 1})]);
+    }
+
+    #[test]
+    fn merge_is_deterministic_across_hot_cold_boundary() {
+        let hot = vec![json!({"id": 10}), json!({"id": 8})];
+        let cold = vec![
+            json!({"id": 9}),
+            json!({"id": 8, "source": "stale-cold"}),
+            json!({"id": 7}),
+            json!({"id": 6}),
+        ];
+
+        let (page, has_more) = merge_hot_cold_rows(hot, cold, 3);
+
+        assert_eq!(
+            page,
+            vec![json!({"id": 10}), json!({"id": 9}), json!({"id": 8})]
+        );
+        assert!(has_more, "the fourth unique row must produce a next cursor");
+    }
+
+    #[test]
+    fn merge_does_not_skip_fully_cold_rows_after_hot_page() {
+        let (first, has_more) = merge_hot_cold_rows(
+            vec![json!({"id": 5}), json!({"id": 4})],
+            vec![json!({"id": 3}), json!({"id": 2}), json!({"id": 1})],
+            2,
+        );
+        assert_eq!(first, vec![json!({"id": 5}), json!({"id": 4})]);
+        assert!(has_more);
+
+        // A subsequent query uses `id < 4` in both stores.  The old cold tail
+        // must remain visible even though the preceding page was hot-only.
+        let (second, second_has_more) = merge_hot_cold_rows(
+            vec![json!({"id": 3})],
+            vec![json!({"id": 2}), json!({"id": 1})],
+            2,
+        );
+        assert_eq!(second, vec![json!({"id": 3}), json!({"id": 2})]);
+        assert!(second_has_more);
+    }
+
+    #[test]
+    fn merge_reports_no_more_rows_at_exact_boundary() {
+        let (page, has_more) = merge_hot_cold_rows(
+            vec![json!({"id": 4})],
+            vec![json!({"id": 3}), json!({"id": 2})],
+            3,
+        );
+        assert_eq!(
+            page,
+            vec![json!({"id": 4}), json!({"id": 3}), json!({"id": 2})]
+        );
+        assert!(!has_more);
+    }
+
+    #[test]
+    fn keyset_pages_cover_each_hot_and_cold_row_once() {
+        let hot = [11_u64, 9, 7];
+        let cold = [10_u64, 9, 8, 6];
+        let mut after = u64::MAX;
+        let mut seen = Vec::new();
+
+        loop {
+            let hot_page: Vec<Value> = hot
+                .iter()
+                .filter(|id| **id < after)
+                .map(|id| json!({"id": id}))
+                .collect();
+            let cold_page: Vec<Value> = cold
+                .iter()
+                .filter(|id| **id < after)
+                .map(|id| json!({"id": id}))
+                .collect();
+            let (page, has_more) = merge_hot_cold_rows(hot_page, cold_page, 2);
+            if page.is_empty() {
+                break;
+            }
+            after = page.last().and_then(row_id).expect("test rows have ids");
+            seen.extend(page.iter().filter_map(row_id));
+            if !has_more {
+                break;
+            }
+        }
+
+        assert_eq!(seen, vec![11, 10, 9, 8, 7, 6]);
     }
 }

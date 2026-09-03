@@ -12,6 +12,8 @@
 ///   - Real-time order processing
 ///   - Multiple payment support
 ///   - Loyalty point tracking
+use std::collections::BTreeSet;
+
 use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::cold_tier::{
@@ -24,6 +26,8 @@ use crate::iot::actions::{iot_action, queue_action_internal};
 use crate::iot::registry::iot_device;
 use crate::sales::pos_config::{pos_config, pos_loyalty_program, PosConfig};
 use crate::types::{CardState, PaymentStatus, PosOrderState, SessionState};
+
+const INITIAL_PLACEMENT_GENERATION: u64 = 1;
 
 // ── Input Params ──────────────────────────────────────────────────────────────
 
@@ -67,6 +71,22 @@ pub struct CreatePosPaymentParams {
     pub card_number: Option<String>,
     pub is_change: bool,
     pub is_tip: bool,
+}
+
+/// Server-only complete aggregate payload for rehydrating a cooled POS order.
+/// The API server obtains the rows from the placement-resolved durable
+/// projection and calls this reducer with the registered hydrator identity.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct HydratePosOrderAggregateParams {
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub placement_generation: u64,
+    pub schema_version: u32,
+    pub archive_version: u64,
+    pub payload_checksum: String,
+    pub order_json: String,
+    pub lines_json: Vec<String>,
+    pub payments_json: Vec<String>,
 }
 
 // ── Tables ────────────────────────────────────────────────────────────────────
@@ -120,6 +140,7 @@ pub struct PosSession {
     pub metadata: Option<String>,
 }
 
+#[derive(Clone)]
 #[table(
     accessor = pos_order,
     public,
@@ -201,6 +222,7 @@ pub struct PosOrder {
     pub archive_version: u64,
 }
 
+#[derive(Clone)]
 #[table(
     accessor = pos_order_line,
     public,
@@ -246,6 +268,7 @@ pub struct PosOrderLine {
     pub metadata: Option<String>,
 }
 
+#[derive(Clone)]
 #[table(
     accessor = pos_payment,
     public,
@@ -1255,6 +1278,287 @@ pub(crate) fn finalize_pos_order_archive_checked(
             _ => Err("pos_order finalization plan contains an unsupported table".to_string()),
         }
     })
+}
+
+// ============================================================================
+// COLD-TIER HYDRATION
+// ============================================================================
+
+/// Internal reducer used by the API-server after it has fetched a complete,
+/// checksum-verified aggregate from the placement-resolved PG projection.
+///
+/// The service-identity check is essential: reducer arguments contain a
+/// durable snapshot, but a snapshot is not an authorization grant.  The
+/// reducer repeats every tenant, version, and membership check inside the
+/// transaction and inserts the aggregate atomically before normal business
+/// reducer logic is allowed to continue.
+#[spacetimedb::reducer]
+pub fn hydrate_pos_order_aggregate(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    placement_generation: u64,
+    schema_version: u32,
+    archive_version: u64,
+    payload_checksum: String,
+    order_json: String,
+    lines_json: Vec<String>,
+    payments_json: Vec<String>,
+) -> Result<(), String> {
+    if !crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
+        ctx,
+        crate::core::cold_tier_identity::POS_ORDER_HYDRATOR_SERVICE,
+    ) {
+        return Err(
+            "hydrate_pos_order_aggregate: caller is not the registered pos-order hydrator identity"
+                .to_string(),
+        );
+    }
+
+    hydrate_pos_order_aggregate_checked(
+        ctx,
+        HydratePosOrderAggregateParams {
+            organization_id,
+            company_id,
+            placement_generation,
+            schema_version,
+            archive_version,
+            payload_checksum,
+            order_json,
+            lines_json,
+            payments_json,
+        },
+    )
+}
+
+/// Transactional hydration logic split out for in-module reducer tests.
+pub(crate) fn hydrate_pos_order_aggregate_checked(
+    ctx: &ReducerContext,
+    params: HydratePosOrderAggregateParams,
+) -> Result<(), String> {
+    if params.organization_id == 0 || params.company_id == 0 {
+        return Err("hydration requires organization and company scope".to_string());
+    }
+    if params.placement_generation != INITIAL_PLACEMENT_GENERATION {
+        return Err("hydration placement generation is stale or unsupported".to_string());
+    }
+    if params.schema_version != 1 {
+        return Err(format!(
+            "hydration schema version {} is unsupported",
+            params.schema_version
+        ));
+    }
+    if params.archive_version == 0 {
+        return Err("hydration archive_version must be non-zero".to_string());
+    }
+    if params.payload_checksum.len() != 64
+        || !params
+            .payload_checksum
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err("hydration payload_checksum must be a sha-256 hex digest".to_string());
+    }
+
+    let spacetimedb_sats::serde::SerdeWrapper(order) =
+        serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PosOrder>>(&params.order_json)
+            .map_err(|error| format!("invalid hydration order payload: {error}"))?;
+    let lines: Vec<PosOrderLine> = params
+        .lines_json
+        .iter()
+        .map(|json| -> Result<PosOrderLine, String> {
+            let spacetimedb_sats::serde::SerdeWrapper(line) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PosOrderLine>>(json)
+                    .map_err(|error| format!("invalid hydration order-line payload: {error}"))?;
+            Ok(line)
+        })
+        .collect::<Result<_, _>>()?;
+    let payments: Vec<PosPayment> = params
+        .payments_json
+        .iter()
+        .map(|json| -> Result<PosPayment, String> {
+            let spacetimedb_sats::serde::SerdeWrapper(payment) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PosPayment>>(json)
+                    .map_err(|error| format!("invalid hydration payment payload: {error}"))?;
+            Ok(payment)
+        })
+        .collect::<Result<_, _>>()?;
+
+    if order.organization_id != params.organization_id || order.company_id != params.company_id {
+        return Err("hydration order organization/company scope mismatch".to_string());
+    }
+    if order.archive_version != params.archive_version {
+        return Err("hydration archive_version does not match order payload".to_string());
+    }
+    if order.cold_eligible_at.is_none() {
+        return Err("hydration order is not an eligible cooled row".to_string());
+    }
+
+    let line_ids = order.lines.iter().copied().collect::<BTreeSet<_>>();
+    if line_ids.len() != order.lines.len() || line_ids.len() != lines.len() {
+        return Err("hydration order-line membership is incomplete or duplicated".to_string());
+    }
+    let payment_ids = order.statement_ids.iter().copied().collect::<BTreeSet<_>>();
+    if payment_ids.len() != order.statement_ids.len() || payment_ids.len() != payments.len() {
+        return Err("hydration payment membership is incomplete or duplicated".to_string());
+    }
+    for line in &lines {
+        if !line_ids.contains(&line.id)
+            || line.organization_id != params.organization_id
+            || line.order_id != order.id
+        {
+            return Err(format!(
+                "hydration line {} has the wrong organization, parent, or membership",
+                line.id
+            ));
+        }
+    }
+    for payment in &payments {
+        if !payment_ids.contains(&payment.id)
+            || payment.organization_id != params.organization_id
+            || payment.company_id != params.company_id
+            || payment.order_id != order.id
+        {
+            return Err(format!(
+                "hydration payment {} has the wrong organization, company, parent, or membership",
+                payment.id
+            ));
+        }
+    }
+
+    // A retry after a successful transaction is a no-op only for the exact
+    // same aggregate. A same-ID, different-tenant or different-version row
+    // is a conflict and must never be overwritten by durable input.
+    if let Some(existing) = ctx.db.pos_order().id().find(&order.id) {
+        let mut existing_lines: Vec<_> = ctx
+            .db
+            .pos_order_line()
+            .pos_line_by_order()
+            .filter(&order.id)
+            .collect();
+        existing_lines.sort_by_key(|line| line.id);
+        let mut existing_payments: Vec<_> = ctx
+            .db
+            .pos_payment()
+            .iter()
+            .filter(|payment| payment.order_id == order.id)
+            .collect();
+        existing_payments.sort_by_key(|payment| payment.id);
+        let mut expected_lines = lines.clone();
+        expected_lines.sort_by_key(|line| line.id);
+        let mut expected_payments = payments.clone();
+        expected_payments.sort_by_key(|payment| payment.id);
+        let existing_line_json = existing_lines
+            .iter()
+            .map(sats_row_json)
+            .collect::<Result<Vec<_>, _>>()?;
+        let expected_line_json = expected_lines
+            .iter()
+            .map(sats_row_json)
+            .collect::<Result<Vec<_>, _>>()?;
+        let existing_payment_json = existing_payments
+            .iter()
+            .map(sats_row_json)
+            .collect::<Result<Vec<_>, _>>()?;
+        let expected_payment_json = expected_payments
+            .iter()
+            .map(sats_row_json)
+            .collect::<Result<Vec<_>, _>>()?;
+        if existing.organization_id != order.organization_id
+            || existing.company_id != order.company_id
+            || existing.archive_version != order.archive_version
+            || existing.lines != order.lines
+            || existing.statement_ids != order.statement_ids
+            || sats_row_json(&existing)? != sats_row_json(&order)?
+            || existing_lines.len() != expected_lines.len()
+            || existing_payments.len() != expected_payments.len()
+            || existing_line_json != expected_line_json
+            || existing_payment_json != expected_payment_json
+        {
+            return Err(format!(
+                "hydration target pos_order {} conflicts with an existing row",
+                order.id
+            ));
+        }
+        return Ok(());
+    }
+
+    for line in &lines {
+        if ctx.db.pos_order_line().id().find(&line.id).is_some() {
+            return Err(format!(
+                "hydration target line {} already exists without its order",
+                line.id
+            ));
+        }
+    }
+    for payment in &payments {
+        if ctx.db.pos_payment().id().find(&payment.id).is_some() {
+            return Err(format!(
+                "hydration target payment {} already exists without its order",
+                payment.id
+            ));
+        }
+    }
+
+    for line in &lines {
+        ctx.db.pos_order_line().insert(line.clone());
+    }
+    for payment in &payments {
+        ctx.db.pos_payment().insert(payment.clone());
+    }
+    ctx.db.pos_order().insert(order.clone());
+
+    let mut changes = Vec::with_capacity(1 + lines.len() + payments.len());
+    changes.push(RowChange::upsert_stdb_row(
+        "pos_order",
+        serde_json::json!({"id": order.id}),
+        &order,
+    )?);
+    changes.extend(
+        lines
+            .iter()
+            .map(|line| {
+                RowChange::upsert_stdb_row(
+                    "pos_order_line",
+                    serde_json::json!({"id": line.id}),
+                    line,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+    );
+    changes.extend(
+        payments
+            .iter()
+            .map(|payment| {
+                RowChange::upsert_stdb_row(
+                    "pos_payment",
+                    serde_json::json!({"id": payment.id}),
+                    payment,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+    );
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id: params.organization_id,
+            operation_id: "erp.hydrate_pos_order_aggregate".to_string(),
+            correlation_id: format!(
+                "pos-order-hydration:{}:{}",
+                order.id, params.archive_version
+            ),
+            changes,
+        },
+    )?;
+    Ok(())
+}
+
+fn sats_row_json<T>(row: &T) -> Result<serde_json::Value, String>
+where
+    T: spacetimedb_sats::Serialize + ?Sized,
+{
+    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(row))
+        .map_err(|error| format!("serialize hydration row: {error}"))
 }
 
 #[reducer]
