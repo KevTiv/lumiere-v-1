@@ -21,12 +21,9 @@ const TABLE: &str = "pos_order";
 const COLD_TABLE: &str = "cold_pos_order";
 const LINE_TABLE: &str = "pos_order_line";
 const PAYMENT_TABLE: &str = "pos_payment";
-// Runtime copy emitted by the same codegen pass that stages the canonical
-// contracts artifact. This keeps the API implementation aligned while a new
-// immutable contracts tag is still being prepared.
-const HYDRATION_MANIFEST_JSON: &str = include_str!("../generated/hydration-manifest.json");
+const HYDRATION_MANIFEST_JSON: &str = lumiere_contracts::manifests::HYDRATION_MANIFEST;
 const PROJECTION_CODEC_MANIFEST_JSON: &str =
-    include_str!("../generated/projection-codec-manifest.json");
+    lumiere_contracts::manifests::PROJECTION_CODEC_MANIFEST;
 const CURRENT_SCHEMA_VERSION: u32 = 1;
 const INITIAL_PLACEMENT_GENERATION: u64 = 1;
 

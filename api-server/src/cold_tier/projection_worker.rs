@@ -29,11 +29,10 @@ use stdb_client::StdbClient;
 use super::{commit_projection, migrate, pg_pool, projection_observability};
 use crate::{config::Config, state::AppState};
 
-/// Generated all-table projection codec artifact checked into the API
-/// package. Regeneration is owned by `lumiere-codegen`; this worker never
-/// accepts a caller-selected schema or SQL destination.
+/// Generated all-table projection codec artifact from the pinned contracts
+/// release. This worker never accepts a caller-selected schema or SQL destination.
 pub const PROJECTION_CODEC_MANIFEST_JSON: &str =
-    include_str!("../generated/projection-codec-manifest.json");
+    lumiere_contracts::manifests::PROJECTION_CODEC_MANIFEST;
 const MAX_CHANGES_PER_COMMIT: usize = 10_000;
 static CURSOR_SCAN_AFTER: AtomicU64 = AtomicU64::new(0);
 

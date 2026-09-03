@@ -440,7 +440,7 @@ pub async fn upsert_row(
     Ok(rows)
 }
 
-fn snake_to_camel(s: &str) -> String {
+pub(crate) fn snake_to_camel(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut upper = false;
     for c in s.chars() {

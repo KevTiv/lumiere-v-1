@@ -9,6 +9,7 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::operational_messaging::{operational_message, OperationalMessage};
+use crate::core::reconstruction::require_writes_unfenced;
 use crate::core::users::{user_organization, user_profile};
 use crate::crm::contact_identities::contact_phone_identity;
 use crate::crm::contacts::{contact, Contact};
@@ -594,6 +595,7 @@ pub fn receive_crm_provider_message(
     organization_id: u64,
     params: ReceiveCrmProviderMessageParams,
 ) -> Result<(), String> {
+    require_writes_unfenced(ctx, organization_id)?;
     require_provider_principal(ctx, organization_id, params.provider_account_id, "messages")?;
     validate_provider_identifier("provider event id", &params.provider_event_id)?;
     validate_provider_identifier("provider message id", &params.provider_message_id)?;
@@ -778,6 +780,7 @@ pub fn record_crm_provider_delivery(
     organization_id: u64,
     params: RecordCrmProviderDeliveryParams,
 ) -> Result<(), String> {
+    require_writes_unfenced(ctx, organization_id)?;
     require_provider_principal(
         ctx,
         organization_id,

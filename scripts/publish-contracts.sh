@@ -108,6 +108,9 @@ cp -R "$STAGING/bindings/." crates/lumiere-contracts/src/bindings/
 rm -rf manifests
 mkdir -p manifests
 cp -R "$STAGING/manifests/." manifests/
+# These two descriptors are companion-generated from the canonical IR. Never
+# let copies inherited from pinned staging masquerade as publisher inputs.
+rm -f manifests/application-operations.json manifests/resource-registry.json
 echo "$VERSION" > CONTRACT_VERSION
 
 # Restore contracts-owned manifests before the Rust crate enumerates them.

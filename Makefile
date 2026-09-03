@@ -994,7 +994,11 @@ check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-std
 	V2_PIN="$$CHECKOUT/ir/PIN-v2.json"; \
 	if [ ! -f "$$V2_PIN" ]; then V2_PIN="$$CHECKOUT/ir/PIN.json"; fi; \
 	diff -rq "$$CHECKOUT/crates/lumiere-contracts/src/bindings" .contracts-staging/bindings && \
-	diff -rq "$$CHECKOUT/manifests" .contracts-staging/manifests && \
+	while IFS= read -r manifest; do \
+		rel="$${manifest#.contracts-staging/manifests/}"; \
+		diff "$$CHECKOUT/manifests/$$rel" "$$manifest" || exit 1; \
+	done < <(find .contracts-staging/manifests -type f \( -name '*.json' -o -name '*.sql' \) \
+		! -name 'application-operations.json' ! -name 'resource-registry.json' | LC_ALL=C sort) && \
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean --expect-schema-hash-from "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" && \
 	python3 scripts/verify-contract-ir.py "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" --require-clean --expect-pin-from "$$V2_PIN" && \
 	python3 "$$CHECKOUT/scripts/generate-from-ir.py" --check && \

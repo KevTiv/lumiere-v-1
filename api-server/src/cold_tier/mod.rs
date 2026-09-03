@@ -36,6 +36,8 @@ pub mod pos_order_drainer;
 pub mod pos_order_read;
 pub mod projection_observability;
 pub mod projection_worker;
+pub mod reconciliation;
+pub mod reconstruction;
 
 /// The canonical read contract for one API resource request.
 ///

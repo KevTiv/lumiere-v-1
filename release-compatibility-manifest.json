@@ -1,25 +1,25 @@
 {
-  "_comment": "Checked-in C4 release compatibility contract. Update this file with every release-significant version or generated artifact change.",
+  "_comment": "Checked-in release compatibility contract. Update this file with every release-significant version or generated artifact change.",
   "schema_version": 1,
   "application_contract": {
     "ir_version": 2,
     "ir_path": "ir/lumiere-contract-ir-v2.json",
     "pin_path": "ir/PIN.json",
-    "artifact_sha256": "c2f0c2ab99d230395085ea82c64009868fb34661becf8daafd76c85984767e7e",
-    "schema_hash": "sha256:ee3b6463657677e6d3e815bab67e6bf1e604645f2c62a3ae68d3bba79a872a03",
-    "source_commit": "4c24456b6608a8073456222865b49358d042be74",
+    "artifact_sha256": "9d22e41389ae0e76aaeb5878040a4791d8481ce23e2f0f14415a35f95006fabf",
+    "schema_hash": "sha256:b03d9c90a18bd1f3001fd73e88fa11d94b24e2929fe0ce46c483bde6bbee271c",
+    "source_commit": "0c8cd2085d3b36dda3e97347c1a0bab24a341bdf",
     "source_repository": "https://github.com/KevTiv/lumiere-v-1.git"
   },
   "lumiere_contracts": {
     "package": "lumiere-contracts",
-    "version": "0.3.27",
-    "tag": "v0.3.27",
-    "revision": "b230a446fe43db5881efe332633a45e62df4cb09",
+    "version": "0.3.28",
+    "tag": "v0.3.28",
+    "revision": "2c330911e60f29b8ccc869cca756400b41cc74ba",
     "repository": "ssh://git@github.com/KevTiv/lumiere-contracts.git"
   },
   "operation_history": {
     "path": "lumiere-codegen/contract-operation-history.json",
-    "checksum": "sha256:df6b510b7e6fa8162bf026608fbb945c5e3c7b80ca7286987b0364193b553f06"
+    "checksum": "sha256:1ad2c66a031152c4166b45f7a073767a009461b570a289b24ed293dc78ad561a"
   },
   "stdb_module": {
     "name": "lumiere_v1",
@@ -31,9 +31,9 @@
   "durable_postgres": {
     "migration_version": 1,
     "migration_name": "0001_durable_projection",
-    "sql_path": "api-server/src/generated/pg_ddl/migrations/0001_durable_projection.sql",
-    "manifest_path": "api-server/src/generated/pg_ddl/durable-pg-schema-manifest.json",
-    "checksum": "sha256:34ae9c41dfef83c3486f6a549e21caecc85c319ee97185897a113f45c6b3d5da"
+    "sql_path": "manifests/pg_ddl/migrations/0001_durable_projection.sql",
+    "manifest_path": "manifests/durable-pg-schema-manifest.json",
+    "checksum": "sha256:d517615dc1597f83da009550c5998f05976b845e22857b0d43c84e3f50e723c0"
   },
   "services": {
     "api_server": {
@@ -48,7 +48,7 @@
   "minimum_client_contract": {
     "version": "ir-v2",
     "ir_version": 2,
-    "generated_contract_release": "0.3.27"
+    "generated_contract_release": "0.3.28"
   },
   "deployment": {
     "config_generation": 1,

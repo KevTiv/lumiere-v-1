@@ -17,7 +17,8 @@ use stdb_client::StdbClient;
 use super::pg_codec::{self, ColumnCodec};
 
 const PROJECTION_CODEC_MANIFEST_JSON: &str =
-    include_str!("../generated/projection-codec-manifest.json");
+    lumiere_contracts::manifests::PROJECTION_CODEC_MANIFEST;
+const RECONSTRUCTION_MANIFEST_JSON: &str = lumiere_contracts::manifests::RECONSTRUCTION_MANIFEST;
 const MAX_ROWS_PER_TABLE: usize = 100_000;
 
 #[derive(Debug, Clone)]
@@ -86,7 +87,7 @@ pub async fn reconcile_organization(
     require_server_identity(stdb)?;
     verify_declared_watermark(stdb, pool, organization_id, watermark).await?;
 
-    let relations = load_relations(PROJECTION_CODEC_MANIFEST_JSON)?;
+    let relations = load_relations(PROJECTION_CODEC_MANIFEST_JSON, RECONSTRUCTION_MANIFEST_JSON)?;
     let client = pool
         .get()
         .await
@@ -221,7 +222,10 @@ async fn verify_declared_watermark(
     Ok(())
 }
 
-fn load_relations(manifest_json: &str) -> Result<Vec<ReconciliationRelation>> {
+fn load_relations(
+    manifest_json: &str,
+    reconstruction_manifest_json: &str,
+) -> Result<Vec<ReconciliationRelation>> {
     let manifest: Value =
         serde_json::from_str(manifest_json).context("parse generated projection codec manifest")?;
     if manifest["checksum_algo"].as_str() != Some("sha256")
@@ -232,9 +236,24 @@ fn load_relations(manifest_json: &str) -> Result<Vec<ReconciliationRelation>> {
     let tables = manifest["tables"]
         .as_object()
         .ok_or_else(|| anyhow!("projection codec manifest has no tables"))?;
+    let reconstruction: Value = serde_json::from_str(reconstruction_manifest_json)
+        .context("parse generated reconstruction manifest")?;
+    let recreated = reconstruction["recreate_order"]
+        .as_array()
+        .ok_or_else(|| anyhow!("reconstruction manifest has no recreate_order"))?
+        .iter()
+        .map(|table| {
+            table
+                .as_str()
+                .ok_or_else(|| anyhow!("reconstruction recreate table must be a string"))
+        })
+        .collect::<Result<std::collections::BTreeSet<_>>>()?;
     let mut relations = Vec::with_capacity(tables.len());
     for (table, metadata) in tables {
         validate_identifier(table)?;
+        if recreated.contains(table.as_str()) {
+            continue;
+        }
         // This is deliberately an organization command. Global platform
         // tables have no organization column and belong to a separate restore
         // scope; including them here would compare unrelated tenants.
@@ -343,8 +362,13 @@ mod tests {
 
     #[test]
     fn generated_manifest_produces_closed_sorted_relation_plan() {
-        let relations = load_relations(PROJECTION_CODEC_MANIFEST_JSON).unwrap();
-        assert!(relations.len() >= 450);
+        let relations =
+            load_relations(PROJECTION_CODEC_MANIFEST_JSON, RECONSTRUCTION_MANIFEST_JSON).unwrap();
+        let reconstruction: Value = serde_json::from_str(RECONSTRUCTION_MANIFEST_JSON).unwrap();
+        assert_eq!(
+            relations.len(),
+            reconstruction["tables"].as_array().unwrap().len()
+        );
         assert!(relations
             .windows(2)
             .all(|pair| pair[0].table < pair[1].table));
@@ -353,6 +377,12 @@ mod tests {
                 .columns
                 .iter()
                 .any(|column| column.name == relation.organization_column)
+        }));
+        assert!(!relations.iter().any(|relation| {
+            matches!(
+                relation.table.as_str(),
+                "organization_reconstruction_fence" | "organization_reconstruction_batch_receipt"
+            )
         }));
     }
 
@@ -418,7 +448,7 @@ mod tests {
             "canonical_serialization":"json_sorted_keys_no_whitespace",
             "tables":{"safe;drop":{"organization_column":"organization_id","primary_key":{"name":"id"},"columns":[]}}
         }"#;
-        assert!(load_relations(manifest)
+        assert!(load_relations(manifest, RECONSTRUCTION_MANIFEST_JSON)
             .unwrap_err()
             .to_string()
             .contains("unsafe"));

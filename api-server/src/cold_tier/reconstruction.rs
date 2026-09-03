@@ -5,15 +5,21 @@
 //! relation, reducer, SQL, or row payload crosses this boundary.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{anyhow, bail, Context, Result};
+use deadpool_postgres::Pool;
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
+use stdb_client::{ReducerCall, StdbClient};
+
+use super::{pg_codec, reconciliation};
 
 pub const RECONSTRUCTION_MANIFEST_JSON: &str =
-    include_str!("../generated/reconstruction-manifest.json");
+    lumiere_contracts::manifests::RECONSTRUCTION_MANIFEST;
 const MAX_BATCH_SIZE: u32 = 256;
+const MAX_DIGEST_ROWS: usize = 100_000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DurableWatermark {
@@ -181,7 +187,358 @@ pub trait ReconstructionSink {
         fence: &ReconstructionFence,
         table: &RestoreTable,
     ) -> Result<TableDigest>;
+    async fn verify_before_release(&self, fence: &ReconstructionFence) -> Result<()>;
     async fn release_fence(&self, fence: &ReconstructionFence) -> Result<()>;
+}
+
+/// Durable reconstruction reader. Every relation and column is resolved from
+/// the pinned generated manifests; callers cannot select SQL identifiers.
+#[derive(Clone)]
+pub struct PgReconstructionSource {
+    pool: Pool,
+}
+
+impl PgReconstructionSource {
+    #[must_use]
+    pub fn new(pool: Pool) -> Self {
+        Self { pool }
+    }
+
+    fn columns(&self, table: &RestoreTable) -> Result<Vec<pg_codec::ColumnCodec>> {
+        pg_codec::load_columns(
+            lumiere_contracts::manifests::PROJECTION_CODEC_MANIFEST,
+            &table.table,
+        )
+        .with_context(|| format!("load generated codec for '{}'", table.table))
+    }
+}
+
+impl ReconstructionSource for PgReconstructionSource {
+    async fn declared_watermark(&self, organization_id: u64) -> Result<DurableWatermark> {
+        let client = self
+            .pool
+            .get()
+            .await
+            .context("get PG reconstruction client")?;
+        let organization_id = organization_id.to_string();
+        let row = client
+            .query_opt(
+                "SELECT applied_sequence::TEXT, commit_checksum FROM organization_projection_watermark WHERE organization_id = $1::TEXT::NUMERIC",
+                &[&organization_id],
+            )
+            .await
+            .context("read durable reconstruction watermark")?
+            .ok_or_else(|| anyhow!("organization has no durable projection watermark"))?;
+        Ok(DurableWatermark {
+            sequence: row
+                .get::<_, String>(0)
+                .parse()
+                .context("decode durable reconstruction sequence")?,
+            commit_checksum: row.get(1),
+        })
+    }
+
+    async fn load_batch(
+        &self,
+        organization_id: u64,
+        watermark: &DurableWatermark,
+        table: &RestoreTable,
+        after_identity: Option<&Value>,
+        limit: u32,
+    ) -> Result<Vec<RestoreRow>> {
+        if !(1..=MAX_BATCH_SIZE).contains(&limit) {
+            bail!("PG reconstruction batch limit is out of bounds");
+        }
+        let columns = self.columns(table)?;
+        let primary = columns
+            .iter()
+            .find(|column| column.name == table.primary_key)
+            .ok_or_else(|| anyhow!("generated codec lacks reconstruction primary key"))?;
+        let projection = pg_codec::projection_with_pg_casts(&columns)
+            .into_iter()
+            .map(|column| {
+                let (name, suffix) = column.split_once("::").unwrap_or((&column, ""));
+                if suffix.is_empty() {
+                    quote_identifier(name)
+                } else {
+                    format!("{}::{suffix}", quote_identifier(name))
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let organization_id_text = organization_id.to_string();
+        let after_text = after_identity
+            .map(|identity| identity_text(identity, &table.primary_key))
+            .transpose()?;
+        let comparison = match (after_text.as_ref(), primary.pg_type.as_str()) {
+            (None, _) => String::new(),
+            (Some(_), "NUMERIC(20,0)") => {
+                format!(
+                    " AND {} > $2::TEXT::NUMERIC",
+                    quote_identifier(&table.primary_key)
+                )
+            }
+            (Some(_), "TEXT") => format!(" AND {} > $2", quote_identifier(&table.primary_key)),
+            (Some(_), other) => bail!("unsupported reconstruction primary key type '{other}'"),
+        };
+        let sql = format!(
+            "SELECT {projection} FROM {table_name} WHERE {organization_column} = $1::TEXT::NUMERIC{comparison} ORDER BY {primary_key} ASC LIMIT {limit}",
+            table_name = quote_identifier(&table.table),
+            organization_column = quote_identifier(&table.organization_column),
+            primary_key = quote_identifier(&table.primary_key),
+        );
+        let client = self
+            .pool
+            .get()
+            .await
+            .context("get PG reconstruction client")?;
+        let rows = if let Some(after) = after_text.as_ref() {
+            client.query(&sql, &[&organization_id_text, after]).await
+        } else {
+            client.query(&sql, &[&organization_id_text]).await
+        }
+        .with_context(|| format!("read durable reconstruction table '{}'", table.table))?;
+        ensure_watermark(self, organization_id, watermark).await?;
+        rows.iter()
+            .map(|row| {
+                let value = pg_codec::row_to_hot_json(&columns, row)?;
+                let primary_json = value
+                    .get(pg_codec::snake_to_camel(&table.primary_key))
+                    .cloned()
+                    .ok_or_else(|| anyhow!("decoded reconstruction row lacks primary key"))?;
+                Ok(RestoreRow {
+                    identity: json!({ table.primary_key.clone(): primary_json }),
+                    checksum: canonical_checksum(&value)?,
+                    row: value,
+                })
+            })
+            .collect()
+    }
+
+    async fn table_digest(
+        &self,
+        organization_id: u64,
+        watermark: &DurableWatermark,
+        table: &RestoreTable,
+    ) -> Result<TableDigest> {
+        let rows = load_all_pg_rows(self, organization_id, watermark, table).await?;
+        digest_rows(&rows)
+    }
+}
+
+/// Trusted STDB reconstruction adapter. It owns the server identity and the
+/// run identity used by every reducer call.
+pub struct StdbReconstructionSink<'a> {
+    stdb: &'a StdbClient,
+    pool: &'a Pool,
+    run_id: String,
+    placement_generation: u64,
+    fence_acquired: AtomicBool,
+}
+
+impl<'a> StdbReconstructionSink<'a> {
+    pub fn new(
+        stdb: &'a StdbClient,
+        pool: &'a Pool,
+        run_id: impl Into<String>,
+        placement_generation: u64,
+    ) -> Result<Self> {
+        require_server_identity(stdb)?;
+        let run_id = run_id.into();
+        validate_run_id(&run_id)?;
+        if placement_generation == 0 {
+            bail!("reconstruction placement generation must be non-zero");
+        }
+        Ok(Self {
+            stdb,
+            pool,
+            run_id,
+            placement_generation,
+            fence_acquired: AtomicBool::new(false),
+        })
+    }
+
+    #[must_use]
+    pub fn has_acquired_fence(&self) -> bool {
+        self.fence_acquired.load(Ordering::Acquire)
+    }
+
+    pub async fn mark_failed(&self, organization_id: u64, error: &anyhow::Error) -> Result<()> {
+        let mut failure = format!("{error:#}");
+        if failure.len() > 1024 {
+            let mut end = 1024;
+            while !failure.is_char_boundary(end) {
+                end -= 1;
+            }
+            failure.truncate(end);
+        }
+        self.call(
+            "fail_organization_reconstruction",
+            json!([organization_id, self.run_id, failure]),
+        )
+        .await
+    }
+
+    async fn call(&self, reducer: &str, args: Value) -> Result<()> {
+        self.stdb
+            .call_reducer(ReducerCall::from_name(reducer, args))
+            .await
+            .with_context(|| format!("call trusted reconstruction reducer '{reducer}'"))
+    }
+}
+
+impl ReconstructionSink for StdbReconstructionSink<'_> {
+    async fn acquire_fence(
+        &self,
+        organization_id: u64,
+        watermark: &DurableWatermark,
+    ) -> Result<ReconstructionFence> {
+        self.call(
+            "begin_organization_reconstruction",
+            json!([
+                organization_id,
+                self.run_id,
+                self.placement_generation,
+                watermark.sequence
+            ]),
+        )
+        .await?;
+        self.fence_acquired.store(true, Ordering::Release);
+        Ok(ReconstructionFence {
+            token: self.run_id.clone(),
+            organization_id,
+            watermark: watermark.clone(),
+        })
+    }
+
+    async fn apply_batch(
+        &self,
+        fence: &ReconstructionFence,
+        table: &RestoreTable,
+        batch_ordinal: u64,
+        is_last_batch: bool,
+        rows: &[RestoreRow],
+    ) -> Result<ApplyDisposition> {
+        let rows_json = rows
+            .iter()
+            .map(|row| canonical_json(&row.row))
+            .collect::<Result<Vec<_>>>()?;
+        self.call(
+            "apply_organization_reconstruction_batch",
+            json!([
+                fence.organization_id,
+                fence.token,
+                table.table,
+                table.restore_order,
+                batch_ordinal,
+                is_last_batch,
+                rows_json
+            ]),
+        )
+        .await?;
+        Ok(ApplyDisposition::Applied)
+    }
+
+    async fn table_digest(
+        &self,
+        fence: &ReconstructionFence,
+        table: &RestoreTable,
+    ) -> Result<TableDigest> {
+        let columns = pg_codec::load_columns(
+            lumiere_contracts::manifests::PROJECTION_CODEC_MANIFEST,
+            &table.table,
+        )?;
+        let projection = columns
+            .iter()
+            .map(|column| column.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
+            "SELECT {projection} FROM `{}` WHERE {} = {} ORDER BY {} ASC LIMIT {}",
+            table.table,
+            table.organization_column,
+            fence.organization_id,
+            table.primary_key,
+            MAX_DIGEST_ROWS + 1,
+        );
+        let rows = self.stdb.query_sql(&sql).await?;
+        if rows.len() > MAX_DIGEST_ROWS {
+            bail!("STDB reconstruction digest exceeds bounded row limit");
+        }
+        digest_rows(&rows)
+    }
+
+    async fn verify_before_release(&self, fence: &ReconstructionFence) -> Result<()> {
+        let report = reconciliation::reconcile_organization(
+            self.stdb,
+            self.pool,
+            fence.organization_id,
+            fence.watermark.sequence,
+        )
+        .await
+        .context("reconcile reconstructed organization before releasing fence")?;
+        if !report.matches() {
+            let mismatches = report
+                .mismatches()
+                .into_iter()
+                .map(|table| table.table.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            bail!("reconstruction reconciliation mismatch: {mismatches}");
+        }
+        Ok(())
+    }
+
+    async fn release_fence(&self, fence: &ReconstructionFence) -> Result<()> {
+        self.call(
+            "complete_organization_reconstruction",
+            json!([
+                fence.organization_id,
+                fence.token,
+                self.placement_generation,
+                fence.watermark.sequence
+            ]),
+        )
+        .await
+    }
+}
+
+/// Execute one complete durable reconstruction. Any failure after fence
+/// acquisition is persisted as a failed fence; completion happens only after
+/// whole-organization PG/STDB reconciliation succeeds.
+pub async fn reconstruct_organization_once(
+    stdb: &StdbClient,
+    pool: &Pool,
+    organization_id: u64,
+    requested: DurableWatermark,
+    run_id: impl Into<String>,
+    placement_generation: u64,
+) -> Result<ReconstructionReport> {
+    let source = PgReconstructionSource::new(pool.clone());
+    let sink = StdbReconstructionSink::new(stdb, pool, run_id, placement_generation)?;
+    let catalog = RestoreCatalog::generated()?;
+    match reconstruct_organization(
+        &source,
+        &sink,
+        &catalog,
+        organization_id,
+        requested,
+        MAX_BATCH_SIZE,
+    )
+    .await
+    {
+        Ok(report) => Ok(report),
+        Err(error) => {
+            if sink.has_acquired_fence() {
+                if let Err(mark_error) = sink.mark_failed(organization_id, &error).await {
+                    return Err(error.context(format!(
+                        "also failed to persist reconstruction fence failure: {mark_error:#}"
+                    )));
+                }
+            }
+            Err(error)
+        }
+    }
 }
 
 /// Restore an organization at exactly the requested durable watermark.
@@ -255,6 +612,9 @@ pub async fn reconstruct_organization<S: ReconstructionSource, T: Reconstruction
             bail!("reconstruction digest mismatch for table '{}'", table.table);
         }
     }
+    sink.verify_before_release(&fence)
+        .await
+        .context("verify reconstruction before releasing writer fence")?;
     sink.release_fence(&fence)
         .await
         .context("release reconstruction writer fence")?;
@@ -287,14 +647,15 @@ fn validate_rows(
             .row
             .as_object()
             .ok_or_else(|| anyhow!("restore row payload must be an object"))?;
-        if object.get(&table.primary_key) != identity.get(&table.primary_key) {
+        let primary_json_key = pg_codec::snake_to_camel(&table.primary_key);
+        if object.get(&primary_json_key) != identity.get(&table.primary_key) {
             bail!("restore row identity does not match its payload");
         }
-        if object.get(&table.organization_column).and_then(json_u64) != Some(organization_id) {
+        let organization_json_key = pg_codec::snake_to_camel(&table.organization_column);
+        if object.get(&organization_json_key).and_then(json_u64) != Some(organization_id) {
             bail!("restore row belongs to a different organization");
         }
-        let encoded = serde_json::to_vec(&row.row).context("encode restore row payload")?;
-        if row.checksum != hex::encode(Sha256::digest(encoded)) {
+        if row.checksum != canonical_checksum(&row.row)? {
             bail!("restore row checksum does not match its payload");
         }
         let current = identity_key(&row.identity, &table.primary_key)?;
@@ -320,6 +681,128 @@ fn identity_key(value: &Value, primary_key: &str) -> Result<(u8, String)> {
         return Ok((1, text.to_owned()));
     }
     bail!("restore row primary key must be a string or unsigned integer")
+}
+
+fn identity_text(value: &Value, primary_key: &str) -> Result<String> {
+    let value = value
+        .get(primary_key)
+        .ok_or_else(|| anyhow!("restore row identity lacks generated primary key"))?;
+    if let Some(number) = value.as_u64() {
+        return Ok(number.to_string());
+    }
+    value
+        .as_str()
+        .map(str::to_owned)
+        .ok_or_else(|| anyhow!("restore row primary key must be a string or unsigned integer"))
+}
+
+async fn ensure_watermark(
+    source: &PgReconstructionSource,
+    organization_id: u64,
+    expected: &DurableWatermark,
+) -> Result<()> {
+    if source.declared_watermark(organization_id).await? != *expected {
+        bail!("durable watermark changed during reconstruction");
+    }
+    Ok(())
+}
+
+async fn load_all_pg_rows(
+    source: &PgReconstructionSource,
+    organization_id: u64,
+    watermark: &DurableWatermark,
+    table: &RestoreTable,
+) -> Result<Vec<Value>> {
+    let mut values = Vec::new();
+    let mut after = None;
+    loop {
+        let batch = source
+            .load_batch(
+                organization_id,
+                watermark,
+                table,
+                after.as_ref(),
+                MAX_BATCH_SIZE,
+            )
+            .await?;
+        if values.len() + batch.len() > MAX_DIGEST_ROWS {
+            bail!("PG reconstruction digest exceeds bounded row limit");
+        }
+        let is_last = batch.len() < MAX_BATCH_SIZE as usize;
+        after = batch.last().map(|row| row.identity.clone());
+        values.extend(batch.into_iter().map(|row| row.row));
+        if is_last {
+            break;
+        }
+    }
+    Ok(values)
+}
+
+fn digest_rows(rows: &[Value]) -> Result<TableDigest> {
+    let mut canonical = rows
+        .iter()
+        .map(canonical_json)
+        .collect::<Result<Vec<_>>>()?;
+    canonical.sort();
+    let mut digest = Sha256::new();
+    for row in canonical {
+        digest.update(row.as_bytes());
+        digest.update(b"\n");
+    }
+    Ok(TableDigest {
+        row_count: rows.len() as u64,
+        checksum: hex::encode(digest.finalize()),
+    })
+}
+
+fn canonical_checksum(value: &Value) -> Result<String> {
+    Ok(hex::encode(Sha256::digest(
+        canonical_json(value)?.as_bytes(),
+    )))
+}
+
+fn canonical_json(value: &Value) -> Result<String> {
+    serde_json::to_string(&canonical_value(value)).context("serialize canonical reconstruction row")
+}
+
+fn canonical_value(value: &Value) -> Value {
+    match value {
+        Value::Object(object) => {
+            let mut keys = object.keys().collect::<Vec<_>>();
+            keys.sort();
+            let mut canonical = Map::new();
+            for key in keys {
+                canonical.insert(key.clone(), canonical_value(&object[key]));
+            }
+            Value::Object(canonical)
+        }
+        Value::Array(values) => Value::Array(values.iter().map(canonical_value).collect()),
+        other => other.clone(),
+    }
+}
+
+fn validate_run_id(run_id: &str) -> Result<()> {
+    if run_id.is_empty()
+        || run_id.len() > 128
+        || !run_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b':'))
+    {
+        bail!("reconstruction run_id has an invalid shape");
+    }
+    Ok(())
+}
+
+fn quote_identifier(identifier: &str) -> String {
+    debug_assert!(validate_identifier("SQL identifier", identifier).is_ok());
+    format!("\"{identifier}\"")
+}
+
+fn require_server_identity(stdb: &StdbClient) -> Result<()> {
+    if stdb.token().trim().is_empty() || stdb.token() == "local-dev-token" {
+        bail!("reconstruction requires a configured STDB server/admin identity");
+    }
+    Ok(())
 }
 
 fn validate_identifier(label: &str, value: &str) -> Result<()> {
@@ -384,8 +867,8 @@ mod tests {
     }
 
     fn restore_row(table: &RestoreTable, organization_id: u64) -> RestoreRow {
-        let row = json!({"id": table.restore_order, "organization_id": organization_id});
-        let checksum = hex::encode(Sha256::digest(serde_json::to_vec(&row).unwrap()));
+        let row = json!({"id": table.restore_order, "organizationId": organization_id});
+        let checksum = canonical_checksum(&row).unwrap();
         RestoreRow {
             identity: json!({"id": table.restore_order}),
             row,
@@ -470,6 +953,11 @@ mod tests {
             }))
         }
 
+        async fn verify_before_release(&self, _: &ReconstructionFence) -> Result<()> {
+            self.events.lock().unwrap().push("verify".into());
+            Ok(())
+        }
+
         async fn release_fence(&self, _: &ReconstructionFence) -> Result<()> {
             self.events.lock().unwrap().push("release".into());
             Ok(())
@@ -493,7 +981,7 @@ mod tests {
         assert_eq!((report.restored_tables, report.restored_rows), (2, 2));
         assert_eq!(
             *sink.events.lock().unwrap(),
-            ["fence", "organization", "sale_order", "release"]
+            ["fence", "organization", "sale_order", "verify", "release"]
         );
     }
 

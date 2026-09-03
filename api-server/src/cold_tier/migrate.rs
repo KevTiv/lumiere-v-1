@@ -72,42 +72,42 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "durable_projection",
         change_set: 1,
         phase: MigrationPhase::Expand,
-        sql: include_str!("../generated/pg_ddl/migrations/0001_durable_projection.sql"),
+        sql: lumiere_contracts::manifests::PG_DDL_MIGRATIONS_0001_DURABLE_PROJECTION,
     },
     Migration {
         version: 2,
         name: "cold_audit_log",
         change_set: 1,
         phase: MigrationPhase::Expand,
-        sql: include_str!("../generated/pg_ddl/cold_audit_log.sql"),
+        sql: lumiere_contracts::manifests::PG_DDL_COLD_AUDIT_LOG,
     },
     Migration {
         version: 3,
         name: "cold_pos_order",
         change_set: 1,
         phase: MigrationPhase::Expand,
-        sql: include_str!("../generated/pg_ddl/cold_pos_order.sql"),
+        sql: lumiere_contracts::manifests::PG_DDL_COLD_POS_ORDER,
     },
     Migration {
         version: 4,
         name: "organization_projection_watermark",
         change_set: 1,
         phase: MigrationPhase::Expand,
-        sql: include_str!("../generated/pg_ddl/organization_projection_watermark.sql"),
+        sql: lumiere_contracts::manifests::PG_DDL_ORGANIZATION_PROJECTION_WATERMARK,
     },
     Migration {
         version: 5,
         name: "organization_projection_quarantine",
         change_set: 1,
         phase: MigrationPhase::Expand,
-        sql: include_str!("../generated/pg_ddl/organization_projection_quarantine.sql"),
+        sql: lumiere_contracts::manifests::PG_DDL_ORGANIZATION_PROJECTION_QUARANTINE,
     },
     Migration {
         version: 6,
         name: "organization_projection_status",
         change_set: 1,
         phase: MigrationPhase::Expand,
-        sql: include_str!("../generated/pg_ddl/organization_projection_status.sql"),
+        sql: lumiere_contracts::manifests::PG_DDL_ORGANIZATION_PROJECTION_STATUS,
     },
     Migration {
         version: 7,
@@ -140,8 +140,7 @@ create table if not exists lumiere_schema_migrations (
 /// `pg_advisory_xact_lock` releases this lock automatically if the connection
 /// or transaction fails, so a crashed drainer cannot strand future startups.
 const MIGRATION_LOCK_KEY: i64 = 0x4c554d49455245;
-const DURABLE_SCHEMA_MANIFEST_JSON: &str =
-    include_str!("../generated/pg_ddl/durable-pg-schema-manifest.json");
+const DURABLE_SCHEMA_MANIFEST_JSON: &str = lumiere_contracts::manifests::DURABLE_PG_SCHEMA_MANIFEST;
 
 /// Return the checksum recorded for a migration's SQL.
 ///

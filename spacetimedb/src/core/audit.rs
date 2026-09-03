@@ -7,6 +7,7 @@
 ///          calling `log_audit_event` directly.
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::reconstruction::require_writes_unfenced;
 use crate::core::users::{user_organization, user_profile};
 use crate::helpers::check_permission;
 
@@ -171,6 +172,7 @@ pub fn log_audit_event(
     organization_id: u64,
     params: LogAuditEventParams,
 ) -> Result<(), String> {
+    require_writes_unfenced(ctx, organization_id)?;
     // Either a member of the org or a superuser may log events
     let is_member = ctx.db.user_organization().iter().any(|uo| {
         uo.user_identity == ctx.sender() && uo.organization_id == organization_id && uo.is_active

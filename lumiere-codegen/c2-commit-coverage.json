@@ -135,6 +135,13 @@
       "change_constructors": ["upsert_stdb_row"]
     },
     {
+      "source": "spacetimedb/src/sales/pos_transactions.rs",
+      "function": "hydrate_pos_order_aggregate_checked",
+      "operation": "hydrate_pos_order_aggregate",
+      "operation_id": "erp.hydrate_pos_order_aggregate",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
       "source": "spacetimedb/src/subscriptions/reducers.rs",
       "function": "create_subscription_from_sale_order",
       "operation": "create_subscription_from_sale_order",

@@ -188,10 +188,10 @@ def read_text(path: Path, label: str) -> str:
         fail(f"cannot read {label}: {error}")
 
 
-def verify_pg(root: Path, manifest: dict[str, Any]) -> None:
+def verify_pg(contracts: Path, manifest: dict[str, Any]) -> None:
     expected = object_field(manifest, "durable_postgres", dict)
-    sql_path = relative_path(root, expected.get("sql_path"), "durable_postgres.sql_path")
-    schema_path = relative_path(root, expected.get("manifest_path"), "durable_postgres.manifest_path")
+    sql_path = relative_path(contracts, expected.get("sql_path"), "durable_postgres.sql_path")
+    schema_path = relative_path(contracts, expected.get("manifest_path"), "durable_postgres.manifest_path")
     schema = read_json(schema_path, "durable PG schema manifest")
     migration = schema.get("migration")
     require(isinstance(migration, dict), "durable PG schema manifest has no migration section")
@@ -278,7 +278,7 @@ def main() -> None:
     verify_contract(root, manifest, contracts)
     verify_operation_history(root, contracts, manifest)
     verify_stdb(root, manifest)
-    verify_pg(root, manifest)
+    verify_pg(contracts, manifest)
     verify_services(root, manifest)
     verify_minimum_client(manifest)
     verify_deployment(root, manifest)
