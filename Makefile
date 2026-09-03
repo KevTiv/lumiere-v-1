@@ -102,7 +102,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	e2e-crm-isolation \
 	init-stack docker-dev docker-dev-iot \
-	codegen check-codegen check-contract-ir check-tenant-ownership check-storage-policy check-c2-commit-coverage check-reducer-contracts-drift check-contracts-drift \
+	codegen check-codegen check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-reducer-contracts-drift check-contracts-drift \
 	clean-contracts-live-staging lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
@@ -148,6 +148,8 @@ help-legacy:
 	@echo "  codegen                 Extract canonical contract IR plus local runtime/audit artifacts"
 	@echo "  check-codegen           Fail if generated artifacts drift from sources (CI). Requires .contracts-staging/ (see contracts-staging-from-pinned)"
 	@echo "  check-contract-ir       Validate the versioned IR envelope and both SHA-256 hashes"
+	@echo "  check-operation-history Fail on reused operation IDs or unapproved contract-shape changes"
+	@echo "  check-release-compatibility Validate pinned IR, contracts, PG migration, services, and deployment generation"
 	@echo "  check-tenant-ownership  Validate C0 direct organization ownership (required by check-codegen)"
 	@echo "  check-storage-policy    Validate C1 all-table storage census (required by check-codegen)"
 	@echo "  check-c2-commit-coverage Validate registered C2 reducer commit coverage (required by check-codegen)"
@@ -886,6 +888,16 @@ codegen: schema-snapshot
 check-contract-ir: codegen
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json
 	python3 lumiere-codegen/tests/test_contract_ir_pin.py
+	python3 scripts/verify-operation-history.py
+	python3 scripts/verify-release-manifest.py
+
+check-operation-history:
+	python3 scripts/verify-operation-history.py
+	python3 -m unittest lumiere-codegen/tests/test_operation_history.py
+
+check-release-compatibility:
+	python3 scripts/verify-release-manifest.py
+	python3 -m unittest scripts/test_verify_release_manifest.py
 
 check-tenant-ownership:
 	python3 scripts/verify-tenant-ownership.py .contracts-staging/manifests/lumiere-schema-manifest.json

@@ -372,6 +372,7 @@ def main() -> None:
                 "projection_table",
                 "module",
                 "projection_mode",
+                "postgres_access_path",
                 "primary_key",
                 "organization_column",
                 "columns",
@@ -388,6 +389,22 @@ def main() -> None:
                 fail(f"PostgreSQL projection table {table} module disagrees with storage policy")
             if projection_table.get("projection_mode") != policy_by_table[table].get("projection_mode"):
                 fail(f"PostgreSQL projection table {table} mode disagrees with storage policy")
+            requested_access_path = policy_by_table[table].get("postgres_access_path")
+            expected_access_path = (
+                "organization_index"
+                if table in {"organization_commit", "organization_row_change"}
+                else requested_access_path
+            )
+            if expected_access_path not in {
+                "organization_index",
+                "organization_partition",
+                "snapshot_key",
+                "platform_shared",
+                "external",
+            }:
+                fail(f"PostgreSQL projection table {table} has invalid storage-policy access path")
+            if projection_table.get("postgres_access_path") != expected_access_path:
+                fail(f"PostgreSQL projection table {table} access path disagrees with storage policy")
             organization_column = projection_table.get("organization_column")
             if organization_column not in (None, "organization_id"):
                 fail(f"PostgreSQL projection table {table} has invalid organization-column metadata")

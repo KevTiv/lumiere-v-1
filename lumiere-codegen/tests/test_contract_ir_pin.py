@@ -52,6 +52,7 @@ class ContractIrPinTest(unittest.TestCase):
                 "projection_table": table["name"],
                 "module": "test",
                 "projection_mode": "upsert-current",
+                "postgres_access_path": "organization_index",
                 "primary_key": {"name": projection_primary_key, "type": "U64"},
                 "columns": [
                     {
@@ -95,6 +96,7 @@ class ContractIrPinTest(unittest.TestCase):
                         "table": table["name"],
                         "module": "test",
                         "projection_mode": "upsert-current",
+                        "postgres_access_path": "organization_index",
                         "cooling_eligibility": "never",
                         "organization_column": "organization_id",
                         "primary_key": {"column": "id"},

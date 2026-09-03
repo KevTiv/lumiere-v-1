@@ -20,6 +20,7 @@ pub mod archive_manifest_emit;
 pub mod codec_emit;
 pub mod hydration_manifest_emit;
 pub mod pg_ddl_emit;
+pub mod pg_migration_emit;
 pub mod schema_ir;
 pub mod stdb_bindings_parse;
 pub mod storage_policy_manifest_emit;
@@ -160,6 +161,29 @@ pub fn run(paths: &Paths) -> Result<()> {
     println!(
         "Wrote {}",
         paths.projection_codec_manifest_api_out.display()
+    );
+
+    // ── 4b. Versioned durable PG schema and migration ────────────────────
+
+    let durable_migration =
+        pg_migration_emit::emit_durable_migration(&schema_manifest, &storage_policy_manifest)
+            .context("generating durable PostgreSQL migration")?;
+    let migration_path = paths
+        .durable_migration_dir
+        .join(format!("{}.sql", pg_migration_emit::DURABLE_MIGRATION_NAME));
+    write_file(&migration_path, &durable_migration.sql)?;
+    write_file(
+        &paths.durable_migration_manifest_out,
+        &durable_migration.manifest,
+    )?;
+    write_file(
+        &paths.durable_migration_manifest_api_out,
+        &durable_migration.manifest,
+    )?;
+    println!("Wrote {}", migration_path.display());
+    println!(
+        "Wrote {} durable PG tables (checksum {})",
+        durable_migration.applicable_table_count, durable_migration.sql_checksum
     );
 
     // ── 5. Hydration manifest: reducers that may target archived rows ──────

@@ -135,8 +135,14 @@ pub fn emit_projection_codec_manifest(
         let projection_mode = policy["projection_mode"]
             .as_str()
             .with_context(|| format!("storage policies[{i}].projection_mode is not a string"))?;
+        let postgres_access_path = policy["postgres_access_path"].as_str().with_context(|| {
+            format!("storage policies[{i}].postgres_access_path is not a string")
+        })?;
         if projection_policies
-            .insert(table.to_string(), (module, projection_mode))
+            .insert(
+                table.to_string(),
+                (module, projection_mode, postgres_access_path),
+            )
             .is_some()
         {
             anyhow::bail!("storage policy manifest has duplicate table '{table}'");
@@ -148,12 +154,20 @@ pub fn emit_projection_codec_manifest(
     let mut tables = serde_json::Map::new();
     for schema in schemas {
         let archive_table = archive_tables.get(&schema.sql_name).map(String::as_str);
-        let (module, projection_mode) = projection_policies
+        let (module, projection_mode, postgres_access_path) = projection_policies
             .get(&schema.sql_name)
             .with_context(|| format!("table '{}' lacks a storage policy", schema.sql_name))?;
+        let postgres_access_path =
+            super::pg_migration_emit::effective_access_path(&schema.sql_name, postgres_access_path);
         tables.insert(
             schema.sql_name.clone(),
-            build_projection_table_entry(schema, archive_table, module, projection_mode),
+            build_projection_table_entry(
+                schema,
+                archive_table,
+                module,
+                projection_mode,
+                postgres_access_path,
+            ),
         );
     }
 
@@ -182,6 +196,7 @@ fn build_projection_table_entry(
     archive_table: Option<&str>,
     module: &str,
     projection_mode: &str,
+    postgres_access_path: &str,
 ) -> Value {
     let columns = build_columns(schema);
     let mut entry = serde_json::Map::new();
@@ -193,6 +208,10 @@ fn build_projection_table_entry(
     entry.insert(
         "projection_mode".into(),
         Value::String(projection_mode.into()),
+    );
+    entry.insert(
+        "postgres_access_path".into(),
+        Value::String(postgres_access_path.into()),
     );
     entry.insert(
         "primary_key".into(),
@@ -386,6 +405,7 @@ mod tests {
                 } else {
                     "upsert-current"
                 },
+                "postgres_access_path": "organization_index",
             })).collect::<Vec<_>>()
         })
     }
@@ -492,12 +512,14 @@ mod tests {
         assert_eq!(country["primary_key"]["type"], "String");
         assert_eq!(country["module"], "localization");
         assert_eq!(country["projection_mode"], "upsert-current");
+        assert_eq!(country["postgres_access_path"], "organization_index");
         assert!(country.get("archive_table").is_none());
         assert!(country.get("extra_columns").is_none());
 
         let audit = &parsed["tables"]["audit_log"];
         assert_eq!(audit["module"], "platform");
         assert_eq!(audit["projection_mode"], "append-history");
+        assert_eq!(audit["postgres_access_path"], "organization_index");
     }
 
     #[test]

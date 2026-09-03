@@ -73,6 +73,7 @@ struct ProjectionCodec {
     projection_mode: ProjectionMode,
     primary_key: String,
     organization_column: String,
+    organization_partitioned: bool,
     columns: Vec<ColumnCodec>,
 }
 
@@ -346,9 +347,14 @@ fn build_upsert_sql(codec: &ProjectionCodec, value_count: usize) -> Result<Strin
             value_count + 1,
         )
     };
+    let conflict_columns = if codec.organization_partitioned {
+        format!("{organization_column}, {primary_key}")
+    } else {
+        primary_key.clone()
+    };
     Ok(format!(
         "INSERT INTO {table} AS target ({columns}) VALUES ({placeholders}) \
-         ON CONFLICT ({primary_key}) {conflict}",
+         ON CONFLICT ({conflict_columns}) {conflict}",
         columns = columns.join(", "),
         placeholders = placeholders.join(", "),
     ))
@@ -571,6 +577,17 @@ fn load_projection_codec(manifest_json: &str, table_name: &str) -> Result<Projec
     if organization_column != "organization_id" {
         bail!("projection codec has unsupported organization column");
     }
+    let organization_partitioned = match entry
+        .get("postgres_access_path")
+        .and_then(Value::as_str)
+        .ok_or_else(|| anyhow!("projection codec table lacks postgres_access_path"))?
+    {
+        "organization_partition" => true,
+        "organization_index" | "snapshot_key" | "platform_shared" | "external" => false,
+        access_path => bail!(
+            "projection codec table '{table_name}' has unsupported PostgreSQL access path '{access_path}'"
+        ),
+    };
     let primary_key = entry
         .get("primary_key")
         .and_then(|key| key.get("name"))
@@ -594,6 +611,7 @@ fn load_projection_codec(manifest_json: &str, table_name: &str) -> Result<Projec
         projection_mode,
         primary_key: primary_key.to_string(),
         organization_column: organization_column.to_string(),
+        organization_partitioned,
         columns,
     })
 }
@@ -799,6 +817,7 @@ mod tests {
                     "projection_mode": "upsert-current",
                     "primary_key": {"name": "id", "type": "U64"},
                     "organization_column": "organization_id",
+                    "postgres_access_path": "organization_index",
                     "columns": [
                         {"name":"id","stdb_type":"U64","pg_type":"NUMERIC(20,0)","nullable":false,"pg_bind":"to_sql_numeric","pg_from":"from_sql_numeric_to_string","api_json":"string"},
                         {"name":"organization_id","stdb_type":"U64","pg_type":"NUMERIC(20,0)","nullable":false,"pg_bind":"to_sql_numeric","pg_from":"from_sql_numeric_to_string","api_json":"string"},
@@ -848,6 +867,7 @@ mod tests {
                     projection_mode: ProjectionMode::UpsertCurrent,
                     primary_key: "id".into(),
                     organization_column: "organization_id".into(),
+                    organization_partitioned: false,
                     columns: vec![],
                 },
                 values: vec![],
@@ -871,6 +891,7 @@ mod tests {
             projection_mode: ProjectionMode::UpsertCurrent,
             primary_key: "id".into(),
             organization_column: "organization_id".into(),
+            organization_partitioned: false,
             columns: vec![
                 ColumnCodec {
                     name: "id".into(),
@@ -896,6 +917,11 @@ mod tests {
         assert!(sql.contains("INSERT INTO \"parent\" AS target"));
         assert!(sql.contains("ON CONFLICT (\"id\") DO UPDATE"));
         assert!(sql.contains("WHERE target.\"organization_id\" = $4::TEXT::NUMERIC"));
+
+        let mut partitioned_codec = codec.clone();
+        partitioned_codec.organization_partitioned = true;
+        let partitioned_sql = build_upsert_sql(&partitioned_codec, 3).unwrap();
+        assert!(partitioned_sql.contains("ON CONFLICT (\"organization_id\", \"id\") DO UPDATE"));
 
         let mut history_codec = codec;
         history_codec.projection_mode = ProjectionMode::AppendHistory;
@@ -1016,13 +1042,16 @@ mod tests {
 
         let config = pg_pool::PgConfig::from_env()?;
         let pool = pg_pool::build_pool(&config)?;
-        migrate::ensure_schema(&pool).await?;
+        // Reproduce the deployed C3 state first: organization projections are
+        // ordinary heap tables. The C4 baseline must adopt that layout before
+        // fresh databases begin using policy-selected hash partitions.
         let relation_count = projection_worker::ensure_projection_relations(
             &pool,
             projection_worker::PROJECTION_CODEC_MANIFEST_JSON,
         )
         .await?;
         assert!(relation_count > 0);
+        migrate::ensure_schema(&pool).await?;
 
         let now_micros = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -1533,6 +1562,7 @@ mod tests {
                     projection_mode: ProjectionMode::UpsertCurrent,
                     primary_key: String::new(),
                     organization_column: String::new(),
+                    organization_partitioned: false,
                     columns: Vec::new(),
                 },
                 values: Vec::new(),

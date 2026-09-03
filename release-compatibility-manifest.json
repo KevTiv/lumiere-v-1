@@ -1,0 +1,66 @@
+{
+  "_comment": "Checked-in C4 release compatibility contract. Update this file with every release-significant version or generated artifact change.",
+  "schema_version": 1,
+  "application_contract": {
+    "ir_version": 2,
+    "ir_path": "ir/lumiere-contract-ir-v2.json",
+    "pin_path": "ir/PIN.json",
+    "artifact_sha256": "c2f0c2ab99d230395085ea82c64009868fb34661becf8daafd76c85984767e7e",
+    "schema_hash": "sha256:ee3b6463657677e6d3e815bab67e6bf1e604645f2c62a3ae68d3bba79a872a03",
+    "source_commit": "4c24456b6608a8073456222865b49358d042be74",
+    "source_repository": "https://github.com/KevTiv/lumiere-v-1.git"
+  },
+  "lumiere_contracts": {
+    "package": "lumiere-contracts",
+    "version": "0.3.27",
+    "tag": "v0.3.27",
+    "revision": "b230a446fe43db5881efe332633a45e62df4cb09",
+    "repository": "ssh://git@github.com/KevTiv/lumiere-contracts.git"
+  },
+  "operation_history": {
+    "path": "lumiere-codegen/contract-operation-history.json",
+    "checksum": "sha256:e6d0e6edcf3404a9944919a0e612723a57251d2bef7b569a8e543ba26847d188"
+  },
+  "stdb_module": {
+    "name": "lumiere_v1",
+    "version": "0.1.0",
+    "contract_version": "ir-v2",
+    "source_path": "spacetimedb/Cargo.toml",
+    "contract_source_path": "spacetimedb/src/core/persistence.rs"
+  },
+  "durable_postgres": {
+    "migration_version": 1,
+    "migration_name": "0001_durable_projection",
+    "sql_path": "api-server/src/generated/pg_ddl/migrations/0001_durable_projection.sql",
+    "manifest_path": "api-server/src/generated/pg_ddl/durable-pg-schema-manifest.json",
+    "checksum": "sha256:34ae9c41dfef83c3486f6a549e21caecc85c319ee97185897a113f45c6b3d5da"
+  },
+  "services": {
+    "api_server": {
+      "version": "0.1.0",
+      "source_path": "api-server/Cargo.toml"
+    },
+    "web": {
+      "version": "0.1.0",
+      "source_path": "frontend/web/package.json"
+    }
+  },
+  "minimum_client_contract": {
+    "version": "ir-v2",
+    "ir_version": 2,
+    "generated_contract_release": "0.3.27"
+  },
+  "deployment": {
+    "config_generation": 1,
+    "config_sources": [
+      {
+        "path": ".env.docker.example",
+        "sha256": "789407026bd0285212ad7a5f535da2742f232e1b5ec24b5eaf534ed7bfa2a78e"
+      },
+      {
+        "path": "frontend/web/.env.example",
+        "sha256": "33e8f8b976ceb57021eb8c3803d000a4a8909bb3a3caf9d0bdfe0d49d3f3902c"
+      }
+    ]
+  }
+}
