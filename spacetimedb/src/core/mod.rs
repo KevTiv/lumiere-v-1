@@ -30,6 +30,7 @@ pub mod permissions;
 pub mod persistence;
 pub mod privacy;
 pub mod queue;
+pub mod reconstruction;
 pub mod reference;
 pub mod users;
 pub mod utm;

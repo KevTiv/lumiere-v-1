@@ -1,0 +1,27 @@
+{
+  "_comment": "Reviewed C7 reconstruction policy. The generator combines these closed durability-class decisions with schema IR and reviewed aggregate parent links; unknown classes, incomplete relationships, and unsafe phase dependencies fail closed.",
+  "version": 1,
+  "same_level_order": "table_ascending",
+  "relationship_source": "storage_policy.aggregate.parent",
+  "durability_actions": {
+    "derived_rebuildable": "recreate",
+    "durable_business_record": "restore",
+    "durable_history": "restore",
+    "durable_operational_state": "restore",
+    "external_reference": "exclude_platform",
+    "platform_control": "exclude_platform"
+  },
+  "table_actions": {
+    "organization_reconstruction_batch_receipt": "recreate",
+    "organization_reconstruction_fence": "recreate"
+  },
+  "recreated_state": {
+    "derived_rebuildable": "Recompute from restored canonical rows after durable restoration completes.",
+    "organization_reconstruction_batch_receipt": "Create target-local idempotency receipts while applying the current reconstruction run; never restore receipts from a source cell.",
+    "organization_reconstruction_fence": "Acquire a fresh target-local writer fence for the reconstruction run; never restore a stale source-cell fence."
+  },
+  "excluded_state": {
+    "external_reference": "Platform-global reference catalogs are bootstrapped independently of an organization restore.",
+    "platform_control": "Platform-global identity, credential, migration, and service-control rows are not organization state."
+  }
+}

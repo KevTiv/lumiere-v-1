@@ -107,7 +107,7 @@ mkdir -p crates/lumiere-contracts/src/bindings
 cp -R "$STAGING/bindings/." crates/lumiere-contracts/src/bindings/
 rm -rf manifests
 mkdir -p manifests
-cp "$STAGING/manifests/"*.json manifests/
+cp -R "$STAGING/manifests/." manifests/
 echo "$VERSION" > CONTRACT_VERSION
 
 # Restore contracts-owned manifests before the Rust crate enumerates them.
@@ -127,11 +127,13 @@ python3 scripts/generate-from-ir.py
   echo "pub mod generated;"
   echo
   echo "pub mod manifests {"
-  for f in manifests/*.json; do
-    name="$(basename "$f" .json)"
-    const_name="$(echo "$name" | tr 'a-z-' 'A-Z_')"
-    echo "    pub const ${const_name}: &str = include_str!(\"../../../manifests/${name}.json\");"
-  done
+  while IFS= read -r f; do
+    rel="${f#manifests/}"
+    name="${rel%.json}"
+    name="${name%.sql}"
+    const_name="$(echo "$name" | tr 'a-z/.-' 'A-Z____')"
+    echo "    pub const ${const_name}: &str = include_str!(\"../../../manifests/${rel}\");"
+  done < <(find manifests -type f \( -name '*.json' -o -name '*.sql' \) | LC_ALL=C sort)
   echo "}"
 } > crates/lumiere-contracts/src/lib.rs
 
@@ -171,7 +173,7 @@ serde_json = "1.0"
 )
 PY
 
-cargo build --manifest-path crates/lumiere-contracts/Cargo.toml
+CARGO_INCREMENTAL=0 cargo build --manifest-path crates/lumiere-contracts/Cargo.toml
 
 # TypeScript package: verbatim spacetime-generate output + lumiere-codegen
 # TS/JSON artifacts. Kept at the exact same relative paths as they had in

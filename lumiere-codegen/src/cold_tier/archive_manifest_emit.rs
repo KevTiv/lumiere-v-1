@@ -100,7 +100,7 @@ pub fn emit_archive_manifest_from_storage_policy(
             "aggregate": policy.aggregate,
             "dependency_behavior": policy.dependency_behavior,
             "hydration_policy": policy.hydration_policy,
-            "pg_ddl_file": format!("api-server/src/generated/pg_ddl/{}.sql", archive.cold_table)
+            "pg_ddl_file": format!("manifests/pg_ddl/{}.sql", archive.cold_table)
         });
         out_candidates.push(entry);
     }
@@ -249,7 +249,7 @@ pub fn emit_archive_manifest(
             .unwrap_or_default();
 
         // Build the output entry.
-        let pg_ddl_file = format!("api-server/src/generated/pg_ddl/{cold_table}.sql");
+        let pg_ddl_file = format!("manifests/pg_ddl/{cold_table}.sql");
         let entry = serde_json::json!({
             "table": table,
             "cold_table": cold_table,

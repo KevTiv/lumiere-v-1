@@ -1,6 +1,6 @@
 //! Cold-tier schema pipeline: SpacetimeDB-generated Rust bindings → Lumiere
 //! schema IR → total storage policy, archive manifest, PG DDL, codec manifest,
-//! hydration manifest.
+//! hydration and reconstruction manifests.
 //!
 //! Steps run strictly in order because each later step consumes the schema
 //! manifest or the total storage-policy census produced/validated by an
@@ -15,12 +15,16 @@
 //!    and all projection tables
 //! 6. `hydration_manifest_emit` — reducers that may target archived rows
 //!    (validated against the schema manifest + active candidate set)
+//! 7. `reconstruction_manifest_emit` — reviewed aggregate relationships and
+//!    deterministic parent-before-child organization restore order
 
 pub mod archive_manifest_emit;
 pub mod codec_emit;
 pub mod hydration_manifest_emit;
 pub mod pg_ddl_emit;
 pub mod pg_migration_emit;
+pub mod reconstruction_apply_emit;
+pub mod reconstruction_manifest_emit;
 pub mod schema_ir;
 pub mod stdb_bindings_parse;
 pub mod storage_policy_manifest_emit;
@@ -30,6 +34,20 @@ use crate::support::{read_to_string, write_file};
 use anyhow::{Context, Result};
 use schema_ir::{GeneratedTableOwnership, LumiereSchemaManifest, OwnershipCounts};
 use serde_json::Value;
+
+/// Fast path for regenerating the closed STDB apply dispatch from an already
+/// generated canonical contracts manifest.
+pub fn run_reconstruction_apply(paths: &Paths) -> Result<()> {
+    let manifest_json = read_to_string(&paths.reconstruction_manifest_out)?;
+    let generated = reconstruction_apply_emit::emit_reconstruction_apply(
+        &manifest_json,
+        &paths.spacetimedb_src_dir,
+    )
+    .context("generating closed SpacetimeDB reconstruction apply dispatch")?;
+    write_file(&paths.reconstruction_apply_rust_out, &generated)?;
+    println!("Wrote {}", paths.reconstruction_apply_rust_out.display());
+    Ok(())
+}
 
 pub fn run(paths: &Paths) -> Result<()> {
     // ── 1. Schema IR: STDB Rust bindings → lumiere-schema-manifest.json ────
@@ -155,15 +173,7 @@ pub fn run(paths: &Paths) -> Result<()> {
         &paths.projection_codec_manifest_out,
         &projection_codec_manifest_json,
     )?;
-    write_file(
-        &paths.projection_codec_manifest_api_out,
-        &projection_codec_manifest_json,
-    )?;
     println!("Wrote {}", paths.projection_codec_manifest_out.display());
-    println!(
-        "Wrote {}",
-        paths.projection_codec_manifest_api_out.display()
-    );
 
     // ── 4b. Versioned durable PG schema and migration ────────────────────
 
@@ -176,10 +186,6 @@ pub fn run(paths: &Paths) -> Result<()> {
     write_file(&migration_path, &durable_migration.sql)?;
     write_file(
         &paths.durable_migration_manifest_out,
-        &durable_migration.manifest,
-    )?;
-    write_file(
-        &paths.durable_migration_manifest_api_out,
         &durable_migration.manifest,
     )?;
     println!("Wrote {}", migration_path.display());
@@ -206,9 +212,33 @@ pub fn run(paths: &Paths) -> Result<()> {
     )
     .context("generating hydration manifest")?;
     write_file(&paths.hydration_manifest_out, &hydration_manifest_json)?;
-    write_file(&paths.hydration_manifest_api_out, &hydration_manifest_json)?;
     println!("Wrote {}", paths.hydration_manifest_out.display());
-    println!("Wrote {}", paths.hydration_manifest_api_out.display());
+
+    // ── 6. Reconstruction: reviewed relations + parent-first order ─────
+
+    let reconstruction_policy_json = read_to_string(&paths.reconstruction_policy_json)?;
+    let reconstruction_manifest_json = reconstruction_manifest_emit::emit_reconstruction_manifest(
+        &reconstruction_policy_json,
+        &schema_manifest,
+        &storage_policy_manifest,
+        &durable_schema_manifest,
+    )
+    .context("generating reconstruction manifest")?;
+    write_file(
+        &paths.reconstruction_manifest_out,
+        &reconstruction_manifest_json,
+    )?;
+    let reconstruction_apply_rust = reconstruction_apply_emit::emit_reconstruction_apply(
+        &reconstruction_manifest_json,
+        &paths.spacetimedb_src_dir,
+    )
+    .context("generating closed SpacetimeDB reconstruction apply dispatch")?;
+    write_file(
+        &paths.reconstruction_apply_rust_out,
+        &reconstruction_apply_rust,
+    )?;
+    println!("Wrote {}", paths.reconstruction_manifest_out.display());
+    println!("Wrote {}", paths.reconstruction_apply_rust_out.display());
 
     println!(
         "lumiere-codegen: {} tables in schema IR ({} enum types) from {}",

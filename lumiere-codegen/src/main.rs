@@ -3,7 +3,7 @@
 //! 1. [`frontend_registry`] — resource registry + STDB types → frontend TS/JSON
 //! 2. [`erp_org_sql`] — ERP org-subscription SQL, cross-checked against the registry
 //! 3. [`query_exec_audit`] — lints `query_exec.rs` against the registry (no writes)
-//! 4. [`cold_tier`] — STDB bindings → schema IR → PG DDL/codec/archive/hydration manifests
+//! 4. [`cold_tier`] — STDB bindings → schema IR → PG/archive/hydration/reconstruction manifests
 //! 5. [`contract_ir`] — canonical, versioned handoff for downstream emitters
 //!
 //! ```text
@@ -32,6 +32,9 @@ use support::read_to_string;
 fn main() -> Result<()> {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let paths = Paths::resolve(manifest_dir);
+    if std::env::args().any(|arg| arg == "--reconstruction-apply-only") {
+        return cold_tier::run_reconstruction_apply(&paths);
+    }
     let registry_text = read_to_string(&paths.resource_registry_json)?;
 
     frontend_registry::run(&paths, &registry_text)?;

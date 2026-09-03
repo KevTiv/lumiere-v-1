@@ -97,7 +97,7 @@ pub fn emit_durable_migration(
         "migration": {
             "version": DURABLE_MIGRATION_VERSION,
             "name": DURABLE_MIGRATION_NAME,
-            "sql_file": format!("api-server/src/generated/pg_ddl/migrations/{DURABLE_MIGRATION_NAME}.sql"),
+            "sql_file": format!("manifests/pg_ddl/migrations/{DURABLE_MIGRATION_NAME}.sql"),
             "checksum": sql_checksum,
             "table_count": applicable_table_count,
             "policy_count": policies.len(),

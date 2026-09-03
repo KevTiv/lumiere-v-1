@@ -41,13 +41,14 @@ pub struct Paths {
     pub cold_ddl_dir: PathBuf,
     pub codec_manifest_out: PathBuf,
     pub projection_codec_manifest_out: PathBuf,
-    pub projection_codec_manifest_api_out: PathBuf,
     pub durable_migration_dir: PathBuf,
     pub durable_migration_manifest_out: PathBuf,
-    pub durable_migration_manifest_api_out: PathBuf,
     pub hydration_policies_json: PathBuf,
     pub hydration_manifest_out: PathBuf,
-    pub hydration_manifest_api_out: PathBuf,
+    pub reconstruction_policy_json: PathBuf,
+    pub reconstruction_manifest_out: PathBuf,
+    pub spacetimedb_src_dir: PathBuf,
+    pub reconstruction_apply_rust_out: PathBuf,
 
     // ── reducer_contract ─────────────────────────────────────────────────
     pub module_schema_json: PathBuf,
@@ -126,20 +127,19 @@ impl Paths {
             storage_policy_json: manifest_dir.join("storage-policy-manifest.json"),
             storage_policy_manifest_out: staging_manifests.join("storage-policy-manifest.json"),
             archive_manifest_out: staging_manifests.join("archive-manifest.json"),
-            cold_ddl_dir: repo_root.join("api-server/src/generated/pg_ddl"),
+            cold_ddl_dir: staging_manifests.join("pg_ddl"),
             codec_manifest_out: staging_manifests.join("codec-manifest.json"),
             projection_codec_manifest_out: staging_manifests.join("projection-codec-manifest.json"),
-            projection_codec_manifest_api_out: repo_root
-                .join("api-server/src/generated/projection-codec-manifest.json"),
-            durable_migration_dir: repo_root.join("api-server/src/generated/pg_ddl/migrations"),
+            durable_migration_dir: staging_manifests.join("pg_ddl/migrations"),
             durable_migration_manifest_out: staging_manifests
                 .join("durable-pg-schema-manifest.json"),
-            durable_migration_manifest_api_out: repo_root
-                .join("api-server/src/generated/pg_ddl/durable-pg-schema-manifest.json"),
             hydration_policies_json: manifest_dir.join("hydration-policies.json"),
             hydration_manifest_out: staging_manifests.join("hydration-manifest.json"),
-            hydration_manifest_api_out: repo_root
-                .join("api-server/src/generated/hydration-manifest.json"),
+            reconstruction_policy_json: manifest_dir.join("reconstruction-policy.json"),
+            reconstruction_manifest_out: staging_manifests.join("reconstruction-manifest.json"),
+            spacetimedb_src_dir: repo_root.join("spacetimedb/src"),
+            reconstruction_apply_rust_out: repo_root
+                .join("spacetimedb/src/generated_reconstruction_apply.rs"),
 
             module_schema_json: contracts_staging_dir.join("module-schema.json"),
             reducer_exposure_json: manifest_dir.join("reducer-exposure.json"),

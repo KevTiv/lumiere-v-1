@@ -917,16 +917,12 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
 		crates/stdb-auth/assets/query_exec_non_registry.json \
-		api-server/src/generated/projection-codec-manifest.json \
-		api-server/src/generated/pg_ddl/ \
 		2>/dev/null || true
 	@git diff --exit-code -- \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
-		crates/stdb-auth/assets/query_exec_non_registry.json \
-		api-server/src/generated/projection-codec-manifest.json \
-		api-server/src/generated/pg_ddl/ || \
+		crates/stdb-auth/assets/query_exec_non_registry.json || \
 		(echo "Generated artifacts are out of date. Run: make generate-stdb-ts-sdk && make codegen" && exit 1)
 
 # Populates .contracts-staging/{bindings,manifests} from the currently
@@ -955,7 +951,7 @@ contracts-staging-from-pinned:
 	rm -rf .contracts-staging; \
 	mkdir -p .contracts-staging/bindings .contracts-staging/manifests .contracts-staging/ts/generated .contracts-staging/ir; \
 	cp -R "$$CHECKOUT/crates/lumiere-contracts/src/bindings/." .contracts-staging/bindings/; \
-	cp "$$CHECKOUT/manifests/"*.json .contracts-staging/manifests/; \
+	cp -R "$$CHECKOUT/manifests/." .contracts-staging/manifests/; \
 	if [ -d "$$CHECKOUT/ir" ]; then cp -R "$$CHECKOUT/ir/." .contracts-staging/ir/; fi; \
 	V2_PIN="$$CHECKOUT/ir/PIN-v2.json"; \
 	if [ ! -f "$$V2_PIN" ]; then V2_PIN="$$CHECKOUT/ir/PIN.json"; fi; \
@@ -998,7 +994,7 @@ check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-std
 	V2_PIN="$$CHECKOUT/ir/PIN-v2.json"; \
 	if [ ! -f "$$V2_PIN" ]; then V2_PIN="$$CHECKOUT/ir/PIN.json"; fi; \
 	diff -rq "$$CHECKOUT/crates/lumiere-contracts/src/bindings" .contracts-staging/bindings && \
-	for manifest in .contracts-staging/manifests/*.json; do diff "$$CHECKOUT/manifests/$$(basename "$$manifest")" "$$manifest" || exit 1; done && \
+	diff -rq "$$CHECKOUT/manifests" .contracts-staging/manifests && \
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean --expect-schema-hash-from "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" && \
 	python3 scripts/verify-contract-ir.py "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" --require-clean --expect-pin-from "$$V2_PIN" && \
 	python3 "$$CHECKOUT/scripts/generate-from-ir.py" --check && \

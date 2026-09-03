@@ -80,6 +80,9 @@ pub fn check_permission(
     resource: &str,
     action: &str,
 ) -> Result<(), String> {
+    if action != "read" {
+        crate::core::reconstruction::require_writes_unfenced(ctx, organization_id)?;
+    }
     let user = ctx
         .db
         .user_profile()

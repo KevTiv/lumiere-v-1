@@ -133,6 +133,7 @@ pub fn record_organization_commit(
     ctx: &ReducerContext,
     input: OrganizationCommitInput,
 ) -> Result<u64, String> {
+    crate::core::reconstruction::require_writes_unfenced(ctx, input.organization_id)?;
     if ctx
         .db
         .organization()

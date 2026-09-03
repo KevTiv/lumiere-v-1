@@ -227,6 +227,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "apply_organization_reconstruction_batch",
+      "exposure": "denied",
+      "reason": "trusted registered reconstruction service only; never exposed through the session BFF"
+    },
+    {
       "name": "apply_sale_order_options",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -385,6 +390,11 @@
       "name": "award_purchase_rfq_bid",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "begin_organization_reconstruction",
+      "exposure": "denied",
+      "reason": "trusted registered reconstruction service only; never exposed through the session BFF"
     },
     {
       "name": "bill_timesheets",
@@ -632,6 +642,11 @@
       "name": "complete_productivity_log",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "complete_organization_reconstruction",
+      "exposure": "denied",
+      "reason": "trusted registered reconstruction service only; never exposed through the session BFF"
     },
     {
       "name": "complete_tax_deadline",
@@ -2332,6 +2347,11 @@
       "name": "fail_quality_check",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "fail_organization_reconstruction",
+      "exposure": "denied",
+      "reason": "trusted registered reconstruction service only; never exposed through the session BFF"
     },
     {
       "name": "fail_warehouse_sync_intent",

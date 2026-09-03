@@ -27,6 +27,9 @@ pub(crate) const POS_ORDER_COLD_DRAINER_SERVICE: &str = "pos_order_cold_drainer"
 /// `service_name` used by the API-server's trusted POS aggregate hydrator.
 pub(crate) const POS_ORDER_HYDRATOR_SERVICE: &str = "pos_order_hydrator";
 
+/// `service_name` used by the trusted per-organization reconstruction command.
+pub(crate) const ORGANIZATION_RECONSTRUCTOR_SERVICE: &str = "organization_reconstructor";
+
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = cold_tier_service_identity,

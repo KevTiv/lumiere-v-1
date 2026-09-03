@@ -50,6 +50,7 @@
 use spacetimedb::{ReducerContext, Table};
 
 // ── Shared utilities ─────────────────────────────────────────────────────────
+mod generated_reconstruction_apply;
 pub mod helpers;
 pub mod types;
 
@@ -204,7 +205,8 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
     analytics_tests::run_all_analytics_tests(ctx).map_err(|e| format!("analytics: {e}"))?;
     iot_tests::run_all_iot_tests(ctx).map_err(|e| format!("iot: {e}"))?;
     helpdesk_tests::run_all_helpdesk_tests(ctx).map_err(|e| format!("helpdesk: {e}"))?;
-    integrations_tests::run_all_integrations_tests(ctx).map_err(|e| format!("integrations: {e}"))?;
+    integrations_tests::run_all_integrations_tests(ctx)
+        .map_err(|e| format!("integrations: {e}"))?;
     data_ops_tests::run_data_ops_commit_test(ctx).map_err(|e| format!("data_ops: {e}"))?;
     log::info!("✅ run_all_domain_tests complete");
     Ok(())

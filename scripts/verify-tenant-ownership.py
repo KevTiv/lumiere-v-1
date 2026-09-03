@@ -94,16 +94,16 @@ def validate_manifest(manifest: dict[str, Any], expected_table_count: int) -> No
             fail(f"table {table['sql_name']} must have an organization-leading index")
 
     # Focused fixtures may validate one table at a time with an explicit
-    # expected count. The production C0 invocation uses the default 461-table
+    # expected count. The production C0 invocation uses the default 463-table
     # count and must contain the complete, closed platform allowlist.
-    if expected_table_count == 461 and platform_tables != PLATFORM_GLOBAL_TABLES:
+    if expected_table_count == 463 and platform_tables != PLATFORM_GLOBAL_TABLES:
         fail(
             "platform-global allowlist mismatch: "
             f"expected {sorted(PLATFORM_GLOBAL_TABLES)}, found {sorted(platform_tables)}"
         )
 
     summary = manifest.get("ownership_summary")
-    if expected_table_count == 461 and summary is None:
+    if expected_table_count == 463 and summary is None:
         fail("generated schema manifest must include ownership_summary")
     if summary is not None:
         if not isinstance(summary, dict) or summary.get("verified") is not True:
@@ -128,7 +128,7 @@ def validate_manifest(manifest: dict[str, Any], expected_table_count: int) -> No
             ):
                 fail("ownership_summary contains an invalid platform-global table entry")
             summary_names.add(name)
-        if expected_table_count == 461 and summary_names != PLATFORM_GLOBAL_TABLES:
+        if expected_table_count == 463 and summary_names != PLATFORM_GLOBAL_TABLES:
             fail("ownership_summary platform-global table list does not match allowlist")
 
 
@@ -147,7 +147,7 @@ def validate_no_global_scope(source_path: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("manifest", type=Path)
-    parser.add_argument("--expected-table-count", type=int, default=461)
+    parser.add_argument("--expected-table-count", type=int, default=463)
     parser.add_argument(
         "--schema-ir-source",
         type=Path,

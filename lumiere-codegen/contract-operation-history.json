@@ -202,6 +202,10 @@
       "name": "apply_org_migrations",
       "shape_fingerprint": "sha256:cf4250dbcdfda8297bb68f20b12fd88113fda1300522f23e17919ce2e8ba32d4"
     },
+    "erp.apply_organization_reconstruction_batch": {
+      "name": "apply_organization_reconstruction_batch",
+      "shape_fingerprint": "sha256:54c767155ae3585c332a5cb6bf05eb8a1f3ff06c19999f075a835992fa7cf99e"
+    },
     "erp.apply_pending_expense_integration_intents": {
       "name": "apply_pending_expense_integration_intents",
       "shape_fingerprint": "sha256:a417512624fa2e53d7f245ebfceb12fa3ffb35a62422d1cbc08e4dd45ea2c443"
@@ -397,6 +401,10 @@
     "erp.backfill_intercompany_organization_ownership": {
       "name": "backfill_intercompany_organization_ownership",
       "shape_fingerprint": "sha256:ae4ec0481872cfbb8af2d4f6a1ef533e6280c0f54e57bf00e4f54242f3c81d9a"
+    },
+    "erp.begin_organization_reconstruction": {
+      "name": "begin_organization_reconstruction",
+      "shape_fingerprint": "sha256:db3cf299d996c5a56cb4e9bad3e87b867f3bcf52ba24d702ed9aed590eeee33c"
     },
     "erp.bill_project_milestone": {
       "name": "bill_project_milestone",
@@ -657,6 +665,10 @@
     "erp.complete_onboarding_item": {
       "name": "complete_onboarding_item",
       "shape_fingerprint": "sha256:256af6b45e60363b48fa3d9c1c233555525d6d25c1731879c3b82494f4b55019"
+    },
+    "erp.complete_organization_reconstruction": {
+      "name": "complete_organization_reconstruction",
+      "shape_fingerprint": "sha256:336e78b48815aa44878eff7a53b81c4fd8537aa054d87415f5c88669be920310"
     },
     "erp.complete_performance_review": {
       "name": "complete_performance_review",
@@ -2217,6 +2229,10 @@
     "erp.fail_iot_action": {
       "name": "fail_iot_action",
       "shape_fingerprint": "sha256:70e7966c460a31303652a52be6981cf1fe029629fba534c834b98a6e448d4ba1"
+    },
+    "erp.fail_organization_reconstruction": {
+      "name": "fail_organization_reconstruction",
+      "shape_fingerprint": "sha256:6923b57ecd4c3e84cc191dd3262327a4761137d74820432cd16a07825cebed6b"
     },
     "erp.fail_project_integration_intent": {
       "name": "fail_project_integration_intent",
