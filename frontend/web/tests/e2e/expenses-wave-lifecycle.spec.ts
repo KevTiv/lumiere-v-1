@@ -473,15 +473,15 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
 
   // EXP-013 approve→post: the single-identity browser fixture cannot approve its
   // own submission (SoD), so the gate-enabled approve + post path is proven via
-  // the domain suite (`run_all_domain_tests` → expenses waves D/E/F), which
-  // exercises approve_expense_sheet_impl with a second identity and then
-  // post_expense_sheet to a Posted move. The lifecycle test above covers the
-  // browser-visible submit→post→reimburse path; this test covers the
-  // approve→post reducer contract that SoD hides from the UI.
+  // the focused domain reducer (`run_expenses_wave_f_test`), which exercises
+  // approve_expense_sheet_impl with a second identity and then post_expense_sheet
+  // to a Posted move. The lifecycle test above covers the browser-visible
+  // submit→post→reimburse path; this test covers the approve→post reducer
+  // contract that SoD hides from the UI.
   test("approve → post domain path (second-identity SoD) @p0", async ({ page }) => {
     test.setTimeout(300_000)
     await gotoModule(page, "/expenses", "expenses")
-    await callReducerOwner("run_all_domain_tests", [])
+    await callReducerOwner("run_expenses_wave_f_test", [])
     await expectNoAppError(page)
   })
 })
