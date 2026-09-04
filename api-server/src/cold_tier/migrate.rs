@@ -18,9 +18,10 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::ledger;
+use crate::platform_control;
 
 /// The table containing the durable migration history.
-pub const MIGRATION_TABLE: &str = "lumiere_schema_migrations";
+pub const MIGRATION_TABLE: &str = platform_control::SCHEMA_MIGRATION_TABLE;
 
 /// One migration known by this application binary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -116,6 +117,13 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: ledger::ARCHIVE_TRANSFER_DDL,
     },
+    Migration {
+        version: 8,
+        name: "platform_control",
+        change_set: 1,
+        phase: MigrationPhase::Expand,
+        sql: platform_control::PLATFORM_CONTROL_DDL,
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.
@@ -125,7 +133,21 @@ pub const MIGRATIONS: &[Migration] = &[
 /// migration ran. The `IF NOT EXISTS` makes bootstrap safe for databases
 /// upgraded from the old startup-only DDL path.
 const MIGRATION_TABLE_DDL: &str = r#"
-create table if not exists lumiere_schema_migrations (
+create schema if not exists lumiere_platform;
+
+-- Adopt the pre-C0 API-server history table without copying or losing its
+-- checksums.  The target relation is intentionally created after this block.
+do $$
+begin
+    if to_regclass('public.lumiere_schema_migrations') is not null
+       and to_regclass('lumiere_platform.schema_migration') is null then
+        alter table public.lumiere_schema_migrations set schema lumiere_platform;
+        alter table lumiere_platform.lumiere_schema_migrations rename to schema_migration;
+    end if;
+end
+$$;
+
+create table if not exists lumiere_platform.schema_migration (
     version bigint primary key,
     name text not null unique,
     change_set bigint not null,
@@ -598,7 +620,7 @@ pub async fn ensure_schema(pool: &Pool) -> Result<()> {
 
     let rows = transaction
         .query(
-            "select version, name, change_set, phase, checksum from lumiere_schema_migrations order by version asc",
+            "select version, name, change_set, phase, checksum from lumiere_platform.schema_migration order by version asc",
             &[],
         )
         .await
@@ -629,7 +651,7 @@ pub async fn ensure_schema(pool: &Pool) -> Result<()> {
             })?;
         transaction
             .execute(
-                "insert into lumiere_schema_migrations (version, name, change_set, phase, checksum) values ($1, $2, $3, $4, $5)",
+                "insert into lumiere_platform.schema_migration (version, name, change_set, phase, checksum) values ($1, $2, $3, $4, $5)",
                 &[&migration.version, &migration.name, &migration.change_set, &migration.phase.as_str(), &checksum],
             )
             .await
@@ -726,8 +748,10 @@ mod tests {
 
     #[test]
     fn bootstrap_is_idempotent_and_has_history_columns() {
-        assert_eq!(MIGRATION_TABLE, "lumiere_schema_migrations");
+        assert_eq!(MIGRATION_TABLE, "lumiere_platform.schema_migration");
         assert!(MIGRATION_TABLE_DDL.contains("create table if not exists"));
+        assert!(MIGRATION_TABLE_DDL.contains("create schema if not exists lumiere_platform"));
+        assert!(MIGRATION_TABLE_DDL.contains("lumiere_schema_migrations set schema"));
         assert!(MIGRATION_TABLE_DDL.contains("version bigint primary key"));
         assert!(MIGRATION_TABLE_DDL.contains("checksum text not null"));
         assert!(MIGRATION_TABLE_DDL.contains("change_set bigint not null"));
