@@ -503,6 +503,7 @@ fn seed_profile(ctx: &ReducerContext, organization_id: u64, superuser: bool) -> 
     let identity = new_identity(ctx);
     ctx.db.user_profile().insert(UserProfile {
         identity,
+        platform_user_id: format!("test-{}", identity.to_hex()),
         organization_id,
         email: format!("{}@workflow.test", identity.to_hex()),
         email_verified: true,

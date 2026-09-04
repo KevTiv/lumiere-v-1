@@ -1,9 +1,9 @@
 /// User Management & Authentication
 ///
 /// Tables:  UserProfile · UserOrganization · UserSession
-/// Pattern: UserProfile is keyed by the opaque SpacetimeDB `Identity` and is
-///          stamped with the owning organization. UserOrganization links a
-///          user to an org+role.
+/// Pattern: UserProfile is keyed by the SpacetimeDB `Identity`, stamped with
+///          the owning organization, and linked to an opaque platform key.
+///          UserOrganization links a user to an org+role.
 ///          UserSession tracks active client connections.
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
@@ -92,6 +92,9 @@ pub struct CreateUserSessionParams {
 pub struct UserProfile {
     #[primary_key]
     pub identity: Identity,
+    /// Opaque key into the platform-control profile; never derived from the
+    /// organization or used as a tenant selector.
+    pub platform_user_id: String,
     /// Organization ownership is assigned from the caller's validated
     /// membership. It is never accepted from profile update parameters.
     pub organization_id: u64,
@@ -194,6 +197,7 @@ pub(crate) fn ensure_user_profile_for_organization(
     }
     ctx.db.user_profile().insert(UserProfile {
         identity,
+        platform_user_id: String::new(),
         organization_id,
         email: String::new(),
         email_verified: false,
@@ -361,6 +365,10 @@ pub fn add_user_to_organization(
         metadata: params.metadata,
     });
 
+    // Materialize the organization-owned profile only after membership has
+    // been validated. The API server binds its opaque platform key separately.
+    ensure_user_profile_for_organization(ctx, user_identity, organization_id);
+
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -446,6 +454,9 @@ pub fn add_org_member(
         is_default: params.is_default,
         metadata: params.metadata,
     });
+
+    // Materialize the profile only after this validated membership exists.
+    ensure_user_profile_for_organization(ctx, user_identity, organization_id);
 
     write_audit_log_v2(
         ctx,

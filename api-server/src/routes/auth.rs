@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::extract::State;
 use axum::response::IntoResponse;
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use cookie::time::Duration;
 use cookie::{Cookie, SameSite};
@@ -12,14 +12,17 @@ use sha2::{Digest, Sha256};
 use tower_cookies::Cookies;
 
 use crate::auth_password::{
-    decrypt_token, encrypt_token, find_credential_by_email, find_credential_by_identity,
+    decrypt_token, encrypt_token, find_credential_by_email, find_credential_by_platform_id,
     find_invite_by_token_hash, find_reset_token_by_hash, generate_secure_token,
     get_role_name_in_organization, is_usable_admin_token, micros_to_secs, now_micros,
     post_auth_destination_after_session, send_resend_email, user_has_organization_rows,
 };
+use crate::cold_tier::pg_pool;
 use crate::error::ApiError;
+use crate::platform_control::{self, PlatformId};
 use crate::session::{identity_json_for_reducer_call, normalize_identity_hex_for_sql};
 use crate::state::AppState;
+use crate::web_session::{require_org, resolve_session};
 
 fn set_stdb_session_cookies(
     config: &crate::config::Config,
@@ -56,6 +59,84 @@ fn clear_stdb_session_cookies(cookies: &Cookies) {
 struct SignInBody {
     email: String,
     password: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProfileUpdateBody {
+    name: Option<String>,
+    first_name: Option<String>,
+    last_name: Option<String>,
+    timezone: Option<String>,
+    language: Option<String>,
+}
+
+async fn profile_get(
+    State(state): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
+    cookies: Cookies,
+) -> Result<Json<Value>, ApiError> {
+    let session = resolve_session(&state, &headers, &cookies)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    require_org(&session)?;
+    let pool = pg_pool::shared_pool().ok_or_else(|| {
+        ApiError::Unavailable("platform authentication storage is unavailable".into())
+    })?;
+    let row = platform_control::find_user_profile_by_stdb_identity(pool, &session.identity_hex)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .ok_or(ApiError::NotFound("User profile not found".into()))?;
+    let profile = json!({
+        "platformUserId": row.get::<_, String>("platform_user_id"),
+        "email": row.get::<_, String>("email"),
+        "emailVerified": row.get::<_, bool>("email_verified"),
+        "name": row.get::<_, String>("name"),
+        "firstName": row.get::<_, Option<String>>("first_name"),
+        "lastName": row.get::<_, Option<String>>("last_name"),
+        "timezone": row.get::<_, String>("timezone"),
+        "language": row.get::<_, String>("language"),
+        "isActive": row.get::<_, bool>("is_active"),
+        "isSuperuser": row.get::<_, bool>("is_superuser"),
+    });
+    Ok(Json(json!({ "data": profile })))
+}
+
+async fn profile_update(
+    State(state): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
+    cookies: Cookies,
+    Json(body): Json<ProfileUpdateBody>,
+) -> Result<Json<Value>, ApiError> {
+    let session = resolve_session(&state, &headers, &cookies)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    require_org(&session)?;
+    let pool = pg_pool::shared_pool().ok_or_else(|| {
+        ApiError::Unavailable("platform authentication storage is unavailable".into())
+    })?;
+    let profile = platform_control::find_user_profile_by_stdb_identity(pool, &session.identity_hex)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .ok_or(ApiError::NotFound("User profile not found".into()))?;
+    let platform_id = profile.get::<_, String>("platform_user_id");
+    let platform_id =
+        PlatformId::new(platform_id).map_err(|e| ApiError::Internal(e.to_string()))?;
+    if !platform_control::update_user_profile(
+        pool,
+        &platform_id,
+        body.name.as_deref(),
+        body.first_name.as_deref(),
+        body.last_name.as_deref(),
+        body.timezone.as_deref(),
+        body.language.as_deref(),
+    )
+    .await
+    .map_err(|e| ApiError::Internal(e.to_string()))?
+    {
+        return Err(ApiError::NotFound("User profile not found".into()));
+    }
+    Ok(Json(json!({ "success": true })))
 }
 
 async fn signin(
@@ -152,27 +233,43 @@ async fn signup(
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     let token_enc = encrypt_token(key, &token)?;
 
-    let admin = state
-        .config
-        .stdb_server_token
-        .as_deref()
-        .filter(|t| is_usable_admin_token(t))
-        .ok_or_else(|| ApiError::Internal("STDB_SERVER_TOKEN is not configured".into()))?;
-    let client = state.client_with_token(admin);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "store_user_credential",
-            json!([
-                identity_json_for_reducer_call(&identity),
-                email.clone(),
-                password_hash,
-                token_enc
-            ]),
-        ))
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-
     let identity_hex = normalize_identity_hex_for_sql(&identity);
+    let platform_user_id = PlatformId::generate();
+    let pool = pg_pool::shared_pool().ok_or_else(|| {
+        ApiError::Unavailable("platform authentication storage is unavailable".into())
+    })?;
+    platform_control::insert_user_credential(
+        pool,
+        &platform_control::UserCredential {
+            platform_user_id: platform_user_id.clone(),
+            email: email.clone(),
+            stdb_identity_hex: identity_hex.clone(),
+            password_hash: Some(password_hash),
+            workos_user_id: None,
+            stdb_token_enc: token_enc,
+            email_verified: false,
+        },
+    )
+    .await
+    .map_err(|e| ApiError::Internal(e.to_string()))?;
+    platform_control::upsert_user_profile(
+        pool,
+        &platform_control::UserProfile {
+            platform_user_id,
+            stdb_identity_hex: identity_hex.clone(),
+            email: email.clone(),
+            email_verified: false,
+            name: String::new(),
+            first_name: None,
+            last_name: None,
+            timezone: "UTC".into(),
+            language: "en".into(),
+            is_active: true,
+            is_superuser: false,
+        },
+    )
+    .await
+    .map_err(|e| ApiError::Internal(e.to_string()))?;
     set_stdb_session_cookies(&state.config, &cookies, &token, &identity_hex);
 
     if let Some(ref api_key) = state.config.resend_api_key {
@@ -232,24 +329,36 @@ async fn forgot_password(
 
     if let Some(cred) = cred {
         let (token, token_hash) = generate_secure_token();
-        let expires_at = now_micros() + (60_i128 * 60 * 1_000_000); // 1h in micros
+        let expires_at_micros = now_micros() + (60_i128 * 60 * 1_000_000);
+        let expires_at = std::time::SystemTime::now()
+            .checked_add(std::time::Duration::from_secs(60 * 60))
+            .ok_or_else(|| ApiError::Internal("invalid reset-token expiry".into()))?;
+        let platform_id = PlatformId::new(cred.platform_user_id.clone())
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+        let pool = pg_pool::shared_pool().ok_or_else(|| {
+            ApiError::Unavailable("platform authentication storage is unavailable".into())
+        })?;
+        platform_control::insert_password_reset_token(pool, &platform_id, &token_hash, expires_at)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
         let admin = state
             .config
             .stdb_server_token
             .as_deref()
             .filter(|t| is_usable_admin_token(t))
             .ok_or_else(|| ApiError::Internal("STDB_SERVER_TOKEN is not configured".into()))?;
-        let client = state.client_with_token(admin);
-        let _ = client
+        state
+            .client_with_token(admin)
             .call_reducer(stdb_client::reducer_call!(
-                "create_password_reset_token",
+                "bind_password_reset_token",
                 json!([
+                    platform_id.as_str(),
                     identity_json_for_reducer_call(&cred.identity_hex),
-                    token_hash,
-                    expires_at.to_string()
+                    expires_at_micros.to_string(),
                 ]),
             ))
-            .await;
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
 
         if let Some(ref api_key) = state.config.resend_api_key {
             let from = state.config.resend_from_email.clone();
@@ -334,32 +443,39 @@ async fn reset_password(
     let new_hash = bcrypt::hash(body.new_password, bcrypt::DEFAULT_COST)
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let admin = state
-        .config
-        .stdb_server_token
-        .as_deref()
-        .filter(|t| is_usable_admin_token(t))
-        .ok_or_else(|| ApiError::Internal("STDB_SERVER_TOKEN is not configured".into()))?;
-    let client = state.client_with_token(admin);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "update_user_password",
-            json!([
-                identity_json_for_reducer_call(&reset_token.identity_hex),
-                new_hash
-            ]),
-        ))
-        .await
+    let platform_id = PlatformId::new(reset_token.platform_user_id.clone())
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "mark_reset_token_used",
-            json!([reset_token.id])
-        ))
+    let pool = pg_pool::shared_pool().ok_or_else(|| {
+        ApiError::Unavailable("platform authentication storage is unavailable".into())
+    })?;
+    if !platform_control::consume_password_reset_token(pool, &hash)
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+    {
+        return Err(ApiError::BadRequest("Invalid or expired reset link".into()));
+    }
+    if !platform_control::update_user_password(pool, &platform_id, &new_hash)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+    {
+        return Err(ApiError::BadRequest("Invalid or expired reset link".into()));
+    }
 
-    if let Some(cred) = find_credential_by_identity(&state, &reset_token.identity_hex).await? {
+    if let Some(cred) = find_credential_by_platform_id(&state, platform_id.as_str()).await? {
+        let admin = state
+            .config
+            .stdb_server_token
+            .as_deref()
+            .filter(|t| is_usable_admin_token(t))
+            .ok_or_else(|| ApiError::Internal("STDB_SERVER_TOKEN is not configured".into()))?;
+        state
+            .client_with_token(admin)
+            .call_reducer(stdb_client::reducer_call!(
+                "mark_password_reset_token_projection_used",
+                json!([platform_id.as_str()]),
+            ))
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
         let raw = decrypt_token(key, &cred.stdb_token_enc)?;
         let id_hex = normalize_identity_hex_for_sql(&cred.identity_hex);
         set_stdb_session_cookies(&state.config, &cookies, &raw, &id_hex);
@@ -594,10 +710,16 @@ async fn accept_invite(
     let role_name = get_role_name_in_organization(&state, invite.role_id, invite.organization_id)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Invite role not found".into()))?;
-    let (member_identity, stdb_token, new_credential) =
+    let (member_identity, stdb_token, platform_user_id, new_credential) =
         if let Some(existing) = find_credential_by_email(&state, &email).await? {
             let tok = decrypt_token(key, &existing.stdb_token_enc)?;
-            (existing.identity_hex, tok, None)
+            (
+                existing.identity_hex.clone(),
+                tok,
+                PlatformId::new(existing.platform_user_id.clone())
+                    .map_err(|e| ApiError::Internal(e.to_string()))?,
+                None,
+            )
         } else {
             let (identity, token) = state
                 .stdb
@@ -607,7 +729,12 @@ async fn accept_invite(
             let password_hash = bcrypt::hash(body.password.as_str(), bcrypt::DEFAULT_COST)
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
             let token_enc = encrypt_token(key, &token)?;
-            (identity, token, Some((password_hash, token_enc)))
+            (
+                identity,
+                token,
+                PlatformId::generate(),
+                Some((password_hash, token_enc)),
+            )
         };
 
     // Establish the validated organization membership before materializing the
@@ -634,19 +761,67 @@ async fn accept_invite(
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     if let Some((password_hash, token_enc)) = new_credential {
-        client
-            .call_reducer(stdb_client::reducer_call!(
-                "store_user_credential",
-                json!([
-                    identity_json_for_reducer_call(&member_identity),
-                    email,
-                    password_hash,
-                    token_enc
-                ]),
-            ))
-            .await
-            .map_err(|e| ApiError::Internal(e.to_string()))?;
+        let pool = pg_pool::shared_pool().ok_or_else(|| {
+            ApiError::Unavailable("platform authentication storage is unavailable".into())
+        })?;
+        let identity_hex = normalize_identity_hex_for_sql(&member_identity);
+        platform_control::insert_user_credential(
+            pool,
+            &platform_control::UserCredential {
+                platform_user_id: platform_user_id.clone(),
+                email: email.clone(),
+                stdb_identity_hex: identity_hex.clone(),
+                password_hash: Some(password_hash),
+                workos_user_id: None,
+                stdb_token_enc: token_enc,
+                email_verified: false,
+            },
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        platform_control::upsert_user_profile(
+            pool,
+            &platform_control::UserProfile {
+                platform_user_id: platform_user_id.clone(),
+                stdb_identity_hex: identity_hex,
+                email: email.clone(),
+                email_verified: false,
+                name: String::new(),
+                first_name: None,
+                last_name: None,
+                timezone: "UTC".into(),
+                language: "en".into(),
+                is_active: true,
+                is_superuser: false,
+            },
+        )
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
     }
+
+    // The membership reducer derives organization ownership. Only after it
+    // succeeds may this opaque platform binding be projected into ERP.
+    client
+        .call_reducer(stdb_client::reducer_call!(
+            "bind_user_credential",
+            json!([
+                platform_user_id.as_str(),
+                identity_json_for_reducer_call(&member_identity),
+                email.clone(),
+            ]),
+        ))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    client
+        .call_reducer(stdb_client::reducer_call!(
+            "bind_user_profile",
+            json!([
+                platform_user_id.as_str(),
+                identity_json_for_reducer_call(&member_identity),
+            ]),
+        ))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     client
         .call_reducer(stdb_client::reducer_call!(
@@ -666,6 +841,7 @@ pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/auth/signin", post(signin))
         .route("/auth/signup", post(signup))
+        .route("/auth/profile", get(profile_get).patch(profile_update))
         .route("/auth/signout", post(signout))
         .route("/auth/forgot-password", post(forgot_password))
         .route("/auth/reset-password", post(reset_password))

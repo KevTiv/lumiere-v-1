@@ -257,6 +257,31 @@ pub async fn insert_user_credential(pool: &Pool, credential: &UserCredential) ->
     Ok(())
 }
 
+/// Update only the canonical password hash for a platform user.
+///
+/// Password material never crosses the SpacetimeDB binding boundary.  The
+/// affected-row check also prevents silently accepting a reset for a missing
+/// platform account.
+pub async fn update_user_password(
+    pool: &Pool,
+    platform_user_id: &PlatformId,
+    password_hash: &str,
+) -> Result<bool> {
+    let client = pool
+        .get()
+        .await
+        .context("get PG client to update platform password")?;
+    let changed = client
+        .execute(
+            "UPDATE lumiere_platform.user_credential SET password_hash = $2, updated_at = now() \
+             WHERE platform_user_id = $1",
+            &[&platform_user_id.as_str(), &password_hash],
+        )
+        .await
+        .context("update platform password hash")?;
+    Ok(changed == 1)
+}
+
 /// Register one active service binding and retire the previous binding for the
 /// same service atomically.  This is intentionally a platform operation and
 /// takes an opaque registrar ID rather than an organization ID.
@@ -450,6 +475,42 @@ pub async fn upsert_user_profile(pool: &Pool, profile: &UserProfile) -> Result<(
         .await
         .context("upsert platform user profile")?;
     Ok(())
+}
+
+/// Update mutable profile fields in platform-control storage. `None` means
+/// keep the existing value; organization membership is intentionally absent.
+pub async fn update_user_profile(
+    pool: &Pool,
+    platform_user_id: &PlatformId,
+    name: Option<&str>,
+    first_name: Option<&str>,
+    last_name: Option<&str>,
+    timezone: Option<&str>,
+    language: Option<&str>,
+) -> Result<bool> {
+    let client = pool
+        .get()
+        .await
+        .context("get PG client to update user profile")?;
+    let changed = client
+        .execute(
+            "UPDATE lumiere_platform.user_profile SET \
+               name = COALESCE($2, name), first_name = COALESCE($3, first_name), \
+               last_name = COALESCE($4, last_name), timezone = COALESCE($5, timezone), \
+               language = COALESCE($6, language), updated_at = now() \
+             WHERE platform_user_id = $1",
+            &[
+                &platform_user_id.as_str(),
+                &name,
+                &first_name,
+                &last_name,
+                &timezone,
+                &language,
+            ],
+        )
+        .await
+        .context("update platform user profile")?;
+    Ok(changed == 1)
 }
 
 /// Insert a hashed reset token for one platform user.

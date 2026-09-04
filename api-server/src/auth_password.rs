@@ -10,7 +10,9 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use stdb_client::StdbClient;
 
+use crate::cold_tier::pg_pool;
 use crate::error::ApiError;
+use crate::platform_control::{self, PlatformId};
 use crate::session::{normalize_identity_hex_for_sql, query_user_organization_with_fallback};
 use crate::state::AppState;
 
@@ -144,61 +146,78 @@ pub fn identity_cell_to_hex(v: &Value) -> Option<String> {
 
 #[derive(Debug, Clone)]
 pub struct StdbCredential {
+    /// Opaque platform-control key; never derived from organization or STDB ids.
+    pub platform_user_id: String,
     pub identity_hex: String,
     pub password_hash: Option<String>,
     pub stdb_token_enc: String,
 }
 
-fn parse_credential(row: &Value) -> Option<StdbCredential> {
-    let identity_hex = identity_cell_to_hex(row.get("identity")?)?;
+fn parse_credential(row: &tokio_postgres::Row) -> Result<StdbCredential, ApiError> {
+    let platform_user_id: String = row
+        .try_get("platform_user_id")
+        .map_err(|e| ApiError::Internal(format!("invalid platform credential id: {e}")))?;
+    PlatformId::new(platform_user_id.clone())
+        .map_err(|e| ApiError::Internal(format!("invalid platform credential id: {e}")))?;
+    let identity_hex: String = row
+        .try_get("stdb_identity_hex")
+        .map_err(|e| ApiError::Internal(format!("invalid STDB credential binding: {e}")))?;
     let password_hash = row
-        .get("passwordHash")
-        .or_else(|| row.get("password_hash"))
-        .and_then(|v| if v.is_null() { None } else { value_as_str(v) });
-    let stdb_token_enc = row
-        .get("stdbTokenEnc")
-        .or_else(|| row.get("stdb_token_enc"))
-        .and_then(|v| value_as_str(v))?;
-    Some(StdbCredential {
+        .try_get::<_, Option<String>>("password_hash")
+        .map_err(|e| ApiError::Internal(format!("invalid password hash: {e}")))?;
+    let stdb_token_enc: String = row
+        .try_get("stdb_token_enc")
+        .map_err(|e| ApiError::Internal(format!("invalid STDB token binding: {e}")))?;
+    Ok(StdbCredential {
+        platform_user_id,
         identity_hex,
         password_hash,
         stdb_token_enc,
     })
 }
 
+fn platform_pool() -> Result<&'static deadpool_postgres::Pool, ApiError> {
+    pg_pool::shared_pool().ok_or_else(|| {
+        ApiError::Unavailable("platform authentication storage is unavailable".into())
+    })
+}
+
 pub async fn find_credential_by_email(
-    state: &AppState,
+    _state: &AppState,
     email: &str,
 ) -> Result<Option<StdbCredential>, ApiError> {
-    let client = admin_client(state)?;
-    let safe = email.replace('\'', "''");
-    let sql = format!(
-        "SELECT identity, password_hash, stdb_token_enc FROM user_credential WHERE email = '{safe}'"
-    );
-    let rows = client
-        .query_sql(&sql)
+    let row = platform_control::find_user_credential_by_email(platform_pool()?, email)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(rows.first().and_then(|r| parse_credential(r)))
+    row.as_ref().map(parse_credential).transpose()
 }
 
 pub async fn find_credential_by_identity(
-    state: &AppState,
+    _state: &AppState,
     identity_hex: &str,
 ) -> Result<Option<StdbCredential>, ApiError> {
-    let client = admin_client(state)?;
-    let hex = identity_hex
+    let identity_hex = identity_hex
         .trim()
         .trim_start_matches("0x")
         .trim_start_matches("0X");
-    let sql = format!(
-        "SELECT identity, password_hash, stdb_token_enc FROM user_credential WHERE identity = 0x{hex}"
-    );
-    let rows = client
-        .query_sql(&sql)
+    let row =
+        platform_control::find_user_credential_by_stdb_identity(platform_pool()?, identity_hex)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+    row.as_ref().map(parse_credential).transpose()
+}
+
+/// Resolve the canonical credential after a platform-control operation.
+pub async fn find_credential_by_platform_id(
+    _state: &AppState,
+    platform_user_id: &str,
+) -> Result<Option<StdbCredential>, ApiError> {
+    let platform_id = PlatformId::new(platform_user_id.to_owned())
+        .map_err(|e| ApiError::Internal(format!("invalid platform credential id: {e}")))?;
+    let row = platform_control::find_user_credential_by_platform_id(platform_pool()?, &platform_id)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(rows.first().and_then(|r| parse_credential(r)))
+    row.as_ref().map(parse_credential).transpose()
 }
 
 #[derive(Debug, Clone)]
@@ -246,21 +265,41 @@ pub async fn find_invite_by_token_hash(
 
 #[derive(Debug, Clone)]
 pub struct StdbResetToken {
-    pub id: u64,
-    pub identity_hex: String,
+    pub id: i64,
+    pub platform_user_id: String,
     pub expires_at: i64,
     pub used_at: Option<i64>,
 }
 
-fn parse_reset_token(row: &Value) -> Option<StdbResetToken> {
-    Some(StdbResetToken {
-        id: value_as_u64(row.get("id")?)?,
-        identity_hex: identity_cell_to_hex(row.get("identity")?)?,
-        expires_at: value_as_i64(row.get("expiresAt").or_else(|| row.get("expires_at"))?)?,
-        used_at: row
-            .get("usedAt")
-            .or_else(|| row.get("used_at"))
-            .and_then(|v| if v.is_null() { None } else { value_as_i64(v) }),
+fn parse_reset_token(row: &tokio_postgres::Row) -> Result<StdbResetToken, ApiError> {
+    let id: i64 = row
+        .try_get("id")
+        .map_err(|e| ApiError::Internal(format!("invalid reset token id: {e}")))?;
+    let platform_user_id: String = row
+        .try_get("platform_user_id")
+        .map_err(|e| ApiError::Internal(format!("invalid reset token platform id: {e}")))?;
+    PlatformId::new(platform_user_id.clone())
+        .map_err(|e| ApiError::Internal(format!("invalid reset token platform id: {e}")))?;
+    let expires_at: std::time::SystemTime = row
+        .try_get("expires_at")
+        .map_err(|e| ApiError::Internal(format!("invalid reset token expiry: {e}")))?;
+    let used_at: Option<std::time::SystemTime> = row
+        .try_get("used_at")
+        .map_err(|e| ApiError::Internal(format!("invalid reset token state: {e}")))?;
+    let expires_at = expires_at
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| ApiError::Internal(format!("invalid reset token expiry: {e}")))?
+        .as_secs() as i64;
+    Ok(StdbResetToken {
+        id,
+        platform_user_id,
+        expires_at,
+        used_at: used_at.map(|value| {
+            value
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|duration| duration.as_secs() as i64)
+                .unwrap_or_default()
+        }),
     })
 }
 
@@ -268,16 +307,10 @@ pub async fn find_reset_token_by_hash(
     state: &AppState,
     token_hash: &str,
 ) -> Result<Option<StdbResetToken>, ApiError> {
-    let client = admin_client(state)?;
-    let safe = token_hash.replace('\'', "''");
-    let sql = format!(
-        "SELECT id, identity, token_hash, expires_at, used_at FROM password_reset_token WHERE token_hash = '{safe}'"
-    );
-    let rows = client
-        .query_sql(&sql)
+    let row = platform_control::find_password_reset_token(platform_pool()?, token_hash)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(rows.first().and_then(|r| parse_reset_token(r)))
+    row.as_ref().map(parse_reset_token).transpose()
 }
 
 pub async fn get_role_name_in_organization(

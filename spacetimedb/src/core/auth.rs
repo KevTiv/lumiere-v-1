@@ -1,13 +1,13 @@
 /// Auth — Credential Management & Invite/Reset Tokens
 ///
 /// Tables (all PRIVATE — no `public` flag, not subscribable by WebSocket clients):
-///   UserCredential     — email + bcrypt hash + encrypted STDB token + optional WorkOS id
+///   UserCredential     — organization-owned binding to a platform-control user
 ///   UserInvite         — org-scoped invite tokens sent by admins
 ///   PasswordResetToken — short-lived tokens for the forgot-password flow
 ///
-/// Reducers are called via the SpacetimeDB HTTP admin API from the Next.js server.
-/// All admin-called reducers assert `ctx.sender()` is a superuser.
-/// The `update_user_email` reducer is called by the connected client after sign-up.
+/// Reducers are called via the SpacetimeDB HTTP admin API from the API server.
+/// Password hashes, reset-token hashes, and STDB session tokens are canonical
+/// platform-control data and never enter this ERP binding.
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::core::users::{
@@ -21,7 +21,8 @@ use crate::helpers::{write_audit_log_v2, AuditLogParams};
 
 #[spacetimedb::table(
     accessor = user_credential,
-    index(accessor = user_credential_by_organization, btree(columns = [organization_id]))
+    index(accessor = user_credential_by_organization, btree(columns = [organization_id])),
+    index(accessor = user_credential_by_identity, btree(columns = [identity]))
 )]
 pub struct UserCredential {
     #[primary_key]
@@ -30,21 +31,12 @@ pub struct UserCredential {
     /// Owning organization, assigned from validated membership by the server
     /// reducer path. This is not client-editable credential data.
     pub organization_id: u64,
-    /// Email is the login key. Unique across all users.
-    #[unique]
+    /// Opaque platform-control key; never derived from an organization id.
+    pub platform_user_id: String,
+    /// Email is a non-authoritative display projection for compatibility.
     pub email: String,
-    /// SpacetimeDB identity that owns this credential.
-    #[unique]
+    /// SpacetimeDB identity bound to this organization-owned projection.
     pub identity: Identity,
-    /// bcrypt hash of the user's password (hashed server-side in Node.js). Empty for SSO-only.
-    pub password_hash: String,
-    /// WorkOS User Management id when the account uses SSO; None for password-only.
-    pub workos_user_id: Option<String>,
-    /// SpacetimeDB token encrypted with AES-GCM using STDB_CREDENTIAL_ENCRYPTION_KEY.
-    /// Stored encrypted so that even if the SpacetimeDB HTTP SQL API is queried,
-    /// the raw token is not exposed.
-    pub stdb_token_enc: String,
-    pub email_verified: bool,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
@@ -76,11 +68,10 @@ pub struct PasswordResetToken {
     #[auto_inc]
     pub id: u64,
     /// Organization ownership is copied from the target identity's validated
-    /// active membership when the token is created.
+    /// active membership when the binding is created.
     pub organization_id: u64,
-    pub identity: Identity,
-    /// SHA-256 hash of the plaintext reset token.
-    pub token_hash: String,
+    /// Opaque platform-control key for the account being reset.
+    pub platform_user_id: String,
     pub expires_at: Timestamp,
     pub used_at: Option<Timestamp>,
 }
@@ -89,7 +80,7 @@ pub struct PasswordResetToken {
 // HELPERS
 // ============================================================================
 
-fn audit_organization_for_identity(ctx: &ReducerContext, identity: Identity) -> u64 {
+fn audit_organization_for_identity(ctx: &ReducerContext, identity: Identity) -> Option<u64> {
     ctx.db
         .user_organization()
         .user_org_by_user()
@@ -103,7 +94,6 @@ fn audit_organization_for_identity(ctx: &ReducerContext, identity: Identity) -> 
                 .find(|uo| uo.is_active)
         })
         .map(|uo| uo.organization_id)
-        .unwrap_or(0)
 }
 
 /// Asserts the calling identity is a superuser (i.e. the server admin identity).
@@ -132,7 +122,7 @@ fn require_dev_reducers_enabled() -> Result<(), String> {
 }
 
 /// **Trusted local / dev nodes only.** Promotes `ctx.sender()` to `is_superuser` so HTTP calls
-/// using `STDB_SERVER_TOKEN` can invoke `store_user_credential` and other admin reducers.
+/// using `STDB_SERVER_TOKEN` can invoke platform binding reducers.
 /// The JWT identity usually has no profile or `is_superuser: false` until this runs or `ensure_dev_admin`.
 /// Do **not** rely on this for production security — anyone who can invoke reducers as this identity
 /// can escalate; use only with local `spacetime` or controlled deployments.
@@ -141,13 +131,8 @@ pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> 
     require_dev_reducers_enabled()?;
 
     let sender = ctx.sender();
-    let organization_id = audit_organization_for_identity(ctx, sender);
-    if organization_id == 0 {
-        return Err(
-            "Caller must belong to an organization before an ERP profile can be created"
-                .to_string(),
-        );
-    }
+    let organization_id = audit_organization_for_identity(ctx, sender)
+        .ok_or("Caller must belong to an organization before an ERP profile can be created")?;
     if let Some(profile) = ctx.db.user_profile().identity().find(sender) {
         if profile.is_superuser {
             return Ok(());
@@ -180,6 +165,7 @@ pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> 
     } else {
         ctx.db.user_profile().insert(UserProfile {
             identity: sender,
+            platform_user_id: String::new(),
             organization_id,
             email: String::new(),
             email_verified: false,
@@ -234,10 +220,9 @@ fn ensure_user_profile_for_identity(
     email: String,
     email_verified: bool,
 ) {
-    let organization_id = audit_organization_for_identity(ctx, identity);
-    if organization_id == 0 {
+    let Some(organization_id) = audit_organization_for_identity(ctx, identity) else {
         return;
-    }
+    };
     ensure_user_profile_for_organization(ctx, identity, organization_id);
     if let Some(profile) = ctx.db.user_profile().identity().find(identity) {
         ctx.db.user_profile().identity().update(UserProfile {
@@ -252,58 +237,40 @@ fn ensure_user_profile_for_identity(
 // REDUCERS — admin-called (from Next.js server via HTTP admin API)
 // ============================================================================
 
-/// Store a new user's credentials after server-side identity provisioning (sign-up).
-/// Called by the server admin identity via HTTP reducer call.
-///
-/// `new_identity` — the SpacetimeDB identity provisioned via POST /v1/identity
-/// `email`        — the user's email (already verified as unique server-side)
-/// `password_hash`— bcrypt hash produced server-side
-/// `stdb_token_enc` — the new identity's token, AES-GCM encrypted server-side
+/// Materialize an organization-owned binding after the server has validated
+/// membership. The opaque platform key is the only identity shared with the
+/// platform-control database; no password, token, or reset secret is accepted.
 #[spacetimedb::reducer]
-pub fn store_user_credential(
+pub fn bind_user_credential(
     ctx: &ReducerContext,
-    new_identity: Identity,
+    platform_user_id: String,
+    user_identity: Identity,
     email: String,
-    password_hash: String,
-    stdb_token_enc: String,
 ) -> Result<(), String> {
     require_superuser(ctx)?;
-
-    let organization_id = audit_organization_for_identity(ctx, new_identity);
-    if organization_id == 0 {
-        return Err("Credential identity must belong to an organization".to_string());
+    if platform_user_id.trim().is_empty() || platform_user_id.len() > 128 {
+        return Err("platform user id is invalid".to_string());
     }
-
-    // Guard against duplicate email (server already checks, but belt-and-suspenders)
-    if ctx.db.user_credential().email().find(&email).is_some() {
-        return Err("Email already registered".to_string());
-    }
+    let organization_id = audit_organization_for_identity(ctx, user_identity)
+        .ok_or("Credential identity must belong to an organization")?;
     if ctx
         .db
         .user_credential()
-        .identity()
-        .find(&new_identity)
-        .is_some()
+        .user_credential_by_identity()
+        .filter(&user_identity)
+        .any(|binding| binding.organization_id == organization_id)
     {
-        return Err("Identity already has credentials".to_string());
+        return Err("Identity already has a credential binding".to_string());
     }
-
-    let profile_email = email.clone();
     let row = ctx.db.user_credential().insert(UserCredential {
         id: 0,
         organization_id,
+        platform_user_id,
         email,
-        identity: new_identity,
-        password_hash,
-        workos_user_id: None,
-        stdb_token_enc,
-        email_verified: false,
+        identity: user_identity,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
     });
-
-    ensure_user_profile_for_identity(ctx, new_identity, profile_email, false);
-
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -314,215 +281,102 @@ pub fn store_user_credential(
             action: "CREATE",
             old_values: None,
             new_values: Some(
-                serde_json::json!({
-                    "identity": new_identity.to_hex().to_string(),
-                    "email_verified": false,
-                })
-                .to_string(),
+                serde_json::json!({ "identity": user_identity.to_hex().to_string() }).to_string(),
             ),
-            changed_fields: vec!["email".to_string(), "identity".to_string()],
+            changed_fields: vec!["platform_user_id".to_string(), "identity".to_string()],
             metadata: None,
         },
     );
-
     Ok(())
 }
 
-/// Store credentials for a new user provisioned via WorkOS SSO (no password).
+/// Attach the canonical platform key to an organization-owned profile binding.
 #[spacetimedb::reducer]
-pub fn store_sso_user_credential(
+pub fn bind_user_profile(
     ctx: &ReducerContext,
-    new_identity: Identity,
-    email: String,
-    stdb_token_enc: String,
-    workos_user_id: String,
-    email_verified: bool,
+    platform_user_id: String,
+    user_identity: Identity,
 ) -> Result<(), String> {
     require_superuser(ctx)?;
-
-    let organization_id = audit_organization_for_identity(ctx, new_identity);
-    if organization_id == 0 {
-        return Err("Credential identity must belong to an organization".to_string());
+    if platform_user_id.trim().is_empty() || platform_user_id.len() > 128 {
+        return Err("platform user id is invalid".to_string());
     }
-
-    if email.is_empty() || workos_user_id.is_empty() {
-        return Err("Email and WorkOS user id are required".to_string());
-    }
-
-    if ctx.db.user_credential().email().find(&email).is_some() {
-        return Err("Email already registered".to_string());
-    }
-    if ctx
+    let profile = ctx
         .db
-        .user_credential()
+        .user_profile()
         .identity()
-        .find(&new_identity)
-        .is_some()
+        .find(user_identity)
+        .ok_or("User profile not found")?;
+    if !ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&user_identity)
+        .any(|membership| {
+            membership.organization_id == profile.organization_id && membership.is_active
+        })
     {
-        return Err("Identity already has credentials".to_string());
+        return Err("User profile has no active organization membership".to_string());
     }
-
-    let dup_workos = ctx.db.user_credential().iter().any(|c| {
-        c.workos_user_id
-            .as_ref()
-            .is_some_and(|w| w == &workos_user_id)
+    ctx.db.user_profile().identity().update(UserProfile {
+        platform_user_id,
+        updated_at: ctx.timestamp,
+        ..profile
     });
-    if dup_workos {
-        return Err("WorkOS user already linked".to_string());
-    }
+    Ok(())
+}
 
-    let profile_email = email.clone();
-    let row = ctx.db.user_credential().insert(UserCredential {
+/// Project reset-token metadata into the target user's organization shard.
+/// The secret hash remains exclusively in platform-control PostgreSQL.
+#[spacetimedb::reducer]
+pub fn bind_password_reset_token(
+    ctx: &ReducerContext,
+    platform_user_id: String,
+    user_identity: Identity,
+    expires_at: Timestamp,
+) -> Result<(), String> {
+    require_superuser(ctx)?;
+    if platform_user_id.trim().is_empty() || platform_user_id.len() > 128 {
+        return Err("platform user id is invalid".to_string());
+    }
+    let organization_id = audit_organization_for_identity(ctx, user_identity)
+        .ok_or("Reset-token identity must belong to an organization")?;
+    ctx.db.password_reset_token().insert(PasswordResetToken {
         id: 0,
         organization_id,
-        email,
-        identity: new_identity,
-        password_hash: String::new(),
-        workos_user_id: Some(workos_user_id.clone()),
-        stdb_token_enc,
-        email_verified,
-        created_at: ctx.timestamp,
-        updated_at: ctx.timestamp,
+        platform_user_id,
+        expires_at,
+        used_at: None,
     });
-
-    ensure_user_profile_for_identity(ctx, new_identity, profile_email, email_verified);
-
-    write_audit_log_v2(
-        ctx,
-        organization_id,
-        AuditLogParams {
-            company_id: None,
-            table_name: "user_credential",
-            record_id: row.id,
-            action: "CREATE",
-            old_values: None,
-            new_values: Some(
-                serde_json::json!({
-                    "identity": new_identity.to_hex().to_string(),
-                    "workos_user_id": workos_user_id,
-                    "email_verified": email_verified,
-                })
-                .to_string(),
-            ),
-            changed_fields: vec![
-                "email".to_string(),
-                "identity".to_string(),
-                "workos_user_id".to_string(),
-            ],
-            metadata: None,
-        },
-    );
-
     Ok(())
 }
 
-/// Link a WorkOS user id to an existing password account (same email).
+/// Mark all organization projections for a consumed platform reset token.
+/// PostgreSQL remains the concurrency/expiry authority.
 #[spacetimedb::reducer]
-pub fn link_workos_user(
+pub fn mark_password_reset_token_projection_used(
     ctx: &ReducerContext,
-    target_identity: Identity,
-    workos_user_id: String,
+    platform_user_id: String,
 ) -> Result<(), String> {
     require_superuser(ctx)?;
-
-    if workos_user_id.is_empty() {
-        return Err("WorkOS user id is required".to_string());
-    }
-
-    let dup_workos = ctx.db.user_credential().iter().any(|c| {
-        c.workos_user_id
-            .as_ref()
-            .is_some_and(|w| w == &workos_user_id)
-    });
-    if dup_workos {
-        return Err("WorkOS user already linked to another account".to_string());
-    }
-
-    let cred = ctx
+    let ids: Vec<u64> = ctx
         .db
-        .user_credential()
-        .identity()
-        .find(&target_identity)
-        .ok_or("Credential not found for identity")?;
-
-    if cred.workos_user_id.is_some() {
-        return Err("Account already has a WorkOS link".to_string());
+        .password_reset_token()
+        .iter()
+        .filter(|token| token.platform_user_id == platform_user_id && token.used_at.is_none())
+        .map(|token| token.id)
+        .collect();
+    for id in ids {
+        if let Some(token) = ctx.db.password_reset_token().id().find(&id) {
+            ctx.db
+                .password_reset_token()
+                .id()
+                .update(PasswordResetToken {
+                    used_at: Some(ctx.timestamp),
+                    ..token
+                });
+        }
     }
-
-    ctx.db.user_credential().id().update(UserCredential {
-        workos_user_id: Some(workos_user_id.clone()),
-        updated_at: ctx.timestamp,
-        ..cred
-    });
-
-    write_audit_log_v2(
-        ctx,
-        audit_organization_for_identity(ctx, target_identity),
-        AuditLogParams {
-            company_id: None,
-            table_name: "user_credential",
-            record_id: cred.id,
-            action: "UPDATE",
-            old_values: None,
-            new_values: Some(
-                serde_json::json!({
-                    "workos_user_id": workos_user_id,
-                    "identity": target_identity.to_hex().to_string(),
-                })
-                .to_string(),
-            ),
-            changed_fields: vec!["workos_user_id".to_string()],
-            metadata: None,
-        },
-    );
-
-    Ok(())
-}
-
-/// Update the stored password hash after a successful password reset.
-/// Called by the server admin identity via HTTP reducer call.
-#[spacetimedb::reducer]
-pub fn update_user_password(
-    ctx: &ReducerContext,
-    target_identity: Identity,
-    new_password_hash: String,
-) -> Result<(), String> {
-    require_superuser(ctx)?;
-
-    let cred = ctx
-        .db
-        .user_credential()
-        .identity()
-        .find(&target_identity)
-        .ok_or("Credential not found for identity")?;
-
-    ctx.db.user_credential().id().update(UserCredential {
-        password_hash: new_password_hash,
-        updated_at: ctx.timestamp,
-        ..cred
-    });
-
-    write_audit_log_v2(
-        ctx,
-        audit_organization_for_identity(ctx, target_identity),
-        AuditLogParams {
-            company_id: None,
-            table_name: "user_credential",
-            record_id: cred.id,
-            action: "UPDATE",
-            old_values: None,
-            new_values: Some(
-                serde_json::json!({
-                    "identity": target_identity.to_hex().to_string(),
-                    "password_updated": true,
-                })
-                .to_string(),
-            ),
-            changed_fields: vec!["password_hash".to_string()],
-            metadata: None,
-        },
-    );
-
     Ok(())
 }
 
@@ -612,93 +466,6 @@ pub fn mark_invite_accepted(ctx: &ReducerContext, invite_id: u64) -> Result<(), 
     Ok(())
 }
 
-/// Store a short-lived password reset token for the forgot-password flow.
-/// Called by the server admin identity via HTTP reducer call.
-#[spacetimedb::reducer]
-pub fn create_password_reset_token(
-    ctx: &ReducerContext,
-    target_identity: Identity,
-    token_hash: String,
-    expires_at: Timestamp,
-) -> Result<(), String> {
-    require_superuser(ctx)?;
-
-    let organization_id = audit_organization_for_identity(ctx, target_identity);
-    if organization_id == 0 {
-        return Err("Reset-token identity must belong to an organization".to_string());
-    }
-
-    let row = ctx.db.password_reset_token().insert(PasswordResetToken {
-        id: 0,
-        organization_id,
-        identity: target_identity,
-        token_hash,
-        expires_at,
-        used_at: None,
-    });
-
-    write_audit_log_v2(
-        ctx,
-        organization_id,
-        AuditLogParams {
-            company_id: None,
-            table_name: "password_reset_token",
-            record_id: row.id,
-            action: "CREATE",
-            old_values: None,
-            new_values: Some(
-                serde_json::json!({
-                    "identity": target_identity.to_hex().to_string(),
-                })
-                .to_string(),
-            ),
-            changed_fields: vec!["identity".to_string(), "token_hash".to_string()],
-            metadata: None,
-        },
-    );
-
-    Ok(())
-}
-
-/// Mark a reset token as used so it cannot be replayed.
-/// Called by the server admin identity via HTTP reducer call.
-#[spacetimedb::reducer]
-pub fn mark_reset_token_used(ctx: &ReducerContext, token_id: u64) -> Result<(), String> {
-    require_superuser(ctx)?;
-
-    let token = ctx
-        .db
-        .password_reset_token()
-        .id()
-        .find(&token_id)
-        .ok_or("Reset token not found")?;
-
-    ctx.db
-        .password_reset_token()
-        .id()
-        .update(PasswordResetToken {
-            used_at: Some(ctx.timestamp),
-            ..token
-        });
-
-    write_audit_log_v2(
-        ctx,
-        token.organization_id,
-        AuditLogParams {
-            company_id: None,
-            table_name: "password_reset_token",
-            record_id: token_id,
-            action: "UPDATE",
-            old_values: Some(serde_json::json!({ "used_at": null }).to_string()),
-            new_values: Some(serde_json::json!({ "used_at": "set" }).to_string()),
-            changed_fields: vec!["used_at".to_string()],
-            metadata: None,
-        },
-    );
-
-    Ok(())
-}
-
 // ============================================================================
 // REDUCERS — client-called (by the authenticated user's own WebSocket)
 // ============================================================================
@@ -737,9 +504,11 @@ pub fn update_user_email(
         ..profile
     });
 
+    let organization_id = audit_organization_for_identity(ctx, ctx.sender())
+        .ok_or("User profile has no active organization membership")?;
     write_audit_log_v2(
         ctx,
-        audit_organization_for_identity(ctx, ctx.sender()),
+        organization_id,
         AuditLogParams {
             company_id: None,
             table_name: "user_profile",
