@@ -260,7 +260,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
 
     await gotoModule(page, "/accounting", "accounting")
     await page.getByTestId("module-tab-accounting-invoices").click()
-    await expect(page.getByText(leadName).first()).toBeVisible({ timeout: 30_000 })
+    await expectSeededText(page, leadName, "/api/query/account-moves")
 
     // Step 11 — create payment → post → register on invoice (UI)
     const { partnerId, amountTotal, currencyId } = await fetchInvoiceMoveDetails(page, moveId)
