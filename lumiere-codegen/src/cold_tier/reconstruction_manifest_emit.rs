@@ -256,6 +256,11 @@ fn validate_policy(policy: &ReconstructionPolicy) -> Result<()> {
             bail!("unsupported reconstruction action '{action}'");
         }
     }
+    for action in policy.table_actions.values() {
+        if !matches!(action.as_str(), RESTORE | RECREATE | EXCLUDE_PLATFORM) {
+            bail!("unsupported reconstruction action '{action}'");
+        }
+    }
     Ok(())
 }
 
@@ -482,6 +487,35 @@ mod tests {
         )
         .unwrap();
         assert_eq!(manifest["tables"][0]["projection_mode"], "upsert-current");
+    }
+
+    #[test]
+    fn rejects_unknown_table_action_override() {
+        let schema = LumiereSchemaManifest {
+            version: 1,
+            tables: vec![table("orders", &["id"])],
+            enum_types: vec![],
+        };
+        let storage = json!({"version":1,"policies":[{
+            "table":"orders",
+            "module":"test",
+            "durability_class":"durable_business_record",
+            "organization_ownership":"direct",
+            "organization_column":"organization_id",
+            "projection_mode":"upsert-current",
+            "aggregate":{"parent":null}
+        }]});
+        let override_policy = r#"{"version":1,"same_level_order":"table_ascending","relationship_source":"storage_policy.aggregate.parent","durability_actions":{"durable_business_record":"restore"},"table_actions":{"orders":"retores"},"recreated_state":{},"excluded_state":{}}"#;
+        let error = emit_reconstruction_manifest(
+            override_policy,
+            &schema,
+            &storage,
+            &durable(&["orders"]),
+        )
+        .unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("unsupported reconstruction action 'retores'"));
     }
 
     #[test]
