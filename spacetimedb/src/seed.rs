@@ -32,8 +32,8 @@ use crate::core::reference::{
     Currency, CurrencyRate, DocumentSequence, UOMCategory, UOMConversion, UOM,
 };
 use crate::core::users::{
-    ensure_user_profile_for_organization, user_organization, user_profile, user_session,
-    UserOrganization, UserProfile, UserSession,
+    ensure_user_profile_for_organization, find_user_profile_for_organization, user_organization,
+    user_profile, user_session, UserOrganization, UserProfile, UserSession,
 };
 use crate::core::utm::{utm_campaign, utm_medium, utm_source, UtmCampaign, UtmMedium, UtmSource};
 
@@ -1118,8 +1118,8 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true}".to_string()),
     });
     ensure_user_profile_for_organization(ctx, seeder, org_id);
-    if let Some(profile) = ctx.db.user_profile().identity().find(seeder) {
-        ctx.db.user_profile().identity().update(UserProfile {
+    if let Some(profile) = find_user_profile_for_organization(ctx, seeder, org_id) {
+        ctx.db.user_profile().id().update(UserProfile {
             email: "seed@lumiere.demo".to_string(),
             name: "Seed Admin".to_string(),
             first_name: Some("Seed".to_string()),
@@ -11257,9 +11257,9 @@ pub fn ensure_dev_admin(ctx: &ReducerContext) -> Result<(), String> {
     // Materialize the ERP profile only after the validated membership exists,
     // then mark it as superuser (parity with seed_dev_data).
     ensure_user_profile_for_organization(ctx, caller, org_id);
-    if let Some(profile) = ctx.db.user_profile().identity().find(caller) {
+    if let Some(profile) = find_user_profile_for_organization(ctx, caller, org_id) {
         if !profile.is_superuser {
-            ctx.db.user_profile().identity().update(UserProfile {
+            ctx.db.user_profile().id().update(UserProfile {
                 is_superuser: true,
                 updated_at: ctx.timestamp,
                 ..profile

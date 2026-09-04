@@ -18,7 +18,7 @@ use crate::accounting::relations::{
     require_active_account, require_active_currency_id, require_active_journal,
 };
 use crate::core::organization::{company, require_company_in_organization};
-use crate::core::users::user_profile;
+use crate::core::users::find_user_profile_for_identity;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{AccountInternalGroup, AssetState, AssetType, DepreciationMethod, JournalType};
 
@@ -1312,11 +1312,7 @@ pub fn set_asset_active(
 /// Validate fixed-asset ownership from company and parent relations.
 #[spacetimedb::reducer]
 pub fn backfill_fixed_asset_organization_ownership(ctx: &ReducerContext) -> Result<(), String> {
-    let user = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let user = find_user_profile_for_identity(ctx, ctx.sender())
         .ok_or("user not found")?;
     if !user.is_superuser {
         return Err("only superusers may backfill accounting ownership".to_string());

@@ -7,7 +7,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 use crate::accounting::relations::{require_active_currency_id, require_contact_in_scope};
 use crate::core::organization::require_company_in_organization;
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
-use crate::core::users::{user_organization, user_profile};
+use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::{require_product_in_org, require_warehouse_in_org_and_company};
@@ -402,11 +402,7 @@ fn require_organization_identity(
     identity: Identity,
     role: &str,
 ) -> Result<(), String> {
-    let profile = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(&identity)
+    let profile = find_user_profile_for_organization(ctx, identity, organization_id)
         .ok_or_else(|| format!("{role} user profile not found"))?;
     if !profile.is_active {
         return Err(format!("{role} user is inactive"));

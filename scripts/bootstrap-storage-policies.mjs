@@ -130,6 +130,8 @@ const EXPLICIT_MODULES = {
   organization: "core",
   organization_commit: "core",
   organization_commit_cursor: "core",
+  organization_reconstruction_batch_receipt: "core",
+  organization_reconstruction_fence: "core",
   organization_row_change: "core",
   organization_settings: "core",
   org_permission: "core",
@@ -267,14 +269,9 @@ const ACTIVE_ARCHIVE_POLICIES = {
   pos_order: { cooling: "policy", hot: "terminal_window", hydration: "full_row" },
 };
 
-const EXTERNAL_REFERENCE_TABLES = new Set([
-  "contact_identity_verification_authority",
-  "country",
-  "country_pack_definition",
-  "country_pack_tax_rule",
-  "currency",
-  "hr_country_pack_leave_default",
-]);
+// Shared provider/reference truth lives outside ERP. Its organization-seeded
+// application copies are ordinary durable organization records.
+const EXTERNAL_REFERENCE_TABLES = new Set();
 
 function moduleFor(tableName) {
   if (EXPLICIT_MODULES[tableName]) return EXPLICIT_MODULES[tableName];

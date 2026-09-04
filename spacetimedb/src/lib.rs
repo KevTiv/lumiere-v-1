@@ -47,7 +47,7 @@
 /// 4. Add `pub mod <domain>;` below in this file
 /// 5. Use `crate::helpers::check_permission` and `crate::helpers::write_audit_log`
 ///    for multi-tenancy and auditing
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::ReducerContext;
 
 // ── Shared utilities ─────────────────────────────────────────────────────────
 mod generated_reconstruction_apply;
@@ -170,8 +170,8 @@ pub mod data_ops_tests;
 
 use crate::core::migrations::apply_pending_global_migrations;
 use crate::core::users::{
-    ensure_user_profile_for_organization, user_organization, user_profile, user_session,
-    UserProfile, UserSession,
+    ensure_user_profile_for_organization, find_user_profile_for_identity, user_organization,
+    user_profile, user_session, UserProfile, UserSession,
 };
 use crate::crm::presence::opportunity_presence;
 use crate::proposals::proposals::proposal_presence;
@@ -232,8 +232,8 @@ pub fn init(ctx: &ReducerContext) {
 /// prevents a shared/sentinel global profile row from being created.
 #[spacetimedb::reducer(client_connected)]
 pub fn identity_connected(ctx: &ReducerContext) {
-    if let Some(profile) = ctx.db.user_profile().identity().find(ctx.sender()) {
-        ctx.db.user_profile().identity().update(UserProfile {
+    if let Some(profile) = find_user_profile_for_identity(ctx, ctx.sender()) {
+        ctx.db.user_profile().id().update(UserProfile {
             last_login: Some(ctx.timestamp),
             updated_at: ctx.timestamp,
             ..profile

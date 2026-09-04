@@ -11,7 +11,7 @@ use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::core::organization::organization;
 use crate::core::permissions::{sod_conflict_rule, SodConflictRule};
-use crate::core::users::user_profile;
+use crate::core::users::{find_user_profile_for_identity, find_user_profile_for_organization};
 use crate::forms::migrations::run_seed_organization_form_configs;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
@@ -380,11 +380,7 @@ pub fn record_platform_migration_binding(
     version: u64,
     name: String,
 ) -> Result<(), String> {
-    let user = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let user = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
         .ok_or("User not found")?;
     if !user.is_superuser {
         return Err("Only superusers may record platform migration bindings".to_string());
@@ -499,11 +495,7 @@ pub fn apply_org_migrations(ctx: &ReducerContext, organization_id: u64) -> Resul
 /// One-shot global migration runner (superuser).
 #[spacetimedb::reducer]
 pub fn apply_global_migrations(ctx: &ReducerContext) -> Result<(), String> {
-    let user = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let user = find_user_profile_for_identity(ctx, ctx.sender())
         .ok_or("User not found")?;
     if !user.is_superuser {
         return Err("Only superusers may apply global migrations".to_string());

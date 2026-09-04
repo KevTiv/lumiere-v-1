@@ -7,7 +7,7 @@
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company;
-use crate::core::users::user_profile;
+use crate::core::users::find_user_profile_for_identity;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
@@ -257,11 +257,7 @@ pub struct DocumentSequence {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
-    let is_su = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let is_su = find_user_profile_for_identity(ctx, ctx.sender())
         .map(|u| u.is_superuser)
         .unwrap_or(false);
 

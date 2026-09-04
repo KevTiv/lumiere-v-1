@@ -134,6 +134,21 @@ class OperationHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.OperationHistoryError, "reuse retired"):
             self.verify_value(ir, history)
 
+    def test_previous_release_may_contain_candidate_retired_ids(self):
+        previous = ir_with(operation())
+        current = ir_with(operation("create_order_v2", "erp.create_order_v2"))
+        history = MODULE.build_history_from_value(current)
+        history["retired_ids"] = ["erp.create_order"]
+        with self.assertRaisesRegex(MODULE.OperationHistoryError, "reuse retired"):
+            self.verify_value(previous, history)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ir_path = root / "ir.json"
+            history_path = root / "history.json"
+            ir_path.write_text(json.dumps(previous), encoding="utf-8")
+            history_path.write_text(json.dumps(history), encoding="utf-8")
+            MODULE.verify(ir_path, history_path, allow_previous_compatibility=True)
+
     def test_unapproved_shape_change_fails_closed(self):
         ir = ir_with(operation())
         history = MODULE.build_history_from_value(ir)

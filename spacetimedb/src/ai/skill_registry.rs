@@ -8,7 +8,7 @@ use crate::ai::skills::{
     ai_agent_run, ai_skill, ai_skill_config, AiAgentRun, AiSkill, AiSkillConfig,
 };
 use crate::core::organization::require_company_in_organization;
-use crate::core::users::user_profile;
+use crate::core::users::find_user_profile_for_identity;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::workflow::authorization::require_workflow_company_access;
 
@@ -2085,11 +2085,7 @@ fn validate_certification_evidence_params(
 }
 
 fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
-    let user = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let user = find_user_profile_for_identity(ctx, ctx.sender())
         .ok_or("User not found")?;
     if !user.is_active || !user.is_superuser {
         return Err(

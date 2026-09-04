@@ -397,6 +397,21 @@
       "reason": "trusted registered reconstruction service only; never exposed through the session BFF"
     },
     {
+      "name": "bind_password_reset_token",
+      "exposure": "denied",
+      "reason": "trusted API-server platform-control path only; never exposed through the session BFF"
+    },
+    {
+      "name": "bind_user_credential",
+      "exposure": "denied",
+      "reason": "trusted API-server platform-control path only; never exposed through the session BFF"
+    },
+    {
+      "name": "bind_user_profile",
+      "exposure": "denied",
+      "reason": "trusted API-server platform-control path only; never exposed through the session BFF"
+    },
+    {
       "name": "bill_timesheets",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -1405,12 +1420,6 @@
       "name": "create_partner_bank",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
-    },
-    {
-      "name": "create_password_reset_token",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
     },
     {
       "name": "create_payment",
@@ -2764,12 +2773,6 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
-      "name": "link_workos_user",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
-    },
-    {
       "name": "lock_document",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2813,6 +2816,11 @@
       "name": "mark_onboarding_done",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "mark_password_reset_token_projection_used",
+      "exposure": "denied",
+      "reason": "trusted API-server platform-control path only; never exposed through the session BFF"
     },
     {
       "name": "match_bank_line",
@@ -3680,18 +3688,6 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
-      "name": "store_sso_user_credential",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
-    },
-    {
-      "name": "store_user_credential",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
-    },
-    {
       "name": "submit_expense",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -4449,12 +4445,6 @@
     },
     {
       "name": "update_user_organization_status",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
-    },
-    {
-      "name": "update_user_password",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site",
       "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"

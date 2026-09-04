@@ -6,7 +6,7 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company, organization, require_company_in_organization};
-use crate::core::users::user_profile;
+use crate::core::users::find_user_profile_for_identity;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{FiscalYearState, PeriodState};
 
@@ -951,11 +951,7 @@ pub(crate) fn require_single_backfill_organization(ctx: &ReducerContext) -> Resu
 /// rewrites ownership.
 #[spacetimedb::reducer]
 pub fn backfill_fiscal_period_organization_ownership(ctx: &ReducerContext) -> Result<(), String> {
-    let user = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let user = find_user_profile_for_identity(ctx, ctx.sender())
         .ok_or("user not found")?;
     if !user.is_superuser {
         return Err("only superusers may backfill accounting ownership".to_string());

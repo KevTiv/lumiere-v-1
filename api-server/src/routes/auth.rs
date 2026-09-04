@@ -338,7 +338,12 @@ async fn forgot_password(
         let pool = pg_pool::shared_pool().ok_or_else(|| {
             ApiError::Unavailable("platform authentication storage is unavailable".into())
         })?;
-        platform_control::insert_password_reset_token(pool, &platform_id, &token_hash, expires_at)
+        let platform_reset_token_id = platform_control::insert_password_reset_token(
+            pool,
+            &platform_id,
+            &token_hash,
+            expires_at,
+        )
             .await
             .map_err(|e| ApiError::Internal(e.to_string()))?;
         let admin = state
@@ -353,6 +358,7 @@ async fn forgot_password(
                 "bind_password_reset_token",
                 json!([
                     platform_id.as_str(),
+                    platform_reset_token_id.as_str(),
                     identity_json_for_reducer_call(&cred.identity_hex),
                     expires_at_micros.to_string(),
                 ]),
@@ -472,7 +478,7 @@ async fn reset_password(
             .client_with_token(admin)
             .call_reducer(stdb_client::reducer_call!(
                 "mark_password_reset_token_projection_used",
-                json!([platform_id.as_str()]),
+                json!([reset_token.platform_reset_token_id]),
             ))
             .await
             .map_err(|e| ApiError::Internal(e.to_string()))?;

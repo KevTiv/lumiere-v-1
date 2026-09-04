@@ -3,7 +3,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::core::audit::audit_log;
 use crate::core::organization::{company, create_company, CreateCompanyParams};
-use crate::core::users::user_profile;
+use crate::core::users::{find_user_profile_for_organization, user_profile};
 use crate::crm::contact_identities::{
     archive_contact_identity, configure_contact_identity_verification_authority,
     contact_identity_evidence_hash, contact_identity_verification_proof, contact_phone_identity,
@@ -611,30 +611,22 @@ pub fn test_verify_and_archive_contact_identity(ctx: &ReducerContext) -> Result<
         return Err("identity-mismatched verification proof should be rejected".to_string());
     }
 
-    let caller = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let caller = find_user_profile_for_organization(ctx, ctx.sender(), org_id)
         .ok_or("verification test caller profile missing")?;
     ctx.db
         .user_profile()
-        .identity()
+        .id()
         .update(crate::core::users::UserProfile {
             is_superuser: false,
             ..caller
         });
     let ordinary_writer_attempt =
         record_contact_identity_verification_proof(ctx, org_id, valid_proof.clone());
-    let ordinary_profile = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let ordinary_profile = find_user_profile_for_organization(ctx, ctx.sender(), org_id)
         .ok_or("verification test caller profile disappeared")?;
     ctx.db
         .user_profile()
-        .identity()
+        .id()
         .update(crate::core::users::UserProfile {
             is_superuser: true,
             ..ordinary_profile

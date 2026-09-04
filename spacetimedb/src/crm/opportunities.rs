@@ -11,7 +11,7 @@ use crate::core::organization::company_id_from_scope;
 use crate::core::permissions::role;
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::core::reference::{currency, uom};
-use crate::core::users::{user_organization, user_profile};
+use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::core::utm::{utm_campaign, utm_medium, utm_source};
 use crate::crm::contacts::{contact, contact_tag, Contact};
 use crate::crm::leads::lead_lost_reason;
@@ -1049,11 +1049,7 @@ pub fn update_opportunity(
         changed_fields.push("lost_reason_id".to_string());
     }
 
-    let user = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let user = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
         .ok_or("User not found")?;
     let user_org = ctx
         .db

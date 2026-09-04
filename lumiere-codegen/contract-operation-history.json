@@ -414,6 +414,18 @@
       "name": "bill_timesheets",
       "shape_fingerprint": "sha256:d451cfe2c903bd625f1c73cf376c95f697666722817dafeaf4a18cdbf4b9e886"
     },
+    "erp.bind_password_reset_token": {
+      "name": "bind_password_reset_token",
+      "shape_fingerprint": "sha256:edfea7acfa36087a0177d87ca67560268461876ffddd18e101a05692aeb10504"
+    },
+    "erp.bind_user_credential": {
+      "name": "bind_user_credential",
+      "shape_fingerprint": "sha256:384e7fad8493b44b245341c54f1556f5812224891ad57848fed8bddce3e48f51"
+    },
+    "erp.bind_user_profile": {
+      "name": "bind_user_profile",
+      "shape_fingerprint": "sha256:43f15168acc0b42c8f0a68fc0b885172cfba8d46bee994922712c2b893c22a58"
+    },
     "erp.block_serial": {
       "name": "block_serial",
       "shape_fingerprint": "sha256:05e061d31dcc4ff2673fe39c5524081a4bb17f2eacf826aed7c7614c54cba9f0"
@@ -1365,10 +1377,6 @@
     "erp.create_partner_bank": {
       "name": "create_partner_bank",
       "shape_fingerprint": "sha256:05e9ec184f42f86df808106da17a890441597b7d18ec43f4701cf5e5419eb026"
-    },
-    "erp.create_password_reset_token": {
-      "name": "create_password_reset_token",
-      "shape_fingerprint": "sha256:10316a2c14280ab6955249cbddec75e82a9ff025637eba1988c058df42dd29b3"
     },
     "erp.create_payment": {
       "name": "create_payment",
@@ -2626,10 +2634,6 @@
       "name": "link_subcontractor_cost_to_project",
       "shape_fingerprint": "sha256:f1a8f6351a5be0d2ef870dd5fdbe2320dc0e0159e420a446e9c73a3464f4e670"
     },
-    "erp.link_workos_user": {
-      "name": "link_workos_user",
-      "shape_fingerprint": "sha256:1071bf62ce43809cdb013716d1d3c015f60c95e97980d3c066ce6e7aef6c092d"
-    },
     "erp.lock_document": {
       "name": "lock_document",
       "shape_fingerprint": "sha256:51b2d8c5f3dd811c1d5428d3541f6c150b51c671ba338834f0bd743735a730ac"
@@ -2682,9 +2686,9 @@
       "name": "mark_onboarding_done",
       "shape_fingerprint": "sha256:304557fce5873839c677c184ff907296b335d072542b6afdfd02f72a12069eed"
     },
-    "erp.mark_reset_token_used": {
-      "name": "mark_reset_token_used",
-      "shape_fingerprint": "sha256:4e379731b5bcdf455bd355e58dba673898db51df646f2754223b0f7682422022"
+    "erp.mark_password_reset_token_projection_used": {
+      "name": "mark_password_reset_token_projection_used",
+      "shape_fingerprint": "sha256:64b5e5828a8a797ed56841de001ec4f697d07514cf994d308005350adeb7dc22"
     },
     "erp.match_bank_line": {
       "name": "match_bank_line",
@@ -2965,6 +2969,10 @@
     "erp.record_payroll_export_result": {
       "name": "record_payroll_export_result",
       "shape_fingerprint": "sha256:09010d59807c52606d87de9864ac9018aefedc72899448741dc9336ff7bbfb8d"
+    },
+    "erp.record_platform_migration_binding": {
+      "name": "record_platform_migration_binding",
+      "shape_fingerprint": "sha256:f85a87ab5875d2dce49c8f83c29ce3e35b202b73c14ef120aa0bfc32358010e9"
     },
     "erp.record_privacy_consent": {
       "name": "record_privacy_consent",
@@ -4366,14 +4374,6 @@
       "name": "stop_timesheet_timer",
       "shape_fingerprint": "sha256:a6f57bb4311a405848817907a3116bead85a83fb3980e86daef4fb684775d301"
     },
-    "erp.store_sso_user_credential": {
-      "name": "store_sso_user_credential",
-      "shape_fingerprint": "sha256:d209f30f974bf9d127f8f16422421b4412475b283bdf9bcdf2af0ef8d0cda956"
-    },
-    "erp.store_user_credential": {
-      "name": "store_user_credential",
-      "shape_fingerprint": "sha256:d73d39bb5b6d36fd2cadb9b7c9ead0f0ba8bb54f37a4430bd6f0d780a8233871"
-    },
     "erp.submit_expense": {
       "name": "submit_expense",
       "shape_fingerprint": "sha256:9ee08be3804cee6b21039da0c004a07ec2a98a9c285e29b6694845ab35894385"
@@ -5102,10 +5102,6 @@
       "name": "update_user_organization_status",
       "shape_fingerprint": "sha256:1bdf0506caabff95080e928c40048c2f30bf4311311f41b9c3cad5a8ec36ca0f"
     },
-    "erp.update_user_password": {
-      "name": "update_user_password",
-      "shape_fingerprint": "sha256:37abdd49221cddb590aa0f123e730db4b15eafd45e38b702d6072ca89d5a8905"
-    },
     "erp.update_user_profile": {
       "name": "update_user_profile",
       "shape_fingerprint": "sha256:c5aec86d5396247ebf5a54be987c62df3cf70c29a08d419881343ba5bc479346"
@@ -5283,8 +5279,39 @@
       "shape_fingerprint": "sha256:77825d94c156ea196af4bd3bfff7632787a29bba8a4123420fdfbd1b14f6dfc1"
     }
   },
-  "retired_ids": [],
+  "retired_ids": [
+    "erp.create_password_reset_token",
+    "erp.link_workos_user",
+    "erp.mark_reset_token_used",
+    "erp.store_sso_user_credential",
+    "erp.store_user_credential",
+    "erp.update_user_password"
+  ],
   "compatibility_exceptions": [
+    {
+      "operation_id": "erp.configure_contact_identity_verification_authority",
+      "previous_fingerprint": "sha256:9bdfa90c80390e20efa391ba5fe809b2bff3b52ad8605aa0d043f4f2ab3d4580",
+      "current_fingerprint": "sha256:6219e24c1993e4a3d291f608fe40e1ce112a45201a532bb9865d98966cd8aedd",
+      "reason": "derive organization ownership for verification authorities from trusted server context"
+    },
+    {
+      "operation_id": "erp.create_country",
+      "previous_fingerprint": "sha256:576359a01457d0ec12198140576ae4246b16ea97167997427b41441caf0f1d39",
+      "current_fingerprint": "sha256:ee573d065df7905c88fab0e4224eb2b05219504bfa47e975d564568fb45c0d4b",
+      "reason": "create organization-seeded country copies instead of platform-global ERP rows"
+    },
+    {
+      "operation_id": "erp.create_currency",
+      "previous_fingerprint": "sha256:db0c114df4005f8d8364c59e71281cd427373f0e62cc119d95134c6c18a6e72f",
+      "current_fingerprint": "sha256:bb07ad1f01b294db9811e3f2389827f483f688f15b72f39cad27c000afe25c09",
+      "reason": "create organization-seeded currency copies instead of platform-global ERP rows"
+    },
+    {
+      "operation_id": "erp.register_cold_tier_service_identity",
+      "previous_fingerprint": "sha256:f7ba7b62be1743c50cc17f699f9e4231d536614650e15ec96edf6454afe67d44",
+      "current_fingerprint": "sha256:2645a6e8b746887c20880af72623418d7d0bd8b530f83c691bca9936e2217dc2",
+      "reason": "bind trusted platform service identities into explicit organization-owned projections"
+    },
     {
       "operation_id": "erp.schedule_tax_deadline_updates",
       "previous_fingerprint": "sha256:5f1b8db3b84ddae4ee4afad1693bbbb157c2a3ecf86f6cc417c498dea5bcd18f",

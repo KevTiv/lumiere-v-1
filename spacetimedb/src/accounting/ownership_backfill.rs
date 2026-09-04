@@ -22,7 +22,7 @@ use crate::accounting::fixed_assets::{
 use crate::accounting::intercompany::{
     backfill_intercompany_organization_ownership, intercompany_rule, intercompany_transaction,
 };
-use crate::core::users::user_profile;
+use crate::core::users::find_user_profile_for_identity;
 
 const BACKFILL_SCOPES: [&str; 4] = [
     "fiscal_periods",
@@ -32,11 +32,7 @@ const BACKFILL_SCOPES: [&str; 4] = [
 ];
 
 fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
-    let user = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let user = find_user_profile_for_identity(ctx, ctx.sender())
         .ok_or("user not found")?;
     if !user.is_superuser {
         return Err("only superusers may manage accounting ownership backfills".to_string());

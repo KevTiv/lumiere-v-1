@@ -11,7 +11,9 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::core::users::{
-    ensure_user_profile_for_organization, user_organization, user_profile, UserProfile,
+    ensure_user_profile_for_organization, find_user_profile_for_identity,
+    find_user_profile_for_organization, has_duplicate_platform_user_binding, user_organization,
+    user_profile, UserProfile,
 };
 use crate::helpers::{write_audit_log_v2, AuditLogParams};
 
@@ -70,6 +72,8 @@ pub struct PasswordResetToken {
     /// Organization ownership is copied from the target identity's validated
     /// active membership when the binding is created.
     pub organization_id: u64,
+    /// Opaque identifier of this platform token. It is not the secret hash.
+    pub platform_reset_token_id: String,
     /// Opaque platform-control key for the account being reset.
     pub platform_user_id: String,
     pub expires_at: Timestamp,
@@ -99,13 +103,9 @@ fn audit_organization_for_identity(ctx: &ReducerContext, identity: Identity) -> 
 /// Asserts the calling identity is a superuser (i.e. the server admin identity).
 /// All admin-called reducers must call this first.
 fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
-    let caller = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let caller = find_user_profile_for_identity(ctx, ctx.sender())
         .ok_or("Caller profile not found")?;
-    if !caller.is_superuser {
+    if !caller.is_superuser || !caller.is_active {
         return Err("Unauthorized: caller is not a superuser".to_string());
     }
     Ok(())
@@ -133,11 +133,11 @@ pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> 
     let sender = ctx.sender();
     let organization_id = audit_organization_for_identity(ctx, sender)
         .ok_or("Caller must belong to an organization before an ERP profile can be created")?;
-    if let Some(profile) = ctx.db.user_profile().identity().find(sender) {
+    if let Some(profile) = find_user_profile_for_organization(ctx, sender, organization_id) {
         if profile.is_superuser {
             return Ok(());
         }
-        ctx.db.user_profile().identity().update(UserProfile {
+        ctx.db.user_profile().id().update(UserProfile {
             is_superuser: true,
             updated_at: ctx.timestamp,
             ..profile
@@ -164,6 +164,7 @@ pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> 
         );
     } else {
         ctx.db.user_profile().insert(UserProfile {
+            id: 0,
             identity: sender,
             platform_user_id: String::new(),
             organization_id,
@@ -224,8 +225,8 @@ fn ensure_user_profile_for_identity(
         return;
     };
     ensure_user_profile_for_organization(ctx, identity, organization_id);
-    if let Some(profile) = ctx.db.user_profile().identity().find(identity) {
-        ctx.db.user_profile().identity().update(UserProfile {
+    if let Some(profile) = find_user_profile_for_organization(ctx, identity, organization_id) {
+        ctx.db.user_profile().id().update(UserProfile {
             email,
             email_verified,
             ..profile
@@ -301,11 +302,7 @@ pub fn bind_user_profile(
     if platform_user_id.trim().is_empty() || platform_user_id.len() > 128 {
         return Err("platform user id is invalid".to_string());
     }
-    let profile = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(user_identity)
+    let profile = find_user_profile_for_identity(ctx, user_identity)
         .ok_or("User profile not found")?;
     if !ctx
         .db
@@ -318,7 +315,15 @@ pub fn bind_user_profile(
     {
         return Err("User profile has no active organization membership".to_string());
     }
-    ctx.db.user_profile().identity().update(UserProfile {
+    if has_duplicate_platform_user_binding(
+        ctx,
+        profile.organization_id,
+        &platform_user_id,
+        profile.id,
+    ) {
+        return Err("Platform user is already bound in this organization".to_string());
+    }
+    ctx.db.user_profile().id().update(UserProfile {
         platform_user_id,
         updated_at: ctx.timestamp,
         ..profile
@@ -332,6 +337,7 @@ pub fn bind_user_profile(
 pub fn bind_password_reset_token(
     ctx: &ReducerContext,
     platform_user_id: String,
+    platform_reset_token_id: String,
     user_identity: Identity,
     expires_at: Timestamp,
 ) -> Result<(), String> {
@@ -339,11 +345,15 @@ pub fn bind_password_reset_token(
     if platform_user_id.trim().is_empty() || platform_user_id.len() > 128 {
         return Err("platform user id is invalid".to_string());
     }
+    if platform_reset_token_id.trim().is_empty() || platform_reset_token_id.len() > 128 {
+        return Err("platform reset token id is invalid".to_string());
+    }
     let organization_id = audit_organization_for_identity(ctx, user_identity)
         .ok_or("Reset-token identity must belong to an organization")?;
     ctx.db.password_reset_token().insert(PasswordResetToken {
         id: 0,
         organization_id,
+        platform_reset_token_id,
         platform_user_id,
         expires_at,
         used_at: None,
@@ -351,19 +361,21 @@ pub fn bind_password_reset_token(
     Ok(())
 }
 
-/// Mark all organization projections for a consumed platform reset token.
+/// Mark the organization projection for one consumed platform reset token.
 /// PostgreSQL remains the concurrency/expiry authority.
 #[spacetimedb::reducer]
 pub fn mark_password_reset_token_projection_used(
     ctx: &ReducerContext,
-    platform_user_id: String,
+    platform_reset_token_id: String,
 ) -> Result<(), String> {
     require_superuser(ctx)?;
     let ids: Vec<u64> = ctx
         .db
         .password_reset_token()
         .iter()
-        .filter(|token| token.platform_user_id == platform_user_id && token.used_at.is_none())
+        .filter(|token| {
+            token.platform_reset_token_id == platform_reset_token_id && token.used_at.is_none()
+        })
         .map(|token| token.id)
         .collect();
     for id in ids {
@@ -479,11 +491,7 @@ pub fn update_user_email(
     email: String,
     email_verified: bool,
 ) -> Result<(), String> {
-    let profile = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let profile = find_user_profile_for_identity(ctx, ctx.sender())
         .ok_or("UserProfile not found — connect first")?;
     if !ctx
         .db
@@ -497,7 +505,7 @@ pub fn update_user_email(
         return Err("User profile has no active organization membership".to_string());
     }
 
-    ctx.db.user_profile().identity().update(UserProfile {
+    ctx.db.user_profile().id().update(UserProfile {
         email: email.clone(),
         email_verified,
         updated_at: ctx.timestamp,

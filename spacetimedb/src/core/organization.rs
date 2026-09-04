@@ -13,7 +13,8 @@ use crate::core::reference::{
     seed_currency_for_organization,
 };
 use crate::core::users::{
-    ensure_user_profile_for_organization, user_organization, user_profile, UserOrganization,
+    ensure_user_profile_for_organization, find_user_profile_for_identity, user_organization,
+    UserOrganization,
 };
 use crate::crm::activities::{activity_type, ActivityType};
 use crate::forms::migrations::run_seed_organization_form_configs;
@@ -953,11 +954,7 @@ pub(crate) fn company_id_from_scope(
 /// One-time migration: set `external_id` on rows that predate the column (empty string).
 #[spacetimedb::reducer]
 pub fn backfill_external_ids(ctx: &ReducerContext) -> Result<(), String> {
-    let me = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let me = find_user_profile_for_identity(ctx, ctx.sender())
         .ok_or("User not found")?;
     if !me.is_superuser {
         return Err("Only superusers may run backfill_external_ids".to_string());

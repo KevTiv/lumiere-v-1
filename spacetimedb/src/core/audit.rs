@@ -8,7 +8,7 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::reconstruction::require_writes_unfenced;
-use crate::core::users::{user_organization, user_profile};
+use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::helpers::check_permission;
 
 // ============================================================================
@@ -178,11 +178,7 @@ pub fn log_audit_event(
         uo.user_identity == ctx.sender() && uo.organization_id == organization_id && uo.is_active
     });
 
-    let is_su = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let is_su = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
         .map(|u| u.is_superuser)
         .unwrap_or(false);
 

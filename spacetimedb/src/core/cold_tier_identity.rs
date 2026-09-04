@@ -16,7 +16,7 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::core::organization::organization;
-use crate::core::users::user_profile;
+use crate::core::users::find_user_profile_for_identity;
 
 /// `service_name` used by the audit-log cold drainer (`api-server/src/cold_tier/audit_drainer.rs`).
 pub(crate) const AUDIT_COLD_DRAINER_SERVICE: &str = "audit_cold_drainer";
@@ -106,7 +106,7 @@ pub fn register_cold_tier_service_identity(
         .db
         .cold_tier_service_identity()
         .cold_tier_service_identity_by_name()
-        .filter(&(organization_id, service_name.clone()))
+        .filter((&organization_id, &service_name))
         .filter(|row| row.is_active)
         .collect();
     for row in active {
@@ -145,11 +145,14 @@ pub(crate) fn is_active_cold_tier_service_identity(
     organization_id: u64,
     service_name: &str,
 ) -> bool {
-    ctx.db
+    let service_name = service_name.to_string();
+    let is_active = ctx
+        .db
         .cold_tier_service_identity()
         .cold_tier_service_identity_by_name()
-        .filter(&(organization_id, service_name.to_string()))
-        .any(|row| row.is_active && row.identity == ctx.sender())
+        .filter((&organization_id, &service_name))
+        .any(|row| row.is_active && row.identity == ctx.sender());
+    is_active
 }
 
 fn validate_platform_id(platform_id: &str) -> Result<String, String> {
@@ -167,11 +170,7 @@ fn validate_platform_id(platform_id: &str) -> Result<String, String> {
 }
 
 fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
-    let user = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let user = find_user_profile_for_identity(ctx, ctx.sender())
         .ok_or("User not found")?;
     if !user.is_active || !user.is_superuser {
         return Err(
@@ -190,7 +189,7 @@ mod tests {
     fn platform_binding_id_must_be_opaque_and_bounded() {
         assert_eq!(
             validate_platform_id(" platform-binding-01 ").as_deref(),
-            Some("platform-binding-01")
+            Ok("platform-binding-01")
         );
         assert!(validate_platform_id("").is_err());
         assert!(validate_platform_id("org/service").is_err());

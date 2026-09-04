@@ -265,15 +265,17 @@ pub async fn find_invite_by_token_hash(
 
 #[derive(Debug, Clone)]
 pub struct StdbResetToken {
-    pub id: i64,
+    pub platform_reset_token_id: String,
     pub platform_user_id: String,
     pub expires_at: i64,
     pub used_at: Option<i64>,
 }
 
 fn parse_reset_token(row: &tokio_postgres::Row) -> Result<StdbResetToken, ApiError> {
-    let id: i64 = row
-        .try_get("id")
+    let platform_reset_token_id: String = row
+        .try_get("platform_reset_token_id")
+        .map_err(|e| ApiError::Internal(format!("invalid reset token id: {e}")))?;
+    PlatformId::new(platform_reset_token_id.clone())
         .map_err(|e| ApiError::Internal(format!("invalid reset token id: {e}")))?;
     let platform_user_id: String = row
         .try_get("platform_user_id")
@@ -291,7 +293,7 @@ fn parse_reset_token(row: &tokio_postgres::Row) -> Result<StdbResetToken, ApiErr
         .map_err(|e| ApiError::Internal(format!("invalid reset token expiry: {e}")))?
         .as_secs() as i64;
     Ok(StdbResetToken {
-        id,
+        platform_reset_token_id,
         platform_user_id,
         expires_at,
         used_at: used_at.map(|value| {

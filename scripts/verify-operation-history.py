@@ -271,7 +271,9 @@ def verify(
     retired = set(history["retired_ids"])
     current_ids = set(current)
     historical_ids = set(historical)
-    reused = current_ids & retired
+    # A pinned previous release may still contain IDs retired by the candidate
+    # history. The candidate IR itself must never reuse those tombstones.
+    reused = (current_ids & retired) if not allow_previous_compatibility else set()
     if reused:
         fail(f"current operation IDs reuse retired IDs: {', '.join(sorted(reused))}")
     active_retired = historical_ids & retired
@@ -283,12 +285,13 @@ def verify(
     missing = historical_ids - current_ids
     added = current_ids - historical_ids
     unretired_missing = missing - retired
-    if (unretired_missing and not allow_previous_compatibility) or added:
+    unretired_added = added - retired if allow_previous_compatibility else added
+    if (unretired_missing and not allow_previous_compatibility) or unretired_added:
         details = []
         if unretired_missing and not allow_previous_compatibility:
             details.append(f"missing current IDs={sorted(unretired_missing)!r}")
-        if added:
-            details.append(f"unrecorded current IDs={sorted(added)!r}")
+        if unretired_added:
+            details.append(f"unrecorded current IDs={sorted(unretired_added)!r}")
         fail("current operation ID set changed; " + "; ".join(details))
     exceptions = {
         exception["operation_id"]: exception

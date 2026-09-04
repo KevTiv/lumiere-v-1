@@ -8,10 +8,8 @@
     { "table": "analytics_metric", "module": "analytics", "storage_class": "always_hot", "reviewed": true },
     { "table": "audit_rule", "module": "core", "storage_class": "always_hot", "reviewed": true },
     { "table": "audit_log", "module": "core", "storage_class": "pg_first", "reviewed": true },
-    { "table": "country", "module": "core", "storage_class": "external_reference", "reviewed": true },
     { "table": "policy_snapshot", "module": "core", "storage_class": "projection_only", "reviewed": true },
     { "table": "contact", "module": "crm", "storage_class": "always_hot", "reviewed": true },
-    { "table": "contact_identity_verification_authority", "module": "crm", "storage_class": "external_reference", "reviewed": true },
     { "table": "crm_forecast_snapshot", "module": "crm", "storage_class": "projection_only", "reviewed": true },
     { "table": "import_job", "module": "data_ops", "storage_class": "always_hot", "reviewed": true },
     { "table": "doc_folder", "module": "documents", "storage_class": "always_hot", "reviewed": true },
@@ -20,7 +18,6 @@
     { "table": "form_config", "module": "forms", "storage_class": "always_hot", "reviewed": true },
     { "table": "helpdesk_sla", "module": "helpdesk", "storage_class": "always_hot", "reviewed": true },
     { "table": "hr_applicant", "module": "hr", "storage_class": "always_hot", "reviewed": true },
-    { "table": "hr_country_pack_leave_default", "module": "hr", "storage_class": "external_reference", "reviewed": true },
     { "table": "hr_labor_cost_snapshot", "module": "hr", "storage_class": "projection_only", "reviewed": true },
     { "table": "google_drive_connection", "module": "integrations", "storage_class": "always_hot", "reviewed": true },
     { "table": "barcode_nomenclature", "module": "inventory", "storage_class": "always_hot", "reviewed": true },
@@ -2377,19 +2374,19 @@
       "module": "core",
       "rationale": "C0 platform trust registry",
       "authoritative_resources": [],
-      "durability_class": "platform_control",
-      "organization_ownership": "platform_global",
-      "organization_column": null,
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
       "company_ownership": "none",
       "company_column_path": null,
       "company_column_nullable": null,
       "aggregate": {
-        "kind": "standalone",
+        "kind": "root",
         "parent": null
       },
       "primary_key": {
-        "strategy": "auto_increment",
-        "column": "id",
+        "strategy": "natural",
+        "column": "platform_id",
         "version_strategy": "none"
       },
       "projection_mode": "upsert-current",
@@ -2399,7 +2396,7 @@
       "dependency_behavior": "independent",
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",
-      "postgres_access_path": "platform_shared"
+      "postgres_access_path": "organization_index"
     },
     {
       "table": "commodity_price_index",
@@ -2858,14 +2855,14 @@
       "module": "crm",
       "rationale": "C0 provider trust anchor",
       "authoritative_resources": [],
-      "durability_class": "external_reference",
-      "organization_ownership": "platform_global",
-      "organization_column": null,
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
       "company_ownership": "none",
       "company_column_path": null,
       "company_column_nullable": null,
       "aggregate": {
-        "kind": "standalone",
+        "kind": "root",
         "parent": null
       },
       "primary_key": {
@@ -2873,14 +2870,14 @@
         "column": "id",
         "version_strategy": "none"
       },
-      "projection_mode": "external-reference",
+      "projection_mode": "upsert-current",
       "hot_retention": "always",
       "cooling_eligibility": "never",
       "cooling_eligibility_source": "not eligible until a reviewed cooling policy is declared",
       "dependency_behavior": "independent",
       "hydration_policy": "not_applicable",
-      "delete_behavior": "external",
-      "postgres_access_path": "external"
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
     },
     {
       "table": "contact_identity_verification_proof",
@@ -3188,72 +3185,72 @@
       "module": "core",
       "rationale": "C0 pre-organization ISO reference catalog",
       "authoritative_resources": [],
-      "durability_class": "external_reference",
-      "organization_ownership": "platform_global",
-      "organization_column": null,
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
       "company_ownership": "none",
       "company_column_path": null,
       "company_column_nullable": null,
       "aggregate": {
-        "kind": "standalone",
+        "kind": "root",
         "parent": null
       },
       "primary_key": {
         "strategy": "natural",
-        "column": "code",
+        "column": "organization_code_key",
         "version_strategy": "none"
       },
-      "projection_mode": "external-reference",
+      "projection_mode": "upsert-current",
       "hot_retention": "always",
       "cooling_eligibility": "never",
       "cooling_eligibility_source": "not eligible until a reviewed cooling policy is declared",
       "dependency_behavior": "independent",
       "hydration_policy": "not_applicable",
-      "delete_behavior": "external",
-      "postgres_access_path": "external"
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
     },
     {
       "table": "country_pack_definition",
       "module": "core",
       "rationale": "C0 shared country-pack catalog",
       "authoritative_resources": [],
-      "durability_class": "external_reference",
-      "organization_ownership": "platform_global",
-      "organization_column": null,
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
       "company_ownership": "none",
       "company_column_path": null,
       "company_column_nullable": null,
       "aggregate": {
-        "kind": "standalone",
+        "kind": "root",
         "parent": null
       },
       "primary_key": {
         "strategy": "natural",
-        "column": "pack_key",
+        "column": "organization_pack_key",
         "version_strategy": "none"
       },
-      "projection_mode": "external-reference",
+      "projection_mode": "upsert-current",
       "hot_retention": "always",
       "cooling_eligibility": "never",
       "cooling_eligibility_source": "not eligible until a reviewed cooling policy is declared",
       "dependency_behavior": "independent",
       "hydration_policy": "not_applicable",
-      "delete_behavior": "external",
-      "postgres_access_path": "external"
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
     },
     {
       "table": "country_pack_tax_rule",
       "module": "core",
       "rationale": "C0 shared country-pack tax catalog",
       "authoritative_resources": [],
-      "durability_class": "external_reference",
-      "organization_ownership": "platform_global",
-      "organization_column": null,
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
       "company_ownership": "none",
       "company_column_path": null,
       "company_column_nullable": null,
       "aggregate": {
-        "kind": "standalone",
+        "kind": "root",
         "parent": null
       },
       "primary_key": {
@@ -3261,14 +3258,14 @@
         "column": "id",
         "version_strategy": "none"
       },
-      "projection_mode": "external-reference",
+      "projection_mode": "upsert-current",
       "hot_retention": "always",
       "cooling_eligibility": "never",
       "cooling_eligibility_source": "not eligible until a reviewed cooling policy is declared",
       "dependency_behavior": "independent",
       "hydration_policy": "not_applicable",
-      "delete_behavior": "external",
-      "postgres_access_path": "external"
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
     },
     {
       "table": "crm_conversation",
@@ -3531,14 +3528,14 @@
       "module": "core",
       "rationale": "C0 pre-organization ISO reference catalog",
       "authoritative_resources": [],
-      "durability_class": "external_reference",
-      "organization_ownership": "platform_global",
-      "organization_column": null,
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
       "company_ownership": "none",
       "company_column_path": null,
       "company_column_nullable": null,
       "aggregate": {
-        "kind": "standalone",
+        "kind": "root",
         "parent": null
       },
       "primary_key": {
@@ -3546,14 +3543,14 @@
         "column": "id",
         "version_strategy": "none"
       },
-      "projection_mode": "external-reference",
+      "projection_mode": "upsert-current",
       "hot_retention": "always",
       "cooling_eligibility": "never",
       "cooling_eligibility_source": "not eligible until a reviewed cooling policy is declared",
       "dependency_behavior": "independent",
       "hydration_policy": "not_applicable",
-      "delete_behavior": "external",
-      "postgres_access_path": "external"
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
     },
     {
       "table": "currency_rate",
@@ -5111,14 +5108,14 @@
       "module": "hr",
       "rationale": "C0 shared country-pack HR defaults",
       "authoritative_resources": [],
-      "durability_class": "external_reference",
-      "organization_ownership": "platform_global",
-      "organization_column": null,
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
       "company_ownership": "none",
       "company_column_path": null,
       "company_column_nullable": null,
       "aggregate": {
-        "kind": "standalone",
+        "kind": "root",
         "parent": null
       },
       "primary_key": {
@@ -5126,14 +5123,14 @@
         "column": "id",
         "version_strategy": "none"
       },
-      "projection_mode": "external-reference",
+      "projection_mode": "upsert-current",
       "hot_retention": "always",
       "cooling_eligibility": "never",
       "cooling_eligibility_source": "not eligible until a reviewed cooling policy is declared",
       "dependency_behavior": "independent",
       "hydration_policy": "not_applicable",
-      "delete_behavior": "external",
-      "postgres_access_path": "external"
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
     },
     {
       "table": "hr_department",
@@ -8204,14 +8201,14 @@
       "module": "core",
       "rationale": "C0 identity token before membership",
       "authoritative_resources": [],
-      "durability_class": "platform_control",
-      "organization_ownership": "platform_global",
-      "organization_column": null,
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
       "company_ownership": "none",
       "company_column_path": null,
       "company_column_nullable": null,
       "aggregate": {
-        "kind": "standalone",
+        "kind": "root",
         "parent": null
       },
       "primary_key": {
@@ -8226,7 +8223,7 @@
       "dependency_behavior": "independent",
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",
-      "postgres_access_path": "platform_shared"
+      "postgres_access_path": "organization_index"
     },
     {
       "table": "payment_account",
@@ -11870,19 +11867,19 @@
       "module": "core",
       "rationale": "C0 module-wide migration ledger",
       "authoritative_resources": [],
-      "durability_class": "platform_control",
-      "organization_ownership": "platform_global",
-      "organization_column": null,
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
       "company_ownership": "none",
       "company_column_path": null,
       "company_column_nullable": null,
       "aggregate": {
-        "kind": "standalone",
+        "kind": "root",
         "parent": null
       },
       "primary_key": {
         "strategy": "auto_increment",
-        "column": "version",
+        "column": "id",
         "version_strategy": "none"
       },
       "projection_mode": "upsert-current",
@@ -11892,7 +11889,7 @@
       "dependency_behavior": "independent",
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",
-      "postgres_access_path": "platform_shared"
+      "postgres_access_path": "organization_index"
     },
     {
       "table": "search_embedding",
@@ -13616,14 +13613,14 @@
       "module": "core",
       "rationale": "C0 identity credential shared across memberships",
       "authoritative_resources": [],
-      "durability_class": "platform_control",
-      "organization_ownership": "platform_global",
-      "organization_column": null,
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
       "company_ownership": "none",
       "company_column_path": null,
       "company_column_nullable": null,
       "aggregate": {
-        "kind": "standalone",
+        "kind": "root",
         "parent": null
       },
       "primary_key": {
@@ -13638,7 +13635,7 @@
       "dependency_behavior": "independent",
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",
-      "postgres_access_path": "platform_shared"
+      "postgres_access_path": "organization_index"
     },
     {
       "table": "user_custom_field",
@@ -13736,23 +13733,23 @@
     {
       "table": "user_profile",
       "module": "core",
-      "rationale": "C0 identity profile shared across memberships",
+      "rationale": "C0 organization-owned profile binding to an opaque platform user",
       "authoritative_resources": [
         "user-profile"
       ],
-      "durability_class": "platform_control",
-      "organization_ownership": "platform_global",
-      "organization_column": null,
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
       "company_ownership": "none",
       "company_column_path": null,
       "company_column_nullable": null,
       "aggregate": {
-        "kind": "standalone",
+        "kind": "root",
         "parent": null
       },
       "primary_key": {
-        "strategy": "identity",
-        "column": "identity",
+        "strategy": "auto_increment",
+        "column": "id",
         "version_strategy": "updated_at"
       },
       "projection_mode": "upsert-current",
@@ -13762,7 +13759,7 @@
       "dependency_behavior": "independent",
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",
-      "postgres_access_path": "platform_shared"
+      "postgres_access_path": "organization_index"
     },
     {
       "table": "user_role_assignment",

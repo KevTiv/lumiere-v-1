@@ -8,7 +8,7 @@
     "durable_business_record": "restore",
     "durable_history": "restore",
     "durable_operational_state": "restore",
-    "external_reference": "exclude_platform",
+    "external_reference": "restore",
     "platform_control": "exclude_platform"
   },
   "table_actions": {
@@ -28,7 +28,6 @@
     "organization_reconstruction_fence": "Acquire a fresh target-local writer fence for the reconstruction run; never restore a stale source-cell fence."
   },
   "excluded_state": {
-    "external_reference": "Platform-global reference catalogs are bootstrapped independently of an organization restore.",
     "platform_control": "Platform-global identity, credential, migration, and service-control rows are not organization state."
   }
 }

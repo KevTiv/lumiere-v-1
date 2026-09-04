@@ -124,6 +124,13 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: platform_control::PLATFORM_CONTROL_DDL,
     },
+    Migration {
+        version: 9,
+        name: "platform_reset_token_binding",
+        change_set: 2,
+        phase: MigrationPhase::Expand,
+        sql: platform_control::PLATFORM_RESET_TOKEN_BINDING_DDL,
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

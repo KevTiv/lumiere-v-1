@@ -878,6 +878,7 @@ fn seed_member(
 ) -> Identity {
     let identity = new_identity(ctx);
     ctx.db.user_profile().insert(UserProfile {
+        id: 0,
         identity,
         platform_user_id: format!("test-{}", identity.to_hex()),
         organization_id: fixture.organization_id,

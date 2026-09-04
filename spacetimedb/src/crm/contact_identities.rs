@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
-use crate::core::users::user_profile;
+use crate::core::users::find_user_profile_for_organization;
 use crate::crm::contacts::{contact, Contact};
 use crate::crm::require_single_company_crm_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
@@ -337,11 +337,7 @@ fn require_trusted_verification_issuer(
     if authority.issuer_identity != ctx.sender() {
         return Err("trusted verification issuer authority required".to_string());
     }
-    let caller = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let caller = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
         .ok_or("trusted verification issuer profile not found")?;
     if !caller.is_active || !caller.is_superuser {
         return Err("trusted verification issuer authority required".to_string());
@@ -645,11 +641,7 @@ pub fn configure_contact_identity_verification_authority(
     issuer_identity: Identity,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "contact_identity_verification_authority", "write")?;
-    let caller = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let caller = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
         .ok_or("verification authority configurator profile not found")?;
     if !caller.is_active || !caller.is_superuser {
         return Err("global server superuser authority required".to_string());

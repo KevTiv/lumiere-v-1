@@ -47,7 +47,7 @@ use crate::core::reference::{
     create_currency, create_uom, create_uom_category, currency, seed_currency_for_organization,
     uom, uom_cat, CreateCurrencyParams, CreateUomCategoryParams, CreateUomParams,
 };
-use crate::core::users::{user_profile, UserProfile};
+use crate::core::users::{find_user_profile_for_identity, user_profile, UserProfile};
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::crm::CRM_MULTI_COMPANY_FLAG;
 use crate::inventory::product::{create_product, product, CreateProductParams};
@@ -1542,8 +1542,8 @@ fn assert_purchasing_scope_persisted(
 
 /// Elevate the caller to superuser so harness reducers pass permission checks.
 pub fn ensure_test_superuser(ctx: &ReducerContext) -> Result<(), String> {
-    if let Some(profile) = ctx.db.user_profile().identity().find(ctx.sender()) {
-        ctx.db.user_profile().identity().update(UserProfile {
+    if let Some(profile) = find_user_profile_for_identity(ctx, ctx.sender()) {
+        ctx.db.user_profile().id().update(UserProfile {
             is_superuser: true,
             ..profile
         });
