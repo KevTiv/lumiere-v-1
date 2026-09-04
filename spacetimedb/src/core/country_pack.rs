@@ -12,7 +12,7 @@
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::tax_management::{account_tax, AccountTax};
-use crate::core::organization::{company, require_company_in_organization};
+use crate::core::organization::{company, organization, require_company_in_organization};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{TaxAmountType, TaxTypeUse};
 
@@ -22,7 +22,10 @@ use crate::types::{TaxAmountType, TaxTypeUse};
     accessor = country_pack_definition,
     public,
     index(accessor = country_pack_by_organization, btree(columns = [organization_id])),
-    index(accessor = country_pack_by_pack_key, btree(columns = [pack_key]))
+    index(
+        accessor = country_pack_by_pack_key,
+        btree(columns = [organization_id, pack_key])
+    )
 )]
 pub struct CountryPackDefinition {
     #[primary_key]
@@ -40,7 +43,10 @@ pub struct CountryPackDefinition {
 #[spacetimedb::table(
     accessor = country_pack_tax_rule,
     public,
-    index(accessor = pack_tax_by_pack, btree(columns = [pack_key])),
+    index(
+        accessor = pack_tax_by_pack,
+        btree(columns = [organization_id, pack_key])
+    ),
     index(accessor = pack_tax_by_organization, btree(columns = [organization_id]))
 )]
 pub struct CountryPackTaxRule {
@@ -599,8 +605,8 @@ fn materialize_pack_taxes_for_company(
         .db
         .country_pack_tax_rule()
         .pack_tax_by_pack()
-        .filter(&pack_key.to_string())
-        .filter(|r| r.organization_id == organization_id && r.is_active)
+        .filter((&organization_id, &pack_key.to_string()))
+        .filter(|r| r.is_active)
         .collect();
 
     for rule in rules {

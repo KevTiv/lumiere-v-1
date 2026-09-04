@@ -442,10 +442,10 @@ pub fn test_identity_scope_and_state_forgery_rejected(ctx: &ReducerContext) -> R
 
 pub fn test_verify_and_archive_contact_identity(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
-    configure_contact_identity_verification_authority(ctx, ctx.sender())?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    configure_contact_identity_verification_authority(ctx, org_id, ctx.sender())?;
 
     create_contact(
         ctx,

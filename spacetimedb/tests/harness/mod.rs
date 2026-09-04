@@ -125,6 +125,31 @@ impl OrgFixture {
             },
         )?;
         let organization_id = org.id;
+        let currency_id = create_currency(
+            ctx,
+            organization_id,
+            format!("T{suffix}"),
+            CreateCurrencyParams {
+                name: "Harness currency".to_string(),
+                symbol: "¤".to_string(),
+                decimal_places: 2,
+                rounding_factor: 0.01,
+                position: "before".to_string(),
+                active: true,
+                metadata: Some(r#"{"harness":"minimal"}"#.to_string()),
+            },
+        )
+        .and_then(|_| {
+            ctx.db
+                .currency()
+                .iter()
+                .find(|currency| {
+                    currency.organization_id == organization_id
+                        && currency.code == format!("T{suffix}")
+                })
+                .map(|currency| currency.id)
+                .ok_or_else(|| "Harness: currency not found after create".to_string())
+        })?;
 
         create_company(
             ctx,
@@ -132,7 +157,7 @@ impl OrgFixture {
             CreateCompanyParams {
                 name: format!("Test Company {suffix}"),
                 code: company_code.clone(),
-                currency_id: 1,
+                currency_id,
                 fiscal_year_end_month: 12,
                 fiscal_year_end_day: 31,
                 is_parent: false,
@@ -399,7 +424,7 @@ impl OrgFixture {
                 uom_po_id: uom_id,
                 standard_price: 10.0,
                 list_price: 20.0,
-                currency_id: 1,
+                currency_id,
                 default_code: Some(format!("HP-{suffix}")),
                 barcode: None,
                 description: None,
@@ -686,13 +711,12 @@ impl PurchasingIntegrityFixture {
     pub fn seed(ctx: &ReducerContext) -> Result<Self, String> {
         ensure_test_superuser(ctx)?;
 
-        let suffix = unique_suffix(ctx);
-        let currency_id = seed_distinctive_currency(ctx, suffix)?;
-
         // OrgFixture provides the fiscal and permission baseline required by the
         // accounting and inventory reducers. The purchasing scope below creates
         // a distinct legal entity rather than reusing its default company.
+        let suffix = unique_suffix(ctx);
         let primary_base = OrgFixture::seed_minimal(ctx)?;
+        let currency_id = seed_distinctive_currency(ctx, primary_base.organization_id, suffix)?;
         let primary = seed_purchasing_integrity_scope(
             ctx,
             primary_base.organization_id,
@@ -748,7 +772,11 @@ impl PurchasingIntegrityFixture {
     }
 }
 
-fn seed_distinctive_currency(ctx: &ReducerContext, suffix: u64) -> Result<u64, String> {
+fn seed_distinctive_currency(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    suffix: u64,
+) -> Result<u64, String> {
     const CURRENCY_CODE_SPACE: u64 = 26 * 26 * 26;
 
     fn currency_code(index: u64) -> String {
@@ -767,7 +795,12 @@ fn seed_distinctive_currency(ctx: &ReducerContext, suffix: u64) -> Result<u64, S
     let mut codes = Vec::with_capacity(2);
     for offset in 0..CURRENCY_CODE_SPACE {
         let code = currency_code(suffix.wrapping_add(offset));
-        if ctx.db.currency().code().find(&code).is_none() {
+        if ctx
+            .db
+            .currency()
+            .iter()
+            .all(|currency| currency.organization_id != organization_id || currency.code != code)
+        {
             codes.push(code);
             if codes.len() == 2 {
                 break;
@@ -786,6 +819,7 @@ fn seed_distinctive_currency(ctx: &ReducerContext, suffix: u64) -> Result<u64, S
     ] {
         create_currency(
             ctx,
+            organization_id,
             code.clone(),
             CreateCurrencyParams {
                 name: name.to_string(),
@@ -801,8 +835,10 @@ fn seed_distinctive_currency(ctx: &ReducerContext, suffix: u64) -> Result<u64, S
 
     ctx.db
         .currency()
-        .code()
-        .find(&codes[1])
+        .iter()
+        .find(|currency| {
+            currency.organization_id == organization_id && currency.code == codes[1]
+        })
         .map(|row| row.id)
         .ok_or("Harness: purchasing currency missing after create".into())
 }

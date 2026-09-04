@@ -395,8 +395,8 @@ pub fn create_currency_rate(
     if params.from_currency_id == params.to_currency_id {
         return Err("Rate currencies must be different".to_string());
     }
-    require_active_currency_by_id(ctx, params.from_currency_id)?;
-    require_active_currency_by_id(ctx, params.to_currency_id)?;
+    require_active_currency_for_organization(ctx, organization_id, params.from_currency_id)?;
+    require_active_currency_for_organization(ctx, organization_id, params.to_currency_id)?;
     if let Some(company_id) = company_id {
         let company = ctx
             .db
@@ -619,6 +619,68 @@ pub(crate) fn require_active_currency_by_id(
         return Err(format!("Currency '{}' is inactive", currency.code));
     }
     Ok(currency)
+}
+
+/// Resolve an active currency and prove that it belongs to the requested
+/// organization before a tenant-owned row can reference it.
+pub(crate) fn require_active_currency_for_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    currency_id: u64,
+) -> Result<Currency, String> {
+    let currency = require_active_currency_by_id(ctx, currency_id)?;
+    if currency.organization_id != organization_id {
+        return Err("Currency does not belong to this organization".to_string());
+    }
+    Ok(currency)
+}
+
+/// Seed one of the supported onboarding currencies into a newly-created
+/// organization.  Bootstrap runs before the caller has an organization
+/// membership, so this internal path intentionally bypasses the superuser
+/// reducer guard while keeping ownership server-derived from `organization_id`.
+pub(crate) fn seed_currency_for_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    code: &str,
+) -> Result<Currency, String> {
+    let normalized = code.trim().to_uppercase();
+    let (name, symbol, decimal_places, rounding_factor) = match normalized.as_str() {
+        "USD" => ("US Dollar", "$", 2, 0.01),
+        "EUR" => ("Euro", "€", 2, 0.01),
+        "GBP" => ("British Pound", "£", 2, 0.01),
+        "CAD" => ("Canadian Dollar", "C$", 2, 0.01),
+        "AUD" => ("Australian Dollar", "A$", 2, 0.01),
+        "JPY" => ("Japanese Yen", "¥", 0, 1.0),
+        _ => return Err(format!("Unsupported onboarding currency '{normalized}'")),
+    };
+    let organization_code_key = format!("{organization_id}:{normalized}");
+    if let Some(existing) = ctx
+        .db
+        .currency()
+        .organization_code_key()
+        .find(&organization_code_key)
+    {
+        if !existing.active {
+            return Err(format!("Currency '{}' is inactive", existing.code));
+        }
+        return Ok(existing);
+    }
+
+    Ok(ctx.db.currency().insert(Currency {
+        id: 0,
+        code: normalized,
+        organization_code_key,
+        organization_id,
+        name: name.to_string(),
+        symbol: symbol.to_string(),
+        decimal_places,
+        rounding_factor,
+        active: true,
+        position: "before".to_string(),
+        created_at: ctx.timestamp,
+        metadata: Some("{\"seed\":\"bootstrap\"}".to_string()),
+    }))
 }
 
 /// Resolves a global `Currency` row by ISO 4217 code (case-insensitive).

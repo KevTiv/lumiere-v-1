@@ -7,7 +7,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 use crate::core::country_pack::{
     company_enabled_pack_keys, country_pack_definition, CountryPackDefinition,
 };
-use crate::core::organization::company_id_from_scope;
+use crate::core::organization::{company_id_from_scope, organization};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::employees::hr_employee;
 use crate::hr::leaves::{hr_leave_type, HrLeaveType};
@@ -19,7 +19,10 @@ use crate::projects::capacity::{public_holiday, PublicHoliday};
 #[spacetimedb::table(
     accessor = hr_country_pack_leave_default,
     public,
-    index(accessor = hr_leave_default_by_pack, btree(columns = [pack_key])),
+    index(
+        accessor = hr_leave_default_by_pack,
+        btree(columns = [organization_id, pack_key])
+    ),
     index(accessor = hr_leave_default_by_organization, btree(columns = [organization_id]))
 )]
 pub struct HrCountryPackLeaveDefault {
@@ -159,7 +162,7 @@ pub(crate) fn seed_hr_country_pack_leave_catalog_for_organization(
             .db
             .hr_country_pack_leave_default()
             .hr_leave_default_by_pack()
-            .filter(&pack_key.to_string())
+            .filter((&organization_id, &pack_key.to_string()))
             .any(|row| row.code == code);
         if exists {
             continue;
@@ -208,8 +211,7 @@ fn materialize_leave_types_for_pack(
         .db
         .hr_country_pack_leave_default()
         .hr_leave_default_by_pack()
-        .filter(&pack_key.to_string())
-        .filter(|default| default.organization_id == organization_id)
+        .filter((&organization_id, &pack_key.to_string()))
     {
         let exists = ctx
             .db

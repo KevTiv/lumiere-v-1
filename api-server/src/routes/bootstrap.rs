@@ -51,6 +51,10 @@ struct BootstrapTenantBody {
     pub default_company_name: String,
     pub default_company_code: String,
     pub default_company_currency_id: u64,
+    /// New tenants select a catalog code; the reducer seeds that currency
+    /// after the organization id exists. The id remains for compatibility and
+    /// is accepted only when it is already organization-owned.
+    pub default_company_currency_code: Option<String>,
     pub fiscal_year_end_month: u32,
     pub fiscal_year_end_day: u32,
     pub seed_form_configs: bool,
@@ -63,6 +67,7 @@ struct BootstrapReducerArg {
     default_company_name: String,
     default_company_code: String,
     default_company_currency_id: u64,
+    default_company_currency_code: Option<String>,
     fiscal_year_end_month: u32,
     fiscal_year_end_day: u32,
     seed_form_configs: bool,
@@ -127,6 +132,7 @@ fn reducer_arg(body: &BootstrapTenantBody) -> BootstrapReducerArg {
         default_company_name: body.default_company_name.clone(),
         default_company_code: body.default_company_code.clone(),
         default_company_currency_id: body.default_company_currency_id,
+        default_company_currency_code: body.default_company_currency_code.clone(),
         fiscal_year_end_month: body.fiscal_year_end_month,
         fiscal_year_end_day: body.fiscal_year_end_day,
         seed_form_configs: body.seed_form_configs,
@@ -156,6 +162,11 @@ fn validate_bootstrap(b: &BootstrapTenantBody) -> Result<(), ApiError> {
     if o.language.trim().is_empty() {
         return Err(ApiError::BadRequest("Language is required".into()));
     }
+    if o.currency_id.is_some() {
+        return Err(ApiError::BadRequest(
+            "organization.currencyId must be null during tenant bootstrap".into(),
+        ));
+    }
     if b.default_company_name.trim().is_empty() {
         return Err(ApiError::BadRequest(
             "Default company name is required".into(),
@@ -166,9 +177,16 @@ fn validate_bootstrap(b: &BootstrapTenantBody) -> Result<(), ApiError> {
             "Default company code is required".into(),
         ));
     }
-    if b.default_company_currency_id == 0 {
+    if b.default_company_currency_id == 0
+        && b
+            .default_company_currency_code
+            .as_deref()
+            .map(str::trim)
+            .unwrap_or_default()
+            .is_empty()
+    {
         return Err(ApiError::BadRequest(
-            "defaultCompanyCurrencyId must be a positive integer".into(),
+            "defaultCompanyCurrencyCode is required when no currency id is supplied".into(),
         ));
     }
     if !(1..=12).contains(&b.fiscal_year_end_month) {
@@ -246,22 +264,28 @@ async fn bootstrap_currencies_get(
         return Err(ApiError::Unauthorized);
     }
 
-    let mut currencies = state
-        .client_with_token(&session.stdb_token)
-        .query_sql("SELECT id, code, name FROM currency WHERE active = true")
-        .await
-        .map_err(|error| ApiError::Internal(error.to_string()))?;
-    currencies.sort_by(|left, right| {
-        left.get("code")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .cmp(
-                right
-                    .get("code")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default(),
-            )
-    });
+    // This is a pre-tenant catalog, not a query over another organization's
+    // rows. The reducer seeds the selected code after the new organization id
+    // exists, so no global/sentinel currency row is required.
+    let currencies = [
+        ("USD", "US Dollar", "$", 2),
+        ("EUR", "Euro", "€", 2),
+        ("GBP", "British Pound", "£", 2),
+        ("CAD", "Canadian Dollar", "C$", 2),
+        ("AUD", "Australian Dollar", "A$", 2),
+        ("JPY", "Japanese Yen", "¥", 0),
+    ]
+    .into_iter()
+    .map(|(code, name, symbol, decimal_places)| {
+        json!({
+            "id": 0,
+            "code": code,
+            "name": name,
+            "symbol": symbol,
+            "decimalPlaces": decimal_places,
+        })
+    })
+    .collect::<Vec<_>>();
 
     Ok(Json(json!({ "data": currencies })))
 }
@@ -297,6 +321,7 @@ mod tests {
             default_company_name: "Acme Main".into(),
             default_company_code: "MAIN".into(),
             default_company_currency_id: 7,
+            default_company_currency_code: Some("USD".into()),
             fiscal_year_end_month: 12,
             fiscal_year_end_day: 31,
             seed_form_configs: false,
@@ -310,6 +335,7 @@ mod tests {
 
         let value = serde_json::to_value(reducer_arg(&body)).expect("serialize reducer args");
         assert_eq!(value["default_company_code"], "MAIN");
+        assert_eq!(value["default_company_currency_code"], "USD");
         assert!(value.get("defaultCompanyCode").is_none());
         assert_eq!(value["organization"]["description"], json!({ "none": [] }));
         assert_eq!(

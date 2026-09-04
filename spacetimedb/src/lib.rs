@@ -169,7 +169,6 @@ pub mod integrations_tests;
 pub mod data_ops_tests;
 
 use crate::core::migrations::apply_pending_global_migrations;
-use crate::core::reference::{currency, Currency};
 use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
 use crate::crm::presence::opportunity_presence;
 use crate::proposals::proposals::proposal_presence;
@@ -218,32 +217,6 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
 /// Use this to seed system roles, default currencies, etc.
 #[spacetimedb::reducer(init)]
 pub fn init(ctx: &ReducerContext) {
-    // Seed the onboarding catalog while leaving numeric identities to the database.
-    for (code, name, symbol, decimal_places, rounding_factor) in [
-        ("USD", "US Dollar", "$", 2, 0.01),
-        ("EUR", "Euro", "€", 2, 0.01),
-        ("GBP", "British Pound", "£", 2, 0.01),
-        ("CAD", "Canadian Dollar", "C$", 2, 0.01),
-        ("AUD", "Australian Dollar", "A$", 2, 0.01),
-        ("JPY", "Japanese Yen", "¥", 0, 1.0),
-    ] {
-        if ctx.db.currency().iter().all(|currency| currency.code != code) {
-            ctx.db.currency().insert(Currency {
-                id: 0,
-                organization_code_key: format!("0:{code}"),
-                organization_id: 0,
-                code: code.to_string(),
-                name: name.to_string(),
-                symbol: symbol.to_string(),
-                decimal_places,
-                rounding_factor,
-                active: true,
-                position: "before".to_string(),
-                created_at: ctx.timestamp,
-                metadata: Some(r#"{"seed":"init"}"#.to_string()),
-            });
-        }
-    }
     if let Err(error) = apply_pending_global_migrations(ctx) {
         log::warn!("Global migrations skipped during init: {error}");
     }

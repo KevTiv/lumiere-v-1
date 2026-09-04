@@ -1,5 +1,5 @@
 //! Country pack activation smoke test (A11).
-use spacetimedb::ReducerContext;
+use spacetimedb::{ReducerContext, Table};
 
 use crate::core::country_pack::{
     company_country_pack, country_pack_definition, country_pack_tax_rule, set_company_country_pack,
@@ -11,12 +11,14 @@ use crate::test_harness::{ensure_test_superuser, OrgFixture};
 pub fn test_country_pack_activation(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     apply_pending_global_migrations(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
 
     let za = ctx
         .db
         .country_pack_definition()
-        .pack_key()
-        .find(&"za".to_string())
+        .country_pack_by_pack_key()
+        .filter((&fixture.organization_id, &"za".to_string()))
+        .next()
         .ok_or("ZA pack definition missing")?;
 
     if !za.is_active {
@@ -27,13 +29,11 @@ pub fn test_country_pack_activation(ctx: &ReducerContext) -> Result<(), String> 
         .db
         .country_pack_tax_rule()
         .pack_tax_by_pack()
-        .filter(&"za".to_string())
+        .filter((&fixture.organization_id, &"za".to_string()))
         .count();
     if tax_rules == 0 {
         return Err("ZA pack tax rules missing".to_string());
     }
-
-    let fixture = OrgFixture::seed_minimal(ctx)?;
 
     set_company_country_pack(
         ctx,

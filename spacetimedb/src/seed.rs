@@ -756,8 +756,8 @@ fn ensure_canonical_e2e_seed_rows(
     let usd_currency_id = ctx
         .db
         .currency()
-        .code()
-        .find(&"USD".to_string())
+        .iter()
+        .find(|currency| currency.organization_id == organization_id && currency.code == "USD")
         .map(|currency| currency.id)
         .ok_or_else(|| "canonical seed requires USD currency".to_string())?;
     let template_product = ctx
@@ -1038,45 +1038,6 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     }
 
     // ── 1.2 Currencies (bootstrap catalog; tenant ownership is assigned below) ─
-    let usd_currency = if let Some(currency) = ctx.db.currency().iter().find(|currency| currency.code == "USD") {
-        currency
-    } else {
-        ctx.db.currency().insert(Currency {
-            id: 0,
-            organization_code_key: "0:USD".to_string(),
-            organization_id: 0,
-            code: "USD".to_string(),
-            name: "US Dollar".to_string(),
-            symbol: "$".to_string(),
-            decimal_places: 2,
-            rounding_factor: 0.01,
-            active: true,
-            position: "before".to_string(),
-            created_at: ctx.timestamp,
-            metadata: None,
-        })
-    };
-    let eur_currency = if let Some(currency) = ctx.db.currency().iter().find(|currency| currency.code == "EUR") {
-        currency
-    } else {
-        ctx.db.currency().insert(Currency {
-            id: 0,
-            organization_code_key: "0:EUR".to_string(),
-            organization_id: 0,
-            code: "EUR".to_string(),
-            name: "Euro".to_string(),
-            symbol: "€".to_string(),
-            decimal_places: 2,
-            rounding_factor: 0.01,
-            active: true,
-            position: "before".to_string(),
-            created_at: ctx.timestamp,
-            metadata: None,
-        })
-    };
-    let usd_currency_id = usd_currency.id;
-    let eur_currency_id = eur_currency.id;
-
     // ── 1.3 Organization ──────────────────────────────────────────────────────
     let org = ctx.db.organization().insert(Organization {
         id: 0,
@@ -1089,7 +1050,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         website: Some("https://lumiere.demo".to_string()),
         email: Some("info@lumiere.demo".to_string()),
         phone: Some("+1-555-0100".to_string()),
-        currency_id: Some(usd_currency_id),
+        currency_id: None,
         timezone: "America/New_York".to_string(),
         date_format: "%Y-%m-%d".to_string(),
         language: "en".to_string(),
@@ -1103,15 +1064,44 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         organization_id: org_id,
         ..org
     });
-    seed_country_pack_catalog_for_organization(ctx, org_id);
-    seed_hr_country_pack_leave_catalog_for_organization(ctx, org_id);
-    for currency in [usd_currency, eur_currency] {
-        ctx.db.currency().id().update(Currency {
+    let usd_currency = ctx.db.currency().insert(Currency {
+            id: 0,
+            organization_code_key: format!("{org_id}:USD"),
             organization_id: org_id,
-            organization_code_key: format!("{org_id}:{}", currency.code),
-            ..currency
+            code: "USD".to_string(),
+            name: "US Dollar".to_string(),
+            symbol: "$".to_string(),
+            decimal_places: 2,
+            rounding_factor: 0.01,
+            active: true,
+            position: "before".to_string(),
+            created_at: ctx.timestamp,
+            metadata: None,
+        });
+    let eur_currency = ctx.db.currency().insert(Currency {
+            id: 0,
+            organization_code_key: format!("{org_id}:EUR"),
+            organization_id: org_id,
+            code: "EUR".to_string(),
+            name: "Euro".to_string(),
+            symbol: "€".to_string(),
+            decimal_places: 2,
+            rounding_factor: 0.01,
+            active: true,
+            position: "before".to_string(),
+            created_at: ctx.timestamp,
+            metadata: None,
+        });
+    let usd_currency_id = usd_currency.id;
+    let eur_currency_id = eur_currency.id;
+    if let Some(org) = ctx.db.organization().id().find(&org_id) {
+        ctx.db.organization().id().update(Organization {
+            currency_id: Some(usd_currency_id),
+            ..org
         });
     }
+    seed_country_pack_catalog_for_organization(ctx, org_id);
+    seed_hr_country_pack_leave_catalog_for_organization(ctx, org_id);
     log::info!("[seed] org_id={}", org_id);
 
     // ── 1.4 Role (owner) ──────────────────────────────────────────────────────
@@ -11035,26 +11025,6 @@ fn ensure_minimal_dev_org(ctx: &ReducerContext) -> Result<(), String> {
     }
     log::info!("[ensure_minimal_dev_org] Seeding Lumiere Dev Org (minimal)…");
 
-    let usd_currency = if let Some(currency) = ctx.db.currency().iter().find(|currency| currency.code == "USD") {
-        currency
-    } else {
-        ctx.db.currency().insert(Currency {
-            id: 0,
-            organization_code_key: "0:USD".to_string(),
-            organization_id: 0,
-            code: "USD".to_string(),
-            name: "US Dollar".to_string(),
-            symbol: "$".to_string(),
-            decimal_places: 2,
-            rounding_factor: 0.01,
-            active: true,
-            position: "before".to_string(),
-            created_at: ctx.timestamp,
-            metadata: Some("{\"seed\":\"dev_minimal\"}".to_string()),
-        })
-    };
-    let usd_currency_id = usd_currency.id;
-
     let org = ctx.db.organization().insert(Organization {
         id: 0,
         organization_id: 0,
@@ -11066,7 +11036,7 @@ fn ensure_minimal_dev_org(ctx: &ReducerContext) -> Result<(), String> {
         website: None,
         email: None,
         phone: None,
-        currency_id: Some(usd_currency_id),
+        currency_id: None,
         timezone: "America/New_York".to_string(),
         date_format: "%Y-%m-%d".to_string(),
         language: "en".to_string(),
@@ -11080,11 +11050,32 @@ fn ensure_minimal_dev_org(ctx: &ReducerContext) -> Result<(), String> {
         organization_id: org_id,
         ..org
     });
-    ctx.db.currency().id().update(Currency {
-        organization_id: org_id,
-        organization_code_key: format!("{org_id}:{}", usd_currency.code),
-        ..usd_currency
+    let usd_currency = ctx.db.currency().iter().find(|currency| {
+        currency.organization_id == org_id && currency.code == "USD"
     });
+    let usd_currency = usd_currency.unwrap_or_else(|| {
+        ctx.db.currency().insert(Currency {
+            id: 0,
+            organization_code_key: format!("{org_id}:USD"),
+            organization_id: org_id,
+            code: "USD".to_string(),
+            name: "US Dollar".to_string(),
+            symbol: "$".to_string(),
+            decimal_places: 2,
+            rounding_factor: 0.01,
+            active: true,
+            position: "before".to_string(),
+            created_at: ctx.timestamp,
+            metadata: Some("{\"seed\":\"dev_minimal\"}".to_string()),
+        })
+    });
+    let usd_currency_id = usd_currency.id;
+    if let Some(org) = ctx.db.organization().id().find(&org_id) {
+        ctx.db.organization().id().update(Organization {
+            currency_id: Some(usd_currency_id),
+            ..org
+        });
+    }
     seed_country_pack_catalog_for_organization(ctx, org_id);
     seed_hr_country_pack_leave_catalog_for_organization(ctx, org_id);
 

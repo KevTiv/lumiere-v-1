@@ -8,7 +8,10 @@ use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::permissions::{role, user_role_assignment, Role, UserRoleAssignment};
 use crate::core::country_pack::seed_country_pack_catalog_for_organization;
-use crate::core::reference::require_active_currency_by_id;
+use crate::core::reference::{
+    require_active_currency_by_id, require_active_currency_for_organization,
+    seed_currency_for_organization,
+};
 use crate::core::users::user_profile;
 use crate::core::users::{user_organization, UserOrganization};
 use crate::crm::activities::{activity_type, ActivityType};
@@ -148,6 +151,9 @@ pub struct BootstrapNewTenantParams {
     pub default_company_name: String,
     pub default_company_code: String,
     pub default_company_currency_id: u64,
+    /// Currency code selected from the server-owned onboarding catalog. When
+    /// present, the reducer seeds the selected row into the new organization.
+    pub default_company_currency_code: Option<String>,
     pub fiscal_year_end_month: u8,
     pub fiscal_year_end_day: u8,
     pub seed_form_configs: bool,
@@ -284,8 +290,11 @@ pub(crate) fn insert_organization_with_owner(
     if params.code.is_empty() {
         return Err("Organization code cannot be empty".to_string());
     }
-    if let Some(currency_id) = params.currency_id {
-        require_active_currency_by_id(ctx, currency_id)?;
+    if params.currency_id.is_some() {
+        return Err(
+            "Organization currency must be selected after organization-owned currencies are seeded"
+                .to_string(),
+        );
     }
 
     let code = params.code.clone();
@@ -321,6 +330,11 @@ pub(crate) fn insert_organization_with_owner(
 
     // Reference/provider rows are tenant-owned. Seed them only after the root
     // organization exists, so no global/sentinel organization is required.
+    let default_currency = seed_currency_for_organization(ctx, org.id, "USD")?;
+    ctx.db.organization().id().update(Organization {
+        currency_id: Some(default_currency.id),
+        ..org.clone()
+    });
     seed_country_pack_catalog_for_organization(ctx, org.id);
     seed_hr_country_pack_leave_catalog_for_organization(ctx, org.id);
 
@@ -407,8 +421,27 @@ pub fn bootstrap_new_tenant(
 
     let (org, owner_role) = insert_organization_with_owner(ctx, params.organization)?;
 
-    let company_currency_id = params.default_company_currency_id;
-    require_active_currency_by_id(ctx, company_currency_id)?;
+    let company_currency = if let Some(code) = params.default_company_currency_code.as_deref() {
+        // A non-zero id is accepted only as an additional integrity check; a
+        // client cannot smuggle a cross-organization row through code-based
+        // bootstrap.
+        if params.default_company_currency_id != 0 {
+            let selected = require_active_currency_by_id(ctx, params.default_company_currency_id)?;
+            if selected.organization_id != org.id {
+                return Err("Currency does not belong to this organization".to_string());
+            }
+            if selected.code != code.trim().to_uppercase() {
+                return Err("Currency id and code select different currencies".to_string());
+            }
+        }
+        seed_currency_for_organization(ctx, org.id, code)?
+    } else {
+        if params.default_company_currency_id == 0 {
+            return Err("A default company currency code is required".to_string());
+        }
+        require_active_currency_for_organization(ctx, org.id, params.default_company_currency_id)?
+    };
+    let company_currency_id = company_currency.id;
 
     ctx.db.organization().id().update(Organization {
         currency_id: Some(company_currency_id),
@@ -530,7 +563,7 @@ pub fn update_organization(
         .find(&organization_id)
         .ok_or("Organization not found")?;
     if let Some(currency_id) = params.currency_id {
-        require_active_currency_by_id(ctx, currency_id)?;
+        require_active_currency_for_organization(ctx, organization_id, currency_id)?;
     }
 
     ctx.db.organization().id().update(Organization {
@@ -604,7 +637,7 @@ pub fn create_company(
     if params.name.is_empty() {
         return Err("Company name cannot be empty".to_string());
     }
-    require_active_currency_by_id(ctx, params.currency_id)?;
+    require_active_currency_for_organization(ctx, organization_id, params.currency_id)?;
 
     if let Some(parent_id) = params.parent_id {
         require_company_in_organization(ctx, organization_id, parent_id)?;

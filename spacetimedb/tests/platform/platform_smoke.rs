@@ -1088,8 +1088,9 @@ pub fn test_documents_wave_c_index_retention_fiscal(ctx: &ReducerContext) -> Res
     if ctx
         .db
         .country_pack_definition()
-        .pack_key()
-        .find(&"au".to_string())
+        .country_pack_by_pack_key()
+        .filter((&org_id, &"au".to_string()))
+        .next()
         .is_none()
     {
         return Err("au country pack missing — run migrations".into());
