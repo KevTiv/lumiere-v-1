@@ -1,17 +1,19 @@
-/// Deterministic schema / org migration ledger.
+/// Deterministic platform-migration bindings and organization migrations.
 ///
-/// Global migrations are recorded in `SchemaMigration`.
-/// Per-organization migrations are recorded in `OrgSchemaMigration`.
+/// `SchemaMigration` is an organization-owned application binding to the
+/// canonical platform migration history in API-server PostgreSQL
+/// (`lumiere_platform.schema_migration`). It is not the global migration
+/// ledger. `OrgSchemaMigration` remains the separate protocol relation for
+/// organization-local application migrations.
 use std::collections::BTreeSet;
 
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
-use crate::core::country_pack::seed_country_pack_catalog;
+use crate::core::organization::organization;
 use crate::core::permissions::{sod_conflict_rule, SodConflictRule};
 use crate::core::users::user_profile;
 use crate::forms::migrations::run_seed_organization_form_configs;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::hr::country_pack_hr::seed_hr_country_pack_leave_catalog;
 
 pub const MIGRATION_COUNTRY_PACK_CATALOG: u64 = 1;
 pub const MIGRATION_HR_COUNTRY_PACK_LEAVE_CATALOG: u64 = 4;
@@ -61,9 +63,27 @@ fn seed_finance_sod_presets(ctx: &ReducerContext, organization_id: u64) {
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
-#[spacetimedb::table(accessor = schema_migration, public)]
+#[spacetimedb::table(
+    accessor = schema_migration,
+    public,
+    index(accessor = schema_migration_by_organization, btree(columns = [organization_id])),
+    index(
+        accessor = schema_migration_by_organization_and_platform_id,
+        btree(columns = [organization_id, platform_migration_id])
+    )
+)]
 pub struct SchemaMigration {
     #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    /// Organization whose application state is being bound.
+    pub organization_id: u64,
+    /// Opaque reference to `lumiere_platform.schema_migration`.
+    pub platform_migration_id: String,
+    /// Organization-qualified uniqueness key, derived by the server.
+    #[unique]
+    pub organization_platform_migration_key: String,
+    /// Descriptive copy of the canonical platform version.
     pub version: u64,
     pub name: String,
     pub applied_at: Timestamp,
@@ -268,22 +288,79 @@ mod tests {
         assert!(verify_zero_unresolved_ownership("c0", 0, None).is_err());
         assert!(verify_zero_unresolved_ownership("", 0, Some(0)).is_err());
     }
+
+    #[test]
+    fn platform_migration_binding_requires_an_opaque_reference() {
+        assert!(validate_platform_migration_id("platform:2026-09-04:catalog").is_ok());
+        assert!(validate_platform_migration_id("").is_err());
+        assert!(validate_platform_migration_id("   ").is_err());
+        assert!(validate_platform_migration_organization_id(41).is_ok());
+        assert!(validate_platform_migration_organization_id(0).is_err());
+    }
 }
 
 // ── Migration runners ────────────────────────────────────────────────────────
 
-fn apply_global_migration(ctx: &ReducerContext, version: u64, name: &str) -> Result<(), String> {
-    if ctx.db.schema_migration().version().find(&version).is_some() {
+fn validate_platform_migration_binding(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    platform_migration_id: &str,
+) -> Result<(), String> {
+    validate_platform_migration_organization_id(organization_id)?;
+    if ctx.db.organization().id().find(&organization_id).is_none() {
+        return Err("platform migration binding organization does not exist".to_string());
+    }
+    validate_platform_migration_id(platform_migration_id)
+}
+
+fn validate_platform_migration_organization_id(organization_id: u64) -> Result<(), String> {
+    if organization_id == 0 {
+        return Err("platform migration binding requires a non-zero organization_id".to_string());
+    }
+    Ok(())
+}
+
+fn validate_platform_migration_id(platform_migration_id: &str) -> Result<(), String> {
+    if platform_migration_id.trim().is_empty() {
+        return Err(
+            "platform migration binding requires an opaque platform migration id".to_string(),
+        );
+    }
+    Ok(())
+}
+
+fn organization_platform_migration_key(
+    organization_id: u64,
+    platform_migration_id: &str,
+) -> String {
+    format!("{organization_id}:{platform_migration_id}")
+}
+
+fn record_platform_migration_binding_for_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    platform_migration_id: &str,
+    version: u64,
+    name: &str,
+) -> Result<(), String> {
+    validate_platform_migration_binding(ctx, organization_id, platform_migration_id)?;
+    let binding_key = organization_platform_migration_key(organization_id, platform_migration_id);
+
+    if ctx
+        .db
+        .schema_migration()
+        .organization_platform_migration_key()
+        .find(&binding_key)
+        .is_some()
+    {
         return Ok(());
     }
 
-    match version {
-        MIGRATION_COUNTRY_PACK_CATALOG => seed_country_pack_catalog(ctx),
-        MIGRATION_HR_COUNTRY_PACK_LEAVE_CATALOG => seed_hr_country_pack_leave_catalog(ctx),
-        _ => return Err(format!("unknown global migration version {version}")),
-    }
-
     ctx.db.schema_migration().insert(SchemaMigration {
+        id: 0,
+        organization_id,
+        platform_migration_id: platform_migration_id.to_string(),
+        organization_platform_migration_key: binding_key,
         version,
         name: name.to_string(),
         applied_at: ctx.timestamp,
@@ -291,6 +368,34 @@ fn apply_global_migration(ctx: &ReducerContext, version: u64, name: &str) -> Res
     });
 
     Ok(())
+}
+
+/// Record a platform migration application supplied by the trusted
+/// API-server PostgreSQL synchronization path.
+#[spacetimedb::reducer]
+pub fn record_platform_migration_binding(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    platform_migration_id: String,
+    version: u64,
+    name: String,
+) -> Result<(), String> {
+    let user = ctx
+        .db
+        .user_profile()
+        .identity()
+        .find(ctx.sender())
+        .ok_or("User not found")?;
+    if !user.is_superuser {
+        return Err("Only superusers may record platform migration bindings".to_string());
+    }
+    record_platform_migration_binding_for_organization(
+        ctx,
+        organization_id,
+        &platform_migration_id,
+        version,
+        &name,
+    )
 }
 
 fn apply_org_migration(
@@ -344,22 +449,38 @@ fn apply_org_migration(
 
 /// Apply all pending global migrations (superuser or module init).
 pub(crate) fn apply_pending_global_migrations(ctx: &ReducerContext) -> Result<(), String> {
-    apply_global_migration(
-        ctx,
-        MIGRATION_COUNTRY_PACK_CATALOG,
-        "seed_country_pack_catalog",
-    )?;
-    apply_global_migration(
-        ctx,
-        MIGRATION_HR_COUNTRY_PACK_LEAVE_CATALOG,
-        "seed_hr_country_pack_leave_catalog",
-    )?;
+    let organization_ids: Vec<u64> = ctx
+        .db
+        .organization()
+        .iter()
+        .map(|organization| organization.id)
+        .filter(|organization_id| *organization_id != 0)
+        .collect();
+    for organization_id in organization_ids {
+        seed_pending_global_migrations_for_organization(ctx, organization_id);
+    }
     Ok(())
+}
+
+/// Seed legacy organization-owned catalog rows for one existing organization.
+///
+/// This intentionally does not write `SchemaMigration`: canonical platform
+/// migration truth is synchronized from API-server PostgreSQL through
+/// `record_platform_migration_binding`.
+fn seed_pending_global_migrations_for_organization(ctx: &ReducerContext, organization_id: u64) {
+    crate::core::country_pack::seed_country_pack_catalog_for_organization(ctx, organization_id);
+    crate::hr::country_pack_hr::seed_hr_country_pack_leave_catalog_for_organization(
+        ctx,
+        organization_id,
+    );
 }
 
 /// Apply pending migrations for one organization.
 #[spacetimedb::reducer]
 pub fn apply_org_migrations(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+    if organization_id == 0 {
+        return Err("organization migrations require a non-zero organization_id".to_string());
+    }
     check_permission(ctx, organization_id, "organization", "write")?;
     apply_org_migration(
         ctx,
