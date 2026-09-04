@@ -25,6 +25,7 @@ import {
   encodeOptionalU64,
   stdbParamsToJson,
 } from "@lumiere/erp-shared/stdb-params-json"
+import { invalidateStdbQueryResources } from "./stdb"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import type {
   CreatePurchaseOrderParams,
@@ -758,9 +759,8 @@ export function usePostLandedCosts(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to post landed costs')
     },
     onSuccess: () => {
-      const orgKey = rqBigIntKey(organizationId)
       invalidateLandedAndPo(qc, organizationId)
-      void qc.invalidateQueries({ queryKey: ['account-moves', orgKey] })
+      invalidateStdbQueryResources(qc, organizationId, ["account-moves"])
     },
   })
 }
@@ -942,7 +942,7 @@ export function useCreateBillFromPurchaseOrder(organizationId: bigint) {
       const orgKey = rqBigIntKey(organizationId)
       void qc.invalidateQueries({ queryKey: ["purchase-orders", orgKey] })
       void qc.invalidateQueries({ queryKey: ["purchase-order-lines", orgKey] })
-      void qc.invalidateQueries({ queryKey: ["account-moves", orgKey] })
+      invalidateStdbQueryResources(qc, organizationId, ["account-moves"])
     },
   })
 }
@@ -1317,8 +1317,8 @@ export function useCreateVendorCreditFromPurchaseReturn(
       const k = rqBigIntKey(organizationId)
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["purchase-returns", k] }),
-        qc.invalidateQueries({ queryKey: ["account-moves", k] }),
       ])
+      invalidateStdbQueryResources(qc, organizationId, ["account-moves"])
     },
   })
 }
