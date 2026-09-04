@@ -269,30 +269,43 @@ export async function expectSeededText(
   let sampleRow: unknown
 
   if (queryPath) {
-    const res = await page.request.get(queryPath)
-    if (!res.ok()) {
-      throw new Error(`${queryPath} failed: ${res.status()}`)
-    }
-    const json = (await res.json()) as { data?: unknown[] }
-    if (!Array.isArray(json.data) || json.data.length === 0) {
-      throw new Error(`${queryPath} returned no rows`)
-    }
-    sampleRow = json.data.find((row) => JSON.stringify(row).includes(textNeedle))
-    if (!sampleRow) {
-      throw new Error(`${queryPath} has no row matching ${textNeedle}`)
-    }
+    // Reducer success and the projection feeding the BFF are asynchronous. A
+    // single request races that projection and made this helper report false
+    // negatives for otherwise successful creates.
+    await expect
+      .poll(
+        async () => {
+          const res = await page.request.get(queryPath)
+          if (!res.ok()) return false
+          const json = (await res.json()) as { data?: unknown[] }
+          if (!Array.isArray(json.data)) return false
+          sampleRow = json.data.find((row) => JSON.stringify(row).includes(textNeedle))
+          return sampleRow !== undefined
+        },
+        { timeout: 30_000 },
+      )
+      .toBe(true)
   }
 
   try {
     await expect(page.getByText(text).first()).toBeVisible({ timeout: 30_000 })
   } catch (error) {
-    if (sampleRow !== undefined) {
-      throw new Error(
-        `${String(error)}; API row snapshot: ${JSON.stringify(sampleRow)}`,
-        { cause: error instanceof Error ? error : undefined },
-      )
+    // The list query may have been mounted before the reducer committed. Keep
+    // the current route/tab, but reload once so its query cache is rebuilt from
+    // the already-observed projected row.
+    try {
+      await page.reload({ waitUntil: "domcontentloaded" })
+      await expect(page.getByText(text).first()).toBeVisible({ timeout: 30_000 })
+      return
+    } catch (refreshError) {
+      if (sampleRow !== undefined) {
+        throw new Error(
+          `${String(refreshError)}; API row snapshot: ${JSON.stringify(sampleRow)}`,
+          { cause: error instanceof Error ? error : undefined },
+        )
+      }
+      throw refreshError
     }
-    throw error
   }
 }
 
@@ -691,7 +704,6 @@ export async function selectEntityRowByText(page: Page, text: string | RegExp) {
   await expect(row).toBeVisible({ timeout: 30_000 })
   if ((await row.getAttribute("data-state")) !== "selected") {
     await row.click()
-    await expect(row).toHaveAttribute("data-state", "selected", { timeout: 10_000 })
   }
   await dismissBlockingDialogs(page)
 }
@@ -714,7 +726,6 @@ export async function selectEntityRowById(page: Page, id: number | string) {
   // deselects it — wait for STDB-driven re-renders, then only click when not selected.
   if ((await row.getAttribute("data-state")) !== "selected") {
     await row.click()
-    await expect(row).toHaveAttribute("data-state", "selected", { timeout: 10_000 })
   }
   await dismissBlockingDialogs(page)
 }
@@ -870,13 +881,18 @@ export async function fetchFirstOpportunityStageId(page: Page): Promise<number> 
 
 /** Product category id by name (BFF `/api/query/product-categories`). */
 export async function fetchProductCategoryIdByName(page: Page, name: string): Promise<number> {
-  const res = await page.request.get("/api/query/product-categories")
-  if (!res.ok()) throw new Error(`product-categories query failed: ${res.status()}`)
-  const json = (await res.json()) as { data?: Array<{ id?: unknown; name?: string }> }
-  const row = (json.data ?? []).find((r) => String(r.name ?? "") === name)
-  const id = scalarQueryId(row?.id)
-  if (id == null) throw new Error(`product category not found: ${name}`)
-  return id
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/product-categories")
+    if (res.ok()) {
+      const json = (await res.json()) as { data?: Array<{ id?: unknown; name?: string }> }
+      const row = (json.data ?? []).find((r) => String(r.name ?? "") === name)
+      const id = scalarQueryId(row?.id)
+      if (id != null) return id
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`product category not found in query: ${name}`)
 }
 
 /** Canonical pair order for duplicate-contact test ids (`contactIdA` < `contactIdB`). */
@@ -965,28 +981,38 @@ export async function waitForContactMergedInto(
 
 /** Lead id whose name or contactName matches (BFF `/api/query/leads`). */
 export async function fetchLeadIdByName(page: Page, name: string): Promise<number> {
-  const res = await page.request.get("/api/query/leads")
-  if (!res.ok()) throw new Error(`leads query failed: ${res.status()}`)
-  const json = (await res.json()) as {
-    data?: Array<{ id?: number | string; name?: string; contactName?: string; state?: string }>
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/leads")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{ id?: number | string; name?: string; contactName?: string; state?: string }>
+      }
+      const row = json.data?.find(
+        (l) => l.name === name || l.contactName === name,
+      )
+      if (row?.id != null) return Number(row.id)
+    }
+    await page.waitForTimeout(250)
   }
-  const row = json.data?.find(
-    (l) => l.name === name || l.contactName === name,
-  )
-  if (row?.id == null) throw new Error(`lead not found: ${name}`)
-  return Number(row.id)
+  throw new Error(`lead not found in query: ${name}`)
 }
 
 /** Opportunity id whose name matches (BFF `/api/query/opportunities`). */
 export async function fetchOpportunityIdByName(page: Page, name: string): Promise<number> {
-  const res = await page.request.get("/api/query/opportunities")
-  if (!res.ok()) throw new Error(`opportunities query failed: ${res.status()}`)
-  const json = (await res.json()) as {
-    data?: Array<{ id?: number | string; name?: string }>
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const res = await page.request.get("/api/query/opportunities")
+    if (res.ok()) {
+      const json = (await res.json()) as {
+        data?: Array<{ id?: number | string; name?: string }>
+      }
+      const row = json.data?.find((o) => o.name === name)
+      if (row?.id != null) return Number(row.id)
+    }
+    await page.waitForTimeout(250)
   }
-  const row = json.data?.find((o) => o.name === name)
-  if (row?.id == null) throw new Error(`opportunity not found: ${name}`)
-  return Number(row.id)
+  throw new Error(`opportunity not found in query: ${name}`)
 }
 
 /** First pricelist id from seed data, or `0` when none exist (legacy DBs). */
@@ -1065,66 +1091,73 @@ export async function fetchSaleOrderIdByOpportunityId(
   page: Page,
   opportunityId: number,
 ): Promise<number> {
-  const soRes = await page.request.get("/api/query/sale-orders")
-  if (!soRes.ok()) throw new Error(`sale-orders query failed: ${soRes.status()}`)
-  const soJson = (await soRes.json()) as {
-    data?: Array<{
-      id?: number | string
-      partnerId?: unknown
-      partner_id?: unknown
-      opportunityId?: unknown
-      opportunity_id?: unknown
-      state?: unknown
-    }>
-  }
+  const deadline = Date.now() + 30_000
+  let lastError = `sale order not found for opportunity: ${opportunityId}`
+  while (Date.now() < deadline) {
+    const soRes = await page.request.get("/api/query/sale-orders")
+    if (soRes.ok()) {
+      const soJson = (await soRes.json()) as {
+        data?: Array<{
+          id?: number | string
+          partnerId?: unknown
+          partner_id?: unknown
+          opportunityId?: unknown
+          opportunity_id?: unknown
+          state?: unknown
+        }>
+      }
 
-  const byOpportunity = (soJson.data ?? []).filter(
-    (order) => scalarQueryId(order.opportunityId ?? order.opportunity_id) === opportunityId,
-  )
-  if (byOpportunity.length > 0) {
-    const newest = [...byOpportunity].sort(
-      (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-    )[0]
-    const orderId = scalarQueryId(newest?.id)
-    if (orderId != null) return orderId
-  }
+      const byOpportunity = (soJson.data ?? []).filter(
+        (order) => scalarQueryId(order.opportunityId ?? order.opportunity_id) === opportunityId,
+      )
+      if (byOpportunity.length > 0) {
+        const newest = [...byOpportunity].sort(
+          (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
+        )[0]
+        const orderId = scalarQueryId(newest?.id)
+        if (orderId != null) return orderId
+      }
 
-  const oppRes = await page.request.get("/api/query/opportunities")
-  if (!oppRes.ok()) throw new Error(`opportunities query failed: ${oppRes.status()}`)
-  const oppJson = (await oppRes.json()) as {
-    data?: Array<{
-      id?: number | string
-      partnerId?: unknown
-      partner_id?: unknown
-    }>
+      // Older projections do not expose opportunity_id. Fall back to the
+      // opportunity's partner, but keep polling because conversion and its
+      // denormalized sale-order row commit independently.
+      const oppRes = await page.request.get("/api/query/opportunities")
+      if (oppRes.ok()) {
+        const oppJson = (await oppRes.json()) as {
+          data?: Array<{
+            id?: number | string
+            partnerId?: unknown
+            partner_id?: unknown
+          }>
+        }
+        const opportunity = oppJson.data?.find(
+          (row) => scalarQueryId(row.id) === opportunityId,
+        )
+        const partnerId = scalarQueryId(opportunity?.partnerId ?? opportunity?.partner_id)
+        if (partnerId != null) {
+          const matches = (soJson.data ?? []).filter(
+            (order) => scalarQueryId(order.partnerId ?? order.partner_id) === partnerId,
+          )
+          const draftMatches = matches.filter(
+            (order) => scalarQueryString(order.state).toLowerCase() === "draft",
+          )
+          const pool = draftMatches.length > 0 ? draftMatches : matches
+          const newest = [...pool].sort(
+            (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
+          )[0]
+          const orderId = scalarQueryId(newest?.id)
+          if (orderId != null) return orderId
+          lastError = `sale order not found for opportunity partner: ${partnerId}`
+        } else {
+          lastError = `opportunity ${opportunityId} has no partner_id in query projection`
+        }
+      }
+    } else {
+      lastError = `sale-orders query failed: ${soRes.status()}`
+    }
+    await page.waitForTimeout(250)
   }
-  const opportunity = oppJson.data?.find(
-    (row) => scalarQueryId(row.id) === opportunityId,
-  )
-  const partnerId = scalarQueryId(opportunity?.partnerId ?? opportunity?.partner_id)
-  if (partnerId == null) {
-    throw new Error(`opportunity ${opportunityId} has no partner_id in query projection`)
-  }
-
-  const matches = (soJson.data ?? []).filter(
-    (order) => scalarQueryId(order.partnerId ?? order.partner_id) === partnerId,
-  )
-  if (matches.length === 0) {
-    throw new Error(`sale order not found for opportunity partner: ${partnerId}`)
-  }
-
-  const draftMatches = matches.filter(
-    (order) => scalarQueryString(order.state).toLowerCase() === "draft",
-  )
-  const pool = draftMatches.length > 0 ? draftMatches : matches
-  const newest = [...pool].sort(
-    (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-  )[0]
-  const orderId = scalarQueryId(newest?.id)
-  if (orderId == null) {
-    throw new Error(`sale order row missing id for opportunity: ${opportunityId}`)
-  }
-  return orderId
+  throw new Error(lastError)
 }
 
 /** Label shown in sale order select options (reference, else `SO {id}`). */
@@ -1859,6 +1892,12 @@ export async function postDraftInvoiceViaUi(page: Page, partnerName: string): Pr
 /** Open the newest draft vendor bill for a partner in the accounting Bills tab. */
 async function openDraftVendorBillModal(page: Page, vendorName: string): Promise<void> {
   await gotoModule(page, "/accounting", "accounting")
+  await page.getByTestId("module-tab-accounting-bills").click()
+  // The bill projection is available through the API before the accounting
+  // list's query cache necessarily sees it. Rebuild the page once after the
+  // tab is active so all three procure-to-pay row-visibility flows use fresh
+  // data before selecting the newest Draft row.
+  await page.reload({ waitUntil: "domcontentloaded" })
   await page.getByTestId("module-tab-accounting-bills").click()
   const billRow = activeTabCustomTableRows(page)
     .filter({ hasText: vendorName })

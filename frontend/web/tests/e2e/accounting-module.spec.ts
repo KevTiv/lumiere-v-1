@@ -171,17 +171,14 @@ test.describe("Accounting module e2e", () => {
     await fillField(page, "dateFrom", isoDate(0))
     await fillField(page, "dateTo", isoDate(365))
     await submitForm(page, "new-budget")
-    await page
-      .waitForResponse((res) => res.url().includes("/api/query/budgets") && res.ok(), { timeout: 30_000 })
-      .catch(() => undefined)
-    await expect(page.getByText(budgetName).first()).toBeVisible({ timeout: 30_000 })
+    await expectSeededText(page, budgetName, "/api/query/budgets")
 
     const termName = smokeName("term")
     await openAccountingTab(page, "payment-terms")
     await openEntityCreate(page, "/accounting", "accounting", "payment-terms", "new-payment-term")
     await fillField(page, "name", termName)
     await submitForm(page, "new-payment-term")
-    await expect(page.getByText(termName).first()).toBeVisible()
+    await expectSeededText(page, termName, "/api/query/account-payment-terms")
 
     await openAccountingTab(page, "payment-term-lines")
     await page.getByTestId("module-create-accounting-payment-term-lines").click()
