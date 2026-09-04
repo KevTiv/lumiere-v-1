@@ -51,6 +51,7 @@ import {
   microsSinceEpochToDate,
   moveStateIsDraft,
   moveTypeIsInvoiceOrRefund,
+  stbEnumTag,
 } from "../lib/accounting-move-utils"
 import { useTranslation } from "@lumiere/i18n"
 
@@ -67,10 +68,13 @@ const statusConfig: Record<BillStatus, { labelKey: string; pillClass: string }> 
 }
 
 function getBillStatus(move: AccountMove): BillStatus {
-  const state = String(move.state)
-  const paymentState = String(move.paymentState)
+  // Typed account-move reads expose algebraic enums as tagged objects (for
+  // example `{ tag: "Draft" }`), while legacy rows may still be strings.
+  // Normalize both representations before deriving the badge/filter status.
+  const state = stbEnumTag(move.state)
+  const paymentState = stbEnumTag(move.paymentState)
   if (state === "Cancelled") return "cancelled"
-  if (state === "Draft") return "draft"
+  if (moveStateIsDraft(move.state)) return "draft"
   if (paymentState === "Paid") return "paid"
   if ((move.amountResidual ?? 0) > 0 && move.invoiceDateDue) {
     const due = microsSinceEpochToDate(move.invoiceDateDue)
