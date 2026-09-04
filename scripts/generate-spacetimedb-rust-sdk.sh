@@ -10,6 +10,10 @@ SPACETIME_BIN="${SPACETIME_BIN:-spacetime}"
 LOG_FILE="$(mktemp "${TMPDIR:-/tmp}/lumiere-stdb-rust-generate.XXXXXX.log")"
 trap 'rm -f "$LOG_FILE"' EXIT
 
+# Bindings are a complete generated snapshot. Clean the exact output directory
+# first so reducers removed from the module cannot survive as stale APIs and so
+# the generator never pauses for an interactive deletion confirmation.
+rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
 set +e

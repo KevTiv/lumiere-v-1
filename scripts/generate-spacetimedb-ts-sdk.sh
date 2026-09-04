@@ -13,6 +13,10 @@ BUILDER_ANNOTATION="// @ts-expect-error -- generated module size exceeds TypeScr
 REDUCERS='export const reducers = __convertToAccessorMap(reducersSchema.reducersType.reducers);'
 REDUCERS_ANNOTATION="// @ts-ignore -- generated module size exceeds TypeScript's instantiation depth in consumers"
 
+# Bindings are a complete generated snapshot. Clean the exact output directory
+# first so reducers removed from the module cannot survive as stale APIs and so
+# the generator never pauses for an interactive deletion confirmation.
+rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 "$SPACETIME_BIN" generate \
   --include-private \
