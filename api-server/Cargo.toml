@@ -43,7 +43,7 @@ name = "projection-worker"
 path = "src/bin/projection-worker.rs"
 
 [dependencies]
-lumiere-contracts.workspace = true
+lumiere-contracts = { workspace = true, features = ["bindings"] }
 anyhow.workspace = true
 aes-gcm.workspace = true
 axum = { workspace = true, features = ["macros", "ws"] }

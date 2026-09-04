@@ -6,13 +6,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    paths:
-      - "frontend/web/tests/e2e/**"
-      - "frontend/web/playwright.config.ts"
-      - "Makefile"
-      - "scripts/e2e*"
-      - "spacetimedb/**"
-      - "api-server/**"
   workflow_dispatch:
     inputs:
       suite:
@@ -41,8 +34,24 @@ env:
   SPACETIME_CLI_VERSION: "2.8.2"
 
 jobs:
+  scope:
+    name: Classify change scope
+    runs-on: ubuntu-latest
+    outputs:
+      valid: ${{ steps.scope.outputs.valid }}
+      run_e2e: ${{ steps.scope.outputs.run_e2e }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: scope
+        run: python3 scripts/ci-change-scope.py --github-output "$GITHUB_OUTPUT"
+      - name: Test change classifier
+        run: python3 -m unittest discover -s scripts/tests -p 'test_ci_change_scope.py'
+
   plan:
     name: Plan E2E matrix
+    needs: scope
     runs-on: ubuntu-latest
     outputs:
       configs: ${{ steps.plan.outputs.configs }}
@@ -51,8 +60,8 @@ jobs:
         run: |
           case "${{ github.event_name }}" in
             push)
-              # Every main push: run both P0 and full with a clean module DB.
-              configs='[{"suite":"p0","clear_db":"1"},{"suite":"full","clear_db":"1"}]'
+              # Main retains one complete run; PRs use the bounded P0 suite.
+              configs='[{"suite":"full","clear_db":"1"}]'
               ;;
             pull_request)
               configs='[{"suite":"p0","clear_db":"0"}]'
@@ -78,7 +87,8 @@ jobs:
 
   e2e-smoke:
     name: Playwright smoke (${{ matrix.config.suite }})
-    needs: plan
+    needs: [scope, plan]
+    if: needs.plan.result == 'success' && needs.scope.outputs.run_e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     concurrency:
@@ -174,6 +184,18 @@ jobs:
         working-directory: frontend/web
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Cache Next.js intermediate output
+        uses: actions/cache@v4
+        with:
+          # Cache compiler data only, never Next's runtime fetch cache.
+          path: |
+            frontend/web/.next/cache/webpack
+            frontend/web/.next/cache/turbopack
+            frontend/web/.next/cache/swc
+          key: next-compiler-v1-${{ runner.os }}-node22-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-${{ github.sha }}
+          restore-keys: |
+            next-compiler-v1-${{ runner.os }}-node22-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-
+
       - name: Run make e2e-smoke
         env:
           E2E_SUITE: ${{ matrix.config.suite }}
@@ -201,3 +223,19 @@ jobs:
           name: e2e-logs-${{ matrix.config.suite }}
           path: .tmp/e2e/
           retention-days: 7
+
+  gate:
+    name: E2E gate
+    if: always()
+    needs: [scope, plan, e2e-smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require scope and E2E result
+        run: |
+          test "${{ needs.scope.result }}" = success
+          test "${{ needs.scope.outputs.valid }}" = true
+          test "${{ needs.plan.result }}" = success
+          case "${{ needs.scope.outputs.run_e2e }}:${{ needs.e2e-smoke.result }}" in
+            true:success|false:skipped) ;;
+            *) exit 1 ;;
+          esac

@@ -361,14 +361,14 @@ GitHub Actions workflow **[E2E smoke](../.github/workflows/e2e-smoke.yml)** runs
 
 | Trigger | Suite | Clear DB |
 |---------|-------|----------|
-| **Pull request** (paths: e2e, Makefile, spacetimedb, api-server) | `p0` only | no |
-| **Push to `main`** | `p0` + `full` | yes |
+| **Pull request** (classifier-selected application/shared/build changes, including frontend) | `p0` only | no |
+| **Push to `main`** (classifier-selected changes) | `full` once, includes P0 | yes |
 | **Weekly schedule** (Mon 08:00 UTC) | `full` | yes |
 | **workflow_dispatch** | operator choice | configurable |
 
-**Required check for merge (operator action):** enable branch protection on **`E2E smoke / Playwright smoke (p0)`**. This is the PR matrix job; GitHub settings are out-of-repo.
+**Required checks for merge (operator action):** prefer the stable **`CI gate`** and **`E2E gate`** job checks from the corresponding workflows. These reject failed/cancelled/missing selected jobs and accept deliberate classifier skips. Existing branch-protection settings are not changed by this branch; migrate any dynamic `Playwright smoke (p0)` requirement through GitHub settings. See the [build and CI guide](guides/build-and-ci-dx.md).
 
-**P0 scope:** 15 spec files under `frontend/web/tests/e2e/` tagged `@p0` (24 tests when listed with `playwright test --grep @p0`). Covers auth shell, module smoke, MVP golden paths, and core mutation suites.
+**P0 scope:** tests tagged `@p0`, excluding `@dev-fixture`. Covers auth shell, module smoke, MVP golden paths, and core mutation suites. Use `pnpm --dir frontend/web exec playwright test --list --grep @p0 --grep-invert @dev-fixture` for the current inventory; counts change as tests are added.
 
 **Reproduce CI P0 locally** (same suite as PRs, without wiping the module):
 

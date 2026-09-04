@@ -11,8 +11,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  scope:
+    name: Classify change scope
+    runs-on: ubuntu-latest
+    outputs:
+      valid: ${{ steps.scope.outputs.valid }}
+      run_e2e: ${{ steps.scope.outputs.run_e2e }}
+      run_rust: ${{ steps.scope.outputs.run_rust }}
+      run_contracts: ${{ steps.scope.outputs.run_contracts }}
+      run_frontend: ${{ steps.scope.outputs.run_frontend }}
+      run_pdf: ${{ steps.scope.outputs.run_pdf }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: scope
+        name: Determine validation scope
+        run: python3 scripts/ci-change-scope.py --github-output "$GITHUB_OUTPUT"
+      - name: Test change classifier
+        run: python3 -B -m unittest discover -s scripts/tests
+
+  stdb-check:
+    name: SpacetimeDB check
+    needs: scope
+    if: needs.scope.outputs.run_contracts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: spacetimedb
+          cache-on-failure: true
+      - name: Check standalone module and tests
+        working-directory: spacetimedb
+        run: cargo check --locked --tests
+
   rust:
     name: Rust
+    needs: scope
+    if: needs.scope.outputs.run_rust == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -60,10 +98,6 @@ jobs:
             .
           cache-on-failure: true
 
-      - name: SpacetimeDB module (cargo check --tests)
-        working-directory: spacetimedb
-        run: cargo check --tests
-
       # No `spacetime` CLI in this runner, so bindings can't be regenerated
       # from the live module here — populate .contracts-staging/ from the
       # currently pinned lumiere-contracts release instead. Schema-affecting
@@ -73,10 +107,13 @@ jobs:
         run: make contracts-staging-from-pinned
 
       - name: Workspace members (api-server, ai-gateway, lumiere-codegen, stdb-auth)
-        run: cargo check -p api-server -p ai-gateway -p lumiere-codegen -p stdb-auth
+        run: cargo check --locked -p api-server -p ai-gateway -p lumiere-codegen -p stdb-auth
 
       - name: lumiere-codegen unit tests
-        run: cargo test -p lumiere-codegen
+        run: cargo test --locked -p lumiere-codegen
+
+      - name: Realtime build generation regression
+        run: bash scripts/test-build-rs-generation.sh
 
       - name: SpacetimeDB Rust generator recovery test
         run: bash scripts/test-generate-spacetimedb-rust-sdk.sh
@@ -85,7 +122,7 @@ jobs:
         run: make check-codegen
 
       - name: api-server reducer contract tests
-        run: cargo test -p api-server http_app::tests
+        run: cargo test --locked -p api-server --lib http_app::tests
 
       - name: C3 PostgreSQL projection matrix
         env:
@@ -96,13 +133,15 @@ jobs:
           PG_USER: lumiere
           PG_PASSWORD: lumiere
           PG_TLS_MODE: disable
-        run: cargo test -p api-server cold_tier::commit_projection::tests::postgres_manifest_matrix -- --nocapture
+        run: cargo test --locked -p api-server --lib cold_tier::commit_projection::tests::postgres_manifest_matrix -- --nocapture
 
       - name: ai-gateway unit tests
-        run: cargo test -p ai-gateway health_returns
+        run: cargo test --locked -p ai-gateway health_returns
 
   contracts-drift:
     name: Contracts drift
+    needs: scope
+    if: needs.scope.outputs.run_contracts == 'true'
     runs-on: ubuntu-latest
     env:
       # Must match the module crate used for authoritative schema extraction.
@@ -171,6 +210,8 @@ jobs:
 
   frontend:
     name: Frontend
+    needs: scope
+    if: needs.scope.outputs.run_frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -208,6 +249,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Validate frontend build-cache graph
+        run: node ../scripts/test-frontend-build-cache.mjs
+
       - name: Check accounting double-cast rationales
         run: bash ../scripts/lint-accounting-as-unknown-as.sh
 
@@ -219,6 +263,10 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Validate Playwright tests load
+        working-directory: frontend/web
+        run: pnpm exec playwright test --list
 
       - name: Enforce mobile API boundary
         run: pnpm --filter mobile lint
@@ -235,48 +283,10 @@ jobs:
       - name: Unit tests (web BFF helpers)
         run: pnpm --dir web test:unit
 
-  playwright-compile:
-    name: Playwright (compile smoke)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-
-      # Same read-only deploy key as the frontend job — see its comment.
-      - name: Configure SSH for private lumiere-contracts dependency
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_ed25519
-          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
-          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.31.0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Validate Playwright tests load
-        working-directory: frontend/web
-        run: pnpm exec playwright test --list
-
   owner-report-pdf:
     name: Owner-report PDF structural regression
+    needs: scope
+    if: needs.scope.outputs.run_pdf == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -305,6 +315,47 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          context: ./chromium-worker
-          tags: lumiere-chromium-worker
-          load: true
+          name: owner-report-pdf-diagnostics
+          path: artifacts/owner-report-pdf/
+          retention-days: 7
+
+  # Retain the historical check name for branch protection. The actual
+  # Playwright compile/list validation now runs in the frontend job.
+  playwright-compile:
+    name: Playwright (compile smoke)
+    if: always()
+    needs: [scope, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compatibility check
+        run: |
+          test "${{ needs.scope.result }}" = success
+          test "${{ needs.scope.outputs.valid }}" = true
+          case "${{ needs.scope.outputs.run_frontend }}:${{ needs.frontend.result }}" in
+            true:success|false:skipped) ;;
+            *) exit 1 ;;
+          esac
+
+  gate:
+    name: CI gate
+    if: always()
+    needs: [scope, stdb-check, rust, contracts-drift, frontend, owner-report-pdf, playwright-compile]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require scope and scheduled validations to pass
+        run: |
+          test "${{ needs.scope.result }}" = success
+          test "${{ needs.scope.outputs.valid }}" = true
+          for pair in \
+            "run_contracts:${{ needs.scope.outputs.run_contracts }}:${{ needs.stdb-check.result }}" \
+            "run_rust:${{ needs.scope.outputs.run_rust }}:${{ needs.rust.result }}" \
+            "run_contracts:${{ needs.scope.outputs.run_contracts }}:${{ needs.contracts-drift.result }}" \
+            "run_frontend:${{ needs.scope.outputs.run_frontend }}:${{ needs.frontend.result }}" \
+            "run_pdf:${{ needs.scope.outputs.run_pdf }}:${{ needs.owner-report-pdf.result }}"; do
+            IFS=: read -r name expected actual <<< "$pair"
+            case "$expected:$actual" in
+              true:success|false:skipped) ;;
+              *) echo "Unexpected result for $name: $expected:$actual"; exit 1 ;;
+            esac
+          done
+          test "${{ needs.playwright-compile.result }}" = success
