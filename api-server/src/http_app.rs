@@ -833,13 +833,17 @@ mod tests {
     }
 
     #[test]
-    fn reviewed_unscoped_reducer_is_explicit() {
+    fn organization_seeded_reference_reducer_is_session_scoped() {
         let contract = stdb_client::reducer_contract("create_country").expect("create_country");
         assert_eq!(contract.exposure, Exposure::Session);
-        assert!(contract.organization_position.is_none());
+        assert_eq!(contract.organization_position, Some(0));
         assert!(contract.company_position.is_none());
-        assert!(contract.unscoped_reason.is_some());
-        assert!(validate_reducer_scope(contract, &[json!({})], 7).is_ok());
+        assert!(contract.unscoped_reason.is_none());
+        assert!(validate_reducer_scope(contract, &[json!(7)], 7).is_ok());
+        assert!(matches!(
+            validate_reducer_scope(contract, &[json!(8)], 7),
+            Err(ApiError::Forbidden(_))
+        ));
     }
 
     #[test]
