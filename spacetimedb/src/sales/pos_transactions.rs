@@ -1080,8 +1080,16 @@ pub fn finalize_pos_order_archive(
     durable_change_schema_version: u32,
     durable_contract_version: String,
 ) -> Result<(), String> {
+    let organization_id = ctx
+        .db
+        .pos_order()
+        .id()
+        .find(&id)
+        .map(|order| order.organization_id)
+        .ok_or("pos order was not found; refusing unscoped finalization")?;
     if !crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
         ctx,
+        organization_id,
         crate::core::cold_tier_identity::POS_ORDER_COLD_DRAINER_SERVICE,
     ) {
         return Err(
@@ -1305,6 +1313,7 @@ pub fn hydrate_pos_order_aggregate(
 ) -> Result<(), String> {
     if !crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
         ctx,
+        organization_id,
         crate::core::cold_tier_identity::POS_ORDER_HYDRATOR_SERVICE,
     ) {
         return Err(

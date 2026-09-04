@@ -226,8 +226,16 @@ pub fn finalize_audit_log_archive(
     id: u64,
     expected_payload_checksum: String,
 ) -> Result<(), String> {
+    let organization_id = ctx
+        .db
+        .audit_log()
+        .id()
+        .find(&id)
+        .map(|row| row.organization_id)
+        .ok_or("audit log row was not found; refusing unscoped finalization")?;
     if !crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
         ctx,
+        organization_id,
         crate::core::cold_tier_identity::AUDIT_COLD_DRAINER_SERVICE,
     ) {
         return Err(

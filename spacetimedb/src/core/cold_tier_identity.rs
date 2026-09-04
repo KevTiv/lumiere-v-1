@@ -9,13 +9,13 @@
 /// later) therefore need their own registered-identity check, the same
 /// pattern `ai/skill_registry.rs` uses for the AI certification executor.
 ///
-/// This is deliberately simpler than that AI-skill pattern: there's one
-/// shared server-token identity for every api-server worker in this
-/// codebase (see `AppState::new` / `STDB_SERVER_TOKEN`), not a per-organization
-/// executor needing hash-pinned rotation — so one active identity per
-/// `service_name`, globally, is enough.
+/// The platform control plane owns the authoritative service registration.
+/// This table is only the organization-owned application binding/projection
+/// of that registration. `identity` and `platform_id` are opaque platform
+/// identifiers, not ERP-generated tenant or user identifiers.
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
+use crate::core::organization::organization;
 use crate::core::users::user_profile;
 
 /// `service_name` used by the audit-log cold drainer (`api-server/src/cold_tier/audit_drainer.rs`).
@@ -36,13 +36,23 @@ pub(crate) const ORGANIZATION_RECONSTRUCTOR_SERVICE: &str = "organization_recons
     public,
     index(
         accessor = cold_tier_service_identity_by_name,
-        btree(columns = [service_name])
+        btree(columns = [organization_id, service_name])
+    ),
+    index(
+        accessor = cold_tier_service_identity_by_organization,
+        btree(columns = [organization_id])
+    ),
+    index(
+        accessor = cold_tier_service_identity_by_platform_identity,
+        btree(columns = [organization_id, identity])
     )
 )]
 pub struct ColdTierServiceIdentity {
     #[primary_key]
-    #[auto_inc]
-    pub id: u64,
+    /// Opaque platform-control binding identifier.
+    pub platform_id: String,
+    /// Direct, non-null tenant ownership for this application projection.
+    pub organization_id: u64,
     pub service_name: String,
     pub identity: Identity,
     pub is_active: bool,
@@ -51,9 +61,9 @@ pub struct ColdTierServiceIdentity {
     pub retired_at: Option<Timestamp>,
 }
 
-/// Register (or replace) the trusted identity for a cold-tier service, e.g.
-/// `"audit_cold_drainer"`. Retires any prior active identity for that same
-/// `service_name` — only one is active at a time.
+/// Register (or replace) the organization binding for a cold-tier service,
+/// e.g. `"audit_cold_drainer"`. Retires any prior active identity for that
+/// `(organization_id, service_name)` — only one is active per organization.
 ///
 /// Not callable through the public API (see `reducer_allowlist.rs`) — this
 /// is a one-time-per-deploy ops action, run the same way
@@ -62,10 +72,24 @@ pub struct ColdTierServiceIdentity {
 #[spacetimedb::reducer]
 pub fn register_cold_tier_service_identity(
     ctx: &ReducerContext,
+    organization_id: u64,
+    platform_id: String,
     service_name: String,
     identity: Identity,
 ) -> Result<(), String> {
     require_superuser(ctx)?;
+
+    let organization = ctx
+        .db
+        .organization()
+        .id()
+        .find(&organization_id)
+        .ok_or("Organization not found")?;
+    if organization.id == 0 || organization.organization_id != organization.id {
+        return Err("Organization has invalid server-owned identity".to_string());
+    }
+
+    let platform_id = validate_platform_id(&platform_id)?;
 
     let service_name = service_name.trim().to_string();
     if service_name.is_empty() {
@@ -82,13 +106,13 @@ pub fn register_cold_tier_service_identity(
         .db
         .cold_tier_service_identity()
         .cold_tier_service_identity_by_name()
-        .filter(&service_name)
+        .filter(&(organization_id, service_name.clone()))
         .filter(|row| row.is_active)
         .collect();
     for row in active {
         ctx.db
             .cold_tier_service_identity()
-            .id()
+            .platform_id()
             .update(ColdTierServiceIdentity {
                 is_active: false,
                 retired_at: Some(ctx.timestamp),
@@ -99,7 +123,8 @@ pub fn register_cold_tier_service_identity(
     ctx.db
         .cold_tier_service_identity()
         .insert(ColdTierServiceIdentity {
-            id: 0,
+            platform_id,
+            organization_id,
             service_name,
             identity,
             is_active: true,
@@ -112,18 +137,33 @@ pub fn register_cold_tier_service_identity(
 }
 
 /// True if `ctx.sender()` is the currently-active registered identity for
-/// `service_name`. Cold-tier finalize reducers must check this before
+/// `(organization_id, service_name)`. Cold-tier finalize reducers must check this before
 /// trusting any caller-supplied checksum/version — the checksum only
 /// authenticates *which row*, never *who is allowed to delete it*.
 pub(crate) fn is_active_cold_tier_service_identity(
     ctx: &ReducerContext,
+    organization_id: u64,
     service_name: &str,
 ) -> bool {
     ctx.db
         .cold_tier_service_identity()
         .cold_tier_service_identity_by_name()
-        .filter(&service_name.to_string())
+        .filter(&(organization_id, service_name.to_string()))
         .any(|row| row.is_active && row.identity == ctx.sender())
+}
+
+fn validate_platform_id(platform_id: &str) -> Result<String, String> {
+    let platform_id = platform_id.trim();
+    if platform_id.is_empty() || platform_id.len() > 256 {
+        return Err("platform_id must contain 1..=256 characters".to_string());
+    }
+    if !platform_id
+        .bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+    {
+        return Err("platform_id must be an opaque platform identifier".to_string());
+    }
+    Ok(platform_id.to_string())
 }
 
 fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
@@ -140,4 +180,20 @@ fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
         );
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_platform_id;
+
+    #[test]
+    fn platform_binding_id_must_be_opaque_and_bounded() {
+        assert_eq!(
+            validate_platform_id(" platform-binding-01 ").as_deref(),
+            Some("platform-binding-01")
+        );
+        assert!(validate_platform_id("").is_err());
+        assert!(validate_platform_id("org/service").is_err());
+        assert!(validate_platform_id(&"x".repeat(257)).is_err());
+    }
 }

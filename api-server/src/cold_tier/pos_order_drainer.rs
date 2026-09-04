@@ -290,7 +290,7 @@ fn require_u64(row: &Value, field: &str) -> Result<u64> {
 /// Before this can finalize anything anywhere, a superuser must register
 /// this drainer's `STDB_SERVER_TOKEN` identity once, directly against
 /// SpacetimeDB (not through api-server's gateway):
-/// `register_cold_tier_service_identity(service_name: "pos_order_cold_drainer", identity: <this identity>)`
+/// `register_cold_tier_service_identity(organization_id, platform_id, service_name: "pos_order_cold_drainer", identity: <this identity>)`
 /// — same one-time setup `audit_drainer.rs` documents for its own service
 /// name.
 ///

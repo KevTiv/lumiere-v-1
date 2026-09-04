@@ -121,7 +121,7 @@ pub fn begin_organization_reconstruction(
     placement_generation: u64,
     target_watermark: u64,
 ) -> Result<(), String> {
-    require_reconstructor(ctx)?;
+    require_reconstructor(ctx, organization_id)?;
     validate_identity(
         organization_id,
         &run_id,
@@ -211,7 +211,7 @@ pub fn apply_organization_reconstruction_batch(
     is_last_batch: bool,
     rows_json: Vec<String>,
 ) -> Result<(), String> {
-    require_reconstructor(ctx)?;
+    require_reconstructor(ctx, organization_id)?;
     let params = ApplyOrganizationReconstructionBatchParams {
         organization_id,
         run_id,
@@ -326,7 +326,7 @@ pub fn fail_organization_reconstruction(
     run_id: String,
     failure: String,
 ) -> Result<(), String> {
-    require_reconstructor(ctx)?;
+    require_reconstructor(ctx, organization_id)?;
     let failure = failure.trim();
     if failure.is_empty() || failure.len() > 1024 {
         return Err("reconstruction failure must contain 1..=1024 characters".to_string());
@@ -348,7 +348,7 @@ pub fn complete_organization_reconstruction(
     placement_generation: u64,
     verified_watermark: u64,
 ) -> Result<(), String> {
-    require_reconstructor(ctx)?;
+    require_reconstructor(ctx, organization_id)?;
     let mut fence = exact_fence(ctx, organization_id, &run_id)?;
     if fence.state != ACTIVE
         || fence.placement_generation != placement_generation
@@ -493,8 +493,12 @@ fn exact_fence(
     Ok(fence)
 }
 
-fn require_reconstructor(ctx: &ReducerContext) -> Result<(), String> {
-    if !is_active_cold_tier_service_identity(ctx, ORGANIZATION_RECONSTRUCTOR_SERVICE) {
+fn require_reconstructor(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+    if !is_active_cold_tier_service_identity(
+        ctx,
+        organization_id,
+        ORGANIZATION_RECONSTRUCTOR_SERVICE,
+    ) {
         return Err("caller is not the registered organization reconstructor".to_string());
     }
     Ok(())

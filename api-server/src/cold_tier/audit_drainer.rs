@@ -35,7 +35,7 @@
 //! this drainer can finalize anything in a new environment, a superuser
 //! must call, once, directly against SpacetimeDB (not through api-server's
 //! gateway — `register_cold_tier_service_identity` is blocked there):
-//! `register_cold_tier_service_identity(service_name: "audit_cold_drainer", identity: <this drainer's STDB_SERVER_TOKEN identity>)`.
+//! `register_cold_tier_service_identity(organization_id, platform_id, service_name: "audit_cold_drainer", identity: <this drainer's STDB_SERVER_TOKEN identity>)`.
 
 use std::{
     net::SocketAddr,
