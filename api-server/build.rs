@@ -38,6 +38,38 @@ fn snake_to_pascal(table: &str) -> String {
         .collect()
 }
 
+fn row_type_path(
+    bindings_dir: &Path,
+    table: &str,
+    table_source: &str,
+) -> Result<std::path::PathBuf, String> {
+    let conventional = bindings_dir.join(format!("{table}_type.rs"));
+    if conventional.is_file() {
+        return Ok(conventional);
+    }
+
+    let imported_module = table_source.lines().find_map(|line| {
+        let import = line.trim().strip_prefix("use super::")?;
+        let (module, _) = import.split_once("::")?;
+        module.ends_with("_type").then_some(module)
+    });
+    let Some(imported_module) = imported_module else {
+        return Err(format!(
+            "resolve generated row type for table {table}: missing {} and no row-type import",
+            conventional.display()
+        ));
+    };
+
+    let imported = bindings_dir.join(format!("{imported_module}.rs"));
+    if !imported.is_file() {
+        return Err(format!(
+            "resolve generated row type for table {table}: missing {}",
+            imported.display()
+        ));
+    }
+    Ok(imported)
+}
+
 fn generate_contents(registry_path: &Path, bindings_dir: &Path) -> Result<String, String> {
     // Generated STDB bindings now live in the `lumiere-contracts` crate. This
     // build script still needs the raw per-table source text (not just the
@@ -71,7 +103,7 @@ fn generate_contents(registry_path: &Path, bindings_dir: &Path) -> Result<String
         }
         let tf = fs::read_to_string(&table_file)
             .map_err(|e| format!("read {}: {e}", table_file.display()))?;
-        let row_type_file = bindings_dir.join(format!("{table}_type.rs"));
+        let row_type_file = row_type_path(bindings_dir, table, &tf)?;
         let row_tf = fs::read_to_string(&row_type_file)
             .map_err(|e| format!("read {}: {e}", row_type_file.display()))?;
         let has_update = tf.contains("TableWithPrimaryKey");
@@ -249,7 +281,7 @@ mod tests {
         fs::create_dir_all(&bindings).unwrap();
         fs::write(
             root.join("registry.json"),
-            r#"{"z":{"table":"zeta"},"a":{"table":"alpha"}}"#,
+            r#"{"z":{"table":"zeta"},"a":{"table":"alpha"},"d":{"table":"doc_folder"}}"#,
         )
         .unwrap();
         for table in ["alpha", "zeta"] {
@@ -264,10 +296,21 @@ mod tests {
             )
             .unwrap();
         }
+        fs::write(
+            bindings.join("doc_folder_table.rs"),
+            "use super::document_folder_type::DocumentFolder;\npub trait DocFolderTableAccess {}",
+        )
+        .unwrap();
+        fs::write(
+            bindings.join("document_folder_type.rs"),
+            "pub company_id: u64",
+        )
+        .unwrap();
         let first = generate_contents(&root.join("registry.json"), &bindings).unwrap();
         let second = generate_contents(&root.join("registry.json"), &bindings).unwrap();
         assert_eq!(first, second);
         assert!(first.find("\"alpha\"").unwrap() < first.find("\"zeta\"").unwrap());
+        assert!(first.contains("\"doc_folder\""));
         let output = root.join("out.rs");
         write_if_changed(&output, first.as_bytes()).unwrap();
         let before = fs::metadata(&output).unwrap().modified().unwrap();
