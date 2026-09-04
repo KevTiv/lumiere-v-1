@@ -262,7 +262,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn unknown_missing_ownership_is_rejected() {
         let table = table("orders", None, false);
         assert!(table
@@ -324,12 +323,19 @@ mod tests {
 
     #[test]
     fn c0_validation_requires_463_direct_relations() {
-        let manifest = LumiereSchemaManifest {
+        let complete = LumiereSchemaManifest {
             version: 1,
             tables: vec![table("orders", Some((GeneratedType::U64, false)), true); 463],
             enum_types: vec![],
         };
-        let error = manifest
+        complete.validate_tenant_ownership().unwrap();
+
+        let incomplete = LumiereSchemaManifest {
+            version: 1,
+            tables: vec![table("orders", Some((GeneratedType::U64, false)), true); 462],
+            enum_types: vec![],
+        };
+        let error = incomplete
             .validate_tenant_ownership()
             .unwrap_err()
             .to_string();

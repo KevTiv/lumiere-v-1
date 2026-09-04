@@ -665,11 +665,6 @@ fn validate_c0_ownership(
         (OrganizationOwnership::PlatformGlobal, GeneratedTableOwnership::Organization) => bail!(
             "storage policy '{table_name}': platform-global ownership is outside the ERP manifest"
         ),
-        (declared, actual) => bail!(
-            "storage policy '{table_name}': declared organization ownership {:?} disagrees with C0 schema ownership {:?}",
-            declared,
-            actual
-        ),
     }
     Ok(())
 }
