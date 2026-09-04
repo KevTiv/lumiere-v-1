@@ -2036,29 +2036,32 @@ export function useReconcilePaymentWithInvoice(organizationId: number, companyId
   })
 }
 
-function invalidateAccountPaymentQueries(qc: ReturnType<typeof useQueryClient>, orgKey: string) {
-  void qc.invalidateQueries({ queryKey: ["stdb", "account-payments", orgKey] })
-  void qc.invalidateQueries({ queryKey: ["stdb", "account-payment-terms", orgKey] })
-  void qc.invalidateQueries({ queryKey: ["stdb", "account-payment-term-lines", orgKey] })
+function invalidateAccountPaymentQueries(
+  qc: ReturnType<typeof useQueryClient>,
+  organizationId: number,
+) {
+  invalidateStdbQueryResources(qc, organizationId, [
+    "account-payments",
+    "account-payment-terms",
+    "account-payment-term-lines",
+  ])
 }
 
 /** Draft customer/vendor payment — call {@link usePostAccountPayment} to post. */
 export function useCreateAccountPayment(organizationId: number) {
   const qc = useQueryClient()
-  const k = String(organizationId)
   return useMutation({
     mutationFn: async (params: CreatePaymentParams) => {
       const { urlPath, init } = stdbBffCommandPost("create_payment", { params: paymentParamsToJson(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () => invalidateAccountPaymentQueries(qc, k),
+    onSuccess: () => invalidateAccountPaymentQueries(qc, organizationId),
   })
 }
 
 export function usePostAccountPayment(organizationId: number) {
   const qc = useQueryClient()
-  const k = String(organizationId)
   return useMutation({
     mutationFn: async (paymentId: bigint) => {
       const { urlPath, init } = stdbBffCommandPost("post_payment", { paymentId: paymentId })
@@ -2066,15 +2069,14 @@ export function usePostAccountPayment(organizationId: number) {
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
-      invalidateAccountPaymentQueries(qc, k)
-      void qc.invalidateQueries({ queryKey: ["stdb", "account-moves", k] })
+      invalidateAccountPaymentQueries(qc, organizationId)
+      invalidateStdbQueryResources(qc, organizationId, ["account-moves"])
     },
   })
 }
 
 export function useCancelAccountPayment(organizationId: number) {
   const qc = useQueryClient()
-  const k = String(organizationId)
   return useMutation({
     mutationFn: async (paymentId: bigint) => {
       const { urlPath, init } = stdbBffCommandPost("cancel_payment", { paymentId: paymentId })
@@ -2082,8 +2084,8 @@ export function useCancelAccountPayment(organizationId: number) {
       if (!r.ok) throw new Error(await parseCallError(r))
     },
     onSuccess: () => {
-      invalidateAccountPaymentQueries(qc, k)
-      void qc.invalidateQueries({ queryKey: ["stdb", "account-moves", k] })
+      invalidateAccountPaymentQueries(qc, organizationId)
+      invalidateStdbQueryResources(qc, organizationId, ["account-moves"])
     },
   })
 }
@@ -2091,33 +2093,30 @@ export function useCancelAccountPayment(organizationId: number) {
 /** Link posted payment to invoice/bill move IDs (`isBill: true` for vendor bills). */
 export function useRegisterPaymentOnInvoice(organizationId: number) {
   const qc = useQueryClient()
-  const k = String(organizationId)
   return useMutation({
     mutationFn: async (args: { paymentId: bigint; invoiceIds: bigint[]; isBill: boolean }) => {
       const { urlPath, init } = stdbBffCommandPost("register_payment_on_invoice", { paymentId: args.paymentId, invoiceIds: args.invoiceIds, isBill: args.isBill })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () => invalidateAccountPaymentQueries(qc, k),
+    onSuccess: () => invalidateAccountPaymentQueries(qc, organizationId),
   })
 }
 
 export function useCreatePaymentTerm(organizationId: number) {
   const qc = useQueryClient()
-  const k = String(organizationId)
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
       const { urlPath, init } = stdbBffCommandPost("create_payment_term", { params: stdbParamsToJson(params as object, "CreatePaymentTermParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () => invalidateAccountPaymentQueries(qc, k),
+    onSuccess: () => invalidateAccountPaymentQueries(qc, organizationId),
   })
 }
 
 export function useUpdatePaymentTerm(organizationId: number) {
   const qc = useQueryClient()
-  const k = String(organizationId)
   return useMutation({
     mutationFn: async (args: {
       termId: bigint
@@ -2134,39 +2133,36 @@ export function useUpdatePaymentTerm(organizationId: number) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () => invalidateAccountPaymentQueries(qc, k),
+    onSuccess: () => invalidateAccountPaymentQueries(qc, organizationId),
   })
 }
 
 export function useDeletePaymentTerm(organizationId: number) {
   const qc = useQueryClient()
-  const k = String(organizationId)
   return useMutation({
     mutationFn: async (termId: bigint) => {
       const { urlPath, init } = stdbBffCommandPost("delete_payment_term", { termId: termId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () => invalidateAccountPaymentQueries(qc, k),
+    onSuccess: () => invalidateAccountPaymentQueries(qc, organizationId),
   })
 }
 
 export function useCreatePaymentTermLine(organizationId: number) {
   const qc = useQueryClient()
-  const k = String(organizationId)
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
       const { urlPath, init } = stdbBffCommandPost("create_payment_term_line", { params: stdbParamsToJson(params as object, "CreatePaymentTermLineParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () => invalidateAccountPaymentQueries(qc, k),
+    onSuccess: () => invalidateAccountPaymentQueries(qc, organizationId),
   })
 }
 
 export function useUpdatePaymentTermLine(organizationId: number) {
   const qc = useQueryClient()
-  const k = String(organizationId)
   return useMutation({
     mutationFn: async (args: {
       lineId: bigint
@@ -2181,20 +2177,19 @@ export function useUpdatePaymentTermLine(organizationId: number) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () => invalidateAccountPaymentQueries(qc, k),
+    onSuccess: () => invalidateAccountPaymentQueries(qc, organizationId),
   })
 }
 
 export function useDeletePaymentTermLine(organizationId: number) {
   const qc = useQueryClient()
-  const k = String(organizationId)
   return useMutation({
     mutationFn: async (lineId: bigint) => {
       const { urlPath, init } = stdbBffCommandPost("delete_payment_term_line", { lineId: lineId })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () => invalidateAccountPaymentQueries(qc, k),
+    onSuccess: () => invalidateAccountPaymentQueries(qc, organizationId),
   })
 }
 
