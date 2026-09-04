@@ -169,7 +169,10 @@ pub mod integrations_tests;
 pub mod data_ops_tests;
 
 use crate::core::migrations::apply_pending_global_migrations;
-use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
+use crate::core::users::{
+    ensure_user_profile_for_organization, user_organization, user_profile, user_session,
+    UserProfile, UserSession,
+};
 use crate::crm::presence::opportunity_presence;
 use crate::proposals::proposals::proposal_presence;
 
@@ -224,7 +227,9 @@ pub fn init(ctx: &ReducerContext) {
 }
 
 /// Called every time a client connects.
-/// Creates a minimal UserProfile on first connection; updates `last_login` otherwise.
+/// Updates the organization-owned profile on connection. A newly provisioned
+/// identity has no ERP profile until it joins its first organization; this
+/// prevents a shared/sentinel global profile row from being created.
 #[spacetimedb::reducer(client_connected)]
 pub fn identity_connected(ctx: &ReducerContext) {
     if let Some(profile) = ctx.db.user_profile().identity().find(ctx.sender()) {
@@ -233,29 +238,21 @@ pub fn identity_connected(ctx: &ReducerContext) {
             updated_at: ctx.timestamp,
             ..profile
         });
-    } else {
-        ctx.db.user_profile().insert(UserProfile {
-            identity: ctx.sender(),
-            email: String::new(),
-            email_verified: false,
-            name: String::new(),
-            first_name: None,
-            last_name: None,
-            avatar_url: None,
-            phone: None,
-            mobile: None,
-            timezone: "UTC".to_string(),
-            language: "en".to_string(),
-            signature: None,
-            notification_preferences: None,
-            ui_preferences: None,
-            is_active: true,
-            is_superuser: false,
-            created_at: ctx.timestamp,
-            updated_at: ctx.timestamp,
-            last_login: Some(ctx.timestamp),
-            metadata: None,
-        });
+    } else if let Some(membership) = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|membership| membership.is_active && membership.is_default)
+        .or_else(|| {
+            ctx.db
+                .user_organization()
+                .user_org_by_user()
+                .filter(&ctx.sender())
+                .find(|membership| membership.is_active)
+        })
+    {
+        ensure_user_profile_for_organization(ctx, ctx.sender(), membership.organization_id);
     }
 }
 

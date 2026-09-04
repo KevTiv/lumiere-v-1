@@ -60,6 +60,7 @@ fn base_contact_params(name: &str, company_id: u64, tax_id: Option<String>) -> C
 }
 
 pub fn test_opportunity_presence_upsert_and_clear(ctx: &ReducerContext) -> Result<(), String> {
+    let fixture = OrgFixture::seed_minimal(ctx)?;
     ensure_test_superuser(ctx)?;
     let caller_profile = ctx
         .db
@@ -72,7 +73,6 @@ pub fn test_opportunity_presence_upsert_and_clear(ctx: &ReducerContext) -> Resul
         updated_at: ctx.timestamp,
         ..caller_profile
     });
-    let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
 

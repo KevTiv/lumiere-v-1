@@ -879,6 +879,7 @@ fn seed_member(
     let identity = new_identity(ctx);
     ctx.db.user_profile().insert(UserProfile {
         identity,
+        organization_id: fixture.organization_id,
         email: format!("{}@human-task.test", identity.to_hex()),
         email_verified: true,
         name: "Human task actor".to_string(),

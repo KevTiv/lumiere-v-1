@@ -32,7 +32,8 @@ use crate::core::reference::{
     Currency, CurrencyRate, DocumentSequence, UOMCategory, UOMConversion, UOM,
 };
 use crate::core::users::{
-    user_organization, user_profile, user_session, UserOrganization, UserProfile, UserSession,
+    ensure_user_profile_for_organization, user_organization, user_profile, user_session,
+    UserOrganization, UserProfile, UserSession,
 };
 use crate::core::utm::{utm_campaign, utm_medium, utm_source, UtmCampaign, UtmMedium, UtmSource};
 
@@ -1001,41 +1002,8 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     // TIER 1 — FOUNDATION
     // =========================================================================
 
-    // ── 1.1 UserProfile (already auto-created by identity_connected; promote) ─
-    if let Some(profile) = ctx.db.user_profile().identity().find(seeder) {
-        ctx.db.user_profile().identity().update(UserProfile {
-            name: "Seed Admin".to_string(),
-            email: "seed@lumiere.demo".to_string(),
-            first_name: Some("Seed".to_string()),
-            last_name: Some("Admin".to_string()),
-            is_superuser: true,
-            updated_at: ctx.timestamp,
-            ..profile
-        });
-    } else {
-        ctx.db.user_profile().insert(UserProfile {
-            identity: seeder,
-            email: "seed@lumiere.demo".to_string(),
-            email_verified: false,
-            name: "Seed Admin".to_string(),
-            first_name: Some("Seed".to_string()),
-            last_name: Some("Admin".to_string()),
-            avatar_url: None,
-            phone: None,
-            mobile: None,
-            timezone: "America/New_York".to_string(),
-            language: "en".to_string(),
-            signature: None,
-            notification_preferences: None,
-            ui_preferences: None,
-            is_active: true,
-            is_superuser: true,
-            created_at: ctx.timestamp,
-            updated_at: ctx.timestamp,
-            last_login: Some(ctx.timestamp),
-            metadata: Some("{\"seed\":true}".to_string()),
-        });
-    }
+    // UserProfile is materialized after the organization and owner membership
+    // exist below; no shared/sentinel profile is created during bootstrap.
 
     // ── 1.2 Currencies (bootstrap catalog; tenant ownership is assigned below) ─
     // ── 1.3 Organization ──────────────────────────────────────────────────────
@@ -1149,6 +1117,18 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         is_default: true,
         metadata: Some("{\"seed\":true}".to_string()),
     });
+    ensure_user_profile_for_organization(ctx, seeder, org_id);
+    if let Some(profile) = ctx.db.user_profile().identity().find(seeder) {
+        ctx.db.user_profile().identity().update(UserProfile {
+            email: "seed@lumiere.demo".to_string(),
+            name: "Seed Admin".to_string(),
+            first_name: Some("Seed".to_string()),
+            last_name: Some("Admin".to_string()),
+            is_superuser: true,
+            updated_at: ctx.timestamp,
+            ..profile
+        });
+    }
 
     // ── 1.6 UserRoleAssignment ────────────────────────────────────────────────
     ctx.db.user_role_assignment().insert(UserRoleAssignment {
@@ -11274,7 +11254,9 @@ pub fn ensure_dev_admin(ctx: &ReducerContext) -> Result<(), String> {
         org_id
     );
 
-    // Mark profile as superuser (parity with seed_dev_data admin / dev_promote_caller_superuser)
+    // Materialize the ERP profile only after the validated membership exists,
+    // then mark it as superuser (parity with seed_dev_data).
+    ensure_user_profile_for_organization(ctx, caller, org_id);
     if let Some(profile) = ctx.db.user_profile().identity().find(caller) {
         if !profile.is_superuser {
             ctx.db.user_profile().identity().update(UserProfile {
@@ -11283,29 +11265,6 @@ pub fn ensure_dev_admin(ctx: &ReducerContext) -> Result<(), String> {
                 ..profile
             });
         }
-    } else {
-        ctx.db.user_profile().insert(UserProfile {
-            identity: caller,
-            email: String::new(),
-            email_verified: false,
-            name: String::new(),
-            first_name: None,
-            last_name: None,
-            avatar_url: None,
-            phone: None,
-            mobile: None,
-            timezone: "UTC".to_string(),
-            language: "en".to_string(),
-            signature: None,
-            notification_preferences: None,
-            ui_preferences: None,
-            is_active: true,
-            is_superuser: true,
-            created_at: ctx.timestamp,
-            updated_at: ctx.timestamp,
-            last_login: Some(ctx.timestamp),
-            metadata: Some("{\"ensure_dev_admin\":true}".to_string()),
-        });
     }
 
     Ok(())

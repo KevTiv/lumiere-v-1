@@ -10,18 +10,26 @@
 /// The `update_user_email` reducer is called by the connected client after sign-up.
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
-use crate::core::users::{user_organization, user_profile, UserProfile};
+use crate::core::users::{
+    ensure_user_profile_for_organization, user_organization, user_profile, UserProfile,
+};
 use crate::helpers::{write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
 // TABLES (private — NO `public` flag)
 // ============================================================================
 
-#[spacetimedb::table(accessor = user_credential)]
+#[spacetimedb::table(
+    accessor = user_credential,
+    index(accessor = user_credential_by_organization, btree(columns = [organization_id]))
+)]
 pub struct UserCredential {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Owning organization, assigned from validated membership by the server
+    /// reducer path. This is not client-editable credential data.
+    pub organization_id: u64,
     /// Email is the login key. Unique across all users.
     #[unique]
     pub email: String,
@@ -59,11 +67,17 @@ pub struct UserInvite {
     pub accepted_at: Option<Timestamp>,
 }
 
-#[spacetimedb::table(accessor = password_reset_token)]
+#[spacetimedb::table(
+    accessor = password_reset_token,
+    index(accessor = reset_token_by_organization, btree(columns = [organization_id]))
+)]
 pub struct PasswordResetToken {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    /// Organization ownership is copied from the target identity's validated
+    /// active membership when the token is created.
+    pub organization_id: u64,
     pub identity: Identity,
     /// SHA-256 hash of the plaintext reset token.
     pub token_hash: String,
@@ -127,6 +141,13 @@ pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> 
     require_dev_reducers_enabled()?;
 
     let sender = ctx.sender();
+    let organization_id = audit_organization_for_identity(ctx, sender);
+    if organization_id == 0 {
+        return Err(
+            "Caller must belong to an organization before an ERP profile can be created"
+                .to_string(),
+        );
+    }
     if let Some(profile) = ctx.db.user_profile().identity().find(sender) {
         if profile.is_superuser {
             return Ok(());
@@ -138,7 +159,7 @@ pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> 
         });
         write_audit_log_v2(
             ctx,
-            audit_organization_for_identity(ctx, sender),
+            organization_id,
             AuditLogParams {
                 company_id: None,
                 table_name: "user_profile",
@@ -159,6 +180,7 @@ pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> 
     } else {
         ctx.db.user_profile().insert(UserProfile {
             identity: sender,
+            organization_id,
             email: String::new(),
             email_verified: false,
             name: String::new(),
@@ -203,39 +225,27 @@ pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> 
     Ok(())
 }
 
-/// Ensure a `UserProfile` exists for HTTP-provisioned identities (E2E seed, sign-up).
-/// `identity_connected` only runs on WebSocket connect; BFF-only users need this path.
+/// Ensure a `UserProfile` exists for HTTP-provisioned identities (E2E seed,
+/// sign-up). A profile is an ERP row, so the identity must already have a
+/// validated organization membership before it can be materialized.
 fn ensure_user_profile_for_identity(
     ctx: &ReducerContext,
     identity: Identity,
     email: String,
     email_verified: bool,
 ) {
-    if ctx.db.user_profile().identity().find(identity).is_some() {
+    let organization_id = audit_organization_for_identity(ctx, identity);
+    if organization_id == 0 {
         return;
     }
-    ctx.db.user_profile().insert(UserProfile {
-        identity,
-        email,
-        email_verified,
-        name: String::new(),
-        first_name: None,
-        last_name: None,
-        avatar_url: None,
-        phone: None,
-        mobile: None,
-        timezone: "UTC".to_string(),
-        language: "en".to_string(),
-        signature: None,
-        notification_preferences: None,
-        ui_preferences: None,
-        is_active: true,
-        is_superuser: false,
-        created_at: ctx.timestamp,
-        updated_at: ctx.timestamp,
-        last_login: Some(ctx.timestamp),
-        metadata: None,
-    });
+    ensure_user_profile_for_organization(ctx, identity, organization_id);
+    if let Some(profile) = ctx.db.user_profile().identity().find(identity) {
+        ctx.db.user_profile().identity().update(UserProfile {
+            email,
+            email_verified,
+            ..profile
+        });
+    }
 }
 
 // ============================================================================
@@ -259,6 +269,11 @@ pub fn store_user_credential(
 ) -> Result<(), String> {
     require_superuser(ctx)?;
 
+    let organization_id = audit_organization_for_identity(ctx, new_identity);
+    if organization_id == 0 {
+        return Err("Credential identity must belong to an organization".to_string());
+    }
+
     // Guard against duplicate email (server already checks, but belt-and-suspenders)
     if ctx.db.user_credential().email().find(&email).is_some() {
         return Err("Email already registered".to_string());
@@ -276,6 +291,7 @@ pub fn store_user_credential(
     let profile_email = email.clone();
     let row = ctx.db.user_credential().insert(UserCredential {
         id: 0,
+        organization_id,
         email,
         identity: new_identity,
         password_hash,
@@ -290,7 +306,7 @@ pub fn store_user_credential(
 
     write_audit_log_v2(
         ctx,
-        audit_organization_for_identity(ctx, new_identity),
+        organization_id,
         AuditLogParams {
             company_id: None,
             table_name: "user_credential",
@@ -324,6 +340,11 @@ pub fn store_sso_user_credential(
 ) -> Result<(), String> {
     require_superuser(ctx)?;
 
+    let organization_id = audit_organization_for_identity(ctx, new_identity);
+    if organization_id == 0 {
+        return Err("Credential identity must belong to an organization".to_string());
+    }
+
     if email.is_empty() || workos_user_id.is_empty() {
         return Err("Email and WorkOS user id are required".to_string());
     }
@@ -353,6 +374,7 @@ pub fn store_sso_user_credential(
     let profile_email = email.clone();
     let row = ctx.db.user_credential().insert(UserCredential {
         id: 0,
+        organization_id,
         email,
         identity: new_identity,
         password_hash: String::new(),
@@ -367,7 +389,7 @@ pub fn store_sso_user_credential(
 
     write_audit_log_v2(
         ctx,
-        audit_organization_for_identity(ctx, new_identity),
+        organization_id,
         AuditLogParams {
             company_id: None,
             table_name: "user_credential",
@@ -601,8 +623,14 @@ pub fn create_password_reset_token(
 ) -> Result<(), String> {
     require_superuser(ctx)?;
 
+    let organization_id = audit_organization_for_identity(ctx, target_identity);
+    if organization_id == 0 {
+        return Err("Reset-token identity must belong to an organization".to_string());
+    }
+
     let row = ctx.db.password_reset_token().insert(PasswordResetToken {
         id: 0,
+        organization_id,
         identity: target_identity,
         token_hash,
         expires_at,
@@ -611,7 +639,7 @@ pub fn create_password_reset_token(
 
     write_audit_log_v2(
         ctx,
-        audit_organization_for_identity(ctx, target_identity),
+        organization_id,
         AuditLogParams {
             company_id: None,
             table_name: "password_reset_token",
@@ -655,7 +683,7 @@ pub fn mark_reset_token_used(ctx: &ReducerContext, token_id: u64) -> Result<(), 
 
     write_audit_log_v2(
         ctx,
-        audit_organization_for_identity(ctx, token.identity),
+        token.organization_id,
         AuditLogParams {
             company_id: None,
             table_name: "password_reset_token",
@@ -690,6 +718,17 @@ pub fn update_user_email(
         .identity()
         .find(ctx.sender())
         .ok_or("UserProfile not found — connect first")?;
+    if !ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .any(|membership| {
+            membership.organization_id == profile.organization_id && membership.is_active
+        })
+    {
+        return Err("User profile has no active organization membership".to_string());
+    }
 
     ctx.db.user_profile().identity().update(UserProfile {
         email: email.clone(),

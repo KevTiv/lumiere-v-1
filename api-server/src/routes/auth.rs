@@ -591,10 +591,13 @@ async fn accept_invite(
     let client = state.client_with_token(admin);
 
     let email = body.email.trim().to_lowercase();
-    let (member_identity, stdb_token) =
+    let role_name = get_role_name_in_organization(&state, invite.role_id, invite.organization_id)
+        .await?
+        .ok_or_else(|| ApiError::BadRequest("Invite role not found".into()))?;
+    let (member_identity, stdb_token, new_credential) =
         if let Some(existing) = find_credential_by_email(&state, &email).await? {
             let tok = decrypt_token(key, &existing.stdb_token_enc)?;
-            (existing.identity_hex, tok)
+            (existing.identity_hex, tok, None)
         } else {
             let (identity, token) = state
                 .stdb
@@ -604,25 +607,11 @@ async fn accept_invite(
             let password_hash = bcrypt::hash(body.password.as_str(), bcrypt::DEFAULT_COST)
                 .map_err(|e| ApiError::Internal(e.to_string()))?;
             let token_enc = encrypt_token(key, &token)?;
-            client
-                .call_reducer(stdb_client::reducer_call!(
-                    "store_user_credential",
-                    json!([
-                        identity_json_for_reducer_call(&identity),
-                        email,
-                        password_hash,
-                        token_enc
-                    ]),
-                ))
-                .await
-                .map_err(|e| ApiError::Internal(e.to_string()))?;
-            (identity, token)
+            (identity, token, Some((password_hash, token_enc)))
         };
 
-    let role_name = get_role_name_in_organization(&state, invite.role_id, invite.organization_id)
-        .await?
-        .ok_or_else(|| ApiError::BadRequest("Invite role not found".into()))?;
-
+    // Establish the validated organization membership before materializing the
+    // organization-owned credential/profile rows.
     client
         .call_reducer(stdb_client::reducer_call!(
             "add_org_member",
@@ -643,6 +632,21 @@ async fn accept_invite(
         ))
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    if let Some((password_hash, token_enc)) = new_credential {
+        client
+            .call_reducer(stdb_client::reducer_call!(
+                "store_user_credential",
+                json!([
+                    identity_json_for_reducer_call(&member_identity),
+                    email,
+                    password_hash,
+                    token_enc
+                ]),
+            ))
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+    }
 
     client
         .call_reducer(stdb_client::reducer_call!(

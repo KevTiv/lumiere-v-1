@@ -43,13 +43,13 @@ use crate::core::organization::{
     company, create_company, insert_organization_with_owner, organization, organization_settings,
     CreateCompanyParams, CreateOrganizationParams, OrganizationSettings,
 };
-use crate::crm::CRM_MULTI_COMPANY_FLAG;
 use crate::core::reference::{
     create_currency, create_uom, create_uom_category, currency, seed_currency_for_organization,
     uom, uom_cat, CreateCurrencyParams, CreateUomCategoryParams, CreateUomParams,
 };
 use crate::core::users::{user_profile, UserProfile};
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
+use crate::crm::CRM_MULTI_COMPANY_FLAG;
 use crate::inventory::product::{create_product, product, CreateProductParams};
 use crate::inventory::product_category::{
     create_product_category, product_category, CreateProductCategoryParams,
@@ -840,9 +840,7 @@ fn seed_distinctive_currency(
     ctx.db
         .currency()
         .iter()
-        .find(|currency| {
-            currency.organization_id == organization_id && currency.code == codes[1]
-        })
+        .find(|currency| currency.organization_id == organization_id && currency.code == codes[1])
         .map(|row| row.id)
         .ok_or("Harness: purchasing currency missing after create".into())
 }
@@ -1548,29 +1546,6 @@ pub fn ensure_test_superuser(ctx: &ReducerContext) -> Result<(), String> {
         ctx.db.user_profile().identity().update(UserProfile {
             is_superuser: true,
             ..profile
-        });
-    } else {
-        ctx.db.user_profile().insert(UserProfile {
-            identity: ctx.sender(),
-            email: "harness@test.local".to_string(),
-            email_verified: false,
-            name: "Harness Tester".to_string(),
-            first_name: Some("Harness".to_string()),
-            last_name: Some("Tester".to_string()),
-            avatar_url: None,
-            phone: None,
-            mobile: None,
-            timezone: "UTC".to_string(),
-            language: "en".to_string(),
-            signature: None,
-            notification_preferences: None,
-            ui_preferences: None,
-            is_active: true,
-            is_superuser: true,
-            created_at: ctx.timestamp,
-            updated_at: ctx.timestamp,
-            last_login: Some(ctx.timestamp),
-            metadata: Some(r#"{"harness":true}"#.to_string()),
         });
     }
     Ok(())

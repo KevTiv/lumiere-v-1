@@ -80,6 +80,24 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
             profile.name
         ));
     }
+    if profile.organization_id != org.id {
+        return Err(format!(
+            "Profile organization mismatch: expected {}, got {}",
+            org.id, profile.organization_id
+        ));
+    }
+    let scoped_profiles: Vec<_> = ctx
+        .db
+        .user_profile()
+        .user_profile_by_organization()
+        .filter(&org.id)
+        .collect();
+    if !scoped_profiles
+        .iter()
+        .any(|candidate| candidate.identity == ctx.sender())
+    {
+        return Err("Organization-leading profile index omitted the caller".to_string());
+    }
 
     if profile.first_name != Some("Test".to_string()) {
         return Err("First name not updated".to_string());

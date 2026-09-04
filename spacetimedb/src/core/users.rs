@@ -1,8 +1,9 @@
 /// User Management & Authentication
 ///
 /// Tables:  UserProfile · UserOrganization · UserSession
-/// Pattern: UserProfile is keyed by SpacetimeDB `Identity` (auto-created on
-///          first connect). UserOrganization links a user to an org+role.
+/// Pattern: UserProfile is keyed by the opaque SpacetimeDB `Identity` and is
+///          stamped with the owning organization. UserOrganization links a
+///          user to an org+role.
 ///          UserSession tracks active client connections.
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
@@ -84,10 +85,16 @@ pub struct CreateUserSessionParams {
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
-#[spacetimedb::table(accessor = user_profile, public)]
+#[spacetimedb::table(
+    accessor = user_profile,
+    index(accessor = user_profile_by_organization, btree(columns = [organization_id]))
+)]
 pub struct UserProfile {
     #[primary_key]
     pub identity: Identity,
+    /// Organization ownership is assigned from the caller's validated
+    /// membership. It is never accepted from profile update parameters.
+    pub organization_id: u64,
     pub email: String,
     pub email_verified: bool,
     pub name: String,
@@ -174,6 +181,42 @@ fn audit_organization_for_identity(ctx: &ReducerContext, identity: Identity) -> 
         .unwrap_or(0)
 }
 
+/// Insert the organization-owned profile for an identity after membership has
+/// been established. Identity-connected users who have not completed tenant
+/// onboarding do not yet have an ERP profile row.
+pub(crate) fn ensure_user_profile_for_organization(
+    ctx: &ReducerContext,
+    identity: Identity,
+    organization_id: u64,
+) {
+    if ctx.db.user_profile().identity().find(identity).is_some() {
+        return;
+    }
+    ctx.db.user_profile().insert(UserProfile {
+        identity,
+        organization_id,
+        email: String::new(),
+        email_verified: false,
+        name: String::new(),
+        first_name: None,
+        last_name: None,
+        avatar_url: None,
+        phone: None,
+        mobile: None,
+        timezone: "UTC".to_string(),
+        language: "en".to_string(),
+        signature: None,
+        notification_preferences: None,
+        ui_preferences: None,
+        is_active: true,
+        is_superuser: false,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        last_login: Some(ctx.timestamp),
+        metadata: None,
+    });
+}
+
 /// Update the calling user's own profile fields.
 /// Clients cannot change `is_active` or `is_superuser` through this reducer.
 #[spacetimedb::reducer]
@@ -187,6 +230,17 @@ pub fn update_user_profile(
         .identity()
         .find(ctx.sender())
         .ok_or("User profile not found")?;
+    if !ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .any(|membership| {
+            membership.organization_id == profile.organization_id && membership.is_active
+        })
+    {
+        return Err("User profile has no active organization membership".to_string());
+    }
 
     let updated_name = params.name.unwrap_or(profile.name.clone());
     let updated_first_name = params.first_name.or(profile.first_name.clone());

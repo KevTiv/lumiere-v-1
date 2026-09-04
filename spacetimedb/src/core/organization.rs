@@ -6,14 +6,15 @@
 use spacetimedb::rand::Rng;
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::permissions::{role, user_role_assignment, Role, UserRoleAssignment};
 use crate::core::country_pack::seed_country_pack_catalog_for_organization;
+use crate::core::permissions::{role, user_role_assignment, Role, UserRoleAssignment};
 use crate::core::reference::{
     require_active_currency_by_id, require_active_currency_for_organization,
     seed_currency_for_organization,
 };
-use crate::core::users::user_profile;
-use crate::core::users::{user_organization, UserOrganization};
+use crate::core::users::{
+    ensure_user_profile_for_organization, user_organization, user_profile, UserOrganization,
+};
 use crate::crm::activities::{activity_type, ActivityType};
 use crate::forms::migrations::run_seed_organization_form_configs;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
@@ -366,6 +367,7 @@ pub(crate) fn insert_organization_with_owner(
         is_default: true,
         metadata: Some("{\"bootstrap\":true}".to_string()),
     });
+    ensure_user_profile_for_organization(ctx, ctx.sender(), org.id);
 
     Ok((org, owner_role))
 }
