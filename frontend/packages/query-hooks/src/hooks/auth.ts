@@ -699,8 +699,20 @@ export function useUpdateUserProfile(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = stdbBffCommandPost("update_user_profile", { params: stdbParamsToJson(params) })
-      const r = await apiFetch(urlPath, init)
+      // Profile/email truth lives in platform-control PostgreSQL. Keep the
+      // session reducer out of this path so an authenticated client cannot
+      // create a projection that diverges from the canonical profile.
+      const r = await apiFetch("/api/auth/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: params.name,
+          firstName: params.firstName,
+          lastName: params.lastName,
+          timezone: params.timezone,
+          language: params.language ?? params.locale,
+        }),
+      })
       if (!r.ok) throw new Error('Failed to update user profile')
     },
     onSuccess: async () => {
@@ -794,12 +806,18 @@ export function useUpdateUserEmail(organizationId: bigint) {
     Error,
     {
       email: string
-      emailVerified: boolean
-    }
+    emailVerified: boolean
+  }
   >({
     mutationFn: async ({ email, emailVerified }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_user_email", { email: email.trim(), emailVerified: emailVerified })
-      const r = await apiFetch(urlPath, init)
+      // Email truth is platform-control data. The API deliberately ignores
+      // client-supplied verification state and clears it until the provider
+      // confirms the new address.
+      const r = await apiFetch("/api/auth/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), emailVerified }),
+      })
       if (!r.ok) throw new Error('Failed to update user email')
     },
     onSuccess: async () => {

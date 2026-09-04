@@ -314,11 +314,11 @@ pub fn test_platform_bindings_and_reference_isolation(ctx: &ReducerContext) -> R
     bind_user_profile(ctx, "platform-user-a".to_string(), target_identity)?;
     ctx.db.user_organization().id().update(UserOrganization {
         is_default: false,
-        ..membership_a
+        ..membership_a.clone()
     });
     ctx.db.user_organization().id().update(UserOrganization {
         is_default: true,
-        ..membership_b
+        ..membership_b.clone()
     });
     bind_user_profile(ctx, "platform-user-b".to_string(), target_identity)?;
 
@@ -351,11 +351,11 @@ pub fn test_platform_bindings_and_reference_isolation(ctx: &ReducerContext) -> R
     )?;
     ctx.db.user_organization().id().update(UserOrganization {
         is_default: true,
-        ..membership_a
+        ..membership_a.clone()
     });
     ctx.db.user_organization().id().update(UserOrganization {
         is_default: false,
-        ..membership_b
+        ..membership_b.clone()
     });
     bind_user_credential(
         ctx,
@@ -391,11 +391,11 @@ pub fn test_platform_bindings_and_reference_isolation(ctx: &ReducerContext) -> R
     )?;
     ctx.db.user_organization().id().update(UserOrganization {
         is_default: true,
-        ..membership_b
+        ..membership_b.clone()
     });
     ctx.db.user_organization().id().update(UserOrganization {
         is_default: false,
-        ..membership_a
+        ..membership_a.clone()
     });
     bind_password_reset_token(
         ctx,

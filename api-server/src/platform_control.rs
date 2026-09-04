@@ -528,6 +528,53 @@ pub async fn update_user_profile(
     Ok(changed == 1)
 }
 
+/// Update the canonical account email in one transaction. Email changes are
+/// deliberately platform-scoped because both credentials and profile rows
+/// carry the display value. Verification is cleared whenever the address is
+/// changed; a separate provider callback must establish verification.
+pub async fn update_user_email(
+    pool: &Pool,
+    platform_user_id: &PlatformId,
+    email: &str,
+) -> Result<bool> {
+    let mut client = pool
+        .get()
+        .await
+        .context("get PG client to update user email")?;
+    let transaction = client
+        .transaction()
+        .await
+        .context("begin user email transaction")?;
+    let credential_changed = transaction
+        .execute(
+            "UPDATE lumiere_platform.user_credential SET email = $2, email_verified = false, updated_at = now() \
+             WHERE platform_user_id = $1",
+            &[&platform_user_id.as_str(), &email],
+        )
+        .await
+        .context("update platform credential email")?;
+    let profile_changed = transaction
+        .execute(
+            "UPDATE lumiere_platform.user_profile SET email = $2, email_verified = false, updated_at = now() \
+             WHERE platform_user_id = $1",
+            &[&platform_user_id.as_str(), &email],
+        )
+        .await
+        .context("update platform profile email")?;
+    if credential_changed != 1 || profile_changed != 1 {
+        transaction
+            .rollback()
+            .await
+            .context("rollback incomplete user email update")?;
+        return Ok(false);
+    }
+    transaction
+        .commit()
+        .await
+        .context("commit user email transaction")?;
+    Ok(true)
+}
+
 /// Insert a hashed reset token for one platform user.
 pub async fn insert_password_reset_token(
     pool: &Pool,

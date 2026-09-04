@@ -20,6 +20,7 @@ const GATEWAY_PREFIXES = [
   '/api/auth/invite',
   '/api/auth/accept-invite',
   '/api/auth/forgot-password',
+  '/api/auth/profile',
   '/api/auth/reset-password',
   '/api/crm/',
   '/api/sales/',

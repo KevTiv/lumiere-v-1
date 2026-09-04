@@ -331,6 +331,105 @@ pub fn bind_user_profile(
     Ok(())
 }
 
+/// Project canonical platform-control profile fields into one organization
+/// binding. This reducer is intentionally operator-only: clients must use the
+/// authenticated API profile route, which updates PostgreSQL first and then
+/// invokes this reducer with the server-resolved organization and identity.
+///
+/// The organization and identity guards prevent a trusted caller from
+/// accidentally writing a profile into a different tenant or to a user who is
+/// not an active member of that tenant.
+#[spacetimedb::reducer]
+pub fn project_user_profile(
+    ctx: &ReducerContext,
+    user_identity: Identity,
+    organization_id: u64,
+    email: String,
+    email_verified: bool,
+    name: String,
+    first_name: Option<String>,
+    last_name: Option<String>,
+    timezone: String,
+    language: String,
+) -> Result<(), String> {
+    require_superuser(ctx)?;
+    let membership_is_active = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&user_identity)
+        .any(|membership| membership.organization_id == organization_id && membership.is_active);
+    if !membership_is_active {
+        return Err("Profile identity is not an active organization member".to_string());
+    }
+
+    let profile = find_user_profile_for_organization(ctx, user_identity, organization_id)
+        .ok_or("User profile not found")?;
+    let profile_id = profile.id;
+    let old_name = profile.name.clone();
+    let old_timezone = profile.timezone.clone();
+    let old_language = profile.language.clone();
+    let old_email = profile.email.clone();
+    ctx.db.user_profile().id().update(UserProfile {
+        email: email.clone(),
+        email_verified,
+        name: name.clone(),
+        first_name,
+        last_name,
+        timezone: timezone.clone(),
+        language: language.clone(),
+        updated_at: ctx.timestamp,
+        ..profile
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "user_profile",
+            record_id: profile_id,
+            action: "UPDATE",
+            old_values: Some(
+                serde_json::json!({
+                    "email": old_email,
+                    "name": old_name,
+                    "timezone": old_timezone,
+                    "language": old_language,
+                })
+                .to_string(),
+            ),
+            new_values: Some(
+                serde_json::json!({
+                    "email": email,
+                    "name": name,
+                    "timezone": timezone,
+                    "language": language,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "email".to_string(),
+                "email_verified".to_string(),
+                "name".to_string(),
+                "first_name".to_string(),
+                "last_name".to_string(),
+                "timezone".to_string(),
+                "language".to_string(),
+            ],
+            metadata: Some(
+                serde_json::json!({
+                    "identity": user_identity.to_hex().to_string(),
+                    "source": "platform_control",
+                })
+                .to_string(),
+            ),
+        },
+    );
+
+    Ok(())
+}
+
 /// Project reset-token metadata into the target user's organization shard.
 /// The secret hash remains exclusively in platform-control PostgreSQL.
 #[spacetimedb::reducer]

@@ -64,6 +64,7 @@ struct SignInBody {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ProfileUpdateBody {
+    email: Option<String>,
     name: Option<String>,
     first_name: Option<String>,
     last_name: Option<String>,
@@ -111,7 +112,7 @@ async fn profile_update(
     let session = resolve_session(&state, &headers, &cookies)
         .await?
         .ok_or(ApiError::Unauthorized)?;
-    require_org(&session)?;
+    let organization_id = require_org(&session)?;
     let pool = pg_pool::shared_pool().ok_or_else(|| {
         ApiError::Unavailable("platform authentication storage is unavailable".into())
     })?;
@@ -122,6 +123,18 @@ async fn profile_update(
     let platform_id = profile.get::<_, String>("platform_user_id");
     let platform_id =
         PlatformId::new(platform_id).map_err(|e| ApiError::Internal(e.to_string()))?;
+    if let Some(email) = body.email.as_deref() {
+        let email = email.trim().to_lowercase();
+        if email.is_empty() || !email.contains('@') {
+            return Err(ApiError::BadRequest("Email must be valid".into()));
+        }
+        if !platform_control::update_user_email(pool, &platform_id, &email)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?
+        {
+            return Err(ApiError::NotFound("User profile not found".into()));
+        }
+    }
     if !platform_control::update_user_profile(
         pool,
         &platform_id,
@@ -136,6 +149,39 @@ async fn profile_update(
     {
         return Err(ApiError::NotFound("User profile not found".into()));
     }
+
+    // PostgreSQL is canonical; immediately refresh the organization-owned
+    // compatibility projection through the operator-only reducer. The target
+    // identity and organization are derived from the authenticated session,
+    // never accepted from the browser payload.
+    let projected = platform_control::find_user_profile_by_platform_id(pool, &platform_id)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .ok_or(ApiError::NotFound("User profile not found".into()))?;
+    let admin = state
+        .config
+        .stdb_server_token
+        .as_deref()
+        .filter(|token| is_usable_admin_token(token))
+        .ok_or_else(|| ApiError::Internal("STDB_SERVER_TOKEN is not configured".into()))?;
+    state
+        .client_with_token(admin)
+        .call_reducer(stdb_client::reducer_call!(
+            "project_user_profile",
+            json!([
+                identity_json_for_reducer_call(&session.identity_hex),
+                organization_id,
+                projected.get::<_, String>("email"),
+                projected.get::<_, bool>("email_verified"),
+                projected.get::<_, String>("name"),
+                projected.get::<_, Option<String>>("first_name"),
+                projected.get::<_, Option<String>>("last_name"),
+                projected.get::<_, String>("timezone"),
+                projected.get::<_, String>("language"),
+            ]),
+        ))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(Json(json!({ "success": true })))
 }
 
