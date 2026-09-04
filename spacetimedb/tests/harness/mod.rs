@@ -45,8 +45,8 @@ use crate::core::organization::{
 };
 use crate::crm::CRM_MULTI_COMPANY_FLAG;
 use crate::core::reference::{
-    create_currency, create_uom, create_uom_category, currency, uom, uom_cat, CreateCurrencyParams,
-    CreateUomCategoryParams, CreateUomParams,
+    create_currency, create_uom, create_uom_category, currency, seed_currency_for_organization,
+    uom, uom_cat, CreateCurrencyParams, CreateUomCategoryParams, CreateUomParams,
 };
 use crate::core::users::{user_profile, UserProfile};
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
@@ -125,6 +125,10 @@ impl OrgFixture {
             },
         )?;
         let organization_id = org.id;
+        // Canonical reference rows are tenant-owned. Seed them only after the
+        // organization exists so tests never depend on global/sentinel rows.
+        seed_currency_for_organization(ctx, organization_id, "USD")?;
+        seed_currency_for_organization(ctx, organization_id, "EUR")?;
         let currency_id = create_currency(
             ctx,
             organization_id,

@@ -18,11 +18,15 @@ use crate::sales::sales_core::{sale_order, sale_order_line};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::DiscountPolicy;
 
-fn persisted_currency_id(ctx: &ReducerContext, code: &str) -> Result<u64, String> {
+fn persisted_currency_id(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    code: &str,
+) -> Result<u64, String> {
     ctx.db
         .currency()
-        .code()
-        .find(&code.to_string())
+        .iter()
+        .find(|currency| currency.organization_id == organization_id && currency.code == code)
         .map(|currency| currency.id)
         .ok_or_else(|| format!("{code} currency not found"))
 }
@@ -242,7 +246,7 @@ pub fn test_convert_opp_missing_currency_fail_closed(ctx: &ReducerContext) -> Re
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
-    let distinct_currency_id = persisted_currency_id(ctx, "EUR")?;
+    let distinct_currency_id = persisted_currency_id(ctx, org_id, "EUR")?;
 
     let _stage_qualify = ctx.db.opp_stage().insert(OpportunityStage {
         id: 0,
@@ -414,7 +418,7 @@ pub fn test_convert_opp_missing_uom_fail_closed(ctx: &ReducerContext) -> Result<
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
-    let distinct_currency_id = persisted_currency_id(ctx, "EUR")?;
+    let distinct_currency_id = persisted_currency_id(ctx, org_id, "EUR")?;
 
     let stage_qualify = ctx.db.opp_stage().insert(OpportunityStage {
         id: 0,
@@ -588,7 +592,7 @@ pub fn test_convert_opp_distinctive_currency_uom(ctx: &ReducerContext) -> Result
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
-    let distinct_currency_id = persisted_currency_id(ctx, "EUR")?;
+    let distinct_currency_id = persisted_currency_id(ctx, org_id, "EUR")?;
 
     let product = ctx
         .db

@@ -1,5 +1,5 @@
 //! Country pack activation smoke test (A11).
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::ReducerContext;
 
 use crate::core::country_pack::{
     company_country_pack, country_pack_definition, country_pack_tax_rule, set_company_country_pack,
