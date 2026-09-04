@@ -27,9 +27,16 @@ classification and dependency order:
    aborts the transaction.
 5. Compare PostgreSQL and SpacetimeDB counts and canonical checksums for every projected
    organization relation. Both stores must still report the declared watermark.
-6. Recreate the manifest's derived state, run module smoke assertions, and call
-   `complete_organization_reconstruction` only after reconciliation succeeds. Completion removes
-   the effective write fence.
+6. Validate the generated recreated-state set, run module smoke assertions, and call
+   `complete_organization_reconstruction` only after reconciliation succeeds. Completion rebuilds
+   policy and project-margin caches idempotently inside the fenced STDB transaction, verifies their
+   organization coverage, and only then removes the effective write fence.
+
+The reconstruction policy conservatively restores seven snapshot tables whose historical period,
+actor, or as-of inputs cannot currently be reproduced at the durable watermark. Only
+`policy_snapshot` and `project_margin_snapshot` are rebuilt; fence and receipt rows remain
+target-local. This prevents a successful drill from silently replacing point-in-time evidence with
+new values computed at recovery time.
 
 If any restore or reconciliation step fails, call `fail_organization_reconstruction` with the
 same run ID or leave the active fence in place. Resume only the same run after the fault is fixed;
@@ -41,3 +48,24 @@ A production recovery exercise is complete only when a disposable destination ha
 all enabled restore relations have been applied, counts and checksums match the durable watermark,
 derived state has been recreated, a second identical run produces no duplicate effects, and normal
 workflows continue after the fence is completed.
+
+## C7-R1 and C7-R2 automated proofs
+
+The fast C7-R1 test in `api-server::cold_tier::reconstruction` runs the complete coordinator against
+a persistent disposable source and destination model. It injects a failure after a committed
+batch, resumes the same run from receipts, verifies the durable watermark and table digests,
+checks the writer fence, repeats the restore with a fresh run ID against the already-populated
+destination, and emits run ID, generation, watermark, classification counts, verification state,
+and elapsed time in the serializable `ReconstructionReport`. It also checks that
+the generated restore, recreate, and excluded sets are disjoint and match their declared coverage.
+
+The C7-R2 proof in `api-server::organization_placement` configures two logical cells and durable
+stores entirely inside the trusted server boundary. A move follows checkpoint, source lifecycle
+fence, target materialization at the next generation, verification, and only then the authoritative
+placement flip. Failed or cross-organization verification restores the exact source placement;
+operations carrying the old generation are rejected after a successful flip. Hydration receives
+the generation from the resolved placement rather than assuming generation one.
+
+These tests are deterministic CI proofs. They do not replace the production acceptance drill
+against restored managed PostgreSQL and a freshly published SpacetimeDB destination; that drill
+must capture the same evidence before production recovery or multi-cell movement is enabled.

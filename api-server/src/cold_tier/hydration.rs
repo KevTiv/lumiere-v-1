@@ -16,6 +16,9 @@ use tokio_postgres::types::ToSql;
 
 use super::{conventions, pg_codec, pg_pool};
 use crate::error::ApiError;
+use crate::organization_placement::{
+    OrganizationPlacement, OrganizationPlacementResolver, PlacementGeneration,
+};
 
 const TABLE: &str = "pos_order";
 const COLD_TABLE: &str = "cold_pos_order";
@@ -25,7 +28,6 @@ const HYDRATION_MANIFEST_JSON: &str = lumiere_contracts::manifests::HYDRATION_MA
 const PROJECTION_CODEC_MANIFEST_JSON: &str =
     lumiere_contracts::manifests::PROJECTION_CODEC_MANIFEST;
 const CURRENT_SCHEMA_VERSION: u32 = 1;
-const INITIAL_PLACEMENT_GENERATION: u64 = 1;
 
 /// Metadata resolved by the authenticated server before durable I/O.
 ///
@@ -46,8 +48,23 @@ impl HydrationContext {
         Self {
             organization_id,
             company_id,
-            placement_generation: INITIAL_PLACEMENT_GENERATION,
+            placement_generation: PlacementGeneration::INITIAL.get(),
         }
+    }
+
+    /// Build hydration context from the server-resolved organization
+    /// placement.  Callers provide only company scope; the generation is
+    /// copied from the trusted placement record and cannot be selected by an
+    /// HTTP payload.
+    pub fn from_placement(placement: &OrganizationPlacement, company_id: u64) -> Result<Self> {
+        if company_id == 0 {
+            bail!("hydration requires non-zero company scope");
+        }
+        Ok(Self {
+            organization_id: placement.organization_id(),
+            company_id,
+            placement_generation: placement.generation().get(),
+        })
     }
 }
 
@@ -83,8 +100,8 @@ pub fn build_pos_order_plan(
     if context.organization_id == 0 || context.company_id == 0 {
         bail!("hydration requires non-zero organization and company scope");
     }
-    if context.placement_generation != INITIAL_PLACEMENT_GENERATION {
-        bail!("hydration placement generation is stale or unsupported");
+    if context.placement_generation == 0 {
+        bail!("hydration placement generation is invalid");
     }
     if schema_version != contract.schema_version || schema_version != CURRENT_SCHEMA_VERSION {
         bail!("hydration schema version is not supported");
@@ -278,15 +295,26 @@ pub async fn hydrate_pos_order_if_absent(
 /// The public inputs are identities only. The durable store, table set,
 /// generation, schema, version, checksum, and reducer payload all remain
 /// server-controlled.
-pub async fn rehydrate_pos_order_from_durable(
+pub async fn rehydrate_pos_order_from_durable<R: OrganizationPlacementResolver>(
     stdb: &StdbClient,
+    placements: &R,
     organization_id: u64,
     company_id: u64,
     order_id: u64,
 ) -> Result<bool, ApiError> {
-    if organization_id == 0 || company_id == 0 || order_id == 0 {
+    let placement = placements.resolve(organization_id).map_err(|error| {
+        ApiError::Internal(format!(
+            "resolve authoritative organization placement: {error}"
+        ))
+    })?;
+    if !placement.lifecycle().permits_business_execution() {
+        return Err(ApiError::Conflict(
+            "organization placement is fenced for hydration".into(),
+        ));
+    }
+    if company_id == 0 || order_id == 0 {
         return Err(ApiError::Unprocessable(
-            "hydration requires positive organization, company, and order IDs".into(),
+            "hydration requires positive company and order IDs".into(),
         ));
     }
     let pool = pg_pool::shared_pool().ok_or_else(|| {
@@ -294,7 +322,9 @@ pub async fn rehydrate_pos_order_from_durable(
     })?;
     let plan = load_pos_order_plan(
         pool,
-        HydrationContext::current(organization_id, company_id),
+        HydrationContext::from_placement(placement, company_id).map_err(|error| {
+            ApiError::Internal(format!("resolve POS hydration context: {error}"))
+        })?,
         order_id,
     )
     .await

@@ -12,6 +12,14 @@ use spacetimedb::{ReducerContext, Table, Timestamp};
 use crate::core::cold_tier_identity::{
     is_active_cold_tier_service_identity, ORGANIZATION_RECONSTRUCTOR_SERVICE,
 };
+use crate::core::permissions::{
+    build_policy_snapshot_row, policy_snapshot, upsert_policy_snapshot,
+};
+use crate::core::users::user_organization;
+use crate::projects::project_accounting::{
+    project_margin_snapshot, refresh_project_margin_snapshot,
+};
+use crate::projects::projects::project_project;
 
 const ACTIVE: &str = "active";
 const FAILED: &str = "failed";
@@ -351,6 +359,7 @@ pub fn complete_organization_reconstruction(
     {
         return Err("reconstruction completion does not match the active fence".to_string());
     }
+    rebuild_organization_recreated_state(ctx, organization_id)?;
     fence.state = COMPLETE.to_string();
     fence.updated_at = ctx.timestamp;
     fence.completed_at = Some(ctx.timestamp);
@@ -359,6 +368,90 @@ pub fn complete_organization_reconstruction(
         .organization_reconstruction_fence()
         .organization_id()
         .update(fence);
+    Ok(())
+}
+
+/// Rebuild organization-local caches after all durable rows have been
+/// restored and before reconciliation or writer-fence release.
+///
+/// The table set is intentionally fixed in trusted code. Historical and
+/// time-dependent snapshots are durable rows and are never synthesized here.
+fn rebuild_organization_recreated_state(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<(), String> {
+    let policy_ids = ctx
+        .db
+        .policy_snapshot()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .map(|row| row.id)
+        .collect::<Vec<_>>();
+    for id in policy_ids {
+        ctx.db.policy_snapshot().id().delete(&id);
+    }
+    let margin_ids = ctx
+        .db
+        .project_margin_snapshot()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .map(|row| row.id)
+        .collect::<Vec<_>>();
+    for id in margin_ids {
+        ctx.db.project_margin_snapshot().id().delete(&id);
+    }
+
+    let identities = ctx
+        .db
+        .user_organization()
+        .user_org_by_org()
+        .filter(&organization_id)
+        .filter(|membership| membership.is_active)
+        .map(|membership| membership.user_identity)
+        .collect::<std::collections::BTreeSet<_>>();
+    for identity in &identities {
+        let snapshot = build_policy_snapshot_row(ctx, organization_id, *identity)?;
+        upsert_policy_snapshot(ctx, snapshot)?;
+    }
+
+    let projects = ctx
+        .db
+        .project_project()
+        .iter()
+        .filter(|project| project.organization_id == organization_id)
+        .map(|project| (project.company_id, project.id))
+        .collect::<Vec<_>>();
+    for (company_id, project_id) in projects {
+        refresh_project_margin_snapshot(ctx, organization_id, company_id, project_id);
+    }
+
+    let rebuilt_identities = ctx
+        .db
+        .policy_snapshot()
+        .iter()
+        .filter(|snapshot| snapshot.organization_id == organization_id)
+        .map(|snapshot| snapshot.user_identity)
+        .collect::<std::collections::BTreeSet<_>>();
+    if rebuilt_identities != identities {
+        return Err("policy snapshot rebuild coverage is incomplete".to_string());
+    }
+    let expected_projects = ctx
+        .db
+        .project_project()
+        .iter()
+        .filter(|project| project.organization_id == organization_id)
+        .map(|project| (project.company_id, project.id))
+        .collect::<std::collections::BTreeSet<_>>();
+    let rebuilt_projects = ctx
+        .db
+        .project_margin_snapshot()
+        .iter()
+        .filter(|snapshot| snapshot.organization_id == organization_id)
+        .map(|snapshot| (snapshot.company_id, snapshot.project_id))
+        .collect::<std::collections::BTreeSet<_>>();
+    if rebuilt_projects != expected_projects {
+        return Err("project margin snapshot rebuild coverage is incomplete".to_string());
+    }
     Ok(())
 }
 

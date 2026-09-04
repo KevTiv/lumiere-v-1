@@ -178,6 +178,14 @@ pub fn emit_reconstruction_manifest(
             let plan = &plans[table];
             let schema_table = schema_by_name[table.as_str()];
             let durable_entry = &durable_tables[table];
+            // A conservative table-level restore override may promote a
+            // snapshot-classified row that has no exact rebuild recipe. The
+            // reconstruction sink applies those rows idempotently by primary
+            // key, which is the same activation behavior as upsert-current.
+            let restore_projection_mode = match plan.projection_mode.as_str() {
+                "snapshot" | "derived-rebuildable" => "upsert-current",
+                mode => mode,
+            };
             let dependencies = plan
                 .parent
                 .as_ref()
@@ -195,7 +203,7 @@ pub fn emit_reconstruction_manifest(
                 "stdb_table_accessor": table,
                 "primary_key": schema_table.primary_key.column_name,
                 "organization_column": plan.organization_column,
-                "projection_mode": plan.projection_mode,
+                "projection_mode": restore_projection_mode,
                 "durable_schema_checksum": durable_entry["schema_checksum"],
                 "parent": plan.parent.as_ref().map(|parent| json!({
                     "table": parent.table,
@@ -444,6 +452,36 @@ mod tests {
             json!(["a_peer", "root", "z_child"])
         );
         assert_eq!(manifest["relationships"][0]["child_table"], "z_child");
+    }
+
+    #[test]
+    fn conservative_restore_override_normalizes_snapshot_apply_mode() {
+        let schema = LumiereSchemaManifest {
+            version: 1,
+            tables: vec![table("point_in_time_snapshot", &["id"])],
+            enum_types: vec![],
+        };
+        let storage = json!({"version":1,"policies":[{
+            "table":"point_in_time_snapshot",
+            "module":"test",
+            "durability_class":"derived_rebuildable",
+            "organization_ownership":"direct",
+            "organization_column":"organization_id",
+            "projection_mode":"snapshot",
+            "aggregate":{"parent":null}
+        }]});
+        let override_policy = r#"{"version":1,"same_level_order":"table_ascending","relationship_source":"storage_policy.aggregate.parent","durability_actions":{"derived_rebuildable":"recreate"},"table_actions":{"point_in_time_snapshot":"restore"},"recreated_state":{},"excluded_state":{}}"#;
+        let manifest: Value = serde_json::from_str(
+            &emit_reconstruction_manifest(
+                override_policy,
+                &schema,
+                &storage,
+                &durable(&["point_in_time_snapshot"]),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(manifest["tables"][0]["projection_mode"], "upsert-current");
     }
 
     #[test]

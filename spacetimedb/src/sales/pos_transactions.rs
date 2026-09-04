@@ -27,8 +27,6 @@ use crate::iot::registry::iot_device;
 use crate::sales::pos_config::{pos_config, pos_loyalty_program, PosConfig};
 use crate::types::{CardState, PaymentStatus, PosOrderState, SessionState};
 
-const INITIAL_PLACEMENT_GENERATION: u64 = 1;
-
 // ── Input Params ──────────────────────────────────────────────────────────────
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -1339,8 +1337,8 @@ pub(crate) fn hydrate_pos_order_aggregate_checked(
     if params.organization_id == 0 || params.company_id == 0 {
         return Err("hydration requires organization and company scope".to_string());
     }
-    if params.placement_generation != INITIAL_PLACEMENT_GENERATION {
-        return Err("hydration placement generation is stale or unsupported".to_string());
+    if params.placement_generation == 0 {
+        return Err("hydration placement generation must be non-zero".to_string());
     }
     if params.schema_version != 1 {
         return Err(format!(

@@ -12,8 +12,15 @@
     "platform_control": "exclude_platform"
   },
   "table_actions": {
+    "ai_agent_run_policy_snapshot": "restore",
+    "capacity_forecast_snapshot": "restore",
+    "crm_forecast_snapshot": "restore",
+    "hr_labor_cost_snapshot": "restore",
     "organization_reconstruction_batch_receipt": "recreate",
-    "organization_reconstruction_fence": "recreate"
+    "organization_reconstruction_fence": "recreate",
+    "project_earned_value_snapshot": "restore",
+    "resource_capacity_snapshot": "restore",
+    "resource_utilisation_snapshot": "restore"
   },
   "recreated_state": {
     "derived_rebuildable": "Recompute from restored canonical rows after durable restoration completes.",

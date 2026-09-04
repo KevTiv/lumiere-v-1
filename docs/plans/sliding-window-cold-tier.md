@@ -694,10 +694,14 @@ Use a mixed set of resource classes rather than only append-only audit data:
 
 ### Phase 6 — optional second logical cell/store correctness proof
 
-- [ ] configure a second logical cell and/or PG store for tests;
-- [ ] move one test organization using checkpoint → verify → generation increment → placement flip;
-- [ ] prove stale generation is fenced;
-- [ ] prove no cross-org/cross-store leakage.
+This proof is tracked as C7-R2 by the canonical deployability plan. Canonical
+C8 remains application-contract convergence and canonical C9 remains the
+security and tenant-isolation proof.
+
+- [x] configure a second logical cell and/or PG store for tests;
+- [x] move one test organization using checkpoint → verify → generation increment → placement flip;
+- [x] prove stale generation is fenced;
+- [x] prove no cross-org/cross-store leakage.
 
 This is a correctness proof, not an autoscaling or active-active project.
 
