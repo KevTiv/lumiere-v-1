@@ -1051,8 +1051,7 @@
     {
       "name": "create_country",
       "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
+      "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
       "name": "create_credit_note_from_invoice",
@@ -1072,8 +1071,7 @@
     {
       "name": "create_currency",
       "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
+      "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
       "name": "create_currency_rate",

@@ -5309,13 +5309,13 @@
     {
       "operation_id": "erp.create_country",
       "previous_fingerprint": "sha256:576359a01457d0ec12198140576ae4246b16ea97167997427b41441caf0f1d39",
-      "current_fingerprint": "sha256:ee573d065df7905c88fab0e4224eb2b05219504bfa47e975d564568fb45c0d4b",
+      "current_fingerprint": "sha256:4e9b3673fc98c182bcfaf197b8024e7bc1422be926a416f70fea2fd6351d8a8e",
       "reason": "create organization-seeded country copies instead of platform-global ERP rows"
     },
     {
       "operation_id": "erp.create_currency",
       "previous_fingerprint": "sha256:db0c114df4005f8d8364c59e71281cd427373f0e62cc119d95134c6c18a6e72f",
-      "current_fingerprint": "sha256:bb07ad1f01b294db9811e3f2389827f483f688f15b72f39cad27c000afe25c09",
+      "current_fingerprint": "sha256:6bcef80118f7936977dd14521087b3a4b60d8fec383cc3d1d3b083fce2cdf7e4",
       "reason": "create organization-seeded currency copies instead of platform-global ERP rows"
     },
     {
