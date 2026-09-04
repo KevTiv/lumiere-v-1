@@ -7,12 +7,14 @@ use spacetimedb::rand::Rng;
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::permissions::{role, user_role_assignment, Role, UserRoleAssignment};
+use crate::core::country_pack::seed_country_pack_catalog_for_organization;
 use crate::core::reference::require_active_currency_by_id;
 use crate::core::users::user_profile;
 use crate::core::users::{user_organization, UserOrganization};
 use crate::crm::activities::{activity_type, ActivityType};
 use crate::forms::migrations::run_seed_organization_form_configs;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::hr::country_pack_hr::seed_hr_country_pack_leave_catalog_for_organization;
 
 // ============================================================================
 // PARAMS TYPES
@@ -316,6 +318,11 @@ pub(crate) fn insert_organization_with_owner(
         ..org
     };
     ctx.db.organization().id().update(org.clone());
+
+    // Reference/provider rows are tenant-owned. Seed them only after the root
+    // organization exists, so no global/sentinel organization is required.
+    seed_country_pack_catalog_for_organization(ctx, org.id);
+    seed_hr_country_pack_leave_catalog_for_organization(ctx, org.id);
 
     let owner_role = ctx.db.role().insert(Role {
         id: 0,

@@ -26,6 +26,7 @@ use crate::core::privacy::{
     DataClassificationRule, PrivacyConsent,
 };
 use crate::core::queue::{enqueue_job_internal, queue_worker, EnqueueJobParams, QueueWorker};
+use crate::core::country_pack::seed_country_pack_catalog_for_organization;
 use crate::core::reference::{
     country, currency, currency_rate, document_sequence, uom, uom_cat, uom_conversion, Country,
     Currency, CurrencyRate, DocumentSequence, UOMCategory, UOMConversion, UOM,
@@ -80,6 +81,7 @@ use crate::sales::pos_transactions::{
 use crate::sales::pricelists::{product_pricelist, ProductPricelist};
 use crate::sales::sales_core::{sale_order, sale_order_line, SaleOrder, SaleOrderLine};
 use crate::types::DiscountPolicy;
+use crate::hr::country_pack_hr::seed_hr_country_pack_leave_catalog_for_organization;
 
 // ── Purchasing ────────────────────────────────────────────────────────────────
 use crate::purchasing::landed_costs::{
@@ -1035,12 +1037,14 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         });
     }
 
-    // ── 1.2 Currencies (global catalog with database-assigned IDs) ───────────
-    let usd_currency = if let Some(currency) = ctx.db.currency().code().find(&"USD".to_string()) {
+    // ── 1.2 Currencies (bootstrap catalog; tenant ownership is assigned below) ─
+    let usd_currency = if let Some(currency) = ctx.db.currency().iter().find(|currency| currency.code == "USD") {
         currency
     } else {
         ctx.db.currency().insert(Currency {
             id: 0,
+            organization_code_key: "0:USD".to_string(),
+            organization_id: 0,
             code: "USD".to_string(),
             name: "US Dollar".to_string(),
             symbol: "$".to_string(),
@@ -1052,11 +1056,13 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             metadata: None,
         })
     };
-    let eur_currency = if let Some(currency) = ctx.db.currency().code().find(&"EUR".to_string()) {
+    let eur_currency = if let Some(currency) = ctx.db.currency().iter().find(|currency| currency.code == "EUR") {
         currency
     } else {
         ctx.db.currency().insert(Currency {
             id: 0,
+            organization_code_key: "0:EUR".to_string(),
+            organization_id: 0,
             code: "EUR".to_string(),
             name: "Euro".to_string(),
             symbol: "€".to_string(),
@@ -1097,6 +1103,15 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         organization_id: org_id,
         ..org
     });
+    seed_country_pack_catalog_for_organization(ctx, org_id);
+    seed_hr_country_pack_leave_catalog_for_organization(ctx, org_id);
+    for currency in [usd_currency, eur_currency] {
+        ctx.db.currency().id().update(Currency {
+            organization_id: org_id,
+            organization_code_key: format!("{org_id}:{}", currency.code),
+            ..currency
+        });
+    }
     log::info!("[seed] org_id={}", org_id);
 
     // ── 1.4 Role (owner) ──────────────────────────────────────────────────────
@@ -8206,9 +8221,11 @@ Prioritize high-severity findings and cite related records."#,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
 
-    if ctx.db.country().code().find(&"US".to_string()).is_none() {
+    if ctx.db.country().iter().all(|country| country.code != "US" || country.organization_id != org_id) {
         ctx.db.country().insert(Country {
+            organization_code_key: format!("{org_id}:US"),
             code: "US".to_string(),
+            organization_id: org_id,
             name: "United States".to_string(),
             official_name: Some("United States of America".to_string()),
             iso3: "USA".to_string(),
@@ -11018,11 +11035,13 @@ fn ensure_minimal_dev_org(ctx: &ReducerContext) -> Result<(), String> {
     }
     log::info!("[ensure_minimal_dev_org] Seeding Lumiere Dev Org (minimal)…");
 
-    let usd_currency = if let Some(currency) = ctx.db.currency().code().find(&"USD".to_string()) {
+    let usd_currency = if let Some(currency) = ctx.db.currency().iter().find(|currency| currency.code == "USD") {
         currency
     } else {
         ctx.db.currency().insert(Currency {
             id: 0,
+            organization_code_key: "0:USD".to_string(),
+            organization_id: 0,
             code: "USD".to_string(),
             name: "US Dollar".to_string(),
             symbol: "$".to_string(),
@@ -11061,6 +11080,13 @@ fn ensure_minimal_dev_org(ctx: &ReducerContext) -> Result<(), String> {
         organization_id: org_id,
         ..org
     });
+    ctx.db.currency().id().update(Currency {
+        organization_id: org_id,
+        organization_code_key: format!("{org_id}:{}", usd_currency.code),
+        ..usd_currency
+    });
+    seed_country_pack_catalog_for_organization(ctx, org_id);
+    seed_hr_country_pack_leave_catalog_for_organization(ctx, org_id);
 
     let company = ctx.db.company().insert(Company {
         id: 0,

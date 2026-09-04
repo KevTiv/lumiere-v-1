@@ -78,13 +78,21 @@ pub struct ContactIdentityVerificationProof {
     pub recorded_at: Timestamp,
 }
 
-/// Singleton trust anchor for the server/provider adapter identity. This is an
-/// exact SpacetimeDB principal, not an organization role or CRM permission.
-#[spacetimedb::table(accessor = contact_identity_verification_authority)]
+/// Organization-scoped trust anchor for the server/provider adapter identity.
+/// This is an exact SpacetimeDB principal, not an organization role or CRM
+/// permission.
+#[spacetimedb::table(
+    accessor = contact_identity_verification_authority,
+    index(accessor = verification_authority_by_organization, btree(columns = [organization_id]))
+)]
 #[derive(Clone)]
 pub struct ContactIdentityVerificationAuthority {
     #[primary_key]
-    pub id: u8,
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    #[unique]
+    pub organization_authority_key: String,
     pub issuer_identity: Identity,
     pub configured_by: Identity,
     pub configured_at: Timestamp,
@@ -316,12 +324,15 @@ fn verify_state_transition(
 
 const MAX_VERIFICATION_PROOF_LIFETIME_MICROS: i64 = 15 * 60 * 1_000_000;
 
-fn require_trusted_verification_issuer(ctx: &ReducerContext) -> Result<(), String> {
+fn require_trusted_verification_issuer(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<(), String> {
     let authority = ctx
         .db
         .contact_identity_verification_authority()
-        .id()
-        .find(&1)
+        .iter()
+        .find(|authority| authority.organization_id == organization_id)
         .ok_or("contact identity verification authority is not configured")?;
     if authority.issuer_identity != ctx.sender() {
         return Err("trusted verification issuer authority required".to_string());
@@ -630,8 +641,10 @@ pub fn verify_contact_identity(
 #[spacetimedb::reducer]
 pub fn configure_contact_identity_verification_authority(
     ctx: &ReducerContext,
+    organization_id: u64,
     issuer_identity: Identity,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "contact_identity_verification_authority", "write")?;
     let caller = ctx
         .db
         .user_profile()
@@ -645,8 +658,8 @@ pub fn configure_contact_identity_verification_authority(
     if let Some(existing) = ctx
         .db
         .contact_identity_verification_authority()
-        .id()
-        .find(&1)
+        .iter()
+        .find(|authority| authority.organization_id == organization_id)
     {
         if existing.issuer_identity != ctx.sender() {
             return Err(
@@ -665,7 +678,9 @@ pub fn configure_contact_identity_verification_authority(
     } else {
         ctx.db.contact_identity_verification_authority().insert(
             ContactIdentityVerificationAuthority {
-                id: 1,
+                id: 0,
+                organization_id,
+                organization_authority_key: format!("{organization_id}:verification"),
                 issuer_identity,
                 configured_by: ctx.sender(),
                 configured_at: ctx.timestamp,
@@ -685,7 +700,7 @@ pub fn record_contact_identity_verification_proof(
     organization_id: u64,
     params: RecordContactIdentityVerificationProofParams,
 ) -> Result<(), String> {
-    require_trusted_verification_issuer(ctx)?;
+    require_trusted_verification_issuer(ctx, organization_id)?;
 
     let identity = ctx
         .db

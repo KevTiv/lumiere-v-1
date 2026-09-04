@@ -1,4 +1,5 @@
-/// Country / locale packs — jurisdiction rules live in pack tables, not core schemas.
+/// Country / locale packs — jurisdiction rules live in organization-owned pack
+/// tables, not core schemas.
 ///
 /// Tables:
 ///   - `CountryPackDefinition` — global catalog (pack_key, country_code, region)
@@ -17,9 +18,16 @@ use crate::types::{TaxAmountType, TaxTypeUse};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
-#[spacetimedb::table(accessor = country_pack_definition, public)]
+#[spacetimedb::table(
+    accessor = country_pack_definition,
+    public,
+    index(accessor = country_pack_by_organization, btree(columns = [organization_id])),
+    index(accessor = country_pack_by_pack_key, btree(columns = [pack_key]))
+)]
 pub struct CountryPackDefinition {
     #[primary_key]
+    pub organization_pack_key: String,
+    pub organization_id: u64,
     pub pack_key: String,
     pub country_code: String,
     pub name: String,
@@ -32,12 +40,16 @@ pub struct CountryPackDefinition {
 #[spacetimedb::table(
     accessor = country_pack_tax_rule,
     public,
-    index(accessor = pack_tax_by_pack, btree(columns = [pack_key]))
+    index(accessor = pack_tax_by_pack, btree(columns = [pack_key])),
+    index(accessor = pack_tax_by_organization, btree(columns = [organization_id]))
 )]
 pub struct CountryPackTaxRule {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
+    #[unique]
+    pub organization_pack_code_key: String,
     pub pack_key: String,
     pub code: String,
     pub name: String,
@@ -105,7 +117,14 @@ fn enabled_pack_definitions(
 ) -> Vec<CountryPackDefinition> {
     company_enabled_pack_keys(ctx, organization_id, company_id)
         .into_iter()
-        .filter_map(|key| ctx.db.country_pack_definition().pack_key().find(&key))
+        .filter_map(|key| {
+            ctx.db
+                .country_pack_definition()
+                .iter()
+                .find(|definition| {
+                    definition.organization_id == organization_id && definition.pack_key == key
+                })
+        })
         .collect()
 }
 
@@ -323,6 +342,16 @@ pub(crate) fn validate_address_for_packs(
 // ── Seed helpers ─────────────────────────────────────────────────────────────
 
 pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
+    let organization_ids: Vec<u64> = ctx.db.organization().iter().map(|org| org.id).collect();
+    for organization_id in organization_ids {
+        seed_country_pack_catalog_for_organization(ctx, organization_id);
+    }
+}
+
+pub(crate) fn seed_country_pack_catalog_for_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) {
     let packs = [
         (
             "au",
@@ -360,7 +389,13 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
 
     for (pack_key, country_code, name, region, version, metadata) in packs {
         let key = pack_key.to_string();
-        if let Some(existing) = ctx.db.country_pack_definition().pack_key().find(&key) {
+        let organization_pack_key = format!("{organization_id}:{key}");
+        if let Some(existing) = ctx
+            .db
+            .country_pack_definition()
+            .organization_pack_key()
+            .find(&organization_pack_key)
+        {
             // Upsert expense evidence / FBT flags / document Wave C keys when catalog advances.
             let meta = existing.metadata.as_deref().unwrap_or("");
             let needs_expense_flags = !meta.contains("expense_require_receipt")
@@ -369,7 +404,7 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             if needs_expense_flags {
                 ctx.db
                     .country_pack_definition()
-                    .pack_key()
+                    .organization_pack_key()
                     .update(CountryPackDefinition {
                         metadata: Some(metadata.to_string()),
                         ..existing
@@ -380,6 +415,8 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
         ctx.db
             .country_pack_definition()
             .insert(CountryPackDefinition {
+                organization_pack_key,
+                organization_id,
                 pack_key: key,
                 country_code: country_code.to_string(),
                 name: name.to_string(),
@@ -476,14 +513,20 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
 
     for (pack_key, country_code, name, region, version, metadata) in extra_packs {
         let key = pack_key.to_string();
-        if let Some(existing) = ctx.db.country_pack_definition().pack_key().find(&key) {
+        let organization_pack_key = format!("{organization_id}:{key}");
+        if let Some(existing) = ctx
+            .db
+            .country_pack_definition()
+            .organization_pack_key()
+            .find(&organization_pack_key)
+        {
             let meta = existing.metadata.as_deref().unwrap_or("");
             let needs_expense_flags = !meta.contains("expense_require_receipt")
                 || !meta.contains("document_search_language");
             if needs_expense_flags {
                 ctx.db
                     .country_pack_definition()
-                    .pack_key()
+                    .organization_pack_key()
                     .update(CountryPackDefinition {
                         metadata: Some(metadata.to_string()),
                         ..existing
@@ -494,6 +537,8 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
         ctx.db
             .country_pack_definition()
             .insert(CountryPackDefinition {
+                organization_pack_key,
+                organization_id,
                 pack_key: key,
                 country_code: country_code.to_string(),
                 name: name.to_string(),
@@ -509,12 +554,18 @@ pub(crate) fn seed_country_pack_catalog(ctx: &ReducerContext) {
             .db
             .country_pack_tax_rule()
             .iter()
-            .any(|r| r.pack_key == pack_key && r.code == code);
+            .any(|r| {
+                r.organization_id == organization_id
+                    && r.pack_key == pack_key
+                    && r.code == code
+            });
         if exists {
             continue;
         }
         ctx.db.country_pack_tax_rule().insert(CountryPackTaxRule {
             id: 0,
+            organization_id,
+            organization_pack_code_key: format!("{organization_id}:{pack_key}:{code}"),
             pack_key: pack_key.to_string(),
             code: code.to_string(),
             name: name.to_string(),
@@ -549,7 +600,7 @@ fn materialize_pack_taxes_for_company(
         .country_pack_tax_rule()
         .pack_tax_by_pack()
         .filter(&pack_key.to_string())
-        .filter(|r| r.is_active)
+        .filter(|r| r.organization_id == organization_id && r.is_active)
         .collect();
 
     for rule in rules {
@@ -638,8 +689,10 @@ pub fn set_company_country_pack(
     let definition = ctx
         .db
         .country_pack_definition()
-        .pack_key()
-        .find(&pack_key)
+        .iter()
+        .find(|definition| {
+            definition.organization_id == organization_id && definition.pack_key == pack_key
+        })
         .ok_or("Unknown country pack")?;
 
     if !definition.is_active {

@@ -1,8 +1,9 @@
 /// Reference / Seed Data
 ///
 /// Tables:  Country · Currency · CurrencyRate · UOMCategory · UOM · UOMConversion
-/// Pattern: Country and Currency are global (no organization_id); everything else
-///          is scoped to an organization. Only superusers may manage global tables.
+/// Pattern: Country and Currency are organization-seeded reference rows.  The
+/// organization scope is persisted directly on every row; callers must resolve
+/// it from authenticated context rather than supplying a writable tenant field.
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company;
@@ -100,10 +101,19 @@ pub struct CreateUomConversionParams {
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
-#[spacetimedb::table(accessor = country, public)]
+#[spacetimedb::table(
+    accessor = country,
+    public,
+    index(accessor = country_by_organization, btree(columns = [organization_id]))
+)]
 pub struct Country {
     #[primary_key]
+    /// Organization-qualified key. `code` remains the business value exposed
+    /// to callers, while this key enforces uniqueness within an organization.
+    pub organization_code_key: String,
+    #[index(btree)]
     pub code: String, // ISO 3166-1 alpha-2
+    pub organization_id: u64,
     pub name: String,
     pub official_name: Option<String>,
     pub iso3: String,
@@ -115,13 +125,21 @@ pub struct Country {
     pub metadata: Option<String>,
 }
 
-#[spacetimedb::table(accessor = currency, public)]
+#[spacetimedb::table(
+    accessor = currency,
+    public,
+    index(accessor = currency_by_organization, btree(columns = [organization_id]))
+)]
 pub struct Currency {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    #[unique]
+    #[index(btree)]
     pub code: String, // ISO 4217
+    /// Organization-qualified business key; the unique constraint is tenant-local.
+    #[unique]
+    pub organization_code_key: String,
+    pub organization_id: u64,
     pub name: String,
     pub symbol: String,
     pub decimal_places: u8,
@@ -250,7 +268,7 @@ fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
     if is_su {
         Ok(())
     } else {
-        Err("Only superusers can manage global reference data".to_string())
+        Err("Only superusers can manage organization reference data".to_string())
     }
 }
 
@@ -259,20 +277,34 @@ fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
 #[spacetimedb::reducer]
 pub fn create_country(
     ctx: &ReducerContext,
+    organization_id: u64,
     code: String,
     params: CreateCountryParams,
 ) -> Result<(), String> {
     require_superuser(ctx)?;
+    check_permission(ctx, organization_id, "country", "create")?;
 
-    if ctx.db.country().code().find(&code).is_some() {
+    let organization_code_key = format!("{organization_id}:{code}");
+    if ctx
+        .db
+        .country()
+        .organization_code_key()
+        .find(&organization_code_key)
+        .is_some()
+    {
         return Err(format!("Country '{}' already exists", code));
     }
     if let Some(currency_id) = params.currency_id {
-        require_active_currency_by_id(ctx, currency_id)?;
+        let currency = require_active_currency_by_id(ctx, currency_id)?;
+        if currency.organization_id != organization_id {
+            return Err("Currency does not belong to this organization".to_string());
+        }
     }
 
     ctx.db.country().insert(Country {
+        organization_code_key,
         code: code.clone(),
+        organization_id,
         name: params.name.clone(),
         official_name: params.official_name,
         iso3: params.iso3,
@@ -286,7 +318,7 @@ pub fn create_country(
 
     write_audit_log_v2(
         ctx,
-        0,
+        organization_id,
         AuditLogParams {
             company_id: None,
             table_name: "country",
@@ -305,16 +337,25 @@ pub fn create_country(
 #[spacetimedb::reducer]
 pub fn create_currency(
     ctx: &ReducerContext,
+    organization_id: u64,
     code: String,
     params: CreateCurrencyParams,
 ) -> Result<(), String> {
     require_superuser(ctx)?;
+    check_permission(ctx, organization_id, "currency", "create")?;
 
     let normalized_code = code.trim().to_uppercase();
     if normalized_code.is_empty() {
         return Err("Currency code cannot be empty".to_string());
     }
-    if ctx.db.currency().code().find(&normalized_code).is_some() {
+    let organization_code_key = format!("{organization_id}:{normalized_code}");
+    if ctx
+        .db
+        .currency()
+        .organization_code_key()
+        .find(&organization_code_key)
+        .is_some()
+    {
         return Err(format!("Currency '{}' already exists", normalized_code));
     }
     if params.position != "before" && params.position != "after" {
@@ -324,6 +365,8 @@ pub fn create_currency(
     ctx.db.currency().insert(Currency {
         id: 0,
         code: normalized_code.clone(),
+        organization_code_key,
+        organization_id,
         name: params.name,
         symbol: params.symbol,
         decimal_places: params.decimal_places,
@@ -579,14 +622,24 @@ pub(crate) fn require_active_currency_by_id(
 }
 
 /// Resolves a global `Currency` row by ISO 4217 code (case-insensitive).
-pub(crate) fn require_currency_row(ctx: &ReducerContext, code: &str) -> Result<Currency, String> {
+pub(crate) fn require_currency_row(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    code: &str,
+) -> Result<Currency, String> {
     let normalized = code.trim().to_uppercase();
     if normalized.is_empty() {
         return Err("Currency code cannot be empty".to_string());
     }
-    ctx.db.currency().code().find(&normalized).ok_or_else(|| {
+    ctx.db
+        .currency()
+        .iter()
+        .find(|currency| {
+            currency.organization_id == organization_id && currency.code == normalized
+        })
+        .ok_or_else(|| {
         format!(
-            "Currency '{}' is not in the global currency table. Seed currencies before tenant bootstrap.",
+            "Currency '{}' is not in this organization's currency table. Seed currencies before tenant bootstrap.",
             normalized
         )
     })

@@ -227,9 +227,11 @@ pub fn init(ctx: &ReducerContext) {
         ("AUD", "Australian Dollar", "A$", 2, 0.01),
         ("JPY", "Japanese Yen", "¥", 0, 1.0),
     ] {
-        if ctx.db.currency().code().find(&code.to_string()).is_none() {
+        if ctx.db.currency().iter().all(|currency| currency.code != code) {
             ctx.db.currency().insert(Currency {
                 id: 0,
+                organization_code_key: format!("0:{code}"),
+                organization_id: 0,
                 code: code.to_string(),
                 name: name.to_string(),
                 symbol: symbol.to_string(),

@@ -28,8 +28,11 @@ pub(crate) fn company_pack_string(
         let Some(def) = ctx
             .db
             .country_pack_definition()
-            .pack_key()
-            .find(&pack.pack_key)
+            .iter()
+            .find(|definition| {
+                definition.organization_id == organization_id
+                    && definition.pack_key == pack.pack_key
+            })
         else {
             continue;
         };
@@ -65,8 +68,11 @@ pub(crate) fn company_pack_string_list(
         let Some(def) = ctx
             .db
             .country_pack_definition()
-            .pack_key()
-            .find(&pack.pack_key)
+            .iter()
+            .find(|definition| {
+                definition.organization_id == organization_id
+                    && definition.pack_key == pack.pack_key
+            })
         else {
             continue;
         };
