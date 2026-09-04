@@ -20,8 +20,8 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
-def ir_with(*operations):
-    return {"ir_version": 2, "operations": list(operations)}
+def ir_with(*operations, types=None):
+    return {"ir_version": 2, "operations": list(operations), "types": types or []}
 
 
 def operation(name="create_order", operation_id="erp.create_order", **changes):
@@ -71,12 +71,55 @@ class OperationHistoryTests(unittest.TestCase):
         changed["source_dirty"] = True
         self.assertEqual(MODULE.shape_fingerprint(original), MODULE.shape_fingerprint(changed))
 
+    def test_shape_fingerprint_uses_type_name_not_typespace_index(self):
+        previous = operation()
+        previous["schema"]["params"]["elements"] = [
+            {"name": {"some": "params"}, "algebraic_type": {"Ref": 4}}
+        ]
+        current = copy.deepcopy(previous)
+        current["schema"]["params"]["elements"][0]["algebraic_type"]["Ref"] = 9
+        previous_ir = ir_with(
+            previous,
+            types=[{"index": 4, "names": ["CreateOrderParams"]}],
+        )
+        current_ir = ir_with(
+            current,
+            types=[{"index": 9, "names": ["CreateOrderParams"]}],
+        )
+
+        previous_history = MODULE.build_history_from_value(previous_ir)
+        current_history = MODULE.build_history_from_value(current_ir)
+
+        self.assertEqual(previous_history["operations"], current_history["operations"])
+
+    def test_unknown_typespace_reference_fails_closed(self):
+        referenced = operation()
+        referenced["schema"]["params"]["elements"] = [
+            {"name": {"some": "params"}, "algebraic_type": {"Ref": 4}}
+        ]
+        with self.assertRaisesRegex(MODULE.OperationHistoryError, "unknown type index"):
+            MODULE.build_history_from_value(ir_with(referenced))
+
     def test_missing_and_added_ids_fail_closed(self):
         ir = ir_with(operation())
         history = MODULE.build_history_from_value(ir)
         changed = ir_with(operation(operation_id="erp.renamed_order"))
         with self.assertRaisesRegex(MODULE.OperationHistoryError, "ID set changed"):
             self.verify_value(changed, history)
+
+    def test_previous_release_may_omit_new_history_ids_only_when_explicit(self):
+        previous = ir_with(operation())
+        current = ir_with(operation(), operation("update_order", "erp.update_order"))
+        history = MODULE.build_history_from_value(current)
+        with self.assertRaisesRegex(MODULE.OperationHistoryError, "ID set changed"):
+            self.verify_value(previous, history)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ir_path = root / "ir.json"
+            history_path = root / "history.json"
+            ir_path.write_text(json.dumps(previous), encoding="utf-8")
+            history_path.write_text(json.dumps(history), encoding="utf-8")
+            MODULE.verify(ir_path, history_path, allow_previous_compatibility=True)
 
     def test_duplicate_current_ids_fail_closed(self):
         first = operation()

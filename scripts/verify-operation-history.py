@@ -8,9 +8,9 @@ of that fingerprint: identity is checked directly and provenance belongs to
 the IR artifact, not to an operation shape.
 
 Canonicalization is UTF-8 JSON with recursively sorted object keys, compact
-separators, and no insignificant whitespace.  The shape projection is an
-explicit allow-list of structural IR fields so future provenance or build
-metadata cannot silently affect the digest.
+separators, and no insignificant whitespace. SpacetimeDB typespace references
+are replaced with their stable type names before hashing; their numeric
+indices are allocation details that change when unrelated types are added.
 """
 
 from __future__ import annotations
@@ -102,7 +102,43 @@ def _without_operation_identity(value: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def operation_shape(operation: dict[str, Any]) -> dict[str, Any]:
+def _type_reference_names(ir: dict[str, Any]) -> dict[int, list[str]]:
+    references: dict[int, list[str]] = {}
+    for position, raw_type in enumerate(_array(ir.get("types", []), "IR types")):
+        type_entry = _object(raw_type, f"IR type {position}")
+        index = type_entry.get("index")
+        names = type_entry.get("names")
+        if not isinstance(index, int) or index < 0:
+            fail(f"IR type {position} has an invalid index")
+        if index in references:
+            fail(f"IR types contain duplicate index {index}")
+        if not isinstance(names, list) or not names or not all(
+            isinstance(name, str) and name for name in names
+        ):
+            fail(f"IR type {index} referenced by an operation must have stable names")
+        references[index] = sorted(names)
+    return references
+
+
+def _semantic_type_references(value: Any, type_names: dict[int, list[str]]) -> Any:
+    if isinstance(value, list):
+        return [_semantic_type_references(item, type_names) for item in value]
+    if not isinstance(value, dict):
+        return value
+    result: dict[str, Any] = {}
+    for key, item in value.items():
+        if key == "Ref":
+            if not isinstance(item, int) or item not in type_names:
+                fail(f"operation schema references unknown type index {item!r}")
+            result[key] = {"type_names": type_names[item]}
+        else:
+            result[key] = _semantic_type_references(item, type_names)
+    return result
+
+
+def operation_shape(
+    operation: dict[str, Any], type_names: dict[int, list[str]] | None = None
+) -> dict[str, Any]:
     """Return the fail-closed structural projection used for hashing.
 
     ``name`` and ``contract_operation_id`` are identity, not shape.  The
@@ -127,14 +163,20 @@ def operation_shape(operation: dict[str, Any]) -> dict[str, Any]:
     shape["application"] = _without_operation_identity(application)
     schema = _object(shape.get("schema"), "operation schema")
     shape["schema"] = _without_operation_identity(schema)
+    if type_names is not None:
+        shape["schema"] = _semantic_type_references(shape["schema"], type_names)
     # The concrete reducer/procedure target is contract shape. Retaining its
     # name ensures an operation ID cannot silently redirect to another action.
     _object(shape.get("target"), "operation target")
     return shape
 
 
-def shape_fingerprint(operation: dict[str, Any]) -> str:
-    return "sha256:" + hashlib.sha256(_canonical_json(operation_shape(operation))).hexdigest()
+def shape_fingerprint(
+    operation: dict[str, Any], type_names: dict[int, list[str]] | None = None
+) -> str:
+    return "sha256:" + hashlib.sha256(
+        _canonical_json(operation_shape(operation, type_names))
+    ).hexdigest()
 
 
 def _validate_operation_id(operation_id: Any, label: str) -> str:
@@ -164,7 +206,7 @@ def _current_operations(ir: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 def _validate_history(history: dict[str, Any]) -> None:
     _exact_fields(history, HISTORY_FIELDS, "operation history")
-    if history["schema_version"] != 1:
+    if history["schema_version"] != 2:
         fail(f"unsupported operation history schema_version {history['schema_version']!r}")
     if history["ir_version"] != 2:
         fail(f"operation history must target IR v2, got {history['ir_version']!r}")
@@ -172,7 +214,7 @@ def _validate_history(history: dict[str, Any]) -> None:
     _exact_fields(fingerprint, FINGERPRINT_FIELDS, "operation history fingerprint")
     if fingerprint["algorithm"] != "sha256":
         fail("operation history fingerprint algorithm must be sha256")
-    if fingerprint["canonicalization"] != "json_sorted_keys_no_whitespace":
+    if fingerprint["canonicalization"] != "json_sorted_keys_semantic_type_refs":
         fail("operation history uses unsupported canonicalization")
     operations = _object(history["operations"], "operation history operations")
     if list(operations) != sorted(operations):
@@ -224,6 +266,7 @@ def verify(
     history = _load_json(history_path, "operation history")
     _validate_history(history)
     current = _current_operations(ir)
+    type_names = _type_reference_names(ir)
     historical = history["operations"]
     retired = set(history["retired_ids"])
     current_ids = set(current)
@@ -240,9 +283,9 @@ def verify(
     missing = historical_ids - current_ids
     added = current_ids - historical_ids
     unretired_missing = missing - retired
-    if unretired_missing or added:
+    if (unretired_missing and not allow_previous_compatibility) or added:
         details = []
-        if unretired_missing:
+        if unretired_missing and not allow_previous_compatibility:
             details.append(f"missing current IDs={sorted(unretired_missing)!r}")
         if added:
             details.append(f"unrecorded current IDs={sorted(added)!r}")
@@ -251,7 +294,9 @@ def verify(
         exception["operation_id"]: exception
         for exception in history["compatibility_exceptions"]
     }
-    unknown_exceptions = set(exceptions) - current_ids
+    unknown_exceptions = set(exceptions) - current_ids - (
+        unretired_missing if allow_previous_compatibility else set()
+    )
     if unknown_exceptions:
         fail(
             "compatibility exceptions target unknown operation IDs: "
@@ -259,7 +304,7 @@ def verify(
         )
     if set(exceptions) & retired:
         fail("compatibility exceptions cannot target retired IDs")
-    for operation_id in sorted(current):
+    for operation_id in sorted(current_ids & historical_ids):
         operation = current[operation_id]
         entry = historical[operation_id]
         current_name = operation["name"]
@@ -267,7 +312,7 @@ def verify(
             fail(
                 f"operation ID {operation_id} changed name from {entry['name']!r} to {current_name!r}"
             )
-        actual = shape_fingerprint(operation)
+        actual = shape_fingerprint(operation, type_names)
         expected = entry["shape_fingerprint"]
         if actual == expected:
             if operation_id in exceptions:
@@ -304,19 +349,20 @@ def build_history_from_value(ir: dict[str, Any]) -> dict[str, Any]:
     """Build a deterministic history document from an already-loaded IR."""
 
     current = _current_operations(ir)
+    type_names = _type_reference_names(ir)
     operations = {
         operation_id: {
             "name": operation["name"],
-            "shape_fingerprint": shape_fingerprint(operation),
+            "shape_fingerprint": shape_fingerprint(operation, type_names),
         }
         for operation_id, operation in sorted(current.items())
     }
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "ir_version": 2,
         "fingerprint": {
             "algorithm": "sha256",
-            "canonicalization": "json_sorted_keys_no_whitespace",
+            "canonicalization": "json_sorted_keys_semantic_type_refs",
         },
         "operations": operations,
         "retired_ids": [],

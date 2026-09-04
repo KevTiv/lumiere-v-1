@@ -881,6 +881,7 @@
     "run_crm_relational_fk_test": "erp.run_crm_relational_fk_test",
     "run_crm_relationship_admin_test": "erp.run_crm_relationship_admin_test",
     "run_crm_wave_2_test": "erp.run_crm_wave_2_test",
+    "run_data_ops_commit_test": "erp.run_data_ops_commit_test",
     "run_document_retention_purge": "erp.run_document_retention_purge",
     "run_documents_folder_test": "erp.run_documents_folder_test",
     "run_documents_wave_a_tests": "erp.run_documents_wave_a_tests",
