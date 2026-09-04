@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "canonical_plan": "docs/plans/core-vertical-deployability-pruning-plan.md",
+  "last_verified": {
+    "date": "2026-09-04",
+    "commit": "f2762621b"
+  },
+  "relation_census": {
+    "application": 458,
+    "protocol": 5,
+    "total": 463,
+    "organization_owned": 452,
+    "platform_global": 11
+  },
+  "gates": {
+    "C0": {
+      "status": "blocked",
+      "evidence": ["current manifest reports 452 organization-owned and 11 platform-global relations"],
+      "required": ["458/458 application ownership", "5/5 protocol ownership", "zero unresolved backfill rows"]
+    },
+    "C1": {
+      "status": "partial",
+      "evidence": ["463/463 relations have storage-policy entries under the pre-C0 ownership model"],
+      "required": ["regenerate after C0", "zero unclassified relations", "all parent relationships validated"]
+    },
+    "C2": {
+      "status": "partial",
+      "evidence": ["22 representative reducers cover 21 business modules"],
+      "required": ["core multi-row commit fixture", "all enabled modules emit complete ordered commits"]
+    },
+    "C3": {
+      "status": "partial",
+      "evidence": ["generic projector and PostgreSQL matrix exist"],
+      "required": ["create/update/delete proof per enabled module", "legacy drainer parity and retirement"]
+    },
+    "C4": {
+      "status": "partial",
+      "evidence": ["versioned generated migrations and release compatibility checks exist"],
+      "required": ["real PostgreSQL current-next-application rollback proof", "C0-adjusted durable schema"]
+    },
+    "C5": {
+      "status": "partial",
+      "evidence": ["four relations are currently cooling-enabled"],
+      "required": ["review every eligible relation", "manifest-driven finalization", "semantic negative fixtures"]
+    },
+    "C6": {
+      "status": "partial",
+      "evidence": ["audit and POS hot-cold read pilots exist", "POS hydration contract exists"],
+      "required": ["generated descriptors for every archive-capable resource", "hydrate-mutate-recool proof"]
+    },
+    "C7": {
+      "status": "partial",
+      "evidence": ["C7-R1 reconstruction and C7-R2 placement focused tests pass"],
+      "required": ["trusted operator entrypoint", "real PostgreSQL to disposable STDB drill", "workflow continuation"]
+    },
+    "C8": {
+      "status": "blocked",
+      "evidence": ["1318 operations remain semantically and idempotency unclassified with codecs unassigned"],
+      "required": ["zero unclassified operations", "generated query and subscription adoption", "handwritten bypass denial"]
+    },
+    "C9": {
+      "status": "partial",
+      "evidence": ["resource-specific tenant checks and C7-R2 placement tests exist"],
+      "required": ["single trusted operation context", "Org A/B and Company A1/A2 proof across every data path"]
+    },
+    "C10": {
+      "status": "blocked",
+      "evidence": ["current main P0 Playwright workflow is failing"],
+      "required": ["green lead-to-cash and procure-to-pay", "degraded-mode and failure-path coverage"]
+    },
+    "C11": {
+      "status": "partial",
+      "evidence": ["basic health, readiness, metrics, and projection status exist"],
+      "required": ["dependency-specific readiness", "bounded retry and poison handling", "synthetic checks and recovery runbooks"]
+    }
+  }
+}
