@@ -32,7 +32,7 @@ pub mod storage_policy_manifest_emit;
 use crate::paths::Paths;
 use crate::support::{read_to_string, write_file};
 use anyhow::{Context, Result};
-use schema_ir::{GeneratedTableOwnership, LumiereSchemaManifest, OwnershipCounts};
+use schema_ir::{LumiereSchemaManifest, OwnershipCounts};
 use serde_json::Value;
 
 /// Fast path for regenerating the closed STDB apply dispatch from an already
@@ -73,23 +73,24 @@ pub fn run(paths: &Paths) -> Result<()> {
     }
     let mut schema_manifest_value =
         serde_json::to_value(&schema_manifest).context("serialise schema manifest")?;
-    let platform_global_tables = schema_manifest
-        .tables
-        .iter()
-        .filter_map(|table| match table.ownership() {
-            Ok(GeneratedTableOwnership::PlatformGlobal(platform)) => Some(serde_json::json!({
-                "sql_name": platform.sql_name,
-                "rationale": platform.rationale,
-            })),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
     schema_manifest_value["ownership_summary"] = match ownership_counts {
         Some(counts) => serde_json::json!({
             "verified": true,
             "erp_owned_count": counts.erp_owned_count,
-            "platform_global_count": counts.platform_global_count,
-            "platform_global_tables": platform_global_tables,
+            "application_relation_count": schema_manifest.tables.iter()
+                .filter(|table| !matches!(table.sql_name.as_str(),
+                    "organization_commit" | "organization_commit_cursor"
+                    | "organization_reconstruction_batch_receipt"
+                    | "organization_reconstruction_fence" | "organization_row_change"))
+                .count(),
+            "protocol_relation_count": schema_manifest.tables.iter()
+                .filter(|table| matches!(table.sql_name.as_str(),
+                    "organization_commit" | "organization_commit_cursor"
+                    | "organization_reconstruction_batch_receipt"
+                    | "organization_reconstruction_fence" | "organization_row_change"))
+                .count(),
+            "platform_global_count": 0,
+            "platform_global_tables": [],
         }),
         None => serde_json::json!({ "verified": false }),
     };
@@ -251,7 +252,7 @@ pub fn run(paths: &Paths) -> Result<()> {
         ownership_counts
             .map(|counts| {
                 format!(
-                    "{} ERP-owned, {} platform-global",
+                    "{} organization-owned, {} platform-global",
                     counts.erp_owned_count, counts.platform_global_count
                 )
             })

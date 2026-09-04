@@ -10,72 +10,6 @@
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
-/// Explicit exceptions for data owned by the platform rather than an ERP
-/// organization. This list is intentionally closed: each exception names the
-/// table and documents why no trusted organization can own it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PlatformGlobalTable {
-    pub sql_name: &'static str,
-    pub rationale: &'static str,
-}
-
-/// The only platform-global tables allowed outside organization ownership.
-pub const PLATFORM_GLOBAL_TABLES: [PlatformGlobalTable; 11] = [
-    PlatformGlobalTable {
-        sql_name: "cold_tier_service_identity",
-        rationale: "Platform trust registry for the shared cold-tier service identity.",
-    },
-    PlatformGlobalTable {
-        sql_name: "contact_identity_verification_authority",
-        rationale: "Singleton provider trust anchor, not an organization role or CRM record.",
-    },
-    PlatformGlobalTable {
-        sql_name: "country",
-        rationale: "ISO country reference catalog seeded before any organization exists.",
-    },
-    PlatformGlobalTable {
-        sql_name: "country_pack_definition",
-        rationale: "Shared country-pack catalog used to activate organization-specific overlays.",
-    },
-    PlatformGlobalTable {
-        sql_name: "country_pack_tax_rule",
-        rationale: "Shared country-pack rules materialized into organization/company tax rows.",
-    },
-    PlatformGlobalTable {
-        sql_name: "currency",
-        rationale: "ISO currency catalog required during organization bootstrap.",
-    },
-    PlatformGlobalTable {
-        sql_name: "hr_country_pack_leave_default",
-        rationale: "Shared HR defaults materialized into organization leave types.",
-    },
-    PlatformGlobalTable {
-        sql_name: "password_reset_token",
-        rationale: "Identity-level token created before organization membership is established.",
-    },
-    PlatformGlobalTable {
-        sql_name: "schema_migration",
-        rationale:
-            "Module-wide migration ledger; organization migrations use org_schema_migration.",
-    },
-    PlatformGlobalTable {
-        sql_name: "user_credential",
-        rationale: "Identity-level credential shared across organization memberships.",
-    },
-    PlatformGlobalTable {
-        sql_name: "user_profile",
-        rationale: "Identity-level profile shared across organization memberships.",
-    },
-];
-
-/// Return the explicit platform classification for a SQL table name.
-pub fn platform_global_table(sql_name: &str) -> Option<PlatformGlobalTable> {
-    PLATFORM_GLOBAL_TABLES
-        .iter()
-        .copied()
-        .find(|table| table.sql_name == sql_name)
-}
-
 /// Root manifest written to `lumiere-schema-manifest.json`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LumiereSchemaManifest {
@@ -90,10 +24,9 @@ pub struct LumiereSchemaManifest {
 /// Ownership classification derived from a table's generated schema.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GeneratedTableOwnership {
-    /// ERP application table carrying a direct organization ownership column.
+    /// ERP application or persistence-protocol table carrying direct
+    /// organization ownership.
     Organization,
-    /// Explicitly classified platform infrastructure/reference table.
-    PlatformGlobal(PlatformGlobalTable),
 }
 
 /// One SpacetimeDB table extracted from the generated Rust bindings.
@@ -126,16 +59,6 @@ impl GeneratedTableSchema {
             .iter()
             .filter(|column| column.sql_name == "organization_id")
             .collect::<Vec<_>>();
-
-        if let Some(platform) = platform_global_table(&self.sql_name) {
-            if !columns.is_empty() {
-                bail!(
-                    "platform-global table {} must not declare organization_id; classify tenant-owned tables explicitly instead",
-                    self.sql_name
-                );
-            }
-            return Ok(GeneratedTableOwnership::PlatformGlobal(platform));
-        }
 
         if columns.len() != 1 {
             bail!(
@@ -175,44 +98,26 @@ impl GeneratedTableSchema {
 }
 
 impl LumiereSchemaManifest {
-    /// Classify every table and return ERP/platform ownership counts.
+    /// Classify every table and return organization/protocol ownership counts.
     pub fn ownership_counts(&self) -> Result<OwnershipCounts> {
         let mut counts = OwnershipCounts::default();
         for table in &self.tables {
-            match table.ownership()? {
-                GeneratedTableOwnership::Organization => counts.erp_owned_count += 1,
-                GeneratedTableOwnership::PlatformGlobal(_) => counts.platform_global_count += 1,
-            }
+            table.ownership()?;
+            counts.erp_owned_count += 1;
         }
         Ok(counts)
     }
 
-    /// Enforce the C0 organization-ownership invariant for every ERP table.
+    /// Enforce the C0 organization-ownership invariant for every manifest relation.
     pub fn validate_tenant_ownership(&self) -> Result<()> {
         if self.tables.len() != 463 {
             bail!(
-                "C0 requires 463 schema tables (452 ERP-owned + 11 platform-global), found {}",
+                "C0 requires 463 organization-owned relations (458 application + 5 protocol), found {}",
                 self.tables.len()
             );
         }
-        let mut platform_tables = std::collections::BTreeSet::new();
         for table in &self.tables {
-            if let GeneratedTableOwnership::PlatformGlobal(platform) = table.ownership()? {
-                platform_tables.insert(platform.sql_name);
-            }
-        }
-        if platform_tables.len() != PLATFORM_GLOBAL_TABLES.len() {
-            let missing = PLATFORM_GLOBAL_TABLES
-                .iter()
-                .filter(|table| !platform_tables.contains(table.sql_name))
-                .map(|table| table.sql_name)
-                .collect::<Vec<_>>();
-            bail!(
-                "C0 platform-global allowlist mismatch: expected {} tables, found {}; missing {:?}",
-                PLATFORM_GLOBAL_TABLES.len(),
-                platform_tables.len(),
-                missing
-            );
+            table.ownership()?;
         }
         Ok(())
     }
@@ -357,36 +262,6 @@ mod tests {
     }
 
     #[test]
-    fn platform_allowlist_is_exact_and_documented() {
-        assert_eq!(PLATFORM_GLOBAL_TABLES.len(), 11);
-        assert!(PLATFORM_GLOBAL_TABLES
-            .iter()
-            .all(|table| !table.sql_name.is_empty() && !table.rationale.is_empty()));
-        let mut names = PLATFORM_GLOBAL_TABLES
-            .iter()
-            .map(|table| table.sql_name)
-            .collect::<Vec<_>>();
-        names.sort_unstable();
-        names.dedup();
-        assert_eq!(names.len(), PLATFORM_GLOBAL_TABLES.len());
-    }
-
-    #[test]
-    fn explicitly_global_table_without_ownership_is_allowed() {
-        let table = table("currency", None, false);
-        assert!(matches!(
-            table.ownership(),
-            Ok(GeneratedTableOwnership::PlatformGlobal(_))
-        ));
-    }
-
-    #[test]
-    fn platform_table_with_ownership_is_rejected() {
-        let table = table("currency", Some((GeneratedType::U64, false)), true);
-        let error = table.ownership().unwrap_err().to_string();
-        assert!(error.contains("platform-global table currency"));
-    }
-
     #[test]
     fn unknown_missing_ownership_is_rejected() {
         let table = table("orders", None, false);
@@ -432,26 +307,23 @@ mod tests {
     }
 
     #[test]
-    fn ownership_counts_distinguish_platform_and_erp() {
+    fn ownership_counts_include_all_relations() {
         let manifest = LumiereSchemaManifest {
             version: 1,
-            tables: vec![
-                table("currency", None, false),
-                table("orders", Some((GeneratedType::U64, false)), true),
-            ],
+            tables: vec![table("orders", Some((GeneratedType::U64, false)), true)],
             enum_types: vec![],
         };
         assert_eq!(
             manifest.ownership_counts().unwrap(),
             OwnershipCounts {
                 erp_owned_count: 1,
-                platform_global_count: 1,
+                platform_global_count: 0,
             }
         );
     }
 
     #[test]
-    fn c0_validation_requires_the_closed_platform_allowlist() {
+    fn c0_validation_requires_463_direct_relations() {
         let manifest = LumiereSchemaManifest {
             version: 1,
             tables: vec![table("orders", Some((GeneratedType::U64, false)), true); 463],
@@ -461,6 +333,6 @@ mod tests {
             .validate_tenant_ownership()
             .unwrap_err()
             .to_string();
-        assert!(error.contains("platform-global allowlist mismatch"));
+        assert!(error.contains("organization-owned relations"));
     }
 }

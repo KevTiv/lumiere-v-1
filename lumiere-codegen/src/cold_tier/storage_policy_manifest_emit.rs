@@ -662,18 +662,9 @@ fn validate_c0_ownership(
                 );
             }
         }
-        (OrganizationOwnership::PlatformGlobal, GeneratedTableOwnership::PlatformGlobal(_)) => {
-            if policy.organization_column.is_some() {
-                bail!(
-                    "storage policy '{table_name}': platform-global ownership must not declare organization_column"
-                );
-            }
-            if policy.company_ownership != CompanyOwnership::None {
-                bail!(
-                    "storage policy '{table_name}': platform-global table must have company_ownership 'none'"
-                );
-            }
-        }
+        (OrganizationOwnership::PlatformGlobal, GeneratedTableOwnership::Organization) => bail!(
+            "storage policy '{table_name}': platform-global ownership is outside the ERP manifest"
+        ),
         (declared, actual) => bail!(
             "storage policy '{table_name}': declared organization ownership {:?} disagrees with C0 schema ownership {:?}",
             declared,
@@ -1061,35 +1052,33 @@ mod tests {
     };
     use serde_json::Value;
 
-    fn table(name: &str, platform_global: bool) -> GeneratedTableSchema {
+    fn table(name: &str, _legacy_platform_global: bool) -> GeneratedTableSchema {
         let mut columns = vec![GeneratedColumn {
             name: "id".into(),
             sql_name: "id".into(),
             ty: GeneratedType::U64,
             nullable: false,
         }];
-        if !platform_global {
-            columns.extend([
-                GeneratedColumn {
-                    name: "organization_id".into(),
-                    sql_name: "organization_id".into(),
-                    ty: GeneratedType::U64,
-                    nullable: false,
-                },
-                GeneratedColumn {
-                    name: "company_id".into(),
-                    sql_name: "company_id".into(),
-                    ty: GeneratedType::U64,
-                    nullable: false,
-                },
-                GeneratedColumn {
-                    name: "parent_id".into(),
-                    sql_name: "parent_id".into(),
-                    ty: GeneratedType::U64,
-                    nullable: false,
-                },
-            ]);
-        }
+        columns.extend([
+            GeneratedColumn {
+                name: "organization_id".into(),
+                sql_name: "organization_id".into(),
+                ty: GeneratedType::U64,
+                nullable: false,
+            },
+            GeneratedColumn {
+                name: "company_id".into(),
+                sql_name: "company_id".into(),
+                ty: GeneratedType::U64,
+                nullable: false,
+            },
+            GeneratedColumn {
+                name: "parent_id".into(),
+                sql_name: "parent_id".into(),
+                ty: GeneratedType::U64,
+                nullable: false,
+            },
+        ]);
         GeneratedTableSchema {
             rust_name: name.into(),
             sql_name: name.into(),
@@ -1098,15 +1087,11 @@ mod tests {
                 ty: GeneratedType::U64,
             },
             columns,
-            indexes: if platform_global {
-                vec![]
-            } else {
-                vec![GeneratedIndex {
-                    name: format!("{name}_organization_id"),
-                    columns: vec!["organization_id".into()],
-                    unique: false,
-                }]
-            },
+            indexes: vec![GeneratedIndex {
+                name: format!("{name}_organization_id"),
+                columns: vec!["organization_id".into()],
+                unique: false,
+            }],
         }
     }
 
@@ -1117,6 +1102,7 @@ mod tests {
             rationale: "test policy".into(),
             authoritative_resources: (table == "orders")
                 .then(|| "orders".into())
+                .or_else(|| (table == "currency").then(|| "currencies".into()))
                 .into_iter()
                 .collect(),
             durability_class: DurabilityClass::DurableBusinessRecord,
@@ -1149,17 +1135,7 @@ mod tests {
     }
 
     fn global_policy(table: &str) -> StoragePolicy {
-        let mut policy = direct_policy(table);
-        policy.module = "platform".into();
-        policy.authoritative_resources = vec!["currencies".into()];
-        policy.durability_class = DurabilityClass::PlatformControl;
-        policy.organization_ownership = OrganizationOwnership::PlatformGlobal;
-        policy.organization_column = None;
-        policy.company_ownership = CompanyOwnership::None;
-        policy.company_column_path = None;
-        policy.company_column_nullable = None;
-        policy.postgres_access_path = PostgresAccessPath::PlatformShared;
-        policy
+        direct_policy(table)
     }
 
     fn manifest() -> LumiereSchemaManifest {
