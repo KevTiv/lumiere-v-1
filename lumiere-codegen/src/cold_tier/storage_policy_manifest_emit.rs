@@ -7,7 +7,7 @@ const EXPECTED_SCHEMA_TABLES: usize = 463;
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::cold_tier::schema_ir::{GeneratedTableOwnership, LumiereSchemaManifest};
+use crate::cold_tier::schema_ir::LumiereSchemaManifest;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -651,18 +651,18 @@ fn validate_c0_ownership(
     table_name: &str,
     table: &crate::cold_tier::schema_ir::GeneratedTableSchema,
 ) -> Result<()> {
-    let actual = table.ownership().with_context(|| {
+    table.ownership().with_context(|| {
         format!("storage policy '{table_name}': schema fails C0 ownership validation")
     })?;
-    match (policy.organization_ownership, actual) {
-        (OrganizationOwnership::Direct, GeneratedTableOwnership::Organization) => {
+    match policy.organization_ownership {
+        OrganizationOwnership::Direct => {
             if policy.organization_column.as_deref() != Some("organization_id") {
                 bail!(
                     "storage policy '{table_name}': direct ownership requires organization_column 'organization_id'"
                 );
             }
         }
-        (OrganizationOwnership::PlatformGlobal, GeneratedTableOwnership::Organization) => bail!(
+        OrganizationOwnership::PlatformGlobal => bail!(
             "storage policy '{table_name}': platform-global ownership is outside the ERP manifest"
         ),
     }
@@ -1129,8 +1129,10 @@ mod tests {
         }
     }
 
-    fn global_policy(table: &str) -> StoragePolicy {
-        direct_policy(table)
+    fn reference_policy(table: &str) -> StoragePolicy {
+        let mut policy = direct_policy(table);
+        policy.module = "reference".into();
+        policy
     }
 
     fn manifest() -> LumiereSchemaManifest {
@@ -1176,7 +1178,7 @@ mod tests {
     fn validates_exact_coverage_and_emits_module_totals() {
         let source = serde_json::to_string(&config(vec![
             direct_policy("orders"),
-            global_policy("currency"),
+            reference_policy("currency"),
         ]))
         .unwrap();
         let value: Value =
@@ -1185,12 +1187,13 @@ mod tests {
         assert_eq!(value["coverage"]["total"], 2);
         assert_eq!(value["coverage"]["unclassified"], 0);
         assert_eq!(value["coverage"]["by_module"]["test"], 1);
-        assert_eq!(value["coverage"]["by_module"]["platform"], 1);
+        assert_eq!(value["coverage"]["by_module"]["reference"], 1);
     }
 
     #[test]
     fn requires_reviewed_fixture_for_each_module_storage_class() {
-        let mut fixture_config = config(vec![direct_policy("orders"), global_policy("currency")]);
+        let mut fixture_config =
+            config(vec![direct_policy("orders"), reference_policy("currency")]);
         fixture_config.reviewed_fixtures.clear();
         let source = serde_json::to_string(&fixture_config).unwrap();
         let error = emit_fixture(&source, &manifest()).unwrap_err().to_string();
@@ -1201,7 +1204,7 @@ mod tests {
     fn production_emitter_rejects_a_reduced_schema_universe() {
         let source = serde_json::to_string(&config(vec![
             direct_policy("orders"),
-            global_policy("currency"),
+            reference_policy("currency"),
         ]))
         .unwrap();
         assert!(
@@ -1240,7 +1243,7 @@ mod tests {
         let mut policy = direct_policy("orders");
         policy.authoritative_resources = vec!["missing".into()];
         let source =
-            serde_json::to_string(&config(vec![policy, global_policy("currency")])).unwrap();
+            serde_json::to_string(&config(vec![policy, reference_policy("currency")])).unwrap();
         assert!(emit_fixture(&source, &manifest())
             .unwrap_err()
             .to_string()
@@ -1249,7 +1252,7 @@ mod tests {
         let mut policy = direct_policy("orders");
         policy.authoritative_resources = vec!["currencies".into()];
         let source =
-            serde_json::to_string(&config(vec![policy, global_policy("currency")])).unwrap();
+            serde_json::to_string(&config(vec![policy, reference_policy("currency")])).unwrap();
         assert!(emit_fixture(&source, &manifest())
             .unwrap_err()
             .to_string()
@@ -1258,21 +1261,20 @@ mod tests {
 
     #[test]
     fn validates_c0_platform_agreement_and_company_path() {
-        let mut wrong_global = global_policy("currency");
-        wrong_global.organization_ownership = OrganizationOwnership::Direct;
-        wrong_global.organization_column = Some("organization_id".into());
+        let mut wrong_global = direct_policy("currency");
+        wrong_global.organization_column = Some("tenant_id".into());
         assert!(validate_storage_policies(
             &config(vec![direct_policy("orders"), wrong_global]),
             &manifest()
         )
         .unwrap_err()
         .to_string()
-        .contains("disagrees"));
+        .contains("direct ownership requires"));
 
         let mut bad_path = direct_policy("orders");
         bad_path.company_column_path = Some(vec!["missing".into()]);
         assert!(validate_storage_policies(
-            &config(vec![bad_path, global_policy("currency")]),
+            &config(vec![bad_path, reference_policy("currency")]),
             &manifest()
         )
         .unwrap_err()
@@ -1332,7 +1334,7 @@ mod tests {
         let mut root = direct_policy("orders");
         root.aggregate.kind = AggregateKind::Child;
         assert!(validate_storage_policies(
-            &config(vec![root, global_policy("currency")]),
+            &config(vec![root, reference_policy("currency")]),
             &manifest()
         )
         .unwrap_err()
@@ -1345,7 +1347,7 @@ mod tests {
         let mut policy = direct_policy("orders");
         policy.durability_class = DurabilityClass::Ephemeral;
         assert!(validate_storage_policies(
-            &config(vec![policy, global_policy("currency")]),
+            &config(vec![policy, reference_policy("currency")]),
             &manifest()
         )
         .unwrap_err()
@@ -1355,7 +1357,7 @@ mod tests {
         let mut policy = direct_policy("orders");
         policy.dependency_behavior = DependencyBehavior::FollowParent;
         assert!(validate_storage_policies(
-            &config(vec![policy, global_policy("currency")]),
+            &config(vec![policy, reference_policy("currency")]),
             &manifest()
         )
         .unwrap_err()

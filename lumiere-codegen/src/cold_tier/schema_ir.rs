@@ -325,7 +325,7 @@ mod tests {
     fn c0_validation_requires_463_direct_relations() {
         let complete = LumiereSchemaManifest {
             version: 1,
-            tables: vec![table("orders", Some((GeneratedType::U64, false)), true); 463],
+            tables: vec![table("orders", Some((GeneratedType::U64, false)), true); 462],
             enum_types: vec![],
         };
         complete.validate_tenant_ownership().unwrap();
