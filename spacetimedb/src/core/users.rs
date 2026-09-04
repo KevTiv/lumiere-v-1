@@ -137,6 +137,7 @@ pub struct UserProfile {
     index(accessor = user_org_by_user, btree(columns = [user_identity])),
     index(accessor = user_org_by_org,  btree(columns = [organization_id]))
 )]
+#[derive(Clone)]
 pub struct UserOrganization {
     #[primary_key]
     #[auto_inc]

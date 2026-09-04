@@ -69,13 +69,14 @@ pub fn test_cross_tenant_company_scope_blocked(ctx: &ReducerContext) -> Result<(
         },
     )?;
 
+    let org_b_currency = seed_currency_for_organization(ctx, org_b.id, "USD")?;
     create_company(
         ctx,
         org_b.id,
         CreateCompanyParams {
             name: "Tenant B Co".to_string(),
             code: "TBC".to_string(),
-            currency_id: 1,
+            currency_id: org_b_currency.id,
             fiscal_year_end_month: 12,
             fiscal_year_end_day: 31,
             is_parent: false,
@@ -171,13 +172,14 @@ pub fn test_audit_log_append_only(ctx: &ReducerContext) -> Result<(), String> {
         },
     )?;
 
+    let audit_currency = seed_currency_for_organization(ctx, org.id, "USD")?;
     create_company(
         ctx,
         org.id,
         CreateCompanyParams {
             name: "Audit Co".to_string(),
             code: "AUDCO".to_string(),
-            currency_id: 1,
+            currency_id: audit_currency.id,
             fiscal_year_end_month: 12,
             fiscal_year_end_day: 31,
             is_parent: false,
@@ -428,7 +430,7 @@ pub fn test_platform_bindings_and_reference_isolation(ctx: &ReducerContext) -> R
     }
 
     // Each organization receives its own reference copies and trust anchor.
-    let currency_a = create_currency(
+    create_currency(
         ctx,
         org_a.id,
         "XAA".to_string(),
@@ -442,7 +444,7 @@ pub fn test_platform_bindings_and_reference_isolation(ctx: &ReducerContext) -> R
             metadata: Some(r#"{"c0_fixture":"org_a"}"#.to_string()),
         },
     )?;
-    let currency_b = create_currency(
+    create_currency(
         ctx,
         org_b.id,
         "XBB".to_string(),
@@ -456,6 +458,18 @@ pub fn test_platform_bindings_and_reference_isolation(ctx: &ReducerContext) -> R
             metadata: Some(r#"{"c0_fixture":"org_b"}"#.to_string()),
         },
     )?;
+    let currency_a = ctx
+        .db
+        .currency()
+        .organization_code_key()
+        .find(&format!("{}:XAA", org_a.id))
+        .ok_or("C0 Org A currency was not persisted")?;
+    let currency_b = ctx
+        .db
+        .currency()
+        .organization_code_key()
+        .find(&format!("{}:XBB", org_b.id))
+        .ok_or("C0 Org B currency was not persisted")?;
     create_country(
         ctx,
         org_a.id,

@@ -277,7 +277,7 @@ pub async fn insert_user_credential(pool: &Pool, credential: &UserCredential) ->
 /// Password material never crosses the SpacetimeDB binding boundary.  The
 /// affected-row check also prevents silently accepting a reset for a missing
 /// platform account.
-pub async fn update_user_password(
+pub async fn replace_password_hash(
     pool: &Pool,
     platform_user_id: &PlatformId,
     password_hash: &str,
@@ -379,6 +379,49 @@ pub async fn find_user_credential_by_email(
         )
         .await
         .context("look up platform credential by email")
+}
+
+/// Look up a credential by its canonical WorkOS subject.
+pub async fn find_user_credential_by_workos_user_id(
+    pool: &Pool,
+    workos_user_id: &str,
+) -> Result<Option<tokio_postgres::Row>> {
+    let client = pool
+        .get()
+        .await
+        .context("get PG client for WorkOS credential lookup")?;
+    client
+        .query_opt(
+            "SELECT id, platform_user_id, email, stdb_identity_hex, password_hash, workos_user_id, stdb_token_enc, email_verified \
+             FROM lumiere_platform.user_credential WHERE workos_user_id = $1",
+            &[&workos_user_id],
+        )
+        .await
+        .context("look up platform credential by WorkOS user ID")
+}
+
+/// Attach a WorkOS subject to an existing canonical credential.
+pub async fn attach_workos_subject(
+    pool: &Pool,
+    platform_user_id: &PlatformId,
+    workos_user_id: &str,
+    email_verified: bool,
+) -> Result<bool> {
+    let client = pool
+        .get()
+        .await
+        .context("get PG client to link WorkOS credential")?;
+    let changed = client
+        .execute(
+            "UPDATE lumiere_platform.user_credential \
+             SET workos_user_id = $2, email_verified = $3, updated_at = now() \
+             WHERE platform_user_id = $1 \
+               AND (workos_user_id IS NULL OR workos_user_id = $2)",
+            &[&platform_user_id.as_str(), &workos_user_id, &email_verified],
+        )
+        .await
+        .context("link canonical WorkOS credential")?;
+    Ok(changed == 1)
 }
 
 /// Look up a credential by its opaque platform key.

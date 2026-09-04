@@ -68,7 +68,12 @@ pub fn run_accounting_ownership_backfill(ctx: &ReducerContext) -> Result<(), Str
 pub fn validate_accounting_ownership_backfill(ctx: &ReducerContext) -> Result<(), String> {
     require_superuser(ctx)?;
 
-    let issue_count = ctx.db.accounting_ownership_backfill_issue().iter().count();
+    let issue_count = ctx
+        .db
+        .accounting_ownership_backfill_issue()
+        .iter()
+        .filter(|issue| !issue.table_name.starts_with("c0:"))
+        .count();
     if issue_count != 0 {
         return Err(format!(
             "accounting ownership validation failed: {issue_count} quarantined row(s) remain"

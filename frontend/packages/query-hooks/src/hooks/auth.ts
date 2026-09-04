@@ -676,25 +676,6 @@ export function useCreateUserInvite(organizationId: bigint) {
   })
 }
 
-/** Pass `targetIdentity` as hex (with or without 0x) and a bcrypt `newPasswordHash` (server-side admin flow). */
-export function useUpdateUserPassword(organizationId: bigint) {
-  const qc = useQueryClient()
-  return useMutation<
-    void,
-    Error,
-    { targetIdentity: string; newPasswordHash: string }
-  >({
-    mutationFn: async ({ targetIdentity, newPasswordHash }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_user_password", { targetIdentity: targetIdentity.trim(), newPasswordHash: newPasswordHash })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update user password')
-    },
-    onSuccess: async () => {
-      await invalidateAuthModule(qc, organizationId)
-    },
-  })
-}
-
 export function useUpdateUserProfile(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
@@ -1206,28 +1187,6 @@ export function useAddUserToOrganization(organizationId: bigint) {
   })
 }
 
-export function useCreatePasswordResetToken(organizationId: bigint) {
-  const qc = useQueryClient()
-  return useMutation<
-    void,
-    Error,
-    { targetIdentity: string; tokenHash: string; expiresAt: unknown }
-  >({
-    mutationFn: async ({ targetIdentity, tokenHash, expiresAt }) => {
-      const { urlPath, init } = stdbBffCommandPost("create_password_reset_token", {
-        targetIdentity: identityForReducer(targetIdentity),
-        tokenHash,
-        expiresAt: timestampFromDatetime(expiresAt),
-      })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to create password reset token")
-    },
-    onSuccess: async () => {
-      await invalidateAuthModule(qc, organizationId)
-    },
-  })
-}
-
 /** Direct reducer call for superuser onboarding (prefer `/api/auth/invite` in product UI). */
 export function useCreateUserInviteReducer(organizationId: bigint) {
   const qc = useQueryClient()
@@ -1252,85 +1211,6 @@ export function useCreateUserInviteReducer(organizationId: bigint) {
       })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to create user invite")
-    },
-    onSuccess: async () => {
-      await invalidateAuthModule(qc, organizationId)
-    },
-  })
-}
-
-export function useStoreUserCredential(organizationId: bigint) {
-  const qc = useQueryClient()
-  return useMutation<
-    void,
-    Error,
-    {
-      newIdentity: string
-      email: string
-      passwordHash: string
-      stdbTokenEnc: string
-    }
-  >({
-    mutationFn: async ({ newIdentity, email, passwordHash, stdbTokenEnc }) => {
-      const { urlPath, init } = stdbBffCommandPost("store_user_credential", {
-        newIdentity: identityForReducer(newIdentity),
-        email: email.trim(),
-        passwordHash,
-        stdbTokenEnc,
-      })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to store user credential")
-    },
-    onSuccess: async () => {
-      await invalidateAuthModule(qc, organizationId)
-    },
-  })
-}
-
-export function useStoreSsoUserCredential(organizationId: bigint) {
-  const qc = useQueryClient()
-  return useMutation<
-    void,
-    Error,
-    {
-      newIdentity: string
-      email: string
-      stdbTokenEnc: string
-      workosUserId: string
-      emailVerified: boolean
-    }
-  >({
-    mutationFn: async ({ newIdentity, email, stdbTokenEnc, workosUserId, emailVerified }) => {
-      const { urlPath, init } = stdbBffCommandPost("store_sso_user_credential", {
-        newIdentity: identityForReducer(newIdentity),
-        email: email.trim(),
-        stdbTokenEnc,
-        workosUserId: workosUserId.trim(),
-        emailVerified,
-      })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to store SSO user credential")
-    },
-    onSuccess: async () => {
-      await invalidateAuthModule(qc, organizationId)
-    },
-  })
-}
-
-export function useLinkWorkosUser(organizationId: bigint) {
-  const qc = useQueryClient()
-  return useMutation<
-    void,
-    Error,
-    { targetIdentity: string; workosUserId: string }
-  >({
-    mutationFn: async ({ targetIdentity, workosUserId }) => {
-      const { urlPath, init } = stdbBffCommandPost("link_workos_user", {
-        targetIdentity: identityForReducer(targetIdentity),
-        workosUserId: workosUserId.trim(),
-      })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to link WorkOS user")
     },
     onSuccess: async () => {
       await invalidateAuthModule(qc, organizationId)

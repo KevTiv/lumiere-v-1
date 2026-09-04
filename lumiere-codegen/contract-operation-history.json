@@ -2834,6 +2834,10 @@
       "name": "produce_manufacturing_order",
       "shape_fingerprint": "sha256:ee9bf2321a9baf8f5194c8c1e3c7da9432085469f32d82e2562ff452d5a0c22e"
     },
+    "erp.project_user_profile": {
+      "name": "project_user_profile",
+      "shape_fingerprint": "sha256:e3b509528c25918d6483fdb7978102b5f408b75351501be393b5b38035aeabb9"
+    },
     "erp.promote_ai_skill_version": {
       "name": "promote_ai_skill_version",
       "shape_fingerprint": "sha256:8df3130da8c562b7b63a9f6dbe5eb7fec8b90bf8cfc70d00f4a04d27877db623"
@@ -3477,6 +3481,10 @@
     "erp.run_analytics_dashboard_company_scope_test": {
       "name": "run_analytics_dashboard_company_scope_test",
       "shape_fingerprint": "sha256:bdb0148a1353e57556847776e328800290592ead0c1faad701d8da187b6ee2f2"
+    },
+    "erp.run_c0_organization_ownership_backfill": {
+      "name": "run_c_0_organization_ownership_backfill",
+      "shape_fingerprint": "sha256:c1b12b57bc5464ec56741decd02d9a3358464e28b4b26e12c22f2ffd262bc2a3"
     },
     "erp.run_cartonization": {
       "name": "run_cartonization",
@@ -5242,6 +5250,10 @@
       "name": "validate_budget",
       "shape_fingerprint": "sha256:3db30a9ac08dbe9c29b30871827c5d9f45d04825cc3085c7605faaf74a72fa46"
     },
+    "erp.validate_c0_organization_ownership_backfill": {
+      "name": "validate_c_0_organization_ownership_backfill",
+      "shape_fingerprint": "sha256:09099bec22d059f9a7cf5e14475000477cbeb612ee69870557cc6d96ce657d4f"
+    },
     "erp.validate_consolidation": {
       "name": "validate_consolidation",
       "shape_fingerprint": "sha256:07fb831150e59e4233e9c14e214cd6e23f0c1f25be774acb5b0d8bcc25267351"
@@ -5317,6 +5329,18 @@
       "previous_fingerprint": "sha256:5f1b8db3b84ddae4ee4afad1693bbbb157c2a3ecf86f6cc417c498dea5bcd18f",
       "current_fingerprint": "sha256:59583d372fad0f77753a86eceb3169fa0db60d62e8557ad8557e3cd85fd2873d",
       "reason": "require an explicit organization for scheduled tax updates instead of permitting a global scan"
+    },
+    {
+      "operation_id": "erp.update_user_email",
+      "previous_fingerprint": "sha256:e24e0004bb2aa8a15c9a922ac8bb3b4699b988f204b7e5396d2d23d176bffee4",
+      "current_fingerprint": "sha256:462a952df31e81997f215091795e2d044b10d4617ae0aaf23a8b70b1f3c6cd95",
+      "reason": "retire direct client profile projection mutation behind the platform-control boundary"
+    },
+    {
+      "operation_id": "erp.update_user_profile",
+      "previous_fingerprint": "sha256:c5aec86d5396247ebf5a54be987c62df3cf70c29a08d419881343ba5bc479346",
+      "current_fingerprint": "sha256:2319bd048633da408f12ded7c8f2ebf802ee40de52f9f43b1b3b493b32527cb0",
+      "reason": "retire direct client profile projection mutation behind the platform-control boundary"
     }
   ]
 }

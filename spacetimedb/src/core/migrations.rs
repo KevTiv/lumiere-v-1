@@ -9,12 +9,16 @@ use std::collections::BTreeSet;
 
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
+use crate::accounting::fiscal_periods::{
+    accounting_ownership_backfill_issue, accounting_ownership_backfill_run,
+    AccountingOwnershipBackfillIssue, AccountingOwnershipBackfillRun,
+};
 use crate::core::auth::{password_reset_token, user_credential};
 use crate::core::cold_tier_identity::cold_tier_service_identity;
 use crate::core::country_pack::{country_pack_definition, country_pack_tax_rule};
 use crate::core::organization::organization;
 use crate::core::permissions::{sod_conflict_rule, SodConflictRule};
-use crate::core::reference::country;
+use crate::core::reference::{country, currency};
 use crate::core::users::{
     find_user_profile_for_identity, find_user_profile_for_organization, user_organization,
     user_profile,
@@ -113,45 +117,6 @@ pub struct OrgSchemaMigration {
     pub name: String,
     pub applied_at: Timestamp,
     pub applied_by: Identity,
-}
-
-/// Durable evidence for a C0 organization-ownership backfill row that could
-/// not be resolved without guessing.  `source_key` is the stable source
-/// primary key (including string primary keys), so retrying a run updates the
-/// same quarantine row instead of creating duplicate evidence.
-#[spacetimedb::table(
-    accessor = c0_ownership_backfill_issue,
-    index(accessor = c0_ownership_issue_by_table, btree(columns = [table_name]))
-)]
-pub struct C0OwnershipBackfillIssue {
-    #[primary_key]
-    #[auto_inc]
-    pub id: u64,
-    #[unique]
-    pub source_key: String,
-    pub table_name: String,
-    pub record_key: String,
-    pub organization_id: Option<u64>,
-    pub issue: String,
-    pub detected_at: Timestamp,
-}
-
-/// Durable summary for one complete C0 ownership scan.  A run is append-only
-/// evidence; the row-level issue table above is the idempotent retry surface.
-#[spacetimedb::table(
-    accessor = c0_ownership_backfill_run,
-    index(accessor = c0_ownership_run_by_scope, btree(columns = [scope]))
-)]
-pub struct C0OwnershipBackfillRun {
-    #[primary_key]
-    #[auto_inc]
-    pub id: u64,
-    pub scope: String,
-    pub scanned_rows: u64,
-    pub backfilled_rows: u64,
-    pub unresolved_rows: u64,
-    pub completed_at: Timestamp,
-    pub completed_by: Identity,
 }
 
 // ── Organization ownership backfill primitives ─────────────────────────────
@@ -287,12 +252,12 @@ mod tests {
             organization_ownership_backfill_issue_key("c0", "pos_payment", 7)
         );
         assert_eq!(
-            c0_source_key("country_pack_definition", "org-41:au"),
-            c0_source_key("country_pack_definition", "org-41:au")
+            c0_record_id(&c0_table_name("country_pack_definition"), "org-41:au"),
+            c0_record_id(&c0_table_name("country_pack_definition"), "org-41:au")
         );
         assert_ne!(
-            c0_source_key("country_pack_definition", "org-41:au"),
-            c0_source_key("country_pack_definition", "org-42:au")
+            c0_record_id(&c0_table_name("country_pack_definition"), "org-41:au"),
+            c0_record_id(&c0_table_name("country_pack_definition"), "org-42:au")
         );
     }
 
@@ -387,54 +352,80 @@ fn validate_platform_migration_id(platform_migration_id: &str) -> Result<(), Str
 
 const C0_OWNERSHIP_BACKFILL_SCOPE: &str = "c0_platform_bindings_and_references";
 
-fn c0_source_key(table_name: &str, record_key: &str) -> String {
-    format!("c0:{table_name}:{record_key}")
+fn c0_table_name(table_name: &str) -> String {
+    format!("c0:{table_name}")
 }
 
-fn c0_clear_issue(ctx: &ReducerContext, table_name: &str, record_key: &str) {
-    let source_key = c0_source_key(table_name, record_key);
-    if let Some(issue) = ctx
+fn c0_record_id(table_name: &str, record_key: &str) -> u64 {
+    // FNV-1a is deliberately fixed rather than relying on Rust's randomized
+    // hashers: retries and later releases must address the same evidence row.
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in table_name.bytes().chain([0]).chain(record_key.bytes()) {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
+}
+
+fn c0_clear_issue(
+    ctx: &ReducerContext,
+    evidence_organization_id: u64,
+    table_name: &str,
+    record_key: &str,
+) {
+    let table_name = c0_table_name(table_name);
+    let record_id = c0_record_id(&table_name, record_key);
+    let issue_ids: Vec<_> = ctx
         .db
-        .c0_ownership_backfill_issue()
-        .source_key()
-        .find(&source_key)
-    {
-        ctx.db.c0_ownership_backfill_issue().id().delete(&issue.id);
+        .accounting_ownership_backfill_issue()
+        .ownership_issue_by_organization()
+        .filter(&evidence_organization_id)
+        .filter(|issue| issue.table_name == table_name && issue.record_id == record_id)
+        .map(|issue| issue.id)
+        .collect();
+    for issue_id in issue_ids {
+        ctx.db
+            .accounting_ownership_backfill_issue()
+            .id()
+            .delete(&issue_id);
     }
 }
 
 fn c0_record_issue(
     ctx: &ReducerContext,
+    evidence_organization_id: u64,
     table_name: &str,
     record_key: &str,
-    organization_id: Option<u64>,
     issue: &str,
 ) {
-    let source_key = c0_source_key(table_name, record_key);
-    let row = C0OwnershipBackfillIssue {
+    let table_name = c0_table_name(table_name);
+    let record_id = c0_record_id(&table_name, record_key);
+    let row = AccountingOwnershipBackfillIssue {
         id: 0,
-        source_key: source_key.clone(),
-        table_name: table_name.to_string(),
-        record_key: record_key.to_string(),
-        organization_id,
-        issue: issue.to_string(),
+        organization_id: evidence_organization_id,
+        table_name: table_name.clone(),
+        record_id,
+        company_id: None,
+        parent_id: None,
+        issue: format!("{issue}; source_key={record_key}"),
         detected_at: ctx.timestamp,
     };
     if let Some(existing) = ctx
         .db
-        .c0_ownership_backfill_issue()
-        .source_key()
-        .find(&source_key)
+        .accounting_ownership_backfill_issue()
+        .ownership_issue_by_organization()
+        .filter(&evidence_organization_id)
+        .find(|existing| existing.table_name == table_name && existing.record_id == record_id)
     {
         ctx.db
-            .c0_ownership_backfill_issue()
+            .accounting_ownership_backfill_issue()
             .id()
-            .update(C0OwnershipBackfillIssue {
+            .update(AccountingOwnershipBackfillIssue {
                 id: existing.id,
                 ..row
             });
     } else {
-        ctx.db.c0_ownership_backfill_issue().insert(row);
+        ctx.db.accounting_ownership_backfill_issue().insert(row);
     }
 }
 
@@ -513,6 +504,7 @@ fn c0_membership_ownership_decision(
 
 fn c0_record_decision(
     ctx: &ReducerContext,
+    evidence_organization_id: u64,
     table_name: &str,
     record_key: &str,
     current_organization_id: Option<u64>,
@@ -520,17 +512,23 @@ fn c0_record_decision(
 ) -> (u64, u64) {
     match decision {
         OrganizationOwnershipBackfillDecision::AlreadyOwned { .. } => {
-            c0_clear_issue(ctx, table_name, record_key);
+            c0_clear_issue(ctx, evidence_organization_id, table_name, record_key);
             (0, 0)
         }
         OrganizationOwnershipBackfillDecision::Backfill { organization_id } => {
-            c0_clear_issue(ctx, table_name, record_key);
+            c0_clear_issue(ctx, evidence_organization_id, table_name, record_key);
             debug_assert!(current_organization_id.is_none() || current_organization_id == Some(0));
             let _ = organization_id;
             (1, 0)
         }
         OrganizationOwnershipBackfillDecision::Quarantine { issue } => {
-            c0_record_issue(ctx, table_name, record_key, current_organization_id, &issue);
+            c0_record_issue(
+                ctx,
+                evidence_organization_id,
+                table_name,
+                record_key,
+                &issue,
+            );
             (0, 1)
         }
     }
@@ -538,20 +536,28 @@ fn c0_record_decision(
 
 fn c0_record_direct_row(
     ctx: &ReducerContext,
+    evidence_organization_id: u64,
     table_name: &str,
     record_key: &str,
     organization_id: u64,
 ) -> (u64, u64) {
     let decision = c0_direct_ownership_decision(ctx, table_name, record_key, organization_id);
-    c0_record_decision(ctx, table_name, record_key, Some(organization_id), decision)
+    c0_record_decision(
+        ctx,
+        evidence_organization_id,
+        table_name,
+        record_key,
+        Some(organization_id),
+        decision,
+    )
 }
 
-fn require_c0_backfill_superuser(ctx: &ReducerContext) -> Result<(), String> {
+fn require_c0_backfill_superuser(ctx: &ReducerContext) -> Result<u64, String> {
     let user = find_user_profile_for_identity(ctx, ctx.sender()).ok_or("user not found")?;
     if !user.is_active || !user.is_superuser {
         return Err("only active superusers may manage C0 ownership backfills".to_string());
     }
-    Ok(())
+    Ok(user.organization_id)
 }
 
 /// Scan the formerly-global platform bindings and seeded reference copies.
@@ -560,19 +566,22 @@ fn require_c0_backfill_superuser(ctx: &ReducerContext) -> Result<(), String> {
 /// persisted in the idempotent quarantine table.
 #[spacetimedb::reducer]
 pub fn run_c0_organization_ownership_backfill(ctx: &ReducerContext) -> Result<(), String> {
-    require_c0_backfill_superuser(ctx)?;
+    let organization_id = require_c0_backfill_superuser(ctx)?;
     let mut scanned_rows = 0_u64;
     let mut backfilled_rows = 0_u64;
     let mut unresolved_rows = 0_u64;
 
     macro_rules! record_direct_rows {
-        ($accessor:ident, $table:literal, $key:expr, $organization:expr) => {{
-            let rows: Vec<_> = ctx.db.$accessor().iter().collect();
-            for row in rows {
+        ($accessor:ident, $row_type:ty, $table:literal, $row:ident => $key:expr, $organization:expr) => {{
+            let rows: Vec<$row_type> = ctx.db.$accessor().iter().collect();
+            for $row in rows {
+                if $organization != organization_id && $organization != 0 {
+                    continue;
+                }
                 scanned_rows += 1;
-                let key = $key(&row);
+                let key = $key;
                 let (backfilled, unresolved) =
-                    c0_record_direct_row(ctx, $table, &key, $organization(&row));
+                    c0_record_direct_row(ctx, organization_id, $table, &key, $organization);
                 backfilled_rows += backfilled;
                 unresolved_rows += unresolved;
             }
@@ -581,61 +590,73 @@ pub fn run_c0_organization_ownership_backfill(ctx: &ReducerContext) -> Result<()
 
     record_direct_rows!(
         cold_tier_service_identity,
+        crate::core::cold_tier_identity::ColdTierServiceIdentity,
         "cold_tier_service_identity",
-        |row: &_| row.platform_id.clone(),
-        |row: &_| row.organization_id
+        row => row.platform_id.clone(),
+        row.organization_id
     );
     record_direct_rows!(
         password_reset_token,
+        crate::core::auth::PasswordResetToken,
         "password_reset_token",
-        |row: &_| row.id.to_string(),
-        |row: &_| row.organization_id
+        row => row.id.to_string(),
+        row.organization_id
     );
     record_direct_rows!(
         schema_migration,
+        SchemaMigration,
         "schema_migration",
-        |row: &_| row.id.to_string(),
-        |row: &_| row.organization_id
+        row => row.id.to_string(),
+        row.organization_id
     );
     record_direct_rows!(
         contact_identity_verification_authority,
+        crate::crm::contact_identities::ContactIdentityVerificationAuthority,
         "contact_identity_verification_authority",
-        |row: &_| row.id.to_string(),
-        |row: &_| row.organization_id
+        row => row.id.to_string(),
+        row.organization_id
     );
     record_direct_rows!(
         country,
+        crate::core::reference::Country,
         "country",
-        |row: &_| row.organization_code_key.clone(),
-        |row: &_| row.organization_id
+        row => row.organization_code_key.clone(),
+        row.organization_id
     );
     record_direct_rows!(
         country_pack_definition,
+        crate::core::country_pack::CountryPackDefinition,
         "country_pack_definition",
-        |row: &_| row.organization_pack_key.clone(),
-        |row: &_| row.organization_id
+        row => row.organization_pack_key.clone(),
+        row.organization_id
     );
     record_direct_rows!(
         country_pack_tax_rule,
+        crate::core::country_pack::CountryPackTaxRule,
         "country_pack_tax_rule",
-        |row: &_| row.id.to_string(),
-        |row: &_| row.organization_id
+        row => row.id.to_string(),
+        row.organization_id
     );
     record_direct_rows!(
         currency,
+        crate::core::reference::Currency,
         "currency",
-        |row: &_| row.id.to_string(),
-        |row: &_| row.organization_id
+        row => row.id.to_string(),
+        row.organization_id
     );
     record_direct_rows!(
         hr_country_pack_leave_default,
+        crate::hr::country_pack_hr::HrCountryPackLeaveDefault,
         "hr_country_pack_leave_default",
-        |row: &_| row.id.to_string(),
-        |row: &_| row.organization_id
+        row => row.id.to_string(),
+        row.organization_id
     );
 
     let credentials: Vec<_> = ctx.db.user_credential().iter().collect();
     for row in credentials {
+        if row.organization_id != organization_id && row.organization_id != 0 {
+            continue;
+        }
         scanned_rows += 1;
         let record_key = row.id.to_string();
         let decision = c0_membership_ownership_decision(
@@ -654,12 +675,13 @@ pub fn run_c0_organization_ownership_backfill(ctx: &ReducerContext) -> Result<()
                         organization_id,
                         ..row
                     });
-                c0_clear_issue(ctx, "user_credential", &record_key);
+                c0_clear_issue(ctx, organization_id, "user_credential", &record_key);
                 backfilled_rows += 1;
             }
             decision => {
                 let (backfilled, unresolved) = c0_record_decision(
                     ctx,
+                    organization_id,
                     "user_credential",
                     &record_key,
                     Some(row.organization_id),
@@ -673,6 +695,9 @@ pub fn run_c0_organization_ownership_backfill(ctx: &ReducerContext) -> Result<()
 
     let profiles: Vec<_> = ctx.db.user_profile().iter().collect();
     for row in profiles {
+        if row.organization_id != organization_id && row.organization_id != 0 {
+            continue;
+        }
         scanned_rows += 1;
         let record_key = row.id.to_string();
         let decision = c0_membership_ownership_decision(
@@ -691,12 +716,13 @@ pub fn run_c0_organization_ownership_backfill(ctx: &ReducerContext) -> Result<()
                         organization_id,
                         ..row
                     });
-                c0_clear_issue(ctx, "user_profile", &record_key);
+                c0_clear_issue(ctx, organization_id, "user_profile", &record_key);
                 backfilled_rows += 1;
             }
             decision => {
                 let (backfilled, unresolved) = c0_record_decision(
                     ctx,
+                    organization_id,
                     "user_profile",
                     &record_key,
                     Some(row.organization_id),
@@ -709,9 +735,10 @@ pub fn run_c0_organization_ownership_backfill(ctx: &ReducerContext) -> Result<()
     }
 
     ctx.db
-        .c0_ownership_backfill_run()
-        .insert(C0OwnershipBackfillRun {
+        .accounting_ownership_backfill_run()
+        .insert(AccountingOwnershipBackfillRun {
             id: 0,
+            organization_id,
             scope: C0_OWNERSHIP_BACKFILL_SCOPE.to_string(),
             scanned_rows,
             backfilled_rows,
@@ -726,12 +753,19 @@ pub fn run_c0_organization_ownership_backfill(ctx: &ReducerContext) -> Result<()
 /// operators can repair their authoritative source and rerun the scan.
 #[spacetimedb::reducer]
 pub fn validate_c0_organization_ownership_backfill(ctx: &ReducerContext) -> Result<(), String> {
-    require_c0_backfill_superuser(ctx)?;
-    let issue_count = ctx.db.c0_ownership_backfill_issue().iter().count();
+    let organization_id = require_c0_backfill_superuser(ctx)?;
+    let issue_count = ctx
+        .db
+        .accounting_ownership_backfill_issue()
+        .ownership_issue_by_organization()
+        .filter(&organization_id)
+        .filter(|issue| issue.table_name.starts_with("c0:"))
+        .count();
     let latest_run = ctx
         .db
-        .c0_ownership_backfill_run()
-        .iter()
+        .accounting_ownership_backfill_run()
+        .ownership_run_by_organization()
+        .filter(&organization_id)
         .filter(|run| run.scope == C0_OWNERSHIP_BACKFILL_SCOPE)
         .max_by_key(|run| run.id)
         .map(|run| run.unresolved_rows);

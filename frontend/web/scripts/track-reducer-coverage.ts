@@ -217,8 +217,6 @@ const EXPLICIT_REDUCER_MODULE: Record<string, string> = {
   unsubscribe_from_record: 'crm',
   // Auth / dev (non–end-user surfaces)
   dev_promote_caller_superuser: 'auth',
-  link_workos_user: 'auth',
-  mark_reset_token_used: 'auth',
   // Workers
   worker_heartbeat: 'internal',
 }
@@ -244,8 +242,6 @@ const PLATFORM_TRIAGE_EXCLUDED_FROM_PRODUCT: Record<string, string> = {
   mark_action_sent: 'platform_api',
   process_pending_scans: 'platform_api',
   dev_promote_caller_superuser: 'platform_api',
-  link_workos_user: 'platform_api',
-  mark_reset_token_used: 'platform_api',
   record_google_drive_sync: 'platform_api',
   record_google_drive_sync_error: 'platform_api',
   record_whatsapp_health_check: 'platform_api',

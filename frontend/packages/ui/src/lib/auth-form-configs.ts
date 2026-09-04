@@ -188,40 +188,9 @@ export const newUserInviteForm = (t: TFunction): FormConfig => ({
   ],
 })
 
-export const updateUserPasswordForm = (t: TFunction): FormConfig => ({
-  id: "update-user-password",
-  title: t("auth.forms.updateUserPassword.title"),
-  description: t("auth.forms.updateUserPassword.description"),
-  sections: [
-    {
-      id: "password",
-      title: t("auth.forms.updateUserPassword.sections.password"),
-      fields: [
-        {
-          id: "newPassword",
-          name: "newPassword",
-          type: "text",
-          label: t("auth.forms.updateUserPassword.fields.newPassword"),
-          required: true,
-          width: "full",
-        },
-        {
-          id: "requireReset",
-          name: "requireReset",
-          type: "checkbox",
-          label: t("auth.forms.updateUserPassword.fields.requireReset"),
-          width: "full",
-          defaultValue: false,
-        },
-      ],
-    },
-  ],
-})
-
 export const authFormConfigs = (t: TFunction): Record<string, FormConfig> => ({
   "new-role": newRoleForm(t),
   "update-role": updateRoleForm(t),
   "new-audit-rule": newAuditRuleForm(t),
   "new-user-invite": newUserInviteForm(t),
-  "update-user-password": updateUserPasswordForm(t),
 })

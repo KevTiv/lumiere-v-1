@@ -21,19 +21,15 @@ import {
 } from "@lumiere/stdb/client-ui-bridge"
 import {
   useCreateAuditRule,
-  useCreatePasswordResetToken,
   useCreateUserInviteReducer,
   useCreateUserSession,
   useEndUserSession,
   useLogAuditEvent,
   useRecordPrivacyConsent,
-  useStoreSsoUserCredential,
-  useStoreUserCredential,
   useUpdateAuditRule,
   useUpdateGoogleDriveCredentials,
   useUpdateOrgMemberRole,
   useUpdateUserEmail,
-  useUpdateUserPassword,
   useUpdateUserProfile,
   useUpdateWhatsappCredentials,
 } from "@lumiere/query-hooks/hooks/auth"
@@ -64,7 +60,6 @@ type SettingsAction =
   | "updateAuditRule"
   | "endSession"
   | "updateProfile"
-  | "updatePassword"
   | "updateEmail"
   | "recordPrivacyConsent"
   | "googleDriveCredentials"
@@ -88,10 +83,7 @@ type SettingsAction =
   | "createDataClassification"
   | "createDataClassificationRule"
   | "updateOrgMemberRole"
-  | "createPasswordResetToken"
   | "createUserInviteDirect"
-  | "storeUserCredential"
-  | "storeSsoUserCredential"
   | "createUserSession"
   | "logAuditEvent"
 
@@ -180,21 +172,6 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
           { id: "department", type: "text", name: "department", label: "Department", width: "1/2" },
           { id: "timezone", type: "text", name: "timezone", label: "Timezone", width: "1/2" },
           { id: "locale", type: "text", name: "locale", label: "Locale", width: "1/2" },
-        ],
-      },
-    ],
-  },
-  updatePassword: {
-    id: "settings-update-password",
-    title: "Update User Password",
-    description: "Admin flow expects a target identity and a server-produced password hash.",
-    submitLabel: "Update password",
-    sections: [
-      {
-        id: "password",
-        fields: [
-          { id: "identity", type: "text", name: "targetIdentity", label: "Target identity", required: true, width: "full" },
-          { id: "hash", type: "textarea", name: "newPasswordHash", label: "New password hash", required: true, rows: 3, width: "full" },
         ],
       },
     ],
@@ -543,22 +520,6 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
       },
     ],
   },
-  createPasswordResetToken: {
-    id: "settings-create-password-reset-token",
-    title: "Create Password Reset Token",
-    description: "Superuser-only. Requires target identity hex and a server-produced token hash.",
-    submitLabel: "Create token",
-    sections: [
-      {
-        id: "reset",
-        fields: [
-          { id: "identity", type: "text", name: "targetIdentity", label: "Target identity", required: true, width: "full" },
-          { id: "hash", type: "textarea", name: "tokenHash", label: "Token hash", required: true, rows: 2, width: "full" },
-          { id: "expires", type: "datetime", name: "expiresAt", label: "Expires at", required: true, width: "full" },
-        ],
-      },
-    ],
-  },
   createUserInviteDirect: {
     id: "settings-create-user-invite-direct",
     title: "Create User Invite (direct reducer)",
@@ -573,41 +534,6 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
           { id: "hash", type: "textarea", name: "tokenHash", label: "Token hash", required: true, rows: 2, width: "full" },
           { id: "invited-by", type: "text", name: "invitedBy", label: "Invited by identity", required: true, width: "1/2" },
           { id: "expires", type: "datetime", name: "expiresAt", label: "Expires at", required: true, width: "1/2" },
-        ],
-      },
-    ],
-  },
-  storeUserCredential: {
-    id: "settings-store-user-credential",
-    title: "Store User Credential",
-    description: "Superuser-only. Provision password credentials after server-side identity creation.",
-    submitLabel: "Store credential",
-    sections: [
-      {
-        id: "credential",
-        fields: [
-          { id: "identity", type: "text", name: "newIdentity", label: "New identity", required: true, width: "full" },
-          { id: "email", type: "text", name: "email", label: "Email", required: true, width: "1/2" },
-          { id: "hash", type: "textarea", name: "passwordHash", label: "Password hash", required: true, rows: 2, width: "full" },
-          { id: "token-enc", type: "textarea", name: "stdbTokenEnc", label: "Encrypted STDB token", required: true, rows: 2, width: "full" },
-        ],
-      },
-    ],
-  },
-  storeSsoUserCredential: {
-    id: "settings-store-sso-user-credential",
-    title: "Store SSO User Credential",
-    description: "Superuser-only. Link WorkOS SSO to a SpacetimeDB identity.",
-    submitLabel: "Store SSO credential",
-    sections: [
-      {
-        id: "credential",
-        fields: [
-          { id: "identity", type: "text", name: "newIdentity", label: "New identity", required: true, width: "full" },
-          { id: "email", type: "text", name: "email", label: "Email", required: true, width: "1/2" },
-          { id: "workos", type: "text", name: "workosUserId", label: "WorkOS user ID", required: true, width: "1/2" },
-          { id: "token-enc", type: "textarea", name: "stdbTokenEnc", label: "Encrypted STDB token", required: true, rows: 2, width: "full" },
-          { id: "verified", type: "switch", name: "emailVerified", label: "Email verified", defaultValue: true, width: "1/2" },
         ],
       },
     ],
@@ -720,7 +646,6 @@ function SettingsLoaded({
   const updateAuditRule = useUpdateAuditRule(orgId)
   const endSession = useEndUserSession(orgId)
   const updateProfile = useUpdateUserProfile(orgId)
-  const updatePassword = useUpdateUserPassword(orgId)
   const updateEmail = useUpdateUserEmail(orgId)
   const recordPrivacyConsent = useRecordPrivacyConsent(orgId)
   const updateGoogleDriveCredentials = useUpdateGoogleDriveCredentials(orgId)
@@ -734,10 +659,7 @@ function SettingsLoaded({
   const createDataClassification = useCreateDataClassification(organizationId)
   const createDataClassificationRule = useCreateDataClassificationRule(organizationId)
   const updateOrgMemberRole = useUpdateOrgMemberRole(orgId)
-  const createPasswordResetToken = useCreatePasswordResetToken(orgId)
   const createUserInviteDirect = useCreateUserInviteReducer(orgId)
-  const storeUserCredential = useStoreUserCredential(orgId)
-  const storeSsoUserCredential = useStoreSsoUserCredential(orgId)
   const createUserSession = useCreateUserSession(orgId)
   const logAuditEvent = useLogAuditEvent(orgId)
 
@@ -746,7 +668,6 @@ function SettingsLoaded({
     updateAuditRule.isPending ||
     endSession.isPending ||
     updateProfile.isPending ||
-    updatePassword.isPending ||
     updateEmail.isPending ||
     recordPrivacyConsent.isPending ||
     updateGoogleDriveCredentials.isPending ||
@@ -760,10 +681,7 @@ function SettingsLoaded({
     createDataClassification.isPending ||
     createDataClassificationRule.isPending ||
     updateOrgMemberRole.isPending ||
-    createPasswordResetToken.isPending ||
     createUserInviteDirect.isPending ||
-    storeUserCredential.isPending ||
-    storeSsoUserCredential.isPending ||
     createUserSession.isPending ||
     logAuditEvent.isPending
 
@@ -784,11 +702,6 @@ function SettingsLoaded({
         await endSession.mutateAsync(formData.sessionId as string | number)
       } else if (activeAction === "updateProfile") {
         await updateProfile.mutateAsync(compactParams(formData, ["name", "department", "timezone", "locale"]))
-      } else if (activeAction === "updatePassword") {
-        await updatePassword.mutateAsync({
-          targetIdentity: String(formData.targetIdentity ?? ""),
-          newPasswordHash: String(formData.newPasswordHash ?? ""),
-        })
       } else if (activeAction === "updateEmail") {
         await updateEmail.mutateAsync({
           email: String(formData.email ?? ""),
@@ -950,12 +863,6 @@ function SettingsLoaded({
           userOrgId: formData.userOrgId as string | number,
           roleName: String(formData.roleName ?? ""),
         })
-      } else if (activeAction === "createPasswordResetToken") {
-        await createPasswordResetToken.mutateAsync({
-          targetIdentity: String(formData.targetIdentity ?? ""),
-          tokenHash: String(formData.tokenHash ?? ""),
-          expiresAt: formData.expiresAt,
-        })
       } else if (activeAction === "createUserInviteDirect") {
         await createUserInviteDirect.mutateAsync({
           email: String(formData.email ?? ""),
@@ -963,21 +870,6 @@ function SettingsLoaded({
           tokenHash: String(formData.tokenHash ?? ""),
           invitedBy: String(formData.invitedBy ?? ""),
           expiresAt: formData.expiresAt,
-        })
-      } else if (activeAction === "storeUserCredential") {
-        await storeUserCredential.mutateAsync({
-          newIdentity: String(formData.newIdentity ?? ""),
-          email: String(formData.email ?? ""),
-          passwordHash: String(formData.passwordHash ?? ""),
-          stdbTokenEnc: String(formData.stdbTokenEnc ?? ""),
-        })
-      } else if (activeAction === "storeSsoUserCredential") {
-        await storeSsoUserCredential.mutateAsync({
-          newIdentity: String(formData.newIdentity ?? ""),
-          email: String(formData.email ?? ""),
-          stdbTokenEnc: String(formData.stdbTokenEnc ?? ""),
-          workosUserId: String(formData.workosUserId ?? ""),
-          emailVerified: Boolean(formData.emailVerified),
         })
       } else if (activeAction === "createUserSession") {
         const expiresTs = optionalTimestamp(formData.expiresAt)
@@ -1023,7 +915,6 @@ function SettingsLoaded({
     { id: "updateAuditRule", title: "Update audit rule", description: "Patch an existing audit rule by ID." },
     { id: "endSession", title: "End session", description: "Terminate a user session by session ID." },
     { id: "updateProfile", title: "Profile", description: "Update profile fields for the current identity." },
-    { id: "updatePassword", title: "Password", description: "Admin password hash update flow." },
     { id: "updateEmail", title: "Email", description: "Update email and verification state." },
     { id: "recordPrivacyConsent", title: "Privacy consent", description: "Record a contact consent decision." },
     { id: "googleDriveCredentials", title: "Google Drive", description: "Update integration credentials." },
@@ -1047,10 +938,7 @@ function SettingsLoaded({
     { id: "createDataClassification", title: "Data classification", description: "Create a data privacy classification." },
     { id: "createDataClassificationRule", title: "Classification rule", description: "Map a classification to a table column." },
     { id: "updateOrgMemberRole", title: "Org member role", description: "Set membership role by role display name." },
-    { id: "createPasswordResetToken", title: "Password reset token", description: "Superuser: store a hashed reset token." },
     { id: "createUserInviteDirect", title: "Invite (direct reducer)", description: "Superuser: create invite row directly." },
-    { id: "storeUserCredential", title: "Store credential", description: "Superuser: provision password credentials." },
-    { id: "storeSsoUserCredential", title: "Store SSO credential", description: "Superuser: link WorkOS SSO identity." },
     { id: "createUserSession", title: "Create session", description: "Record a user session row (admin/testing)." },
     { id: "logAuditEvent", title: "Log audit event", description: "Insert a manual audit log entry." },
   ]
