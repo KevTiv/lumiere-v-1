@@ -95,6 +95,17 @@ jobs:
       - name: Workspace members (api-server, ai-gateway, lumiere-codegen, stdb-auth)
         run: cargo check --locked -p api-server -p ai-gateway -p lumiere-codegen -p stdb-auth
 
+      - name: C3 PostgreSQL projection matrix
+        env:
+          C3_TEST_PG: "1"
+          PG_HOST: 127.0.0.1
+          PG_PORT: "5432"
+          PG_DATABASE: lumiere
+          PG_USER: lumiere
+          PG_PASSWORD: lumiere
+          PG_TLS_MODE: disable
+        run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::commit_projection::tests::postgres_manifest_matrix -- --nocapture
+
       - name: lumiere-codegen unit tests
         run: cargo test --locked -p lumiere-codegen
 
@@ -115,17 +126,6 @@ jobs:
 
       - name: api-server reducer contract tests
         run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib commands::tests
-
-      - name: C3 PostgreSQL projection matrix
-        env:
-          C3_TEST_PG: "1"
-          PG_HOST: 127.0.0.1
-          PG_PORT: "5432"
-          PG_DATABASE: lumiere
-          PG_USER: lumiere
-          PG_PASSWORD: lumiere
-          PG_TLS_MODE: disable
-        run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::commit_projection::tests::postgres_manifest_matrix -- --nocapture
 
       - name: ai-gateway unit tests
         run: cargo test --locked -p ai-gateway --bin gateway
