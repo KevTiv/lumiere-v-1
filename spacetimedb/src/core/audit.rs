@@ -12,15 +12,6 @@ use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::helpers::check_permission;
 
 // ============================================================================
-// RETIRED COLD-TIER ARCHIVE FINALIZE
-// ============================================================================
-//
-// Ordinary audit append paths do not yet emit an `organization_commit` and
-// `organization_row_change`. Without that exact row/version watermark proof,
-// audit rows must remain hot. Keep the reducer signature as a fail-closed
-// compatibility tombstone until the immutable operation ID is retired.
-
-// ============================================================================
 // PARAMS TYPES
 // ============================================================================
 
@@ -158,23 +149,6 @@ pub fn log_audit_event(
     });
 
     Ok(())
-}
-
-/// Retired compatibility tombstone for the former audit cooling operation.
-///
-/// Audit rows remain hot until their normal write path participates in the
-/// durable commit protocol. This reducer never deletes data, including when
-/// called by a registered projection worker.
-#[spacetimedb::reducer]
-pub fn finalize_audit_log_archive(
-    _ctx: &ReducerContext,
-    _id: u64,
-    _expected_payload_checksum: String,
-) -> Result<(), String> {
-    Err(
-        "audit_log cooling is disabled until append writes carry exact commit-watermark evidence"
-            .to_string(),
-    )
 }
 
 #[spacetimedb::reducer]

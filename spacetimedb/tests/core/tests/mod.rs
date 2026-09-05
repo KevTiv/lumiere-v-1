@@ -1,5 +1,4 @@
 //! Core domain test suite — invoke via `run_all_core_tests` reducer.
-pub mod audit_finalize_test;
 pub mod bootstrap_commit_test;
 pub mod operational_messaging_test;
 pub mod permissions_tests;
@@ -14,15 +13,8 @@ pub fn run_all_core_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_core_sod_test(ctx)?;
     run_core_permissions_test(ctx)?;
     run_queue_foundation_tests(ctx)?;
-    run_core_audit_finalize_test(ctx)?;
     log::info!("✅ run_all_core_tests complete");
     Ok(())
-}
-
-#[spacetimedb::reducer]
-pub fn run_core_audit_finalize_test(ctx: &ReducerContext) -> Result<(), String> {
-    audit_finalize_test::test_audit_finalize_is_disabled(ctx)
-        .map_err(|error| format!("retired_audit_finalize: {error}"))
 }
 
 #[spacetimedb::reducer]

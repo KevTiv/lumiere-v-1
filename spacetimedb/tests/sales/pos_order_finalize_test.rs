@@ -1,10 +1,8 @@
 //! `finalize_pos_order_archive` coverage (cold-tier Phase 2 write path).
 //!
-//! Mirrors `audit_finalize_test.rs`'s structure but exercises the general
-//! version-checked protocol (archive_version + cold_eligible_at) instead of
-//! audit_log's checksum-only one — see the module doc on
-//! `finalize_pos_order_archive` in `spacetimedb/src/sales/pos_transactions.rs`
-//! for why the two protocols differ.
+//! Exercises the general version-checked protocol (archive_version +
+//! cold_eligible_at); see the module doc on `finalize_pos_order_archive` in
+//! `spacetimedb/src/sales/pos_transactions.rs` for the protocol details.
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::persistence::{

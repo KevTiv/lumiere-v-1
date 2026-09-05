@@ -8,8 +8,7 @@
 //! inventory, or workflow rules: those rules live in the owning domain and
 //! are represented here as facts computed immediately before finalization.
 //!
-//! Append-only audit retains its checksum protocol; mutable aggregate
-//! finalizers use [`validate_cooling_eligibility`] and
+//! Mutable aggregate finalizers use [`validate_cooling_eligibility`] and
 //! [`delete_aggregate`] without duplicating the safety checks.
 
 use std::collections::BTreeSet;
