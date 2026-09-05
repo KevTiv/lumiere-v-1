@@ -363,17 +363,23 @@ async fn verify_durable_projection(
         .ok_or_else(|| {
             anyhow!("pos_order {id}: exact durable projection and watermark are not yet available")
         })?;
-    let durable_version: String = row.get(0);
-    let durable_eligible_at: Option<i64> = row.get(1);
-    let durable_sequence: String = row.get(2);
+    let durable_version: String = row.try_get(0).context("read durable archive version")?;
+    let durable_eligible_at: Option<i64> = row
+        .try_get(1)
+        .context("read durable eligibility timestamp")?;
+    let durable_sequence: String = row.try_get(2).context("read durable row commit sequence")?;
     if durable_version != expected_version || durable_eligible_at != Some(cold_eligible_at_micros) {
         return Err(anyhow!(
             "pos_order {id}: durable version mismatch at commit {durable_sequence}; expected version {expected_version} and eligibility {cold_eligible_at_micros}, found version {durable_version} and eligibility {durable_eligible_at:?}"
         ));
     }
-    let durable_watermark: String = row.get(3);
-    let change_schema_version: i32 = row.get(4);
-    let contract_version: String = row.get(5);
+    let durable_watermark: String = row
+        .try_get(3)
+        .context("read durable projection watermark")?;
+    let change_schema_version: i64 = row
+        .try_get(4)
+        .context("read durable change schema version")?;
+    let contract_version: String = row.try_get(5).context("read durable contract version")?;
     let row_commit_sequence: u64 = durable_sequence
         .parse()
         .context("parse durable row commit sequence")?;
@@ -385,7 +391,7 @@ async fn verify_durable_projection(
             "pos_order {id}: durable watermark {durable_watermark} does not cover row commit {row_commit_sequence}"
         ));
     }
-    if change_schema_version != commit_projection::CHANGE_SCHEMA_VERSION as i32
+    if change_schema_version != i64::from(commit_projection::CHANGE_SCHEMA_VERSION)
         || contract_version != commit_projection::CONTRACT_VERSION
     {
         return Err(anyhow!(
@@ -395,11 +401,15 @@ async fn verify_durable_projection(
     Ok(DurableProjectionProof {
         row_commit_sequence,
         durable_watermark,
-        change_schema_version: change_schema_version
-            .try_into()
-            .context("durable change schema version is negative")?,
+        change_schema_version: checked_change_schema_version(change_schema_version)?,
         contract_version,
     })
+}
+
+fn checked_change_schema_version(value: i64) -> Result<u32> {
+    value
+        .try_into()
+        .context("durable change schema version is outside u32 range")
 }
 
 fn bounded_batch_size(value: u32) -> Result<u32> {
@@ -457,6 +467,17 @@ mod tests {
         assert!(COLD_ROW_PROOF_SQL.contains("archive_version::TEXT"));
         assert!(COLD_ROW_PROOF_SQL.contains("payload_checksum"));
         assert!(COLD_ROW_PROOF_SQL.contains("organization_id = $1::TEXT::NUMERIC"));
+    }
+
+    #[test]
+    fn durability_proof_decodes_postgres_bigint_schema_version_safely() {
+        let expected = i64::from(commit_projection::CHANGE_SCHEMA_VERSION);
+        assert_eq!(
+            checked_change_schema_version(expected).unwrap(),
+            expected as u32
+        );
+        assert!(checked_change_schema_version(-1).is_err());
+        assert!(checked_change_schema_version(i64::from(u32::MAX) + 1).is_err());
     }
 
     fn candidate(id: u64, eligible: Value) -> Value {
