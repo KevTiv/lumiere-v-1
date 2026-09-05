@@ -4,7 +4,7 @@
  * precedence: phone first, mobile fallback when phone is blank.
  */
 
-type QueryRow = Record<string, unknown>
+import type { RowValueMap } from "./row-values"
 
 export function norm(value: unknown): string {
   return String(value ?? "")
@@ -12,11 +12,11 @@ export function norm(value: unknown): string {
     .toLowerCase()
 }
 
-export function rowId(row: QueryRow): string {
+export function rowId(row: RowValueMap): string {
   return String(row.id ?? "")
 }
 
-export function rowEmail(row: QueryRow): string {
+export function rowEmail(row: RowValueMap): string {
   return norm(row.email ?? row.emailFrom ?? row.email_from)
 }
 
@@ -27,12 +27,12 @@ export function rowEmail(row: QueryRow): string {
  * blank, falls back to `mobile`. This matches the Rust `contact_phone`
  * reference in `spacetimedb/src/crm/duplicate.rs`.
  */
-export function rowPhone(row: QueryRow): string {
+export function rowPhone(row: RowValueMap): string {
   const phone = norm(row.phone ?? row.phoneNumber ?? row.phone_number)
   if (phone) return phone
   return norm(row.mobile)
 }
 
-export function rowName(row: QueryRow): string {
+export function rowName(row: RowValueMap): string {
   return norm(row.name ?? row.displayName ?? row.display_name)
 }

@@ -6,13 +6,15 @@
  * Use `firstNonNullKey` when null/undefined should be skipped.
  */
 
-type Row = Record<string, unknown>
+export interface RowValueMap {
+  [key: string]: unknown
+}
 
 /**
  * Return the value of the first key that exists as an own property.
  * Preserves null — only skips keys that are not own properties.
  */
-export function firstOwnedKey(row: Row, ...keys: string[]): unknown {
+export function firstOwnedKey(row: RowValueMap, ...keys: string[]): unknown {
   for (const key of keys) {
     if (Object.prototype.hasOwnProperty.call(row, key)) {
       return row[key]
@@ -25,7 +27,7 @@ export function firstOwnedKey(row: Row, ...keys: string[]): unknown {
  * Return the value of the first key whose value is not null/undefined.
  * Uses own-property check (does not traverse prototype chain).
  */
-export function firstNonNullKey(row: Row, ...keys: string[]): unknown {
+export function firstNonNullKey(row: RowValueMap, ...keys: string[]): unknown {
   for (const key of keys) {
     if (Object.prototype.hasOwnProperty.call(row, key)) {
       const value = row[key]
@@ -55,7 +57,7 @@ export function toCamelCase(key: string): string {
  * Look up a row field trying exact, snake_case, and camelCase variants.
  * Uses own-property checks. Preserves null — only skips missing keys.
  */
-export function getRowField(row: Row, key: string): unknown {
+export function getRowField(row: RowValueMap, key: string): unknown {
   if (Object.prototype.hasOwnProperty.call(row, key)) return row[key]
   const snake = toSnakeCase(key)
   if (Object.prototype.hasOwnProperty.call(row, snake)) return row[snake]

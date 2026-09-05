@@ -1,8 +1,13 @@
 /** Pure entity-display adapters; no component imports are needed to test them. */
-import { firstOwnedKey, toCamelCase, toSnakeCase } from "@lumiere/erp-shared/row-values"
+import {
+  firstOwnedKey,
+  toCamelCase,
+  toSnakeCase,
+  type RowValueMap,
+} from "@lumiere/erp-shared/row-values"
 import { isoToDate, millisToDate } from "@lumiere/erp-shared/timestamp-values"
 
-export function getRowField(row: Record<string, unknown>, key: string): unknown {
+export function getRowField(row: RowValueMap, key: string): unknown {
   // Entity config historically accepts PascalCase keys as well as camelCase.
   return firstOwnedKey(row, key, toSnakeCase(key).replace(/^_/, ""), toCamelCase(key))
 }
