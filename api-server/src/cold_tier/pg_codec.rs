@@ -264,14 +264,11 @@ fn decode_column(col: &ColumnCodec, raw: &Value) -> Result<PgValue> {
             PgValue::NumericText(Some(n.to_string()))
         }
         "BIGINT" => {
-            // Timestamp columns arrive as {"microsSinceUnixEpoch": <i64>};
+            // Timestamp columns arrive as either ergonomic
+            // {"microsSinceUnixEpoch": <i64>} or the canonical SATS
+            // {"__timestamp_micros_since_unix_epoch__": <i64>} wrapper;
             // plain integer columns arrive as a raw JSON number.
-            let n = if let Some(micros) = raw.get("microsSinceUnixEpoch").and_then(|v| v.as_i64()) {
-                micros
-            } else {
-                raw.as_i64()
-                    .ok_or_else(|| anyhow!("expected i64-like number or timestamp, got {raw}"))?
-            };
+            let n = decode_bigint_or_timestamp(raw)?;
             PgValue::BigInt(Some(n))
         }
         "INTEGER" => {
@@ -319,6 +316,27 @@ fn decode_column(col: &ColumnCodec, raw: &Value) -> Result<PgValue> {
 /// uses this for a tombstone key, where a complete row is intentionally absent.
 pub(crate) fn decode_key_value(col: &ColumnCodec, raw: &Value) -> Result<PgValue> {
     decode_column(col, raw)
+}
+
+fn decode_bigint_or_timestamp(raw: &Value) -> Result<i64> {
+    if let Some(n) = raw.as_i64() {
+        return Ok(n);
+    }
+
+    let Value::Object(obj) = raw else {
+        anyhow::bail!("expected i64-like number or timestamp, got {raw}");
+    };
+    if obj.len() != 1 {
+        anyhow::bail!("expected single-key timestamp wrapper, got {raw}");
+    }
+
+    let micros = obj
+        .get("microsSinceUnixEpoch")
+        .or_else(|| obj.get("__timestamp_micros_since_unix_epoch__"))
+        .ok_or_else(|| anyhow!("expected timestamp wrapper, got {raw}"))?;
+    micros
+        .as_i64()
+        .ok_or_else(|| anyhow!("expected i64 timestamp micros, got {micros}"))
 }
 
 fn null_value_for(pg_type: &str) -> Result<PgValue> {
@@ -583,10 +601,42 @@ mod tests {
     }
 
     #[test]
+    fn decodes_canonical_timestamp_object_wrapper() {
+        let mut row = sample_row();
+        row["dateOrder"] = json!({
+            "__timestamp_micros_since_unix_epoch__": 1_781_987_714_525_004_i64,
+        });
+
+        let values = decode_row(&cols(), &row).unwrap();
+        assert!(matches!(
+            values[7],
+            PgValue::BigInt(Some(1_781_987_714_525_004))
+        ));
+    }
+
+    #[test]
+    fn rejects_malformed_timestamp_object_wrappers() {
+        let mut malformed = sample_row();
+        malformed["dateOrder"] = json!({
+            "__timestamp_micros_since_unix_epoch__": "not-an-integer",
+        });
+        let err = format!("{:#}", decode_row(&cols(), &malformed).unwrap_err());
+        assert!(err.to_string().contains("expected i64 timestamp micros"));
+
+        let mut multi_key = sample_row();
+        multi_key["dateOrder"] = json!({
+            "__timestamp_micros_since_unix_epoch__": 1,
+            "extra": true,
+        });
+        let err = format!("{:#}", decode_row(&cols(), &multi_key).unwrap_err());
+        assert!(err.to_string().contains("single-key timestamp wrapper"));
+    }
+
+    #[test]
     fn rejects_malformed_identity_object_wrappers() {
         let mut malformed = sample_row();
         malformed["userId"] = json!({ "__identity__": [1, 2, 3] });
-        let err = decode_row(&cols(), &malformed).unwrap_err();
+        let err = format!("{:#}", decode_row(&cols(), &malformed).unwrap_err());
         assert!(err
             .to_string()
             .contains("expected 32-byte array for Identity"));
@@ -596,7 +646,7 @@ mod tests {
             "__identity__": format!("0x{}", "ab".repeat(32)),
             "extra": true,
         });
-        let err = decode_row(&cols(), &multi_key).unwrap_err();
+        let err = format!("{:#}", decode_row(&cols(), &multi_key).unwrap_err());
         assert!(err.to_string().contains("single-key __identity__ object"));
     }
 
