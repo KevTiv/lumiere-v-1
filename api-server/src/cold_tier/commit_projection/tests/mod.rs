@@ -14,6 +14,8 @@ use serde_json::{json, Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+mod legacy_worker_parity;
+
 const STORAGE_POLICY_MANIFEST_JSON: &str =
     include_str!("../../../../../lumiere-codegen/storage-policy-manifest.json");
 
