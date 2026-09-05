@@ -333,6 +333,15 @@ PostgreSQL rows and cursor; an injected gap blocks advancement visibly.
 **Gate:** current → next → application rollback works without destructive
 PostgreSQL downgrade, and incompatible combinations fail closed.
 
+**Implemented evidence:** the real-PostgreSQL compatibility drill starts from
+the C3 heap layout, applies the current versioned catalog, applies a simulated
+next-release additive migration, and proves the current application can start
+again without removing the new relation or its data. A subsequent simulated
+contract migration is rejected fail-closed. The same drill round-trips maximum
+`u64`, timestamp, identity, enum, vector, and nested-structure values through
+the generated PostgreSQL codec. The release manifest binds both the immutable
+generated baseline and the application migration-catalog version.
+
 ### C5 — Implement module-aware cooling and finalization
 
 **Priority:** P0

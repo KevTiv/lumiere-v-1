@@ -47,9 +47,16 @@
       "required": []
     },
     "C4": {
-      "status": "partial",
-      "evidence": ["versioned generated migrations and release compatibility checks exist"],
-      "required": ["real PostgreSQL current-next-application rollback proof", "C0-adjusted durable schema"]
+      "status": "complete",
+      "evidence": [
+        "the pinned v0.3.29 durable schema generates all 463 applicable organization-owned relations with zero platform-global relations plus policy-derived tenant-leading indexes and hash partitions",
+        "the checksum-verified application catalog has ordered expand, project/backfill, verify, and contract phases and is bound as version 10 by the release compatibility manifest",
+        "the real PostgreSQL compatibility drill adopts the C3 heap layout, applies current migrations, applies a future additive migration, starts the current application again without destructive downgrade, and preserves the future relation and row",
+        "the same drill applies a future contract migration and proves that the current application fails closed",
+        "the real PostgreSQL codec fixture round-trips maximum u64, signed timestamp, identity, enum text, vector, and nested-structure values without shape loss",
+        "release compatibility and operation-history verification pass against immutable lumiere-contracts v0.3.29; 1321 operation IDs have fingerprint/tombstone history"
+      ],
+      "required": []
     },
     "C5": {
       "status": "partial",
