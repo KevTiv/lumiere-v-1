@@ -109,7 +109,10 @@ class HelperTests(unittest.TestCase):
 
     def test_api_build_and_metadata_target_dir(self):
         self.invoke("api-build")
-        self.assertIn("-p api-server --bin api-server --locked", (self.root / "cargo.log").read_text())
+        self.assertIn(
+            "-p api-server --bin api-server --bin storage-migrate --locked",
+            (self.root / "cargo.log").read_text(),
+        )
         self.assertEqual(self.invoke("api-binary", env=self.env | {"CARGO_TARGET_DIR": "custom-target"}).stdout.strip(), str(self.root / "custom-target/debug/api-server"))
 
     def test_frontend_reuse_identity_failure_and_ci(self):
