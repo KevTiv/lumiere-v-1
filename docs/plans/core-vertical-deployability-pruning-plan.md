@@ -351,9 +351,9 @@ generated baseline and the application migration-catalog version.
 **Priority:** P0
 
 **Current status:** Partial. Policy/code-generation, reducer fixtures, the
-PostgreSQL ledger, and split worker credentials are implemented. C5 remains
-open for the disposable registered-worker STDB-to-PostgreSQL drill and an
-immutable generated-contract release.
+PostgreSQL ledger, split worker credentials, and the disposable registered-worker
+STDB-to-PostgreSQL drill are implemented and verified. C5 remains open only for
+an immutable generated-contract release and consumer pin.
 
 - Derive the archive candidate subset from the total storage-policy manifest;
   the current reviewed subset has one root, `pos_order`, with POS children
@@ -415,10 +415,12 @@ and dependency safety are proven.
   `STDB_FINALIZATION_TOKEN` credentials. Private commit/source reads use the
   administrator client; finalizer reducer calls use only the registered worker
   client, and startup fails closed when either token is missing or equal.
-- `scripts/c5-finalization-drill.sh` and its ignored Rust live test install a
-  disposable PostgreSQL database, project a real hydrated POS aggregate, invoke
-  the finalizer with the registered worker identity, and verify child/root
-  removal, the cold checksum row, and the finalized transfer ledger.
+- `scripts/c5-finalization-drill.sh` and its ignored Rust live test passed
+  against disposable local STDB and PostgreSQL on 2026-09-05. The drill projects
+  a real `erp.create_pos_order` commit, hydrates a remapped child-bearing POS
+  aggregate from canonical commit JSON, invokes the finalizer with a distinct
+  registered worker identity, and verifies child/root removal, the cold checksum
+  row, and the finalized transfer ledger.
 - The archive-transfer ledger uses compare-and-set identity, bounded pending
   reads, crash reconciliation, and explicit schema verification. Real
   PostgreSQL tests prove the normal retry/finalize path and fail closed when a
@@ -433,11 +435,6 @@ and dependency safety are proven.
   `Cargo.toml:21` pin from v0.3.29 and verify release fingerprints. The pinned
   v0.3.29 artifact predates the C5 provenance ratchet and still lists the now
   ineligible audit archive candidate.
-- Run disposable STDB + PostgreSQL runtime fixtures through the registered
-  finalization worker identity, proving archive write/checksum/version/watermark
-  durability before reducer deletion for the POS aggregate. The test harness is
-  implemented and fails closed without distinct credentials; a live run is
-  still required.
 
 ### C6 — Generalize bounded hot+cold reads and hydration
 

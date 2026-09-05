@@ -72,11 +72,10 @@
         "real PostgreSQL tests prove archive_transfer compare-and-set retries, bounded pending reads, finalization/reconciliation, and rejection of a malformed pre-existing ledger schema",
         "scripts/bootstrap-storage-policies.mjs write mode reproduces reviewed fixtures plus semantic/archive metadata and passes --check",
         "the projection worker uses distinct administrator/source-read and registered-worker/finalizer clients and fails startup closed when either credential is absent or equal",
-        "scripts/c5-finalization-drill.sh and the ignored Rust live test provide a bounded disposable PostgreSQL plus STDB POS finalization drill"
+        "scripts/c5-finalization-drill.sh and the ignored Rust live test passed against disposable local STDB and PostgreSQL on 2026-09-05, projecting a real create_pos_order commit, hydrating a remapped child-bearing aggregate from canonical commit JSON, finalizing it through a distinct registered worker identity, and verifying child/root deletion plus cold-row and ledger proofs"
       ],
       "required": [
-        "publish an immutable lumiere-contracts release containing the updated 463-table reviewed provenance and one-root archive subset, update the Cargo.toml:21 pin from v0.3.29, and verify release fingerprints",
-        "run the implemented disposable STDB plus PostgreSQL end-to-end POS finalization drill through the registered projection_worker identity"
+        "publish an immutable lumiere-contracts release containing the updated 463-table reviewed provenance and one-root archive subset, update the Cargo.toml:21 pin from v0.3.29, and verify release fingerprints"
       ]
     },
     "C6": {
