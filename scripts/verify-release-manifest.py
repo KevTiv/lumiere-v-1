@@ -188,7 +188,7 @@ def read_text(path: Path, label: str) -> str:
         fail(f"cannot read {label}: {error}")
 
 
-def verify_pg(contracts: Path, manifest: dict[str, Any]) -> None:
+def verify_pg(root: Path, contracts: Path, manifest: dict[str, Any]) -> None:
     expected = object_field(manifest, "durable_postgres", dict)
     sql_path = relative_path(contracts, expected.get("sql_path"), "durable_postgres.sql_path")
     schema_path = relative_path(contracts, expected.get("manifest_path"), "durable_postgres.manifest_path")
@@ -202,6 +202,31 @@ def verify_pg(contracts: Path, manifest: dict[str, Any]) -> None:
     require(digest.startswith("sha256:") and HEX64.fullmatch(digest[7:]), "durable_postgres.checksum is invalid")
     require(digest == f"sha256:{sha256(sql_path)}", "durable PG migration checksum does not match SQL")
     require(migration.get("checksum") == digest, "durable PG schema manifest checksum does not match release manifest")
+
+    catalog_path = relative_path(
+        root,
+        expected.get("application_catalog_path"),
+        "durable_postgres.application_catalog_path",
+    )
+    catalog_version = object_field(expected, "application_catalog_version", int)
+    catalog_checksum = object_field(expected, "application_catalog_checksum", str)
+    require(catalog_version > 0, "durable_postgres.application_catalog_version must be positive")
+    require(
+        catalog_checksum.startswith("sha256:") and HEX64.fullmatch(catalog_checksum[7:]),
+        "durable_postgres.application_catalog_checksum is invalid",
+    )
+    catalog_source = read_text(catalog_path, "application PostgreSQL migration catalog")
+    catalog_match = re.search(
+        r"pub const MIGRATIONS:\s*&\[Migration\]\s*=\s*&\[(.*?)\n\];",
+        catalog_source,
+        re.DOTALL,
+    )
+    require(catalog_match is not None, "application PostgreSQL migration catalog is missing")
+    versions = [
+        int(value)
+        for value in re.findall(r"(?m)^\s*version:\s*(\d+),\s*$", catalog_match.group(1))
+    ]
+    require(versions == list(range(1, catalog_version + 1)), "application PostgreSQL migration catalog version does not match manifest")
 
 
 def verify_services(root: Path, manifest: dict[str, Any]) -> None:
@@ -278,7 +303,7 @@ def main() -> None:
     verify_contract(root, manifest, contracts)
     verify_operation_history(root, contracts, manifest)
     verify_stdb(root, manifest)
-    verify_pg(contracts, manifest)
+    verify_pg(root, contracts, manifest)
     verify_services(root, manifest)
     verify_minimum_client(manifest)
     verify_deployment(root, manifest)

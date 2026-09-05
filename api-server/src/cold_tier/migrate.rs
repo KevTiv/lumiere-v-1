@@ -354,6 +354,25 @@ pub fn migration_checksum(sql: &str) -> String {
     format!("sha256:{:x}", Sha256::digest(sql.as_bytes()))
 }
 
+/// Return a deterministic fingerprint for the complete application migration
+/// catalog, including every migration's rollout metadata and SQL checksum.
+pub fn migration_catalog_checksum(migrations: &[Migration]) -> String {
+    let mut digest = Sha256::new();
+    for migration in migrations {
+        digest.update(migration.version.to_be_bytes());
+        digest.update([0]);
+        digest.update(migration.name.as_bytes());
+        digest.update([0]);
+        digest.update(migration.change_set.to_be_bytes());
+        digest.update([0]);
+        digest.update(migration.phase.as_str().as_bytes());
+        digest.update([0]);
+        digest.update(migration_checksum(migration.sql).as_bytes());
+        digest.update([0xff]);
+    }
+    format!("sha256:{:x}", digest.finalize())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct AppliedMigration {
     version: i64,
@@ -946,6 +965,24 @@ mod tests {
     }
 
     #[test]
+    fn release_manifest_binds_complete_application_migration_catalog() {
+        let manifest: Value =
+            serde_json::from_str(include_str!("../../../release-compatibility-manifest.json"))
+                .expect("release compatibility manifest is valid JSON");
+        assert_eq!(
+            manifest["durable_postgres"]["application_catalog_version"],
+            MIGRATIONS
+                .last()
+                .expect("migration catalog is non-empty")
+                .version
+        );
+        assert_eq!(
+            manifest["durable_postgres"]["application_catalog_checksum"],
+            migration_catalog_checksum(MIGRATIONS)
+        );
+    }
+
+    #[test]
     fn postgres_identifier_matches_server_truncation() {
         assert_eq!(postgres_identifier("short_index"), "short_index");
         assert_eq!(
@@ -1108,3 +1145,6 @@ mod tests {
             .contains("future contract migration"));
     }
 }
+
+#[cfg(test)]
+mod postgres_compatibility_tests;

@@ -33,7 +33,10 @@
     "migration_name": "0001_durable_projection",
     "sql_path": "manifests/pg_ddl/migrations/0001_durable_projection.sql",
     "manifest_path": "manifests/durable-pg-schema-manifest.json",
-    "checksum": "sha256:a4f8579bfee4c6e59911de92968c854a1fe605ae61e3e4871b410951ebc9c4bf"
+    "checksum": "sha256:a4f8579bfee4c6e59911de92968c854a1fe605ae61e3e4871b410951ebc9c4bf",
+    "application_catalog_path": "api-server/src/cold_tier/migrate.rs",
+    "application_catalog_version": 10,
+    "application_catalog_checksum": "sha256:2eca9e2bcd3c5ae39f79c13630958aaee3abcd727b776788150c67eebadafdb6"
   },
   "services": {
     "api_server": {
@@ -51,11 +54,11 @@
     "generated_contract_release": "0.3.29"
   },
   "deployment": {
-    "config_generation": 1,
+    "config_generation": 2,
     "config_sources": [
       {
         "path": ".env.docker.example",
-        "sha256": "789407026bd0285212ad7a5f535da2742f232e1b5ec24b5eaf534ed7bfa2a78e"
+        "sha256": "af1e65434ba832e98e8eb66bc894c626b5f1bb4e28e6ec4aaa842c44c7165f23"
       },
       {
         "path": "frontend/web/.env.example",

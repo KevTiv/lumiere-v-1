@@ -72,6 +72,28 @@ class ReleaseManifestTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("migration checksum", result.stderr)
 
+    def test_changed_application_migration_catalog_version_fails_closed(self):
+        temp, path = self._tampered_manifest(
+            lambda data: data["durable_postgres"].update(
+                {"application_catalog_version": 999}
+            )
+        )
+        self.addCleanup(temp.cleanup)
+        result = self._run(path)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("catalog version", result.stderr)
+
+    def test_invalid_application_migration_catalog_checksum_fails_closed(self):
+        temp, path = self._tampered_manifest(
+            lambda data: data["durable_postgres"].update(
+                {"application_catalog_checksum": "sha256:" + "0" * 63}
+            )
+        )
+        self.addCleanup(temp.cleanup)
+        result = self._run(path)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("application_catalog_checksum is invalid", result.stderr)
+
     def test_changed_operation_history_checksum_fails_closed(self):
         temp, path = self._tampered_manifest(
             lambda data: data["operation_history"].update(
