@@ -10,6 +10,7 @@
 use anyhow::{anyhow, bail, Context, Result};
 use deadpool_postgres::Pool;
 use serde_json::{json, Value};
+use std::collections::BTreeSet;
 use stdb_client::StdbClient;
 
 use super::super::{commit_projection, ledger, pg_codec};
@@ -33,7 +34,7 @@ const DURABILITY_PROOF_SQL: &str =
          FROM organization_row_change \
          WHERE organization_id = $1::TEXT::NUMERIC \
            AND table_name = 'pos_order' \
-           AND row_identity_json = $3::JSONB \
+           AND row_identity_json = $3::TEXT::JSONB \
            AND change_kind = 'upsert' \
          ORDER BY commit_sequence DESC \
          LIMIT 1 \
@@ -73,20 +74,12 @@ pub async fn drain_batch(
 
     let columns =
         pg_codec::load_columns(CODEC_MANIFEST_JSON, TABLE).context("load pos_order columns")?;
-    let column_list: String = columns
-        .iter()
-        .map(|column| column.name.as_str())
-        .collect::<Vec<_>>()
-        .join(", ");
-    let sql = format!(
-        "SELECT {column_list} FROM {TABLE} \
-         WHERE cold_eligible_at IS NOT NULL \
-         ORDER BY id ASC LIMIT {batch_size}"
-    );
+    let sql = format!("SELECT * FROM {TABLE}");
     let raw_rows = source_stdb
         .query_sql(&sql)
         .await
         .context("query pos_order finalization batch")?;
+    let raw_rows = select_candidates(raw_rows, batch_size)?;
 
     stats.read = raw_rows.len();
     for raw in &raw_rows {
@@ -129,15 +122,10 @@ async fn reconcile_pending(
                 bail!("pending pos_order transfer has an invalid resource or version");
             }
             let hot = stdb
-                .query_sql(&format!(
-                    "SELECT id, organization_id FROM {TABLE} WHERE id = {id} LIMIT 1"
-                ))
+                .query_sql(&format!("SELECT * FROM {TABLE} WHERE id = {id}"))
                 .await
                 .context("check pending pos_order hot row")?;
-            if let Some(row) = hot.first() {
-                if row.get("organizationId").and_then(Value::as_u64) != Some(organization_id) {
-                    bail!("pending pos_order transfer organization disagrees with hot row");
-                }
+            if select_exact_pos_order_row(hot, id, Some(organization_id))?.is_some() {
                 return Ok(false);
             }
 
@@ -278,14 +266,74 @@ pub(super) async fn drain_one_for_test(
     raw: &Value,
 ) -> Result<()> {
     let id = require_u64(raw, "id")?;
+    let organization_id = require_u64(raw, "organizationId")?;
     let source_row = source_stdb
-        .query_sql(&format!("SELECT * FROM {TABLE} WHERE id = {id} LIMIT 1"))
+        .query_sql(&format!("SELECT * FROM {TABLE} WHERE id = {id}"))
         .await
-        .context("read selected pos_order with administrator/source token")?
-        .into_iter()
-        .next()
+        .context("read selected pos_order with administrator/source token")?;
+    let source_row = select_exact_pos_order_row(source_row, id, Some(organization_id))?
         .ok_or_else(|| anyhow!("source pos_order {id} disappeared before finalization"))?;
     drain_one(pool, finalizer_stdb, columns, &source_row).await
+}
+
+fn select_candidates(rows: Vec<Value>, batch_size: u32) -> Result<Vec<Value>> {
+    let mut candidates = Vec::with_capacity(rows.len());
+    for row in rows {
+        let eligible = row
+            .get("coldEligibleAt")
+            .ok_or_else(|| anyhow!("pos_order candidate is missing coldEligibleAt"))?;
+        if eligible.is_null() {
+            continue;
+        }
+        let id = require_u64(&row, "id")?;
+        candidates.push((id, row));
+    }
+
+    candidates.sort_by_key(|(id, _)| *id);
+    let mut seen_ids = BTreeSet::new();
+    for (id, _) in &candidates {
+        if !seen_ids.insert(*id) {
+            bail!("pos_order candidate query returned duplicate id {id}");
+        }
+    }
+
+    Ok(candidates
+        .into_iter()
+        .take(batch_size as usize)
+        .map(|(_, row)| row)
+        .collect())
+}
+
+fn select_exact_pos_order_row(
+    rows: Vec<Value>,
+    expected_id: u64,
+    expected_organization_id: Option<u64>,
+) -> Result<Option<Value>> {
+    match rows.len() {
+        0 => Ok(None),
+        1 => {
+            let row = rows
+                .into_iter()
+                .next()
+                .ok_or_else(|| anyhow!("pos_order row disappeared during cardinality check"))?;
+            let id = require_u64(&row, "id")?;
+            if id != expected_id {
+                bail!("pos_order query returned id {id}; expected exact id {expected_id}");
+            }
+            if let Some(expected_organization_id) = expected_organization_id {
+                let organization_id = require_u64(&row, "organizationId")?;
+                if organization_id != expected_organization_id {
+                    bail!(
+                        "pos_order query returned organization {organization_id}; expected exact organization {expected_organization_id}"
+                    );
+                }
+            }
+            Ok(Some(row))
+        }
+        count => Err(anyhow!(
+            "pos_order query returned {count} rows; expected exactly one"
+        )),
+    }
 }
 
 /// Prove the exact current row image is covered by the contiguous PG
@@ -397,7 +445,7 @@ mod tests {
 
     #[test]
     fn durability_proof_requires_exact_identity_version_and_watermark() {
-        assert!(DURABILITY_PROOF_SQL.contains("row_identity_json = $3::JSONB"));
+        assert!(DURABILITY_PROOF_SQL.contains("row_identity_json = $3::TEXT::JSONB"));
         assert!(
             DURABILITY_PROOF_SQL.contains("watermark.applied_sequence >= change.commit_sequence")
         );
@@ -409,5 +457,97 @@ mod tests {
         assert!(COLD_ROW_PROOF_SQL.contains("archive_version::TEXT"));
         assert!(COLD_ROW_PROOF_SQL.contains("payload_checksum"));
         assert!(COLD_ROW_PROOF_SQL.contains("organization_id = $1::TEXT::NUMERIC"));
+    }
+
+    fn candidate(id: u64, eligible: Value) -> Value {
+        json!({
+            "id": id,
+            "organizationId": 7,
+            "coldEligibleAt": eligible,
+        })
+    }
+
+    #[test]
+    fn candidate_selection_filters_sorts_and_bounds_in_rust() {
+        let selected = select_candidates(
+            vec![
+                candidate(9, json!({"microsSinceUnixEpoch": 9})),
+                candidate(2, Value::Null),
+                candidate(4, json!({"microsSinceUnixEpoch": 4})),
+                candidate(1, json!({"microsSinceUnixEpoch": 1})),
+            ],
+            2,
+        )
+        .unwrap();
+        assert_eq!(
+            selected
+                .iter()
+                .map(|row| row["id"].as_u64().unwrap())
+                .collect::<Vec<_>>(),
+            vec![1, 4]
+        );
+    }
+
+    #[test]
+    fn candidate_selection_rejects_duplicate_ids_and_missing_eligibility() {
+        let duplicate = select_candidates(
+            vec![
+                candidate(4, json!({"microsSinceUnixEpoch": 4})),
+                candidate(4, json!({"microsSinceUnixEpoch": 5})),
+            ],
+            10,
+        );
+        assert!(duplicate.unwrap_err().to_string().contains("duplicate id"));
+
+        let missing = select_candidates(vec![json!({"id": 4})], 10);
+        assert!(missing
+            .unwrap_err()
+            .to_string()
+            .contains("missing coldEligibleAt"));
+    }
+
+    #[test]
+    fn exact_row_selection_requires_scope_and_cardinality() {
+        assert!(select_exact_pos_order_row(Vec::new(), 4, Some(7))
+            .unwrap()
+            .is_none());
+        assert!(select_exact_pos_order_row(
+            vec![candidate(4, json!({"microsSinceUnixEpoch": 4}))],
+            4,
+            Some(7),
+        )
+        .unwrap()
+        .is_some());
+        assert!(select_exact_pos_order_row(
+            vec![
+                candidate(4, json!({"microsSinceUnixEpoch": 4})),
+                candidate(4, json!({"microsSinceUnixEpoch": 5})),
+            ],
+            4,
+            Some(7),
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("exactly one"));
+        assert!(select_exact_pos_order_row(
+            vec![candidate(4, json!({"microsSinceUnixEpoch": 4}))],
+            5,
+            Some(7),
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("expected exact id"));
+        assert!(select_exact_pos_order_row(
+            vec![json!({
+                "id": 4,
+                "organizationId": 8,
+                "coldEligibleAt": {"microsSinceUnixEpoch": 4},
+            })],
+            4,
+            Some(7),
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("expected exact organization"));
     }
 }
