@@ -13,7 +13,6 @@ use deadpool_postgres::Pool;
 use serde::Deserialize;
 use stdb_client::StdbClient;
 
-mod audit_log;
 mod pos_order;
 
 #[cfg(test)]
@@ -74,7 +73,6 @@ struct ArchiveManifest {
 /// A handler selected only after the candidate has passed the closed mapping.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CandidateHandler {
-    AuditLog,
     PosOrder,
 }
 
@@ -99,11 +97,18 @@ pub fn parse_archive_manifest(manifest_json: &str) -> Result<Vec<ArchiveCandidat
             manifest.version
         );
     }
-    if manifest.candidates.is_empty() {
+    // v0.3.29 predates the reviewed policy that made audit_log always-hot and
+    // still advertises its obsolete finalizer. Ignore only that exact legacy
+    // tuple while consumers transition to the corrected generated manifest.
+    // Any malformed or unknown audit candidate still fails closed below.
+    let mut candidates = manifest
+        .candidates
+        .into_iter()
+        .filter(|candidate| !is_legacy_always_hot_audit_candidate(candidate))
+        .collect::<Vec<_>>();
+    if candidates.is_empty() {
         bail!("archive manifest must contain at least one candidate");
     }
-
-    let mut candidates = manifest.candidates;
     for candidate in &candidates {
         validate_candidate(candidate)?;
     }
@@ -134,9 +139,6 @@ fn validate_candidate(candidate: &ArchiveCandidate) -> Result<CandidateHandler> 
         candidate.finalize_reducer.as_str(),
         candidate.mode.as_str(),
     ) {
-        ("audit_log", "cold_audit_log", "finalize_audit_log_archive", "append_only") => {
-            Ok(CandidateHandler::AuditLog)
-        }
         ("pos_order", "cold_pos_order", "finalize_pos_order_archive", "versioned") => {
             Ok(CandidateHandler::PosOrder)
         }
@@ -147,6 +149,23 @@ fn validate_candidate(candidate: &ArchiveCandidate) -> Result<CandidateHandler> 
             mode
         ),
     }
+}
+
+fn is_legacy_always_hot_audit_candidate(candidate: &ArchiveCandidate) -> bool {
+    matches!(
+        (
+            candidate.table.as_str(),
+            candidate.cold_table.as_str(),
+            candidate.finalize_reducer.as_str(),
+            candidate.mode.as_str(),
+        ),
+        (
+            "audit_log",
+            "cold_audit_log",
+            "finalize_audit_log_archive",
+            "append_only"
+        )
+    )
 }
 
 /// Return the deterministic handler order for validated candidates.
@@ -189,11 +208,6 @@ pub async fn drain_batch(
 
     for target in targets {
         let candidate_stats = match target.handler {
-            CandidateHandler::AuditLog => {
-                audit_log::drain_batch(source_stdb, finalizer_stdb, pool, batch_size)
-                    .await
-                    .with_context(|| format!("drain archive candidate '{}'", target.table))?
-            }
             CandidateHandler::PosOrder => {
                 pos_order::drain_batch(source_stdb, finalizer_stdb, pool, batch_size)
                     .await
@@ -232,7 +246,33 @@ mod tests {
                 .iter()
                 .map(|candidate| candidate.table.as_str())
                 .collect::<Vec<_>>(),
-            vec!["audit_log", "pos_order"]
+            vec!["pos_order"]
+        );
+    }
+
+    #[test]
+    fn skips_the_exact_legacy_always_hot_audit_candidate() {
+        let parsed = parse_archive_manifest(&manifest(vec![
+            candidate(
+                "audit_log",
+                "cold_audit_log",
+                "finalize_audit_log_archive",
+                "append_only",
+            ),
+            candidate(
+                "pos_order",
+                "cold_pos_order",
+                "finalize_pos_order_archive",
+                "versioned",
+            ),
+        ]))
+        .unwrap();
+        assert_eq!(
+            parsed
+                .iter()
+                .map(|candidate| candidate.table.as_str())
+                .collect::<Vec<_>>(),
+            vec!["pos_order"]
         );
     }
 
@@ -263,35 +303,25 @@ mod tests {
 
     #[test]
     fn dispatch_order_is_stable_and_closed() {
-        let values = vec![
-            candidate(
-                "pos_order",
-                "cold_pos_order",
-                "finalize_pos_order_archive",
-                "versioned",
-            ),
-            candidate(
-                "audit_log",
-                "cold_audit_log",
-                "finalize_audit_log_archive",
-                "append_only",
-            ),
-        ];
+        let values = vec![candidate(
+            "pos_order",
+            "cold_pos_order",
+            "finalize_pos_order_archive",
+            "versioned",
+        )];
         let candidates = parse_archive_manifest(&manifest(values)).unwrap();
         let targets = dispatch_order(&candidates).unwrap();
-        assert_eq!(targets[0].table, "audit_log");
-        assert_eq!(targets[0].handler, CandidateHandler::AuditLog);
-        assert_eq!(targets[1].table, "pos_order");
-        assert_eq!(targets[1].handler, CandidateHandler::PosOrder);
+        assert_eq!(targets[0].table, "pos_order");
+        assert_eq!(targets[0].handler, CandidateHandler::PosOrder);
     }
 
     #[test]
     fn rejects_duplicate_candidate_tables() {
         let value = candidate(
-            "audit_log",
-            "cold_audit_log",
-            "finalize_audit_log_archive",
-            "append_only",
+            "pos_order",
+            "cold_pos_order",
+            "finalize_pos_order_archive",
+            "versioned",
         );
         let error = parse_archive_manifest(&manifest(vec![value.clone(), value])).unwrap_err();
         assert!(error.to_string().contains("duplicate candidate table"));
@@ -301,7 +331,7 @@ mod tests {
     fn aggregates_candidate_stats() {
         let mut aggregate = FinalizationDrainStats::default();
         aggregate.record(
-            "audit_log",
+            "pos_order",
             CandidateDrainStats {
                 read: 4,
                 archived: 3,
@@ -311,7 +341,7 @@ mod tests {
             },
         );
         aggregate.record(
-            "pos_order",
+            "another_candidate",
             CandidateDrainStats {
                 read: 6,
                 archived: 5,
@@ -331,6 +361,6 @@ mod tests {
             ),
             (10, 8, 6, 3, 1)
         );
-        assert_eq!(aggregate.by_candidate["audit_log"].failed, 1);
+        assert_eq!(aggregate.by_candidate["pos_order"].failed, 1);
     }
 }
