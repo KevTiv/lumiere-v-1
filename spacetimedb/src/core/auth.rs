@@ -103,8 +103,8 @@ fn audit_organization_for_identity(ctx: &ReducerContext, identity: Identity) -> 
 /// Asserts the calling identity is a superuser (i.e. the server admin identity).
 /// All admin-called reducers must call this first.
 fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
-    let caller = find_user_profile_for_identity(ctx, ctx.sender())
-        .ok_or("Caller profile not found")?;
+    let caller =
+        find_user_profile_for_identity(ctx, ctx.sender()).ok_or("Caller profile not found")?;
     if !caller.is_superuser || !caller.is_active {
         return Err("Unauthorized: caller is not a superuser".to_string());
     }
@@ -302,8 +302,8 @@ pub fn bind_user_profile(
     if platform_user_id.trim().is_empty() || platform_user_id.len() > 128 {
         return Err("platform user id is invalid".to_string());
     }
-    let profile = find_user_profile_for_identity(ctx, user_identity)
-        .ok_or("User profile not found")?;
+    let profile =
+        find_user_profile_for_identity(ctx, user_identity).ok_or("User profile not found")?;
     if !ctx
         .db
         .user_organization()

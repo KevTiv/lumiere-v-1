@@ -9,6 +9,11 @@ Location: `docs/plan` as requested; related architectural plans remain in `docs/
 Companion work: [build DX and CI execution ledger](build-dx-ci-execution-plan.md).
 Build-orchestration improvements do not complete any module extraction below.
 
+Expanded refactor handoff: [code ownership and deduplication plan](code-ownership-deduplication-refactor-plan.md).
+Its D40 task coordinates the M-tasks in this document rather than executing a
+second extraction plan. Agree the order of overlapping helper corrections and
+file moves before assigning agents; keep behavior changes separate from moves.
+
 ## 1. Objective and authority
 
 Break large, mixed-responsibility modules into cohesive modules while preserving HTTP behavior, public Rust entry points, authorization, generated-contract ownership, and persistence semantics. The coordinator must delegate bounded work, review every returned change, integrate it into the working codebase, and verify the combined result. Delegation alone does not complete a task.

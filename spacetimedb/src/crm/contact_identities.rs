@@ -640,7 +640,12 @@ pub fn configure_contact_identity_verification_authority(
     organization_id: u64,
     issuer_identity: Identity,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "contact_identity_verification_authority", "write")?;
+    check_permission(
+        ctx,
+        organization_id,
+        "contact_identity_verification_authority",
+        "write",
+    )?;
     let caller = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
         .ok_or("verification authority configurator profile not found")?;
     if !caller.is_active || !caller.is_superuser {

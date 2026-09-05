@@ -306,8 +306,8 @@ pub fn update_user_profile(
     ctx: &ReducerContext,
     params: UpdateUserProfileParams,
 ) -> Result<(), String> {
-    let profile = find_user_profile_for_identity(ctx, ctx.sender())
-        .ok_or("User profile not found")?;
+    let profile =
+        find_user_profile_for_identity(ctx, ctx.sender()).ok_or("User profile not found")?;
     if !ctx
         .db
         .user_organization()

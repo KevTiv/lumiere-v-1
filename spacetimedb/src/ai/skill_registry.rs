@@ -2085,8 +2085,7 @@ fn validate_certification_evidence_params(
 }
 
 fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
-    let user = find_user_profile_for_identity(ctx, ctx.sender())
-        .ok_or("User not found")?;
+    let user = find_user_profile_for_identity(ctx, ctx.sender()).ok_or("User not found")?;
     if !user.is_active || !user.is_superuser {
         return Err(
             "only an active platform superuser may register certification runtimes".to_string(),

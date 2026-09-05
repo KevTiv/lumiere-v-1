@@ -12,6 +12,7 @@ use spacetimedb::{Identity, ReducerContext, Table};
 // ── Core ──────────────────────────────────────────────────────────────────────
 use crate::ai::reducer_allowlist::{ai_reducer_allowlist, AiReducerAllowlist};
 use crate::core::audit::{audit_log, audit_rule, AuditLog, AuditRule};
+use crate::core::country_pack::seed_country_pack_catalog_for_organization;
 use crate::core::messaging::{mail_follower, mail_message, MailFollower, MailMessage};
 use crate::core::organization::{
     company, new_external_id, organization, organization_settings, Company, Organization,
@@ -26,7 +27,6 @@ use crate::core::privacy::{
     DataClassificationRule, PrivacyConsent,
 };
 use crate::core::queue::{enqueue_job_internal, queue_worker, EnqueueJobParams, QueueWorker};
-use crate::core::country_pack::seed_country_pack_catalog_for_organization;
 use crate::core::reference::{
     country, currency, currency_rate, document_sequence, uom, uom_cat, uom_conversion, Country,
     Currency, CurrencyRate, DocumentSequence, UOMCategory, UOMConversion, UOM,
@@ -71,6 +71,7 @@ use crate::inventory::tracking::{
 use crate::inventory::warehouse::{stock_location, warehouse, StockLocation, Warehouse};
 
 // ── Sales ─────────────────────────────────────────────────────────────────────
+use crate::hr::country_pack_hr::seed_hr_country_pack_leave_catalog_for_organization;
 use crate::sales::pos_config::{
     pos_config, pos_loyalty_program, pos_payment_method, PosConfig, PosLoyaltyProgram,
     PosPaymentMethod,
@@ -82,7 +83,6 @@ use crate::sales::pos_transactions::{
 use crate::sales::pricelists::{product_pricelist, ProductPricelist};
 use crate::sales::sales_core::{sale_order, sale_order_line, SaleOrder, SaleOrderLine};
 use crate::types::DiscountPolicy;
-use crate::hr::country_pack_hr::seed_hr_country_pack_leave_catalog_for_organization;
 
 // ── Purchasing ────────────────────────────────────────────────────────────────
 use crate::purchasing::landed_costs::{
@@ -1033,33 +1033,33 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         ..org
     });
     let usd_currency = ctx.db.currency().insert(Currency {
-            id: 0,
-            organization_code_key: format!("{org_id}:USD"),
-            organization_id: org_id,
-            code: "USD".to_string(),
-            name: "US Dollar".to_string(),
-            symbol: "$".to_string(),
-            decimal_places: 2,
-            rounding_factor: 0.01,
-            active: true,
-            position: "before".to_string(),
-            created_at: ctx.timestamp,
-            metadata: None,
-        });
+        id: 0,
+        organization_code_key: format!("{org_id}:USD"),
+        organization_id: org_id,
+        code: "USD".to_string(),
+        name: "US Dollar".to_string(),
+        symbol: "$".to_string(),
+        decimal_places: 2,
+        rounding_factor: 0.01,
+        active: true,
+        position: "before".to_string(),
+        created_at: ctx.timestamp,
+        metadata: None,
+    });
     let eur_currency = ctx.db.currency().insert(Currency {
-            id: 0,
-            organization_code_key: format!("{org_id}:EUR"),
-            organization_id: org_id,
-            code: "EUR".to_string(),
-            name: "Euro".to_string(),
-            symbol: "€".to_string(),
-            decimal_places: 2,
-            rounding_factor: 0.01,
-            active: true,
-            position: "before".to_string(),
-            created_at: ctx.timestamp,
-            metadata: None,
-        });
+        id: 0,
+        organization_code_key: format!("{org_id}:EUR"),
+        organization_id: org_id,
+        code: "EUR".to_string(),
+        name: "Euro".to_string(),
+        symbol: "€".to_string(),
+        decimal_places: 2,
+        rounding_factor: 0.01,
+        active: true,
+        position: "before".to_string(),
+        created_at: ctx.timestamp,
+        metadata: None,
+    });
     let usd_currency_id = usd_currency.id;
     let eur_currency_id = eur_currency.id;
     if let Some(org) = ctx.db.organization().id().find(&org_id) {
@@ -8191,7 +8191,12 @@ Prioritize high-severity findings and cite related records."#,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
 
-    if ctx.db.country().iter().all(|country| country.code != "US" || country.organization_id != org_id) {
+    if ctx
+        .db
+        .country()
+        .iter()
+        .all(|country| country.code != "US" || country.organization_id != org_id)
+    {
         ctx.db.country().insert(Country {
             organization_code_key: format!("{org_id}:US"),
             code: "US".to_string(),
@@ -11030,9 +11035,11 @@ fn ensure_minimal_dev_org(ctx: &ReducerContext) -> Result<(), String> {
         organization_id: org_id,
         ..org
     });
-    let usd_currency = ctx.db.currency().iter().find(|currency| {
-        currency.organization_id == org_id && currency.code == "USD"
-    });
+    let usd_currency = ctx
+        .db
+        .currency()
+        .iter()
+        .find(|currency| currency.organization_id == org_id && currency.code == "USD");
     let usd_currency = usd_currency.unwrap_or_else(|| {
         ctx.db.currency().insert(Currency {
             id: 0,

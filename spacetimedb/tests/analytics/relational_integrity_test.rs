@@ -176,7 +176,8 @@ pub fn test_cross_company_widget_add_rejected(ctx: &ReducerContext) -> Result<()
 
     let widget_b_id = create_widget(ctx, &fixture, Some(company_b), "ANL-005 Widget B")?;
 
-    let rejected = add_widget_to_dashboard(ctx, fixture.organization_id, dashboard_a_id, widget_b_id);
+    let rejected =
+        add_widget_to_dashboard(ctx, fixture.organization_id, dashboard_a_id, widget_b_id);
     match rejected {
         Err(ref e) if e.to_lowercase().contains("company") => {}
         other => {

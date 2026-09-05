@@ -238,7 +238,12 @@ pub fn update_widget_layout(
     if let Some(widget_company) = widget.company_id {
         match company_id {
             Some(cid) if cid == widget_company => {}
-            _ => return Err("Company scope mismatch — provide the widget's company_id to update it".to_string()),
+            _ => {
+                return Err(
+                    "Company scope mismatch — provide the widget's company_id to update it"
+                        .to_string(),
+                )
+            }
         }
     }
 

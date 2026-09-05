@@ -6,7 +6,9 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
-use crate::inventory::stock::{increase_quant_at_location, require_location_in_org, require_product_in_org};
+use crate::inventory::stock::{
+    increase_quant_at_location, require_location_in_org, require_product_in_org,
+};
 use serde_json;
 
 // ── Tables ───────────────────────────────────────────────────────────────────

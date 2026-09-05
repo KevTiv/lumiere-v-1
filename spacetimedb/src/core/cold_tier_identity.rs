@@ -170,8 +170,7 @@ fn validate_platform_id(platform_id: &str) -> Result<String, String> {
 }
 
 fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
-    let user = find_user_profile_for_identity(ctx, ctx.sender())
-        .ok_or("User not found")?;
+    let user = find_user_profile_for_identity(ctx, ctx.sender()).ok_or("User not found")?;
     if !user.is_active || !user.is_superuser {
         return Err(
             "only an active platform superuser may register cold-tier service identities"

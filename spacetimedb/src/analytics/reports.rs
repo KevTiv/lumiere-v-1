@@ -364,9 +364,7 @@ fn validate_schedule_configuration(
             // ANL-002: when both the schedule and template carry a company scope, they must match
             if let (Some(report_company), Some(tmpl_company)) = (company_id, template.company_id) {
                 if report_company != tmpl_company {
-                    return Err(
-                        "Report template does not belong to this company".to_string(),
-                    );
+                    return Err("Report template does not belong to this company".to_string());
                 }
             }
             if params.recipients.is_empty() {
@@ -937,7 +935,12 @@ pub fn update_report_template(
     if let Some(tmpl_company) = tmpl.company_id {
         match company_id {
             Some(cid) if cid == tmpl_company => {}
-            _ => return Err("Company scope mismatch — provide the template's company_id to update it".to_string()),
+            _ => {
+                return Err(
+                    "Company scope mismatch — provide the template's company_id to update it"
+                        .to_string(),
+                )
+            }
         }
     }
 
@@ -1365,7 +1368,12 @@ pub fn update_metric_values(
     if let Some(metric_company) = metric.company_id {
         match company_id {
             Some(cid) if cid == metric_company => {}
-            _ => return Err("Company scope mismatch — provide the metric's company_id to update it".to_string()),
+            _ => {
+                return Err(
+                    "Company scope mismatch — provide the metric's company_id to update it"
+                        .to_string(),
+                )
+            }
         }
     }
 

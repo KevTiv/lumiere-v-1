@@ -13,7 +13,11 @@ use crate::documents::documents::{create_document, document, CreateDocumentParam
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::InsightSeverity;
 
-fn create_test_insight(ctx: &ReducerContext, fixture: &OrgFixture, title: &str) -> Result<u64, String> {
+fn create_test_insight(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    title: &str,
+) -> Result<u64, String> {
     create_ai_insight(
         ctx,
         fixture.organization_id,

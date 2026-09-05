@@ -136,11 +136,9 @@ pub fn test_warehouse_geo_rejects_invalid_warehouse(ctx: &ReducerContext) -> Res
         None,
         None,
     )?;
-    let persisted = ctx
-        .db
-        .warehouse_geo()
-        .iter()
-        .any(|g| g.organization_id == local.organization_id && g.warehouse_id == local.warehouse_id);
+    let persisted = ctx.db.warehouse_geo().iter().any(|g| {
+        g.organization_id == local.organization_id && g.warehouse_id == local.warehouse_id
+    });
     if !persisted {
         return Err("valid warehouse_geo upsert was not persisted".to_string());
     }

@@ -1312,8 +1312,7 @@ pub fn set_asset_active(
 /// Validate fixed-asset ownership from company and parent relations.
 #[spacetimedb::reducer]
 pub fn backfill_fixed_asset_organization_ownership(ctx: &ReducerContext) -> Result<(), String> {
-    let user = find_user_profile_for_identity(ctx, ctx.sender())
-        .ok_or("user not found")?;
+    let user = find_user_profile_for_identity(ctx, ctx.sender()).ok_or("user not found")?;
     if !user.is_superuser {
         return Err("only superusers may backfill accounting ownership".to_string());
     }

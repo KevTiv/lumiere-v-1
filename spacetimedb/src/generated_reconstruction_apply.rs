@@ -485,9 +485,10 @@ pub(crate) fn apply_generated_reconstruction_row(
     match table_name {
         "account_account" => {
             use crate::accounting::chart_of_accounts::{account_account as _, AccountAccount};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountAccount>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_account: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountAccount>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for account_account: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -497,10 +498,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing account_account row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_account row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_account row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -510,12 +512,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_account_type" => {
-            use crate::accounting::chart_of_accounts::{account_account_type as _, AccountAccountType};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountAccountType>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_account_type: {error}"))?;
+            use crate::accounting::chart_of_accounts::{
+                account_account_type as _, AccountAccountType,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountAccountType>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for account_account_type: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -525,10 +532,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing account_account_type row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_account_type row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_account_type row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -538,12 +546,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_analytic_account" => {
-            use crate::accounting::analytic_accounting::{account_analytic_account as _, AccountAnalyticAccount};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountAnalyticAccount>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_analytic_account: {error}"))?;
+            use crate::accounting::analytic_accounting::{
+                account_analytic_account as _, AccountAnalyticAccount,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountAnalyticAccount>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for account_analytic_account: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -552,11 +565,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing account_analytic_account row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_analytic_account row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing account_analytic_account row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_analytic_account row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -566,12 +582,19 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_analytic_distribution_model" => {
-            use crate::accounting::analytic_accounting::{account_analytic_distribution_model as _, AccountAnalyticDistributionModel};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountAnalyticDistributionModel>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_analytic_distribution_model: {error}"))?;
+            use crate::accounting::analytic_accounting::{
+                account_analytic_distribution_model as _, AccountAnalyticDistributionModel,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountAnalyticDistributionModel>,
+            >(row_json)
+            .map_err(|error| {
+                format!(
+                    "invalid canonical row JSON for account_analytic_distribution_model: {error}"
+                )
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -580,11 +603,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing account_analytic_distribution_model row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing account_analytic_distribution_model row: {error}")
+                })?;
                 let incoming_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
                 )
-                .map_err(|error| format!("serialize incoming account_analytic_distribution_model row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize incoming account_analytic_distribution_model row: {error}")
+                })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -594,12 +621,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_analytic_line" => {
-            use crate::accounting::analytic_accounting::{account_analytic_line as _, AccountAnalyticLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountAnalyticLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_analytic_line: {error}"))?;
+            use crate::accounting::analytic_accounting::{
+                account_analytic_line as _, AccountAnalyticLine,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountAnalyticLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for account_analytic_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -608,11 +640,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing account_analytic_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_analytic_line row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing account_analytic_line row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_analytic_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -622,12 +657,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_asset" => {
             use crate::accounting::fixed_assets::{account_asset as _, AccountAsset};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountAsset>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_asset: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountAsset>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for account_asset: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -637,10 +673,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing account_asset row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_asset row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_asset row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -650,12 +687,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_bank_statement" => {
-            use crate::accounting::bank_reconciliation::{account_bank_statement as _, AccountBankStatement};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountBankStatement>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_bank_statement: {error}"))?;
+            use crate::accounting::bank_reconciliation::{
+                account_bank_statement as _, AccountBankStatement,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountBankStatement>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for account_bank_statement: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -664,11 +706,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing account_bank_statement row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_bank_statement row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing account_bank_statement row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_bank_statement row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -678,12 +723,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_fiscal_position" => {
-            use crate::sales::oms_extensions::{account_fiscal_position as _, AccountFiscalPosition};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountFiscalPosition>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_fiscal_position: {error}"))?;
+            use crate::sales::oms_extensions::{
+                account_fiscal_position as _, AccountFiscalPosition,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountFiscalPosition>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for account_fiscal_position: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -692,11 +742,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing account_fiscal_position row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_fiscal_position row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing account_fiscal_position row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_fiscal_position row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -706,12 +759,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_fiscal_position_tax" => {
-            use crate::sales::oms_extensions::{account_fiscal_position_tax as _, AccountFiscalPositionTax};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountFiscalPositionTax>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_fiscal_position_tax: {error}"))?;
+            use crate::sales::oms_extensions::{
+                account_fiscal_position_tax as _, AccountFiscalPositionTax,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountFiscalPositionTax>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for account_fiscal_position_tax: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -720,11 +778,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing account_fiscal_position_tax row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_fiscal_position_tax row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing account_fiscal_position_tax row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_fiscal_position_tax row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -734,12 +795,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_fiscal_year" => {
             use crate::accounting::fiscal_periods::{account_fiscal_year as _, AccountFiscalYear};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountFiscalYear>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_fiscal_year: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountFiscalYear>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for account_fiscal_year: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -749,10 +813,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing account_fiscal_year row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_fiscal_year row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_fiscal_year row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -762,12 +827,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_group" => {
             use crate::accounting::chart_of_accounts::{account_group as _, AccountGroup};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountGroup>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_group: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountGroup>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for account_group: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -777,10 +843,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing account_group row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_group row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_group row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -790,12 +857,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_incoterm" => {
             use crate::sales::oms_extensions::{account_incoterm as _, AccountIncoterm};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountIncoterm>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_incoterm: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountIncoterm>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for account_incoterm: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -805,10 +873,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing account_incoterm row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_incoterm row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_incoterm row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -818,12 +887,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_journal" => {
             use crate::accounting::chart_of_accounts::{account_journal as _, AccountJournal};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountJournal>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_journal: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountJournal>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for account_journal: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -833,10 +903,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing account_journal row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_journal row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_journal row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -846,12 +917,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_move" => {
             use crate::accounting::journal_entries::{account_move as _, AccountMove};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountMove>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_move: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountMove>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for account_move: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -861,10 +933,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing account_move row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_move row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming account_move row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -874,12 +945,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_payment" => {
             use crate::accounting::payments::{account_payment as _, AccountPayment};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountPayment>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_payment: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountPayment>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for account_payment: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -889,10 +961,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing account_payment row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_payment row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_payment row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -902,12 +975,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_payment_term" => {
             use crate::accounting::payment_terms::{account_payment_term as _, AccountPaymentTerm};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountPaymentTerm>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_payment_term: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountPaymentTerm>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for account_payment_term: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -917,10 +993,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing account_payment_term row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_payment_term row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_payment_term row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -930,12 +1007,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_reconciliation_widget" => {
-            use crate::accounting::bank_reconciliation::{account_reconciliation_widget as _, AccountReconciliationWidget};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountReconciliationWidget>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_reconciliation_widget: {error}"))?;
+            use crate::accounting::bank_reconciliation::{
+                account_reconciliation_widget as _, AccountReconciliationWidget,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountReconciliationWidget>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for account_reconciliation_widget: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -944,11 +1026,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing account_reconciliation_widget row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_reconciliation_widget row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing account_reconciliation_widget row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_reconciliation_widget row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -958,12 +1043,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_tax" => {
             use crate::accounting::tax_management::{account_tax as _, AccountTax};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountTax>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_tax: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountTax>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for account_tax: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -973,10 +1059,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing account_tax row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_tax row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming account_tax row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -986,12 +1071,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_tax_group" => {
             use crate::accounting::tax_management::{account_tax_group as _, AccountTaxGroup};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountTaxGroup>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_tax_group: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountTaxGroup>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for account_tax_group: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1001,10 +1089,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing account_tax_group row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_tax_group row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_tax_group row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1014,12 +1103,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "accounting_operation_receipt" => {
-            use crate::accounting::idempotency::{accounting_operation_receipt as _, AccountingOperationReceipt};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountingOperationReceipt>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for accounting_operation_receipt: {error}"))?;
+            use crate::accounting::idempotency::{
+                accounting_operation_receipt as _, AccountingOperationReceipt,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountingOperationReceipt>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for accounting_operation_receipt: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1028,11 +1122,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing accounting_operation_receipt row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming accounting_operation_receipt row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing accounting_operation_receipt row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming accounting_operation_receipt row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1042,12 +1139,19 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "accounting_ownership_backfill_issue" => {
-            use crate::accounting::fiscal_periods::{accounting_ownership_backfill_issue as _, AccountingOwnershipBackfillIssue};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountingOwnershipBackfillIssue>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for accounting_ownership_backfill_issue: {error}"))?;
+            use crate::accounting::fiscal_periods::{
+                accounting_ownership_backfill_issue as _, AccountingOwnershipBackfillIssue,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountingOwnershipBackfillIssue>,
+            >(row_json)
+            .map_err(|error| {
+                format!(
+                    "invalid canonical row JSON for accounting_ownership_backfill_issue: {error}"
+                )
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1056,11 +1160,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing accounting_ownership_backfill_issue row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing accounting_ownership_backfill_issue row: {error}")
+                })?;
                 let incoming_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
                 )
-                .map_err(|error| format!("serialize incoming accounting_ownership_backfill_issue row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize incoming accounting_ownership_backfill_issue row: {error}")
+                })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1070,12 +1178,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "accounting_ownership_backfill_run" => {
-            use crate::accounting::fiscal_periods::{accounting_ownership_backfill_run as _, AccountingOwnershipBackfillRun};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountingOwnershipBackfillRun>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for accounting_ownership_backfill_run: {error}"))?;
+            use crate::accounting::fiscal_periods::{
+                accounting_ownership_backfill_run as _, AccountingOwnershipBackfillRun,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountingOwnershipBackfillRun>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for accounting_ownership_backfill_run: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1084,11 +1197,16 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing accounting_ownership_backfill_run row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming accounting_ownership_backfill_run row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing accounting_ownership_backfill_run row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!(
+                                "serialize incoming accounting_ownership_backfill_run row: {error}"
+                            )
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1098,7 +1216,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "activity" => {
             use crate::crm::activities::{activity as _, Activity};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -1113,10 +1231,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing activity row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming activity row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming activity row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1126,12 +1243,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "activity_type" => {
             use crate::crm::activities::{activity_type as _, ActivityType};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ActivityType>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for activity_type: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ActivityType>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for activity_type: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1141,10 +1259,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing activity_type row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming activity_type row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming activity_type row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1154,12 +1273,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "adjustment_reason" => {
-            use crate::inventory::inventory_adjustments::{adjustment_reason as _, AdjustmentReason};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AdjustmentReason>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for adjustment_reason: {error}"))?;
+            use crate::inventory::inventory_adjustments::{
+                adjustment_reason as _, AdjustmentReason,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AdjustmentReason>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for adjustment_reason: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1169,10 +1293,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing adjustment_reason row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming adjustment_reason row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming adjustment_reason row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1182,12 +1307,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_action_draft" => {
             use crate::ai::action_drafts::{ai_action_draft as _, AiActionDraft};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiActionDraft>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_action_draft: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiActionDraft>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for ai_action_draft: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1197,10 +1323,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing ai_action_draft row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_action_draft row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming ai_action_draft row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1210,7 +1337,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_agent" => {
             use crate::ai::agents::{ai_agent as _, AiAgent};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -1225,10 +1352,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing ai_agent row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_agent row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming ai_agent row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1238,12 +1364,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_agent_run" => {
             use crate::ai::skills::{ai_agent_run as _, AiAgentRun};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiAgentRun>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_agent_run: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiAgentRun>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for ai_agent_run: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1253,10 +1380,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing ai_agent_run row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_agent_run row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming ai_agent_run row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1266,12 +1392,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_chat_message" => {
             use crate::ai::chat::{ai_chat_message as _, AiChatMessage};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiChatMessage>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_chat_message: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiChatMessage>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for ai_chat_message: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1281,10 +1408,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing ai_chat_message row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_chat_message row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming ai_chat_message row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1294,12 +1422,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_chat_session" => {
             use crate::ai::chat::{ai_chat_session as _, AiChatSession};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiChatSession>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_chat_session: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiChatSession>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for ai_chat_session: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1309,10 +1438,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing ai_chat_session row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_chat_session row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming ai_chat_session row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1322,12 +1452,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_document_processing_job" => {
-            use crate::ai::intelligence::{ai_document_processing_job as _, AiDocumentProcessingJob};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiDocumentProcessingJob>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_document_processing_job: {error}"))?;
+            use crate::ai::intelligence::{
+                ai_document_processing_job as _, AiDocumentProcessingJob,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiDocumentProcessingJob>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for ai_document_processing_job: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1336,11 +1471,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing ai_document_processing_job row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_document_processing_job row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing ai_document_processing_job row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming ai_document_processing_job row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1350,12 +1488,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_insight" => {
             use crate::ai::intelligence::{ai_insight as _, AiInsight};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiInsight>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_insight: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiInsight>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for ai_insight: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1365,10 +1504,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing ai_insight row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_insight row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming ai_insight row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1378,12 +1516,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_reducer_allowlist" => {
             use crate::ai::reducer_allowlist::{ai_reducer_allowlist as _, AiReducerAllowlist};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiReducerAllowlist>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_reducer_allowlist: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiReducerAllowlist>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for ai_reducer_allowlist: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1393,10 +1534,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing ai_reducer_allowlist row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_reducer_allowlist row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming ai_reducer_allowlist row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1406,7 +1548,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_skill" => {
             use crate::ai::skills::{ai_skill as _, AiSkill};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -1421,10 +1563,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing ai_skill row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_skill row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming ai_skill row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1434,12 +1575,19 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_skill_certification_environment" => {
-            use crate::ai::skill_registry::{ai_skill_certification_environment as _, AiSkillCertificationEnvironment};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiSkillCertificationEnvironment>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_skill_certification_environment: {error}"))?;
+            use crate::ai::skill_registry::{
+                ai_skill_certification_environment as _, AiSkillCertificationEnvironment,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiSkillCertificationEnvironment>,
+            >(row_json)
+            .map_err(|error| {
+                format!(
+                    "invalid canonical row JSON for ai_skill_certification_environment: {error}"
+                )
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1448,11 +1596,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing ai_skill_certification_environment row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing ai_skill_certification_environment row: {error}")
+                })?;
                 let incoming_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
                 )
-                .map_err(|error| format!("serialize incoming ai_skill_certification_environment row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize incoming ai_skill_certification_environment row: {error}")
+                })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1462,12 +1614,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_skill_certification_evidence" => {
-            use crate::ai::skill_registry::{ai_skill_certification_evidence as _, AiSkillCertificationEvidence};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiSkillCertificationEvidence>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_skill_certification_evidence: {error}"))?;
+            use crate::ai::skill_registry::{
+                ai_skill_certification_evidence as _, AiSkillCertificationEvidence,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiSkillCertificationEvidence>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for ai_skill_certification_evidence: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1476,11 +1633,16 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing ai_skill_certification_evidence row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_skill_certification_evidence row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing ai_skill_certification_evidence row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!(
+                                "serialize incoming ai_skill_certification_evidence row: {error}"
+                            )
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1490,12 +1652,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_skill_certification_request" => {
-            use crate::ai::skill_registry::{ai_skill_certification_request as _, AiSkillCertificationRequest};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiSkillCertificationRequest>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_skill_certification_request: {error}"))?;
+            use crate::ai::skill_registry::{
+                ai_skill_certification_request as _, AiSkillCertificationRequest,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiSkillCertificationRequest>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for ai_skill_certification_request: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1504,11 +1671,16 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing ai_skill_certification_request row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_skill_certification_request row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing ai_skill_certification_request row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!(
+                                "serialize incoming ai_skill_certification_request row: {error}"
+                            )
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1518,9 +1690,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_skill_certification_runtime_profile" => {
-            use crate::ai::skill_registry::{ai_skill_certification_runtime_profile as _, AiSkillCertificationRuntimeProfile};
+            use crate::ai::skill_registry::{
+                ai_skill_certification_runtime_profile as _, AiSkillCertificationRuntimeProfile,
+            };
             let spacetimedb_sats::serde::SerdeWrapper(row) =
                 serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiSkillCertificationRuntimeProfile>>(row_json)
                     .map_err(|error| format!("invalid canonical row JSON for ai_skill_certification_runtime_profile: {error}"))?;
@@ -1532,11 +1706,19 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing ai_skill_certification_runtime_profile row: {error}"))?;
+                .map_err(|error| {
+                    format!(
+                        "serialize existing ai_skill_certification_runtime_profile row: {error}"
+                    )
+                })?;
                 let incoming_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
                 )
-                .map_err(|error| format!("serialize incoming ai_skill_certification_runtime_profile row: {error}"))?;
+                .map_err(|error| {
+                    format!(
+                        "serialize incoming ai_skill_certification_runtime_profile row: {error}"
+                    )
+                })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1546,12 +1728,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_skill_config" => {
             use crate::ai::skills::{ai_skill_config as _, AiSkillConfig};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiSkillConfig>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_skill_config: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiSkillConfig>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for ai_skill_config: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1561,10 +1744,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing ai_skill_config row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_skill_config row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming ai_skill_config row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1574,12 +1758,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_skill_fixture" => {
             use crate::ai::skill_registry::{ai_skill_fixture as _, AiSkillFixture};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiSkillFixture>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_skill_fixture: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiSkillFixture>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for ai_skill_fixture: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1589,10 +1774,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing ai_skill_fixture row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_skill_fixture row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming ai_skill_fixture row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1602,12 +1788,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_skill_test_run" => {
             use crate::ai::skill_registry::{ai_skill_test_run as _, AiSkillTestRun};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiSkillTestRun>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_skill_test_run: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiSkillTestRun>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for ai_skill_test_run: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1617,10 +1806,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing ai_skill_test_run row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_skill_test_run row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming ai_skill_test_run row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1630,12 +1820,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_team_member" => {
             use crate::ai::agents::{ai_team_member as _, AiTeamMember};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiTeamMember>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_team_member: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiTeamMember>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for ai_team_member: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1645,10 +1836,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing ai_team_member row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_team_member row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming ai_team_member row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1658,12 +1850,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_team_member_skill" => {
             use crate::ai::skills::{ai_team_member_skill as _, AiTeamMemberSkill};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiTeamMemberSkill>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_team_member_skill: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiTeamMemberSkill>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for ai_team_member_skill: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1673,10 +1868,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing ai_team_member_skill row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_team_member_skill row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming ai_team_member_skill row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1686,12 +1882,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "amortization_schedule" => {
-            use crate::accounting::amortization::{amortization_schedule as _, AmortizationSchedule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AmortizationSchedule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for amortization_schedule: {error}"))?;
+            use crate::accounting::amortization::{
+                amortization_schedule as _, AmortizationSchedule,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AmortizationSchedule>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for amortization_schedule: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1700,11 +1901,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing amortization_schedule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming amortization_schedule row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing amortization_schedule row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming amortization_schedule row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1714,12 +1918,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "analytics_metric" => {
             use crate::analytics::reports::{analytics_metric as _, AnalyticsMetric};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AnalyticsMetric>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for analytics_metric: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AnalyticsMetric>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for analytics_metric: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1729,10 +1934,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing analytics_metric row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming analytics_metric row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming analytics_metric row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1742,12 +1948,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "assignment_rule" => {
             use crate::crm::segments::{assignment_rule as _, AssignmentRule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AssignmentRule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for assignment_rule: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AssignmentRule>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for assignment_rule: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1757,10 +1964,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing assignment_rule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming assignment_rule row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming assignment_rule row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1770,7 +1978,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "audit_log" => {
             use crate::core::audit::{audit_log as _, AuditLog};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -1785,10 +1993,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing audit_log row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming audit_log row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming audit_log row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1798,12 +2005,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "audit_rule" => {
             use crate::core::audit::{audit_rule as _, AuditRule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AuditRule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for audit_rule: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AuditRule>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for audit_rule: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1813,10 +2021,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing audit_rule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming audit_rule row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming audit_rule row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1826,12 +2033,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "bank_match_candidate" => {
-            use crate::accounting::bank_reconciliation::{bank_match_candidate as _, BankMatchCandidate};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<BankMatchCandidate>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for bank_match_candidate: {error}"))?;
+            use crate::accounting::bank_reconciliation::{
+                bank_match_candidate as _, BankMatchCandidate,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<BankMatchCandidate>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for bank_match_candidate: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1841,10 +2053,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing bank_match_candidate row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming bank_match_candidate row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming bank_match_candidate row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1854,12 +2067,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "bank_statement_import" => {
-            use crate::accounting::bank_reconciliation::{bank_statement_import as _, BankStatementImport};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<BankStatementImport>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for bank_statement_import: {error}"))?;
+            use crate::accounting::bank_reconciliation::{
+                bank_statement_import as _, BankStatementImport,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<BankStatementImport>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for bank_statement_import: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1868,11 +2086,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing bank_statement_import row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming bank_statement_import row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing bank_statement_import row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming bank_statement_import row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1882,12 +2103,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "barcode_nomenclature" => {
             use crate::inventory::barcode::{barcode_nomenclature as _, BarcodeNomenclature};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<BarcodeNomenclature>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for barcode_nomenclature: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<BarcodeNomenclature>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for barcode_nomenclature: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1897,10 +2121,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing barcode_nomenclature row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming barcode_nomenclature row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming barcode_nomenclature row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1910,12 +2135,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "barcode_rule" => {
             use crate::inventory::barcode::{barcode_rule as _, BarcodeRule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<BarcodeRule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for barcode_rule: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<BarcodeRule>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for barcode_rule: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1925,10 +2151,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing barcode_rule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming barcode_rule row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming barcode_rule row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1938,12 +2163,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "barcode_scan" => {
             use crate::inventory::barcode::{barcode_scan as _, BarcodeScan};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<BarcodeScan>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for barcode_scan: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<BarcodeScan>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for barcode_scan: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1953,10 +2179,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing barcode_scan row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming barcode_scan row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming barcode_scan row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1966,12 +2191,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "billing_account" => {
             use crate::core::billing::{billing_account as _, BillingAccount};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<BillingAccount>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for billing_account: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<BillingAccount>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for billing_account: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -1981,10 +2207,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing billing_account row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming billing_account row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming billing_account row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -1994,12 +2221,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "bom_explosion_result" => {
-            use crate::manufacturing::bill_of_materials::{bom_explosion_result as _, BomExplosionResult};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<BomExplosionResult>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for bom_explosion_result: {error}"))?;
+            use crate::manufacturing::bill_of_materials::{
+                bom_explosion_result as _, BomExplosionResult,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<BomExplosionResult>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for bom_explosion_result: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2009,10 +2241,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing bom_explosion_result row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming bom_explosion_result row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming bom_explosion_result row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2022,12 +2255,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "budget_post" => {
             use crate::accounting::budgeting::{budget_post as _, BudgetPost};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<BudgetPost>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for budget_post: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<BudgetPost>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for budget_post: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2037,10 +2271,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing budget_post row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming budget_post row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming budget_post row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2050,12 +2283,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "calendar_event" => {
             use crate::crm::activities::{calendar_event as _, CalendarEvent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CalendarEvent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for calendar_event: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CalendarEvent>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for calendar_event: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2065,10 +2299,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing calendar_event row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming calendar_event row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming calendar_event row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2078,12 +2313,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "capacity_forecast_snapshot" => {
-            use crate::projects::psa_advanced::{capacity_forecast_snapshot as _, CapacityForecastSnapshot};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CapacityForecastSnapshot>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for capacity_forecast_snapshot: {error}"))?;
+            use crate::projects::psa_advanced::{
+                capacity_forecast_snapshot as _, CapacityForecastSnapshot,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CapacityForecastSnapshot>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for capacity_forecast_snapshot: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2092,11 +2332,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing capacity_forecast_snapshot row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming capacity_forecast_snapshot row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing capacity_forecast_snapshot row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming capacity_forecast_snapshot row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2106,12 +2349,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "cartonization_result" => {
-            use crate::inventory::warehouse_operations::{cartonization_result as _, CartonizationResult};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CartonizationResult>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for cartonization_result: {error}"))?;
+            use crate::inventory::warehouse_operations::{
+                cartonization_result as _, CartonizationResult,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CartonizationResult>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for cartonization_result: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2121,10 +2369,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing cartonization_result row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming cartonization_result row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming cartonization_result row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2134,12 +2383,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "cold_tier_service_identity" => {
-            use crate::core::cold_tier_identity::{cold_tier_service_identity as _, ColdTierServiceIdentity};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ColdTierServiceIdentity>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for cold_tier_service_identity: {error}"))?;
+            use crate::core::cold_tier_identity::{
+                cold_tier_service_identity as _, ColdTierServiceIdentity,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ColdTierServiceIdentity>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for cold_tier_service_identity: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2148,11 +2402,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing cold_tier_service_identity row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming cold_tier_service_identity row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing cold_tier_service_identity row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming cold_tier_service_identity row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2162,12 +2419,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "commodity_price_index" => {
-            use crate::purchasing::procurement_advanced::{commodity_price_index as _, CommodityPriceIndex};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CommodityPriceIndex>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for commodity_price_index: {error}"))?;
+            use crate::purchasing::procurement_advanced::{
+                commodity_price_index as _, CommodityPriceIndex,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CommodityPriceIndex>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for commodity_price_index: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2176,11 +2438,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing commodity_price_index row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming commodity_price_index row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing commodity_price_index row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming commodity_price_index row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2190,7 +2455,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "company" => {
             use crate::core::organization::{company as _, Company};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -2205,10 +2470,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing company row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming company row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming company row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2218,12 +2482,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "company_country_pack" => {
             use crate::core::country_pack::{company_country_pack as _, CompanyCountryPack};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CompanyCountryPack>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for company_country_pack: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CompanyCountryPack>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for company_country_pack: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2233,10 +2500,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing company_country_pack row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming company_country_pack row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming company_country_pack row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2246,12 +2514,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "company_vertical_pack" => {
             use crate::core::organization::{company_vertical_pack as _, CompanyVerticalPack};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CompanyVerticalPack>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for company_vertical_pack: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CompanyVerticalPack>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for company_vertical_pack: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2260,11 +2531,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing company_vertical_pack row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming company_vertical_pack row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing company_vertical_pack row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming company_vertical_pack row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2274,12 +2548,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "consignment_agreement" => {
-            use crate::purchasing::procurement_advanced::{consignment_agreement as _, ConsignmentAgreement};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ConsignmentAgreement>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for consignment_agreement: {error}"))?;
+            use crate::purchasing::procurement_advanced::{
+                consignment_agreement as _, ConsignmentAgreement,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ConsignmentAgreement>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for consignment_agreement: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2288,11 +2567,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing consignment_agreement row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming consignment_agreement row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing consignment_agreement row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming consignment_agreement row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2302,12 +2584,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "consolidation_account" => {
-            use crate::accounting::consolidation::{consolidation_account as _, ConsolidationAccount};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ConsolidationAccount>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for consolidation_account: {error}"))?;
+            use crate::accounting::consolidation::{
+                consolidation_account as _, ConsolidationAccount,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ConsolidationAccount>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for consolidation_account: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2316,11 +2603,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing consolidation_account row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming consolidation_account row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing consolidation_account row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming consolidation_account row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2330,12 +2620,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "consolidation_company_rate" => {
-            use crate::accounting::consolidation::{consolidation_company_rate as _, ConsolidationCompanyRate};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ConsolidationCompanyRate>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for consolidation_company_rate: {error}"))?;
+            use crate::accounting::consolidation::{
+                consolidation_company_rate as _, ConsolidationCompanyRate,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ConsolidationCompanyRate>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for consolidation_company_rate: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2344,11 +2639,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing consolidation_company_rate row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming consolidation_company_rate row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing consolidation_company_rate row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming consolidation_company_rate row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2358,12 +2656,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "consolidation_elimination_entry" => {
-            use crate::accounting::consolidation::{consolidation_elimination_entry as _, ConsolidationEliminationEntry};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ConsolidationEliminationEntry>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for consolidation_elimination_entry: {error}"))?;
+            use crate::accounting::consolidation::{
+                consolidation_elimination_entry as _, ConsolidationEliminationEntry,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ConsolidationEliminationEntry>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for consolidation_elimination_entry: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2372,11 +2675,16 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing consolidation_elimination_entry row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming consolidation_elimination_entry row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing consolidation_elimination_entry row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!(
+                                "serialize incoming consolidation_elimination_entry row: {error}"
+                            )
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2386,12 +2694,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "consolidation_journal" => {
-            use crate::accounting::consolidation::{consolidation_journal as _, ConsolidationJournal};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ConsolidationJournal>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for consolidation_journal: {error}"))?;
+            use crate::accounting::consolidation::{
+                consolidation_journal as _, ConsolidationJournal,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ConsolidationJournal>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for consolidation_journal: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2400,11 +2713,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing consolidation_journal row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming consolidation_journal row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing consolidation_journal row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming consolidation_journal row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2414,7 +2730,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "contact" => {
             use crate::crm::contacts::{contact as _, Contact};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -2429,10 +2745,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing contact row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming contact row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming contact row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2442,12 +2757,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "contact_category" => {
             use crate::crm::contacts::{contact_category as _, ContactCategory};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ContactCategory>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for contact_category: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ContactCategory>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for contact_category: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2457,10 +2773,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing contact_category row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming contact_category row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming contact_category row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2470,12 +2787,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "contact_communication_preference" => {
-            use crate::core::operational_messaging::{contact_communication_preference as _, ContactCommunicationPreference};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ContactCommunicationPreference>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for contact_communication_preference: {error}"))?;
+            use crate::core::operational_messaging::{
+                contact_communication_preference as _, ContactCommunicationPreference,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ContactCommunicationPreference>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for contact_communication_preference: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2484,11 +2806,16 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing contact_communication_preference row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming contact_communication_preference row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing contact_communication_preference row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!(
+                                "serialize incoming contact_communication_preference row: {error}"
+                            )
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2498,12 +2825,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "contact_duplicate_candidate" => {
-            use crate::crm::duplicate::{contact_duplicate_candidate as _, ContactDuplicateCandidate};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ContactDuplicateCandidate>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for contact_duplicate_candidate: {error}"))?;
+            use crate::crm::duplicate::{
+                contact_duplicate_candidate as _, ContactDuplicateCandidate,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ContactDuplicateCandidate>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for contact_duplicate_candidate: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2512,11 +2844,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing contact_duplicate_candidate row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming contact_duplicate_candidate row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing contact_duplicate_candidate row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming contact_duplicate_candidate row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2526,9 +2861,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "contact_identity_verification_authority" => {
-            use crate::crm::contact_identities::{contact_identity_verification_authority as _, ContactIdentityVerificationAuthority};
+            use crate::crm::contact_identities::{
+                contact_identity_verification_authority as _, ContactIdentityVerificationAuthority,
+            };
             let spacetimedb_sats::serde::SerdeWrapper(row) =
                 serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ContactIdentityVerificationAuthority>>(row_json)
                     .map_err(|error| format!("invalid canonical row JSON for contact_identity_verification_authority: {error}"))?;
@@ -2540,11 +2877,19 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing contact_identity_verification_authority row: {error}"))?;
+                .map_err(|error| {
+                    format!(
+                        "serialize existing contact_identity_verification_authority row: {error}"
+                    )
+                })?;
                 let incoming_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
                 )
-                .map_err(|error| format!("serialize incoming contact_identity_verification_authority row: {error}"))?;
+                .map_err(|error| {
+                    format!(
+                        "serialize incoming contact_identity_verification_authority row: {error}"
+                    )
+                })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2554,12 +2899,19 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "contact_identity_verification_proof" => {
-            use crate::crm::contact_identities::{contact_identity_verification_proof as _, ContactIdentityVerificationProof};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ContactIdentityVerificationProof>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for contact_identity_verification_proof: {error}"))?;
+            use crate::crm::contact_identities::{
+                contact_identity_verification_proof as _, ContactIdentityVerificationProof,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ContactIdentityVerificationProof>,
+            >(row_json)
+            .map_err(|error| {
+                format!(
+                    "invalid canonical row JSON for contact_identity_verification_proof: {error}"
+                )
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2568,11 +2920,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing contact_identity_verification_proof row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing contact_identity_verification_proof row: {error}")
+                })?;
                 let incoming_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
                 )
-                .map_err(|error| format!("serialize incoming contact_identity_verification_proof row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize incoming contact_identity_verification_proof row: {error}")
+                })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2582,12 +2938,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "contact_phone_identity" => {
-            use crate::crm::contact_identities::{contact_phone_identity as _, ContactPhoneIdentity};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ContactPhoneIdentity>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for contact_phone_identity: {error}"))?;
+            use crate::crm::contact_identities::{
+                contact_phone_identity as _, ContactPhoneIdentity,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ContactPhoneIdentity>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for contact_phone_identity: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2596,11 +2957,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing contact_phone_identity row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming contact_phone_identity row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing contact_phone_identity row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming contact_phone_identity row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2610,12 +2974,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "contact_relationship" => {
             use crate::crm::contacts::{contact_relationship as _, ContactRelationship};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ContactRelationship>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for contact_relationship: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ContactRelationship>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for contact_relationship: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2625,10 +2992,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing contact_relationship row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming contact_relationship row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming contact_relationship row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2638,12 +3006,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "contact_relationship_insight" => {
-            use crate::crm::relationship_intel::{contact_relationship_insight as _, ContactRelationshipInsight};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ContactRelationshipInsight>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for contact_relationship_insight: {error}"))?;
+            use crate::crm::relationship_intel::{
+                contact_relationship_insight as _, ContactRelationshipInsight,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ContactRelationshipInsight>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for contact_relationship_insight: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2652,11 +3025,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing contact_relationship_insight row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming contact_relationship_insight row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing contact_relationship_insight row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming contact_relationship_insight row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2666,12 +3042,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "contact_segment" => {
             use crate::crm::segments::{contact_segment as _, ContactSegment};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ContactSegment>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for contact_segment: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ContactSegment>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for contact_segment: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2681,10 +3058,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing contact_segment row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming contact_segment row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming contact_segment row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2694,12 +3072,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "contact_tag" => {
             use crate::crm::contacts::{contact_tag as _, ContactTag};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ContactTag>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for contact_tag: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ContactTag>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for contact_tag: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2709,10 +3088,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing contact_tag row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming contact_tag row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming contact_tag row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2722,7 +3100,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "country" => {
             use crate::core::reference::{country as _, Country};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -2732,15 +3110,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
             let rows = ctx.db.country();
-            if let Some(existing) = rows.organization_code_key().find(&row.organization_code_key) {
+            if let Some(existing) = rows
+                .organization_code_key()
+                .find(&row.organization_code_key)
+            {
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing country row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming country row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming country row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2750,25 +3130,34 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "country_pack_definition" => {
             use crate::core::country_pack::{country_pack_definition as _, CountryPackDefinition};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CountryPackDefinition>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for country_pack_definition: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CountryPackDefinition>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for country_pack_definition: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
             let rows = ctx.db.country_pack_definition();
-            if let Some(existing) = rows.organization_pack_key().find(&row.organization_pack_key) {
+            if let Some(existing) = rows
+                .organization_pack_key()
+                .find(&row.organization_pack_key)
+            {
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing country_pack_definition row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming country_pack_definition row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing country_pack_definition row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming country_pack_definition row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2778,12 +3167,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "country_pack_tax_rule" => {
             use crate::core::country_pack::{country_pack_tax_rule as _, CountryPackTaxRule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CountryPackTaxRule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for country_pack_tax_rule: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CountryPackTaxRule>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for country_pack_tax_rule: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2792,11 +3184,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing country_pack_tax_rule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming country_pack_tax_rule row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing country_pack_tax_rule row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming country_pack_tax_rule row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2806,12 +3201,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "crm_conversation" => {
             use crate::crm::inbox::{crm_conversation as _, CrmConversation};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CrmConversation>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for crm_conversation: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CrmConversation>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for crm_conversation: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2821,10 +3217,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing crm_conversation row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming crm_conversation row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming crm_conversation row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2834,12 +3231,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "crm_forecast_snapshot" => {
             use crate::crm::forecast::{crm_forecast_snapshot as _, CrmForecastSnapshot};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CrmForecastSnapshot>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for crm_forecast_snapshot: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CrmForecastSnapshot>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for crm_forecast_snapshot: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2848,11 +3248,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing crm_forecast_snapshot row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming crm_forecast_snapshot row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing crm_forecast_snapshot row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming crm_forecast_snapshot row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2862,12 +3265,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "crm_provider_event_receipt" => {
             use crate::crm::inbox::{crm_provider_event_receipt as _, CrmProviderEventReceipt};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CrmProviderEventReceipt>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for crm_provider_event_receipt: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CrmProviderEventReceipt>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for crm_provider_event_receipt: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2876,11 +3282,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing crm_provider_event_receipt row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming crm_provider_event_receipt row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing crm_provider_event_receipt row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming crm_provider_event_receipt row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2890,12 +3299,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "crm_provider_principal" => {
             use crate::crm::inbox::{crm_provider_principal as _, CrmProviderPrincipal};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CrmProviderPrincipal>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for crm_provider_principal: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CrmProviderPrincipal>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for crm_provider_principal: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2904,11 +3316,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing crm_provider_principal row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming crm_provider_principal row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing crm_provider_principal row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming crm_provider_principal row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2918,7 +3333,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "crm_team" => {
             use crate::crm::leads::{crm_team as _, CrmTeam};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -2933,10 +3348,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing crm_team row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming crm_team row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming crm_team row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2946,12 +3360,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "crossovered_budget" => {
             use crate::accounting::budgeting::{crossovered_budget as _, CrossoveredBudget};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CrossoveredBudget>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for crossovered_budget: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CrossoveredBudget>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for crossovered_budget: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2961,10 +3378,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing crossovered_budget row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming crossovered_budget row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming crossovered_budget row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -2974,12 +3392,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "crossovered_budget_lines" => {
-            use crate::accounting::budgeting::{crossovered_budget_lines as _, CrossoveredBudgetLines};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CrossoveredBudgetLines>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for crossovered_budget_lines: {error}"))?;
+            use crate::accounting::budgeting::{
+                crossovered_budget_lines as _, CrossoveredBudgetLines,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CrossoveredBudgetLines>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for crossovered_budget_lines: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -2988,11 +3411,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing crossovered_budget_lines row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming crossovered_budget_lines row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing crossovered_budget_lines row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming crossovered_budget_lines row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3002,7 +3428,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "currency" => {
             use crate::core::reference::{currency as _, Currency};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -3017,10 +3443,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing currency row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming currency row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming currency row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3030,12 +3455,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "currency_rate" => {
             use crate::core::reference::{currency_rate as _, CurrencyRate};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CurrencyRate>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for currency_rate: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CurrencyRate>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for currency_rate: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3045,10 +3471,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing currency_rate row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming currency_rate row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming currency_rate row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3058,12 +3485,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "dashboard" => {
             use crate::analytics::dashboards::{dashboard as _, Dashboard};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<Dashboard>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for dashboard: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<Dashboard>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for dashboard: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3073,10 +3501,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing dashboard row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming dashboard row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming dashboard row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3086,12 +3513,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "dashboard_widget" => {
             use crate::analytics::dashboards::{dashboard_widget as _, DashboardWidget};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DashboardWidget>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for dashboard_widget: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DashboardWidget>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for dashboard_widget: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3101,10 +3529,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing dashboard_widget row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming dashboard_widget row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming dashboard_widget row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3114,12 +3543,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "data_classification" => {
             use crate::core::privacy::{data_classification as _, DataClassification};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DataClassification>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for data_classification: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DataClassification>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for data_classification: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3129,10 +3561,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing data_classification row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming data_classification row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming data_classification row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3142,12 +3575,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "data_classification_rule" => {
             use crate::core::privacy::{data_classification_rule as _, DataClassificationRule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DataClassificationRule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for data_classification_rule: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DataClassificationRule>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for data_classification_rule: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3156,11 +3592,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing data_classification_rule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming data_classification_rule row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing data_classification_rule row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming data_classification_rule row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3170,12 +3609,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "deferred_revenue_schedule" => {
-            use crate::subscriptions::tables::{deferred_revenue_schedule as _, DeferredRevenueSchedule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DeferredRevenueSchedule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for deferred_revenue_schedule: {error}"))?;
+            use crate::subscriptions::tables::{
+                deferred_revenue_schedule as _, DeferredRevenueSchedule,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DeferredRevenueSchedule>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for deferred_revenue_schedule: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3184,11 +3628,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing deferred_revenue_schedule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming deferred_revenue_schedule row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing deferred_revenue_schedule row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming deferred_revenue_schedule row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3198,12 +3645,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "delegated_admin_scope" => {
             use crate::core::permissions::{delegated_admin_scope as _, DelegatedAdminScope};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DelegatedAdminScope>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for delegated_admin_scope: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DelegatedAdminScope>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for delegated_admin_scope: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3212,11 +3662,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing delegated_admin_scope row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming delegated_admin_scope row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing delegated_admin_scope row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming delegated_admin_scope row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3226,12 +3679,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "delivery_carrier" => {
             use crate::sales::delivery_shipping::{delivery_carrier as _, DeliveryCarrier};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DeliveryCarrier>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for delivery_carrier: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DeliveryCarrier>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for delivery_carrier: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3241,10 +3695,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing delivery_carrier row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming delivery_carrier row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming delivery_carrier row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3254,12 +3709,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "doc_folder" => {
             use crate::documents::documents::{doc_folder as _, DocumentFolder};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DocumentFolder>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for doc_folder: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DocumentFolder>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for doc_folder: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3269,10 +3725,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing doc_folder row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming doc_folder row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming doc_folder row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3282,7 +3737,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "document" => {
             use crate::documents::documents::{document as _, Document};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -3297,10 +3752,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing document row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming document row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming document row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3310,12 +3764,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "document_external_ref" => {
             use crate::documents::drive_sync::{document_external_ref as _, DocumentExternalRef};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DocumentExternalRef>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for document_external_ref: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DocumentExternalRef>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for document_external_ref: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3324,11 +3781,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing document_external_ref row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming document_external_ref row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing document_external_ref row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming document_external_ref row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3338,12 +3798,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "document_legal_hold" => {
             use crate::documents::legal_hold::{document_legal_hold as _, DocumentLegalHold};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DocumentLegalHold>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for document_legal_hold: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DocumentLegalHold>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for document_legal_hold: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3353,10 +3816,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing document_legal_hold row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming document_legal_hold row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming document_legal_hold row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3366,12 +3830,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "document_presence" => {
             use crate::documents::presence::{document_presence as _, DocumentPresence};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DocumentPresence>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for document_presence: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DocumentPresence>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for document_presence: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3381,10 +3848,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing document_presence row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming document_presence row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming document_presence row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3394,12 +3862,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "document_retention_purge_job" => {
-            use crate::documents::regional::{document_retention_purge_job as _, DocumentRetentionPurgeJob};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DocumentRetentionPurgeJob>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for document_retention_purge_job: {error}"))?;
+            use crate::documents::regional::{
+                document_retention_purge_job as _, DocumentRetentionPurgeJob,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DocumentRetentionPurgeJob>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for document_retention_purge_job: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3408,11 +3881,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing document_retention_purge_job row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming document_retention_purge_job row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing document_retention_purge_job row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming document_retention_purge_job row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3422,12 +3898,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "document_sequence" => {
             use crate::core::reference::{document_sequence as _, DocumentSequence};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DocumentSequence>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for document_sequence: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DocumentSequence>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for document_sequence: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3437,10 +3916,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing document_sequence row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming document_sequence row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming document_sequence row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3450,12 +3930,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "document_signature_request" => {
-            use crate::documents::esign::{document_signature_request as _, DocumentSignatureRequest};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DocumentSignatureRequest>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for document_signature_request: {error}"))?;
+            use crate::documents::esign::{
+                document_signature_request as _, DocumentSignatureRequest,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DocumentSignatureRequest>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for document_signature_request: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3464,11 +3949,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing document_signature_request row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming document_signature_request row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing document_signature_request row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming document_signature_request row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3478,12 +3966,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "document_template" => {
             use crate::documents::templates::{document_template as _, DocumentTemplate};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DocumentTemplate>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for document_template: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DocumentTemplate>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for document_template: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3493,10 +3984,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing document_template row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming document_template row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming document_template row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3506,12 +3998,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "expense_card_statement_line" => {
-            use crate::expenses::expense_wave_e::{expense_card_statement_line as _, ExpenseCardStatementLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ExpenseCardStatementLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for expense_card_statement_line: {error}"))?;
+            use crate::expenses::expense_wave_e::{
+                expense_card_statement_line as _, ExpenseCardStatementLine,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ExpenseCardStatementLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for expense_card_statement_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3520,11 +4017,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing expense_card_statement_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming expense_card_statement_line row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing expense_card_statement_line row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming expense_card_statement_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3534,12 +4034,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "expense_integration_intent" => {
-            use crate::expenses::expense_wave_d::{expense_integration_intent as _, ExpenseIntegrationIntent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ExpenseIntegrationIntent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for expense_integration_intent: {error}"))?;
+            use crate::expenses::expense_wave_d::{
+                expense_integration_intent as _, ExpenseIntegrationIntent,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ExpenseIntegrationIntent>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for expense_integration_intent: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3548,11 +4053,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing expense_integration_intent row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming expense_integration_intent row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing expense_integration_intent row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming expense_integration_intent row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3562,12 +4070,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "expense_sheet" => {
             use crate::expenses::expenses::{expense_sheet as _, HrExpenseSheet};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrExpenseSheet>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for expense_sheet: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrExpenseSheet>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for expense_sheet: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3577,10 +4086,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing expense_sheet row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming expense_sheet row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming expense_sheet row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3590,12 +4100,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "field_permission" => {
             use crate::core::permissions::{field_permission as _, FieldPermission};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<FieldPermission>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for field_permission: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<FieldPermission>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for field_permission: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3605,10 +4116,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing field_permission row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming field_permission row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming field_permission row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3618,12 +4130,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "financial_report" => {
             use crate::accounting::financial_statements::{financial_report as _, FinancialReport};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<FinancialReport>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for financial_report: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<FinancialReport>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for financial_report: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3633,10 +4146,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing financial_report row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming financial_report row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming financial_report row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3646,12 +4160,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "fleet_vehicle" => {
             use crate::fleet::fleet::{fleet_vehicle as _, FleetVehicle};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<FleetVehicle>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for fleet_vehicle: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<FleetVehicle>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for fleet_vehicle: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3661,10 +4176,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing fleet_vehicle row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming fleet_vehicle row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming fleet_vehicle row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3674,12 +4190,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "fleet_vehicle_service_type" => {
             use crate::fleet::fleet::{fleet_vehicle_service_type as _, FleetVehicleServiceType};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<FleetVehicleServiceType>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for fleet_vehicle_service_type: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<FleetVehicleServiceType>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for fleet_vehicle_service_type: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3688,11 +4207,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing fleet_vehicle_service_type row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming fleet_vehicle_service_type row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing fleet_vehicle_service_type row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming fleet_vehicle_service_type row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3702,12 +4224,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "form_config" => {
             use crate::forms::{form_config as _, FormConfig};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<FormConfig>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for form_config: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<FormConfig>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for form_config: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3717,10 +4240,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing form_config row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming form_config row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming form_config row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3730,12 +4252,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "fx_revaluation_run" => {
             use crate::accounting::fx_revaluation::{fx_revaluation_run as _, FxRevaluationRun};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<FxRevaluationRun>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for fx_revaluation_run: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<FxRevaluationRun>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for fx_revaluation_run: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3745,10 +4270,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing fx_revaluation_run row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming fx_revaluation_run row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming fx_revaluation_run row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3758,12 +4284,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "generated_owner_report" => {
             use crate::analytics::reports::{generated_owner_report as _, GeneratedOwnerReport};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<GeneratedOwnerReport>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for generated_owner_report: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<GeneratedOwnerReport>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for generated_owner_report: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3772,11 +4301,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing generated_owner_report row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming generated_owner_report row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing generated_owner_report row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming generated_owner_report row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3786,12 +4318,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "google_drive_connection" => {
-            use crate::integrations::google_drive::{google_drive_connection as _, GoogleDriveConnection};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<GoogleDriveConnection>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for google_drive_connection: {error}"))?;
+            use crate::integrations::google_drive::{
+                google_drive_connection as _, GoogleDriveConnection,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<GoogleDriveConnection>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for google_drive_connection: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3800,11 +4337,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing google_drive_connection row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming google_drive_connection row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing google_drive_connection row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming google_drive_connection row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3814,12 +4354,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "guarded_action_receipt" => {
-            use crate::workflow::action_registry::{guarded_action_receipt as _, GuardedActionReceipt};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<GuardedActionReceipt>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for guarded_action_receipt: {error}"))?;
+            use crate::workflow::action_registry::{
+                guarded_action_receipt as _, GuardedActionReceipt,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<GuardedActionReceipt>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for guarded_action_receipt: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3828,11 +4373,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing guarded_action_receipt row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming guarded_action_receipt row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing guarded_action_receipt row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming guarded_action_receipt row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3842,12 +4390,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "helpdesk_sla" => {
             use crate::helpdesk::tickets::{helpdesk_sla as _, HelpdeskSLA};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HelpdeskSLA>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for helpdesk_sla: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HelpdeskSLA>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for helpdesk_sla: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3857,10 +4406,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing helpdesk_sla row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming helpdesk_sla row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming helpdesk_sla row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3870,12 +4418,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "helpdesk_sla_check_job" => {
             use crate::helpdesk::tickets::{helpdesk_sla_check_job as _, HelpdeskSlaCheckJob};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HelpdeskSlaCheckJob>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for helpdesk_sla_check_job: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HelpdeskSlaCheckJob>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for helpdesk_sla_check_job: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3884,11 +4435,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing helpdesk_sla_check_job row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming helpdesk_sla_check_job row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing helpdesk_sla_check_job row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming helpdesk_sla_check_job row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3898,12 +4452,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "helpdesk_stage" => {
             use crate::helpdesk::tickets::{helpdesk_stage as _, HelpdeskStage};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HelpdeskStage>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for helpdesk_stage: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HelpdeskStage>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for helpdesk_stage: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3913,10 +4468,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing helpdesk_stage row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming helpdesk_stage row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming helpdesk_stage row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3926,12 +4482,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "helpdesk_team" => {
             use crate::helpdesk::tickets::{helpdesk_team as _, HelpdeskTeam};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HelpdeskTeam>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for helpdesk_team: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HelpdeskTeam>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for helpdesk_team: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3941,10 +4498,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing helpdesk_team row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming helpdesk_team row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming helpdesk_team row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3954,12 +4512,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "helpdesk_ticket" => {
             use crate::helpdesk::tickets::{helpdesk_ticket as _, HelpdeskTicket};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HelpdeskTicket>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for helpdesk_ticket: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HelpdeskTicket>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for helpdesk_ticket: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3969,10 +4528,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing helpdesk_ticket row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming helpdesk_ticket row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming helpdesk_ticket row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -3982,12 +4542,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_applicant" => {
             use crate::hr::recruitment::{hr_applicant as _, HrApplicant};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrApplicant>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_applicant: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrApplicant>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for hr_applicant: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -3997,10 +4558,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_applicant row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_applicant row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming hr_applicant row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4010,12 +4570,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_attendance" => {
             use crate::hr::attendance::{hr_attendance as _, HrAttendance};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrAttendance>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_attendance: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrAttendance>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for hr_attendance: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4025,10 +4586,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_attendance row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_attendance row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_attendance row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4038,12 +4600,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_benefit_enrollment" => {
             use crate::hr::benefits::{hr_benefit_enrollment as _, HrBenefitEnrollment};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrBenefitEnrollment>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_benefit_enrollment: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrBenefitEnrollment>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_benefit_enrollment: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4052,11 +4617,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing hr_benefit_enrollment row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_benefit_enrollment row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing hr_benefit_enrollment row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_benefit_enrollment row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4066,12 +4634,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_benefit_plan" => {
             use crate::hr::benefits::{hr_benefit_plan as _, HrBenefitPlan};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrBenefitPlan>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_benefit_plan: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrBenefitPlan>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for hr_benefit_plan: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4081,10 +4650,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_benefit_plan row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_benefit_plan row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_benefit_plan row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4094,12 +4664,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_capacity_forecast" => {
             use crate::hr::wfm::{hr_capacity_forecast as _, HrCapacityForecast};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrCapacityForecast>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_capacity_forecast: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrCapacityForecast>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_capacity_forecast: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4109,10 +4682,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_capacity_forecast row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_capacity_forecast row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_capacity_forecast row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4122,12 +4696,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_compensation_event" => {
             use crate::hr::compensation::{hr_compensation_event as _, HrCompensationEvent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrCompensationEvent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_compensation_event: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrCompensationEvent>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_compensation_event: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4136,11 +4713,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing hr_compensation_event row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_compensation_event row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing hr_compensation_event row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_compensation_event row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4150,12 +4730,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_contract" => {
             use crate::hr::contracts::{hr_contract as _, HrContract};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrContract>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_contract: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrContract>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for hr_contract: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4165,10 +4746,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_contract row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_contract row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming hr_contract row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4178,12 +4758,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_country_pack_leave_default" => {
-            use crate::hr::country_pack_hr::{hr_country_pack_leave_default as _, HrCountryPackLeaveDefault};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrCountryPackLeaveDefault>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_country_pack_leave_default: {error}"))?;
+            use crate::hr::country_pack_hr::{
+                hr_country_pack_leave_default as _, HrCountryPackLeaveDefault,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrCountryPackLeaveDefault>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_country_pack_leave_default: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4192,11 +4777,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing hr_country_pack_leave_default row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_country_pack_leave_default row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing hr_country_pack_leave_default row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_country_pack_leave_default row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4206,12 +4794,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_department" => {
             use crate::hr::employees::{hr_department as _, HrDepartment};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrDepartment>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_department: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrDepartment>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for hr_department: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4221,10 +4810,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_department row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_department row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_department row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4234,12 +4824,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_employee" => {
             use crate::hr::employees::{hr_employee as _, HrEmployee};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrEmployee>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_employee: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrEmployee>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for hr_employee: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4249,10 +4840,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_employee row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_employee row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming hr_employee row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4262,12 +4852,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_employee_document" => {
             use crate::hr::documents::{hr_employee_document as _, HrEmployeeDocument};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrEmployeeDocument>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_employee_document: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrEmployeeDocument>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_employee_document: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4277,10 +4870,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_employee_document row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_employee_document row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_employee_document row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4290,12 +4884,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_employee_skill" => {
             use crate::hr::skills::{hr_employee_skill as _, HrEmployeeSkill};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrEmployeeSkill>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_employee_skill: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrEmployeeSkill>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_employee_skill: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4305,10 +4902,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_employee_skill row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_employee_skill row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_employee_skill row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4318,12 +4916,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_expense" => {
             use crate::expenses::expenses::{hr_expense as _, HrExpense};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrExpense>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_expense: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrExpense>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for hr_expense: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4333,10 +4932,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_expense row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_expense row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming hr_expense row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4346,12 +4944,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_expense_advance" => {
             use crate::expenses::expense_wave_d::{hr_expense_advance as _, HrExpenseAdvance};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrExpenseAdvance>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_expense_advance: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrExpenseAdvance>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_expense_advance: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4361,10 +4962,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_expense_advance row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_expense_advance row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_expense_advance row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4374,12 +4976,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_expense_mileage_rate" => {
-            use crate::expenses::expense_depth::{hr_expense_mileage_rate as _, HrExpenseMileageRate};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrExpenseMileageRate>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_expense_mileage_rate: {error}"))?;
+            use crate::expenses::expense_depth::{
+                hr_expense_mileage_rate as _, HrExpenseMileageRate,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrExpenseMileageRate>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_expense_mileage_rate: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4388,11 +4995,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing hr_expense_mileage_rate row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_expense_mileage_rate row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing hr_expense_mileage_rate row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_expense_mileage_rate row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4402,12 +5012,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_expense_per_diem_rate" => {
-            use crate::expenses::expense_depth::{hr_expense_per_diem_rate as _, HrExpensePerDiemRate};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrExpensePerDiemRate>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_expense_per_diem_rate: {error}"))?;
+            use crate::expenses::expense_depth::{
+                hr_expense_per_diem_rate as _, HrExpensePerDiemRate,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrExpensePerDiemRate>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_expense_per_diem_rate: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4416,11 +5031,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing hr_expense_per_diem_rate row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_expense_per_diem_rate row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing hr_expense_per_diem_rate row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_expense_per_diem_rate row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4430,12 +5048,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_expense_policy" => {
             use crate::expenses::expenses::{hr_expense_policy as _, HrExpensePolicy};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrExpensePolicy>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_expense_policy: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrExpensePolicy>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_expense_policy: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4445,10 +5066,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_expense_policy row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_expense_policy row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_expense_policy row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4458,12 +5080,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_expense_receipt" => {
             use crate::expenses::expenses::{hr_expense_receipt as _, HrExpenseReceipt};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrExpenseReceipt>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_expense_receipt: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrExpenseReceipt>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_expense_receipt: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4473,10 +5098,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_expense_receipt row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_expense_receipt row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_expense_receipt row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4486,12 +5112,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_global_assignment" => {
             use crate::hr::global_assignment::{hr_global_assignment as _, HrGlobalAssignment};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrGlobalAssignment>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_global_assignment: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrGlobalAssignment>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_global_assignment: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4501,10 +5130,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_global_assignment row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_global_assignment row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_global_assignment row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4514,12 +5144,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_integration_intent" => {
             use crate::hr::integrations::{hr_integration_intent as _, HrIntegrationIntent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrIntegrationIntent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_integration_intent: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrIntegrationIntent>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_integration_intent: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4528,11 +5161,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing hr_integration_intent row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_integration_intent row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing hr_integration_intent row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_integration_intent row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4542,12 +5178,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_job_position" => {
             use crate::hr::employees::{hr_job_position as _, HrJobPosition};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrJobPosition>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_job_position: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrJobPosition>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for hr_job_position: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4557,10 +5194,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_job_position row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_job_position row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_job_position row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4570,12 +5208,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_labor_cost_snapshot" => {
             use crate::hr::wfm::{hr_labor_cost_snapshot as _, HrLaborCostSnapshot};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrLaborCostSnapshot>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_labor_cost_snapshot: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrLaborCostSnapshot>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_labor_cost_snapshot: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4584,11 +5225,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing hr_labor_cost_snapshot row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_labor_cost_snapshot row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing hr_labor_cost_snapshot row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_labor_cost_snapshot row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4598,7 +5242,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_leave" => {
             use crate::hr::leaves::{hr_leave as _, HrLeave};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -4613,10 +5257,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_leave row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_leave row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming hr_leave row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4626,12 +5269,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_leave_type" => {
             use crate::hr::leaves::{hr_leave_type as _, HrLeaveType};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrLeaveType>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_leave_type: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrLeaveType>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for hr_leave_type: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4641,10 +5285,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_leave_type row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_leave_type row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_leave_type row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4654,12 +5299,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_offboarding_checklist" => {
             use crate::hr::offboarding::{hr_offboarding_checklist as _, HrOffboardingChecklist};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrOffboardingChecklist>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_offboarding_checklist: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrOffboardingChecklist>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_offboarding_checklist: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4668,11 +5316,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing hr_offboarding_checklist row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_offboarding_checklist row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing hr_offboarding_checklist row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_offboarding_checklist row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4682,12 +5333,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_onboarding_progress" => {
             use crate::hr::onboarding::{hr_onboarding_progress as _, HrOnboardingProgress};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrOnboardingProgress>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_onboarding_progress: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrOnboardingProgress>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_onboarding_progress: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4696,11 +5350,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing hr_onboarding_progress row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_onboarding_progress row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing hr_onboarding_progress row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_onboarding_progress row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4710,12 +5367,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_onboarding_template" => {
             use crate::hr::onboarding::{hr_onboarding_template as _, HrOnboardingTemplate};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrOnboardingTemplate>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_onboarding_template: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrOnboardingTemplate>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_onboarding_template: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4724,11 +5384,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing hr_onboarding_template row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_onboarding_template row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing hr_onboarding_template row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_onboarding_template row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4738,12 +5401,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_payroll_export_intent" => {
             use crate::hr::payroll::{hr_payroll_export_intent as _, HrPayrollExportIntent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrPayrollExportIntent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_payroll_export_intent: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrPayrollExportIntent>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_payroll_export_intent: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4752,11 +5418,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing hr_payroll_export_intent row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_payroll_export_intent row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing hr_payroll_export_intent row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_payroll_export_intent row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4766,12 +5435,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_payroll_structure" => {
             use crate::hr::payroll::{hr_payroll_structure as _, HrPayrollStructure};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrPayrollStructure>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_payroll_structure: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrPayrollStructure>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_payroll_structure: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4781,10 +5453,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_payroll_structure row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_payroll_structure row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_payroll_structure row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4794,12 +5467,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_payslip" => {
             use crate::hr::payroll::{hr_payslip as _, HrPayslip};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrPayslip>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_payslip: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrPayslip>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for hr_payslip: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4809,10 +5483,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_payslip row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_payslip row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming hr_payslip row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4822,12 +5495,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_performance_cycle" => {
             use crate::hr::performance::{hr_performance_cycle as _, HrPerformanceCycle};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrPerformanceCycle>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_performance_cycle: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrPerformanceCycle>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_performance_cycle: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4837,10 +5513,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_performance_cycle row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_performance_cycle row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_performance_cycle row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4850,12 +5527,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_performance_goal" => {
             use crate::hr::performance::{hr_performance_goal as _, HrPerformanceGoal};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrPerformanceGoal>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_performance_goal: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrPerformanceGoal>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_performance_goal: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4865,10 +5545,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_performance_goal row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_performance_goal row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_performance_goal row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4878,12 +5559,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_performance_review" => {
             use crate::hr::performance::{hr_performance_review as _, HrPerformanceReview};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrPerformanceReview>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_performance_review: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrPerformanceReview>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_performance_review: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4892,11 +5576,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing hr_performance_review row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_performance_review row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing hr_performance_review row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_performance_review row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4906,12 +5593,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_pii_access_log" => {
             use crate::hr::pii::{hr_pii_access_log as _, HrPiiAccessLog};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrPiiAccessLog>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_pii_access_log: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrPiiAccessLog>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_pii_access_log: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4921,10 +5611,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_pii_access_log row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_pii_access_log row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_pii_access_log row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4934,12 +5625,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_resource" => {
             use crate::hr::employees::{hr_resource as _, HrResource};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrResource>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_resource: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrResource>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for hr_resource: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4949,10 +5641,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_resource row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_resource row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming hr_resource row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4962,12 +5653,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_salary_rule" => {
             use crate::hr::payroll::{hr_salary_rule as _, HrSalaryRule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrSalaryRule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_salary_rule: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrSalaryRule>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for hr_salary_rule: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -4977,10 +5669,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_salary_rule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_salary_rule row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_salary_rule row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -4990,12 +5683,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_shift_opt_job" => {
             use crate::hr::wfm::{hr_shift_opt_job as _, HrShiftOptJob};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrShiftOptJob>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_shift_opt_job: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrShiftOptJob>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for hr_shift_opt_job: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5005,10 +5699,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_shift_opt_job row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_shift_opt_job row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_shift_opt_job row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5018,7 +5713,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_skill" => {
             use crate::hr::skills::{hr_skill as _, HrSkill};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -5033,10 +5728,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_skill row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_skill row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming hr_skill row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5046,12 +5740,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_statutory_id" => {
             use crate::hr::country_pack_hr::{hr_statutory_id as _, HrStatutoryId};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrStatutoryId>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_statutory_id: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrStatutoryId>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for hr_statutory_id: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5061,10 +5756,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_statutory_id row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_statutory_id row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_statutory_id row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5074,12 +5770,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_work_schedule" => {
             use crate::hr::attendance::{hr_work_schedule as _, HrWorkSchedule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrWorkSchedule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_work_schedule: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrWorkSchedule>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for hr_work_schedule: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5089,10 +5786,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_work_schedule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_work_schedule row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_work_schedule row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5102,12 +5800,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "import_job" => {
             use crate::data_ops::import_tracker::{import_job as _, ImportJob};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ImportJob>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for import_job: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ImportJob>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for import_job: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5117,10 +5816,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing import_job row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming import_job row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming import_job row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5130,12 +5828,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "import_mapping_template" => {
-            use crate::data_ops::import_mapping_templates::{import_mapping_template as _, ImportMappingTemplate};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ImportMappingTemplate>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for import_mapping_template: {error}"))?;
+            use crate::data_ops::import_mapping_templates::{
+                import_mapping_template as _, ImportMappingTemplate,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ImportMappingTemplate>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for import_mapping_template: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5144,11 +5847,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing import_mapping_template row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming import_mapping_template row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing import_mapping_template row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming import_mapping_template row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5158,12 +5864,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "intercompany_rule" => {
             use crate::accounting::intercompany::{intercompany_rule as _, IntercompanyRule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<IntercompanyRule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for intercompany_rule: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<IntercompanyRule>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for intercompany_rule: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5173,10 +5882,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing intercompany_rule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming intercompany_rule row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming intercompany_rule row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5186,12 +5896,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "intercompany_transaction" => {
-            use crate::accounting::intercompany::{intercompany_transaction as _, IntercompanyTransaction};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<IntercompanyTransaction>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for intercompany_transaction: {error}"))?;
+            use crate::accounting::intercompany::{
+                intercompany_transaction as _, IntercompanyTransaction,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<IntercompanyTransaction>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for intercompany_transaction: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5200,11 +5915,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing intercompany_transaction row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming intercompany_transaction row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing intercompany_transaction row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming intercompany_transaction row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5214,12 +5932,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "inventory_adjustment" => {
-            use crate::inventory::inventory_adjustments::{inventory_adjustment as _, InventoryAdjustment};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<InventoryAdjustment>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for inventory_adjustment: {error}"))?;
+            use crate::inventory::inventory_adjustments::{
+                inventory_adjustment as _, InventoryAdjustment,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<InventoryAdjustment>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for inventory_adjustment: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5229,10 +5952,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing inventory_adjustment row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming inventory_adjustment row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming inventory_adjustment row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5242,12 +5966,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "inventory_audit_run" => {
             use crate::inventory::audit::{inventory_audit_run as _, InventoryAuditRun};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<InventoryAuditRun>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for inventory_audit_run: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<InventoryAuditRun>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for inventory_audit_run: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5257,10 +5984,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing inventory_audit_run row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming inventory_audit_run row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming inventory_audit_run row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5270,12 +5998,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "inventory_audit_violation" => {
-            use crate::inventory::audit::{inventory_audit_violation as _, InventoryAuditViolation};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<InventoryAuditViolation>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for inventory_audit_violation: {error}"))?;
+            use crate::inventory::audit::{
+                inventory_audit_violation as _, InventoryAuditViolation,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<InventoryAuditViolation>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for inventory_audit_violation: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5284,11 +6017,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing inventory_audit_violation row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming inventory_audit_violation row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing inventory_audit_violation row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming inventory_audit_violation row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5298,12 +6034,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "inventory_close" => {
             use crate::inventory::inventory_close::{inventory_close as _, InventoryClose};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<InventoryClose>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for inventory_close: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<InventoryClose>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for inventory_close: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5313,10 +6050,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing inventory_close row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming inventory_close row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming inventory_close row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5326,12 +6064,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "inventory_close_line" => {
-            use crate::inventory::inventory_close::{inventory_close_line as _, InventoryCloseLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<InventoryCloseLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for inventory_close_line: {error}"))?;
+            use crate::inventory::inventory_close::{
+                inventory_close_line as _, InventoryCloseLine,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<InventoryCloseLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for inventory_close_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5341,10 +6084,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing inventory_close_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming inventory_close_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming inventory_close_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5354,12 +6098,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "inventory_exception" => {
             use crate::inventory::exceptions::{inventory_exception as _, InventoryException};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<InventoryException>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for inventory_exception: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<InventoryException>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for inventory_exception: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5369,10 +6116,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing inventory_exception row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming inventory_exception row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming inventory_exception row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5382,12 +6130,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "inventory_integration_intent" => {
-            use crate::inventory::integration::{inventory_integration_intent as _, InventoryIntegrationIntent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<InventoryIntegrationIntent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for inventory_integration_intent: {error}"))?;
+            use crate::inventory::integration::{
+                inventory_integration_intent as _, InventoryIntegrationIntent,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<InventoryIntegrationIntent>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for inventory_integration_intent: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5396,11 +6149,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing inventory_integration_intent row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming inventory_integration_intent row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing inventory_integration_intent row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming inventory_integration_intent row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5410,12 +6166,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "inventory_valuation" => {
             use crate::inventory::valuation::{inventory_valuation as _, InventoryValuation};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<InventoryValuation>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for inventory_valuation: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<InventoryValuation>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for inventory_valuation: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5425,10 +6184,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing inventory_valuation row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming inventory_valuation row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming inventory_valuation row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5438,12 +6198,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "iot_action" => {
             use crate::iot::actions::{iot_action as _, IoTAction};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<IoTAction>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for iot_action: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<IoTAction>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for iot_action: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5453,10 +6214,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing iot_action row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming iot_action row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming iot_action row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5466,7 +6226,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "iot_alert" => {
             use crate::iot::alerts::{iot_alert as _, IoTAlert};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -5481,10 +6241,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing iot_alert row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming iot_alert row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming iot_alert row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5494,12 +6253,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "iot_device" => {
             use crate::iot::registry::{iot_device as _, IoTDevice};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<IoTDevice>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for iot_device: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<IoTDevice>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for iot_device: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5509,10 +6269,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing iot_device row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming iot_device row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming iot_device row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5522,7 +6281,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "iot_hub" => {
             use crate::iot::registry::{iot_hub as _, IoTHub};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -5537,10 +6296,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing iot_hub row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming iot_hub row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming iot_hub row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5550,12 +6308,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "iot_pairing_token" => {
             use crate::iot::registry::{iot_pairing_token as _, IoTPairingToken};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<IoTPairingToken>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for iot_pairing_token: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<IoTPairingToken>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for iot_pairing_token: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5565,10 +6326,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing iot_pairing_token row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming iot_pairing_token row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming iot_pairing_token row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5578,12 +6340,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "iot_telemetry" => {
             use crate::iot::telemetry::{iot_telemetry as _, IoTTelemetry};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<IoTTelemetry>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for iot_telemetry: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<IoTTelemetry>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for iot_telemetry: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5593,10 +6356,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing iot_telemetry row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming iot_telemetry row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming iot_telemetry row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5606,12 +6370,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "iot_threshold" => {
             use crate::iot::telemetry::{iot_threshold as _, IoTThreshold};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<IoTThreshold>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for iot_threshold: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<IoTThreshold>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for iot_threshold: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5621,10 +6386,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing iot_threshold row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming iot_threshold row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming iot_threshold row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5634,12 +6400,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "kb_category" => {
             use crate::documents::knowledge::{kb_category as _, KnowledgeArticleCategory};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<KnowledgeArticleCategory>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for kb_category: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<KnowledgeArticleCategory>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for kb_category: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5649,10 +6416,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing kb_category row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming kb_category row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming kb_category row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5662,12 +6428,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "knowledge_article" => {
             use crate::documents::knowledge::{knowledge_article as _, KnowledgeArticle};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<KnowledgeArticle>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for knowledge_article: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<KnowledgeArticle>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for knowledge_article: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5677,10 +6446,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing knowledge_article row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming knowledge_article row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming knowledge_article row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5690,12 +6460,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "knowledge_article_presence" => {
-            use crate::documents::presence::{knowledge_article_presence as _, KnowledgeArticlePresence};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<KnowledgeArticlePresence>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for knowledge_article_presence: {error}"))?;
+            use crate::documents::presence::{
+                knowledge_article_presence as _, KnowledgeArticlePresence,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<KnowledgeArticlePresence>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for knowledge_article_presence: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5704,11 +6479,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing knowledge_article_presence row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming knowledge_article_presence row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing knowledge_article_presence row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming knowledge_article_presence row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5718,7 +6496,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "lead" => {
             use crate::crm::leads::{lead as _, Lead};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -5733,10 +6511,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing lead row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming lead row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming lead row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5746,12 +6523,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "lead_lost_reason" => {
             use crate::crm::leads::{lead_lost_reason as _, LeadLostReason};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<LeadLostReason>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for lead_lost_reason: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<LeadLostReason>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for lead_lost_reason: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5761,10 +6539,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing lead_lost_reason row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming lead_lost_reason row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming lead_lost_reason row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5774,12 +6553,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "lead_score" => {
             use crate::crm::lead_scoring::{lead_score as _, LeadScore};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<LeadScore>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for lead_score: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<LeadScore>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for lead_score: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5789,10 +6569,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing lead_score row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming lead_score row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming lead_score row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5802,12 +6581,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "lead_score_factor" => {
             use crate::crm::lead_scoring::{lead_score_factor as _, LeadScoreFactor};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<LeadScoreFactor>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for lead_score_factor: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<LeadScoreFactor>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for lead_score_factor: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5817,10 +6599,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing lead_score_factor row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming lead_score_factor row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming lead_score_factor row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5830,12 +6613,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "lead_source" => {
             use crate::crm::leads::{lead_source as _, LeadSource};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<LeadSource>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for lead_source: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<LeadSource>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for lead_source: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5845,10 +6629,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing lead_source row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming lead_source row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming lead_source row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5858,12 +6641,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "mail_follower" => {
             use crate::core::messaging::{mail_follower as _, MailFollower};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<MailFollower>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for mail_follower: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<MailFollower>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for mail_follower: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5873,10 +6657,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing mail_follower row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming mail_follower row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming mail_follower row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5886,12 +6671,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "mail_message" => {
             use crate::core::messaging::{mail_message as _, MailMessage};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<MailMessage>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for mail_message: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<MailMessage>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for mail_message: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5901,10 +6687,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing mail_message row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming mail_message row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming mail_message row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5914,12 +6699,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "mail_template" => {
             use crate::documents::templates::{mail_template as _, MailTemplate};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<MailTemplate>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for mail_template: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<MailTemplate>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for mail_template: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5929,10 +6715,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing mail_template row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming mail_template row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming mail_template row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5942,12 +6729,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "message_batch" => {
             use crate::core::operational_messaging::{message_batch as _, MessageBatch};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<MessageBatch>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for message_batch: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<MessageBatch>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for message_batch: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5957,10 +6745,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing message_batch row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming message_batch row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming message_batch row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5970,12 +6759,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "message_template" => {
             use crate::core::operational_messaging::{message_template as _, MessageTemplate};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<MessageTemplate>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for message_template: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<MessageTemplate>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for message_template: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -5985,10 +6775,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing message_template row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming message_template row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming message_template row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -5998,7 +6789,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "mrp_bom" => {
             use crate::manufacturing::bill_of_materials::{mrp_bom as _, MrpBom};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -6013,10 +6804,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing mrp_bom row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming mrp_bom row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming mrp_bom row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6026,12 +6816,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "mrp_loss_category" => {
             use crate::manufacturing::work_centers::{mrp_loss_category as _, MrpLossCategory};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<MrpLossCategory>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for mrp_loss_category: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<MrpLossCategory>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for mrp_loss_category: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6041,10 +6834,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing mrp_loss_category row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming mrp_loss_category row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming mrp_loss_category row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6054,12 +6848,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "mrp_production" => {
             use crate::manufacturing::manufacturing_orders::{mrp_production as _, MrpProduction};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<MrpProduction>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for mrp_production: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<MrpProduction>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for mrp_production: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6069,10 +6864,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing mrp_production row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming mrp_production row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming mrp_production row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6082,12 +6878,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "mrp_routing_workcenter" => {
-            use crate::manufacturing::bill_of_materials::{mrp_routing_workcenter as _, MrpRoutingWorkcenter};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<MrpRoutingWorkcenter>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for mrp_routing_workcenter: {error}"))?;
+            use crate::manufacturing::bill_of_materials::{
+                mrp_routing_workcenter as _, MrpRoutingWorkcenter,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<MrpRoutingWorkcenter>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for mrp_routing_workcenter: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6096,11 +6897,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing mrp_routing_workcenter row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming mrp_routing_workcenter row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing mrp_routing_workcenter row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming mrp_routing_workcenter row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6110,12 +6914,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "mrp_workcenter" => {
             use crate::manufacturing::work_centers::{mrp_workcenter as _, MrpWorkcenter};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<MrpWorkcenter>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for mrp_workcenter: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<MrpWorkcenter>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for mrp_workcenter: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6125,10 +6930,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing mrp_workcenter row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming mrp_workcenter row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming mrp_workcenter row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6138,12 +6944,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "mrp_workcenter_productivity" => {
-            use crate::manufacturing::work_centers::{mrp_workcenter_productivity as _, MrpWorkcenterProductivity};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<MrpWorkcenterProductivity>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for mrp_workcenter_productivity: {error}"))?;
+            use crate::manufacturing::work_centers::{
+                mrp_workcenter_productivity as _, MrpWorkcenterProductivity,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<MrpWorkcenterProductivity>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for mrp_workcenter_productivity: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6152,11 +6963,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing mrp_workcenter_productivity row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming mrp_workcenter_productivity row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing mrp_workcenter_productivity row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming mrp_workcenter_productivity row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6166,12 +6980,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "mrp_workorder" => {
             use crate::manufacturing::manufacturing_orders::{mrp_workorder as _, MrpWorkorder};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<MrpWorkorder>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for mrp_workorder: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<MrpWorkorder>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for mrp_workorder: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6181,10 +6996,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing mrp_workorder row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming mrp_workorder row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming mrp_workorder row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6194,12 +7010,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "operational_message" => {
-            use crate::core::operational_messaging::{operational_message as _, OperationalMessage};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<OperationalMessage>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for operational_message: {error}"))?;
+            use crate::core::operational_messaging::{
+                operational_message as _, OperationalMessage,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<OperationalMessage>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for operational_message: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6209,10 +7030,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing operational_message row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming operational_message row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming operational_message row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6222,12 +7044,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "opp_stage" => {
             use crate::crm::opportunities::{opp_stage as _, OpportunityStage};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<OpportunityStage>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for opp_stage: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<OpportunityStage>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for opp_stage: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6237,10 +7060,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing opp_stage row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming opp_stage row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming opp_stage row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6250,12 +7072,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "opportunity" => {
             use crate::crm::opportunities::{opportunity as _, Opportunity};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<Opportunity>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for opportunity: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<Opportunity>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for opportunity: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6265,10 +7088,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing opportunity row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming opportunity row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming opportunity row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6278,12 +7100,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "opportunity_presence" => {
             use crate::crm::presence::{opportunity_presence as _, OpportunityPresence};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<OpportunityPresence>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for opportunity_presence: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<OpportunityPresence>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for opportunity_presence: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6293,10 +7118,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing opportunity_presence row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming opportunity_presence row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming opportunity_presence row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6306,12 +7132,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "org_permission" => {
             use crate::core::permissions::{org_permission as _, OrgPermission};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<OrgPermission>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for org_permission: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<OrgPermission>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for org_permission: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6321,10 +7148,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing org_permission row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming org_permission row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming org_permission row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6334,12 +7162,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "org_schema_migration" => {
             use crate::core::migrations::{org_schema_migration as _, OrgSchemaMigration};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<OrgSchemaMigration>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for org_schema_migration: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<OrgSchemaMigration>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for org_schema_migration: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6349,10 +7180,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing org_schema_migration row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming org_schema_migration row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming org_schema_migration row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6362,12 +7194,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "organization" => {
             use crate::core::organization::{organization as _, Organization};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<Organization>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for organization: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<Organization>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for organization: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6377,10 +7210,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing organization row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming organization row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming organization row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6390,12 +7222,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "organization_commit" => {
             use crate::core::persistence::{organization_commit as _, OrganizationCommit};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<OrganizationCommit>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for organization_commit: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<OrganizationCommit>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for organization_commit: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6405,10 +7240,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing organization_commit row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming organization_commit row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming organization_commit row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6418,12 +7254,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "organization_commit_cursor" => {
-            use crate::core::persistence::{organization_commit_cursor as _, OrganizationCommitCursor};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<OrganizationCommitCursor>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for organization_commit_cursor: {error}"))?;
+            use crate::core::persistence::{
+                organization_commit_cursor as _, OrganizationCommitCursor,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<OrganizationCommitCursor>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for organization_commit_cursor: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6432,11 +7273,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing organization_commit_cursor row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming organization_commit_cursor row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing organization_commit_cursor row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming organization_commit_cursor row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6446,12 +7290,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "organization_row_change" => {
             use crate::core::persistence::{organization_row_change as _, OrganizationRowChange};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<OrganizationRowChange>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for organization_row_change: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<OrganizationRowChange>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for organization_row_change: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6460,11 +7307,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing organization_row_change row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming organization_row_change row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing organization_row_change row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming organization_row_change row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6474,12 +7324,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "organization_settings" => {
             use crate::core::organization::{organization_settings as _, OrganizationSettings};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<OrganizationSettings>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for organization_settings: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<OrganizationSettings>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for organization_settings: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6488,11 +7341,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing organization_settings row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming organization_settings row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing organization_settings row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming organization_settings row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6502,12 +7358,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "packaging_material" => {
-            use crate::inventory::warehouse_operations::{packaging_material as _, PackagingMaterial};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PackagingMaterial>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for packaging_material: {error}"))?;
+            use crate::inventory::warehouse_operations::{
+                packaging_material as _, PackagingMaterial,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PackagingMaterial>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for packaging_material: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6517,10 +7378,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing packaging_material row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming packaging_material row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming packaging_material row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6530,12 +7392,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "partner_credit_control" => {
-            use crate::accounting::credit_control::{partner_credit_control as _, PartnerCreditControl};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PartnerCreditControl>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for partner_credit_control: {error}"))?;
+            use crate::accounting::credit_control::{
+                partner_credit_control as _, PartnerCreditControl,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PartnerCreditControl>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for partner_credit_control: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6544,11 +7411,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing partner_credit_control row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming partner_credit_control row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing partner_credit_control row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming partner_credit_control row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6558,12 +7428,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "password_reset_token" => {
             use crate::core::auth::{password_reset_token as _, PasswordResetToken};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PasswordResetToken>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for password_reset_token: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PasswordResetToken>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for password_reset_token: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6573,10 +7446,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing password_reset_token row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming password_reset_token row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming password_reset_token row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6586,12 +7460,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "payment_account" => {
             use crate::accounting::payment_management::{payment_account as _, PaymentAccount};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PaymentAccount>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for payment_account: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PaymentAccount>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for payment_account: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6601,10 +7476,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing payment_account row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming payment_account row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming payment_account row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6614,12 +7490,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "payment_fee" => {
             use crate::accounting::payment_management::{payment_fee as _, PaymentFee};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PaymentFee>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for payment_fee: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PaymentFee>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for payment_fee: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6629,10 +7506,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing payment_fee row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming payment_fee row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming payment_fee row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6642,12 +7518,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "payment_reconciliation" => {
-            use crate::accounting::payment_management::{payment_reconciliation as _, PaymentReconciliation};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PaymentReconciliation>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for payment_reconciliation: {error}"))?;
+            use crate::accounting::payment_management::{
+                payment_reconciliation as _, PaymentReconciliation,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PaymentReconciliation>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for payment_reconciliation: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6656,11 +7537,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing payment_reconciliation row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming payment_reconciliation row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing payment_reconciliation row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming payment_reconciliation row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6670,12 +7554,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "payment_reversal" => {
             use crate::accounting::payment_management::{payment_reversal as _, PaymentReversal};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PaymentReversal>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for payment_reversal: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PaymentReversal>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for payment_reversal: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6685,10 +7570,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing payment_reversal row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming payment_reversal row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming payment_reversal row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6698,12 +7584,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "payment_transaction" => {
-            use crate::accounting::payment_management::{payment_transaction as _, PaymentTransaction};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PaymentTransaction>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for payment_transaction: {error}"))?;
+            use crate::accounting::payment_management::{
+                payment_transaction as _, PaymentTransaction,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PaymentTransaction>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for payment_transaction: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6713,10 +7604,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing payment_transaction row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming payment_transaction row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming payment_transaction row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6726,12 +7618,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "picking_wave" => {
             use crate::inventory::warehouse_operations::{picking_wave as _, PickingWave};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PickingWave>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for picking_wave: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PickingWave>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for picking_wave: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6741,10 +7634,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing picking_wave row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming picking_wave row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming picking_wave row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6754,12 +7646,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "pos_config" => {
             use crate::sales::pos_config::{pos_config as _, PosConfig};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PosConfig>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for pos_config: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PosConfig>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for pos_config: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6769,10 +7662,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing pos_config row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming pos_config row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming pos_config row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6782,12 +7674,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "pos_loyalty_card" => {
             use crate::sales::pos_transactions::{pos_loyalty_card as _, PosLoyaltyCard};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PosLoyaltyCard>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for pos_loyalty_card: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PosLoyaltyCard>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for pos_loyalty_card: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6797,10 +7690,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing pos_loyalty_card row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming pos_loyalty_card row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming pos_loyalty_card row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6810,12 +7704,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "pos_loyalty_program" => {
             use crate::sales::pos_config::{pos_loyalty_program as _, PosLoyaltyProgram};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PosLoyaltyProgram>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for pos_loyalty_program: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PosLoyaltyProgram>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for pos_loyalty_program: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6825,10 +7722,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing pos_loyalty_program row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming pos_loyalty_program row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming pos_loyalty_program row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6838,7 +7736,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "pos_order" => {
             use crate::sales::pos_transactions::{pos_order as _, PosOrder};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -6853,10 +7751,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing pos_order row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming pos_order row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming pos_order row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6866,12 +7763,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "pos_payment_method" => {
             use crate::sales::pos_config::{pos_payment_method as _, PosPaymentMethod};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PosPaymentMethod>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for pos_payment_method: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PosPaymentMethod>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for pos_payment_method: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6881,10 +7781,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing pos_payment_method row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming pos_payment_method row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming pos_payment_method row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6894,12 +7795,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "pos_session" => {
             use crate::sales::pos_transactions::{pos_session as _, PosSession};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PosSession>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for pos_session: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PosSession>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for pos_session: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6909,10 +7811,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing pos_session row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming pos_session row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming pos_session row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6922,12 +7823,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "pos_terminal" => {
             use crate::fleet::fleet::{pos_terminal as _, PosTerminal};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PosTerminal>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for pos_terminal: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PosTerminal>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for pos_terminal: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6937,10 +7839,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing pos_terminal row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming pos_terminal row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming pos_terminal row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6950,12 +7851,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "privacy_consent" => {
             use crate::core::privacy::{privacy_consent as _, PrivacyConsent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PrivacyConsent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for privacy_consent: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PrivacyConsent>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for privacy_consent: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -6965,10 +7867,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing privacy_consent row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming privacy_consent row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming privacy_consent row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -6978,7 +7881,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "product" => {
             use crate::inventory::product::{product as _, Product};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -6993,10 +7896,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing product row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming product row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming product row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7006,12 +7908,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "product_attribute" => {
             use crate::inventory::product::{product_attribute as _, ProductAttribute};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProductAttribute>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for product_attribute: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProductAttribute>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for product_attribute: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7021,10 +7926,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing product_attribute row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming product_attribute row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming product_attribute row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7034,12 +7940,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "product_attribute_value" => {
             use crate::inventory::product::{product_attribute_value as _, ProductAttributeValue};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProductAttributeValue>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for product_attribute_value: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProductAttributeValue>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for product_attribute_value: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7048,11 +7957,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing product_attribute_value row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming product_attribute_value row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing product_attribute_value row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming product_attribute_value row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7062,12 +7974,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "product_category" => {
             use crate::inventory::product_category::{product_category as _, ProductCategory};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProductCategory>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for product_category: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProductCategory>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for product_category: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7077,10 +7990,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing product_category row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming product_category row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming product_category row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7090,12 +8004,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "product_packaging" => {
             use crate::inventory::product::{product_packaging as _, ProductPackaging};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProductPackaging>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for product_packaging: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProductPackaging>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for product_packaging: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7105,10 +8022,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing product_packaging row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming product_packaging row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming product_packaging row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7118,12 +8036,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "product_pricelist" => {
             use crate::sales::pricelists::{product_pricelist as _, ProductPricelist};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProductPricelist>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for product_pricelist: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProductPricelist>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for product_pricelist: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7133,10 +8054,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing product_pricelist row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming product_pricelist row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming product_pricelist row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7146,12 +8068,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "product_supplier_info" => {
             use crate::inventory::product::{product_supplier_info as _, ProductSupplierInfo};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProductSupplierInfo>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for product_supplier_info: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProductSupplierInfo>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for product_supplier_info: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7160,11 +8085,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing product_supplier_info row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming product_supplier_info row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing product_supplier_info row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming product_supplier_info row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7174,12 +8102,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "product_variant" => {
             use crate::inventory::product::{product_variant as _, ProductVariant};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProductVariant>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for product_variant: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProductVariant>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for product_variant: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7189,10 +8118,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing product_variant row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming product_variant row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming product_variant row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7202,12 +8132,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "profit_loss_line" => {
             use crate::accounting::financial_statements::{profit_loss_line as _, ProfitLossLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProfitLossLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for profit_loss_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProfitLossLine>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for profit_loss_line: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7217,10 +8148,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing profit_loss_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming profit_loss_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming profit_loss_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7230,12 +8162,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "project_baseline" => {
             use crate::projects::psa_advanced::{project_baseline as _, ProjectBaseline};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProjectBaseline>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for project_baseline: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProjectBaseline>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for project_baseline: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7245,10 +8178,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing project_baseline row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming project_baseline row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming project_baseline row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7258,12 +8192,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "project_change_order" => {
             use crate::projects::psa_advanced::{project_change_order as _, ProjectChangeOrder};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProjectChangeOrder>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for project_change_order: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProjectChangeOrder>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for project_change_order: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7273,10 +8210,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing project_change_order row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming project_change_order row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming project_change_order row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7286,12 +8224,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "project_earned_value_snapshot" => {
-            use crate::projects::psa_advanced::{project_earned_value_snapshot as _, ProjectEarnedValueSnapshot};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProjectEarnedValueSnapshot>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for project_earned_value_snapshot: {error}"))?;
+            use crate::projects::psa_advanced::{
+                project_earned_value_snapshot as _, ProjectEarnedValueSnapshot,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProjectEarnedValueSnapshot>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for project_earned_value_snapshot: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7300,11 +8243,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing project_earned_value_snapshot row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming project_earned_value_snapshot row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing project_earned_value_snapshot row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming project_earned_value_snapshot row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7314,12 +8260,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "project_integration_intent" => {
-            use crate::projects::psa_advanced::{project_integration_intent as _, ProjectIntegrationIntent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProjectIntegrationIntent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for project_integration_intent: {error}"))?;
+            use crate::projects::psa_advanced::{
+                project_integration_intent as _, ProjectIntegrationIntent,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProjectIntegrationIntent>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for project_integration_intent: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7328,11 +8279,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing project_integration_intent row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming project_integration_intent row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing project_integration_intent row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming project_integration_intent row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7342,12 +8296,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "project_milestone" => {
             use crate::projects::milestones::{project_milestone as _, ProjectMilestone};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProjectMilestone>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for project_milestone: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProjectMilestone>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for project_milestone: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7357,10 +8314,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing project_milestone row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming project_milestone row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming project_milestone row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7370,12 +8328,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "project_project" => {
             use crate::projects::projects::{project_project as _, ProjectProject};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProjectProject>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for project_project: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProjectProject>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for project_project: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7385,10 +8344,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing project_project row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming project_project row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming project_project row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7398,12 +8358,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "project_rate_card" => {
             use crate::projects::rate_cards::{project_rate_card as _, ProjectRateCard};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProjectRateCard>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for project_rate_card: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProjectRateCard>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for project_rate_card: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7413,10 +8376,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing project_rate_card row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming project_rate_card row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming project_rate_card row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7426,12 +8390,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "project_revenue_schedule" => {
-            use crate::projects::psa_advanced::{project_revenue_schedule as _, ProjectRevenueSchedule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProjectRevenueSchedule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for project_revenue_schedule: {error}"))?;
+            use crate::projects::psa_advanced::{
+                project_revenue_schedule as _, ProjectRevenueSchedule,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProjectRevenueSchedule>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for project_revenue_schedule: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7440,11 +8409,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing project_revenue_schedule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming project_revenue_schedule row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing project_revenue_schedule row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming project_revenue_schedule row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7454,12 +8426,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "project_subcontractor_cost" => {
-            use crate::projects::project_accounting::{project_subcontractor_cost as _, ProjectSubcontractorCost};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProjectSubcontractorCost>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for project_subcontractor_cost: {error}"))?;
+            use crate::projects::project_accounting::{
+                project_subcontractor_cost as _, ProjectSubcontractorCost,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProjectSubcontractorCost>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for project_subcontractor_cost: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7468,11 +8445,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing project_subcontractor_cost row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming project_subcontractor_cost row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing project_subcontractor_cost row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming project_subcontractor_cost row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7482,12 +8462,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "project_task" => {
             use crate::projects::tasks::{project_task as _, ProjectTask};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProjectTask>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for project_task: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProjectTask>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for project_task: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7497,10 +8478,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing project_task row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming project_task row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming project_task row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7510,12 +8490,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "project_task_stage" => {
             use crate::projects::task_stages::{project_task_stage as _, ProjectTaskStage};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProjectTaskStage>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for project_task_stage: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProjectTaskStage>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for project_task_stage: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7525,10 +8508,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing project_task_stage row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming project_task_stage row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming project_task_stage row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7538,12 +8522,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "project_timesheet" => {
             use crate::projects::timesheets::{project_timesheet as _, ProjectTimesheet};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProjectTimesheet>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for project_timesheet: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProjectTimesheet>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for project_timesheet: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7553,10 +8540,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing project_timesheet row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming project_timesheet row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming project_timesheet row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7566,12 +8554,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "project_timesheet_approval" => {
-            use crate::projects::timesheets::{project_timesheet_approval as _, ProjectTimesheetApproval};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProjectTimesheetApproval>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for project_timesheet_approval: {error}"))?;
+            use crate::projects::timesheets::{
+                project_timesheet_approval as _, ProjectTimesheetApproval,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProjectTimesheetApproval>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for project_timesheet_approval: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7580,11 +8573,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing project_timesheet_approval row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming project_timesheet_approval row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing project_timesheet_approval row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming project_timesheet_approval row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7594,7 +8590,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "proposal" => {
             use crate::proposals::proposals::{proposal as _, Proposal};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -7609,10 +8605,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing proposal row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming proposal row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming proposal row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7622,12 +8617,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "proposal_analysis" => {
             use crate::proposals::proposals::{proposal_analysis as _, ProposalAnalysis};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProposalAnalysis>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for proposal_analysis: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProposalAnalysis>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for proposal_analysis: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7637,10 +8635,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing proposal_analysis row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming proposal_analysis row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming proposal_analysis row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7650,12 +8649,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "proposal_bid_decision" => {
             use crate::proposals::proposals::{proposal_bid_decision as _, ProposalBidDecision};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProposalBidDecision>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for proposal_bid_decision: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProposalBidDecision>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for proposal_bid_decision: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7664,11 +8666,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing proposal_bid_decision row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming proposal_bid_decision row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing proposal_bid_decision row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming proposal_bid_decision row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7678,12 +8683,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "proposal_clarification" => {
             use crate::proposals::proposals::{proposal_clarification as _, ProposalClarification};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProposalClarification>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for proposal_clarification: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProposalClarification>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for proposal_clarification: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7692,11 +8700,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing proposal_clarification row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming proposal_clarification row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing proposal_clarification row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming proposal_clarification row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7706,12 +8717,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "proposal_clause" => {
             use crate::proposals::proposals::{proposal_clause as _, ProposalClause};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProposalClause>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for proposal_clause: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProposalClause>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for proposal_clause: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7721,10 +8733,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing proposal_clause row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming proposal_clause row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming proposal_clause row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7734,12 +8747,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "proposal_comment" => {
             use crate::proposals::proposals::{proposal_comment as _, ProposalComment};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProposalComment>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for proposal_comment: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProposalComment>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for proposal_comment: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7749,10 +8763,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing proposal_comment row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming proposal_comment row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming proposal_comment row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7762,12 +8777,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "proposal_compliance_requirement" => {
-            use crate::proposals::proposals::{proposal_compliance_requirement as _, ProposalComplianceRequirement};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProposalComplianceRequirement>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for proposal_compliance_requirement: {error}"))?;
+            use crate::proposals::proposals::{
+                proposal_compliance_requirement as _, ProposalComplianceRequirement,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProposalComplianceRequirement>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for proposal_compliance_requirement: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7776,11 +8796,16 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing proposal_compliance_requirement row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming proposal_compliance_requirement row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing proposal_compliance_requirement row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!(
+                                "serialize incoming proposal_compliance_requirement row: {error}"
+                            )
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7790,12 +8815,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "proposal_integration_intent" => {
-            use crate::proposals::proposals::{proposal_integration_intent as _, ProposalIntegrationIntent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProposalIntegrationIntent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for proposal_integration_intent: {error}"))?;
+            use crate::proposals::proposals::{
+                proposal_integration_intent as _, ProposalIntegrationIntent,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProposalIntegrationIntent>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for proposal_integration_intent: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7804,11 +8834,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing proposal_integration_intent row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming proposal_integration_intent row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing proposal_integration_intent row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming proposal_integration_intent row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7818,12 +8851,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "proposal_presence" => {
             use crate::proposals::proposals::{proposal_presence as _, ProposalPresence};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProposalPresence>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for proposal_presence: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProposalPresence>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for proposal_presence: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7833,10 +8869,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing proposal_presence row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming proposal_presence row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming proposal_presence row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7846,12 +8883,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "proposal_procurement_score" => {
-            use crate::proposals::proposals::{proposal_procurement_score as _, ProposalProcurementScore};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProposalProcurementScore>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for proposal_procurement_score: {error}"))?;
+            use crate::proposals::proposals::{
+                proposal_procurement_score as _, ProposalProcurementScore,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProposalProcurementScore>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for proposal_procurement_score: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7860,11 +8902,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing proposal_procurement_score row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming proposal_procurement_score row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing proposal_procurement_score row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming proposal_procurement_score row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7874,12 +8919,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "proposal_source_doc" => {
             use crate::proposals::proposals::{proposal_source_doc as _, ProposalSourceDoc};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProposalSourceDoc>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for proposal_source_doc: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProposalSourceDoc>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for proposal_source_doc: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7889,10 +8937,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing proposal_source_doc row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming proposal_source_doc row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming proposal_source_doc row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7902,12 +8951,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "proposal_template" => {
             use crate::proposals::proposals::{proposal_template as _, ProposalTemplate};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProposalTemplate>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for proposal_template: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProposalTemplate>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for proposal_template: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7917,10 +8969,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing proposal_template row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming proposal_template row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming proposal_template row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7930,12 +8983,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "public_holiday" => {
             use crate::projects::capacity::{public_holiday as _, PublicHoliday};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PublicHoliday>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for public_holiday: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PublicHoliday>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for public_holiday: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7945,10 +8999,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing public_holiday row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming public_holiday row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming public_holiday row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7958,12 +9013,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "purchase_approval_delegate" => {
-            use crate::purchasing::procurement_advanced::{purchase_approval_delegate as _, PurchaseApprovalDelegate};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PurchaseApprovalDelegate>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for purchase_approval_delegate: {error}"))?;
+            use crate::purchasing::procurement_advanced::{
+                purchase_approval_delegate as _, PurchaseApprovalDelegate,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PurchaseApprovalDelegate>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for purchase_approval_delegate: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -7972,11 +9032,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing purchase_approval_delegate row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming purchase_approval_delegate row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing purchase_approval_delegate row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming purchase_approval_delegate row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -7986,12 +9049,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "purchase_blanket_order" => {
-            use crate::purchasing::procurement_advanced::{purchase_blanket_order as _, PurchaseBlanketOrder};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PurchaseBlanketOrder>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for purchase_blanket_order: {error}"))?;
+            use crate::purchasing::procurement_advanced::{
+                purchase_blanket_order as _, PurchaseBlanketOrder,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PurchaseBlanketOrder>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for purchase_blanket_order: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8000,11 +9068,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing purchase_blanket_order row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming purchase_blanket_order row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing purchase_blanket_order row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming purchase_blanket_order row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8014,12 +9085,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "purchase_contract" => {
-            use crate::purchasing::procurement_advanced::{purchase_contract as _, PurchaseContract};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PurchaseContract>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for purchase_contract: {error}"))?;
+            use crate::purchasing::procurement_advanced::{
+                purchase_contract as _, PurchaseContract,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PurchaseContract>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for purchase_contract: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8029,10 +9105,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing purchase_contract row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming purchase_contract row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming purchase_contract row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8042,12 +9119,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "purchase_order" => {
             use crate::purchasing::purchase_orders::{purchase_order as _, PurchaseOrder};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PurchaseOrder>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for purchase_order: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PurchaseOrder>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for purchase_order: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8057,10 +9135,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing purchase_order row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming purchase_order row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming purchase_order row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8070,12 +9149,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "purchase_requisition" => {
-            use crate::purchasing::purchase_orders::{purchase_requisition as _, PurchaseRequisition};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PurchaseRequisition>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for purchase_requisition: {error}"))?;
+            use crate::purchasing::purchase_orders::{
+                purchase_requisition as _, PurchaseRequisition,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PurchaseRequisition>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for purchase_requisition: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8085,10 +9169,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing purchase_requisition row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming purchase_requisition row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming purchase_requisition row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8098,12 +9183,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "purchase_return" => {
             use crate::purchasing::purchase_returns::{purchase_return as _, PurchaseReturn};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PurchaseReturn>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for purchase_return: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PurchaseReturn>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for purchase_return: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8113,10 +9199,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing purchase_return row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming purchase_return row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming purchase_return row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8126,12 +9213,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "purchase_rfq" => {
             use crate::purchasing::sourcing::{purchase_rfq as _, PurchaseRfq};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PurchaseRfq>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for purchase_rfq: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PurchaseRfq>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for purchase_rfq: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8141,10 +9229,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing purchase_rfq row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming purchase_rfq row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming purchase_rfq row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8154,12 +9241,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "purchasing_integration_intent" => {
-            use crate::purchasing::procurement_advanced::{purchasing_integration_intent as _, PurchasingIntegrationIntent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PurchasingIntegrationIntent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for purchasing_integration_intent: {error}"))?;
+            use crate::purchasing::procurement_advanced::{
+                purchasing_integration_intent as _, PurchasingIntegrationIntent,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PurchasingIntegrationIntent>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for purchasing_integration_intent: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8168,11 +9260,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing purchasing_integration_intent row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming purchasing_integration_intent row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing purchasing_integration_intent row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming purchasing_integration_intent row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8182,12 +9277,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "quality_alert" => {
             use crate::inventory::quality::{quality_alert as _, QualityAlert};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<QualityAlert>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for quality_alert: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<QualityAlert>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for quality_alert: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8197,10 +9293,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing quality_alert row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming quality_alert row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming quality_alert row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8210,12 +9307,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "quality_alert_reason" => {
             use crate::inventory::quality::{quality_alert_reason as _, QualityAlertReason};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<QualityAlertReason>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for quality_alert_reason: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<QualityAlertReason>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for quality_alert_reason: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8225,10 +9325,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing quality_alert_reason row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming quality_alert_reason row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming quality_alert_reason row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8238,12 +9339,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "quality_check" => {
             use crate::inventory::quality::{quality_check as _, QualityCheck};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<QualityCheck>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for quality_check: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<QualityCheck>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for quality_check: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8253,10 +9355,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing quality_check row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming quality_check row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming quality_check row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8266,12 +9369,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "quality_point" => {
             use crate::inventory::quality::{quality_point as _, QualityPoint};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<QualityPoint>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for quality_point: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<QualityPoint>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for quality_point: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8281,10 +9385,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing quality_point row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming quality_point row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming quality_point row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8294,12 +9399,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "quality_team" => {
             use crate::inventory::quality::{quality_team as _, QualityTeam};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<QualityTeam>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for quality_team: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<QualityTeam>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for quality_team: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8309,10 +9415,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing quality_team row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming quality_team row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming quality_team row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8322,12 +9427,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "queue_attempt" => {
             use crate::core::queue::{queue_attempt as _, QueueAttempt};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<QueueAttempt>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for queue_attempt: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<QueueAttempt>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for queue_attempt: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8337,10 +9443,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing queue_attempt row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming queue_attempt row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming queue_attempt row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8350,12 +9457,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "queue_effect_receipt" => {
             use crate::core::queue::{queue_effect_receipt as _, QueueEffectReceipt};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<QueueEffectReceipt>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for queue_effect_receipt: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<QueueEffectReceipt>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for queue_effect_receipt: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8365,10 +9475,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing queue_effect_receipt row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming queue_effect_receipt row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming queue_effect_receipt row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8378,7 +9489,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "queue_job" => {
             use crate::core::queue::{queue_job as _, QueueJob};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -8393,10 +9504,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing queue_job row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming queue_job row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming queue_job row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8406,12 +9516,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "queue_worker" => {
             use crate::core::queue::{queue_worker as _, QueueWorker};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<QueueWorker>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for queue_worker: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<QueueWorker>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for queue_worker: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8421,10 +9532,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing queue_worker row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming queue_worker row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming queue_worker row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8434,12 +9544,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "record_custom_field_value" => {
             use crate::forms::{record_custom_field_value as _, RecordCustomFieldValue};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<RecordCustomFieldValue>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for record_custom_field_value: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<RecordCustomFieldValue>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for record_custom_field_value: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8448,11 +9561,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing record_custom_field_value row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming record_custom_field_value row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing record_custom_field_value row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming record_custom_field_value row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8462,12 +9578,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "replenishment_rule" => {
             use crate::inventory::replenishment::{replenishment_rule as _, ReplenishmentRule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ReplenishmentRule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for replenishment_rule: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ReplenishmentRule>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for replenishment_rule: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8477,10 +9596,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing replenishment_rule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming replenishment_rule row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming replenishment_rule row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8490,12 +9610,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "report_template" => {
             use crate::analytics::reports::{report_template as _, ReportTemplate};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ReportTemplate>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for report_template: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ReportTemplate>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for report_template: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8505,10 +9626,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing report_template row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming report_template row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming report_template row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8518,12 +9640,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "res_partner_bank" => {
             use crate::purchasing::vendor_management::{res_partner_bank as _, ResPartnerBank};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ResPartnerBank>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for res_partner_bank: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ResPartnerBank>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for res_partner_bank: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8533,10 +9656,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing res_partner_bank row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming res_partner_bank row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming res_partner_bank row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8546,12 +9670,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "resource_allocation" => {
             use crate::projects::capacity::{resource_allocation as _, ResourceAllocation};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ResourceAllocation>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for resource_allocation: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ResourceAllocation>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for resource_allocation: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8561,10 +9688,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing resource_allocation row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming resource_allocation row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming resource_allocation row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8574,12 +9702,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "resource_capacity_snapshot" => {
-            use crate::projects::capacity::{resource_capacity_snapshot as _, ResourceCapacitySnapshot};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ResourceCapacitySnapshot>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for resource_capacity_snapshot: {error}"))?;
+            use crate::projects::capacity::{
+                resource_capacity_snapshot as _, ResourceCapacitySnapshot,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ResourceCapacitySnapshot>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for resource_capacity_snapshot: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8588,11 +9721,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing resource_capacity_snapshot row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming resource_capacity_snapshot row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing resource_capacity_snapshot row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming resource_capacity_snapshot row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8602,12 +9738,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "resource_utilisation_snapshot" => {
-            use crate::projects::project_accounting::{resource_utilisation_snapshot as _, ResourceUtilisationSnapshot};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ResourceUtilisationSnapshot>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for resource_utilisation_snapshot: {error}"))?;
+            use crate::projects::project_accounting::{
+                resource_utilisation_snapshot as _, ResourceUtilisationSnapshot,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ResourceUtilisationSnapshot>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for resource_utilisation_snapshot: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8616,11 +9757,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing resource_utilisation_snapshot row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming resource_utilisation_snapshot row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing resource_utilisation_snapshot row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming resource_utilisation_snapshot row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8630,12 +9774,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "return_order" => {
             use crate::sales::return_orders::{return_order as _, ReturnOrder};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ReturnOrder>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for return_order: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ReturnOrder>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for return_order: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8645,10 +9790,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing return_order row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming return_order row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming return_order row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8658,12 +9802,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "revenue_recognition_rule" => {
-            use crate::subscriptions::tables::{revenue_recognition_rule as _, RevenueRecognitionRule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<RevenueRecognitionRule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for revenue_recognition_rule: {error}"))?;
+            use crate::subscriptions::tables::{
+                revenue_recognition_rule as _, RevenueRecognitionRule,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<RevenueRecognitionRule>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for revenue_recognition_rule: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8672,11 +9821,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing revenue_recognition_rule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming revenue_recognition_rule row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing revenue_recognition_rule row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming revenue_recognition_rule row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8686,7 +9838,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "role" => {
             use crate::core::permissions::{role as _, Role};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -8701,10 +9853,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing role row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming role row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming role row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8714,12 +9865,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "sale_commission" => {
             use crate::sales::oms_extensions::{sale_commission as _, SaleCommission};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SaleCommission>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for sale_commission: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SaleCommission>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for sale_commission: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8729,10 +9881,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing sale_commission row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming sale_commission row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming sale_commission row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8742,12 +9895,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "sale_commission_plan" => {
             use crate::sales::oms_advanced::{sale_commission_plan as _, SaleCommissionPlan};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SaleCommissionPlan>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for sale_commission_plan: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SaleCommissionPlan>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for sale_commission_plan: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8757,10 +9913,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing sale_commission_plan row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming sale_commission_plan row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming sale_commission_plan row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8770,12 +9927,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "sale_contract" => {
             use crate::sales::oms_advanced::{sale_contract as _, SaleContract};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SaleContract>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for sale_contract: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SaleContract>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for sale_contract: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8785,10 +9943,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing sale_contract row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming sale_contract row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming sale_contract row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8798,12 +9957,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "sale_cpq_constraint" => {
             use crate::sales::oms_advanced::{sale_cpq_constraint as _, SaleCpqConstraint};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SaleCpqConstraint>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for sale_cpq_constraint: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SaleCpqConstraint>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for sale_cpq_constraint: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8813,10 +9975,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing sale_cpq_constraint row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming sale_cpq_constraint row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming sale_cpq_constraint row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8826,12 +9989,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "sale_order" => {
             use crate::sales::sales_core::{sale_order as _, SaleOrder};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SaleOrder>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for sale_order: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SaleOrder>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for sale_order: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8841,10 +10005,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing sale_order row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming sale_order row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming sale_order row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8854,12 +10017,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "sale_promotion" => {
             use crate::sales::oms_extensions::{sale_promotion as _, SalePromotion};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SalePromotion>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for sale_promotion: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SalePromotion>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for sale_promotion: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8869,10 +10033,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing sale_promotion row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming sale_promotion row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming sale_promotion row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8882,12 +10047,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "sales_integration_intent" => {
-            use crate::sales::oms_advanced::{sales_integration_intent as _, SalesIntegrationIntent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SalesIntegrationIntent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for sales_integration_intent: {error}"))?;
+            use crate::sales::oms_advanced::{
+                sales_integration_intent as _, SalesIntegrationIntent,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SalesIntegrationIntent>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for sales_integration_intent: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8896,11 +10066,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing sales_integration_intent row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming sales_integration_intent row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing sales_integration_intent row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming sales_integration_intent row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8910,12 +10083,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "sales_sla_escalation_job" => {
-            use crate::sales::oms_advanced::{sales_sla_escalation_job as _, SalesSlaEscalationJob};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SalesSlaEscalationJob>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for sales_sla_escalation_job: {error}"))?;
+            use crate::sales::oms_advanced::{
+                sales_sla_escalation_job as _, SalesSlaEscalationJob,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SalesSlaEscalationJob>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for sales_sla_escalation_job: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8924,11 +10102,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing sales_sla_escalation_job row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming sales_sla_escalation_job row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing sales_sla_escalation_job row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming sales_sla_escalation_job row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8938,12 +10119,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "saved_report" => {
             use crate::analytics::reports::{saved_report as _, SavedReport};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SavedReport>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for saved_report: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SavedReport>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for saved_report: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8953,10 +10135,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing saved_report row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming saved_report row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming saved_report row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8966,12 +10147,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "scheduled_report" => {
             use crate::analytics::reports::{scheduled_report as _, ScheduledReport};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ScheduledReport>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for scheduled_report: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ScheduledReport>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for scheduled_report: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -8981,10 +10163,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing scheduled_report row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming scheduled_report row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming scheduled_report row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -8994,12 +10177,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "scheduled_report_run" => {
             use crate::analytics::reports::{scheduled_report_run as _, ScheduledReportRun};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ScheduledReportRun>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for scheduled_report_run: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ScheduledReportRun>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for scheduled_report_run: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9009,10 +10195,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing scheduled_report_run row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming scheduled_report_run row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming scheduled_report_run row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9022,12 +10209,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "schema_migration" => {
             use crate::core::migrations::{schema_migration as _, SchemaMigration};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SchemaMigration>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for schema_migration: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SchemaMigration>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for schema_migration: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9037,10 +10225,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing schema_migration row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming schema_migration row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming schema_migration row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9050,12 +10239,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "search_embedding" => {
             use crate::ai::intelligence::{search_embedding as _, SearchEmbedding};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SearchEmbedding>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for search_embedding: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SearchEmbedding>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for search_embedding: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9065,10 +10255,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing search_embedding row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming search_embedding row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming search_embedding row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9078,12 +10269,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "serial_lot_traceability" => {
             use crate::inventory::tracking::{serial_lot_traceability as _, SerialLotTraceability};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SerialLotTraceability>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for serial_lot_traceability: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SerialLotTraceability>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for serial_lot_traceability: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9092,11 +10286,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing serial_lot_traceability row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming serial_lot_traceability row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing serial_lot_traceability row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming serial_lot_traceability row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9106,12 +10303,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "shipping_method" => {
             use crate::sales::delivery_shipping::{shipping_method as _, ShippingMethod};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ShippingMethod>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for shipping_method: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ShippingMethod>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for shipping_method: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9121,10 +10319,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing shipping_method row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming shipping_method row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming shipping_method row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9134,12 +10333,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "sod_conflict_rule" => {
             use crate::core::permissions::{sod_conflict_rule as _, SodConflictRule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SodConflictRule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for sod_conflict_rule: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SodConflictRule>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for sod_conflict_rule: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9149,10 +10351,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing sod_conflict_rule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming sod_conflict_rule row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming sod_conflict_rule row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9162,12 +10365,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_count_sheet" => {
             use crate::inventory::cycle_count::{stock_count_sheet as _, StockCountSheet};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockCountSheet>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_count_sheet: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockCountSheet>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for stock_count_sheet: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9177,10 +10383,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing stock_count_sheet row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_count_sheet row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_count_sheet row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9190,12 +10397,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_cycle_count" => {
             use crate::inventory::cycle_count::{stock_cycle_count as _, StockCycleCount};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockCycleCount>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_cycle_count: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockCycleCount>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for stock_cycle_count: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9205,10 +10415,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing stock_cycle_count row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_cycle_count row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_cycle_count row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9218,12 +10429,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_inventory" => {
             use crate::inventory::inventory_adjustments::{stock_inventory as _, StockInventory};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockInventory>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_inventory: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockInventory>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for stock_inventory: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9233,10 +10445,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing stock_inventory row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_inventory row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_inventory row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9246,12 +10459,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_landed_cost" => {
             use crate::purchasing::landed_costs::{stock_landed_cost as _, StockLandedCost};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockLandedCost>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_landed_cost: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockLandedCost>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for stock_landed_cost: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9261,10 +10477,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing stock_landed_cost row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_landed_cost row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_landed_cost row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9274,12 +10491,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_landed_cost_lines" => {
-            use crate::purchasing::landed_costs::{stock_landed_cost_lines as _, StockLandedCostLines};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockLandedCostLines>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_landed_cost_lines: {error}"))?;
+            use crate::purchasing::landed_costs::{
+                stock_landed_cost_lines as _, StockLandedCostLines,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockLandedCostLines>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for stock_landed_cost_lines: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9288,11 +10510,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing stock_landed_cost_lines row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_landed_cost_lines row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing stock_landed_cost_lines row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_landed_cost_lines row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9302,12 +10527,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_location" => {
             use crate::inventory::warehouse::{stock_location as _, StockLocation};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockLocation>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_location: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockLocation>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for stock_location: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9317,10 +10543,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing stock_location row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_location row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_location row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9330,12 +10557,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_move" => {
             use crate::inventory::stock::{stock_move as _, StockMove};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockMove>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_move: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockMove>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for stock_move: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9345,10 +10573,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing stock_move row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_move row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming stock_move row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9358,12 +10585,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_package" => {
             use crate::inventory::packing::{stock_package as _, StockPackage};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockPackage>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_package: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockPackage>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for stock_package: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9373,10 +10601,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing stock_package row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_package row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_package row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9386,12 +10615,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_picking_batch" => {
             use crate::sales::delivery_shipping::{stock_picking_batch as _, StockPickingBatch};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockPickingBatch>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_picking_batch: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockPickingBatch>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for stock_picking_batch: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9401,10 +10633,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing stock_picking_batch row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_picking_batch row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_picking_batch row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9414,12 +10647,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_production_lot" => {
             use crate::inventory::tracking::{stock_production_lot as _, StockProductionLot};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockProductionLot>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_production_lot: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockProductionLot>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for stock_production_lot: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9429,10 +10665,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing stock_production_lot row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_production_lot row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_production_lot row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9442,12 +10679,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_production_serial" => {
             use crate::inventory::tracking::{stock_production_serial as _, StockProductionSerial};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockProductionSerial>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_production_serial: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockProductionSerial>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for stock_production_serial: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9456,11 +10696,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing stock_production_serial row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_production_serial row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing stock_production_serial row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_production_serial row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9470,12 +10713,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_quant" => {
             use crate::inventory::stock::{stock_quant as _, StockQuant};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockQuant>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_quant: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockQuant>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for stock_quant: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9485,10 +10729,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing stock_quant row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_quant row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming stock_quant row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9498,12 +10741,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_reorder_group" => {
             use crate::inventory::replenishment::{stock_reorder_group as _, StockReorderGroup};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockReorderGroup>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_reorder_group: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockReorderGroup>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for stock_reorder_group: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9513,10 +10759,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing stock_reorder_group row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_reorder_group row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_reorder_group row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9526,12 +10773,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_route" => {
             use crate::inventory::warehouse::{stock_route as _, StockRoute};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockRoute>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_route: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockRoute>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for stock_route: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9541,10 +10789,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing stock_route row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_route row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming stock_route row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9554,12 +10801,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_rule" => {
             use crate::inventory::warehouse::{stock_rule as _, StockRule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockRule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_rule: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockRule>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for stock_rule: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9569,10 +10817,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing stock_rule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_rule row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming stock_rule row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9582,12 +10829,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_traceability_report" => {
-            use crate::inventory::tracking::{stock_traceability_report as _, StockTraceabilityReport};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockTraceabilityReport>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_traceability_report: {error}"))?;
+            use crate::inventory::tracking::{
+                stock_traceability_report as _, StockTraceabilityReport,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockTraceabilityReport>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for stock_traceability_report: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9596,11 +10848,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing stock_traceability_report row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_traceability_report row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing stock_traceability_report row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_traceability_report row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9610,12 +10865,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "subscription" => {
             use crate::subscriptions::tables::{subscription as _, Subscription};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<Subscription>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for subscription: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<Subscription>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for subscription: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9625,10 +10881,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing subscription row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming subscription row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming subscription row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9638,12 +10893,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "subscription_amendment" => {
-            use crate::subscriptions::subscription_wave_c::{subscription_amendment as _, SubscriptionAmendment};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SubscriptionAmendment>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for subscription_amendment: {error}"))?;
+            use crate::subscriptions::subscription_wave_c::{
+                subscription_amendment as _, SubscriptionAmendment,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SubscriptionAmendment>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for subscription_amendment: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9652,11 +10912,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing subscription_amendment row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming subscription_amendment row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing subscription_amendment row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming subscription_amendment row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9666,12 +10929,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "subscription_billing_run" => {
-            use crate::subscriptions::tables::{subscription_billing_run as _, SubscriptionBillingRun};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SubscriptionBillingRun>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for subscription_billing_run: {error}"))?;
+            use crate::subscriptions::tables::{
+                subscription_billing_run as _, SubscriptionBillingRun,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SubscriptionBillingRun>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for subscription_billing_run: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9680,11 +10948,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing subscription_billing_run row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming subscription_billing_run row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing subscription_billing_run row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming subscription_billing_run row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9694,12 +10965,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "subscription_bundle" => {
-            use crate::subscriptions::subscription_wave_d::{subscription_bundle as _, SubscriptionBundle};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SubscriptionBundle>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for subscription_bundle: {error}"))?;
+            use crate::subscriptions::subscription_wave_d::{
+                subscription_bundle as _, SubscriptionBundle,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SubscriptionBundle>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for subscription_bundle: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9709,10 +10985,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing subscription_bundle row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming subscription_bundle row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming subscription_bundle row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9722,12 +10999,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "subscription_collection" => {
-            use crate::subscriptions::subscription_wave_e::{subscription_collection as _, SubscriptionCollection};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SubscriptionCollection>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for subscription_collection: {error}"))?;
+            use crate::subscriptions::subscription_wave_e::{
+                subscription_collection as _, SubscriptionCollection,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SubscriptionCollection>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for subscription_collection: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9736,11 +11018,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing subscription_collection row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming subscription_collection row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing subscription_collection row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming subscription_collection row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9750,12 +11035,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "subscription_commitment" => {
-            use crate::subscriptions::subscription_wave_d::{subscription_commitment as _, SubscriptionCommitment};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SubscriptionCommitment>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for subscription_commitment: {error}"))?;
+            use crate::subscriptions::subscription_wave_d::{
+                subscription_commitment as _, SubscriptionCommitment,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SubscriptionCommitment>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for subscription_commitment: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9764,11 +11054,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing subscription_commitment row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming subscription_commitment row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing subscription_commitment row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming subscription_commitment row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9778,12 +11071,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "subscription_entitlement" => {
-            use crate::subscriptions::subscription_wave_e::{subscription_entitlement as _, SubscriptionEntitlement};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SubscriptionEntitlement>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for subscription_entitlement: {error}"))?;
+            use crate::subscriptions::subscription_wave_e::{
+                subscription_entitlement as _, SubscriptionEntitlement,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SubscriptionEntitlement>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for subscription_entitlement: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9792,11 +11090,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing subscription_entitlement row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming subscription_entitlement row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing subscription_entitlement row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming subscription_entitlement row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9806,12 +11107,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "subscription_payment_intent" => {
-            use crate::subscriptions::subscription_wave_e::{subscription_payment_intent as _, SubscriptionPaymentIntent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SubscriptionPaymentIntent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for subscription_payment_intent: {error}"))?;
+            use crate::subscriptions::subscription_wave_e::{
+                subscription_payment_intent as _, SubscriptionPaymentIntent,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SubscriptionPaymentIntent>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for subscription_payment_intent: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9820,11 +11126,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing subscription_payment_intent row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming subscription_payment_intent row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing subscription_payment_intent row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming subscription_payment_intent row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9834,12 +11143,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "subscription_plan" => {
             use crate::subscriptions::tables::{subscription_plan as _, SubscriptionPlan};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SubscriptionPlan>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for subscription_plan: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SubscriptionPlan>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for subscription_plan: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9849,10 +11161,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing subscription_plan row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming subscription_plan row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming subscription_plan row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9862,12 +11175,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "subscription_price_index" => {
-            use crate::subscriptions::subscription_wave_e::{subscription_price_index as _, SubscriptionPriceIndex};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SubscriptionPriceIndex>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for subscription_price_index: {error}"))?;
+            use crate::subscriptions::subscription_wave_e::{
+                subscription_price_index as _, SubscriptionPriceIndex,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SubscriptionPriceIndex>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for subscription_price_index: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9876,11 +11194,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing subscription_price_index row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming subscription_price_index row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing subscription_price_index row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming subscription_price_index row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9890,12 +11211,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "subscription_price_tier" => {
-            use crate::subscriptions::subscription_wave_d::{subscription_price_tier as _, SubscriptionPriceTier};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SubscriptionPriceTier>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for subscription_price_tier: {error}"))?;
+            use crate::subscriptions::subscription_wave_d::{
+                subscription_price_tier as _, SubscriptionPriceTier,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SubscriptionPriceTier>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for subscription_price_tier: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9904,11 +11230,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing subscription_price_tier row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming subscription_price_tier row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing subscription_price_tier row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming subscription_price_tier row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9918,12 +11247,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "subscription_tax_settle_intent" => {
-            use crate::subscriptions::subscription_wave_e::{subscription_tax_settle_intent as _, SubscriptionTaxSettleIntent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SubscriptionTaxSettleIntent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for subscription_tax_settle_intent: {error}"))?;
+            use crate::subscriptions::subscription_wave_e::{
+                subscription_tax_settle_intent as _, SubscriptionTaxSettleIntent,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SubscriptionTaxSettleIntent>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for subscription_tax_settle_intent: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9932,11 +11266,16 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing subscription_tax_settle_intent row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming subscription_tax_settle_intent row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing subscription_tax_settle_intent row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!(
+                                "serialize incoming subscription_tax_settle_intent row: {error}"
+                            )
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9946,12 +11285,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "subscription_usage_charge" => {
-            use crate::subscriptions::subscription_wave_d::{subscription_usage_charge as _, SubscriptionUsageCharge};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SubscriptionUsageCharge>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for subscription_usage_charge: {error}"))?;
+            use crate::subscriptions::subscription_wave_d::{
+                subscription_usage_charge as _, SubscriptionUsageCharge,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SubscriptionUsageCharge>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for subscription_usage_charge: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9960,11 +11304,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing subscription_usage_charge row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming subscription_usage_charge row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing subscription_usage_charge row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming subscription_usage_charge row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -9974,12 +11321,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "supplier_intake_request" => {
-            use crate::purchasing::vendor_management::{supplier_intake_request as _, SupplierIntakeRequest};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SupplierIntakeRequest>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for supplier_intake_request: {error}"))?;
+            use crate::purchasing::vendor_management::{
+                supplier_intake_request as _, SupplierIntakeRequest,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SupplierIntakeRequest>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for supplier_intake_request: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -9988,11 +11340,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing supplier_intake_request row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming supplier_intake_request row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing supplier_intake_request row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming supplier_intake_request row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10002,12 +11357,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "tax_deadline" => {
             use crate::accounting::tax_management::{tax_deadline as _, TaxDeadline};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<TaxDeadline>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for tax_deadline: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<TaxDeadline>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for tax_deadline: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10017,10 +11373,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing tax_deadline row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming tax_deadline row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming tax_deadline row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10030,12 +11385,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "tax_deadline_status_job" => {
-            use crate::accounting::tax_management::{tax_deadline_status_job as _, TaxDeadlineStatusJob};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<TaxDeadlineStatusJob>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for tax_deadline_status_job: {error}"))?;
+            use crate::accounting::tax_management::{
+                tax_deadline_status_job as _, TaxDeadlineStatusJob,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<TaxDeadlineStatusJob>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for tax_deadline_status_job: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10044,11 +11404,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing tax_deadline_status_job row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming tax_deadline_status_job row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing tax_deadline_status_job row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming tax_deadline_status_job row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10058,12 +11421,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "tax_jurisdiction" => {
             use crate::accounting::tax_management::{tax_jurisdiction as _, TaxJurisdiction};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<TaxJurisdiction>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for tax_jurisdiction: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<TaxJurisdiction>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for tax_jurisdiction: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10073,10 +11437,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing tax_jurisdiction row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming tax_jurisdiction row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming tax_jurisdiction row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10086,12 +11451,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "tax_schedule" => {
             use crate::accounting::tax_management::{tax_schedule as _, TaxSchedule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<TaxSchedule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for tax_schedule: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<TaxSchedule>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for tax_schedule: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10101,10 +11467,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing tax_schedule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming tax_schedule row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming tax_schedule row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10114,12 +11479,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "trial_balance" => {
             use crate::accounting::financial_statements::{trial_balance as _, TrialBalance};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<TrialBalance>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for trial_balance: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<TrialBalance>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for trial_balance: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10129,10 +11495,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing trial_balance row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming trial_balance row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming trial_balance row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10142,7 +11509,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "uom" => {
             use crate::core::reference::{uom as _, UOM};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -10157,10 +11524,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing uom row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming uom row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming uom row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10170,12 +11536,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "uom_cat" => {
             use crate::core::reference::{uom_cat as _, UOMCategory};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<UOMCategory>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for uom_cat: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<UOMCategory>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for uom_cat: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10185,10 +11552,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing uom_cat row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming uom_cat row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming uom_cat row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10198,12 +11564,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "uom_conversion" => {
             use crate::core::reference::{uom_conversion as _, UOMConversion};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<UOMConversion>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for uom_conversion: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<UOMConversion>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for uom_conversion: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10213,10 +11580,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing uom_conversion row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming uom_conversion row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming uom_conversion row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10226,12 +11594,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "user_credential" => {
             use crate::core::auth::{user_credential as _, UserCredential};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<UserCredential>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for user_credential: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<UserCredential>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for user_credential: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10241,10 +11610,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing user_credential row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming user_credential row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming user_credential row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10254,12 +11624,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "user_custom_field" => {
             use crate::forms::{user_custom_field as _, UserCustomField};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<UserCustomField>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for user_custom_field: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<UserCustomField>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for user_custom_field: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10269,10 +11642,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing user_custom_field row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming user_custom_field row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming user_custom_field row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10282,12 +11656,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "user_invite" => {
             use crate::core::auth::{user_invite as _, UserInvite};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<UserInvite>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for user_invite: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<UserInvite>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for user_invite: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10297,10 +11672,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing user_invite row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming user_invite row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming user_invite row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10310,12 +11684,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "user_organization" => {
             use crate::core::users::{user_organization as _, UserOrganization};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<UserOrganization>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for user_organization: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<UserOrganization>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for user_organization: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10325,10 +11702,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing user_organization row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming user_organization row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming user_organization row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10338,12 +11716,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "user_profile" => {
             use crate::core::users::{user_profile as _, UserProfile};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<UserProfile>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for user_profile: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<UserProfile>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for user_profile: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10353,10 +11732,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing user_profile row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming user_profile row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming user_profile row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10366,12 +11744,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "user_role_assignment" => {
             use crate::core::permissions::{user_role_assignment as _, UserRoleAssignment};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<UserRoleAssignment>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for user_role_assignment: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<UserRoleAssignment>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for user_role_assignment: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10381,10 +11762,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing user_role_assignment row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming user_role_assignment row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming user_role_assignment row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10394,12 +11776,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "user_session" => {
             use crate::core::users::{user_session as _, UserSession};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<UserSession>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for user_session: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<UserSession>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for user_session: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10409,10 +11792,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing user_session row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming user_session row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming user_session row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10422,12 +11804,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "utm_campaign" => {
             use crate::core::utm::{utm_campaign as _, UtmCampaign};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<UtmCampaign>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for utm_campaign: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<UtmCampaign>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for utm_campaign: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10437,10 +11820,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing utm_campaign row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming utm_campaign row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming utm_campaign row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10450,12 +11832,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "utm_medium" => {
             use crate::core::utm::{utm_medium as _, UtmMedium};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<UtmMedium>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for utm_medium: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<UtmMedium>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for utm_medium: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10465,10 +11848,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing utm_medium row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming utm_medium row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming utm_medium row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10478,12 +11860,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "utm_source" => {
             use crate::core::utm::{utm_source as _, UtmSource};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<UtmSource>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for utm_source: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<UtmSource>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for utm_source: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10493,10 +11876,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing utm_source row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming utm_source row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming utm_source row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10506,12 +11888,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "vendor_risk_flag" => {
             use crate::purchasing::procurement_advanced::{vendor_risk_flag as _, VendorRiskFlag};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<VendorRiskFlag>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for vendor_risk_flag: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<VendorRiskFlag>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for vendor_risk_flag: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10521,10 +11904,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing vendor_risk_flag row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming vendor_risk_flag row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming vendor_risk_flag row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10534,12 +11918,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "vendor_scorecard" => {
             use crate::purchasing::procurement_advanced::{vendor_scorecard as _, VendorScorecard};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<VendorScorecard>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for vendor_scorecard: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<VendorScorecard>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for vendor_scorecard: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10549,10 +11934,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing vendor_scorecard row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming vendor_scorecard row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming vendor_scorecard row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10562,12 +11948,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "warehouse" => {
             use crate::inventory::warehouse::{warehouse as _, Warehouse};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<Warehouse>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for warehouse: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<Warehouse>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for warehouse: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10577,10 +11964,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing warehouse row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming warehouse row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming warehouse row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10590,12 +11976,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "warehouse_3_d_zone" => {
             use crate::inventory::warehouse::{warehouse_3d_zone as _, Warehouse3DZone};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<Warehouse3DZone>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for warehouse_3_d_zone: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<Warehouse3DZone>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for warehouse_3_d_zone: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10605,10 +11994,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing warehouse_3_d_zone row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming warehouse_3_d_zone row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming warehouse_3_d_zone row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10618,12 +12008,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "warehouse_geo" => {
             use crate::fleet::fleet::{warehouse_geo as _, WarehouseGeo};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WarehouseGeo>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for warehouse_geo: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WarehouseGeo>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for warehouse_geo: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10633,10 +12024,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing warehouse_geo row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming warehouse_geo row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming warehouse_geo row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10646,12 +12038,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "warehouse_sync_intent" => {
-            use crate::inventory::warehouse_sync::{warehouse_sync_intent as _, WarehouseSyncIntent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WarehouseSyncIntent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for warehouse_sync_intent: {error}"))?;
+            use crate::inventory::warehouse_sync::{
+                warehouse_sync_intent as _, WarehouseSyncIntent,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WarehouseSyncIntent>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for warehouse_sync_intent: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10660,11 +12057,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing warehouse_sync_intent row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming warehouse_sync_intent row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing warehouse_sync_intent row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming warehouse_sync_intent row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10674,12 +12074,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "warehouse_task" => {
             use crate::inventory::warehouse_operations::{warehouse_task as _, WarehouseTask};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WarehouseTask>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for warehouse_task: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WarehouseTask>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for warehouse_task: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10689,10 +12090,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing warehouse_task row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming warehouse_task row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming warehouse_task row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10702,12 +12104,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "whatsapp_business_account" => {
-            use crate::integrations::whatsapp_business::{whatsapp_business_account as _, WhatsAppBusinessAccount};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WhatsAppBusinessAccount>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for whatsapp_business_account: {error}"))?;
+            use crate::integrations::whatsapp_business::{
+                whatsapp_business_account as _, WhatsAppBusinessAccount,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WhatsAppBusinessAccount>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for whatsapp_business_account: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10716,11 +12123,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing whatsapp_business_account row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming whatsapp_business_account row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing whatsapp_business_account row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming whatsapp_business_account row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10730,7 +12140,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow" => {
             use crate::workflow::definitions::{workflow as _, Workflow};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -10745,10 +12155,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing workflow row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming workflow row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10758,12 +12167,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_calendar" => {
             use crate::workflow::calendar::{workflow_calendar as _, WorkflowCalendar};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowCalendar>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_calendar: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowCalendar>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_calendar: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10773,10 +12185,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing workflow_calendar row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_calendar row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_calendar row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10786,12 +12199,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_candidate_group_member" => {
-            use crate::workflow::approvals::{workflow_candidate_group_member as _, WorkflowCandidateGroupMember};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowCandidateGroupMember>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_candidate_group_member: {error}"))?;
+            use crate::workflow::approvals::{
+                workflow_candidate_group_member as _, WorkflowCandidateGroupMember,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowCandidateGroupMember>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_candidate_group_member: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10800,11 +12218,16 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing workflow_candidate_group_member row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_candidate_group_member row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing workflow_candidate_group_member row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!(
+                                "serialize incoming workflow_candidate_group_member row: {error}"
+                            )
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10814,12 +12237,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_command_receipt" => {
             use crate::workflow::runtime::{workflow_command_receipt as _, WorkflowCommandReceipt};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowCommandReceipt>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_command_receipt: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowCommandReceipt>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_command_receipt: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10828,11 +12254,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing workflow_command_receipt row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_command_receipt row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing workflow_command_receipt row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_command_receipt row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10842,12 +12271,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_delegation" => {
             use crate::workflow::authorization::{workflow_delegation as _, WorkflowDelegation};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowDelegation>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_delegation: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowDelegation>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_delegation: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10857,10 +12289,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing workflow_delegation row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_delegation row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_delegation row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10870,12 +12303,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_delivery_attempt" => {
-            use crate::workflow::delivery::{workflow_delivery_attempt as _, WorkflowDeliveryAttempt};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowDeliveryAttempt>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_delivery_attempt: {error}"))?;
+            use crate::workflow::delivery::{
+                workflow_delivery_attempt as _, WorkflowDeliveryAttempt,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowDeliveryAttempt>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_delivery_attempt: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10884,11 +12322,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing workflow_delivery_attempt row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_delivery_attempt row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing workflow_delivery_attempt row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_delivery_attempt row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10898,12 +12339,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_delivery_receipt" => {
-            use crate::workflow::delivery::{workflow_delivery_receipt as _, WorkflowDeliveryReceipt};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowDeliveryReceipt>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_delivery_receipt: {error}"))?;
+            use crate::workflow::delivery::{
+                workflow_delivery_receipt as _, WorkflowDeliveryReceipt,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowDeliveryReceipt>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_delivery_receipt: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10912,11 +12358,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing workflow_delivery_receipt row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_delivery_receipt row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing workflow_delivery_receipt row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_delivery_receipt row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10926,12 +12375,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_edge" => {
             use crate::workflow::definitions::{workflow_edge as _, WorkflowEdge};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowEdge>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_edge: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowEdge>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for workflow_edge: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10941,10 +12391,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing workflow_edge row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_edge row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_edge row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10954,12 +12405,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_fork" => {
             use crate::workflow::branches::{workflow_fork as _, WorkflowFork};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowFork>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_fork: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowFork>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for workflow_fork: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10969,10 +12421,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing workflow_fork row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_fork row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_fork row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -10982,12 +12435,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_human_task" => {
             use crate::workflow::approvals::{workflow_human_task as _, WorkflowHumanTask};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowHumanTask>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_human_task: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowHumanTask>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_human_task: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -10997,10 +12453,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing workflow_human_task row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_human_task row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_human_task row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11010,12 +12467,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_human_task_receipt" => {
-            use crate::workflow::approvals::{workflow_human_task_receipt as _, WorkflowHumanTaskReceipt};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowHumanTaskReceipt>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_human_task_receipt: {error}"))?;
+            use crate::workflow::approvals::{
+                workflow_human_task_receipt as _, WorkflowHumanTaskReceipt,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowHumanTaskReceipt>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_human_task_receipt: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11024,11 +12486,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing workflow_human_task_receipt row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_human_task_receipt row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing workflow_human_task_receipt row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_human_task_receipt row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11038,12 +12503,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_instance" => {
             use crate::workflow::runtime::{workflow_instance as _, WorkflowInstance};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowInstance>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_instance: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowInstance>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_instance: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11053,10 +12521,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing workflow_instance row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_instance row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_instance row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11066,12 +12535,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_join_arrival" => {
             use crate::workflow::branches::{workflow_join_arrival as _, WorkflowJoinArrival};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowJoinArrival>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_join_arrival: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowJoinArrival>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_join_arrival: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11080,11 +12552,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing workflow_join_arrival row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_join_arrival row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing workflow_join_arrival row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_join_arrival row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11094,12 +12569,19 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_migration_instance_result" => {
-            use crate::workflow::migration::{workflow_migration_instance_result as _, WorkflowMigrationInstanceResult};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowMigrationInstanceResult>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_migration_instance_result: {error}"))?;
+            use crate::workflow::migration::{
+                workflow_migration_instance_result as _, WorkflowMigrationInstanceResult,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowMigrationInstanceResult>,
+            >(row_json)
+            .map_err(|error| {
+                format!(
+                    "invalid canonical row JSON for workflow_migration_instance_result: {error}"
+                )
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11108,11 +12590,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing workflow_migration_instance_result row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing workflow_migration_instance_result row: {error}")
+                })?;
                 let incoming_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
                 )
-                .map_err(|error| format!("serialize incoming workflow_migration_instance_result row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize incoming workflow_migration_instance_result row: {error}")
+                })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11122,12 +12608,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_migration_plan" => {
             use crate::workflow::migration::{workflow_migration_plan as _, WorkflowMigrationPlan};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowMigrationPlan>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_migration_plan: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowMigrationPlan>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_migration_plan: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11136,11 +12625,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing workflow_migration_plan row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_migration_plan row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing workflow_migration_plan row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_migration_plan row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11150,12 +12642,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_migration_preflight" => {
-            use crate::workflow::migration::{workflow_migration_preflight as _, WorkflowMigrationPreflight};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowMigrationPreflight>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_migration_preflight: {error}"))?;
+            use crate::workflow::migration::{
+                workflow_migration_preflight as _, WorkflowMigrationPreflight,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowMigrationPreflight>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_migration_preflight: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11164,11 +12661,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing workflow_migration_preflight row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_migration_preflight row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing workflow_migration_preflight row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_migration_preflight row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11178,12 +12678,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_node" => {
             use crate::workflow::definitions::{workflow_node as _, WorkflowNode};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowNode>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_node: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowNode>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for workflow_node: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11193,10 +12694,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing workflow_node row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_node row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_node row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11206,12 +12708,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_outbox" => {
             use crate::workflow::delivery::{workflow_outbox as _, WorkflowOutbox};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowOutbox>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_outbox: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowOutbox>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for workflow_outbox: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11221,10 +12724,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing workflow_outbox row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_outbox row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_outbox row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11234,12 +12738,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_simulation_result" => {
-            use crate::workflow::simulation::{workflow_simulation_result as _, WorkflowSimulationResult};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowSimulationResult>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_simulation_result: {error}"))?;
+            use crate::workflow::simulation::{
+                workflow_simulation_result as _, WorkflowSimulationResult,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowSimulationResult>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_simulation_result: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11248,11 +12757,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing workflow_simulation_result row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_simulation_result row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing workflow_simulation_result row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_simulation_result row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11262,12 +12774,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_timer" => {
             use crate::workflow::delivery::{workflow_timer as _, WorkflowTimer};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowTimer>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_timer: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowTimer>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for workflow_timer: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11277,10 +12790,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing workflow_timer row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_timer row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_timer row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11290,12 +12804,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_token" => {
             use crate::workflow::runtime::{workflow_token as _, WorkflowToken};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowToken>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_token: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowToken>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for workflow_token: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11305,10 +12820,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing workflow_token row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_token row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_token row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11318,12 +12834,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "working_calendar" => {
             use crate::projects::capacity::{working_calendar as _, WorkingCalendar};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkingCalendar>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for working_calendar: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkingCalendar>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for working_calendar: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11333,10 +12850,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing working_calendar row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming working_calendar row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming working_calendar row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11346,12 +12864,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_asset_depreciation_line" => {
-            use crate::accounting::fixed_assets::{account_asset_depreciation_line as _, AccountAssetDepreciationLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountAssetDepreciationLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_asset_depreciation_line: {error}"))?;
+            use crate::accounting::fixed_assets::{
+                account_asset_depreciation_line as _, AccountAssetDepreciationLine,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountAssetDepreciationLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for account_asset_depreciation_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11360,11 +12883,16 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing account_asset_depreciation_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_asset_depreciation_line row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing account_asset_depreciation_line row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!(
+                                "serialize incoming account_asset_depreciation_line row: {error}"
+                            )
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11374,12 +12902,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_bank_statement_line" => {
-            use crate::accounting::bank_reconciliation::{account_bank_statement_line as _, AccountBankStatementLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountBankStatementLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_bank_statement_line: {error}"))?;
+            use crate::accounting::bank_reconciliation::{
+                account_bank_statement_line as _, AccountBankStatementLine,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountBankStatementLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for account_bank_statement_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11388,11 +12921,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing account_bank_statement_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_bank_statement_line row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing account_bank_statement_line row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_bank_statement_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11402,12 +12938,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_move_line" => {
             use crate::accounting::journal_entries::{account_move_line as _, AccountMoveLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountMoveLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_move_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountMoveLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for account_move_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11417,10 +12956,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing account_move_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_move_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_move_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11430,12 +12970,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_payment_term_line" => {
-            use crate::accounting::payment_terms::{account_payment_term_line as _, AccountPaymentTermLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountPaymentTermLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_payment_term_line: {error}"))?;
+            use crate::accounting::payment_terms::{
+                account_payment_term_line as _, AccountPaymentTermLine,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountPaymentTermLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for account_payment_term_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11444,11 +12989,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing account_payment_term_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_payment_term_line row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing account_payment_term_line row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_payment_term_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11458,12 +13006,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "account_period" => {
             use crate::accounting::fiscal_periods::{account_period as _, AccountPeriod};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AccountPeriod>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for account_period: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AccountPeriod>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for account_period: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11473,10 +13022,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing account_period row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming account_period row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming account_period row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11486,12 +13036,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_agent_run_policy_snapshot" => {
-            use crate::ai::skill_registry::{ai_agent_run_policy_snapshot as _, AiAgentRunPolicySnapshot};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiAgentRunPolicySnapshot>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_agent_run_policy_snapshot: {error}"))?;
+            use crate::ai::skill_registry::{
+                ai_agent_run_policy_snapshot as _, AiAgentRunPolicySnapshot,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiAgentRunPolicySnapshot>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for ai_agent_run_policy_snapshot: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11500,11 +13055,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing ai_agent_run_policy_snapshot row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_agent_run_policy_snapshot row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing ai_agent_run_policy_snapshot row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming ai_agent_run_policy_snapshot row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11514,12 +13072,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_agent_run_step" => {
             use crate::ai::skills::{ai_agent_run_step as _, AiAgentRunStep};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiAgentRunStep>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_agent_run_step: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiAgentRunStep>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for ai_agent_run_step: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11529,10 +13090,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing ai_agent_run_step row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_agent_run_step row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming ai_agent_run_step row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11542,12 +13104,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_skill_release" => {
             use crate::ai::skill_registry::{ai_skill_release as _, AiSkillRelease};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiSkillRelease>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_skill_release: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiSkillRelease>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for ai_skill_release: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11557,10 +13120,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing ai_skill_release row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_skill_release row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming ai_skill_release row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11570,12 +13134,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "ai_skill_version" => {
             use crate::ai::skill_registry::{ai_skill_version as _, AiSkillVersion};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiSkillVersion>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for ai_skill_version: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AiSkillVersion>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for ai_skill_version: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11585,10 +13150,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing ai_skill_version row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming ai_skill_version row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming ai_skill_version row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11598,12 +13164,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "amortization_line" => {
             use crate::accounting::amortization::{amortization_line as _, AmortizationLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AmortizationLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for amortization_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<AmortizationLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for amortization_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11613,10 +13182,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing amortization_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming amortization_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming amortization_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11626,12 +13196,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "balance_sheet_line" => {
-            use crate::accounting::financial_statements::{balance_sheet_line as _, BalanceSheetLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<BalanceSheetLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for balance_sheet_line: {error}"))?;
+            use crate::accounting::financial_statements::{
+                balance_sheet_line as _, BalanceSheetLine,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<BalanceSheetLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for balance_sheet_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11641,10 +13216,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing balance_sheet_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming balance_sheet_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming balance_sheet_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11654,12 +13230,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "bank_statement_import_line" => {
-            use crate::accounting::bank_reconciliation::{bank_statement_import_line as _, BankStatementImportLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<BankStatementImportLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for bank_statement_import_line: {error}"))?;
+            use crate::accounting::bank_reconciliation::{
+                bank_statement_import_line as _, BankStatementImportLine,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<BankStatementImportLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for bank_statement_import_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11668,11 +13249,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing bank_statement_import_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming bank_statement_import_line row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing bank_statement_import_line row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming bank_statement_import_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11682,12 +13266,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "cash_flow_line" => {
             use crate::accounting::financial_statements::{cash_flow_line as _, CashFlowLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CashFlowLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for cash_flow_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CashFlowLine>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for cash_flow_line: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11697,10 +13282,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing cash_flow_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming cash_flow_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming cash_flow_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11710,12 +13296,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "contact_category_assignment" => {
-            use crate::crm::contacts::{contact_category_assignment as _, ContactCategoryAssignment};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ContactCategoryAssignment>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for contact_category_assignment: {error}"))?;
+            use crate::crm::contacts::{
+                contact_category_assignment as _, ContactCategoryAssignment,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ContactCategoryAssignment>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for contact_category_assignment: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11724,11 +13315,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing contact_category_assignment row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming contact_category_assignment row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing contact_category_assignment row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming contact_category_assignment row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11738,12 +13332,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "contact_role_assignment" => {
             use crate::crm::contact_roles::{contact_role_assignment as _, ContactRoleAssignment};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ContactRoleAssignment>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for contact_role_assignment: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ContactRoleAssignment>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for contact_role_assignment: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11752,11 +13349,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing contact_role_assignment row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming contact_role_assignment row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing contact_role_assignment row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming contact_role_assignment row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11766,12 +13366,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "contact_segment_rule" => {
             use crate::crm::segments::{contact_segment_rule as _, ContactSegmentRule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ContactSegmentRule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for contact_segment_rule: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ContactSegmentRule>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for contact_segment_rule: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11781,10 +13384,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing contact_segment_rule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming contact_segment_rule row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming contact_segment_rule row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11794,12 +13398,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "contact_tag_assignment" => {
             use crate::crm::contacts::{contact_tag_assignment as _, ContactTagAssignment};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ContactTagAssignment>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for contact_tag_assignment: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ContactTagAssignment>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for contact_tag_assignment: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11808,11 +13415,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing contact_tag_assignment row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming contact_tag_assignment row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing contact_tag_assignment row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming contact_tag_assignment row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11822,12 +13432,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "crm_conversation_message" => {
             use crate::crm::inbox::{crm_conversation_message as _, CrmConversationMessage};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CrmConversationMessage>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for crm_conversation_message: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<CrmConversationMessage>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for crm_conversation_message: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11836,11 +13449,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing crm_conversation_message row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming crm_conversation_message row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing crm_conversation_message row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming crm_conversation_message row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11850,12 +13466,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "deferred_revenue_line" => {
             use crate::subscriptions::tables::{deferred_revenue_line as _, DeferredRevenueLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DeferredRevenueLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for deferred_revenue_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DeferredRevenueLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for deferred_revenue_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11864,11 +13483,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing deferred_revenue_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming deferred_revenue_line row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing deferred_revenue_line row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming deferred_revenue_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11878,12 +13500,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "delivery_price_rule" => {
             use crate::sales::delivery_shipping::{delivery_price_rule as _, DeliveryPriceRule};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DeliveryPriceRule>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for delivery_price_rule: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DeliveryPriceRule>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for delivery_price_rule: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11893,10 +13518,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing delivery_price_rule row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming delivery_price_rule row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming delivery_price_rule row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11906,12 +13532,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "document_version" => {
             use crate::documents::documents::{document_version as _, DocumentVersion};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<DocumentVersion>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for document_version: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<DocumentVersion>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for document_version: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11921,10 +13548,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing document_version row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming document_version row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming document_version row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11934,12 +13562,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "form_config_field" => {
             use crate::forms::{form_config_field as _, FormConfigField};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<FormConfigField>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for form_config_field: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<FormConfigField>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for form_config_field: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11949,10 +13580,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing form_config_field row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming form_config_field row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming form_config_field row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11962,12 +13594,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "form_role_config" => {
             use crate::forms::{form_role_config as _, FormRoleConfig};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<FormRoleConfig>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for form_role_config: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<FormRoleConfig>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for form_role_config: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -11977,10 +13610,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing form_role_config row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming form_role_config row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming form_role_config row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -11990,12 +13624,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "helpdesk_team_member" => {
             use crate::helpdesk::tickets::{helpdesk_team_member as _, HelpdeskTeamMember};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HelpdeskTeamMember>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for helpdesk_team_member: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HelpdeskTeamMember>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for helpdesk_team_member: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12005,10 +13642,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing helpdesk_team_member row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming helpdesk_team_member row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming helpdesk_team_member row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12018,12 +13656,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_expense_advance_application" => {
-            use crate::expenses::expense_wave_d::{hr_expense_advance_application as _, HrExpenseAdvanceApplication};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrExpenseAdvanceApplication>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_expense_advance_application: {error}"))?;
+            use crate::expenses::expense_wave_d::{
+                hr_expense_advance_application as _, HrExpenseAdvanceApplication,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrExpenseAdvanceApplication>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_expense_advance_application: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12032,11 +13675,16 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing hr_expense_advance_application row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_expense_advance_application row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing hr_expense_advance_application row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!(
+                                "serialize incoming hr_expense_advance_application row: {error}"
+                            )
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12046,12 +13694,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_expense_allocation" => {
             use crate::expenses::expense_depth::{hr_expense_allocation as _, HrExpenseAllocation};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrExpenseAllocation>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_expense_allocation: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrExpenseAllocation>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_expense_allocation: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12060,11 +13711,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing hr_expense_allocation row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_expense_allocation row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing hr_expense_allocation row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_expense_allocation row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12074,12 +13728,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_expense_policy_exception" => {
-            use crate::expenses::expense_wave_d::{hr_expense_policy_exception as _, HrExpensePolicyException};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrExpensePolicyException>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_expense_policy_exception: {error}"))?;
+            use crate::expenses::expense_wave_d::{
+                hr_expense_policy_exception as _, HrExpensePolicyException,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrExpensePolicyException>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_expense_policy_exception: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12088,11 +13747,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing hr_expense_policy_exception row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_expense_policy_exception row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing hr_expense_policy_exception row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_expense_policy_exception row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12102,12 +13764,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_leave_allocation" => {
             use crate::hr::leaves::{hr_leave_allocation as _, HrLeaveAllocation};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrLeaveAllocation>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_leave_allocation: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrLeaveAllocation>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_leave_allocation: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12117,10 +13782,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing hr_leave_allocation row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_leave_allocation row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_leave_allocation row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12130,12 +13796,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "hr_onboarding_template_item" => {
-            use crate::hr::onboarding::{hr_onboarding_template_item as _, HrOnboardingTemplateItem};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HrOnboardingTemplateItem>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for hr_onboarding_template_item: {error}"))?;
+            use crate::hr::onboarding::{
+                hr_onboarding_template_item as _, HrOnboardingTemplateItem,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<HrOnboardingTemplateItem>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for hr_onboarding_template_item: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12144,11 +13815,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing hr_onboarding_template_item row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming hr_onboarding_template_item row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing hr_onboarding_template_item row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming hr_onboarding_template_item row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12158,12 +13832,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "import_job_error" => {
             use crate::data_ops::import_tracker::{import_job_error as _, ImportJobError};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ImportJobError>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for import_job_error: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ImportJobError>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for import_job_error: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12173,10 +13848,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing import_job_error row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming import_job_error row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming import_job_error row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12186,12 +13862,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "import_job_record" => {
             use crate::data_ops::import_tracker::{import_job_record as _, ImportJobRecord};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ImportJobRecord>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for import_job_record: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ImportJobRecord>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for import_job_record: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12201,10 +13880,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing import_job_record row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming import_job_record row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming import_job_record row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12214,12 +13894,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "mrp_bom_line" => {
             use crate::manufacturing::bill_of_materials::{mrp_bom_line as _, MrpBomLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<MrpBomLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for mrp_bom_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<MrpBomLine>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for mrp_bom_line: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12229,10 +13910,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing mrp_bom_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming mrp_bom_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming mrp_bom_line row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12242,12 +13922,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "opportunity_line" => {
             use crate::crm::opportunities::{opportunity_line as _, OpportunityLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<OpportunityLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for opportunity_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<OpportunityLine>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for opportunity_line: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12257,10 +13938,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing opportunity_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming opportunity_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming opportunity_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12270,12 +13952,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "pos_order_line" => {
             use crate::sales::pos_transactions::{pos_order_line as _, PosOrderLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PosOrderLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for pos_order_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PosOrderLine>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for pos_order_line: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12285,10 +13968,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing pos_order_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming pos_order_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming pos_order_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12298,12 +13982,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "pos_payment" => {
             use crate::sales::pos_transactions::{pos_payment as _, PosPayment};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PosPayment>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for pos_payment: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PosPayment>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for pos_payment: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12313,10 +13998,9 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing pos_payment row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming pos_payment row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| format!("serialize incoming pos_payment row: {error}"))?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12326,12 +14010,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "product_attribute_line" => {
             use crate::inventory::product::{product_attribute_line as _, ProductAttributeLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProductAttributeLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for product_attribute_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProductAttributeLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for product_attribute_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12340,11 +14027,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing product_attribute_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming product_attribute_line row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing product_attribute_line row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming product_attribute_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12354,12 +14044,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "product_pricelist_item" => {
             use crate::sales::pricelists::{product_pricelist_item as _, ProductPricelistItem};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProductPricelistItem>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for product_pricelist_item: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProductPricelistItem>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for product_pricelist_item: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12368,11 +14061,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing product_pricelist_item row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming product_pricelist_item row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing product_pricelist_item row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming product_pricelist_item row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12382,12 +14078,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "project_rate_card_line" => {
             use crate::projects::rate_cards::{project_rate_card_line as _, ProjectRateCardLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProjectRateCardLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for project_rate_card_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProjectRateCardLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for project_rate_card_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12396,11 +14095,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing project_rate_card_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming project_rate_card_line row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing project_rate_card_line row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming project_rate_card_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12410,12 +14112,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "project_revenue_line" => {
             use crate::projects::psa_advanced::{project_revenue_line as _, ProjectRevenueLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProjectRevenueLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for project_revenue_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProjectRevenueLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for project_revenue_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12425,10 +14130,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing project_revenue_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming project_revenue_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming project_revenue_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12438,12 +14144,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "proposal_line_item" => {
             use crate::proposals::proposals::{proposal_line_item as _, ProposalLineItem};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProposalLineItem>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for proposal_line_item: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProposalLineItem>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for proposal_line_item: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12453,10 +14162,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing proposal_line_item row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming proposal_line_item row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming proposal_line_item row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12466,12 +14176,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "proposal_section" => {
             use crate::proposals::proposals::{proposal_section as _, ProposalSection};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProposalSection>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for proposal_section: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProposalSection>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for proposal_section: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12481,10 +14192,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing proposal_section row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming proposal_section row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming proposal_section row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12494,12 +14206,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "proposal_version" => {
             use crate::proposals::proposals::{proposal_version as _, ProposalVersion};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ProposalVersion>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for proposal_version: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ProposalVersion>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for proposal_version: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12509,10 +14222,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing proposal_version row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming proposal_version row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming proposal_version row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12522,12 +14236,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "purchase_blanket_order_line" => {
-            use crate::purchasing::procurement_advanced::{purchase_blanket_order_line as _, PurchaseBlanketOrderLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PurchaseBlanketOrderLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for purchase_blanket_order_line: {error}"))?;
+            use crate::purchasing::procurement_advanced::{
+                purchase_blanket_order_line as _, PurchaseBlanketOrderLine,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PurchaseBlanketOrderLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for purchase_blanket_order_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12536,11 +14255,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing purchase_blanket_order_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming purchase_blanket_order_line row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing purchase_blanket_order_line row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming purchase_blanket_order_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12550,12 +14272,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "purchase_blanket_release" => {
-            use crate::purchasing::procurement_advanced::{purchase_blanket_release as _, PurchaseBlanketRelease};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PurchaseBlanketRelease>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for purchase_blanket_release: {error}"))?;
+            use crate::purchasing::procurement_advanced::{
+                purchase_blanket_release as _, PurchaseBlanketRelease,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PurchaseBlanketRelease>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for purchase_blanket_release: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12564,11 +14291,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing purchase_blanket_release row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming purchase_blanket_release row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing purchase_blanket_release row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming purchase_blanket_release row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12578,12 +14308,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "purchase_order_line" => {
             use crate::purchasing::purchase_orders::{purchase_order_line as _, PurchaseOrderLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PurchaseOrderLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for purchase_order_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PurchaseOrderLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for purchase_order_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12593,10 +14326,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing purchase_order_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming purchase_order_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming purchase_order_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12606,12 +14340,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "purchase_requisition_line" => {
-            use crate::purchasing::purchase_orders::{purchase_requisition_line as _, PurchaseRequisitionLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PurchaseRequisitionLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for purchase_requisition_line: {error}"))?;
+            use crate::purchasing::purchase_orders::{
+                purchase_requisition_line as _, PurchaseRequisitionLine,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PurchaseRequisitionLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for purchase_requisition_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12620,11 +14359,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing purchase_requisition_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming purchase_requisition_line row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing purchase_requisition_line row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming purchase_requisition_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12634,12 +14376,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "purchase_return_line" => {
-            use crate::purchasing::purchase_returns::{purchase_return_line as _, PurchaseReturnLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PurchaseReturnLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for purchase_return_line: {error}"))?;
+            use crate::purchasing::purchase_returns::{
+                purchase_return_line as _, PurchaseReturnLine,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PurchaseReturnLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for purchase_return_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12649,10 +14396,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing purchase_return_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming purchase_return_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming purchase_return_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12662,12 +14410,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "purchase_rfq_bid" => {
             use crate::purchasing::sourcing::{purchase_rfq_bid as _, PurchaseRfqBid};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PurchaseRfqBid>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for purchase_rfq_bid: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PurchaseRfqBid>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for purchase_rfq_bid: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12677,10 +14426,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing purchase_rfq_bid row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming purchase_rfq_bid row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming purchase_rfq_bid row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12690,12 +14440,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "purchase_rfq_line" => {
             use crate::purchasing::sourcing::{purchase_rfq_line as _, PurchaseRfqLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PurchaseRfqLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for purchase_rfq_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<PurchaseRfqLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for purchase_rfq_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12705,10 +14458,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing purchase_rfq_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming purchase_rfq_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming purchase_rfq_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12718,12 +14472,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "return_order_line" => {
             use crate::sales::return_orders::{return_order_line as _, ReturnOrderLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<ReturnOrderLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for return_order_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<ReturnOrderLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for return_order_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12733,10 +14490,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing return_order_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming return_order_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming return_order_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12746,12 +14504,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "sale_commission_plan_split" => {
-            use crate::sales::oms_advanced::{sale_commission_plan_split as _, SaleCommissionPlanSplit};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SaleCommissionPlanSplit>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for sale_commission_plan_split: {error}"))?;
+            use crate::sales::oms_advanced::{
+                sale_commission_plan_split as _, SaleCommissionPlanSplit,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SaleCommissionPlanSplit>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for sale_commission_plan_split: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12760,11 +14523,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing sale_commission_plan_split row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming sale_commission_plan_split row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing sale_commission_plan_split row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming sale_commission_plan_split row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12774,12 +14540,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "sale_order_line" => {
             use crate::sales::sales_core::{sale_order_line as _, SaleOrderLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SaleOrderLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for sale_order_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SaleOrderLine>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for sale_order_line: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12789,10 +14556,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing sale_order_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming sale_order_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming sale_order_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12802,12 +14570,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "sale_order_option" => {
             use crate::sales::sales_core::{sale_order_option as _, SaleOrderOption};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SaleOrderOption>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for sale_order_option: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SaleOrderOption>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for sale_order_option: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12817,10 +14588,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing sale_order_option row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming sale_order_option row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming sale_order_option row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12830,12 +14602,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "segment_member" => {
             use crate::crm::segments::{segment_member as _, SegmentMember};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SegmentMember>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for segment_member: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SegmentMember>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for segment_member: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12845,10 +14618,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing segment_member row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming segment_member row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming segment_member row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12858,12 +14632,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_inventory_line" => {
-            use crate::inventory::inventory_adjustments::{stock_inventory_line as _, StockInventoryLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockInventoryLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_inventory_line: {error}"))?;
+            use crate::inventory::inventory_adjustments::{
+                stock_inventory_line as _, StockInventoryLine,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockInventoryLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for stock_inventory_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12873,10 +14652,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing stock_inventory_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_inventory_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_inventory_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12886,12 +14666,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_landed_cost_allocation" => {
-            use crate::purchasing::landed_costs::{stock_landed_cost_allocation as _, StockLandedCostAllocation};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockLandedCostAllocation>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_landed_cost_allocation: {error}"))?;
+            use crate::purchasing::landed_costs::{
+                stock_landed_cost_allocation as _, StockLandedCostAllocation,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockLandedCostAllocation>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for stock_landed_cost_allocation: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12900,11 +14685,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing stock_landed_cost_allocation row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_landed_cost_allocation row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing stock_landed_cost_allocation row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_landed_cost_allocation row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12914,12 +14702,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_landed_cost_application" => {
-            use crate::purchasing::landed_costs::{stock_landed_cost_application as _, StockLandedCostApplication};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockLandedCostApplication>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_landed_cost_application: {error}"))?;
+            use crate::purchasing::landed_costs::{
+                stock_landed_cost_application as _, StockLandedCostApplication,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockLandedCostApplication>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for stock_landed_cost_application: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12928,11 +14721,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing stock_landed_cost_application row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_landed_cost_application row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing stock_landed_cost_application row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_landed_cost_application row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12942,12 +14738,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_move_line" => {
             use crate::inventory::stock::{stock_move_line as _, StockMoveLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockMoveLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_move_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockMoveLine>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for stock_move_line: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12957,10 +14754,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing stock_move_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_move_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_move_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12970,12 +14768,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "stock_picking" => {
             use crate::inventory::stock::{stock_picking as _, StockPicking};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<StockPicking>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for stock_picking: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<StockPicking>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for stock_picking: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -12985,10 +14784,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing stock_picking row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming stock_picking row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming stock_picking row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -12998,12 +14798,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "subscription_bundle_item" => {
-            use crate::subscriptions::subscription_wave_d::{subscription_bundle_item as _, SubscriptionBundleItem};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SubscriptionBundleItem>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for subscription_bundle_item: {error}"))?;
+            use crate::subscriptions::subscription_wave_d::{
+                subscription_bundle_item as _, SubscriptionBundleItem,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SubscriptionBundleItem>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for subscription_bundle_item: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -13012,11 +14817,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing subscription_bundle_item row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming subscription_bundle_item row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing subscription_bundle_item row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming subscription_bundle_item row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -13026,12 +14834,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "subscription_line" => {
             use crate::subscriptions::tables::{subscription_line as _, SubscriptionLine};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SubscriptionLine>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for subscription_line: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SubscriptionLine>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for subscription_line: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -13041,10 +14852,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing subscription_line row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming subscription_line row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming subscription_line row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -13054,12 +14866,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "subscription_usage_event" => {
-            use crate::subscriptions::subscription_wave_d::{subscription_usage_event as _, SubscriptionUsageEvent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<SubscriptionUsageEvent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for subscription_usage_event: {error}"))?;
+            use crate::subscriptions::subscription_wave_d::{
+                subscription_usage_event as _, SubscriptionUsageEvent,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<SubscriptionUsageEvent>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for subscription_usage_event: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -13068,11 +14885,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing subscription_usage_event row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming subscription_usage_event row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing subscription_usage_event row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming subscription_usage_event row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -13082,12 +14902,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "tax_deadline_reminder" => {
-            use crate::accounting::tax_management::{tax_deadline_reminder as _, TaxDeadlineReminder};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<TaxDeadlineReminder>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for tax_deadline_reminder: {error}"))?;
+            use crate::accounting::tax_management::{
+                tax_deadline_reminder as _, TaxDeadlineReminder,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<TaxDeadlineReminder>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for tax_deadline_reminder: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -13096,11 +14921,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing tax_deadline_reminder row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming tax_deadline_reminder row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing tax_deadline_reminder row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming tax_deadline_reminder row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -13110,12 +14938,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_calendar_version" => {
-            use crate::workflow::calendar::{workflow_calendar_version as _, WorkflowCalendarVersion};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowCalendarVersion>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_calendar_version: {error}"))?;
+            use crate::workflow::calendar::{
+                workflow_calendar_version as _, WorkflowCalendarVersion,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowCalendarVersion>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_calendar_version: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -13124,11 +14957,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing workflow_calendar_version row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_calendar_version row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing workflow_calendar_version row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_calendar_version row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -13138,12 +14974,15 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_decision_event" => {
             use crate::workflow::runtime::{workflow_decision_event as _, WorkflowDecisionEvent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowDecisionEvent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_decision_event: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowDecisionEvent>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_decision_event: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -13152,11 +14991,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing workflow_decision_event row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_decision_event row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing workflow_decision_event row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_decision_event row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -13166,12 +15008,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_human_task_candidate" => {
-            use crate::workflow::approvals::{workflow_human_task_candidate as _, WorkflowHumanTaskCandidate};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowHumanTaskCandidate>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_human_task_candidate: {error}"))?;
+            use crate::workflow::approvals::{
+                workflow_human_task_candidate as _, WorkflowHumanTaskCandidate,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowHumanTaskCandidate>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_human_task_candidate: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -13180,11 +15027,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing workflow_human_task_candidate row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_human_task_candidate row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing workflow_human_task_candidate row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_human_task_candidate row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -13194,12 +15044,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_human_task_event" => {
-            use crate::workflow::approvals::{workflow_human_task_event as _, WorkflowHumanTaskEvent};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowHumanTaskEvent>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_human_task_event: {error}"))?;
+            use crate::workflow::approvals::{
+                workflow_human_task_event as _, WorkflowHumanTaskEvent,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowHumanTaskEvent>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_human_task_event: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -13208,11 +15063,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing workflow_human_task_event row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_human_task_event row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing workflow_human_task_event row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_human_task_event row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -13222,12 +15080,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_simulation_step" => {
-            use crate::workflow::simulation::{workflow_simulation_step as _, WorkflowSimulationStep};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowSimulationStep>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_simulation_step: {error}"))?;
+            use crate::workflow::simulation::{
+                workflow_simulation_step as _, WorkflowSimulationStep,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowSimulationStep>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_simulation_step: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -13236,11 +15099,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing workflow_simulation_step row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_simulation_step row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing workflow_simulation_step row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_simulation_step row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -13250,12 +15116,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_version" => {
             use crate::workflow::definitions::{workflow_version as _, WorkflowVersion};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowVersion>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_version: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowVersion>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for workflow_version: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -13265,10 +15132,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing workflow_version row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_version row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_version row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -13278,12 +15146,13 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "form_field_label" => {
             use crate::forms::{form_field_label as _, FormFieldLabel};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<FormFieldLabel>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for form_field_label: {error}"))?;
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<FormFieldLabel>,
+            >(row_json)
+            .map_err(|error| format!("invalid canonical row JSON for form_field_label: {error}"))?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -13293,10 +15162,11 @@ pub(crate) fn apply_generated_reconstruction_row(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
                 .map_err(|error| format!("serialize existing form_field_label row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming form_field_label row: {error}"))?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming form_field_label row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -13306,12 +15176,17 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         "workflow_calendar_exception" => {
-            use crate::workflow::calendar::{workflow_calendar_exception as _, WorkflowCalendarException};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
-                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<WorkflowCalendarException>>(row_json)
-                    .map_err(|error| format!("invalid canonical row JSON for workflow_calendar_exception: {error}"))?;
+            use crate::workflow::calendar::{
+                workflow_calendar_exception as _, WorkflowCalendarException,
+            };
+            let spacetimedb_sats::serde::SerdeWrapper(row) = serde_json::from_str::<
+                spacetimedb_sats::serde::SerdeWrapper<WorkflowCalendarException>,
+            >(row_json)
+            .map_err(|error| {
+                format!("invalid canonical row JSON for workflow_calendar_exception: {error}")
+            })?;
             if row.organization_id != organization_id {
                 return Err("reconstruction row belongs to a different organization".to_string());
             }
@@ -13320,11 +15195,14 @@ pub(crate) fn apply_generated_reconstruction_row(
                 let existing_json = serde_json::to_value(
                     spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
                 )
-                .map_err(|error| format!("serialize existing workflow_calendar_exception row: {error}"))?;
-                let incoming_json = serde_json::to_value(
-                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
-                )
-                .map_err(|error| format!("serialize incoming workflow_calendar_exception row: {error}"))?;
+                .map_err(|error| {
+                    format!("serialize existing workflow_calendar_exception row: {error}")
+                })?;
+                let incoming_json =
+                    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                        .map_err(|error| {
+                            format!("serialize incoming workflow_calendar_exception row: {error}")
+                        })?;
                 if existing_json == incoming_json {
                     Ok(GeneratedApplyOutcome::AlreadyPresent)
                 } else {
@@ -13334,7 +15212,7 @@ pub(crate) fn apply_generated_reconstruction_row(
                 rows.insert(row);
                 Ok(GeneratedApplyOutcome::Inserted)
             }
-        },
+        }
         _ => Err("table is not in the generated reconstruction allowlist".to_string()),
     }
 }

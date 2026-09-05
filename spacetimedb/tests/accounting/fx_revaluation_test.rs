@@ -26,9 +26,12 @@ pub fn test_fx_revaluation_posts_balanced_move(ctx: &ReducerContext) -> Result<(
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
-    let sek = if let Some(currency) = ctx.db.currency().iter().find(|currency| {
-        currency.organization_id == org_id && currency.code == "SEK"
-    }) {
+    let sek = if let Some(currency) = ctx
+        .db
+        .currency()
+        .iter()
+        .find(|currency| currency.organization_id == org_id && currency.code == "SEK")
+    {
         currency
     } else {
         ctx.db.currency().insert(Currency {

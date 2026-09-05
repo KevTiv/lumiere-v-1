@@ -12,11 +12,11 @@ use crate::core::organization::company;
 use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::stock::require_product_in_org;
-use crate::subscriptions::reducers::validate_subscription_metadata;
 use crate::subscriptions::billing_helpers::{
     blank_line, calculate_next_date, normalize_payment_mode, normalize_plan_billing_period,
     normalize_rule_type, refresh_subscription_kpis, resolve_subscription_fx_rate,
 };
+use crate::subscriptions::reducers::validate_subscription_metadata;
 use crate::subscriptions::tables::{
     subscription, subscription_line, subscription_plan, Subscription, SubscriptionLine,
     SubscriptionPlan,

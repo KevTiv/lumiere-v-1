@@ -417,13 +417,12 @@ fn c0_record_issue(
         .filter(&evidence_organization_id)
         .find(|existing| existing.table_name == table_name && existing.record_id == record_id)
     {
-        ctx.db
-            .accounting_ownership_backfill_issue()
-            .id()
-            .update(AccountingOwnershipBackfillIssue {
+        ctx.db.accounting_ownership_backfill_issue().id().update(
+            AccountingOwnershipBackfillIssue {
                 id: existing.id,
                 ..row
-            });
+            },
+        );
     } else {
         ctx.db.accounting_ownership_backfill_issue().insert(row);
     }

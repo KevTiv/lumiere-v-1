@@ -313,15 +313,9 @@ fn validate_statutory_id_kind(
     }
     let mut allowed: Vec<String> = Vec::new();
     for pack_key in enabled {
-        if let Some(def) = ctx
-            .db
-            .country_pack_definition()
-            .iter()
-            .find(|definition| {
-                definition.organization_id == organization_id
-                    && definition.pack_key == pack_key
-            })
-        {
+        if let Some(def) = ctx.db.country_pack_definition().iter().find(|definition| {
+            definition.organization_id == organization_id && definition.pack_key == pack_key
+        }) {
             allowed.extend(pack_statutory_id_kinds(&def));
         }
     }

@@ -173,7 +173,14 @@ fn test_signal_replay_stale_and_terminal(ctx: &ReducerContext) -> Result<(), Str
     start_workflow(
         ctx,
         fixture.organization_id,
-        start_params(&fixture, workflow_id, version_id, subject_id, "start-201", None),
+        start_params(
+            &fixture,
+            workflow_id,
+            version_id,
+            subject_id,
+            "start-201",
+            None,
+        ),
     )?;
     let instance = latest_instance(ctx, fixture.organization_id, workflow_id)?;
     let next = signal_params(&fixture, instance.id, subject_id, 1, "next", "signal-next");
@@ -203,7 +210,14 @@ fn test_signal_replay_stale_and_terminal(ctx: &ReducerContext) -> Result<(), Str
         return Err(format!("signal key mismatch was not atomic: {error}"));
     }
 
-    let stale = signal_params(&fixture, instance.id, subject_id, 1, "finish", "signal-stale");
+    let stale = signal_params(
+        &fixture,
+        instance.id,
+        subject_id,
+        1,
+        "finish",
+        "signal-stale",
+    );
     let error = signal_workflow(ctx, fixture.organization_id, stale)
         .err()
         .ok_or("stale signal revision advanced")?;
@@ -213,7 +227,14 @@ fn test_signal_replay_stale_and_terminal(ctx: &ReducerContext) -> Result<(), Str
         return Err(format!("stale signal was not atomic: {error}"));
     }
 
-    let finish = signal_params(&fixture, instance.id, subject_id, 2, "finish", "signal-finish");
+    let finish = signal_params(
+        &fixture,
+        instance.id,
+        subject_id,
+        2,
+        "finish",
+        "signal-finish",
+    );
     signal_workflow(ctx, fixture.organization_id, finish)?;
     let completed = require_instance(ctx, instance.id)?;
     if completed.state != WorkflowInstanceState::Completed
@@ -235,7 +256,14 @@ fn test_signal_replay_stale_and_terminal(ctx: &ReducerContext) -> Result<(), Str
     }
 
     let completed_counts = runtime_counts(ctx, instance.id);
-    let terminal = signal_params(&fixture, instance.id, subject_id, 3, "finish", "signal-terminal");
+    let terminal = signal_params(
+        &fixture,
+        instance.id,
+        subject_id,
+        3,
+        "finish",
+        "signal-terminal",
+    );
     let error = signal_workflow(ctx, fixture.organization_id, terminal)
         .err()
         .ok_or("terminal instance accepted a new signal")?;
@@ -253,7 +281,14 @@ fn test_cancel_replay_and_terminal_behavior(ctx: &ReducerContext) -> Result<(), 
     start_workflow(
         ctx,
         fixture.organization_id,
-        start_params(&fixture, workflow_id, version_id, subject_id, "start-301", None),
+        start_params(
+            &fixture,
+            workflow_id,
+            version_id,
+            subject_id,
+            "start-301",
+            None,
+        ),
     )?;
     let instance = latest_instance(ctx, fixture.organization_id, workflow_id)?;
     let cancel = CancelWorkflowParams {
@@ -356,7 +391,10 @@ fn seed_purchase_order_subject(
         .db
         .contact()
         .iter()
-        .find(|c| c.organization_id == fixture.organization_id && c.display_name == format!("Vendor {tag}"))
+        .find(|c| {
+            c.organization_id == fixture.organization_id
+                && c.display_name == format!("Vendor {tag}")
+        })
         .map(|c| c.id)
         .ok_or_else(|| format!("vendor contact {tag} missing"))?;
     create_purchase_order(

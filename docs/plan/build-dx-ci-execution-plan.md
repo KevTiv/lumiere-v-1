@@ -17,6 +17,10 @@ The [operating guide](../guides/build-and-ci-dx.md) is the command/reference
 document. The [modularization plan](api-server-modularization-coordination-plan.md)
 remains separate and unimplemented by this batch.
 
+The [code ownership and deduplication handoff](code-ownership-deduplication-refactor-plan.md)
+tracks remaining setup/lifecycle duplication in D50. It does not reclassify this
+implemented batch or mark DX2–DX7 complete; preserve their prerequisite gates.
+
 ## Ownership and integration
 
 | Work | Initial owner | Coordinator review/integration |

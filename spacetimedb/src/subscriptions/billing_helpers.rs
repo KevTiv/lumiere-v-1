@@ -3,7 +3,6 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
-use crate::sales::sales_core::sale_order_line;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, add_account_move_line, create_account_move,
     insert_draft_account_move_line, post_invoice, AccountMove, AccountMoveLine,
@@ -19,6 +18,7 @@ use crate::core::reference::resolve_currency_rate_as_of;
 use crate::crm::contacts::contact;
 use crate::helpers::calculate_tax;
 use crate::inventory::product::product;
+use crate::sales::sales_core::sale_order_line;
 use crate::subscriptions::tables::{
     deferred_revenue_line, deferred_revenue_schedule, revenue_recognition_rule, subscription,
     subscription_billing_run, subscription_line, subscription_plan, DeferredRevenueLine,

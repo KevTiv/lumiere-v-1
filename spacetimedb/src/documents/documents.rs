@@ -12,19 +12,19 @@ use crate::accounting::journal_entries::account_move;
 use crate::core::organization::require_company_in_organization;
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contacts::contact;
+use crate::documents::pack_locale::{
+    build_default_index_content, compute_purge_after, document_residency_region_for_company,
+    document_search_language_for_company, truncate_index_content, validate_fiscal_archive,
+};
 use crate::expenses::expenses::{expense_sheet, hr_expense};
 use crate::helpdesk::tickets::helpdesk_ticket;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::employees::hr_employee;
 use crate::inventory::product::product;
 use crate::projects::tasks::project_task;
 use crate::purchasing::purchase_orders::purchase_order;
 use crate::sales::sales_core::sale_order;
 use crate::subscriptions::tables::subscription;
-use crate::documents::pack_locale::{
-    build_default_index_content, compute_purge_after, document_residency_region_for_company,
-    document_search_language_for_company, truncate_index_content, validate_fiscal_archive,
-};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
 // TABLES
@@ -320,7 +320,9 @@ fn validate_blob_registration(
     }
     let mt = mimetype.trim().to_ascii_lowercase();
     if !ALLOWED_DOCUMENT_MIMETYPES.contains(&mt.as_str()) {
-        return Err(format!("mimetype '{mimetype}' is not an allowed document type"));
+        return Err(format!(
+            "mimetype '{mimetype}' is not an allowed document type"
+        ));
     }
     let checksum = checksum.trim();
     if checksum.is_empty() {

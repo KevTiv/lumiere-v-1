@@ -142,14 +142,15 @@ pub fn test_csv_import_rejects_bad_fks(ctx: &ReducerContext) -> Result<(), Strin
         .db
         .import_job()
         .iter()
-        .filter(|j| j.organization_id == fixture.organization_id && j.table_name == "helpdesk_stage")
+        .filter(|j| {
+            j.organization_id == fixture.organization_id && j.table_name == "helpdesk_stage"
+        })
         .max_by_key(|j| j.id)
         .ok_or("stage import job missing")?;
     if stage_job.error_rows != 1 || stage_job.imported_rows != 0 {
         return Err(format!(
             "stage import accepted a bogus team_id: errors={} imported={}",
-            stage_job.error_rows,
-            stage_job.imported_rows
+            stage_job.error_rows, stage_job.imported_rows
         ));
     }
     if ctx
@@ -204,8 +205,7 @@ pub fn test_csv_import_rejects_bad_fks(ctx: &ReducerContext) -> Result<(), Strin
     if ticket_job.error_rows != 2 || ticket_job.imported_rows != 0 {
         return Err(format!(
             "ticket import accepted a bogus FK: errors={} imported={}",
-            ticket_job.error_rows,
-            ticket_job.imported_rows
+            ticket_job.error_rows, ticket_job.imported_rows
         ));
     }
 
@@ -225,8 +225,7 @@ pub fn test_csv_import_rejects_bad_fks(ctx: &ReducerContext) -> Result<(), Strin
     if partner_job.error_rows != 1 || partner_job.imported_rows != 0 {
         return Err(format!(
             "ticket import accepted a cross-org partner_id: errors={} imported={}",
-            partner_job.error_rows,
-            partner_job.imported_rows
+            partner_job.error_rows, partner_job.imported_rows
         ));
     }
     Ok(())
@@ -320,9 +319,8 @@ pub fn test_sla_reached_is_system_only(ctx: &ReducerContext) -> Result<(), Strin
         .ok_or("sla missing after create")?;
 
     // CSV import must ignore a user-supplied sla_reached=true column.
-    let csv = format!(
-        "name,team_id,stage_id,sla_reached\nHLP-007 CSV Ticket,{team_id},{stage_id},true"
-    );
+    let csv =
+        format!("name,team_id,stage_id,sla_reached\nHLP-007 CSV Ticket,{team_id},{stage_id},true");
     import_helpdesk_ticket_csv(ctx, fixture.organization_id, csv)?;
     let csv_ticket = ctx
         .db
@@ -425,10 +423,14 @@ pub fn test_sla_reached_is_system_only(ctx: &ReducerContext) -> Result<(), Strin
     }
 
     // ...and must flip sla_reached once a ticket's own deadline is in the past.
-    let overdue = ctx.db.helpdesk_ticket().id().update(crate::helpdesk::tickets::HelpdeskTicket {
-        sla_deadline: Some(ctx.timestamp - std::time::Duration::from_secs(60)),
-        ..still_open
-    });
+    let overdue = ctx
+        .db
+        .helpdesk_ticket()
+        .id()
+        .update(crate::helpdesk::tickets::HelpdeskTicket {
+            sla_deadline: Some(ctx.timestamp - std::time::Duration::from_secs(60)),
+            ..still_open
+        });
     run_helpdesk_sla_check(
         ctx,
         HelpdeskSlaCheckJob {

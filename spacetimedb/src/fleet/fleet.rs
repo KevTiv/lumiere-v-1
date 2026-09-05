@@ -87,7 +87,7 @@ pub struct FleetVehicle {
     pub name: String, // e.g. "Truck #101"
     pub license_plate: Option<String>,
     pub driver_name: Option<String>,
-    pub driver_id: Option<u64>, // FK -> HrEmployee.id
+    pub driver_id: Option<u64>,       // FK -> HrEmployee.id
     pub service_type_id: Option<u64>, // FK -> FleetVehicleServiceType.id
     pub status: VehicleStatus,
     pub latitude: Option<f64>,
@@ -612,7 +612,9 @@ pub fn create_pos_terminal(
             record_id: row.id,
             action: "CREATE",
             old_values: None,
-            new_values: Some(serde_json::json!({ "name": row.name, "company_id": company_id }).to_string()),
+            new_values: Some(
+                serde_json::json!({ "name": row.name, "company_id": company_id }).to_string(),
+            ),
             changed_fields: vec!["name".to_string(), "company_id".to_string()],
             metadata: None,
         },

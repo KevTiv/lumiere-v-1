@@ -124,12 +124,9 @@ fn enabled_pack_definitions(
     company_enabled_pack_keys(ctx, organization_id, company_id)
         .into_iter()
         .filter_map(|key| {
-            ctx.db
-                .country_pack_definition()
-                .iter()
-                .find(|definition| {
-                    definition.organization_id == organization_id && definition.pack_key == key
-                })
+            ctx.db.country_pack_definition().iter().find(|definition| {
+                definition.organization_id == organization_id && definition.pack_key == key
+            })
         })
         .collect()
 }
@@ -556,15 +553,9 @@ pub(crate) fn seed_country_pack_catalog_for_organization(
     }
 
     for (pack_key, code, name, rate, tax_use) in tax_rules {
-        let exists = ctx
-            .db
-            .country_pack_tax_rule()
-            .iter()
-            .any(|r| {
-                r.organization_id == organization_id
-                    && r.pack_key == pack_key
-                    && r.code == code
-            });
+        let exists = ctx.db.country_pack_tax_rule().iter().any(|r| {
+            r.organization_id == organization_id && r.pack_key == pack_key && r.code == code
+        });
         if exists {
             continue;
         }

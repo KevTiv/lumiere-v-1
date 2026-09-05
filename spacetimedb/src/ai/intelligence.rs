@@ -158,7 +158,7 @@ pub struct AiDocumentProcessingJob {
     #[auto_inc]
     pub id: u64,
 
-    pub organization_id: u64, // AI-002: Tenant isolation
+    pub organization_id: u64,  // AI-002: Tenant isolation
     pub document_type: String, // Invoice, Receipt, Contract, etc.
     pub job_type: String,      // OCR, Extraction, Classification, Analysis
     pub status: JobStatus,

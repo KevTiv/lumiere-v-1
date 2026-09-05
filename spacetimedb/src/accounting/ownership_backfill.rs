@@ -32,8 +32,7 @@ const BACKFILL_SCOPES: [&str; 4] = [
 ];
 
 fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
-    let user = find_user_profile_for_identity(ctx, ctx.sender())
-        .ok_or("user not found")?;
+    let user = find_user_profile_for_identity(ctx, ctx.sender()).ok_or("user not found")?;
     if !user.is_superuser {
         return Err("only superusers may manage accounting ownership backfills".to_string());
     }
