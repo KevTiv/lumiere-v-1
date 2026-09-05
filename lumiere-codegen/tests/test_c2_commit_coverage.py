@@ -45,17 +45,47 @@ class C2CommitCoverageTests(unittest.TestCase):
     def test_unregistered_call_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            source = root / "spacetimedb/src/example.rs"
+            source = root / "spacetimedb/src/core/example.rs"
             source.parent.mkdir(parents=True)
+            (source.parent / "mod.rs").write_text("pub mod example;\n", encoding="utf-8")
+            (root / "spacetimedb/src/lib.rs").write_text(
+                "// ── Domain modules\npub mod core;\n"
+                "/// Shared org/company/COA fixture\n",
+                encoding="utf-8",
+            )
             source.write_text(
-                'fn example() { record_organization_commit(ctx, OrganizationCommitInput { operation_id: "erp.example", changes }); }\n',
+                'fn registered() { let changes = vec![RowChange::upsert("row", key, value)]; '
+                'record_organization_commit(ctx, OrganizationCommitInput { operation_id: "erp.registered", changes }); }\n'
+                'fn unregistered() { record_organization_commit(ctx, OrganizationCommitInput { operation_id: "erp.unregistered", changes }); }\n',
                 encoding="utf-8",
             )
             metadata = root / "coverage.json"
-            metadata.write_text(json.dumps({"schema_version": 1, "reducers": []}), encoding="utf-8")
+            metadata.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "reducers": [
+                            {
+                                "source": "spacetimedb/src/core/example.rs",
+                                "function": "registered",
+                                "operation": "registered",
+                                "operation_id": "erp.registered",
+                                "change_constructors": ["upsert"],
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
             operation_ids = root / "operation-ids.json"
-            operation_ids.write_text(json.dumps({"operations": {"example": "erp.example"}}), encoding="utf-8")
-            with self.assertRaises(MODULE.CoverageError):
+            operation_ids.write_text(
+                json.dumps({"operations": {"registered": "erp.registered"}}),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                MODULE.CoverageError,
+                r"unregistered C2 commit call at spacetimedb/src/core/example.rs:unregistered",
+            ):
                 MODULE.verify(root, metadata, operation_ids)
 
 

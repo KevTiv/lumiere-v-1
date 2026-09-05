@@ -552,7 +552,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_row_changes_are_preserved_in_declared_order() {
+    fn repeated_current_state_upserts_are_preserved_in_declared_order() {
         let changes = prepare_changes(&input(vec![
             RowChange::upsert(
                 "sale_order",
