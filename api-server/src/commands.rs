@@ -4,7 +4,7 @@ use crate::error::ApiError;
 use crate::state::AppState;
 use axum::Json;
 use serde_json::{json, Value};
-use stdb_client::{Exposure, ReducerCall, ReducerContract};
+use stdb_client::{Exposure, ReducerCall, ReducerContract, StdbClientError};
 
 pub(crate) fn session_reducer_contract(
     reducer: &str,
@@ -128,12 +128,30 @@ pub(crate) async fn execute_reducer_call(
             ));
         }
     }
-    client
-        .call_reducer(call)
-        .await
-        .map_err(ApiError::internal)?;
+    client.call_reducer(call).await.map_err(map_reducer_error)?;
 
     Ok(Json(json!({ "ok": true })))
+}
+
+/// Preserve reducer-level authorization and validation failures at the BFF
+/// boundary. SpacetimeDB uses HTTP 530 for reducer errors, including the
+/// permission denial that callers must see as HTTP 403. Unknown upstream
+/// failures remain internal and keep their source for diagnostics.
+fn map_reducer_error(error: anyhow::Error) -> ApiError {
+    let Some(client_error) = error.downcast_ref::<StdbClientError>() else {
+        return ApiError::internal(error);
+    };
+    let Some(body) = client_error.response_body() else {
+        return ApiError::internal(error);
+    };
+    if client_error.status_code() != Some(530) {
+        return ApiError::internal(error);
+    }
+    if body.to_ascii_lowercase().contains("permission denied") {
+        ApiError::Forbidden(body.to_owned())
+    } else {
+        ApiError::Unprocessable(body.to_owned())
+    }
 }
 
 fn validate_reducer_scope(
@@ -457,6 +475,30 @@ mod tests {
         .expect("valid named command");
 
         assert_eq!(args, vec![json!({}), json!(9), json!(7), json!({})]);
+    }
+
+    #[test]
+    fn reducer_permission_denial_maps_upstream_530_to_forbidden() {
+        let error = anyhow::Error::new(StdbClientError::Http(
+            "530 <unknown status code>".into(),
+            "Permission denied: write on account_move".into(),
+        ));
+        assert!(matches!(
+            map_reducer_error(error),
+            ApiError::Forbidden(message) if message == "Permission denied: write on account_move"
+        ));
+    }
+
+    #[test]
+    fn reducer_validation_maps_upstream_530_to_unprocessable() {
+        let error = anyhow::Error::new(StdbClientError::Http(
+            "530 <unknown status code>".into(),
+            "currency_id is required".into(),
+        ));
+        assert!(matches!(
+            map_reducer_error(error),
+            ApiError::Unprocessable(message) if message == "currency_id is required"
+        ));
     }
 
     #[test]

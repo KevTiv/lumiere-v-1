@@ -21,6 +21,25 @@ pub enum StdbClientError {
     Parse(String),
 }
 
+impl StdbClientError {
+    /// Return the numeric upstream status when the HTTP status string is
+    /// parseable (SpacetimeDB may use non-standard statuses such as 530).
+    pub fn status_code(&self) -> Option<u16> {
+        let Self::Http(status, _) = self else {
+            return None;
+        };
+        status.split_whitespace().next()?.parse().ok()
+    }
+
+    /// Return the upstream response body for HTTP failures.
+    pub fn response_body(&self) -> Option<&str> {
+        match self {
+            Self::Http(_, body) => Some(body),
+            Self::Parse(_) => None,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct StdbClient {
     http: std::sync::Arc<reqwest::Client>,

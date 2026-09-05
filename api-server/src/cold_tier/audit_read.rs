@@ -40,34 +40,29 @@ const READ_COLUMNS: &[&str] = &[
     "timestamp",
 ];
 
-/// Merge cold + hot audit-log rows for `organization_id`, in the same shape
-/// and bound (`id DESC`, top 500) the hot-only endpoint has always returned.
+/// Read hot audit-log rows for `organization_id`, in the same shape and bound
+/// (`id DESC`, top 500) the endpoint has always returned.
+///
+/// `audit_log` is an always-hot table. Keep this path independent from the
+/// legacy cold archive reader so a stale archive manifest or unavailable PG
+/// cannot turn an authoritative hot read into a failed request.
+pub async fn hot_rows(stdb: &StdbClient, organization_id: u64) -> Result<Vec<Value>, ApiError> {
+    let columns = audit_columns()?;
+    let plan = audit_plan(organization_id, &columns);
+    let (sql, binds) = super::compile_stdb_sql(&plan).map_err(ApiError::internal)?;
+    stdb.query_sql(&super::inline_stdb_literals(&sql, &binds))
+        .await
+        .map_err(ApiError::internal)
+}
+
+/// Merge cold + hot audit-log rows for migration/compatibility callers.
+/// New `audit-log` HTTP reads must use [`hot_rows`].
 ///
 /// Cold-store failure rejects the request. A hot-only result would conceal
 /// missing history behind the normal successful response contract.
 pub async fn merged_rows(stdb: &StdbClient, organization_id: u64) -> Result<Vec<Value>, ApiError> {
-    let all_columns = pg_codec::load_columns(CODEC_MANIFEST_JSON, "audit_log")
-        .map_err(|e| ApiError::Internal(format!("load audit_log codec columns: {e}")))?;
-    let columns: Vec<pg_codec::ColumnCodec> = all_columns
-        .into_iter()
-        .filter(|column| READ_COLUMNS.contains(&column.name.as_str()))
-        .collect();
-    let plan = ResourceReadPlan {
-        resource: "audit-log".into(),
-        table: "audit_log".into(),
-        projection: pg_codec::projection_with_pg_casts(&columns),
-        organization_id,
-        company_id: None,
-        predicates: vec![],
-        order: vec![ReadOrder {
-            column: "id".into(),
-            direction: OrderDirection::Desc,
-        }],
-        page: PageSpec {
-            limit: PageSpec::AUDIT_LOG_DEFAULT_LIMIT,
-            cursor: None,
-        },
-    };
+    let columns = audit_columns()?;
+    let plan = audit_plan(organization_id, &columns);
     let (hot_sql, hot_binds) = super::compile_stdb_sql(&plan).map_err(ApiError::internal)?;
     let hot_rows = stdb
         .query_sql(&super::inline_stdb_literals(&hot_sql, &hot_binds))
@@ -94,6 +89,34 @@ pub async fn merged_rows(stdb: &StdbClient, organization_id: u64) -> Result<Vec<
     )
     .map_err(ApiError::internal)?;
     Ok(merged)
+}
+
+fn audit_columns() -> Result<Vec<pg_codec::ColumnCodec>, ApiError> {
+    let all_columns = pg_codec::load_columns(CODEC_MANIFEST_JSON, "audit_log")
+        .map_err(|e| ApiError::Internal(format!("load audit_log codec columns: {e}")))?;
+    Ok(all_columns
+        .into_iter()
+        .filter(|column| READ_COLUMNS.contains(&column.name.as_str()))
+        .collect())
+}
+
+fn audit_plan(organization_id: u64, columns: &[pg_codec::ColumnCodec]) -> ResourceReadPlan {
+    ResourceReadPlan {
+        resource: "audit-log".into(),
+        table: "audit_log".into(),
+        projection: pg_codec::projection_with_pg_casts(columns),
+        organization_id,
+        company_id: None,
+        predicates: vec![],
+        order: vec![ReadOrder {
+            column: "id".into(),
+            direction: OrderDirection::Desc,
+        }],
+        page: PageSpec {
+            limit: PageSpec::AUDIT_LOG_DEFAULT_LIMIT,
+            cursor: None,
+        },
+    }
 }
 
 async fn query_cold_rows(

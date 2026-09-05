@@ -372,7 +372,7 @@ pub async fn execute_resource_query_for_company(
             return imports::read_import_mapping_templates(client, organization_id).await;
         }
         "audit-log" => {
-            return crate::cold_tier::audit_read::merged_rows(client, organization_id).await;
+            return crate::cold_tier::audit_read::hot_rows(client, organization_id).await;
         }
         "audit-rules" => {
             return access_control::read_audit_rules(client, organization_id).await;
