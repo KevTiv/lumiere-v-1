@@ -106,6 +106,12 @@ fn stdb_option<T: Serialize>(value: Option<&T>) -> Value {
     }
 }
 
+fn tenant_currency_sql(organization_id: u64) -> String {
+    format!(
+        "SELECT id, code, name, symbol, decimal_places FROM currency WHERE organization_id = {organization_id} AND active = true"
+    )
+}
+
 impl From<&OrganizationInput> for OrganizationReducerArg {
     fn from(value: &OrganizationInput) -> Self {
         Self {
@@ -263,9 +269,24 @@ async fn bootstrap_currencies_get(
         return Err(ApiError::Unauthorized);
     }
 
-    // This is a pre-tenant catalog, not a query over another organization's
-    // rows. The reducer seeds the selected code after the new organization id
-    // exists, so no global/sentinel currency row is required.
+    if let Some(organization_id) = session.organization_id {
+        let client = state.client_with_token(&session.stdb_token);
+        let mut currencies = client
+            .query_sql(&tenant_currency_sql(organization_id))
+            .await
+            .map_err(ApiError::internal)?;
+        currencies.sort_by(|left, right| {
+            left.get("code")
+                .and_then(Value::as_str)
+                .cmp(&right.get("code").and_then(Value::as_str))
+        });
+        return Ok(Json(json!({ "data": currencies })));
+    }
+
+    // A user without a tenant receives a code-only onboarding catalog, not
+    // rows from another organization. The reducer seeds the selected code
+    // after the new organization id exists, so these ids deliberately remain
+    // zero and must never be used by an established tenant.
     let currencies = [
         ("USD", "US Dollar", "$", 2),
         ("EUR", "Euro", "€", 2),
@@ -342,5 +363,13 @@ mod tests {
             json!({ "some": "fixture" })
         );
         assert_eq!(value["settings"]["metadata"], json!({ "some": "settings" }));
+    }
+
+    #[test]
+    fn tenant_currency_query_is_directly_organization_scoped() {
+        assert_eq!(
+            tenant_currency_sql(42),
+            "SELECT id, code, name, symbol, decimal_places FROM currency WHERE organization_id = 42 AND active = true"
+        );
     }
 }
