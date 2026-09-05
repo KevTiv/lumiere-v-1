@@ -97,15 +97,7 @@ pub fn parse_archive_manifest(manifest_json: &str) -> Result<Vec<ArchiveCandidat
             manifest.version
         );
     }
-    // v0.3.29 predates the reviewed policy that made audit_log always-hot and
-    // still advertises its obsolete finalizer. Ignore only that exact legacy
-    // tuple while consumers transition to the corrected generated manifest.
-    // Any malformed or unknown audit candidate still fails closed below.
-    let mut candidates = manifest
-        .candidates
-        .into_iter()
-        .filter(|candidate| !is_legacy_always_hot_audit_candidate(candidate))
-        .collect::<Vec<_>>();
+    let mut candidates = manifest.candidates;
     if candidates.is_empty() {
         bail!("archive manifest must contain at least one candidate");
     }
@@ -149,23 +141,6 @@ fn validate_candidate(candidate: &ArchiveCandidate) -> Result<CandidateHandler> 
             mode
         ),
     }
-}
-
-fn is_legacy_always_hot_audit_candidate(candidate: &ArchiveCandidate) -> bool {
-    matches!(
-        (
-            candidate.table.as_str(),
-            candidate.cold_table.as_str(),
-            candidate.finalize_reducer.as_str(),
-            candidate.mode.as_str(),
-        ),
-        (
-            "audit_log",
-            "cold_audit_log",
-            "finalize_audit_log_archive",
-            "append_only"
-        )
-    )
 }
 
 /// Return the deterministic handler order for validated candidates.
@@ -241,32 +216,6 @@ mod tests {
     #[test]
     fn parses_and_sorts_pinned_candidates() {
         let parsed = parse_archive_manifest(ARCHIVE_MANIFEST_JSON).unwrap();
-        assert_eq!(
-            parsed
-                .iter()
-                .map(|candidate| candidate.table.as_str())
-                .collect::<Vec<_>>(),
-            vec!["pos_order"]
-        );
-    }
-
-    #[test]
-    fn skips_the_exact_legacy_always_hot_audit_candidate() {
-        let parsed = parse_archive_manifest(&manifest(vec![
-            candidate(
-                "audit_log",
-                "cold_audit_log",
-                "finalize_audit_log_archive",
-                "append_only",
-            ),
-            candidate(
-                "pos_order",
-                "cold_pos_order",
-                "finalize_pos_order_archive",
-                "versioned",
-            ),
-        ]))
-        .unwrap();
         assert_eq!(
             parsed
                 .iter()
