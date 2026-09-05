@@ -2,17 +2,33 @@
 # Run the ignored live C5 finalization drill against an already-running module.
 # This never publishes or resets SpacetimeDB. PostgreSQL is created and dropped
 # by the test itself, so a failed run may only leave its uniquely named drill DB.
+# The STDB target must be loopback, explicitly acknowledged as disposable, and
+# named with the `lumiere-c5-` prefix because the drill replaces service bindings
+# and creates then finalizes one POS aggregate.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-required=(C5_STDB_ADMIN_TOKEN C5_STDB_WORKER_TOKEN STDB_HOST STDB_MODULE)
+required=(C5_DISPOSABLE_STDB C5_STDB_ADMIN_TOKEN C5_STDB_WORKER_TOKEN STDB_HOST STDB_MODULE)
 for name in "${required[@]}"; do
   if [[ -z "${!name:-}" ]]; then
     echo "[c5-drill] $name is required; refusing to run" >&2
     exit 2
   fi
 done
+
+if [[ "${C5_DISPOSABLE_STDB}" != "1" ]]; then
+  echo "[c5-drill] C5_DISPOSABLE_STDB=1 is required; refusing to mutate the target module" >&2
+  exit 2
+fi
+case "${STDB_HOST}" in
+  http://127.0.0.1|http://127.0.0.1:*|http://localhost|http://localhost:*) ;;
+  *) echo "[c5-drill] STDB_HOST must be loopback for this disposable drill" >&2; exit 2 ;;
+esac
+if [[ "${STDB_MODULE}" != lumiere-c5-* ]]; then
+  echo "[c5-drill] STDB_MODULE must use the disposable 'lumiere-c5-' prefix" >&2
+  exit 2
+fi
 
 if [[ "${C5_STDB_ADMIN_TOKEN}" == "${C5_STDB_WORKER_TOKEN}" ]]; then
   echo "[c5-drill] admin and worker tokens must be distinct; refusing to run" >&2

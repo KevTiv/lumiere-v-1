@@ -17,6 +17,7 @@ use super::pos_order;
 use crate::cold_tier::{conventions, migrate, pg_codec, pg_pool, projection_worker};
 
 const DRILL_FLAG: &str = "C5_FINALIZATION_DRILL";
+const DRILL_DISPOSABLE_FLAG: &str = "C5_DISPOSABLE_STDB";
 const DRILL_ADMIN_TOKEN: &str = "C5_STDB_ADMIN_TOKEN";
 const DRILL_WORKER_TOKEN: &str = "C5_STDB_WORKER_TOKEN";
 const DRILL_WORKER_IDENTITY: &str = "C5_STDB_WORKER_IDENTITY";
@@ -27,6 +28,7 @@ async fn c5_live_finalization_worker_drill() -> Result<()> {
     require_enabled()?;
     let stdb_host = env_required("STDB_HOST")?;
     let stdb_module = env_required("STDB_MODULE")?;
+    require_disposable_target(&stdb_host, &stdb_module)?;
     let admin_token = env_required(DRILL_ADMIN_TOKEN)?;
     let worker_token = env_required(DRILL_WORKER_TOKEN)?;
     let worker_identity = normalize_identity(&env_required(DRILL_WORKER_IDENTITY)?)?;
@@ -247,6 +249,46 @@ fn require_enabled() -> Result<()> {
         bail!("{DRILL_FLAG}=1 is required; refusing to run a live disposable drill")
     }
     Ok(())
+}
+
+fn require_disposable_target(host: &str, module: &str) -> Result<()> {
+    validate_disposable_target(
+        std::env::var(DRILL_DISPOSABLE_FLAG).as_deref() == Ok("1"),
+        host,
+        module,
+    )
+}
+
+fn validate_disposable_target(acknowledged: bool, host: &str, module: &str) -> Result<()> {
+    if !acknowledged {
+        bail!("{DRILL_DISPOSABLE_FLAG}=1 is required; refusing to mutate a non-disposable module")
+    }
+    let is_loopback = host.starts_with("http://127.0.0.1:")
+        || host.starts_with("http://localhost:")
+        || host == "http://127.0.0.1"
+        || host == "http://localhost";
+    if !is_loopback {
+        bail!("C5 drill requires a loopback STDB_HOST, got {host}")
+    }
+    if !module.starts_with("lumiere-c5-") {
+        bail!("C5 drill requires a disposable STDB_MODULE prefixed with 'lumiere-c5-'")
+    }
+    Ok(())
+}
+
+#[test]
+fn disposable_target_validation_rejects_shared_or_remote_modules() {
+    assert!(validate_disposable_target(true, "http://127.0.0.1:3000", "lumiere-c5-drill").is_ok());
+    assert!(
+        validate_disposable_target(false, "http://127.0.0.1:3000", "lumiere-c5-drill").is_err()
+    );
+    assert!(validate_disposable_target(
+        true,
+        "https://maincloud.spacetimedb.com",
+        "lumiere-c5-drill"
+    )
+    .is_err());
+    assert!(validate_disposable_target(true, "http://127.0.0.1:3000", "lumiere-v1").is_err());
 }
 
 fn env_required(name: &str) -> Result<String> {
