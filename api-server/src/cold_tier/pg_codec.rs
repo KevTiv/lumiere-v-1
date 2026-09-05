@@ -249,6 +249,15 @@ pub fn decode_row(columns: &[ColumnCodec], row: &Value) -> Result<Vec<PgValue>> 
 }
 
 fn decode_column(col: &ColumnCodec, raw: &Value) -> Result<PgValue> {
+    let raw = if col.nullable {
+        match normalize_nullable_sats_option(raw)? {
+            Some(raw) => raw,
+            None => return Ok(null_value_for(&col.pg_type)?),
+        }
+    } else {
+        raw
+    };
+
     if raw.is_null() {
         if !col.nullable {
             anyhow::bail!("non-nullable but value is null");
@@ -316,6 +325,35 @@ fn decode_column(col: &ColumnCodec, raw: &Value) -> Result<PgValue> {
 /// uses this for a tombstone key, where a complete row is intentionally absent.
 pub(crate) fn decode_key_value(col: &ColumnCodec, raw: &Value) -> Result<PgValue> {
     decode_column(col, raw)
+}
+
+/// Unwrap one canonical SATS Option value for nullable columns. Direct JSON
+/// objects remain untouched unless they use an Option key, so JSONB payloads
+/// retain their original shape. Any Option-looking wrapper must be exact.
+fn normalize_nullable_sats_option(raw: &Value) -> Result<Option<&Value>> {
+    let Value::Object(obj) = raw else {
+        return Ok(Some(raw));
+    };
+
+    let has_option_key = obj.contains_key("none") || obj.contains_key("some");
+    if obj.len() != 1 {
+        if has_option_key {
+            anyhow::bail!("expected single-key SATS Option wrapper, got {raw}");
+        }
+        return Ok(Some(raw));
+    }
+
+    if let Some(payload) = obj.get("none") {
+        if !payload.as_array().is_some_and(Vec::is_empty) {
+            anyhow::bail!("expected empty none payload in SATS Option wrapper, got {raw}");
+        }
+        return Ok(None);
+    }
+    if let Some(payload) = obj.get("some") {
+        return Ok(Some(payload));
+    }
+
+    Ok(Some(raw))
 }
 
 fn decode_bigint_or_timestamp(raw: &Value) -> Result<i64> {
@@ -615,6 +653,26 @@ mod tests {
     }
 
     #[test]
+    fn decodes_nullable_sats_option_timestamp_values() {
+        let mut none_row = sample_row();
+        none_row["coldEligibleAt"] = json!({ "none": [] });
+        let none_values = decode_row(&cols(), &none_row).unwrap();
+        assert!(matches!(none_values[8], PgValue::BigInt(None)));
+
+        let mut some_row = sample_row();
+        some_row["coldEligibleAt"] = json!({
+            "some": {
+                "__timestamp_micros_since_unix_epoch__": 1_781_987_714_525_004_i64,
+            }
+        });
+        let some_values = decode_row(&cols(), &some_row).unwrap();
+        assert!(matches!(
+            some_values[8],
+            PgValue::BigInt(Some(1_781_987_714_525_004))
+        ));
+    }
+
+    #[test]
     fn rejects_malformed_timestamp_object_wrappers() {
         let mut malformed = sample_row();
         malformed["dateOrder"] = json!({
@@ -630,6 +688,28 @@ mod tests {
         });
         let err = format!("{:#}", decode_row(&cols(), &multi_key).unwrap_err());
         assert!(err.to_string().contains("single-key timestamp wrapper"));
+    }
+
+    #[test]
+    fn rejects_malformed_nullable_sats_option_wrappers() {
+        let mut malformed_none = sample_row();
+        malformed_none["coldEligibleAt"] = json!({ "none": [1] });
+        let err = format!("{:#}", decode_row(&cols(), &malformed_none).unwrap_err());
+        assert!(err
+            .to_string()
+            .contains("expected empty none payload in SATS Option wrapper"));
+
+        let mut multi_key = sample_row();
+        multi_key["coldEligibleAt"] = json!({ "none": [], "extra": true });
+        let err = format!("{:#}", decode_row(&cols(), &multi_key).unwrap_err());
+        assert!(err
+            .to_string()
+            .contains("expected single-key SATS Option wrapper"));
+
+        let mut non_nullable = sample_row();
+        non_nullable["dateOrder"] = json!({ "none": [] });
+        let err = format!("{:#}", decode_row(&cols(), &non_nullable).unwrap_err());
+        assert!(err.to_string().contains("expected timestamp wrapper"));
     }
 
     #[test]
