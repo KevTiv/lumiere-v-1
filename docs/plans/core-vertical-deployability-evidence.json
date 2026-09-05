@@ -36,9 +36,15 @@
       "required": []
     },
     "C3": {
-      "status": "partial",
-      "evidence": ["generic projector and PostgreSQL matrix exist"],
-      "required": ["create/update/delete proof per enabled module", "legacy drainer parity and retirement"]
+      "status": "complete",
+      "evidence": [
+        "the manifest-driven projector covers every enabled module with create, update, and delete fixtures derived from the checked-in storage and codec manifests",
+        "a disposable real PostgreSQL run passed the all-module matrix with atomic ordered commits, exact duplicate replay, process-pool restart, durable cursor persistence, visible gap rejection, and quarantine without cursor skipping",
+        "commit db99f1030 adds explicit generic-projector parity for audit_log append-history and pos_order create/update/delete behavior, including stable ledger and cursor counts on duplicate delivery",
+        "commit 5bc0dd700 retires the audit and POS drainer binaries, modules, Compose services, probes, environment settings, and obsolete write/finalize metrics while preserving C5 finalization contracts",
+        "the additive migration in commit 2f1e2eea4 upgrades pre-C4 heap protocol JSON columns, the colliding tax-deadline unique index, and all required organization commit/change constraints; both real PostgreSQL C3 tests pass"
+      ],
+      "required": []
     },
     "C4": {
       "status": "partial",
