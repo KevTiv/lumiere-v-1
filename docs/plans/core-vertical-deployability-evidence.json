@@ -24,13 +24,16 @@
       "required": ["regenerate after C0", "zero unclassified relations", "all parent relationships validated"]
     },
     "C2": {
-      "status": "partial",
+      "status": "complete",
       "evidence": [
         "23 representative reducers cover all 22 enabled modules",
         "the coverage gate derives the enabled module census from spacetimedb/src/lib.rs and fails closed on missing modules",
-        "bootstrap_new_tenant records the complete ordered tenant graph in one organization commit; static verification and Rust compilation pass"
+        "bootstrap_new_tenant records the complete ordered tenant graph in one organization commit; static verification and Rust compilation pass",
+        "commit f956f743f strengthens the core fixture to compare every ordered identity and canonical full-row payload with the persisted STDB outcome",
+        "a disposable in-memory SpacetimeDB 2.8.2 runtime execution passed with one erp.bootstrap_new_tenant commit, sequence 1, cursor 2, 63 ordered upserts, and contiguous ordinals 0 through 62",
+        "the validated WASM SHA-256 was 38909fd2788c71dee4c792110723237816957bbaafae1b173ef6c3bc255a6342"
       ],
-      "required": ["execute the core bootstrap commit fixture against a published disposable SpacetimeDB module"]
+      "required": []
     },
     "C3": {
       "status": "partial",
