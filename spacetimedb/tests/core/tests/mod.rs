@@ -1,5 +1,6 @@
 //! Core domain test suite — invoke via `run_all_core_tests` reducer.
 pub mod audit_finalize_test;
+pub mod bootstrap_commit_test;
 pub mod operational_messaging_test;
 pub mod permissions_tests;
 pub mod queue_tests;

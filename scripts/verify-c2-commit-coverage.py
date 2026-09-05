@@ -18,6 +18,9 @@ FUNCTION_RE = re.compile(r"\bfn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 OPERATION_RE = re.compile(r'operation_id\s*:\s*"([^"]+)"')
 COMMIT_CALL = "record_organization_commit("
 COMMIT_DEFINITION = re.compile(r"\bfn\s+record_organization_commit\s*$")
+DOMAIN_MODULE_MARKER = "// ── Domain modules"
+DOMAIN_MODULE_END_MARKER = "/// Shared org/company/COA fixture"
+PUB_MODULE_RE = re.compile(r"^\s*pub\s+mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*;", re.MULTILINE)
 
 
 class CoverageError(ValueError):
@@ -155,6 +158,76 @@ def _load_json(path: Path) -> Any:
         raise CoverageError(f"cannot read {path}: {error}") from error
 
 
+def _canonical_enabled_modules(repo_root: Path) -> frozenset[str]:
+    """Return the enabled domain modules from the crate's module census.
+
+    ``spacetimedb/src/lib.rs`` is the source of truth for the public domain
+    module map. The census is intersected with directory modules so the
+    development-only ``seed.rs`` module is not treated as a business module.
+    This keeps the gate tied to the crate's actual enabled module map instead
+    of a duplicated count or list in the coverage metadata.
+    """
+
+    lib_path = repo_root / "spacetimedb/src/lib.rs"
+    try:
+        source = lib_path.read_text(encoding="utf-8")
+    except OSError as error:
+        raise CoverageError(f"cannot read canonical module census {lib_path}: {error}") from error
+    start = source.find(DOMAIN_MODULE_MARKER)
+    end = source.find(DOMAIN_MODULE_END_MARKER, start + len(DOMAIN_MODULE_MARKER))
+    if start < 0 or end < 0:
+        raise CoverageError(
+            "canonical module census is missing the domain-module section in "
+            f"{lib_path.relative_to(repo_root)}"
+        )
+    declared = set(PUB_MODULE_RE.findall(source[start:end]))
+    if not declared:
+        raise CoverageError("canonical module census declares no domain modules")
+
+    source_root = repo_root / "spacetimedb/src"
+    enabled = frozenset(
+        module
+        for module in declared
+        if (source_root / module).is_dir() and (source_root / module / "mod.rs").is_file()
+    )
+    if not enabled:
+        raise CoverageError("canonical module census has no enabled source modules")
+    if "core" not in enabled:
+        raise CoverageError("canonical module census must include the core module")
+    return enabled
+
+
+def _module_from_source(source_name: str) -> str:
+    """Extract the domain module from a repository-relative Rust source path."""
+
+    parts = Path(source_name).parts
+    if len(parts) < 4 or parts[:2] != ("spacetimedb", "src"):
+        raise CoverageError(
+            "C2 reducer source must identify a domain module under spacetimedb/src: "
+            f"{source_name}"
+        )
+    return parts[2]
+
+
+def _validate_module_coverage(
+    entries: list[dict[str, Any]], expected_modules: frozenset[str]
+) -> None:
+    """Require at least one registered reducer for every enabled module."""
+
+    covered_modules = {_module_from_source(entry["source"]) for entry in entries}
+    unexpected = covered_modules - expected_modules
+    if unexpected:
+        raise CoverageError(
+            "C2 coverage references modules outside the enabled module census: "
+            + ", ".join(sorted(unexpected))
+        )
+    missing = expected_modules - covered_modules
+    if missing:
+        raise CoverageError(
+            "C2 module coverage is missing enabled modules: " + ", ".join(sorted(missing))
+        )
+
+
 def verify(repo_root: Path, metadata_path: Path, operation_ids_path: Path) -> None:
     metadata = _load_json(metadata_path)
     if not isinstance(metadata, dict) or metadata.get("schema_version") != 1:
@@ -225,6 +298,8 @@ def verify(repo_root: Path, metadata_path: Path, operation_ids_path: Path) -> No
                 f"{source_name}:{function} must use the persistence helper, not direct commit-table writes"
             )
         configured_calls.add(key)
+
+    _validate_module_coverage(entries, _canonical_enabled_modules(repo_root))
 
     # Every active helper call in the module must be registered. This catches
     # newly instrumented reducers that forgot to extend the metadata contract.

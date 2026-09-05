@@ -23,6 +23,13 @@
       "change_constructors": ["upsert_stdb_row"]
     },
     {
+      "source": "spacetimedb/src/core/organization.rs",
+      "function": "record_bootstrap_organization_commit",
+      "operation": "bootstrap_new_tenant",
+      "operation_id": "erp.bootstrap_new_tenant",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
       "source": "spacetimedb/src/crm/opportunities.rs",
       "function": "convert_opportunity_to_sale_order",
       "operation": "convert_opportunity_to_sale_order",

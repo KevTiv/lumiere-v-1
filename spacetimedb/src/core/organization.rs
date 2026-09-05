@@ -6,20 +6,26 @@
 use spacetimedb::rand::Rng;
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::country_pack::seed_country_pack_catalog_for_organization;
+use crate::core::country_pack::{
+    country_pack_definition, country_pack_tax_rule, seed_country_pack_catalog_for_organization,
+};
 use crate::core::permissions::{role, user_role_assignment, Role, UserRoleAssignment};
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::core::reference::{
-    require_active_currency_by_id, require_active_currency_for_organization,
+    currency, require_active_currency_by_id, require_active_currency_for_organization,
     seed_currency_for_organization,
 };
 use crate::core::users::{
     ensure_user_profile_for_organization, find_user_profile_for_identity, user_organization,
-    UserOrganization,
+    user_profile, UserOrganization,
 };
 use crate::crm::activities::{activity_type, ActivityType};
 use crate::forms::migrations::run_seed_organization_form_configs;
+use crate::forms::{form_config, form_config_field, form_field_label, form_role_config};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::hr::country_pack_hr::seed_hr_country_pack_leave_catalog_for_organization;
+use crate::hr::country_pack_hr::{
+    hr_country_pack_leave_default, seed_hr_country_pack_leave_catalog_for_organization,
+};
 
 // ============================================================================
 // PARAMS TYPES
@@ -548,6 +554,264 @@ pub fn bootstrap_new_tenant(
         },
     );
 
+    record_bootstrap_organization_commit(ctx, org.id)?;
+
+    Ok(())
+}
+
+/// Record the complete tenant graph created by [`bootstrap_new_tenant`].
+///
+/// Bootstrap has no client-owned organization scope, so this snapshot is
+/// collected from the organization just created and its server-owned children.
+/// The explicit parent-before-child order is the durable projection contract;
+/// the commit helper then adds the actor, timestamp, schema version, sequence,
+/// and checksum atomically with the reducer.
+fn record_bootstrap_organization_commit(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<(), String> {
+    let committed_organization = ctx
+        .db
+        .organization()
+        .id()
+        .find(&organization_id)
+        .ok_or("Organization disappeared before bootstrap commit recording")?;
+    let mut changes = vec![RowChange::upsert_stdb_row(
+        "organization",
+        serde_json::json!({"id": committed_organization.id}),
+        &committed_organization,
+    )?];
+
+    let mut currencies: Vec<_> = ctx
+        .db
+        .currency()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .collect();
+    currencies.sort_by_key(|row| row.id);
+    for row in currencies {
+        changes.push(RowChange::upsert_stdb_row(
+            "currency",
+            serde_json::json!({"id": row.id}),
+            &row,
+        )?);
+    }
+
+    let mut country_packs: Vec<_> = ctx
+        .db
+        .country_pack_definition()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .collect();
+    country_packs
+        .sort_by(|left, right| left.organization_pack_key.cmp(&right.organization_pack_key));
+    for row in country_packs {
+        changes.push(RowChange::upsert_stdb_row(
+            "country_pack_definition",
+            serde_json::json!({"organization_pack_key": row.organization_pack_key}),
+            &row,
+        )?);
+    }
+
+    let mut country_pack_tax_rules: Vec<_> = ctx
+        .db
+        .country_pack_tax_rule()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .collect();
+    country_pack_tax_rules.sort_by_key(|row| row.id);
+    for row in country_pack_tax_rules {
+        changes.push(RowChange::upsert_stdb_row(
+            "country_pack_tax_rule",
+            serde_json::json!({"id": row.id}),
+            &row,
+        )?);
+    }
+
+    let mut leave_defaults: Vec<_> = ctx
+        .db
+        .hr_country_pack_leave_default()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .collect();
+    leave_defaults.sort_by_key(|row| row.id);
+    for row in leave_defaults {
+        changes.push(RowChange::upsert_stdb_row(
+            "hr_country_pack_leave_default",
+            serde_json::json!({"id": row.id}),
+            &row,
+        )?);
+    }
+
+    if let Some(settings) = ctx
+        .db
+        .organization_settings()
+        .organization_id()
+        .find(&organization_id)
+    {
+        changes.push(RowChange::upsert_stdb_row(
+            "organization_settings",
+            serde_json::json!({"organization_id": organization_id}),
+            &settings,
+        )?);
+    }
+
+    let mut activities: Vec<_> = ctx
+        .db
+        .activity_type()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .collect();
+    activities.sort_by_key(|row| row.id);
+    for row in activities {
+        changes.push(RowChange::upsert_stdb_row(
+            "activity_type",
+            serde_json::json!({"id": row.id}),
+            &row,
+        )?);
+    }
+
+    let mut companies: Vec<_> = ctx
+        .db
+        .company()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .collect();
+    companies.sort_by_key(|row| row.id);
+    for row in companies {
+        changes.push(RowChange::upsert_stdb_row(
+            "company",
+            serde_json::json!({"id": row.id}),
+            &row,
+        )?);
+    }
+
+    let mut roles: Vec<_> = ctx
+        .db
+        .role()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .collect();
+    roles.sort_by_key(|row| row.id);
+    for row in roles {
+        changes.push(RowChange::upsert_stdb_row(
+            "role",
+            serde_json::json!({"id": row.id}),
+            &row,
+        )?);
+    }
+
+    let mut profiles: Vec<_> = ctx
+        .db
+        .user_profile()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .collect();
+    profiles.sort_by_key(|row| row.id);
+    for row in profiles {
+        changes.push(RowChange::upsert_stdb_row(
+            "user_profile",
+            serde_json::json!({"id": row.id}),
+            &row,
+        )?);
+    }
+
+    let mut memberships: Vec<_> = ctx
+        .db
+        .user_organization()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .collect();
+    memberships.sort_by_key(|row| row.id);
+    for row in memberships {
+        changes.push(RowChange::upsert_stdb_row(
+            "user_organization",
+            serde_json::json!({"id": row.id}),
+            &row,
+        )?);
+    }
+
+    let mut assignments: Vec<_> = ctx
+        .db
+        .user_role_assignment()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .collect();
+    assignments.sort_by_key(|row| row.id);
+    for row in assignments {
+        changes.push(RowChange::upsert_stdb_row(
+            "user_role_assignment",
+            serde_json::json!({"id": row.id}),
+            &row,
+        )?);
+    }
+
+    let mut form_configs: Vec<_> = ctx
+        .db
+        .form_config()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .collect();
+    form_configs.sort_by_key(|row| row.id);
+    for row in &form_configs {
+        changes.push(RowChange::upsert_stdb_row(
+            "form_config",
+            serde_json::json!({"id": row.id}),
+            row,
+        )?);
+    }
+    let mut form_fields: Vec<_> = ctx
+        .db
+        .form_config_field()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .collect();
+    form_fields.sort_by_key(|row| row.id);
+    for row in form_fields {
+        changes.push(RowChange::upsert_stdb_row(
+            "form_config_field",
+            serde_json::json!({"id": row.id}),
+            &row,
+        )?);
+    }
+    let mut form_labels: Vec<_> = ctx
+        .db
+        .form_field_label()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .collect();
+    form_labels.sort_by_key(|row| row.id);
+    for row in form_labels {
+        changes.push(RowChange::upsert_stdb_row(
+            "form_field_label",
+            serde_json::json!({"id": row.id}),
+            &row,
+        )?);
+    }
+    let mut form_roles: Vec<_> = ctx
+        .db
+        .form_role_config()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .collect();
+    form_roles.sort_by_key(|row| row.id);
+    for row in form_roles {
+        changes.push(RowChange::upsert_stdb_row(
+            "form_role_config",
+            serde_json::json!({"id": row.id}),
+            &row,
+        )?);
+    }
+
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.bootstrap_new_tenant".to_string(),
+            correlation_id: format!("bootstrap:organization:{organization_id}"),
+            changes,
+        },
+    )?;
     Ok(())
 }
 
@@ -954,8 +1218,7 @@ pub(crate) fn company_id_from_scope(
 /// One-time migration: set `external_id` on rows that predate the column (empty string).
 #[spacetimedb::reducer]
 pub fn backfill_external_ids(ctx: &ReducerContext) -> Result<(), String> {
-    let me = find_user_profile_for_identity(ctx, ctx.sender())
-        .ok_or("User not found")?;
+    let me = find_user_profile_for_identity(ctx, ctx.sender()).ok_or("User not found")?;
     if !me.is_superuser {
         return Err("Only superusers may run backfill_external_ids".to_string());
     }

@@ -25,8 +25,12 @@
     },
     "C2": {
       "status": "partial",
-      "evidence": ["22 representative reducers cover 21 business modules"],
-      "required": ["core multi-row commit fixture", "all enabled modules emit complete ordered commits"]
+      "evidence": [
+        "23 representative reducers cover all 22 enabled modules",
+        "the coverage gate derives the enabled module census from spacetimedb/src/lib.rs and fails closed on missing modules",
+        "bootstrap_new_tenant records the complete ordered tenant graph in one organization commit; static verification and Rust compilation pass"
+      ],
+      "required": ["execute the core bootstrap commit fixture against a published disposable SpacetimeDB module"]
     },
     "C3": {
       "status": "partial",

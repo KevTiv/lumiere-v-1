@@ -292,17 +292,15 @@ fn json_u64(value: &Value) -> Option<u64> {
 }
 
 fn allocate_sequence(ctx: &ReducerContext, organization_id: u64) -> Result<u64, String> {
-    match ctx
+    let cursor = ctx
         .db
         .organization_commit_cursor()
         .organization_id()
-        .find(&organization_id)
-    {
-        Some(cursor) => {
-            let sequence = cursor.next_sequence;
-            let next_sequence = sequence
-                .checked_add(1)
-                .ok_or_else(|| "organization commit sequence exhausted".to_string())?;
+        .find(&organization_id);
+    let (sequence, next_sequence) =
+        next_sequence(cursor.as_ref().map(|cursor| cursor.next_sequence))?;
+    match cursor {
+        Some(_) => {
             ctx.db
                 .organization_commit_cursor()
                 .organization_id()
@@ -310,18 +308,28 @@ fn allocate_sequence(ctx: &ReducerContext, organization_id: u64) -> Result<u64, 
                     organization_id,
                     next_sequence,
                 });
-            Ok(sequence)
         }
         None => {
             ctx.db
                 .organization_commit_cursor()
                 .insert(OrganizationCommitCursor {
                     organization_id,
-                    next_sequence: 2,
+                    next_sequence,
                 });
-            Ok(1)
         }
     }
+    Ok(sequence)
+}
+
+fn next_sequence(current: Option<u64>) -> Result<(u64, u64), String> {
+    let sequence = current.unwrap_or(1);
+    if sequence == 0 {
+        return Err("organization commit cursor has an invalid zero next sequence".to_string());
+    }
+    let next_sequence = sequence
+        .checked_add(1)
+        .ok_or_else(|| "organization commit sequence exhausted".to_string())?;
+    Ok((sequence, next_sequence))
 }
 
 fn commit_checksum(
@@ -483,6 +491,93 @@ mod tests {
         )]))
         .unwrap();
         assert_eq!(left[0].checksum, right[0].checksum);
+    }
+
+    #[test]
+    fn commit_checksum_is_stable_for_equivalent_inputs_and_order_sensitive() {
+        let left_input = input(vec![
+            RowChange::upsert(
+                "sale_order",
+                json!({"id": 5}),
+                json!({"id": 5, "organization_id": 7, "status": "confirmed"}),
+            ),
+            RowChange::delete("sale_order_line", json!({"id": 9})),
+        ]);
+        let equivalent_input = input(vec![
+            RowChange::upsert(
+                "sale_order",
+                json!({"id": 5}),
+                serde_json::from_str(r#"{"status":"confirmed","organization_id":7,"id":5}"#)
+                    .unwrap(),
+            ),
+            RowChange::delete("sale_order_line", json!({"id": 9})),
+        ]);
+        let reordered_input = input(vec![
+            RowChange::delete("sale_order_line", json!({"id": 9})),
+            RowChange::upsert(
+                "sale_order",
+                json!({"id": 5}),
+                json!({"id": 5, "organization_id": 7, "status": "confirmed"}),
+            ),
+        ]);
+        let left_changes = prepare_changes(&left_input).unwrap();
+        let equivalent_changes = prepare_changes(&equivalent_input).unwrap();
+        let reordered_changes = prepare_changes(&reordered_input).unwrap();
+        let occurred_at = Timestamp::from_micros_since_unix_epoch(123);
+        let actor = "ab".repeat(32);
+
+        let left_checksum = commit_checksum(&left_input, 4, occurred_at, &actor, &left_changes);
+        assert_eq!(
+            left_checksum,
+            commit_checksum(
+                &equivalent_input,
+                4,
+                occurred_at,
+                &actor,
+                &equivalent_changes
+            )
+        );
+        assert_ne!(
+            left_checksum,
+            commit_checksum(&reordered_input, 4, occurred_at, &actor, &reordered_changes)
+        );
+    }
+
+    #[test]
+    fn sequence_allocator_is_positive_monotonic_and_fails_closed() {
+        assert_eq!(next_sequence(None).unwrap(), (1, 2));
+        assert_eq!(next_sequence(Some(7)).unwrap(), (7, 8));
+        assert!(next_sequence(Some(0)).is_err());
+        assert!(next_sequence(Some(u64::MAX)).is_err());
+    }
+
+    #[test]
+    fn duplicate_row_changes_are_preserved_in_declared_order() {
+        let changes = prepare_changes(&input(vec![
+            RowChange::upsert(
+                "sale_order",
+                json!({"id": 5}),
+                json!({"id": 5, "organization_id": 7, "status": "draft"}),
+            ),
+            RowChange::upsert(
+                "sale_order",
+                json!({"id": 5}),
+                json!({"id": 5, "organization_id": 7, "status": "confirmed"}),
+            ),
+        ]))
+        .unwrap();
+
+        assert_eq!(changes.len(), 2);
+        assert_eq!(changes[0].row_identity_json, changes[1].row_identity_json);
+        assert_ne!(changes[0].checksum, changes[1].checksum);
+        assert_eq!(
+            changes[0].row_json.as_deref().unwrap(),
+            r#"{"id":5,"organization_id":7,"status":"draft"}"#
+        );
+        assert_eq!(
+            changes[1].row_json.as_deref().unwrap(),
+            r#"{"id":5,"organization_id":7,"status":"confirmed"}"#
+        );
     }
 
     #[test]
