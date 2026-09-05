@@ -12,6 +12,9 @@ pub struct Config {
     pub stdb_module: String,
     /// Server/admin token for SQL fallback (same as `STDB_SERVER_TOKEN` in Next.js).
     pub stdb_server_token: Option<String>,
+    /// Dedicated projection/finalization worker token. It must be distinct from
+    /// `STDB_SERVER_TOKEN`; finalizer reducers authenticate its registered identity.
+    pub stdb_finalization_token: Option<String>,
     /// Allowed browser origins for CORS (comma-separated). Empty → common localhost dev URLs.
     pub cors_origins: Vec<String>,
     pub dev_mock_org_id: Option<u64>,
@@ -83,12 +86,17 @@ impl Config {
 
         let stdb_server_token = std::env::var("STDB_SERVER_TOKEN")
             .ok()
+            .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty());
         if prod && stdb_server_token.is_none() {
             anyhow::bail!(
                 "STDB_SERVER_TOKEN must be set in production (SpacetimeDB server/admin JWT for HTTP SQL)"
             );
         }
+        let stdb_finalization_token = std::env::var("STDB_FINALIZATION_TOKEN")
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
 
         // CORS_ORIGINS: comma-separated http(s)://host:port; required for credentialed cross-origin
         // browser calls (wildcard * is invalid with credentials: include).
@@ -249,6 +257,7 @@ impl Config {
             stdb_host,
             stdb_module,
             stdb_server_token,
+            stdb_finalization_token,
             cors_origins,
             dev_mock_org_id,
             ai_gateway_url,

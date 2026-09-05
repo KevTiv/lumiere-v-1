@@ -33,12 +33,6 @@
       "reviewed": true
     },
     {
-      "table": "audit_log",
-      "module": "core",
-      "storage_class": "pg_first",
-      "reviewed": true
-    },
-    {
       "table": "policy_snapshot",
       "module": "core",
       "storage_class": "projection_only",
@@ -2014,37 +2008,13 @@
         "version_strategy": "none"
       },
       "projection_mode": "append-history",
-      "hot_retention": "none",
-      "cooling_eligibility": "policy",
-      "cooling_eligibility_source": "reviewed:c5/people-platform/coolable/audit-log",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:c5/people-platform/always-hot/missing-commit-watermark-evidence",
       "dependency_behavior": "independent",
       "hydration_policy": "not_applicable",
       "delete_behavior": "append_only",
-      "postgres_access_path": "organization_partition",
-      "semantic_eligibility": {
-        "state": "immutable after creation",
-        "age_window": "eligible immediately after exact append-only PG archive proof",
-        "open_obligations": "must_be_clear",
-        "workflow_state": "must_not_be_active",
-        "durable_watermark": "append-only archive checksum proof",
-        "exact_durable_version": "canonical payload checksum must match",
-        "hot_dependencies": "must_be_clear"
-      },
-      "archive": {
-        "cold_table": "cold_audit_log",
-        "mode": "append_only",
-        "scope": {
-          "organization_id": "organization_id",
-          "company_id": "company_id"
-        },
-        "finalize_reducer": "finalize_audit_log_archive",
-        "order_by": [
-          {
-            "column": "id",
-            "direction": "ASC"
-          }
-        ]
-      }
+      "postgres_access_path": "organization_partition"
     },
     {
       "table": "audit_rule",

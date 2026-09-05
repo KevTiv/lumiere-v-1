@@ -346,10 +346,10 @@ generated baseline and the application migration-catalog version.
 
 **Priority:** P0
 
-**Current status:** Partial. Policy/code-generation, live reducer fixtures, and
-the PostgreSQL ledger are verified. C5 remains open for the combined
-registered-worker STDB-to-PostgreSQL drill and an immutable generated-contract
-release.
+**Current status:** Partial. Policy/code-generation, reducer fixtures, the
+PostgreSQL ledger, and split worker credentials are implemented. C5 remains
+open for the disposable registered-worker STDB-to-PostgreSQL drill and an
+immutable generated-contract release.
 
 - Replace the two-entry archive candidate list with the total storage-policy
   manifest; archive candidates become a generated subset.
@@ -364,7 +364,8 @@ release.
 - Keep active master/configuration rows always hot unless a separate
   projection/hydration design proves otherwise.
 - Treat append-heavy audit, telemetry, usage, execution, and message history as
-  explicit PG-first or short-hot-tail classes where domain behavior permits.
+  explicit PG-first or short-hot-tail classes only where the normal write path
+  emits the exact durable commit/watermark evidence required for cooling.
 
 **Gate:** every module has at least one reviewed policy fixture for each storage
 class it uses; no row can be deleted from STDB before exact-version durability
@@ -379,26 +380,41 @@ and dependency safety are proven.
   fixtures cover every module/storage-class pair currently used by the 22
   modules.
 - Archive generation now derives its subset from the total storage policy. The
-  current generated staging output has exactly two root candidates:
-  `audit_log` (`pg_first`, append-only) and `pos_order` (`terminal_window`,
-  versioned); `pos_order_line` and `pos_payment` are reviewed children that
-  inherit the parent archive rather than becoming independent candidates. The
-  retired independent candidate input has no live code path.
+  current generated staging output has exactly one root candidate: `pos_order`
+  (`terminal_window`, versioned). `pos_order_line` and `pos_payment` are
+  reviewed children that inherit the parent archive rather than becoming
+  independent candidates. The retired independent candidate input has no live
+  code path.
+- `audit_log` is fail-closed as `always_hot`: its ordinary append paths do not
+  yet emit an `organization_commit`/`organization_row_change`, so an exact
+  projection watermark cannot be proven. The former finalizer signature is a
+  compatibility tombstone that always rejects deletion. The legacy PostgreSQL
+  migration and hot+cold read remain available for already archived dev data.
 - `spacetimedb/src/core/cold_tier.rs` provides the shared fail-closed gate for
   policy, age/window, terminal state, open obligations, workflow state, hot
   dependencies, rebuildability, durable watermark, archive version, schema
   version, and contract version, with child-first aggregate deletion.
-- Runtime reducer fixtures cover audit checksum match/mismatch, idempotency,
-  cross-row checksum rejection, and caller identity. POS fixtures cover exact
-  archive version, the thirty-day terminal window, non-terminal state, open
+- A reducer fixture asserts that the retired audit finalizer cannot delete a
+  hot row and currently compiles with the module test surface. POS fixtures
+  cover exact archive version, the thirty-day terminal
+  window, non-terminal state, open
   obligations, active workflow, missing child membership, watermark/schema
-  mismatch, idempotency, and caller identity. Both grouped suites passed on a
-  freshly published disposable local STDB database.
-- `api-server/src/cold_tier/finalization_worker/` now parses the pinned archive
+  mismatch, idempotency, and caller identity; the POS grouped suite passed on
+  a freshly published disposable local STDB database before this fail-closed
+  policy correction.
+- `api-server/src/cold_tier/finalization_worker/` parses the pinned archive
   manifest, rejects unknown table/reducer/mode mappings, sorts deterministically,
-  dispatches audit/POS handlers, and aggregates per-candidate statistics. Its
+  dispatches reviewed handlers, and aggregates per-candidate statistics. Its
   focused tests cover parsing, closed dispatch, duplicate rejection, ordering,
   and stats aggregation.
+- The projection worker now requires distinct `STDB_SERVER_TOKEN` and
+  `STDB_FINALIZATION_TOKEN` credentials. Private commit/source reads use the
+  administrator client; finalizer reducer calls use only the registered worker
+  client, and startup fails closed when either token is missing or equal.
+- `scripts/c5-finalization-drill.sh` and its ignored Rust live test install a
+  disposable PostgreSQL database, project a real hydrated POS aggregate, invoke
+  the finalizer with the registered worker identity, and verify child/root
+  removal, the cold checksum row, and the finalized transfer ledger.
 - The archive-transfer ledger uses compare-and-set identity, bounded pending
   reads, crash reconciliation, and explicit schema verification. Real
   PostgreSQL tests prove the normal retry/finalize path and fail closed when a
@@ -409,15 +425,15 @@ and dependency safety are proven.
 **Remaining C5 evidence/blockers:**
 
 - Publish an immutable `lumiere-contracts` release containing the updated
-  463-table reviewed provenance and generated archive subset, then move the
+  463-table reviewed provenance and one-root archive subset, then move the
   `Cargo.toml:21` pin from v0.3.29 and verify release fingerprints. The pinned
-  v0.3.29 artifact already has 463 policies and the same two archive candidates,
-  but most always-hot decisions predate the C5 `reviewed:` provenance ratchet.
+  v0.3.29 artifact predates the C5 provenance ratchet and still lists the now
+  ineligible audit archive candidate.
 - Run disposable STDB + PostgreSQL runtime fixtures through the registered
   finalization worker identity, proving archive write/checksum/version/watermark
-  durability before reducer deletion for both candidates. The live reducer and
-  real-PG ledger tests verify each side independently; the single combined
-  worker/service-identity drill is still required.
+  durability before reducer deletion for the POS aggregate. The test harness is
+  implemented and fails closed without distinct credentials; a live run is
+  still required.
 
 ### C6 — Generalize bounded hot+cold reads and hydration
 

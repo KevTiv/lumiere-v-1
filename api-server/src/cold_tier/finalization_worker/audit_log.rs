@@ -96,14 +96,15 @@ struct AuditRow {
 /// query is returned because retrying the same batch is the coordinator's
 /// recovery boundary.
 pub async fn drain_batch(
-    stdb: &StdbClient,
+    source_stdb: &StdbClient,
+    finalizer_stdb: &StdbClient,
     pool: &Pool,
     batch_size: u32,
 ) -> Result<super::CandidateDrainStats> {
     let batch_size = bounded_batch_size(batch_size)?;
 
     let mut stats = super::CandidateDrainStats::default();
-    reconcile_pending(pool, stdb, batch_size, &mut stats).await?;
+    reconcile_pending(pool, source_stdb, batch_size, &mut stats).await?;
 
     let sql = format!(
         "SELECT id, organization_id, company_id, table_name, record_id, action, \
@@ -111,14 +112,14 @@ pub async fn drain_batch(
                 ip_address, user_agent, timestamp, metadata \
          FROM audit_log ORDER BY id ASC LIMIT {batch_size}"
     );
-    let raw_rows = stdb
+    let raw_rows = source_stdb
         .query_sql(&sql)
         .await
         .context("query audit_log finalization batch")?;
 
     stats.read = raw_rows.len();
     for raw in &raw_rows {
-        match drain_one(pool, stdb, raw).await {
+        match drain_one(pool, finalizer_stdb, raw).await {
             Ok(()) => {
                 stats.archived += 1;
                 stats.finalized += 1;
@@ -204,7 +205,7 @@ async fn reconcile_pending(
     Ok(())
 }
 
-async fn drain_one(pool: &Pool, stdb: &StdbClient, raw: &Value) -> Result<()> {
+async fn drain_one(pool: &Pool, finalizer_stdb: &StdbClient, raw: &Value) -> Result<()> {
     let row = parse_audit_row(raw)?;
     verify_durable_projection(pool, row.organization_id.parse()?, row.id_u64).await?;
     upsert_cold_audit_log(pool, &row).await?;
@@ -222,12 +223,13 @@ async fn drain_one(pool: &Pool, stdb: &StdbClient, raw: &Value) -> Result<()> {
     .await
     .context("record audit_log archive transfer")?;
 
-    stdb.call_reducer(stdb_client::reducer_call!(
-        "finalize_audit_log_archive",
-        json!([row.id_u64, row.checksum]),
-    ))
-    .await
-    .context("call finalize_audit_log_archive")?;
+    finalizer_stdb
+        .call_reducer(stdb_client::reducer_call!(
+            "finalize_audit_log_archive",
+            json!([row.id_u64, row.checksum]),
+        ))
+        .await
+        .context("call finalize_audit_log_archive")?;
 
     ledger::mark_finalized(pool, "audit_log", &row.id)
         .await

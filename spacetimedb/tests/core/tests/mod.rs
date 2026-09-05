@@ -21,16 +21,8 @@ pub fn run_all_core_tests(ctx: &ReducerContext) -> Result<(), String> {
 
 #[spacetimedb::reducer]
 pub fn run_core_audit_finalize_test(ctx: &ReducerContext) -> Result<(), String> {
-    audit_finalize_test::test_finalize_deletes_on_checksum_match(ctx)
-        .map_err(|e| format!("finalize_checksum_match: {e}"))?;
-    audit_finalize_test::test_finalize_refuses_on_checksum_mismatch(ctx)
-        .map_err(|e| format!("finalize_checksum_mismatch: {e}"))?;
-    audit_finalize_test::test_finalize_is_idempotent_when_already_gone(ctx)
-        .map_err(|e| format!("finalize_idempotent: {e}"))?;
-    audit_finalize_test::test_finalize_rejects_checksum_from_a_different_row(ctx)
-        .map_err(|e| format!("finalize_cross_row_checksum: {e}"))?;
-    audit_finalize_test::test_finalize_rejects_unregistered_caller(ctx)
-        .map_err(|e| format!("finalize_unregistered_caller: {e}"))
+    audit_finalize_test::test_audit_finalize_is_disabled(ctx)
+        .map_err(|error| format!("retired_audit_finalize: {error}"))
 }
 
 #[spacetimedb::reducer]

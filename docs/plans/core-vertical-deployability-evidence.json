@@ -63,17 +63,20 @@
       "evidence": [
         "lumiere-codegen/storage-policy-manifest.json contains 463 unique reviewed policy entries; the Rust validator enforces exact 463-table coverage, aggregate/archive coherence, semantic eligibility fields, and reviewed fixture coverage",
         "29 reviewed fixtures cover every module/storage-class pair currently used by the 22 modules",
-        "the policy-derived archive subset contains exactly audit_log (pg_first, append_only) and pos_order (terminal_window, versioned); pos_order_line and pos_payment inherit the reviewed POS parent archive",
+        "the policy-derived archive subset contains exactly one root, pos_order (terminal_window, versioned); pos_order_line and pos_payment inherit the reviewed POS parent archive",
+        "audit_log is fail-closed as always_hot because ordinary audit appends do not emit exact organization commit and watermark evidence; its compatibility finalizer always rejects deletion while legacy cold reads and migration remain available",
         "the retired independent archive-candidate input has no live code path; archive generation consumes the total storage-policy census",
         "spacetimedb/src/core/cold_tier.rs implements policy, age/window, terminal-state, obligation, workflow, hot-dependency, rebuildability, durable-watermark, archive-version, schema-version, and contract-version gates with child-first aggregate deletion",
-      "live grouped reducer fixtures passed on a freshly published disposable local STDB database: audit covers checksum match/mismatch, cross-row rejection, idempotency, and caller identity; POS covers the thirty-day terminal window, terminal state, obligations, workflow, missing children, watermark/schema/version mismatch, idempotency, and caller identity",
-      "api-server/src/cold_tier/finalization_worker parses the pinned manifest, rejects unknown table/reducer/mode mappings, dispatches deterministically, and aggregates candidate statistics with focused parser/dispatch tests",
-      "real PostgreSQL tests prove archive_transfer compare-and-set retries, bounded pending reads, finalization/reconciliation, and rejection of a malformed pre-existing ledger schema",
-      "scripts/bootstrap-storage-policies.mjs write mode reproduces reviewed fixtures plus semantic/archive metadata and passes --check"
+        "the retired-audit fail-closed reducer fixture compiles with the module test surface; POS runtime fixtures cover the thirty-day terminal window, terminal state, obligations, workflow, missing children, watermark/schema/version mismatch, idempotency, and caller identity",
+        "api-server/src/cold_tier/finalization_worker parses the pinned manifest, rejects unknown table/reducer/mode mappings, dispatches deterministically, and aggregates candidate statistics with focused parser/dispatch tests",
+        "real PostgreSQL tests prove archive_transfer compare-and-set retries, bounded pending reads, finalization/reconciliation, and rejection of a malformed pre-existing ledger schema",
+        "scripts/bootstrap-storage-policies.mjs write mode reproduces reviewed fixtures plus semantic/archive metadata and passes --check",
+        "the projection worker uses distinct administrator/source-read and registered-worker/finalizer clients and fails startup closed when either credential is absent or equal",
+        "scripts/c5-finalization-drill.sh and the ignored Rust live test provide a bounded disposable PostgreSQL plus STDB POS finalization drill"
       ],
       "required": [
-      "publish an immutable lumiere-contracts release containing the updated 463-table reviewed provenance, update the Cargo.toml:21 pin from v0.3.29, and verify release fingerprints; v0.3.29 already has 463 policies and the same two archive candidates but predates the C5 reviewed-provenance ratchet",
-      "run one disposable STDB plus PostgreSQL end-to-end finalization drill through the registered projection_worker identity, proving archive durability/checksum/version/watermark before reducer deletion for audit_log and pos_order"
+        "publish an immutable lumiere-contracts release containing the updated 463-table reviewed provenance and one-root archive subset, update the Cargo.toml:21 pin from v0.3.29, and verify release fingerprints",
+        "run the implemented disposable STDB plus PostgreSQL end-to-end POS finalization drill through the registered projection_worker identity"
       ]
     },
     "C6": {

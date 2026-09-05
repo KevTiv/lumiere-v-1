@@ -7,6 +7,7 @@ pub(crate) fn test_config(server_token: Option<&str>) -> Config {
         stdb_host: "http://127.0.0.1:3000".into(),
         stdb_module: "test-module".into(),
         stdb_server_token: server_token.map(str::to_string),
+        stdb_finalization_token: None,
         cors_origins: vec![],
         dev_mock_org_id: None,
         ai_gateway_url: "http://127.0.0.1:3001".into(),

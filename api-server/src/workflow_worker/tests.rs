@@ -127,6 +127,7 @@ fn dispatch_allowlist_fail_closed_with_webhook() {
         stdb_host: String::new(),
         stdb_module: String::new(),
         stdb_server_token: None,
+        stdb_finalization_token: None,
         cors_origins: vec![],
         dev_mock_org_id: None,
         ai_gateway_url: String::new(),

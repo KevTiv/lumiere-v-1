@@ -62,14 +62,33 @@ fn require_server_identity(stdb: &StdbClient) -> Result<()> {
     Ok(())
 }
 
+fn require_split_stdb_tokens(
+    source_token: Option<&str>,
+    finalization_token: Option<&str>,
+) -> Result<String> {
+    let source_token = source_token
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
+        .context("projection worker requires STDB_SERVER_TOKEN for private commit tables")?;
+    let finalization_token = finalization_token
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
+        .context("projection worker requires STDB_FINALIZATION_TOKEN for finalizer reducers")?;
+    if source_token == finalization_token {
+        bail!(
+            "STDB_FINALIZATION_TOKEN must be distinct from STDB_SERVER_TOKEN; source reads and finalizer reducers require separate identities"
+        );
+    }
+    Ok(finalization_token.to_owned())
+}
+
 /// Start the standalone projection worker service.
 pub async fn serve() -> Result<()> {
     let config = Config::from_env()?;
-    if config.stdb_server_token.is_none() {
-        bail!(
-            "projection worker requires STDB_SERVER_TOKEN to read private commit protocol tables"
-        );
-    }
+    let finalization_token = require_split_stdb_tokens(
+        config.stdb_server_token.as_deref(),
+        config.stdb_finalization_token.as_deref(),
+    )?;
     let poll_secs = std::env::var("LUMIERE_PROJECTION_WORKER_POLL_SECS")
         .ok()
         .and_then(|value| value.parse().ok())
@@ -90,6 +109,7 @@ pub async fn serve() -> Result<()> {
         .and_then(|value| value.parse().ok())
         .unwrap_or(8096u16);
     let state = Arc::new(AppState::new(config));
+    let finalization_stdb = state.stdb.with_token(&finalization_token);
     let pg_config = pg_pool::PgConfig::from_env().context("PG config for projection worker")?;
     let pool = pg_pool::build_pool(&pg_config).context("build PG pool for projection worker")?;
     migrate::ensure_schema(&pool)
@@ -102,6 +122,7 @@ pub async fn serve() -> Result<()> {
     let ready = Arc::new(AtomicBool::new(false));
     let worker_ready = ready.clone();
     let worker_state = state;
+    let worker_finalization_stdb = finalization_stdb;
     let worker_pool = pool.clone();
     tokio::spawn(async move {
         loop {
@@ -109,6 +130,7 @@ pub async fn serve() -> Result<()> {
                 Ok(stats) => {
                     let finalization = finalization_worker::drain_batch(
                         &worker_state.stdb,
+                        &worker_finalization_stdb,
                         &worker_pool,
                         finalization_batch,
                     )
@@ -196,9 +218,21 @@ pub async fn serve() -> Result<()> {
 mod tests {
     use super::decode::parse_commit;
     use super::relations::{parse_relations, render_relation_ddl};
+    use super::require_split_stdb_tokens;
     use super::status::{classify_apply_error, projection_heads, ProjectionFailureKind};
     use anyhow::anyhow;
     use serde_json::{json, Value};
+
+    #[test]
+    fn split_stdb_tokens_fail_closed_when_missing_or_equal() {
+        assert!(require_split_stdb_tokens(None, Some("worker")).is_err());
+        assert!(require_split_stdb_tokens(Some("source"), None).is_err());
+        assert!(require_split_stdb_tokens(Some("same"), Some("same")).is_err());
+        assert!(
+            require_split_stdb_tokens(Some(" source "), Some(" worker "))
+                .is_ok_and(|token| token == "worker")
+        );
+    }
 
     fn manifest() -> String {
         json!({

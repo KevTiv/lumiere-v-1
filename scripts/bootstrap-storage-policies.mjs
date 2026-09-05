@@ -265,7 +265,6 @@ const SNAPSHOT_TABLES = new Set([
 const OPERATIONAL_STATE_TABLES = new Set(["organization_commit_cursor"]);
 
 const ACTIVE_ARCHIVE_POLICIES = {
-  audit_log: { cooling: "policy", hot: "none", hydration: "not_applicable" },
   pos_order: { cooling: "policy", hot: "terminal_window", hydration: "full_row" },
 };
 
@@ -459,9 +458,7 @@ function buildPolicy(table, allTables, resourcesByTable) {
     projection_mode: projectionMode,
     hot_retention: activeArchive?.hot ?? (coolingParent ? "terminal_window" : "always"),
     cooling_eligibility: activeArchive?.cooling ?? (coolingParent ? "parent" : "never"),
-    cooling_eligibility_source: table.sql_name === "audit_log"
-      ? "reviewed:c5/people-platform/coolable/audit-log"
-      : table.sql_name === "pos_order"
+    cooling_eligibility_source: table.sql_name === "pos_order"
         ? "reviewed:c5/finance-commercial/coolable/pos-order"
         : coolingParent
           ? `reviewed:c5/finance-commercial/coolable/${coolingParent}-child`
@@ -494,24 +491,7 @@ function buildPolicy(table, allTables, resourcesByTable) {
               : "organization_index",
   };
 
-  if (table.sql_name === "audit_log") {
-    policy.semantic_eligibility = {
-      state: "immutable after creation",
-      age_window: "eligible immediately after exact append-only PG archive proof",
-      open_obligations: "must_be_clear",
-      workflow_state: "must_not_be_active",
-      durable_watermark: "append-only archive checksum proof",
-      exact_durable_version: "canonical payload checksum must match",
-      hot_dependencies: "must_be_clear",
-    };
-    policy.archive = {
-      cold_table: "cold_audit_log",
-      mode: "append_only",
-      scope: { organization_id: "organization_id", company_id: "company_id" },
-      finalize_reducer: "finalize_audit_log_archive",
-      order_by: [{ column: "id", direction: "ASC" }],
-    };
-  } else if (table.sql_name === "pos_order") {
+  if (table.sql_name === "pos_order") {
     policy.rationale = "POS transaction aggregate root; lines and payments cool and hydrate atomically with the order.";
     policy.semantic_eligibility = {
       state: "Paid or otherwise terminal; domain reducer validates state",

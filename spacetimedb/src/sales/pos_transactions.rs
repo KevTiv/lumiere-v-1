@@ -1051,10 +1051,9 @@ pub fn create_pos_order(
 // ============================================================================
 //
 // Version-checked finalize, per the general (mutable-resource) protocol in
-// docs/plans/sliding-window-cold-tier.md §6.1 — unlike audit_log's checksum-
-// based finalize (audit_log is append-only with no archive_version/
-// cold_eligible_at concept), this is the "real" protocol every future
-// mutable archive candidate follows:
+// docs/plans/sliding-window-cold-tier.md §6.1. Audit-log cooling is disabled
+// because ordinary audit appends do not yet carry exact commit-watermark
+// evidence; this versioned protocol is the active C5 path:
 //
 //   1. the C5 finalization service reads (id, archive_version,
 //      cold_eligible_at, full payload);
@@ -1119,9 +1118,8 @@ pub fn finalize_pos_order_archive(
 }
 
 /// The version-check/deletion logic, split out so tests can exercise it
-/// directly — same reasoning as `audit::finalize_audit_log_archive_checked`:
-/// a single reducer invocation can't fake `ctx.sender()` as the registered
-/// finalization identity, so the identity gate is tested separately.
+/// directly. A single reducer invocation cannot fake `ctx.sender()` as the
+/// registered finalization identity, so the identity gate is tested separately.
 pub(crate) fn finalize_pos_order_archive_checked(
     ctx: &ReducerContext,
     id: u64,

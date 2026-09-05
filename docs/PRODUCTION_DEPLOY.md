@@ -23,6 +23,7 @@ These variables use `${VAR:?set VAR}` in `docker-compose.yml` — Compose fails 
 |----------|---------|--------|
 | `STDB_MODULE` | web, api-server, ai-gateway | Published SpacetimeDB database name |
 | `STDB_SERVER_TOKEN` | web, api-server | Admin/service JWT for HTTP SQL and auth reducers |
+| `STDB_FINALIZATION_TOKEN` | projection-worker | Dedicated registered `projection_worker` identity; must differ from `STDB_SERVER_TOKEN` |
 | `STDB_TOKEN` | ai-gateway | Service token for SpacetimeDB HTTP API (not the same as `STDB_SERVER_TOKEN`) |
 | `AI_CERTIFICATION_STDB_TOKEN` | ai-gateway | Dedicated certification executor token; never reuse browser, API, or general gateway credentials |
 | `AI_CERTIFICATION_RUNTIME_HASH` | ai-gateway | Registered immutable executor digest (`sha256:` plus 64 lowercase hex characters) |
@@ -79,6 +80,11 @@ pinned generated archive manifest and runs each supported candidate through
 its reviewed domain finalizer. Unknown candidate/reducer/mode combinations
 fail startup instead of being skipped. Set `LUMIERE_FINALIZATION_WORKER_BATCH`
 to a value from 1 through 200 (default 100).
+
+The worker uses `STDB_SERVER_TOKEN` only for private source/commit-table reads
+and uses `STDB_FINALIZATION_TOKEN` only for finalizer reducer calls. Both must
+be present and distinct; startup fails closed otherwise. Register the exact
+finalization-token identity for each organization under `projection_worker`.
 
 Before enabling cooling for an organization, register the projection worker's
 dedicated SpacetimeDB identity under the service name `projection_worker` with

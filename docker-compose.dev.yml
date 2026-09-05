@@ -267,6 +267,7 @@ services:
       STDB_HOST: http://spacetimedb:3000
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
       STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN in .env.docker}
+      STDB_FINALIZATION_TOKEN: ${STDB_FINALIZATION_TOKEN:?set STDB_FINALIZATION_TOKEN in .env.docker}
       PG_HOST: postgres
       PG_PORT: 5432
       PG_DATABASE: ${PG_DATABASE:-lumiere}

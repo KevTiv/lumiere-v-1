@@ -62,13 +62,14 @@ struct DurableProjectionProof {
 /// from being considered.  A batch-level STDB/PG query failure is propagated
 /// to the coordinator.
 pub async fn drain_batch(
-    stdb: &StdbClient,
+    source_stdb: &StdbClient,
+    finalizer_stdb: &StdbClient,
     pool: &Pool,
     batch_size: u32,
 ) -> Result<CandidateDrainStats> {
     let batch_size = bounded_batch_size(batch_size)?;
     let mut stats = CandidateDrainStats::default();
-    reconcile_pending(pool, stdb, batch_size, &mut stats).await?;
+    reconcile_pending(pool, source_stdb, batch_size, &mut stats).await?;
 
     let columns =
         pg_codec::load_columns(CODEC_MANIFEST_JSON, TABLE).context("load pos_order columns")?;
@@ -82,14 +83,14 @@ pub async fn drain_batch(
          WHERE cold_eligible_at IS NOT NULL \
          ORDER BY id ASC LIMIT {batch_size}"
     );
-    let raw_rows = stdb
+    let raw_rows = source_stdb
         .query_sql(&sql)
         .await
         .context("query pos_order finalization batch")?;
 
     stats.read = raw_rows.len();
     for raw in &raw_rows {
-        match drain_one(pool, stdb, &columns, raw).await {
+        match drain_one(pool, finalizer_stdb, &columns, raw).await {
             Ok(()) => {
                 stats.archived += 1;
                 stats.finalized += 1;
@@ -266,6 +267,25 @@ async fn drain_one(
         .await
         .context("mark archive_transfer finalized")?;
     Ok(())
+}
+
+#[cfg(test)]
+pub(super) async fn drain_one_for_test(
+    pool: &Pool,
+    source_stdb: &StdbClient,
+    finalizer_stdb: &StdbClient,
+    columns: &[pg_codec::ColumnCodec],
+    raw: &Value,
+) -> Result<()> {
+    let id = require_u64(raw, "id")?;
+    let source_row = source_stdb
+        .query_sql(&format!("SELECT * FROM {TABLE} WHERE id = {id} LIMIT 1"))
+        .await
+        .context("read selected pos_order with administrator/source token")?
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow!("source pos_order {id} disappeared before finalization"))?;
+    drain_one(pool, finalizer_stdb, columns, &source_row).await
 }
 
 /// Prove the exact current row image is covered by the contiguous PG

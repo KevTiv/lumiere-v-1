@@ -12,55 +12,13 @@ use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::helpers::check_permission;
 
 // ============================================================================
-// COLD-TIER ARCHIVE FINALIZE
+// RETIRED COLD-TIER ARCHIVE FINALIZE
 // ============================================================================
 //
-// `finalize_audit_log_archive` is reserved for the C5 cooling/finalization
-// path. It deletes the STDB row only if the row still exists and its canonical
-// checksum matches the expected durable copy.
-//
-// `audit_log` rows are never updated (append-only, see module doc above), so
-// this is not a concurrent-mutation guard the way it would be for a mutable
-// resource — it guards against a transcription bug turning the PG copy into
-// something that doesn't match what's still sitting in STDB.
-//
-// The canonical checksum recipe is part of the C5 finalization contract. The
-// shape is a flat JSON object with these exact snake_case
-// keys, u64-like fields as decimal strings (never raw JSON numbers, to avoid
-// precision drift), `Identity` as lowercase hex via `to_hex().to_string()`,
-// serialized with `serde_json`'s default (unordered-input, BTreeMap-backed)
-// map — which sorts keys — and no `preserve_order` feature enabled anywhere
-// in the dependency tree, so the output is already canonical without an
-// extra sort pass.
-
-/// Compute the canonical checksum for one `AuditLog` row. See the module
-/// note above `finalize_audit_log_archive` for why this must remain stable.
-pub(crate) fn audit_log_canonical_checksum(row: &AuditLog) -> String {
-    use sha2::{Digest, Sha256};
-
-    let value = serde_json::json!({
-        "action": row.action,
-        "changed_fields": row.changed_fields,
-        "company_id": row.company_id.map(|v| v.to_string()),
-        "id": row.id.to_string(),
-        "ip_address": row.ip_address,
-        "metadata": row.metadata,
-        "new_values": row.new_values,
-        "old_values": row.old_values,
-        "organization_id": row.organization_id.to_string(),
-        "record_id": row.record_id.to_string(),
-        "session_id": row.session_id.map(|v| v.to_string()),
-        "table_name": row.table_name,
-        "timestamp": row.timestamp.to_micros_since_unix_epoch().to_string(),
-        "user_agent": row.user_agent,
-        "user_identity": row.user_identity.to_hex().to_string(),
-    });
-
-    let bytes = serde_json::to_vec(&value).unwrap_or_default();
-    let mut hasher = Sha256::new();
-    hasher.update(&bytes);
-    hex::encode(hasher.finalize())
-}
+// Ordinary audit append paths do not yet emit an `organization_commit` and
+// `organization_row_change`. Without that exact row/version watermark proof,
+// audit rows must remain hot. Keep the reducer signature as a fail-closed
+// compatibility tombstone until the immutable operation ID is retired.
 
 // ============================================================================
 // PARAMS TYPES
@@ -202,65 +160,21 @@ pub fn log_audit_event(
     Ok(())
 }
 
-/// Internal: delete an `audit_log` row once the C5 finalization path has
-/// durably verified the exact same row.
+/// Retired compatibility tombstone for the former audit cooling operation.
 ///
-/// Called only by the trusted C5 finalization service, never by frontend
-/// clients. A missing row is rejected because its organization cannot be
-/// authenticated in STDB. The worker reconciles an ambiguous successful
-/// deletion from its organization-scoped PostgreSQL transfer ledger.
+/// Audit rows remain hot until their normal write path participates in the
+/// durable commit protocol. This reducer never deletes data, including when
+/// called by a registered projection worker.
 #[spacetimedb::reducer]
 pub fn finalize_audit_log_archive(
-    ctx: &ReducerContext,
-    id: u64,
-    expected_payload_checksum: String,
+    _ctx: &ReducerContext,
+    _id: u64,
+    _expected_payload_checksum: String,
 ) -> Result<(), String> {
-    let organization_id = ctx
-        .db
-        .audit_log()
-        .id()
-        .find(&id)
-        .map(|row| row.organization_id)
-        .ok_or("audit log row was not found; refusing unscoped finalization")?;
-    if !crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
-        ctx,
-        organization_id,
-        crate::core::cold_tier_identity::PROJECTION_WORKER_SERVICE,
-    ) {
-        return Err(
-            "finalize_audit_log_archive: caller is not the registered projection worker identity"
-                .to_string(),
-        );
-    }
-
-    finalize_audit_log_archive_checked(ctx, id, expected_payload_checksum)
-}
-
-/// The checksum-verification/deletion logic, split out from the reducer so
-/// tests can exercise it directly without needing to fake `ctx.sender()` as
-/// the registered finalization identity (there's no way to do that from within a
-/// single reducer invocation — `ctx.sender()` is fixed for the whole call).
-/// The identity gate itself is covered separately by calling the public
-/// reducer as an unregistered caller and expecting it to fail.
-pub(crate) fn finalize_audit_log_archive_checked(
-    ctx: &ReducerContext,
-    id: u64,
-    expected_payload_checksum: String,
-) -> Result<(), String> {
-    let Some(row) = ctx.db.audit_log().id().find(id) else {
-        // Already finalized by a prior/racing call.
-        return Ok(());
-    };
-
-    let actual = audit_log_canonical_checksum(&row);
-    if actual != expected_payload_checksum {
-        return Err(format!(
-            "audit_log {id}: checksum mismatch (expected {expected_payload_checksum}, computed {actual}); refusing to delete"
-        ));
-    }
-
-    ctx.db.audit_log().id().delete(&id);
-    Ok(())
+    Err(
+        "audit_log cooling is disabled until append writes carry exact commit-watermark evidence"
+            .to_string(),
+    )
 }
 
 #[spacetimedb::reducer]

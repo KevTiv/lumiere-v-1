@@ -11,6 +11,7 @@ fn test_config(server_token: Option<&str>, dev_mock_org_id: Option<u64>) -> Conf
         stdb_host: "http://127.0.0.1:3000".into(),
         stdb_module: "test-module".into(),
         stdb_server_token: server_token.map(str::to_string),
+        stdb_finalization_token: None,
         cors_origins: vec![],
         dev_mock_org_id,
         ai_gateway_url: "http://127.0.0.1:3001".into(),

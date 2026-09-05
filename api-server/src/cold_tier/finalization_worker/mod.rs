@@ -16,6 +16,9 @@ use stdb_client::StdbClient;
 mod audit_log;
 mod pos_order;
 
+#[cfg(test)]
+mod drill;
+
 /// The generated archive manifest from the pinned contracts release.
 pub const ARCHIVE_MANIFEST_JSON: &str = lumiere_contracts::manifests::ARCHIVE_MANIFEST;
 
@@ -175,7 +178,8 @@ pub fn dispatch_order(candidates: &[ArchiveCandidate]) -> Result<Vec<DispatchTar
 /// handler-level error is returned with candidate context; it is never treated
 /// as an unsupported candidate or silently skipped.
 pub async fn drain_batch(
-    stdb: &StdbClient,
+    source_stdb: &StdbClient,
+    finalizer_stdb: &StdbClient,
     pool: &Pool,
     batch_size: u32,
 ) -> Result<FinalizationDrainStats> {
@@ -185,12 +189,16 @@ pub async fn drain_batch(
 
     for target in targets {
         let candidate_stats = match target.handler {
-            CandidateHandler::AuditLog => audit_log::drain_batch(stdb, pool, batch_size)
-                .await
-                .with_context(|| format!("drain archive candidate '{}'", target.table))?,
-            CandidateHandler::PosOrder => pos_order::drain_batch(stdb, pool, batch_size)
-                .await
-                .with_context(|| format!("drain archive candidate '{}'", target.table))?,
+            CandidateHandler::AuditLog => {
+                audit_log::drain_batch(source_stdb, finalizer_stdb, pool, batch_size)
+                    .await
+                    .with_context(|| format!("drain archive candidate '{}'", target.table))?
+            }
+            CandidateHandler::PosOrder => {
+                pos_order::drain_batch(source_stdb, finalizer_stdb, pool, batch_size)
+                    .await
+                    .with_context(|| format!("drain archive candidate '{}'", target.table))?
+            }
         };
         stats.record(&target.table, candidate_stats);
     }
