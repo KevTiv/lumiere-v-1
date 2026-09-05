@@ -265,9 +265,14 @@ const SNAPSHOT_TABLES = new Set([
 const OPERATIONAL_STATE_TABLES = new Set(["organization_commit_cursor"]);
 
 const ACTIVE_ARCHIVE_POLICIES = {
-  audit_log: { cooling: "policy", hot: "time_window", hydration: "not_applicable" },
+  audit_log: { cooling: "policy", hot: "none", hydration: "not_applicable" },
   pos_order: { cooling: "policy", hot: "terminal_window", hydration: "full_row" },
 };
+
+const COOLING_PARENT_TABLES = new Map([
+  ["pos_order_line", "pos_order"],
+  ["pos_payment", "pos_order"],
+]);
 
 // Shared provider/reference truth lives outside ERP. Its organization-seeded
 // application copies are ordinary durable organization records.
@@ -322,6 +327,19 @@ function moduleFor(tableName) {
   };
   if (explicitDomain[tableName]) return explicitDomain[tableName];
   throw new Error(`no C1 module mapping for ${tableName}`);
+}
+
+const FINANCE_COMMERCIAL_MODULES = new Set([
+  "accounting", "crm", "expenses", "proposals", "purchasing", "sales", "subscriptions",
+]);
+const OPERATIONS_MODULES = new Set([
+  "analytics", "data_ops", "documents", "fleet", "inventory", "iot", "manufacturing", "projects",
+]);
+
+function reviewGroup(moduleName) {
+  if (FINANCE_COMMERCIAL_MODULES.has(moduleName)) return "finance-commercial";
+  if (OPERATIONS_MODULES.has(moduleName)) return "operations";
+  return "people-platform";
 }
 
 function hasColumn(table, name) {
@@ -386,6 +404,7 @@ function buildPolicy(table, allTables, resourcesByTable) {
   const parentTable = parentOverride && allTables.find((candidate) => candidate.sql_name === parentOverride[0]);
   const parentValid = parentTable && hasColumn(table, parentOverride[1]) && hasColumn(parentTable, parentOverride[2]);
   const activeArchive = ACTIVE_ARCHIVE_POLICIES[table.sql_name];
+  const coolingParent = COOLING_PARENT_TABLES.get(table.sql_name);
   const externalReference = EXTERNAL_REFERENCE_TABLES.has(table.sql_name);
   const resolvedCompanyPath = platform ? null : companyPath(table, allTables);
   const parentCompany = !hasCompany && resolvedCompanyPath !== null;
@@ -411,7 +430,7 @@ function buildPolicy(table, allTables, resourcesByTable) {
           ? "durable_operational_state"
           : "durable_business_record";
 
-  return {
+  const policy = {
     table: table.sql_name,
     module: moduleFor(table.sql_name),
     rationale: platform
@@ -438,15 +457,21 @@ function buildPolicy(table, allTables, resourcesByTable) {
       version_strategy: versionStrategy(table),
     },
     projection_mode: projectionMode,
-    hot_retention: activeArchive?.hot ?? "always",
-    cooling_eligibility: activeArchive?.cooling ?? "never",
+    hot_retention: activeArchive?.hot ?? (coolingParent ? "terminal_window" : "always"),
+    cooling_eligibility: activeArchive?.cooling ?? (coolingParent ? "parent" : "never"),
     cooling_eligibility_source: table.sql_name === "audit_log"
-      ? "archive-candidates.json:audit_log.finalize_audit_log_archive"
+      ? "reviewed:c5/people-platform/coolable/audit-log"
       : table.sql_name === "pos_order"
-        ? "archive-candidates.json:pos_order.finalize_pos_order_archive"
-        : "not eligible until a reviewed cooling policy is declared",
-    dependency_behavior: parentValid ? "follow_parent" : "independent",
-    hydration_policy: activeArchive?.hydration ?? "not_applicable",
+        ? "reviewed:c5/finance-commercial/coolable/pos-order"
+        : coolingParent
+          ? `reviewed:c5/finance-commercial/coolable/${coolingParent}-child`
+        : `reviewed:c5/${reviewGroup(moduleFor(table.sql_name))}/always-hot/missing-semantic-safety-contract`,
+    dependency_behavior: activeArchive && table.sql_name === "pos_order"
+      ? "block_parent_cooling"
+      : coolingParent || parentValid
+        ? "follow_parent"
+        : "independent",
+    hydration_policy: activeArchive?.hydration ?? (coolingParent ? "parent" : "not_applicable"),
     delete_behavior: externalReference
       ? "external"
       : appendHistory
@@ -468,6 +493,94 @@ function buildPolicy(table, allTables, resourcesByTable) {
               ? "append_sequence"
               : "organization_index",
   };
+
+  if (table.sql_name === "audit_log") {
+    policy.semantic_eligibility = {
+      state: "immutable after creation",
+      age_window: "eligible immediately after exact append-only PG archive proof",
+      open_obligations: "must_be_clear",
+      workflow_state: "must_not_be_active",
+      durable_watermark: "append-only archive checksum proof",
+      exact_durable_version: "canonical payload checksum must match",
+      hot_dependencies: "must_be_clear",
+    };
+    policy.archive = {
+      cold_table: "cold_audit_log",
+      mode: "append_only",
+      scope: { organization_id: "organization_id", company_id: "company_id" },
+      finalize_reducer: "finalize_audit_log_archive",
+      order_by: [{ column: "id", direction: "ASC" }],
+    };
+  } else if (table.sql_name === "pos_order") {
+    policy.rationale = "POS transaction aggregate root; lines and payments cool and hydrate atomically with the order.";
+    policy.semantic_eligibility = {
+      state: "Paid or otherwise terminal; domain reducer validates state",
+      age_window: "cold_eligible_at is the reviewed terminal-window eligibility boundary and must be reached",
+      open_obligations: "must_be_clear",
+      workflow_state: "must_not_be_active",
+      durable_watermark: "required",
+      exact_durable_version: "archive_version must match",
+      hot_dependencies: "all required child rows must be eligible",
+    };
+    policy.archive = {
+      cold_table: "cold_pos_order",
+      mode: "versioned",
+      scope: { organization_id: "organization_id", company_id: "company_id" },
+      finalize_reducer: "finalize_pos_order_archive",
+      order_by: [{ column: "id", direction: "ASC" }],
+    };
+  } else if (table.sql_name === "pos_order_line") {
+    policy.semantic_eligibility = {
+      state: "inherited from terminal pos_order parent",
+      age_window: "inherited from pos_order.cold_eligible_at",
+      open_obligations: "inherited from parent aggregate",
+      workflow_state: "inherited from parent aggregate",
+      durable_watermark: "required for exact child row image",
+      exact_durable_version: "latest child commit must be covered",
+      hot_dependencies: "must remain in the same aggregate as pos_order",
+    };
+  } else if (table.sql_name === "pos_payment") {
+    policy.semantic_eligibility = {
+      state: "inherited from terminal pos_order parent",
+      age_window: "inherited from pos_order.cold_eligible_at",
+      open_obligations: "payment_status must be terminal and parent must have no balance due",
+      workflow_state: "inherited from parent aggregate",
+      durable_watermark: "required for exact child row image",
+      exact_durable_version: "latest child commit must be covered",
+      hot_dependencies: "must remain in the same aggregate as pos_order",
+    };
+  }
+
+  return policy;
+}
+
+function storageClass(policy) {
+  if (policy.hot_retention === "terminal_window") return "terminal_window";
+  if (policy.hot_retention === "time_window") return "short_hot_tail";
+  if (policy.hot_retention === "none") return "pg_first";
+  if (["derived-rebuildable", "snapshot", "ephemeral"].includes(policy.projection_mode)) {
+    return "projection_only";
+  }
+  if (policy.projection_mode === "external-reference") return "external_reference";
+  return "always_hot";
+}
+
+function reviewedFixtures(policies) {
+  const seen = new Set();
+  const fixtures = [];
+  for (const policy of policies) {
+    const storage_class = storageClass(policy);
+    const key = `${policy.module}\u0000${storage_class}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    fixtures.push({
+      table: policy.table,
+      module: policy.module,
+      storage_class,
+      reviewed: true,
+    });
+  }
+  return fixtures;
 }
 
 function validateParentOverrides(tables) {
@@ -555,6 +668,9 @@ function validate(schema, policyDocument, resourceRegistry) {
     }
     if (!policy.cooling_eligibility || !policy.cooling_eligibility_source || !policy.dependency_behavior || !policy.hydration_policy) {
       throw new Error(`incomplete lifecycle policy: ${policy.table}`);
+    }
+    if (!policy.cooling_eligibility_source.startsWith("reviewed:")) {
+      throw new Error(`unreviewed cooling decision: ${policy.table}`);
     }
     if (!policy.delete_behavior || !policy.postgres_access_path) {
       throw new Error(`incomplete persistence policy: ${policy.table}`);
@@ -649,16 +765,45 @@ let policyDocument;
 if (checkOnly) {
   policyDocument = JSON.parse(fs.readFileSync(policyPath, "utf8"));
 } else {
+  const existingDocument = fs.existsSync(policyPath)
+    ? JSON.parse(fs.readFileSync(policyPath, "utf8"))
+    : { policies: [] };
+  const existingByTable = new Map(existingDocument.policies.map((policy) => [policy.table, policy]));
+  const policies = schema.tables.map((table) => {
+    const generated = buildPolicy(table, schema.tables, resourcesByTable);
+    const reviewed = existingByTable.get(table.sql_name);
+    // Reviewed domain classifications are deliberate source data. Preserve
+    // them across a structural census refresh; the validator below rejects
+    // stale tables, ownership paths, relationships, resources, and enum
+    // values instead of silently replacing the review with defaults.
+    return reviewed ? { ...generated, ...reviewed } : generated;
+  });
   policyDocument = {
     _comment: "Checked-in C1 storage-policy source. Bootstrap defaults are deterministic; reviewed policy entries may be hand-edited and must pass --check.",
     version: 1,
-    policies: schema.tables.map((table) => buildPolicy(table, schema.tables, resourcesByTable)),
+    reviewed_fixtures: existingDocument.reviewed_fixtures ?? reviewedFixtures(policies),
+    policies,
   };
 }
 
 validate(schema, policyDocument, resourceRegistry);
 
 if (checkOnly) {
+  const existingByTable = new Map(policyDocument.policies.map((policy) => [policy.table, policy]));
+  const refreshedPolicies = schema.tables.map((table) => {
+    const generated = buildPolicy(table, schema.tables, resourcesByTable);
+    const reviewed = existingByTable.get(table.sql_name);
+    return reviewed ? { ...generated, ...reviewed } : generated;
+  });
+  const refreshed = {
+    _comment: "Checked-in C1 storage-policy source. Bootstrap defaults are deterministic; reviewed policy entries may be hand-edited and must pass --check.",
+    version: 1,
+    reviewed_fixtures: policyDocument.reviewed_fixtures ?? reviewedFixtures(refreshedPolicies),
+    policies: refreshedPolicies,
+  };
+  if (JSON.stringify(refreshed) !== JSON.stringify(policyDocument)) {
+    throw new Error("storage policy source is not reproducible; run the bootstrap without --check");
+  }
   console.log(`C1 storage policy check passed: ${policyDocument.policies.length}/463 tables`);
 } else {
   fs.writeFileSync(policyPath, `${JSON.stringify(policyDocument, null, 2)}\n`);

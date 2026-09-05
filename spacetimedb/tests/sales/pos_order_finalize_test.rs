@@ -19,7 +19,7 @@ use crate::sales::pos_config::{
 use crate::sales::pos_transactions::{
     create_pos_order, finalize_pos_order_archive, finalize_pos_order_archive_checked,
     open_pos_session, pos_loyalty_card, pos_order, pos_session, CreatePosOrderLineParams,
-    CreatePosOrderParams, PosLoyaltyCard, PosOrder,
+    CreatePosOrderParams, PosLoyaltyCard, PosOrder, POS_ORDER_HOT_RETENTION,
 };
 use crate::test_harness::OrgFixture;
 use crate::types::{CardState, PosOrderState};
@@ -76,7 +76,7 @@ fn insert_test_order(ctx: &ReducerContext, fixture: &OrgFixture, uid: &str) -> P
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         metadata: None,
-        cold_eligible_at: Some(ctx.timestamp),
+        cold_eligible_at: Some(ctx.timestamp - POS_ORDER_HOT_RETENTION),
         archive_version: 1,
     })
 }
@@ -97,6 +97,41 @@ fn record_test_order_commit(ctx: &ReducerContext, order: &PosOrder) -> Result<u6
     )
 }
 
+fn assert_finalization_rejected(
+    ctx: &ReducerContext,
+    order: &PosOrder,
+    expected_archive_version: u64,
+    expected_cold_eligible_at_micros: i64,
+    row_commit_sequence: u64,
+    durable_watermark: u64,
+    durable_change_schema_version: u32,
+    durable_contract_version: &str,
+) -> Result<(), String> {
+    let result = finalize_pos_order_archive_checked(
+        ctx,
+        order.id,
+        expected_archive_version,
+        expected_cold_eligible_at_micros,
+        row_commit_sequence,
+        durable_watermark,
+        durable_change_schema_version,
+        durable_contract_version,
+    );
+    if result.is_ok() {
+        return Err(format!(
+            "finalization unexpectedly accepted unsafe pos_order {}",
+            order.id
+        ));
+    }
+    if ctx.db.pos_order().id().find(order.id).is_none() {
+        return Err(format!(
+            "unsafe pos_order {} was deleted after rejected finalization",
+            order.id
+        ));
+    }
+    Ok(())
+}
+
 #[spacetimedb::reducer]
 pub fn test_pos_order_finalize_deletes_on_version_match(
     ctx: &ReducerContext,
@@ -108,6 +143,12 @@ pub fn test_pos_order_finalize_deletes_on_version_match(
         .ok_or("cold_eligible_at should be set")?
         .to_micros_since_unix_epoch();
     let sequence = record_test_order_commit(ctx, &order)?;
+    let commits_before = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| commit.organization_id == order.organization_id)
+        .count();
 
     finalize_pos_order_archive_checked(
         ctx,
@@ -123,6 +164,17 @@ pub fn test_pos_order_finalize_deletes_on_version_match(
     if ctx.db.pos_order().id().find(order.id).is_some() {
         return Err("row should have been deleted on version match".to_string());
     }
+    let commits_after = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| commit.organization_id == order.organization_id)
+        .count();
+    if commits_after != commits_before {
+        return Err(
+            "cooling must not project deletes for PostgreSQL-backed aggregate members".to_string(),
+        );
+    }
     Ok(())
 }
 
@@ -137,24 +189,103 @@ pub fn test_pos_order_finalize_refuses_on_version_mismatch(
         .ok_or("cold_eligible_at should be set")?
         .to_micros_since_unix_epoch();
 
-    // Wrong archive_version — simulates the row having mutated since the
-    // worker read it.
-    let result = finalize_pos_order_archive_checked(
+    let sequence = record_test_order_commit(ctx, &order)?;
+    assert_finalization_rejected(
         ctx,
-        order.id,
+        &order,
         order.archive_version + 1,
         expected_micros,
-        0,
-        0,
+        sequence,
+        sequence,
         CHANGE_SCHEMA_VERSION,
         CONTRACT_VERSION,
-    );
-    if result.is_ok() {
-        return Err("finalize should reject a stale archive_version".to_string());
-    }
-    if ctx.db.pos_order().id().find(order.id).is_none() {
-        return Err("row should NOT have been deleted on version mismatch".to_string());
-    }
+    )?;
+
+    let mut nonterminal = insert_test_order(ctx, &fixture, "finalize-nonterminal");
+    nonterminal.state = PosOrderState::Draft;
+    ctx.db.pos_order().id().update(nonterminal.clone());
+    let sequence = record_test_order_commit(ctx, &nonterminal)?;
+    assert_finalization_rejected(
+        ctx,
+        &nonterminal,
+        nonterminal.archive_version,
+        expected_micros,
+        sequence,
+        sequence,
+        CHANGE_SCHEMA_VERSION,
+        CONTRACT_VERSION,
+    )?;
+
+    let mut obligated = insert_test_order(ctx, &fixture, "finalize-open-obligation");
+    obligated.is_partially_paid = true;
+    ctx.db.pos_order().id().update(obligated.clone());
+    let sequence = record_test_order_commit(ctx, &obligated)?;
+    assert_finalization_rejected(
+        ctx,
+        &obligated,
+        obligated.archive_version,
+        expected_micros,
+        sequence,
+        sequence,
+        CHANGE_SCHEMA_VERSION,
+        CONTRACT_VERSION,
+    )?;
+
+    let mut active_workflow = insert_test_order(ctx, &fixture, "finalize-active-workflow");
+    active_workflow.to_invoice = true;
+    ctx.db.pos_order().id().update(active_workflow.clone());
+    let sequence = record_test_order_commit(ctx, &active_workflow)?;
+    assert_finalization_rejected(
+        ctx,
+        &active_workflow,
+        active_workflow.archive_version,
+        expected_micros,
+        sequence,
+        sequence,
+        CHANGE_SCHEMA_VERSION,
+        CONTRACT_VERSION,
+    )?;
+
+    let mut incomplete = insert_test_order(ctx, &fixture, "finalize-missing-child");
+    incomplete.lines = vec![u64::MAX];
+    ctx.db.pos_order().id().update(incomplete.clone());
+    let sequence = record_test_order_commit(ctx, &incomplete)?;
+    assert_finalization_rejected(
+        ctx,
+        &incomplete,
+        incomplete.archive_version,
+        expected_micros,
+        sequence,
+        sequence,
+        CHANGE_SCHEMA_VERSION,
+        CONTRACT_VERSION,
+    )?;
+
+    let watermark_gap = insert_test_order(ctx, &fixture, "finalize-watermark-gap");
+    let sequence = record_test_order_commit(ctx, &watermark_gap)?;
+    assert_finalization_rejected(
+        ctx,
+        &watermark_gap,
+        watermark_gap.archive_version,
+        expected_micros,
+        sequence,
+        sequence.saturating_sub(1),
+        CHANGE_SCHEMA_VERSION,
+        CONTRACT_VERSION,
+    )?;
+
+    let incompatible = insert_test_order(ctx, &fixture, "finalize-schema-mismatch");
+    let sequence = record_test_order_commit(ctx, &incompatible)?;
+    assert_finalization_rejected(
+        ctx,
+        &incompatible,
+        incompatible.archive_version,
+        expected_micros,
+        sequence,
+        sequence,
+        CHANGE_SCHEMA_VERSION + 1,
+        CONTRACT_VERSION,
+    )?;
     Ok(())
 }
 
@@ -184,6 +315,34 @@ pub fn test_pos_order_finalize_refuses_on_cold_eligible_at_mismatch(
         return Err("row should NOT have been deleted on cold_eligible_at mismatch".to_string());
     }
     Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn test_pos_order_finalize_refuses_before_terminal_window(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let mut order = insert_test_order(ctx, &fixture, "finalize-before-terminal-window");
+    order = ctx.db.pos_order().id().update(PosOrder {
+        cold_eligible_at: Some(ctx.timestamp + POS_ORDER_HOT_RETENTION),
+        ..order
+    });
+    let expected_micros = order
+        .cold_eligible_at
+        .ok_or("cold_eligible_at should be set")?
+        .to_micros_since_unix_epoch();
+    let sequence = record_test_order_commit(ctx, &order)?;
+
+    assert_finalization_rejected(
+        ctx,
+        &order,
+        order.archive_version,
+        expected_micros,
+        sequence,
+        sequence,
+        CHANGE_SCHEMA_VERSION,
+        CONTRACT_VERSION,
+    )
 }
 
 #[spacetimedb::reducer]
@@ -235,7 +394,7 @@ pub fn test_pos_order_finalize_rejects_unregistered_caller(
         .to_micros_since_unix_epoch();
 
     // The test-runner identity is never registered as the
-    // pos_order_cold_drainer service identity, so the public reducer must
+    // projection_worker service identity, so the public reducer must
     // refuse the call even though version/eligibility match.
     let result = finalize_pos_order_archive(
         ctx,
@@ -249,7 +408,7 @@ pub fn test_pos_order_finalize_rejects_unregistered_caller(
     );
     if result.is_ok() {
         return Err(
-            "finalize_pos_order_archive should reject a caller that isn't the registered drainer identity"
+            "finalize_pos_order_archive should reject a caller that isn't the registered projection worker identity"
                 .to_string(),
         );
     }

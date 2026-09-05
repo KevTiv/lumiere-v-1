@@ -25,7 +25,7 @@ use axum::{
 use serde_json::json;
 use stdb_client::StdbClient;
 
-use super::{migrate, pg_pool, projection_observability};
+use super::{finalization_worker, migrate, pg_pool, projection_observability};
 use crate::{config::Config, state::AppState};
 
 /// Generated all-table projection codec artifact from the pinned contracts
@@ -80,6 +80,11 @@ pub async fn serve() -> Result<()> {
         .and_then(|value| value.parse().ok())
         .filter(|value| *value > 0)
         .unwrap_or(100u32);
+    let finalization_batch = std::env::var("LUMIERE_FINALIZATION_WORKER_BATCH")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value| *value > 0 && *value <= 200)
+        .unwrap_or(100u32);
     let port = std::env::var("LUMIERE_PROJECTION_WORKER_PORT")
         .ok()
         .and_then(|value| value.parse().ok())
@@ -91,6 +96,8 @@ pub async fn serve() -> Result<()> {
         .await
         .context("apply projection infrastructure schema")?;
     ensure_projection_relations(&pool, PROJECTION_CODEC_MANIFEST_JSON).await?;
+    finalization_worker::parse_archive_manifest(finalization_worker::ARCHIVE_MANIFEST_JSON)
+        .context("validate generated C5 archive manifest")?;
 
     let ready = Arc::new(AtomicBool::new(false));
     let worker_ready = ready.clone();
@@ -100,6 +107,12 @@ pub async fn serve() -> Result<()> {
         loop {
             match drain_batch(&worker_state.stdb, &worker_pool, batch).await {
                 Ok(stats) => {
+                    let finalization = finalization_worker::drain_batch(
+                        &worker_state.stdb,
+                        &worker_pool,
+                        finalization_batch,
+                    )
+                    .await;
                     let persisted_quarantine =
                         match projection_observability::read_projection_statuses(&worker_pool).await
                         {
@@ -114,12 +127,24 @@ pub async fn serve() -> Result<()> {
                                 true
                             }
                         };
+                    let finalization_failed = match &finalization {
+                        Ok(finalization_stats) => finalization_stats.failed > 0,
+                        Err(error) => {
+                            tracing::error!(%error, "manifest-driven C5 finalization batch failed");
+                            true
+                        }
+                    };
                     worker_ready.store(
-                        stats.failed == 0 && !persisted_quarantine,
+                        stats.failed == 0 && !persisted_quarantine && !finalization_failed,
                         Ordering::Relaxed,
                     );
                     if stats.commits > 0 || stats.already_applied > 0 {
                         tracing::info!(?stats, "projection worker batch complete");
+                    }
+                    if let Ok(finalization_stats) = finalization {
+                        if finalization_stats.read > 0 {
+                            tracing::info!(?finalization_stats, "C5 finalization batch complete");
+                        }
                     }
                 }
                 Err(error) => {

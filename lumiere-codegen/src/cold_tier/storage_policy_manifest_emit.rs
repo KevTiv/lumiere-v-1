@@ -433,6 +433,9 @@ pub fn validate_storage_policies(
         if policy.rationale.trim().is_empty() {
             bail!("policies[{index}] ('{table_name}'): rationale must not be empty");
         }
+        if !policy.cooling_eligibility_source.starts_with("reviewed:") {
+            bail!("policies[{index}] ('{table_name}'): cooling decision has not been reviewed");
+        }
         validate_c0_ownership(policy, table_name, table)?;
         validate_aggregate_and_parent(policy, table_name, table, &config.policies, &tables)?;
         validate_company_path(policy, table_name, table, &config.policies, &tables)?;
@@ -1118,7 +1121,8 @@ mod tests {
             projection_mode: ProjectionMode::UpsertCurrent,
             hot_retention: HotRetention::Always,
             cooling_eligibility: CoolingEligibility::Never,
-            cooling_eligibility_source: "not eligible until reviewed".into(),
+            cooling_eligibility_source:
+                "reviewed:c5/test/always-hot/missing-semantic-safety-contract".into(),
             dependency_behavior: DependencyBehavior::Independent,
             hydration_policy: HydrationPolicy::NotApplicable,
             delete_behavior: DeleteBehavior::Tombstone,
@@ -1198,6 +1202,17 @@ mod tests {
         let source = serde_json::to_string(&fixture_config).unwrap();
         let error = emit_fixture(&source, &manifest()).unwrap_err().to_string();
         assert!(error.contains("lacks a reviewed policy fixture"));
+    }
+
+    #[test]
+    fn rejects_an_unreviewed_table_decision() {
+        let mut fixture_config =
+            config(vec![direct_policy("orders"), reference_policy("currency")]);
+        fixture_config.policies[0].cooling_eligibility_source =
+            "not eligible until reviewed".into();
+        let source = serde_json::to_string(&fixture_config).unwrap();
+        let error = emit_fixture(&source, &manifest()).unwrap_err().to_string();
+        assert!(error.contains("cooling decision has not been reviewed"));
     }
 
     #[test]

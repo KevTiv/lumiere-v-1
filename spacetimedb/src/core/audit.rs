@@ -206,11 +206,9 @@ pub fn log_audit_event(
 /// durably verified the exact same row.
 ///
 /// Called only by the trusted C5 finalization service, never by frontend
-/// clients. Idempotent:
-/// if `id` no longer exists, that can only mean an earlier finalize call
-/// already deleted it (rows are never deleted any other way, and auto-inc
-/// ids are never reused), so this returns `Ok(())` rather than an error. This
-/// makes duplicate or racing finalization calls safe.
+/// clients. A missing row is rejected because its organization cannot be
+/// authenticated in STDB. The worker reconciles an ambiguous successful
+/// deletion from its organization-scoped PostgreSQL transfer ledger.
 #[spacetimedb::reducer]
 pub fn finalize_audit_log_archive(
     ctx: &ReducerContext,
@@ -227,10 +225,10 @@ pub fn finalize_audit_log_archive(
     if !crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
         ctx,
         organization_id,
-        crate::core::cold_tier_identity::AUDIT_COLD_DRAINER_SERVICE,
+        crate::core::cold_tier_identity::PROJECTION_WORKER_SERVICE,
     ) {
         return Err(
-            "finalize_audit_log_archive: caller is not the registered C5 audit finalization identity"
+            "finalize_audit_log_archive: caller is not the registered projection worker identity"
                 .to_string(),
         );
     }

@@ -26,6 +26,7 @@ pub mod audit_read;
 pub mod commit_projection;
 pub mod conventions;
 pub mod cursor;
+pub mod finalization_worker;
 pub mod hydration;
 pub mod ledger;
 pub mod migrate;

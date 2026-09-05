@@ -16,6 +16,11 @@ use std::collections::BTreeSet;
 
 use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+/// Paid POS aggregates remain hot for thirty days before archive finalization.
+/// `cold_eligible_at` stores the end of this reviewed terminal window.
+pub(crate) const POS_ORDER_HOT_RETENTION: std::time::Duration =
+    std::time::Duration::from_secs(30 * 86_400);
+
 use crate::core::cold_tier::{
     finalize_cooling, prove_durable_row, AggregateChildRef, AggregateFinalizationPlan,
     AggregateRootRef, CoolingEligibilityFacts,
@@ -817,7 +822,7 @@ pub fn create_pos_order(
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         metadata: None,
-        cold_eligible_at: Some(ctx.timestamp),
+        cold_eligible_at: Some(ctx.timestamp + POS_ORDER_HOT_RETENTION),
         archive_version: 1,
     });
 
@@ -1069,7 +1074,9 @@ pub fn create_pos_order(
 /// durably verified the exact same version.
 ///
 /// Called only by the registered C5 finalization identity (see
-/// `core::cold_tier_identity`), never by frontend clients.
+/// `core::cold_tier_identity`), never by frontend clients. A missing root is
+/// rejected because its organization cannot be authenticated in STDB; the
+/// worker reconciles ambiguous success from its durable transfer ledger.
 #[spacetimedb::reducer]
 pub fn finalize_pos_order_archive(
     ctx: &ReducerContext,
@@ -1091,10 +1098,10 @@ pub fn finalize_pos_order_archive(
     if !crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
         ctx,
         organization_id,
-        crate::core::cold_tier_identity::POS_ORDER_COLD_DRAINER_SERVICE,
+        crate::core::cold_tier_identity::PROJECTION_WORKER_SERVICE,
     ) {
         return Err(
-            "finalize_pos_order_archive: caller is not the registered C5 pos-order finalization identity"
+            "finalize_pos_order_archive: caller is not the registered projection worker identity"
                 .to_string(),
         );
     }
@@ -1268,6 +1275,12 @@ pub(crate) fn finalize_pos_order_archive_checked(
         },
         children,
     };
+    // Deliberately do not emit organization-row-change deletes here. The
+    // durable PostgreSQL `pos_order_line` and `pos_payment` projections are
+    // the cooled aggregate members used by hydration; publishing deletes
+    // would erase those members after they leave the hot STDB working set.
+    // The root has the additional immutable `cold_pos_order` checksum/version
+    // proof written by the finalization worker.
     finalize_cooling(&facts, &durable, &plan, |target| {
         match target.table_name.as_str() {
             "pos_order_line" => {

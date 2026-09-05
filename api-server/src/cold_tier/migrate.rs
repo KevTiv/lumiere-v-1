@@ -592,6 +592,8 @@ async fn verify_durable_schema(transaction: &tokio_postgres::Transaction<'_>) ->
              join pg_catalog.pg_namespace n on n.oid = parent.relnamespace \
              join pg_catalog.pg_class child on child.oid = inheritance.inhrelid \
              where n.nspname = current_schema() \
+               and parent.relkind = 'p' \
+               and child.relispartition \
              order by parent.relname, child.relname",
             &[],
         )
@@ -599,10 +601,9 @@ async fn verify_durable_schema(transaction: &tokio_postgres::Transaction<'_>) ->
         .context("read durable PostgreSQL partition bounds")?;
     let mut partition_bounds = BTreeMap::<String, Vec<String>>::new();
     for row in partition_child_rows {
-        partition_bounds
-            .entry(row.get(0))
-            .or_default()
-            .push(row.get(1));
+        let bound: Option<String> = row.get(1);
+        let bound = bound.context("durable PostgreSQL partition child has no bound")?;
+        partition_bounds.entry(row.get(0)).or_default().push(bound);
     }
     let constraint_rows = transaction
         .query(
@@ -621,6 +622,58 @@ async fn verify_durable_schema(transaction: &tokio_postgres::Transaction<'_>) ->
             .entry(row.get(0))
             .or_default()
             .insert(row.get(1));
+    }
+
+    // `archive_transfer` is shared cold-tier infrastructure rather than an
+    // application projection, so it is intentionally absent from the
+    // generated durable-schema manifest. Verify its migration-owned shape
+    // explicitly; `CREATE TABLE IF NOT EXISTS` must not adopt a malformed
+    // pre-existing ledger.
+    let archive_transfer = actual_tables
+        .get("archive_transfer")
+        .context("archive_transfer table is missing")?;
+    if archive_transfer.relkind != "r" {
+        bail!("archive_transfer has incompatible relation kind");
+    }
+    let expected_archive_transfer_columns = [
+        ("resource", "text", true),
+        ("row_id", "numeric(20,0)", true),
+        ("organization_id", "numeric(20,0)", true),
+        ("archive_version", "bigint", true),
+        ("payload_checksum", "text", true),
+        ("pg_transferred_at", "timestamp with time zone", true),
+        ("stdb_finalized_at", "timestamp with time zone", false),
+    ];
+    for (column, expected_type, expected_not_null) in expected_archive_transfer_columns {
+        let (actual_type, actual_not_null) = archive_transfer
+            .columns
+            .get(column)
+            .with_context(|| format!("archive_transfer lacks required column '{column}'"))?;
+        if actual_type != expected_type || *actual_not_null != expected_not_null {
+            bail!("archive_transfer column '{column}' has incompatible type or nullability");
+        }
+    }
+    let archive_indexes = indexes
+        .get("archive_transfer")
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    let archive_primary = ["resource".to_string(), "row_id".to_string()];
+    if !archive_indexes
+        .iter()
+        .any(|(name, primary, unique, columns)| {
+            name == "archive_transfer_pkey" && *primary && *unique && columns == &archive_primary
+        })
+    {
+        bail!("archive_transfer has an incompatible primary key");
+    }
+    let archive_org_index = ["organization_id".to_string()];
+    if !archive_indexes
+        .iter()
+        .any(|(name, primary, unique, columns)| {
+            name == "archive_transfer_org" && !*primary && !*unique && columns == &archive_org_index
+        })
+    {
+        bail!("archive_transfer lacks its organization index");
     }
 
     for (table, expected) in expected_tables {

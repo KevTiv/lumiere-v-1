@@ -117,6 +117,19 @@ jobs:
           PG_TLS_MODE: disable
         run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::migrate::postgres_compatibility_tests::postgres_current_next_application_rollback -- --nocapture
 
+      - name: C5 manifest-driven finalization
+        env:
+          C5_TEST_PG: "1"
+          PG_HOST: 127.0.0.1
+          PG_PORT: "5432"
+          PG_DATABASE: lumiere
+          PG_USER: lumiere
+          PG_PASSWORD: lumiere
+          PG_TLS_MODE: disable
+        run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::finalization_worker:: -- --nocapture
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::ledger:: -- --nocapture
+
       - name: lumiere-codegen unit tests
         run: cargo test --locked -p lumiere-codegen
 

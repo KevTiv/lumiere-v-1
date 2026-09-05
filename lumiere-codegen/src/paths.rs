@@ -34,7 +34,6 @@ pub struct Paths {
     // ── cold_tier ────────────────────────────────────────────────────────
     pub stdb_bindings_dir: PathBuf,
     pub schema_manifest_out: PathBuf,
-    pub archive_candidates_json: PathBuf,
     pub storage_policy_json: PathBuf,
     pub storage_policy_manifest_out: PathBuf,
     pub archive_manifest_out: PathBuf,
@@ -132,7 +131,6 @@ impl Paths {
 
             stdb_bindings_dir: contracts_staging_dir.join("bindings"),
             schema_manifest_out: staging_manifests.join("lumiere-schema-manifest.json"),
-            archive_candidates_json: manifest_dir.join("archive-candidates.json"),
             storage_policy_json: manifest_dir.join("storage-policy-manifest.json"),
             storage_policy_manifest_out: staging_manifests.join("storage-policy-manifest.json"),
             archive_manifest_out: staging_manifests.join("archive-manifest.json"),

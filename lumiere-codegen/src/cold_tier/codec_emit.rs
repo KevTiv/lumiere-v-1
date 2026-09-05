@@ -43,18 +43,18 @@ use crate::cold_tier::schema_ir::{GeneratedTableSchema, GeneratedType, LumiereSc
 
 /// Build the codec manifest for archive-candidate tables.
 ///
-/// `candidates_json` is the raw `archive-candidates.json` text (same input as
-/// the archive manifest).  Returns the pretty-printed JSON string.
+/// `candidates_json` is the generated archive manifest derived from the
+/// reviewed storage policy. Returns the pretty-printed JSON string.
 pub fn emit_codec_manifest(
     candidates_json: &str,
     schema_manifest: &LumiereSchemaManifest,
 ) -> Result<String> {
     let config: Value =
-        serde_json::from_str(candidates_json).context("parse archive-candidates.json")?;
+        serde_json::from_str(candidates_json).context("parse generated archive manifest")?;
 
     let candidates = config["candidates"]
         .as_array()
-        .context("archive-candidates.json: missing 'candidates' array")?;
+        .context("generated archive manifest: missing 'candidates' array")?;
 
     let mut tables = serde_json::Map::new();
 
@@ -98,10 +98,10 @@ pub fn emit_projection_codec_manifest(
     storage_policy_manifest: &Value,
 ) -> Result<String> {
     let config: Value =
-        serde_json::from_str(candidates_json).context("parse archive-candidates.json")?;
+        serde_json::from_str(candidates_json).context("parse generated archive manifest")?;
     let candidates = config["candidates"]
         .as_array()
-        .context("archive-candidates.json: missing 'candidates' array")?;
+        .context("generated archive manifest: missing 'candidates' array")?;
 
     let mut archive_tables = std::collections::BTreeMap::new();
     for (i, cand) in candidates.iter().enumerate() {

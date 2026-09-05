@@ -18,11 +18,8 @@ use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 use crate::core::organization::organization;
 use crate::core::users::find_user_profile_for_identity;
 
-/// Reserved service name for the C5 audit-log finalization path.
-pub(crate) const AUDIT_COLD_DRAINER_SERVICE: &str = "audit_cold_drainer";
-
-/// Reserved service name for the C5 pos_order finalization path.
-pub(crate) const POS_ORDER_COLD_DRAINER_SERVICE: &str = "pos_order_cold_drainer";
+/// Reserved service name for the manifest-driven projection/finalization worker.
+pub(crate) const PROJECTION_WORKER_SERVICE: &str = "projection_worker";
 
 /// `service_name` used by the API-server's trusted POS aggregate hydrator.
 pub(crate) const POS_ORDER_HYDRATOR_SERVICE: &str = "pos_order_hydrator";
@@ -62,7 +59,7 @@ pub struct ColdTierServiceIdentity {
 }
 
 /// Register (or replace) the organization binding for a cold-tier service,
-/// e.g. `"audit_cold_drainer"`. Retires any prior active identity for that
+/// e.g. `"projection_worker"`. Retires any prior active identity for that
 /// `(organization_id, service_name)` — only one is active per organization.
 ///
 /// Not callable through the public API (see `reducer_allowlist.rs`) — this

@@ -259,14 +259,16 @@ stop:
 	spacetime stop
 
 publish:
-	sudo LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish $(DB) --module-path $(MODULE) --server local -y
+	cd $(MODULE) && LUMIERE_ENABLE_DEV_REDUCERS=1 cargo build --locked --target wasm32-unknown-unknown --release
+	spacetime publish $(DB) --bin-path $(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm --server local -y
 
 
 generate-stdb-ts-sdk:
 	bash scripts/generate-spacetimedb-ts-sdk.sh ".contracts-staging/ts/generated" "$(MODULE)"
 
 publish-clear:
-	LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish $(DB) --module-path $(MODULE) --server local --clear-database -y
+	cd $(MODULE) && LUMIERE_ENABLE_DEV_REDUCERS=1 cargo build --locked --target wasm32-unknown-unknown --release
+	spacetime publish $(DB) --bin-path $(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm --server local --clear-database -y
 
 # A test target must terminate. Use `local-logs` separately when diagnosis is
 # needed; `logs` intentionally tails forever.

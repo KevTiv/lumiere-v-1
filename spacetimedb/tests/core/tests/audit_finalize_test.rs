@@ -108,13 +108,13 @@ pub fn test_finalize_rejects_unregistered_caller(ctx: &ReducerContext) -> Result
     let row = insert_test_row(ctx, "finalize_unregistered_caller");
     let checksum = audit_log_canonical_checksum(&row);
 
-    // The test-runner identity is never registered as the audit_cold_drainer
+    // The test-runner identity is never registered as the projection_worker
     // service identity, so the public reducer must refuse the call even
     // though the checksum is correct.
     let result = finalize_audit_log_archive(ctx, row.id, checksum);
     if result.is_ok() {
         return Err(
-            "finalize_audit_log_archive should reject a caller that isn't the registered drainer identity"
+            "finalize_audit_log_archive should reject a caller that isn't the registered projection worker identity"
                 .to_string(),
         );
     }

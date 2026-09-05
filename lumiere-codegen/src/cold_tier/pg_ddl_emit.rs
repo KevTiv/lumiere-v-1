@@ -1,7 +1,7 @@
 //! PG DDL generator.
 //!
 //! Consumes the stable Lumiere schema IR and emits `cold_{table}.sql` DDL
-//! files for each archive-candidate table listed in `archive-candidates.json`.
+//! files for each archive-capable table in the generated archive manifest.
 //!
 //! ## Type mapping
 //!
@@ -162,7 +162,7 @@ CREATE INDEX IF NOT EXISTS organization_projection_status_backlog
     ]
 }
 
-/// Config for one archive candidate (from `archive-candidates.json`).
+/// Config for one archive candidate from the reviewed storage-policy subset.
 #[derive(Debug)]
 pub struct ArchiveCandidateConfig<'a> {
     /// Source STDB table name, e.g. `"audit_log"`.

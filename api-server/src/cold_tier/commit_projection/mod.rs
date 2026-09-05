@@ -75,5 +75,5 @@ struct PreparedChange {
     key_value: super::pg_codec::PgValue,
 }
 
-const CHANGE_SCHEMA_VERSION: u32 = 1;
-const CONTRACT_VERSION: &str = "ir-v2";
+pub(crate) const CHANGE_SCHEMA_VERSION: u32 = 1;
+pub(crate) const CONTRACT_VERSION: &str = "ir-v2";

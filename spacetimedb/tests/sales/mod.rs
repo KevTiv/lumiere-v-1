@@ -52,6 +52,8 @@ pub fn run_pos_order_finalize_test(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("pos_order_finalize_version_mismatch: {e}"))?;
     pos_order_finalize_test::test_pos_order_finalize_refuses_on_cold_eligible_at_mismatch(ctx)
         .map_err(|e| format!("pos_order_finalize_cold_eligible_at_mismatch: {e}"))?;
+    pos_order_finalize_test::test_pos_order_finalize_refuses_before_terminal_window(ctx)
+        .map_err(|e| format!("pos_order_finalize_terminal_window: {e}"))?;
     pos_order_finalize_test::test_pos_order_finalize_is_idempotent_when_already_gone(ctx)
         .map_err(|e| format!("pos_order_finalize_idempotent: {e}"))?;
     pos_order_finalize_test::test_pos_order_finalize_rejects_unregistered_caller(ctx)

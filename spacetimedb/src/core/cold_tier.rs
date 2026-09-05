@@ -439,6 +439,12 @@ mod tests {
         stale.durable_watermark = 11;
         assert!(validate_cooling_eligibility(&facts(), &stale).is_err());
         stale = durable();
+        stale.archive_version = 2;
+        assert!(validate_cooling_eligibility(&facts(), &stale).is_err());
+        stale = durable();
+        stale.durable_change_schema_version += 1;
+        assert!(validate_cooling_eligibility(&facts(), &stale).is_err());
+        stale = durable();
         stale.durable_contract_version = "ir-v1".to_string();
         assert!(validate_cooling_eligibility(&facts(), &stale).is_err());
     }

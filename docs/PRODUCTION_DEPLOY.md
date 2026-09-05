@@ -73,10 +73,19 @@ node scripts/check-compose-readiness.mjs \
   --probe chromium=http://chromium-worker:8090/health/ready
 ```
 
-The projection worker is the sole C3 SpacetimeDB-to-PostgreSQL durability
-service and applies the manifest-driven commit stream. The legacy audit and
-POS cold drainers are retired; resource cooling and STDB finalization remain
-paused until the canonical C5 cooling/finalization work is complete.
+The projection worker is the sole SpacetimeDB-to-PostgreSQL durability and C5
+finalization service. After applying the ordered commit stream, it reads the
+pinned generated archive manifest and runs each supported candidate through
+its reviewed domain finalizer. Unknown candidate/reducer/mode combinations
+fail startup instead of being skipped. Set `LUMIERE_FINALIZATION_WORKER_BATCH`
+to a value from 1 through 200 (default 100).
+
+Before enabling cooling for an organization, register the projection worker's
+dedicated SpacetimeDB identity under the service name `projection_worker` with
+`register_cold_tier_service_identity`. The registration is a direct owner-token
+operations action and must not be exposed through the application API. The
+retired `audit_cold_drainer` and `pos_order_cold_drainer` service names are no
+longer accepted by finalization reducers.
 
 When running the probe from a sibling container, use Compose service DNS names such as
 `chromium-worker`; host-side probes should use published or externally routed hostnames.

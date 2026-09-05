@@ -9556,7 +9556,9 @@ Prioritize high-severity findings and cite related records."#,
         write_uid: seeder,
         write_date: ctx.timestamp,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
-        cold_eligible_at: Some(ctx.timestamp),
+        cold_eligible_at: Some(
+            ctx.timestamp + crate::sales::pos_transactions::POS_ORDER_HOT_RETENTION,
+        ),
         archive_version: 1,
     });
     ctx.db.pos_order_line().id().update(PosOrderLine {
