@@ -337,12 +337,18 @@ fn null_value_for(pg_type: &str) -> Result<PgValue> {
 }
 
 /// Extract raw bytes from an `Identity` cell — accepts a hex string
-/// (optionally `0x`-prefixed) or a JSON array of 32 byte numbers. See the
-/// same acceptance rule (and the reason for it — this hasn't been verified
-/// against a live module's actual SQL-endpoint JSON shape yet) documented
-/// on the projection identity decoder.
+/// (optionally `0x`-prefixed), the canonical SATS single-key object
+/// (`{"__identity__":"0x..."}`), or a JSON array of 32 byte numbers.
+/// Identity objects must contain exactly the canonical `__identity__` key;
+/// malformed or multi-key wrappers are rejected rather than coerced.
 fn decode_identity_bytes(v: &Value) -> Result<Vec<u8>> {
     match v {
+        Value::Object(obj) => {
+            if obj.len() != 1 || !obj.contains_key("__identity__") {
+                anyhow::bail!("expected single-key __identity__ object for Identity, got {v}");
+            }
+            decode_identity_bytes(&obj["__identity__"])
+        }
         Value::String(s) => {
             let stripped = s
                 .strip_prefix("0x")
@@ -559,6 +565,39 @@ mod tests {
             PgValue::BigInt(Some(1_781_987_714_525_004))
         ));
         assert!(matches!(values[9], PgValue::NumericText(Some(ref s)) if s == "1"));
+    }
+
+    #[test]
+    fn decodes_canonical_identity_object_wrapper() {
+        let identity = "cd".repeat(32);
+        let mut row = sample_row();
+        row["userId"] = json!({ "__identity__": format!("0x{identity}") });
+
+        let values = decode_row(&cols(), &row).unwrap();
+        match &values[6] {
+            PgValue::Bytea(Some(bytes)) => {
+                assert_eq!(bytes, &hex::decode(identity).unwrap());
+            }
+            other => panic!("expected Bytea, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_identity_object_wrappers() {
+        let mut malformed = sample_row();
+        malformed["userId"] = json!({ "__identity__": [1, 2, 3] });
+        let err = decode_row(&cols(), &malformed).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("expected 32-byte array for Identity"));
+
+        let mut multi_key = sample_row();
+        multi_key["userId"] = json!({
+            "__identity__": format!("0x{}", "ab".repeat(32)),
+            "extra": true,
+        });
+        let err = decode_row(&cols(), &multi_key).unwrap_err();
+        assert!(err.to_string().contains("single-key __identity__ object"));
     }
 
     #[test]
