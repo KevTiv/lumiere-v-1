@@ -1,8 +1,8 @@
 //! Projection status classification and persistence adapters.
 
 use super::super::projection_observability;
-use super::decode::parse_timestamp;
-use anyhow::Result;
+use super::decode::{parse_timestamp, require_u64};
+use anyhow::{bail, Result};
 use deadpool_postgres::Pool;
 use stdb_client::StdbClient;
 
@@ -62,15 +62,81 @@ pub(super) async fn oldest_unprojected_at(
 ) -> Option<i64> {
     let rows = stdb
         .query_sql(&format!(
-            "SELECT occurred_at FROM organization_commit \
-             WHERE organization_id = {organization_id} AND sequence >= {sequence} \
-             ORDER BY sequence ASC LIMIT 1"
+            "SELECT * FROM organization_commit \
+             WHERE organization_id = {organization_id} AND sequence >= {sequence}"
         ))
         .await
         .ok()?;
-    rows.first()
-        .and_then(|row| row.get("occurredAt"))
-        .and_then(|value| parse_timestamp(value).ok())
+    select_oldest_commit_timestamp(rows, organization_id, sequence)
+        .ok()
+        .flatten()
+}
+
+pub(super) fn select_oldest_commit_timestamp(
+    rows: Vec<serde_json::Value>,
+    organization_id: u64,
+    sequence: u64,
+) -> Result<Option<i64>> {
+    let mut candidates = Vec::with_capacity(rows.len());
+    for row in rows {
+        let row_organization_id = require_u64(&row, "organizationId")?;
+        let row_sequence = require_u64(&row, "sequence")?;
+        if row_organization_id != organization_id {
+            bail!(
+                "organization commit query returned row outside requested organization {organization_id}"
+            );
+        }
+        if row_sequence >= sequence {
+            let occurred_at = parse_timestamp(
+                row.get("occurredAt")
+                    .ok_or_else(|| anyhow::anyhow!("projection occurredAt is missing"))?,
+            )?;
+            candidates.push((row_sequence, occurred_at));
+        }
+    }
+
+    candidates.sort_by_key(|(row_sequence, _)| *row_sequence);
+    for pair in candidates.windows(2) {
+        if pair[0].0 == pair[1].0 {
+            bail!(
+                "organization commit query returned duplicate sequence {}",
+                pair[0].0
+            );
+        }
+    }
+    Ok(candidates.first().map(|(_, occurred_at)| *occurred_at))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn commit(organization_id: u64, sequence: u64, occurred_at: i64) -> serde_json::Value {
+        json!({
+            "organizationId": organization_id,
+            "sequence": sequence,
+            "occurredAt": {"microsSinceUnixEpoch": occurred_at},
+        })
+    }
+
+    #[test]
+    fn oldest_commit_selection_sorts_and_filters_in_rust() {
+        let occurred_at = select_oldest_commit_timestamp(
+            vec![commit(7, 9, 90), commit(7, 5, 50), commit(7, 8, 80)],
+            7,
+            8,
+        )
+        .unwrap();
+        assert_eq!(occurred_at, Some(80));
+    }
+
+    #[test]
+    fn oldest_commit_selection_rejects_duplicate_sequences() {
+        let error = select_oldest_commit_timestamp(vec![commit(7, 8, 80), commit(7, 8, 81)], 7, 8)
+            .unwrap_err();
+        assert!(error.to_string().contains("duplicate sequence"));
+    }
 }
 
 pub(super) async fn record_success(

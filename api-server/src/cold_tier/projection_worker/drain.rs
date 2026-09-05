@@ -3,16 +3,17 @@
 use super::super::commit_projection;
 use super::decode::{parse_change, parse_commit, require_u64};
 use super::require_server_identity;
-use super::source::{next_projection_sequence, query_cursors};
+use super::source::{next_projection_sequence, query_cursors, select_commit_row};
 use super::status::{
     classify_apply_error, oldest_unprojected_at, projection_heads, record_failure, record_success,
     ProjectionFailureKind,
 };
 use super::ProjectionDrainStats;
 use super::{CURSOR_SCAN_AFTER, MAX_CHANGES_PER_COMMIT, PROJECTION_CODEC_MANIFEST_JSON};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use deadpool_postgres::Pool;
 use serde_json::Value;
+use std::collections::BTreeSet;
 use std::sync::atomic::Ordering;
 use stdb_client::StdbClient;
 
@@ -129,12 +130,8 @@ async fn drain_organization(
     }
     let commit_rows = match stdb
         .query_sql(&format!(
-            "SELECT id, organization_id, sequence, operation_id, correlation_id, \
-                    change_schema_version, contract_version, occurred_at, actor_identity, \
-                    row_change_count, checksum \
-             FROM organization_commit \
-             WHERE organization_id = {organization_id} AND sequence = {next_sequence} \
-             LIMIT 1"
+            "SELECT * FROM organization_commit \
+             WHERE organization_id = {organization_id} AND sequence = {next_sequence}"
         ))
         .await
         .with_context(|| format!("query organization {organization_id} commit {next_sequence}"))
@@ -161,29 +158,53 @@ async fn drain_organization(
             return;
         }
     };
-    let Some(commit_row) = commit_rows.first() else {
-        let error =
-            anyhow!("organization {organization_id} projection commit {next_sequence} is missing");
-        stats.failed += 1;
-        if let Err(status_error) = record_failure(
-            pool,
-            organization_id,
-            stdb_head,
-            pg_durable_head,
-            None,
-            "gap",
-            &error,
-            None,
-        )
-        .await
-        {
+    let commit_row = match select_commit_row(commit_rows, organization_id, next_sequence) {
+        Ok(Some(row)) => row,
+        Ok(None) => {
+            let error = anyhow!(
+                "organization {organization_id} projection commit {next_sequence} is missing"
+            );
             stats.failed += 1;
-            tracing::error!(%status_error, organization_id, "record projection gap status failed");
+            if let Err(status_error) = record_failure(
+                pool,
+                organization_id,
+                stdb_head,
+                pg_durable_head,
+                None,
+                "gap",
+                &error,
+                None,
+            )
+            .await
+            {
+                stats.failed += 1;
+                tracing::error!(%status_error, organization_id, "record projection gap status failed");
+            }
+            tracing::warn!(%error, "projection commit gap; watermark remains unchanged");
+            return;
         }
-        tracing::warn!(%error, "projection commit gap; watermark remains unchanged");
-        return;
+        Err(error) => {
+            stats.failed += 1;
+            if let Err(status_error) = record_failure(
+                pool,
+                organization_id,
+                stdb_head,
+                pg_durable_head,
+                None,
+                "malformed_commit",
+                &error,
+                Some(next_sequence),
+            )
+            .await
+            {
+                stats.failed += 1;
+                tracing::error!(%status_error, organization_id, "record malformed projection status failed");
+            }
+            tracing::error!(%error, organization_id, sequence = next_sequence, "projection commit cardinality check failed");
+            return;
+        }
     };
-    let commit = match parse_commit(commit_row) {
+    let commit = match parse_commit(&commit_row) {
         Ok(commit) => commit,
         Err(error) => {
             stats.failed += 1;
@@ -229,13 +250,9 @@ async fn drain_organization(
     }
     let changes = match stdb
         .query_sql(&format!(
-            "SELECT id, organization_id, commit_sequence, ordinal, table_name, \
-                    row_identity_json, change_kind, row_json, checksum \
-             FROM organization_row_change \
+            "SELECT * FROM organization_row_change \
              WHERE organization_id = {organization_id} \
-               AND commit_sequence = {next_sequence} \
-             ORDER BY ordinal ASC LIMIT {}",
-            MAX_CHANGES_PER_COMMIT + 1
+               AND commit_sequence = {next_sequence}"
         ))
         .await
         .with_context(|| {
@@ -263,32 +280,19 @@ async fn drain_organization(
             return;
         }
     };
-    if changes.len() > MAX_CHANGES_PER_COMMIT {
-        let error = anyhow!(
-            "organization {organization_id} commit {next_sequence} exceeds the bounded change limit"
-        );
-        stats.failed += 1;
-        if let Err(status_error) = record_failure(
-            pool,
-            organization_id,
-            stdb_head,
-            pg_durable_head,
-            Some(commit.occurred_at_micros),
-            "change_limit",
-            &error,
-            Some(next_sequence),
-        )
-        .await
-        {
-            stats.failed += 1;
-            tracing::error!(%status_error, organization_id, "record projection quarantine status failed");
-        }
-        tracing::error!(%error, "projection commit quarantined");
-        return;
-    }
-    let changes = match changes.iter().map(parse_change).collect::<Result<Vec<_>>>() {
+    let changes = match normalize_changes(
+        changes,
+        organization_id,
+        next_sequence,
+        commit.row_change_count,
+    ) {
         Ok(changes) => changes,
         Err(error) => {
+            let failure_kind = if error.to_string().contains("bounded change limit") {
+                "change_limit"
+            } else {
+                "malformed_change"
+            };
             stats.failed += 1;
             if let Err(status_error) = record_failure(
                 pool,
@@ -296,7 +300,7 @@ async fn drain_organization(
                 stdb_head,
                 pg_durable_head,
                 Some(commit.occurred_at_micros),
-                "malformed_change",
+                failure_kind,
                 &error,
                 Some(next_sequence),
             )
@@ -305,7 +309,7 @@ async fn drain_organization(
                 stats.failed += 1;
                 tracing::error!(%status_error, organization_id, "record projection change status failed");
             }
-            tracing::error!(%error, organization_id, sequence = next_sequence, "malformed projection change quarantined");
+            tracing::error!(%error, organization_id, sequence = next_sequence, "projection changes quarantined");
             return;
         }
     };
@@ -367,5 +371,133 @@ async fn drain_organization(
                 tracing::error!(%error, organization_id, "record projection success status failed");
             }
         }
+    }
+}
+
+fn normalize_changes(
+    rows: Vec<Value>,
+    organization_id: u64,
+    commit_sequence: u64,
+    expected_count: u32,
+) -> Result<Vec<commit_projection::OrganizationRowChangeInput>> {
+    if rows.len() > MAX_CHANGES_PER_COMMIT {
+        bail!(
+            "organization {organization_id} commit {commit_sequence} exceeds the bounded change limit"
+        );
+    }
+
+    let mut indexed = Vec::with_capacity(rows.len());
+    let mut seen_ordinals = BTreeSet::new();
+    let mut seen_ids = BTreeSet::new();
+    for row in rows {
+        let row_organization_id = require_u64(&row, "organizationId")?;
+        let row_commit_sequence = require_u64(&row, "commitSequence")?;
+        if row_organization_id != organization_id || row_commit_sequence != commit_sequence {
+            bail!(
+                "organization row-change query returned row outside requested organization {organization_id} sequence {commit_sequence}"
+            );
+        }
+        let change = parse_change(&row)?;
+        if !seen_ordinals.insert(change.ordinal) {
+            bail!(
+                "organization {organization_id} commit {commit_sequence} returned duplicate change ordinal {}",
+                change.ordinal
+            );
+        }
+        if !seen_ids.insert(change.id.clone()) {
+            bail!(
+                "organization {organization_id} commit {commit_sequence} returned duplicate change id {}",
+                change.id
+            );
+        }
+        indexed.push((change.ordinal, change.id.clone(), change));
+    }
+
+    if indexed.len() != expected_count as usize {
+        bail!(
+            "organization {organization_id} commit {commit_sequence} returned {} changes; expected {}",
+            indexed.len(),
+            expected_count
+        );
+    }
+
+    indexed.sort_by_key(|(ordinal, _, _)| *ordinal);
+
+    Ok(indexed.into_iter().map(|(_, _, change)| change).collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn change(id: &str, organization_id: u64, commit_sequence: u64, ordinal: u64) -> Value {
+        json!({
+            "id": id,
+            "organizationId": organization_id,
+            "commitSequence": commit_sequence,
+            "ordinal": ordinal,
+            "tableName": "company",
+            "rowIdentityJson": format!("{{\"id\":{ordinal}}}"),
+            "changeKind": "upsert",
+            "rowJson": "{}",
+            "checksum": format!("{:0>64}", ordinal),
+        })
+    }
+
+    #[test]
+    fn normalizes_changes_by_ordinal_and_requires_commit_cardinality() {
+        let normalized = normalize_changes(
+            vec![
+                change("change-2", 7, 4, 2),
+                change("change-0", 7, 4, 0),
+                change("change-1", 7, 4, 1),
+            ],
+            7,
+            4,
+            3,
+        )
+        .unwrap();
+        assert_eq!(
+            normalized
+                .iter()
+                .map(|change| change.ordinal)
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2]
+        );
+
+        let mismatch = normalize_changes(vec![change("change-0", 7, 4, 0)], 7, 4, 2);
+        assert!(mismatch.unwrap_err().to_string().contains("expected 2"));
+    }
+
+    #[test]
+    fn normalization_rejects_duplicate_or_out_of_scope_changes() {
+        let duplicate_ordinal = normalize_changes(
+            vec![change("change-0", 7, 4, 0), change("change-1", 7, 4, 0)],
+            7,
+            4,
+            2,
+        );
+        assert!(duplicate_ordinal
+            .unwrap_err()
+            .to_string()
+            .contains("duplicate change ordinal"));
+
+        let duplicate_id = normalize_changes(
+            vec![change("same", 7, 4, 0), change("same", 7, 4, 1)],
+            7,
+            4,
+            2,
+        );
+        assert!(duplicate_id
+            .unwrap_err()
+            .to_string()
+            .contains("duplicate change id"));
+
+        let out_of_scope = normalize_changes(vec![change("change-0", 8, 4, 0)], 7, 4, 1);
+        assert!(out_of_scope
+            .unwrap_err()
+            .to_string()
+            .contains("outside requested"));
     }
 }
