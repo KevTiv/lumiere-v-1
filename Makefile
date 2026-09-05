@@ -829,9 +829,9 @@ e2e-smoke:
 		fi; \
 		echo "[e2e] Building api-server (first run may take a few minutes)..."; \
 		scripts/e2e-dx.sh api-build; \
+		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
 		echo "[e2e] Applying checksum-verified PostgreSQL migrations..."; \
 		scripts/e2e-dx.sh storage-migrate; \
-		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
 		echo "[e2e] Starting api-server on :$(E2E_API_PORT)..."; \
 		LUMIERE_E2E=1 \
 		PORT="$(E2E_API_PORT)" \
