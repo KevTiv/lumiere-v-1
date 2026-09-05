@@ -170,6 +170,22 @@ create table if not exists lumiere_platform.schema_migration (
 /// or transaction fails, so a crashed drainer cannot strand future startups.
 const MIGRATION_LOCK_KEY: i64 = 0x4c554d49455245;
 const DURABLE_SCHEMA_MANIFEST_JSON: &str = lumiere_contracts::manifests::DURABLE_PG_SCHEMA_MANIFEST;
+const POSTGRES_IDENTIFIER_MAX_BYTES: usize = 63;
+
+fn postgres_identifier(identifier: &str) -> String {
+    identifier
+        .chars()
+        .scan(0usize, |bytes, character| {
+            let next = *bytes + character.len_utf8();
+            if next > POSTGRES_IDENTIFIER_MAX_BYTES {
+                None
+            } else {
+                *bytes = next;
+                Some(character)
+            }
+        })
+        .collect()
+}
 
 /// Return the checksum recorded for a migration's SQL.
 ///
@@ -495,6 +511,7 @@ async fn verify_durable_schema(transaction: &tokio_postgres::Transaction<'_>) ->
             let index_name = expected_index["name"]
                 .as_str()
                 .context("durable PostgreSQL index lacks name")?;
+            let persisted_index_name = postgres_identifier(index_name);
             let index_unique = expected_index["unique"]
                 .as_bool()
                 .context("durable PostgreSQL index lacks uniqueness")?;
@@ -510,7 +527,9 @@ async fn verify_durable_schema(transaction: &tokio_postgres::Transaction<'_>) ->
                 })
                 .collect::<Result<Vec<_>>>()?;
             let matches = table_indexes.iter().any(|(name, _, unique, columns)| {
-                name == index_name && *unique == index_unique && columns == &index_columns
+                name == &persisted_index_name
+                    && *unique == index_unique
+                    && columns == &index_columns
             });
             if !matches {
                 bail!("durable PostgreSQL table '{table}' lacks declared index '{index_name}'");
@@ -715,6 +734,18 @@ mod tests {
             migration_checksum("create table one (id bigint)"),
             migration_checksum("create table one (id bigint, value text)")
         );
+    }
+
+    #[test]
+    fn postgres_identifier_matches_server_truncation() {
+        assert_eq!(postgres_identifier("short_index"), "short_index");
+        assert_eq!(
+            postgres_identifier(
+                "contact_identity_verification_authority_organization_authority_key"
+            ),
+            "contact_identity_verification_authority_organization_authority_"
+        );
+        assert!(postgres_identifier(&format!("{}é", "x".repeat(62))).len() <= 63);
     }
 
     #[test]
