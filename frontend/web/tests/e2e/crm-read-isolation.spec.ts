@@ -310,8 +310,8 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
       )
     }
     const currencies = (await currenciesResponse.json()) as { data?: QueryRow[] }
-    const currencyId = valueAsId(currencies.data?.[0] ?? {}, "id")
-    if (currencyId == null) throw new Error("bootstrap currency catalog is empty")
+    const currencyCode = valueAsString(currencies.data?.[0] ?? {}, "code")
+    if (!currencyCode) throw new Error("bootstrap currency catalog is empty")
 
     const mainCompanyName = `${suffix} main`
     const bootstrap = await api.post("/api/bootstrap/tenant", {
@@ -333,7 +333,8 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
         },
         defaultCompanyName: mainCompanyName,
         defaultCompanyCode: `${organizationCode}M`,
-        defaultCompanyCurrencyId: currencyId,
+        defaultCompanyCurrencyId: 0,
+        defaultCompanyCurrencyCode: currencyCode,
         fiscalYearEndMonth: 12,
         fiscalYearEndDay: 31,
         seedFormConfigs: false,
@@ -363,7 +364,10 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
       `${label} main company`,
     )
     const mainCompanyId = valueAsId(mainCompany, "id")
-    if (mainCompanyId == null) throw new Error(`${label} main company has no id`)
+    const currencyId = valueAsId(mainCompany, "currencyId", "currency_id")
+    if (mainCompanyId == null || currencyId == null) {
+      throw new Error(`${label} main company has no id or currency`)
+    }
 
     const branchCompanyName = `${suffix} branch`
     await callReducerBff(page, "create_company", [
