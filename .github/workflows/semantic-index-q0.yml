@@ -44,7 +44,7 @@ jobs:
     timeout-minutes: 20
     services:
       qdrant:
-        image: qdrant/qdrant:v1.12.6
+        image: qdrant/qdrant:v1.17.0
         ports:
           - 6333:6333
           - 6334:6334
