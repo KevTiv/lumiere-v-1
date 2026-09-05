@@ -18,6 +18,13 @@ The near-term production deployment is explicitly **Cloudflare global ingress â†
 
 The application-contract IR also becomes the source for generated harness-safe capability/tool descriptors. The AI harness, web, Expo, and future clients consume the same stable ERP operations. Casbin-style server policy remains the sole authorization authority; capability metadata is structural and never grants access by itself.
 
+Current C5 storage policy: `pos_order` is the sole archive root candidate;
+`pos_order_line` and `pos_payment` inherit that reviewed aggregate archive.
+`audit_log` is `always_hot` and is not an active archive/finalization
+candidate. Its legacy cold schema/read compatibility is retained only for
+already-archived development data. The related audit cold-tier document is a
+superseded historical proposal.
+
 For analytical AI workflows, raw ERP query results are not the default model context. Large/bulk results remain server-side and are reduced through typed deterministic analysis plans before a compact result reaches the model. The model chooses authorized capabilities and analysis intent; trusted code performs bulk filtering, grouping, aggregation, comparison, and projection.
 
 Traffic resilience is part of the contract boundary as well: generated operations carry structural traffic classification so Cloudflare/Kong and application admission control can apply bounded, server-authoritative rate/concurrency/retry policy without moving business logic into the edge or gateway.
@@ -660,7 +667,7 @@ Required deployment properties:
 
 ### Phase 4 â€” prove durable read
 
-Use `audit_log` first:
+Use the reviewed `pos_order` aggregate first:
 
 - [ ] STDB procedure authorizes bounded historical query;
 - [ ] gateway executes generated contract against placement-resolved PG;

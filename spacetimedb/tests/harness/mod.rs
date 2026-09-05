@@ -98,8 +98,6 @@ pub struct OrgFixture {
 impl OrgFixture {
     /// Seed org-scoped baseline data via domain reducers (plus one warehouse row aligned with `seed.rs`).
     pub fn seed_minimal(ctx: &ReducerContext) -> Result<Self, String> {
-        ensure_test_superuser(ctx)?;
-
         let suffix = unique_suffix(ctx);
         let org_code = format!("T{suffix}");
         let company_code = format!("C{suffix}");
@@ -125,6 +123,10 @@ impl OrgFixture {
             },
         )?;
         let organization_id = org.id;
+        // Organization creation establishes the caller's membership and
+        // organization-owned profile. Promote only after that profile exists;
+        // fresh C0 databases intentionally have no global/sentinel profile.
+        ensure_test_superuser(ctx)?;
         // Canonical reference rows are tenant-owned. Seed them only after the
         // organization exists so tests never depend on global/sentinel rows.
         seed_currency_for_organization(ctx, organization_id, "USD")?;

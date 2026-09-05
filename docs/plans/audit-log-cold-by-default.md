@@ -1,12 +1,21 @@
-# Audit-log cold-by-default: first resource in the sliding-window architecture
+# Audit-log cold-by-default: superseded historical proposal
 
-**Status:** Proposed — revised 2026-08-18 after architecture review
+**Status:** Superseded by the C5 policy correction (2026-09-05)
 **Tracks:** `storage-tier`, `audit`, `production-readiness`
 **Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [backup-recovery-followup.md](./backup-recovery-followup.md)
 
+> This document records the earlier audit-log cold-tier design and is retained
+> for decision history. It is not an active implementation contract. The
+> current C5 policy has exactly one archive root: `pos_order` (with its reviewed
+> children). `audit_log` is `always_hot` because ordinary audit appends do not
+> emit the exact organization commit and projection-watermark evidence needed
+> for safe deletion. The compatibility `cold_audit_log` schema/read path and
+> migration remain available for already-archived development data, but no
+> active audit drainer or audit finalizer is part of the archive candidate set.
+
 ---
 
-## 1. Decision
+## 1. Historical decision (superseded)
 
 Use the existing SpacetimeDB `audit_log` table itself as the short-lived transactional outbox for Phase 1.
 

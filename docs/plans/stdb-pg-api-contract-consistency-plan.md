@@ -13,7 +13,7 @@
 
 That changes what is cheap. Before extraction, adding a generated artifact meant adding thousands of reviewed files to every PR. Now a new manifest is one JSON file in a released tag. The call-path inconsistencies below have all been "known but expensive"; the expense is gone.
 
-This plan does **not** build the application-contract IR. It makes the existing STDB/PG/API call paths converge on single seams *shaped like* that IR, so Phase 1 of the cold-tier plan becomes a generation step rather than a rewrite.
+This plan does **not** build the application-contract IR. It makes the existing STDB/PG/API call paths converge on single seams *shaped like* that IR, so Phase 1 of the cold-tier plan becomes a generation step rather than a rewrite. Its archive counts below are a historical 2026-08-24 snapshot; the current C5 policy has one active archive root, `pos_order`, while `audit_log` is `always_hot` with compatibility-only cold reads/migration.
 
 The 2026-08-24 STDB access-path investigation adds one additional requirement to this convergence work:
 
@@ -37,7 +37,7 @@ Counted on this branch (`vibe/sliding-window-cold-tier`), against pinned contrac
 | Read resources compiled through `ResourceReadPlan` | 1 (`pos_order`) | [pos_order_read.rs](api-server/src/cold_tier/pos_order_read.rs) |
 | Hand-written read SQL builder | 2,149 lines | [query_exec.rs](api-server/src/query_exec.rs) |
 | STDB→PG drainers | 2 (`audit_log`, `pos_order`) | `cold_tier/*_drainer.rs`, 919 lines |
-| Archive candidates declared | 2 | `manifests/archive-manifest.json` |
+| Active archive roots | 1 (`pos_order`; POS children inherit) | current C5 storage-policy subset |
 | Hydration policies declared | 0 | `manifests/hydration-manifest.json` |
 | Tables in the schema manifest | 458 | `manifests/lumiere-schema-manifest.json` |
 | Reducers in the schema manifest | **0** | there is no reducer section |
@@ -78,7 +78,14 @@ Two compilers means every cold-tier promotion is a rewrite rather than a manifes
 
 ### 3.3 Projection is per-table hand-written code
 
-`audit_drainer.rs` (649) and `pos_order_drainer.rs` (270) implement the same shape — read hot tail, encode via codec manifest, upsert into PG, call a finalize reducer, advance a watermark — twice, divergently. `archive-manifest.json` already carries everything a generic drainer needs per candidate (`cold_table`, `finalize_reducer`, `mode`, `order_by`, `primary_key`, `scope_columns`, `pg_ddl_file`). With 2 candidates the duplication is cheap; it is the third that must not be written by hand.
+The historical audit and POS drainers implemented the same shape — read hot
+tail, encode via codec manifest, upsert into PG, call a finalize reducer, and
+advance a watermark — twice, divergently. The current archive manifest has
+one active root (`pos_order`); `audit_log` remains a compatibility-only cold
+read/migration surface and is not an active finalization candidate. The
+manifest still carries everything a generic drainer needs for a coolable
+candidate (`cold_table`, `finalize_reducer`, `mode`, `order_by`, `primary_key`,
+`scope_columns`, `pg_ddl_file`).
 
 ### 3.4 Cache invalidation is 5% covered and fails open
 
@@ -155,7 +162,9 @@ The manifest is compiled in from `lumiere_contracts::manifests::REDUCER_MANIFEST
 
 ### 4.4 One drainer
 
-A single `cold_tier::drainer` parameterized by an `ArchiveCandidate`, with `audit_log` and `pos_order` as its two registrations. Mode-specific behavior (`append_only` vs. the mutable case) lives in one `match`, not one file per table.
+A single `cold_tier::drainer` parameterized by an `ArchiveCandidate`, with
+`pos_order` as the active registration. `audit_log` remains hot and its legacy
+cold compatibility path must not be treated as an archive candidate.
 
 ### 4.5 Shared application read intent + durable physical access contract
 
@@ -310,7 +319,7 @@ Inherited from [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) §2,
 
 ### Phase D — manifest-driven projection
 
-- [ ] extract the shared drainer loop; register `audit_log` and `pos_order` through it;
+- [ ] extract the shared drainer loop; register the reviewed `pos_order` root through it;
 - [ ] prove equivalence against the current drainers on real data before deleting them;
 - [ ] add a third candidate end-to-end as the actual test of genericity;
 - [ ] extend projection metadata with key/source/maintainer/rebuild/access-path information where the application IR later adopts `ProjectionDescriptor`;

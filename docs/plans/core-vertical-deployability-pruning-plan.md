@@ -66,7 +66,9 @@ persisted-data, all-module, release, and CI gates in this document.
   reads.
 - PostgreSQL pool/TLS configuration, generated cold-table DDL, transfer ledger,
   checksums, and merged hot/cold read foundations exist.
-- `audit_log` has an idempotent STDB → PostgreSQL drainer and finalization path.
+- `audit_log` remains always-hot for active writes; its legacy PostgreSQL
+  migration/read compatibility is retained for already-archived development
+  data, but it is not an active C5 archive/finalization candidate.
 - `pos_order` proves the version-aware mutable-resource archive protocol.
 - The ERP master tracker records no remaining P0/P1 domain-integrity items,
   although many browser workflows still lack full E2E proof.
@@ -74,7 +76,9 @@ persisted-data, all-module, release, and CI gates in this document.
 ### Not present
 
 - PostgreSQL is **not yet a durable projection of the whole ERP**. Generated DDL
-  and workers currently cover only `audit_log` and `pos_order`.
+  and workers cover the broad projection surface, while the active C5 archive
+  root is `pos_order` (with reviewed children); `audit_log` is compatibility-only
+  for cold reads/migration.
 - There is no canonical, total per-organization business commit stream covering
   all reconstructable tables.
 - There is no production-grade migration history for PostgreSQL; schema setup is
@@ -106,7 +110,7 @@ relations. The original application baseline was:
 ```text
 425 carry organization_id directly
  33 do not
-  2 are declared archive candidates
+  1 is the declared archive root (`pos_order`; reviewed children inherit it)
   0 have hydration policies
 ```
 
@@ -351,8 +355,9 @@ PostgreSQL ledger, and split worker credentials are implemented. C5 remains
 open for the disposable registered-worker STDB-to-PostgreSQL drill and an
 immutable generated-contract release.
 
-- Replace the two-entry archive candidate list with the total storage-policy
-  manifest; archive candidates become a generated subset.
+- Derive the archive candidate subset from the total storage-policy manifest;
+  the current reviewed subset has one root, `pos_order`, with POS children
+  inheriting the aggregate archive.
 - Add semantic eligibility for every coolable aggregate:
   state, age/window, open obligations, workflow state, durable watermark, exact
   durable version, and hot dependency checks.

@@ -2266,10 +2266,6 @@
       "name": "fail_warehouse_sync_intent",
       "shape_fingerprint": "sha256:c007c12280cf21f42a1dd62504624a0315eb08c2ce5ca12771fd4e9c867616ec"
     },
-    "erp.finalize_audit_log_archive": {
-      "name": "finalize_audit_log_archive",
-      "shape_fingerprint": "sha256:14b55d9b67374e476f5a3aae7c449f57b5381b7e66d4c8023595c7343488db48"
-    },
     "erp.finalize_import_assistant_job": {
       "name": "finalize_import_assistant_job",
       "shape_fingerprint": "sha256:209600e875820ed14dc27f61478c5c433daebf3422c716db54ad76ebe0ef3938"
@@ -3489,10 +3485,6 @@
     "erp.run_cartonization": {
       "name": "run_cartonization",
       "shape_fingerprint": "sha256:073de8d6d98559603a90bbd47e8fa109d47fa50cfea388e3c94c327fd0a80e5b"
-    },
-    "erp.run_core_audit_finalize_test": {
-      "name": "run_core_audit_finalize_test",
-      "shape_fingerprint": "sha256:48188c723cca23a3b4cf2a0ab70697f2916b1daa6c1f7eee3539214acd39991e"
     },
     "erp.run_core_operational_messaging_test": {
       "name": "run_core_operational_messaging_test",
@@ -5293,8 +5285,10 @@
   },
   "retired_ids": [
     "erp.create_password_reset_token",
+    "erp.finalize_audit_log_archive",
     "erp.link_workos_user",
     "erp.mark_reset_token_used",
+    "erp.run_core_audit_finalize_test",
     "erp.store_sso_user_credential",
     "erp.store_user_credential",
     "erp.update_user_password"
