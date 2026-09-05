@@ -6,6 +6,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 use crate::accounting::journal_entries::account_move;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::subscriptions::billing_helpers::calculate_next_date;
+use crate::subscriptions::relations::require_subscription;
 use crate::subscriptions::tables::{
     deferred_revenue_line, deferred_revenue_schedule, subscription, subscription_line,
     subscription_plan, DeferredRevenueLine, DeferredRevenueSchedule, Subscription,
@@ -245,27 +246,6 @@ pub struct RebaseDeferredSchedulesParams {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-fn load_sub(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    company_id: u64,
-    subscription_id: u64,
-) -> Result<Subscription, String> {
-    let sub = ctx
-        .db
-        .subscription()
-        .id()
-        .find(&subscription_id)
-        .ok_or("Subscription not found")?;
-    if sub.organization_id != organization_id {
-        return Err("Subscription does not belong to this organization".to_string());
-    }
-    if sub.company_id != company_id {
-        return Err("Subscription does not belong to this company".to_string());
-    }
-    Ok(sub)
-}
-
 fn secs(ts: Timestamp) -> u64 {
     ts.to_duration_since_unix_epoch()
         .unwrap_or_default()
@@ -449,7 +429,7 @@ pub fn record_subscription_payment_failure(
     params: RecordSubscriptionPaymentFailureParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription", "write")?;
-    let sub = load_sub(ctx, organization_id, company_id, subscription_id)?;
+    let sub = require_subscription(ctx, organization_id, company_id, subscription_id)?;
     if sub.state == "closed" {
         return Err("Subscription is closed".to_string());
     }
@@ -523,7 +503,7 @@ pub fn advance_subscription_dunning(
     params: AdvanceSubscriptionDunningParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription", "write")?;
-    let sub = load_sub(ctx, organization_id, company_id, subscription_id)?;
+    let sub = require_subscription(ctx, organization_id, company_id, subscription_id)?;
     if sub.state == "closed" {
         return Ok(());
     }
@@ -626,7 +606,7 @@ pub fn grant_subscription_entitlement(
     params: GrantSubscriptionEntitlementParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription", "write")?;
-    let sub = load_sub(ctx, organization_id, company_id, subscription_id)?;
+    let sub = require_subscription(ctx, organization_id, company_id, subscription_id)?;
     let code = params.feature_code.trim().to_string();
     if code.is_empty() {
         return Err("feature_code is required".to_string());
@@ -739,7 +719,7 @@ pub fn create_subscription_payment_intent(
     params: CreateSubscriptionPaymentIntentParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription", "write")?;
-    let sub = load_sub(ctx, organization_id, company_id, subscription_id)?;
+    let sub = require_subscription(ctx, organization_id, company_id, subscription_id)?;
     let intent_type = params.intent_type.trim().to_ascii_lowercase();
     if !payment_intent_types().contains(&intent_type.as_str()) {
         return Err("intent_type must be card_charge|pix|boleto|paynow|fpx|qris|eft".to_string());
@@ -845,7 +825,7 @@ pub fn apply_subscription_payment_intent(
             ..intent.clone()
         });
 
-    let sub = load_sub(ctx, organization_id, company_id, intent.subscription_id)?;
+    let sub = require_subscription(ctx, organization_id, company_id, intent.subscription_id)?;
     let _ = grant_default_entitlement(ctx, organization_id, company_id, &sub)?;
     let mut coll = ensure_collection(ctx, organization_id, company_id, intent.subscription_id);
     ctx.db
@@ -935,7 +915,7 @@ pub fn create_subscription_tax_settle_intent(
     params: CreateSubscriptionTaxSettleIntentParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription", "write")?;
-    let _sub = load_sub(ctx, organization_id, company_id, subscription_id)?;
+    let _sub = require_subscription(ctx, organization_id, company_id, subscription_id)?;
     let intent_type = params.intent_type.trim().to_ascii_lowercase();
     if intent_type != "wht" && intent_type != "e_invoice" {
         return Err("intent_type must be wht|e_invoice".to_string());
@@ -1167,7 +1147,7 @@ pub fn apply_index_linked_renewal(
     params: ApplyIndexLinkedRenewalParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription", "write")?;
-    let sub = load_sub(ctx, organization_id, company_id, subscription_id)?;
+    let sub = require_subscription(ctx, organization_id, company_id, subscription_id)?;
     if sub.state != "active" && sub.state != "paused" {
         return Err("Subscription must be active or paused".to_string());
     }
@@ -1279,7 +1259,7 @@ pub fn rebase_deferred_schedules_for_subscription(
     params: RebaseDeferredSchedulesParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "deferred_revenue_schedule", "write")?;
-    let _sub = load_sub(ctx, organization_id, company_id, subscription_id)?;
+    let _sub = require_subscription(ctx, organization_id, company_id, subscription_id)?;
     if params.scale_factor <= 0.0 {
         return Err("scale_factor must be > 0".to_string());
     }
@@ -1385,7 +1365,7 @@ pub fn refresh_subscription_exception_flags(
     subscription_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription", "write")?;
-    let sub = load_sub(ctx, organization_id, company_id, subscription_id)?;
+    let sub = require_subscription(ctx, organization_id, company_id, subscription_id)?;
     let now = secs(ctx.timestamp);
     let next = secs(sub.recurring_next_date);
     let due_to_bill = sub.state == "active" && next <= now;

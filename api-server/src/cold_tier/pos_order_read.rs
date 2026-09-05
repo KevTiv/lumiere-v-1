@@ -119,6 +119,7 @@ pub async fn merged_page(
 /// exists.  Hot rows win when the finalize race leaves the same primary key in
 /// both stores; this keeps the authoritative current representation visible
 /// until the hot delete completes.
+#[cfg(test)]
 fn merge_hot_cold_rows(
     hot_rows: Vec<Value>,
     cold_rows: Vec<Value>,

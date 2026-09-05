@@ -14,7 +14,7 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use serde_json::{Map, Value};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use stdb_client::StdbClient;
 use thiserror::Error;
@@ -1094,8 +1094,8 @@ fn parse_request(row: &Value) -> Result<CertificationRequest> {
         skill_id: required_u64(row, "skillId", "skill_id")?,
         skill_version_id: required_u64(row, "skillVersionId", "skill_version_id")?,
         fixture_id: required_u64(row, "fixtureId", "fixture_id")?,
-        runtime_profile_id: optional_u64(row, "runtimeProfileId", "runtime_profile_id"),
-        certification_environment_id: optional_u64(
+        runtime_profile_id: row_u64(row, "runtimeProfileId", "runtime_profile_id"),
+        certification_environment_id: row_u64(
             row,
             "certificationEnvironmentId",
             "certification_environment_id",
@@ -1214,16 +1214,12 @@ fn failure_hashes(
     }
 }
 
+use crate::wire_decode::row_u64;
+
 fn required_u64(row: &Value, camel: &str, snake: &str) -> Result<u64> {
-    optional_u64(row, camel, snake)
+    row_u64(row, camel, snake)
         .filter(|value| *value > 0)
         .with_context(|| format!("{snake} is missing or invalid"))
-}
-
-fn optional_u64(row: &Value, camel: &str, snake: &str) -> Option<u64> {
-    row.get(camel)
-        .or_else(|| row.get(snake))
-        .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
 }
 
 fn row_string(row: &Value, camel: &str, snake: &str) -> Option<String> {
@@ -1250,7 +1246,7 @@ fn runtime_profile_matches(
 }
 
 pub fn hash_value(value: &Value) -> String {
-    let canonical = canonicalize(value);
+    let canonical = crate::wire_decode::canonicalize(value);
     let bytes = serde_json::to_vec(&canonical).unwrap_or_else(|_| b"null".to_vec());
     sha256_prefixed(&bytes)
 }
@@ -1259,22 +1255,6 @@ fn sha256_prefixed(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     format!("sha256:{:x}", hasher.finalize())
-}
-
-fn canonicalize(value: &Value) -> Value {
-    match value {
-        Value::Object(object) => {
-            let mut entries: Vec<_> = object.iter().collect();
-            entries.sort_by(|(left, _), (right, _)| left.cmp(right));
-            let mut canonical = Map::new();
-            for (key, value) in entries {
-                canonical.insert(key.clone(), canonicalize(value));
-            }
-            Value::Object(canonical)
-        }
-        Value::Array(items) => Value::Array(items.iter().map(canonicalize).collect()),
-        other => other.clone(),
-    }
 }
 
 #[cfg(test)]

@@ -14,7 +14,7 @@
 //! plan's invariant that "existing callers remain unchanged" (frontend
 //! compatibility is non-negotiable, not just a nice-to-have).
 
-use serde_json::{json, Value};
+use serde_json::Value;
 use stdb_client::StdbClient;
 
 use crate::error::ApiError;
@@ -120,6 +120,7 @@ async fn query_cold_rows(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn hot_ids_are_preferred_over_cold_duplicates() {

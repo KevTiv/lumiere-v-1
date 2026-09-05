@@ -6,7 +6,8 @@ use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line, AccountMove, AccountMoveLine,
 };
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::subscriptions::billing_helpers::blank_line;
+use crate::accounting::line_params::blank_journal_line;
+use crate::subscriptions::relations::require_subscription;
 use crate::subscriptions::tables::{
     subscription, subscription_line, subscription_plan, Subscription,
 };
@@ -258,27 +259,6 @@ fn usage_idempotency_key(organization_id: u64, source: &str, event_id: &str) -> 
     format!("{organization_id}:{source}:{event_id}")
 }
 
-fn load_subscription(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    company_id: u64,
-    subscription_id: u64,
-) -> Result<Subscription, String> {
-    let sub = ctx
-        .db
-        .subscription()
-        .id()
-        .find(&subscription_id)
-        .ok_or("Subscription not found")?;
-    if sub.organization_id != organization_id {
-        return Err("Subscription does not belong to this organization".to_string());
-    }
-    if sub.company_id != company_id {
-        return Err("Subscription does not belong to this company".to_string());
-    }
-    Ok(sub)
-}
-
 /// Progressive tier rating: units in each band × band price.
 /// Tiers are `(min_qty inclusive, max_qty exclusive or None, unit_price)`.
 pub(crate) fn rate_quantity_progressive(
@@ -431,7 +411,7 @@ pub fn append_unbilled_usage_to_invoice(
 
     let mut usage_amount = 0.0f64;
     for charge in &unbilled {
-        let mut line = blank_line(
+        let mut line = blank_journal_line(
             income_account_id,
             if charge.description.is_empty() {
                 format!("Usage charge {}", charge.id)
@@ -480,7 +460,7 @@ pub fn append_unbilled_usage_to_invoice(
         if commit.min_amount > relevant + f64::EPSILON {
             let gap = commit.min_amount - relevant;
             let desc = format!("Minimum commitment true-up ({})", commit.id);
-            let mut line = blank_line(income_account_id, desc.clone());
+            let mut line = blank_journal_line(income_account_id, desc.clone());
             line.credit = gap;
             line.debit = 0.0;
             line.sequence = next_seq;
@@ -581,7 +561,7 @@ pub fn ingest_subscription_usage_event(
     params: IngestSubscriptionUsageEventParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription", "write")?;
-    let _sub = load_subscription(ctx, organization_id, company_id, subscription_id)?;
+    let _sub = require_subscription(ctx, organization_id, company_id, subscription_id)?;
 
     let source = params.source.trim().to_string();
     let event_id = params.event_id.trim().to_string();
@@ -667,7 +647,7 @@ pub fn rate_subscription_usage_events(
     params: RateSubscriptionUsageEventsParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription", "write")?;
-    let sub = load_subscription(ctx, organization_id, company_id, subscription_id)?;
+    let sub = require_subscription(ctx, organization_id, company_id, subscription_id)?;
     let limit = params.limit.clamp(1, 500) as usize;
     let fallback = params.fallback_unit_price.unwrap_or(0.0);
 
@@ -846,7 +826,7 @@ pub fn set_subscription_commitment(
     params: SetSubscriptionCommitmentParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription", "write")?;
-    let _sub = load_subscription(ctx, organization_id, company_id, subscription_id)?;
+    let _sub = require_subscription(ctx, organization_id, company_id, subscription_id)?;
     if params.min_amount < 0.0 {
         return Err("min_amount must be >= 0".to_string());
     }
@@ -1050,7 +1030,7 @@ pub fn apply_subscription_bundle(
     params: ApplySubscriptionBundleParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription", "write")?;
-    let sub = load_subscription(ctx, organization_id, company_id, subscription_id)?;
+    let sub = require_subscription(ctx, organization_id, company_id, subscription_id)?;
     let bundle = ctx
         .db
         .subscription_bundle()

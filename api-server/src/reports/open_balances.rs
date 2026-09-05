@@ -50,18 +50,6 @@ enum AgingBucketKey {
     Over90,
 }
 
-impl AgingBucketKey {
-    fn id(self) -> &'static str {
-        match self {
-            Self::Current => "current",
-            Self::Days1To30 => "1_30",
-            Self::Days31To60 => "31_60",
-            Self::Days61To90 => "61_90",
-            Self::Over90 => "over_90",
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DueBucketSummary {

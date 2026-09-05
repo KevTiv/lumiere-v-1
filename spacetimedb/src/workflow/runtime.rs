@@ -365,7 +365,7 @@ pub(crate) fn start_workflow_internal(
         &WorkflowCommandKind::Start,
         &params.idempotency_key,
     );
-    if replay_receipt(ctx, &scope_key, &input_hash)?.is_some() {
+    if crate::workflow::receipts::replay_command_receipt(ctx, &scope_key, &input_hash)?.is_some() {
         return Ok(());
     }
 
@@ -576,7 +576,7 @@ pub fn signal_workflow(
         &WorkflowCommandKind::Signal,
         &params.idempotency_key,
     );
-    if replay_receipt(ctx, &scope_key, &input_hash)?.is_some() {
+    if crate::workflow::receipts::replay_command_receipt(ctx, &scope_key, &input_hash)?.is_some() {
         return Ok(());
     }
 
@@ -733,7 +733,7 @@ pub fn cancel_workflow(
         &WorkflowCommandKind::Cancel,
         &params.idempotency_key,
     );
-    if replay_receipt(ctx, &scope_key, &input_hash)?.is_some() {
+    if crate::workflow::receipts::replay_command_receipt(ctx, &scope_key, &input_hash)?.is_some() {
         return Ok(());
     }
 
@@ -1311,25 +1311,6 @@ fn apply_cancellation(
 // ============================================================================
 // RECEIPTS, EVENTS AND CANONICAL INPUTS
 // ============================================================================
-
-fn replay_receipt(
-    ctx: &ReducerContext,
-    scope_key: &str,
-    input_hash: &str,
-) -> Result<Option<WorkflowCommandReceipt>, String> {
-    let Some(receipt) = ctx
-        .db
-        .workflow_command_receipt()
-        .scope_key()
-        .find(scope_key.to_string())
-    else {
-        return Ok(None);
-    };
-    if receipt.input_hash != input_hash {
-        return Err("idempotency key was already used with different input".to_string());
-    }
-    Ok(Some(receipt))
-}
 
 #[allow(clippy::too_many_arguments)]
 fn insert_receipt(

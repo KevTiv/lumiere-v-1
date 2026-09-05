@@ -4,11 +4,11 @@
 ///
 /// Tables for managing taxes, tax groups, jurisdictions, tax schedules, and tax deadlines.
 /// Includes a scheduled reducer for automatic deadline status updates.
-use std::collections::HashSet;
 
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::relations::require_active_account;
+use crate::accounting::relations::require_active_tax_ids;
 use crate::core::organization::{organization, require_company_in_organization};
 use crate::core::reference::country;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
@@ -396,35 +396,6 @@ fn validate_tax_group_accounts(
             if account.internal_group != Some(group) {
                 return Err(format!("{role} account has the wrong role"));
             }
-        }
-    }
-    Ok(())
-}
-
-fn validate_tax_ids(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    company_id: u64,
-    tax_ids: &[u64],
-) -> Result<(), String> {
-    let mut seen = HashSet::with_capacity(tax_ids.len());
-    for tax_id in tax_ids {
-        if !seen.insert(*tax_id) {
-            return Err(format!("Tax {tax_id} is duplicated"));
-        }
-        let tax = ctx
-            .db
-            .account_tax()
-            .id()
-            .find(tax_id)
-            .ok_or_else(|| format!("Tax {tax_id} not found"))?;
-        if tax.organization_id != organization_id || tax.company_id != company_id {
-            return Err(format!(
-                "Tax {tax_id} does not belong to this organization and company"
-            ));
-        }
-        if !tax.active {
-            return Err(format!("Tax {tax_id} is inactive"));
         }
     }
     Ok(())
@@ -993,7 +964,7 @@ pub fn create_tax_schedule(
     check_permission(ctx, organization_id, "tax_schedule", "create")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
     validate_tax_jurisdiction(ctx, organization_id, params.jurisdiction_id)?;
-    validate_tax_ids(ctx, organization_id, company_id, &params.tax_ids)?;
+    require_active_tax_ids(ctx, organization_id, company_id, &params.tax_ids)?;
 
     let schedule = ctx.db.tax_schedule().insert(TaxSchedule {
         id: 0,
@@ -1062,7 +1033,7 @@ pub fn update_tax_schedule(
 
     // Validate all taxes if provided
     if let Some(ref new_tax_ids) = params.tax_ids {
-        validate_tax_ids(ctx, organization_id, company_id, new_tax_ids)?;
+        require_active_tax_ids(ctx, organization_id, company_id, new_tax_ids)?;
     }
 
     let old_values =

@@ -7,10 +7,9 @@ use crate::error::ApiError;
 use super::{
     catalog::{catalog_entry, ReportAvailability},
     commercial::{
-        monthly_owner, payment_fee_summary, purchase_spend, sales_by_product, AmountRow,
-        ContactRow, FeeRow, IdRow, LandedCostRow, MonthlyOwnerReportV1, MovementRow,
-        PaymentAccountRow, PaymentFeeSummaryReportV1, PaymentTransactionRow, ProductRow,
-        PurchaseLineRow, PurchaseSpendReportV1, SalesByProductReportV1, SalesLineRow,
+        monthly_owner, payment_fee_summary, purchase_spend, sales_by_product, IdRow,
+        MonthlyOwnerReportV1, PaymentFeeSummaryReportV1, ProductRow, PurchaseSpendReportV1,
+        SalesByProductReportV1,
     },
     common::{
         GeneratedOwnerReportHistoryRow, ReportCurrency, ReportEnvelope, ReportKey,
@@ -153,7 +152,6 @@ pub async fn preview_report(
         ReportKey::MonthlyOwnerReportV1 => {
             preview_monthly_owner(client, organization_id, identity_hex, request).await
         }
-        _ => unreachable!("availability and report implementation must stay aligned"),
     }
 }
 

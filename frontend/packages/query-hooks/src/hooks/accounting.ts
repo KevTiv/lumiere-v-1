@@ -18,6 +18,7 @@ import {
   type ClearablePatch,
 } from "@lumiere/erp-shared/accounting-create-params"
 import { stdbParamsToJson, encodeOptionalU64 } from "@lumiere/erp-shared/stdb-params-json"
+import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
 import type {
   AccountFiscalYear,
   AccountPeriod,
@@ -61,10 +62,6 @@ import {
   useTypedStdbQuery,
 } from "./stdb"
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
-
-function toScalarU64(v: bigint | number | string): bigint {
-  return typeof v === "bigint" ? v : BigInt(String(v))
-}
 
 // ── Type Imports from @lumiere/stdb ─────────────────────────────────────────
 

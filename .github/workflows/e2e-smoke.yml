@@ -113,49 +113,15 @@ jobs:
       # The install unpacks a ~150MB binary bundle; cached by exact version,
       # so this only actually downloads again when SPACETIME_CLI_VERSION
       # changes. Mirrors ci.yml's contracts-drift job.
-      - name: Cache spacetime CLI
-        id: cache-spacetime
-        uses: actions/cache@v4
+      - uses: ./.github/actions/setup-spacetime-cli
         with:
-          path: |
-            ~/.local/bin/spacetime
-            ~/.local/share/spacetime/bin
-          key: spacetime-cli-${{ env.SPACETIME_CLI_VERSION }}-${{ runner.os }}
+          version: ${{ env.SPACETIME_CLI_VERSION }}
 
-      - name: Install SpacetimeDB CLI
-        if: steps.cache-spacetime.outputs.cache-hit != 'true'
-        run: |
-          curl -sSf https://install.spacetimedb.com | sh -s -- -y
-          "$HOME/.local/bin/spacetime" version install "$SPACETIME_CLI_VERSION"
-          "$HOME/.local/bin/spacetime" version use "$SPACETIME_CLI_VERSION"
-
-      - name: Add spacetime CLI to PATH
-        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      # pnpm resolves the @lumiere/contracts git-subdirectory dependency
-      # over SSH — same read-only deploy key as ci.yml's frontend job.
-      - name: Configure SSH for private lumiere-contracts dependency
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_ed25519
-          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
-          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
-
-      - uses: pnpm/action-setup@v4
+      - uses: ./.github/actions/setup-contracts-ssh
         with:
-          version: 10.31.0
+          deploy-key: ${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+      - uses: ./.github/actions/setup-frontend
 
       - name: Install frontend dependencies
         working-directory: frontend

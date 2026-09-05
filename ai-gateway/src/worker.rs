@@ -10,8 +10,6 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::Context;
-
 use crate::{
     config::Config, providers::EmbedProvider, qdrant_client::VectorStore,
     stdb_embed::{

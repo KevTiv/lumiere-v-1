@@ -3,15 +3,12 @@
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
 import type { CreateInvoiceReminderBatchParams, CreateMessageBatchParams, CreateMessageTemplateParams, MailFollower, MailMessage, ReviewMessageBatchParams } from "@lumiere/stdb/types"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 import { useStdbQuery } from "./stdb"
-
-function toScalarU64(v: bigint | number | string): bigint {
-  return typeof v === "bigint" ? v : BigInt(String(v))
-}
 
 export type PostMessageInput = {
   model: string

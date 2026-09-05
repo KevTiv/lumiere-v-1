@@ -192,21 +192,6 @@ pub async fn find_credential_by_email(
     row.as_ref().map(parse_credential).transpose()
 }
 
-pub async fn find_credential_by_identity(
-    _state: &AppState,
-    identity_hex: &str,
-) -> Result<Option<StdbCredential>, ApiError> {
-    let identity_hex = identity_hex
-        .trim()
-        .trim_start_matches("0x")
-        .trim_start_matches("0X");
-    let row =
-        platform_control::find_user_credential_by_stdb_identity(platform_pool()?, identity_hex)
-            .await
-            .map_err(|e| ApiError::Internal(e.to_string()))?;
-    row.as_ref().map(parse_credential).transpose()
-}
-
 /// Resolve the canonical credential after a platform-control operation.
 pub async fn find_credential_by_platform_id(
     _state: &AppState,
@@ -306,7 +291,7 @@ fn parse_reset_token(row: &tokio_postgres::Row) -> Result<StdbResetToken, ApiErr
 }
 
 pub async fn find_reset_token_by_hash(
-    state: &AppState,
+    _state: &AppState,
     token_hash: &str,
 ) -> Result<Option<StdbResetToken>, ApiError> {
     let row = platform_control::find_password_reset_token(platform_pool()?, token_hash)

@@ -15,6 +15,7 @@ mod skills;
 mod state;
 mod stdb_embed;
 mod tools;
+mod wire_decode;
 mod worker;
 
 use std::sync::Arc;

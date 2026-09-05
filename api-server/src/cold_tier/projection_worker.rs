@@ -720,22 +720,7 @@ fn render_relation_ddl(relation: &ProjectionRelation) -> Result<String> {
     ))
 }
 
-fn validate_identifier(value: &str) -> Result<()> {
-    if value.is_empty()
-        || value.len() > 128
-        || !value
-            .bytes()
-            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
-    {
-        bail!("unsafe projection identifier '{value}'");
-    }
-    Ok(())
-}
-
-fn quote_identifier(value: &str) -> Result<String> {
-    validate_identifier(value)?;
-    Ok(format!("\"{value}\""))
-}
+use super::conventions::{quote_identifier, validate_identifier};
 
 fn validate_pg_type(value: &str) -> Result<()> {
     if matches!(

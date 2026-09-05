@@ -1,11 +1,11 @@
 //! Wave C — mileage/per diem rates, split allocations, project rebill.
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::chart_of_accounts::{account_account, account_journal};
+use crate::accounting::chart_of_accounts::{account_journal};
+use crate::accounting::line_params::{journal_line_params, validate_company_account};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line, AccountMove,
-    AddAccountMoveLineParams,
 };
 use crate::accounting::tax_management::{account_tax, account_tax_group};
 use crate::core::country_pack::company_enabled_pack_keys;
@@ -208,73 +208,6 @@ fn resolve_tax_payable_account(ctx: &ReducerContext, tax_ids: &[u64]) -> Option<
         }
     }
     None
-}
-
-fn empty_line_params(
-    account_id: u64,
-    name: String,
-    debit: f64,
-    credit: f64,
-    sequence: u32,
-) -> AddAccountMoveLineParams {
-    AddAccountMoveLineParams {
-        account_id,
-        name,
-        debit,
-        credit,
-        sequence,
-        quantity: if debit > 0.0 || credit > 0.0 {
-            1.0
-        } else {
-            0.0
-        },
-        price_unit: debit.max(credit),
-        discount: 0.0,
-        tax_ids: vec![],
-        partner_id: None,
-        product_id: None,
-        product_uom_id: None,
-        product_category_id: None,
-        analytic_account_id: None,
-        analytic_tag_ids: vec![],
-        display_type: None,
-        is_downpayment: false,
-        exclude_from_invoice_tab: false,
-        blocked: false,
-        group_tax_id: None,
-        tax_line_id: None,
-        tax_group_id: None,
-        tax_repartition_line_id: None,
-        tax_audit: None,
-        reconcile_model_id: None,
-        payment_id: None,
-        statement_line_id: None,
-        matching_number: None,
-        matching_label: None,
-        expected_pay_date: None,
-        expected_pay_date_currency_id: None,
-        expected_pay_date_amount: 0.0,
-        expected_pay_date_residual: 0.0,
-        metadata: None,
-    }
-}
-
-fn validate_account(
-    ctx: &ReducerContext,
-    company_id: u64,
-    account_id: u64,
-    label: &str,
-) -> Result<(), String> {
-    let account = ctx
-        .db
-        .account_account()
-        .id()
-        .find(&account_id)
-        .ok_or_else(|| format!("{label} account not found"))?;
-    if account.company_id != company_id {
-        return Err(format!("{label} account does not belong to this company"));
-    }
-    Ok(())
 }
 
 pub(crate) fn allocations_for_expense(
@@ -754,8 +687,8 @@ pub fn create_expense_project_rebill(
     if params.receivable_account_id == params.income_account_id {
         return Err("Receivable and income accounts must differ".to_string());
     }
-    validate_account(ctx, company_id, params.receivable_account_id, "Receivable")?;
-    validate_account(ctx, company_id, params.income_account_id, "Income")?;
+    validate_company_account(ctx, company_id, params.receivable_account_id, "Receivable")?;
+    validate_company_account(ctx, company_id, params.income_account_id, "Income")?;
     let journal = ctx
         .db
         .account_journal()
@@ -946,7 +879,7 @@ pub fn create_expense_project_rebill(
 
     let mut seq = 1u32;
     for (label, amt, analytic_id, _project_id) in income_lines {
-        let mut lp = empty_line_params(params.income_account_id, label, 0.0, amt, seq);
+        let mut lp = journal_line_params(params.income_account_id, label, 0.0, amt, seq);
         lp.analytic_account_id = analytic_id;
         lp.partner_id = Some(partner_id);
         lp.tax_ids = tax_ids.clone();
@@ -956,7 +889,7 @@ pub fn create_expense_project_rebill(
     if amount_tax > 0.0001 {
         let tax_account =
             resolve_tax_payable_account(ctx, &tax_ids).unwrap_or(params.income_account_id);
-        let mut tax_lp = empty_line_params(
+        let mut tax_lp = journal_line_params(
             tax_account,
             format!("Tax on rebill — {}", sheet.name),
             0.0,
@@ -968,7 +901,7 @@ pub fn create_expense_project_rebill(
         insert_draft_account_move_line(ctx, &move_record, tax_lp)?;
         seq += 1;
     }
-    let mut ar = empty_line_params(
+    let mut ar = journal_line_params(
         params.receivable_account_id,
         format!("Customer receivable — {}", sheet.name),
         amount_total,

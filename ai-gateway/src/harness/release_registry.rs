@@ -508,11 +508,7 @@ fn sql_literal(value: &str) -> Result<String, String> {
     Ok(value.replace('\'', "''"))
 }
 
-fn row_u64(row: &Value, camel: &str, snake: &str) -> Option<u64> {
-    row.get(camel)
-        .or_else(|| row.get(snake))
-        .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
-}
+use crate::wire_decode::{row_u64, snake_to_camel};
 
 fn row_string(row: &Value, camel: &str, snake: &str) -> Option<String> {
     row.get(camel)
@@ -535,21 +531,7 @@ fn string_array(row: &Value, field: &str) -> Option<Vec<String>> {
         })
 }
 
-fn snake_to_camel(value: &str) -> String {
-    let mut out = String::new();
-    let mut uppercase = false;
-    for character in value.chars() {
-        if character == '_' {
-            uppercase = true;
-        } else if uppercase {
-            out.extend(character.to_uppercase());
-            uppercase = false;
-        } else {
-            out.push(character);
-        }
-    }
-    out
-}
+
 
 fn semver_major(value: &str) -> Option<u32> {
     value.split('.').next()?.parse().ok()

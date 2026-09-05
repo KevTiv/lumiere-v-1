@@ -40,22 +40,6 @@ struct ClientSubscribe {
     active_company_id: Option<u64>,
 }
 
-pub(crate) fn notify_row_change(
-    tx: &tokio::sync::mpsc::UnboundedSender<String>,
-    op: &str,
-    table: &str,
-    resources: &[String],
-) {
-    let msg = json!({
-        "type": "change",
-        "op": op,
-        "table": table,
-        "resources": resources,
-    })
-    .to_string();
-    let _ = tx.send(msg);
-}
-
 fn parse_tables_from_sql(sql: &str) -> HashSet<String> {
     let mut out = HashSet::new();
     let lower = sql.to_ascii_lowercase();

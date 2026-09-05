@@ -13,6 +13,7 @@
 
 pub mod billing_helpers;
 pub mod reducers;
+pub mod relations;
 pub mod subscription_wave_c;
 pub mod subscription_wave_d;
 pub mod subscription_wave_e;

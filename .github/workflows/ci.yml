@@ -71,25 +71,9 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      # Generated STDB bindings + manifests live in the private
-      # KevTiv/lumiere-contracts repo, consumed as a tag-pinned git
-      # dependency. This runner needs read-only SSH access to fetch it. The
-      # deploy key on lumiere-contracts is read-only, so a compromised
-      # secret here cannot write to that repo. github.com's SSH host key is
-      # pinned to the value GitHub publishes rather than trusted on first
-      # use. See docs/plans/contracts-extraction-execution-plan.md.
-      - name: Configure SSH for private lumiere-contracts dependency
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_ed25519
-          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
-          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/setup-contracts-ssh
+        with:
+          deploy-key: ${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -154,19 +138,9 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
-      # Same read-only deploy key as the Rust job — see the comment there.
-      - name: Configure SSH for private lumiere-contracts dependency
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_ed25519
-          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
-          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/setup-contracts-ssh
+        with:
+          deploy-key: ${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -175,29 +149,9 @@ jobs:
             .
           cache-on-failure: true
 
-      # Pinned to the same SpacetimeDB CLI version the generated bindings
-      # were produced with so this job's `spacetime generate` output is
-      # directly comparable to what's published. The install unpacks a
-      # ~150MB binary bundle; cached by exact version, so this only
-      # actually downloads again when SPACETIME_CLI_VERSION changes.
-      - name: Cache spacetime CLI
-        id: cache-spacetime
-        uses: actions/cache@v4
+      - uses: ./.github/actions/setup-spacetime-cli
         with:
-          path: |
-            ~/.local/bin/spacetime
-            ~/.local/share/spacetime/bin
-          key: spacetime-cli-${{ env.SPACETIME_CLI_VERSION }}-${{ runner.os }}
-
-      - name: Install spacetime CLI
-        if: steps.cache-spacetime.outputs.cache-hit != 'true'
-        run: |
-          curl -sSf https://install.spacetimedb.com | sh -s -- -y
-          "$HOME/.local/bin/spacetime" version install "$SPACETIME_CLI_VERSION"
-          "$HOME/.local/bin/spacetime" version use "$SPACETIME_CLI_VERSION"
-
-      - name: Add spacetime CLI to PATH
-        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          version: ${{ env.SPACETIME_CLI_VERSION }}
 
       # Fails when the live SpacetimeDB module schema has changed but nobody
       # ran `make publish-contracts` to release the corresponding
@@ -219,32 +173,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # pnpm resolves the @lumiere/contracts git-subdirectory dependency
-      # (packages/stdb, packages/query-hooks) over SSH — same read-only
-      # deploy key as the Rust jobs. See the comment on the Rust job's
-      # equivalent step.
-      - name: Configure SSH for private lumiere-contracts dependency
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_ed25519
-          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
-          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
-
-      - uses: pnpm/action-setup@v4
+      - uses: ./.github/actions/setup-contracts-ssh
         with:
-          version: 10.31.0
+          deploy-key: ${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+      - uses: ./.github/actions/setup-frontend
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

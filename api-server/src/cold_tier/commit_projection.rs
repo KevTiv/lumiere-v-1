@@ -593,7 +593,7 @@ fn load_projection_codec(manifest_json: &str, table_name: &str) -> Result<Projec
         .and_then(|key| key.get("name"))
         .and_then(Value::as_str)
         .ok_or_else(|| anyhow!("projection codec table lacks primary-key metadata"))?;
-    if !is_safe_identifier(primary_key) {
+    if super::conventions::validate_identifier(primary_key).is_err() {
         bail!("projection codec has unsafe primary-key identifier");
     }
     let columns = pg_codec::load_columns(manifest_json, table_name)?;
@@ -602,7 +602,7 @@ fn load_projection_codec(manifest_json: &str, table_name: &str) -> Result<Projec
     }
     if columns
         .iter()
-        .any(|column| !is_safe_identifier(&column.name))
+        .any(|column| super::conventions::validate_identifier(&column.name).is_err())
     {
         bail!("projection codec has unsafe column identifier");
     }
@@ -651,20 +651,8 @@ fn parse_canonical_json(text: &str, label: &str) -> Result<Value> {
 }
 
 fn canonical_json(value: &Value) -> Result<String> {
-    serde_json::to_string(&sort_json(value)).context("serialize canonical JSON")
-}
-
-fn sort_json(value: &Value) -> Value {
-    match value {
-        Value::Object(object) => Value::Object(
-            object
-                .iter()
-                .map(|(key, value)| (key.clone(), sort_json(value)))
-                .collect(),
-        ),
-        Value::Array(values) => Value::Array(values.iter().map(sort_json).collect()),
-        value => value.clone(),
-    }
+    serde_json::to_string(&super::conventions::canonicalize_json(value))
+        .context("serialize canonical JSON")
 }
 
 fn change_checksum(table: &str, identity: &str, kind: &str, row: &str) -> String {
@@ -706,20 +694,7 @@ fn decode_identity(identity: &str) -> Result<Vec<u8>> {
     Ok(hex::decode(identity)?)
 }
 
-fn quote_identifier(identifier: &str) -> Result<String> {
-    if !is_safe_identifier(identifier) {
-        bail!("unsafe projection SQL identifier '{identifier}'");
-    }
-    Ok(format!("\"{identifier}\""))
-}
-
-fn is_safe_identifier(identifier: &str) -> bool {
-    !identifier.is_empty()
-        && identifier.len() <= 128
-        && identifier
-            .bytes()
-            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
-}
+use super::conventions::quote_identifier;
 
 fn validate_token(name: &str, value: &str) -> Result<()> {
     if value.is_empty() || value.trim() != value || value.len() > 256 {
@@ -774,21 +749,7 @@ fn locked_operation_ids() -> Result<&'static BTreeSet<String>> {
     result.as_ref().map_err(|error| anyhow!("{error}"))
 }
 
-fn snake_to_camel(value: &str) -> String {
-    let mut output = String::with_capacity(value.len());
-    let mut uppercase = false;
-    for character in value.chars() {
-        if character == '_' {
-            uppercase = true;
-        } else if uppercase {
-            output.push(character.to_ascii_uppercase());
-            uppercase = false;
-        } else {
-            output.push(character);
-        }
-    }
-    output
-}
+use super::pg_codec::snake_to_camel;
 
 fn commit_id(organization_id: u64, sequence: u64) -> String {
     format!("{organization_id}:{sequence}")

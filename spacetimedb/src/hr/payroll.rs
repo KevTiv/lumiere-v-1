@@ -6,11 +6,11 @@
 /// `account_move_id`.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::chart_of_accounts::{account_account, account_journal};
+use crate::accounting::chart_of_accounts::{account_journal};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
+use crate::accounting::line_params::{journal_line_params, validate_company_account};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line, AccountMove,
-    AddAccountMoveLineParams,
 };
 use crate::core::country_pack::company_enabled_pack_keys;
 use crate::core::organization::{company, company_id_from_scope};
@@ -233,73 +233,6 @@ fn resolve_pack_key(
     keys.into_iter()
         .next()
         .ok_or("No enabled country pack for company — set pack_key explicitly".to_string())
-}
-
-fn validate_payroll_account(
-    ctx: &ReducerContext,
-    company_id: u64,
-    account_id: u64,
-    label: &str,
-) -> Result<(), String> {
-    let account = ctx
-        .db
-        .account_account()
-        .id()
-        .find(&account_id)
-        .ok_or_else(|| format!("{label} account not found"))?;
-    if account.company_id != company_id {
-        return Err(format!("{label} account does not belong to this company"));
-    }
-    Ok(())
-}
-
-fn payroll_line_params(
-    account_id: u64,
-    name: String,
-    debit: f64,
-    credit: f64,
-    sequence: u32,
-) -> AddAccountMoveLineParams {
-    AddAccountMoveLineParams {
-        account_id,
-        name,
-        debit,
-        credit,
-        sequence,
-        quantity: if debit > 0.0 || credit > 0.0 {
-            1.0
-        } else {
-            0.0
-        },
-        price_unit: debit.max(credit),
-        discount: 0.0,
-        tax_ids: vec![],
-        partner_id: None,
-        product_id: None,
-        product_uom_id: None,
-        product_category_id: None,
-        analytic_account_id: None,
-        analytic_tag_ids: vec![],
-        display_type: None,
-        is_downpayment: false,
-        exclude_from_invoice_tab: false,
-        blocked: false,
-        group_tax_id: None,
-        tax_line_id: None,
-        tax_group_id: None,
-        tax_repartition_line_id: None,
-        tax_audit: None,
-        reconcile_model_id: None,
-        payment_id: None,
-        statement_line_id: None,
-        matching_number: None,
-        matching_label: None,
-        expected_pay_date: None,
-        expected_pay_date_currency_id: None,
-        expected_pay_date_amount: 0.0,
-        expected_pay_date_residual: 0.0,
-        metadata: None,
-    }
 }
 
 /// Apply partner engine payslip figures (Verify state only) — no salary-rule execution.
@@ -927,10 +860,10 @@ pub fn post_payslip(
     }
 
     ensure_accounting_period_open_for_date(ctx, company_id, params.accounting_date)?;
-    validate_payroll_account(ctx, company_id, params.expense_account_id, "Expense")?;
-    validate_payroll_account(ctx, company_id, params.payable_account_id, "Payable")?;
+    validate_company_account(ctx, company_id, params.expense_account_id, "Expense")?;
+    validate_company_account(ctx, company_id, params.payable_account_id, "Payable")?;
     if let Some(tax_id) = params.tax_withholding_account_id {
-        validate_payroll_account(ctx, company_id, tax_id, "Tax withholding")?;
+        validate_company_account(ctx, company_id, tax_id, "Tax withholding")?;
     }
     let journal = ctx
         .db
@@ -1018,7 +951,7 @@ pub fn post_payslip(
     insert_draft_account_move_line(
         ctx,
         &move_record,
-        payroll_line_params(
+        journal_line_params(
             params.expense_account_id,
             format!("Payroll expense — {}", payslip.name),
             gross,
@@ -1029,7 +962,7 @@ pub fn post_payslip(
     insert_draft_account_move_line(
         ctx,
         &move_record,
-        payroll_line_params(
+        journal_line_params(
             params.payable_account_id,
             format!("Salaries payable — {}", payslip.name),
             0.0,
@@ -1044,7 +977,7 @@ pub fn post_payslip(
         insert_draft_account_move_line(
             ctx,
             &move_record,
-            payroll_line_params(
+            journal_line_params(
                 tax_id,
                 format!("Payroll withholding — {}", payslip.name),
                 0.0,

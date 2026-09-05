@@ -36,8 +36,6 @@ struct WorkerRow {
 #[derive(Debug, Deserialize, Clone)]
 struct TimerRow {
     id: u64,
-    #[serde(alias = "organizationId")]
-    organization_id: u64,
     #[serde(alias = "companyId")]
     company_id: u64,
     revision: u64,
@@ -53,8 +51,6 @@ struct InstanceRow {
 #[derive(Debug, Deserialize, Clone)]
 struct QueueJobRow {
     id: u64,
-    #[serde(alias = "organizationId")]
-    organization_id: u64,
     revision: u64,
     payload: String,
 }
@@ -654,6 +650,7 @@ fn timestamp_micros(row: &Value, camel: &str, snake: &str) -> Option<u64> {
 }
 
 /// Forced crash points for Gate W crash/replay suite (WF-10–WF-12).
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum DispatchCrashPoint {
     None,
@@ -662,6 +659,7 @@ enum DispatchCrashPoint {
     AfterResultBeforeComplete,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum DispatchPhase {
     Claimed,
@@ -670,6 +668,7 @@ enum DispatchPhase {
     JobCompleted,
 }
 
+#[cfg(test)]
 #[derive(Debug, Default)]
 struct FakeExternalLedger {
     /// Effect keys that have a committed local result (semantic once).
@@ -680,6 +679,7 @@ struct FakeExternalLedger {
     completions: u64,
 }
 
+#[cfg(test)]
 #[derive(Debug)]
 enum DispatchAttemptError {
     Crashed(DispatchPhase),
@@ -687,6 +687,7 @@ enum DispatchAttemptError {
 }
 
 /// Pure outbox attempt used by Gate W tests: claim → adapter → result → complete.
+#[cfg(test)]
 fn run_outbox_attempt(
     ledger: &mut FakeExternalLedger,
     effect_key: &str,
@@ -719,6 +720,7 @@ fn run_outbox_attempt(
 }
 
 /// Replay after crash: only commits once per effect key (WF-11).
+#[cfg(test)]
 fn replay_outbox_until_complete(
     ledger: &mut FakeExternalLedger,
     effect_key: &str,

@@ -23,6 +23,7 @@ import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { invalidateResourceQueries } from "../subscription-query"
 import { toCreateAuditRuleParams } from "@lumiere/erp-shared/settings-create-params"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
 import type {
   AuditLog,
   AuditRule,
@@ -31,12 +32,6 @@ import type {
   UserOrganization,
   UserRoleAssignment,
 } from "@lumiere/stdb/types"
-
-type ScalarId = bigint | number | string
-
-function toScalarU64(v: ScalarId): bigint {
-  return typeof v === "bigint" ? v : BigInt(String(v))
-}
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 

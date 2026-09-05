@@ -61,6 +61,7 @@ import type {
 } from "@lumiere/stdb/types"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
 
 import {
   finalizeCreateActivityParams,
@@ -85,12 +86,6 @@ import {
   type UpdateContactDetailsParams,
   type UpdateLeadParams,
 } from "./crm-params-merge"
-
-type ScalarId = string | number | bigint
-
-function toScalarU64(v: ScalarId): bigint {
-  return typeof v === "bigint" ? v : BigInt(String(v))
-}
 
 type ContactPatch<P> = { contactId: ScalarId; params: Partial<P> }
 type LeadPatch<P> = { leadId: ScalarId; params: Partial<P> }

@@ -586,21 +586,7 @@ fn json_u64(value: Option<&Value>) -> Option<u64> {
     None
 }
 
-fn snake_to_camel(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut upper = false;
-    for c in s.chars() {
-        if c == '_' {
-            upper = true;
-        } else if upper {
-            out.push(c.to_ascii_uppercase());
-            upper = false;
-        } else {
-            out.push(c);
-        }
-    }
-    out
-}
+use crate::wire_decode::snake_to_camel;
 
 fn utc_now_rfc3339() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};

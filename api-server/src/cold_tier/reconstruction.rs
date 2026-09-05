@@ -11,7 +11,7 @@ use std::time::Instant;
 use anyhow::{anyhow, bail, Context, Result};
 use deadpool_postgres::Pool;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use stdb_client::{ReducerCall, StdbClient};
 
@@ -78,12 +78,12 @@ impl RestoreCatalog {
         let mut names = BTreeSet::new();
         let mut orders = BTreeSet::new();
         for table in &manifest.tables {
-            for (label, value) in [
+            for (_, value) in [
                 ("table", table.table.as_str()),
                 ("module", table.module.as_str()),
                 ("primary key", table.primary_key.as_str()),
             ] {
-                validate_identifier(label, value)?;
+                super::conventions::validate_identifier(value)?;
             }
             if table.organization_column != "organization_id"
                 || !matches!(
@@ -119,12 +119,12 @@ impl RestoreCatalog {
             }
         }
         let mut classified = names.clone();
-        for (label, tables) in [
+        for (_, tables) in [
             ("recreated", &manifest.recreate_order),
             ("excluded", &manifest.excluded_tables),
         ] {
             for table in tables {
-                validate_identifier(label, table)?;
+                super::conventions::validate_identifier(table)?;
                 if !classified.insert(table.clone()) {
                     bail!("reconstruction table '{table}' has multiple classifications");
                 }
@@ -841,23 +841,8 @@ fn canonical_checksum(value: &Value) -> Result<String> {
 }
 
 fn canonical_json(value: &Value) -> Result<String> {
-    serde_json::to_string(&canonical_value(value)).context("serialize canonical reconstruction row")
-}
-
-fn canonical_value(value: &Value) -> Value {
-    match value {
-        Value::Object(object) => {
-            let mut keys = object.keys().collect::<Vec<_>>();
-            keys.sort();
-            let mut canonical = Map::new();
-            for key in keys {
-                canonical.insert(key.clone(), canonical_value(&object[key]));
-            }
-            Value::Object(canonical)
-        }
-        Value::Array(values) => Value::Array(values.iter().map(canonical_value).collect()),
-        other => other.clone(),
-    }
+    serde_json::to_string(&super::conventions::canonicalize_json(value))
+        .context("serialize canonical reconstruction row")
 }
 
 fn validate_run_id(run_id: &str) -> Result<()> {
@@ -873,25 +858,13 @@ fn validate_run_id(run_id: &str) -> Result<()> {
 }
 
 fn quote_identifier(identifier: &str) -> String {
-    debug_assert!(validate_identifier("SQL identifier", identifier).is_ok());
+    debug_assert!(super::conventions::validate_identifier(identifier).is_ok());
     format!("\"{identifier}\"")
 }
 
 fn require_server_identity(stdb: &StdbClient) -> Result<()> {
     if stdb.token().trim().is_empty() || stdb.token() == "local-dev-token" {
         bail!("reconstruction requires a configured STDB server/admin identity");
-    }
-    Ok(())
-}
-
-fn validate_identifier(label: &str, value: &str) -> Result<()> {
-    if value.is_empty()
-        || value.len() > 128
-        || !value
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
-    {
-        bail!("reconstruction {label} must be lowercase snake_case");
     }
     Ok(())
 }

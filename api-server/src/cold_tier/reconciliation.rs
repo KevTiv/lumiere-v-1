@@ -10,7 +10,7 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use deadpool_postgres::Pool;
-use serde_json::{Map, Value};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use stdb_client::StdbClient;
 
@@ -312,36 +312,11 @@ fn rows_checksum(rows: &[Value]) -> Result<String> {
 }
 
 fn canonical_json(value: &Value) -> Result<String> {
-    serde_json::to_string(&canonical_value(value)).context("serialize canonical reconciliation row")
+    serde_json::to_string(&super::conventions::canonicalize_json(value))
+        .context("serialize canonical reconciliation row")
 }
 
-fn canonical_value(value: &Value) -> Value {
-    match value {
-        Value::Object(object) => {
-            let mut keys = object.keys().collect::<Vec<_>>();
-            keys.sort();
-            let mut canonical = Map::new();
-            for key in keys {
-                canonical.insert(key.clone(), canonical_value(&object[key]));
-            }
-            Value::Object(canonical)
-        }
-        Value::Array(values) => Value::Array(values.iter().map(canonical_value).collect()),
-        other => other.clone(),
-    }
-}
-
-fn validate_identifier(identifier: &str) -> Result<()> {
-    let mut chars = identifier.chars();
-    if !matches!(chars.next(), Some('a'..='z'))
-        || !chars.all(|character| {
-            character.is_ascii_lowercase() || character.is_ascii_digit() || character == '_'
-        })
-    {
-        bail!("generated projection identifier '{identifier}' is unsafe");
-    }
-    Ok(())
-}
+use super::conventions::validate_identifier;
 
 fn quote_identifier(identifier: &str) -> String {
     debug_assert!(validate_identifier(identifier).is_ok());

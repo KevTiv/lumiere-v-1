@@ -83,7 +83,7 @@ pub fn compute_payload_checksum_canonical(value: &serde_json::Value) -> String {
 }
 
 /// Recursively sort object keys in a JSON value to produce canonical JSON.
-fn canonicalize_json(value: &serde_json::Value) -> serde_json::Value {
+pub(crate) fn canonicalize_json(value: &serde_json::Value) -> serde_json::Value {
     use serde_json::{Map, Value};
 
     match value {
@@ -103,6 +103,30 @@ fn canonicalize_json(value: &serde_json::Value) -> serde_json::Value {
         // Primitives are already canonical.
         other => other.clone(),
     }
+}
+
+/// Validate a PostgreSQL identifier for use in generated projection SQL.
+///
+/// Allows lowercase ASCII letters, digits, and underscores, up to 128 bytes,
+/// non-empty. This matches the grammar of all generated manifest identifiers.
+pub(crate) fn validate_identifier(value: &str) -> anyhow::Result<()> {
+    if value.is_empty()
+        || value.len() > 128
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+    {
+        anyhow::bail!("unsafe projection identifier '{value}'");
+    }
+    Ok(())
+}
+
+/// Quote a validated PostgreSQL identifier for use in generated SQL.
+///
+/// The identifier is validated in release builds before quoting.
+pub(crate) fn quote_identifier(identifier: &str) -> anyhow::Result<String> {
+    validate_identifier(identifier)?;
+    Ok(format!("\"{identifier}\""))
 }
 
 // ---------------------------------------------------------------------------

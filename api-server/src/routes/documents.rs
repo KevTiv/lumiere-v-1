@@ -4,7 +4,7 @@ use std::io::BufWriter;
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, State},
     http::{header, HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -21,11 +21,6 @@ use crate::query_exec::execute_resource_query;
 use crate::session::ApiSession;
 use crate::state::AppState;
 use crate::web_session::{require_org, resolve_session};
-
-#[derive(Debug, Deserialize)]
-struct PdfFormatQuery {
-    format: Option<String>,
-}
 
 #[derive(Debug, Deserialize)]
 struct PivotTableBody {
@@ -408,11 +403,11 @@ fn trial_balance_xlsx(report: &Value, trial_rows: &[Value]) -> Result<Vec<u8>, A
         .map_err(|e| ApiError::Internal(e.to_string()))
 }
 
-fn render_lines_pdf(title: &str, lines: &[String]) -> Vec<u8> {
+fn render_lines_pdf(title: &str, lines: &[String]) -> Result<Vec<u8>, ApiError> {
     let (doc, page1, layer1) = PdfDocument::new(title, Mm(210.0), Mm(297.0), "Layer 1");
     let font = doc
         .add_builtin_font(BuiltinFont::Helvetica)
-        .expect("builtin font");
+        .map_err(|e| ApiError::Internal(format!("add builtin font: {e}")))?;
     let layer = doc.get_page(page1).get_layer(layer1);
 
     layer.use_text(title, 16.0, Mm(15.0), Mm(280.0), &font);
@@ -429,9 +424,10 @@ fn render_lines_pdf(title: &str, lines: &[String]) -> Vec<u8> {
     let mut buf = Vec::new();
     {
         let mut writer = BufWriter::new(&mut buf);
-        doc.save(&mut writer).expect("save pdf");
+        doc.save(&mut writer)
+            .map_err(|e| ApiError::Internal(format!("save pdf: {e}")))?;
     }
-    buf
+    Ok(buf)
 }
 
 async fn financial_report_pdf(
@@ -439,7 +435,6 @@ async fn financial_report_pdf(
     headers: HeaderMap,
     cookies: Cookies,
     Path(report_id): Path<u64>,
-    Query(_q): Query<PdfFormatQuery>,
 ) -> Result<Response, ApiError> {
     let session = resolve_session(&state, &headers, &cookies)
         .await?
@@ -450,7 +445,7 @@ async fn financial_report_pdf(
         .and_then(|v| v.as_str())
         .unwrap_or("Financial Report");
     let lines = financial_report_lines(&report, &trial_rows);
-    let pdf_bytes = render_lines_pdf(title, &lines);
+    let pdf_bytes = render_lines_pdf(title, &lines)?;
     let filename = format!("financial-report-{report_id}.pdf");
     attachment_response(filename, "application/pdf", pdf_bytes)
 }
@@ -560,7 +555,7 @@ async fn sale_order_pdf(
         "Line items are available in the ERP record.".to_string(),
     ];
 
-    let pdf_bytes = render_lines_pdf(name, &lines);
+    let pdf_bytes = render_lines_pdf(name, &lines)?;
     attachment_response(
         format!("sale-order-{order_id}.pdf"),
         "application/pdf",
@@ -613,7 +608,7 @@ async fn account_move_pdf(
         "Generated from Lumiere ERP document pipeline.".to_string(),
     ];
 
-    let pdf_bytes = render_lines_pdf(name, &lines);
+    let pdf_bytes = render_lines_pdf(name, &lines)?;
     attachment_response(
         format!("account-move-{move_id}.pdf"),
         "application/pdf",

@@ -8,6 +8,7 @@ pub mod domain_queries;
 pub mod error;
 pub mod expense_integration_worker;
 pub mod hr_integration_worker;
+pub mod integration_worker;
 pub mod metrics;
 mod middleware;
 pub mod organization_placement;

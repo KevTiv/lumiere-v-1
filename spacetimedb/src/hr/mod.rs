@@ -14,6 +14,7 @@ pub mod payroll;
 pub mod performance;
 pub mod pii;
 pub mod recruitment;
+pub mod relations;
 pub mod skills;
 pub mod wfm;
 

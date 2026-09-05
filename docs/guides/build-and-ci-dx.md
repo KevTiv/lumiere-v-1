@@ -68,6 +68,22 @@ Avoid running competing Cargo jobs in the same checkout. A filtered Rust test
 still compiles its library; use `--lib` where appropriate to avoid extra test
 targets, not as a promise of per-module compilation.
 
+## Reusable CI setup actions
+
+Three composite actions under `.github/actions/` consolidate setup that was
+previously inlined in every workflow job:
+
+| Action | Purpose | Replaces |
+| --- | --- | --- |
+| `setup-contracts-ssh` | Read-only SSH key + known_hosts for the private lumiere-contracts git dependency | 8 identical 11-line inline blocks across all workflows |
+| `setup-frontend` | Pinned pnpm 10.31.0 + Node 22 with lockfile-based cache | 5 identical pnpm/Node setup blocks |
+| `setup-spacetime-cli` | Cache + install + PATH for the pinned SpacetimeDB CLI | 2 identical cache/install/PATH blocks (ci.yml, e2e-smoke.yml) |
+
+Each workflow passes its own `secrets.LUMIERE_CONTRACTS_DEPLOY_KEY` and
+`SPACETIME_CLI_VERSION` as inputs. Permissions, event selection, job
+dependencies, and required-gate logic remain at the workflow level. The
+composite actions contain only setup steps — no build, test, or deployment.
+
 ## CI selection and gates
 
 `scripts/ci-change-scope.py` reads a complete Git merge-base diff. Renames retain

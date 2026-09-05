@@ -3,10 +3,11 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
+use crate::accounting::line_params::blank_journal_line;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, add_account_move_line, create_account_move,
     insert_draft_account_move_line, post_invoice, AccountMove, AccountMoveLine,
-    AddAccountMoveLineParams, CreateAccountMoveParams,
+    CreateAccountMoveParams,
 };
 use crate::accounting::payments::{
     account_payment, create_payment, post_payment_impl, register_payment_on_invoice,
@@ -112,45 +113,6 @@ pub fn default_billing_run_key(subscription_id: u64, invoice_date: Timestamp) ->
         .unwrap_or_default()
         .as_secs();
     format!("sub:{}:period:{}", subscription_id, secs)
-}
-
-pub(crate) fn blank_line(account_id: u64, name: String) -> AddAccountMoveLineParams {
-    AddAccountMoveLineParams {
-        account_id,
-        name,
-        debit: 0.0,
-        credit: 0.0,
-        sequence: 0,
-        quantity: 1.0,
-        price_unit: 0.0,
-        discount: 0.0,
-        tax_ids: vec![],
-        partner_id: None,
-        product_id: None,
-        product_uom_id: None,
-        product_category_id: None,
-        analytic_account_id: None,
-        analytic_tag_ids: vec![],
-        display_type: None,
-        is_downpayment: false,
-        exclude_from_invoice_tab: false,
-        blocked: false,
-        group_tax_id: None,
-        tax_line_id: None,
-        tax_group_id: None,
-        tax_repartition_line_id: None,
-        tax_audit: None,
-        reconcile_model_id: None,
-        payment_id: None,
-        statement_line_id: None,
-        matching_number: None,
-        matching_label: None,
-        expected_pay_date: None,
-        expected_pay_date_currency_id: None,
-        expected_pay_date_amount: 0.0,
-        expected_pay_date_residual: 0.0,
-        metadata: None,
-    }
 }
 
 /// Resolve FX rate subscription currency → company currency at invoice date (1.0 if same).
@@ -661,7 +623,7 @@ pub fn create_subscription_ar_invoice(
             }
         }
 
-        let mut income = blank_line(income_account_id, line.name.clone());
+        let mut income = blank_journal_line(income_account_id, line.name.clone());
         income.credit = subtotal;
         income.debit = 0.0;
         income.sequence = seq as u32;
@@ -686,7 +648,7 @@ pub fn create_subscription_ar_invoice(
         let tax_acct = resolve_tax_payable_account(ctx, &all_tax_ids, tax_account_id).ok_or(
             "Tax computed on subscription lines but no tax payable account; pass tax_account_id or configure tax group tax_payable_account_id",
         )?;
-        let mut tax_line = blank_line(tax_acct, "Tax".to_string());
+        let mut tax_line = blank_journal_line(tax_acct, "Tax".to_string());
         tax_line.credit = amount_tax;
         tax_line.debit = 0.0;
         tax_line.sequence = seq;
@@ -700,7 +662,7 @@ pub fn create_subscription_ar_invoice(
 
     let amount_total = amount_untaxed + amount_tax;
 
-    let mut receivable = blank_line(
+    let mut receivable = blank_journal_line(
         receivable_account_id,
         partner_display_name
             .clone()
@@ -976,7 +938,7 @@ pub fn apply_subscription_invoice_payment(
         .ok_or("Payment move not found after create")?;
 
     add_account_move_line(ctx, organization_id, payment_move_id, {
-        let mut line = blank_line(bank_account_id, "Bank".to_string());
+        let mut line = blank_journal_line(bank_account_id, "Bank".to_string());
         line.debit = pay_amount;
         line.sequence = 1;
         line.price_unit = pay_amount;
@@ -984,7 +946,7 @@ pub fn apply_subscription_invoice_payment(
         line
     })?;
     add_account_move_line(ctx, organization_id, payment_move_id, {
-        let mut line = blank_line(receivable_account_id, "Accounts Receivable".to_string());
+        let mut line = blank_journal_line(receivable_account_id, "Accounts Receivable".to_string());
         line.credit = pay_amount;
         line.sequence = 2;
         line.price_unit = pay_amount;
