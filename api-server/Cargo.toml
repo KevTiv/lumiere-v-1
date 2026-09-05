@@ -34,6 +34,10 @@ path = "src/bin/workflow-worker.rs"
 name = "projection-worker"
 path = "src/bin/projection-worker.rs"
 
+[[bin]]
+name = "storage-migrate"
+path = "src/bin/storage-migrate.rs"
+
 [dependencies]
 lumiere-contracts = { workspace = true, features = ["bindings"] }
 anyhow.workspace = true

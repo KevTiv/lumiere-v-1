@@ -49,6 +49,13 @@ pub async fn run_projection_worker() -> anyhow::Result<()> {
     cold_tier::projection_worker::serve().await
 }
 
+/// Apply all checksum-verified PostgreSQL storage migrations and exit.
+pub async fn run_storage_migrations() -> anyhow::Result<()> {
+    let config = cold_tier::pg_pool::PgConfig::from_env()?;
+    let pool = cold_tier::pg_pool::build_pool(&config)?;
+    cold_tier::migrate::ensure_schema(&pool).await
+}
+
 /// Run the standalone project payroll/calendar/e-invoice intent worker service.
 pub async fn run_project_integration_worker() -> anyhow::Result<()> {
     project_integration_worker::serve().await

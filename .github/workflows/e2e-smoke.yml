@@ -91,6 +91,20 @@ jobs:
     if: needs.plan.result == 'success' && needs.scope.outputs.run_e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: lumiere
+          POSTGRES_USER: lumiere
+          POSTGRES_PASSWORD: lumiere
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U lumiere -d lumiere"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     concurrency:
       group: e2e-smoke-${{ github.workflow }}-${{ github.ref }}-${{ matrix.config.suite }}
       cancel-in-progress: true
@@ -168,6 +182,12 @@ jobs:
           E2E_CLEAR_DB: ${{ matrix.config.clear_db }}
           NEXT_PUBLIC_STDB_MODULE: ${{ env.STDB_MODULE }}
           NEXT_PUBLIC_STDB_HOST: ${{ env.STDB_HOST }}
+          PG_HOST: 127.0.0.1
+          PG_PORT: "5432"
+          PG_DATABASE: lumiere
+          PG_USER: lumiere
+          PG_PASSWORD: lumiere
+          PG_TLS_MODE: disable
         run: |
           # Makefile defaults to a macOS dev PATH; use the runner PATH in CI.
           export E2E_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.cargo/bin:${HOME}/.local/bin:${PNPM_HOME}"

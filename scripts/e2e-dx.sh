@@ -14,7 +14,12 @@ api_binary() {
     python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"] + "/debug/api-server")'
 }
 
-api_build() { cargo build -p api-server --bin api-server --locked; }
+storage_migrate_binary() {
+  cargo metadata --no-deps --format-version 1 --locked |
+    python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"] + "/debug/storage-migrate")'
+}
+
+api_build() { cargo build -p api-server --bin api-server --bin storage-migrate --locked; }
 
 frontend_build() {
   local stamp="$ROOT/.tmp/e2e/frontend.hash" current build_id
@@ -46,6 +51,12 @@ case "${1:-}" in
     shift
     exec "$binary" "$@"
     ;;
+  storage-migrate)
+    binary="$(storage_migrate_binary)"
+    [ -x "$binary" ] || { echo "[e2e] Missing $binary; run api-build first." >&2; exit 1; }
+    shift
+    exec "$binary" "$@"
+    ;;
   frontend-build) frontend_build ;;
-  *) echo "usage: $0 {api-fingerprint|frontend-fingerprint|stdb-fingerprint|api-build|api-binary|api-run|frontend-build}" >&2; exit 2 ;;
+  *) echo "usage: $0 {api-fingerprint|frontend-fingerprint|stdb-fingerprint|api-build|api-binary|api-run|storage-migrate|frontend-build}" >&2; exit 2 ;;
 esac

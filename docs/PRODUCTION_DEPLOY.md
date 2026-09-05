@@ -15,6 +15,16 @@ Print the checklist without validating:
 scripts/check-prod-env.sh --list
 ```
 
+Apply the checksum-verified PostgreSQL catalog before starting services that
+use platform credentials or durable projections:
+
+```bash
+cargo run --locked -p api-server --bin storage-migrate
+```
+
+The command uses the same `PG_*` variables as api-server and exits non-zero if
+the existing migration history is incompatible with the release.
+
 ## Host `.env` (docker compose)
 
 These variables use `${VAR:?set VAR}` in `docker-compose.yml` — Compose fails at parse time if they are missing:
