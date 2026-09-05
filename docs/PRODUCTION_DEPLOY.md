@@ -69,11 +69,14 @@ node scripts/check-compose-readiness.mjs \
   --ai http://ai-gateway:8080/health/ready \
   --probe owner-report=http://owner-report-worker:8091/health/ready \
   --probe workflow=http://workflow-worker:8093/health/ready \
-  --probe audit-drainer=http://audit-cold-drainer:8094/health/ready \
-  --probe pos-drainer=http://pos-order-cold-drainer:8095/health/ready \
   --probe projection=http://projection-worker:8096/health/ready \
   --probe chromium=http://chromium-worker:8090/health/ready
 ```
+
+The projection worker is the sole C3 SpacetimeDB-to-PostgreSQL durability
+service and applies the manifest-driven commit stream. The legacy audit and
+POS cold drainers are retired; resource cooling and STDB finalization remain
+paused until the canonical C5 cooling/finalization work is complete.
 
 When running the probe from a sibling container, use Compose service DNS names such as
 `chromium-worker`; host-side probes should use published or externally routed hostnames.

@@ -4,8 +4,8 @@
 //!
 //! Every cold-tier table stores a `payload_checksum` and (for mutable
 //! transactional resources) an `archive_version`.  This module defines the
-//! canonical rules so the codegen, drainer, finalize reducer, and recovery
-//! tooling all agree.
+//! canonical rules so codegen, the generic projector, the C5 finalize reducer,
+//! and recovery tooling all agree.
 //!
 //! ## Payload checksum
 //!
@@ -22,8 +22,8 @@
 //! {"action":"CREATE","changed_fields":["name"],"company_id":null,"id":42,...}
 //! ```
 //!
-//! The checksum is computed by the drainer **before** the PG UPSERT and stored
-//! in `payload_checksum`.  The finalize reducer verifies that PG contains a row
+//! The checksum is computed before the durable PG write and stored in
+//! `payload_checksum`. The C5 finalize reducer verifies that PG contains a row
 //! with the same checksum before deleting the STDB row.
 //!
 //! ## Archive version
@@ -74,7 +74,7 @@ pub fn compute_payload_checksum_json<T: serde::Serialize>(value: &T) -> anyhow::
 /// Compute the payload checksum from a `serde_json::Value`, ensuring canonical
 /// key ordering by re-serialising through sorted keys.
 ///
-/// This is the recommended function for drainer code that receives a
+/// This is the recommended function for projection code that receives a
 /// `serde_json::Value` row representation.
 pub fn compute_payload_checksum_canonical(value: &serde_json::Value) -> String {
     let canonical = canonicalize_json(value);

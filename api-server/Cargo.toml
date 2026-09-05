@@ -31,14 +31,6 @@ name = "workflow-worker"
 path = "src/bin/workflow-worker.rs"
 
 [[bin]]
-name = "audit-cold-drainer"
-path = "src/bin/audit-cold-drainer.rs"
-
-[[bin]]
-name = "pos-order-cold-drainer"
-path = "src/bin/pos-order-cold-drainer.rs"
-
-[[bin]]
 name = "projection-worker"
 path = "src/bin/projection-worker.rs"
 

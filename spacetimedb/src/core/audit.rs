@@ -15,22 +15,17 @@ use crate::helpers::check_permission;
 // COLD-TIER ARCHIVE FINALIZE
 // ============================================================================
 //
-// `finalize_audit_log_archive` is called by the api-server audit drainer
-// (see `api-server/src/cold_tier/audit_drainer.rs`) after the row has been
-// UPSERTed into `cold_audit_log` and verified there. It deletes the STDB row
-// only if the row still exists and its canonical checksum matches the one
-// the drainer computed when it read the row and wrote it to PG.
+// `finalize_audit_log_archive` is reserved for the C5 cooling/finalization
+// path. It deletes the STDB row only if the row still exists and its canonical
+// checksum matches the expected durable copy.
 //
 // `audit_log` rows are never updated (append-only, see module doc above), so
 // this is not a concurrent-mutation guard the way it would be for a mutable
 // resource — it guards against a transcription bug turning the PG copy into
 // something that doesn't match what's still sitting in STDB.
 //
-// The canonical checksum recipe below MUST stay byte-for-byte identical to
-// the one in `api-server/src/cold_tier/audit_drainer.rs` (`canonical_row_json`).
-// The two live in different crates (this one compiles to wasm32, the other
-// is native) and cannot share code, so any change here must be mirrored
-// there by hand. The shape: a flat JSON object with these exact snake_case
+// The canonical checksum recipe is part of the C5 finalization contract. The
+// shape is a flat JSON object with these exact snake_case
 // keys, u64-like fields as decimal strings (never raw JSON numbers, to avoid
 // precision drift), `Identity` as lowercase hex via `to_hex().to_string()`,
 // serialized with `serde_json`'s default (unordered-input, BTreeMap-backed)
@@ -39,8 +34,7 @@ use crate::helpers::check_permission;
 // extra sort pass.
 
 /// Compute the canonical checksum for one `AuditLog` row. See the module
-/// note above `finalize_audit_log_archive` for why this must mirror the
-/// drainer's `canonical_row_json` exactly.
+/// note above `finalize_audit_log_archive` for why this must remain stable.
 pub(crate) fn audit_log_canonical_checksum(row: &AuditLog) -> String {
     use sha2::{Digest, Sha256};
 
@@ -208,14 +202,15 @@ pub fn log_audit_event(
     Ok(())
 }
 
-/// Internal: delete an `audit_log` row once the api-server audit drainer has
-/// durably UPSERTed and verified the exact same row in `cold_audit_log`.
+/// Internal: delete an `audit_log` row once the C5 finalization path has
+/// durably verified the exact same row.
 ///
-/// Called only by the audit drainer, never by frontend clients. Idempotent:
+/// Called only by the trusted C5 finalization service, never by frontend
+/// clients. Idempotent:
 /// if `id` no longer exists, that can only mean an earlier finalize call
 /// already deleted it (rows are never deleted any other way, and auto-inc
-/// ids are never reused), so this returns `Ok(())` rather than an error —
-/// this is what makes duplicate/racing drainer instances safe.
+/// ids are never reused), so this returns `Ok(())` rather than an error. This
+/// makes duplicate or racing finalization calls safe.
 #[spacetimedb::reducer]
 pub fn finalize_audit_log_archive(
     ctx: &ReducerContext,
@@ -235,7 +230,7 @@ pub fn finalize_audit_log_archive(
         crate::core::cold_tier_identity::AUDIT_COLD_DRAINER_SERVICE,
     ) {
         return Err(
-            "finalize_audit_log_archive: caller is not the registered audit cold-drainer identity"
+            "finalize_audit_log_archive: caller is not the registered C5 audit finalization identity"
                 .to_string(),
         );
     }
@@ -245,7 +240,7 @@ pub fn finalize_audit_log_archive(
 
 /// The checksum-verification/deletion logic, split out from the reducer so
 /// tests can exercise it directly without needing to fake `ctx.sender()` as
-/// the registered drainer identity (there's no way to do that from within a
+/// the registered finalization identity (there's no way to do that from within a
 /// single reducer invocation — `ctx.sender()` is fixed for the whole call).
 /// The identity gate itself is covered separately by calling the public
 /// reducer as an unregistered caller and expecting it to fail.

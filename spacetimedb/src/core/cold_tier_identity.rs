@@ -5,8 +5,8 @@
 /// from any other authenticated caller (see `AuthCtx` in the SDK: it only
 /// exposes `is_internal()` for scheduled reducers, nothing about ownership).
 /// Reducers that must only ever be called by a trusted internal service
-/// (the audit-log cold drainer today; future cold-tier finalize reducers
-/// later) therefore need their own registered-identity check, the same
+/// (the C5 cooling/finalization services) therefore need their own
+/// registered-identity check, the same
 /// pattern `ai/skill_registry.rs` uses for the AI certification executor.
 ///
 /// The platform control plane owns the authoritative service registration.
@@ -18,10 +18,10 @@ use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 use crate::core::organization::organization;
 use crate::core::users::find_user_profile_for_identity;
 
-/// `service_name` used by the audit-log cold drainer (`api-server/src/cold_tier/audit_drainer.rs`).
+/// Reserved service name for the C5 audit-log finalization path.
 pub(crate) const AUDIT_COLD_DRAINER_SERVICE: &str = "audit_cold_drainer";
 
-/// `service_name` used by the pos_order cold drainer.
+/// Reserved service name for the C5 pos_order finalization path.
 pub(crate) const POS_ORDER_COLD_DRAINER_SERVICE: &str = "pos_order_cold_drainer";
 
 /// `service_name` used by the API-server's trusted POS aggregate hydrator.
@@ -137,7 +137,7 @@ pub fn register_cold_tier_service_identity(
 }
 
 /// True if `ctx.sender()` is the currently-active registered identity for
-/// `(organization_id, service_name)`. Cold-tier finalize reducers must check this before
+/// `(organization_id, service_name)`. C5 cold-tier finalize reducers must check this before
 /// trusting any caller-supplied checksum/version — the checksum only
 /// authenticates *which row*, never *who is allowed to delete it*.
 pub(crate) fn is_active_cold_tier_service_identity(

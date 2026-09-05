@@ -302,8 +302,9 @@ ordered commit whose row set matches the committed STDB outcome.
   making a business outcome durable.
 - Keep resource cooling as a separate policy after projection. Projection is
   durability; cooling is hot-working-set management.
-- Retain the existing audit and `pos_order` workers only until their resources
-  use the general projector, then delete them.
+- Retire the legacy audit and `pos_order` workers once generic projection parity
+  is proven. C3 retains PostgreSQL durability through the manifest-driven
+  projector; resource cooling and STDB finalization remain paused until C5.
 
 **Gate:** each enabled module has positive create/update/delete projection
 fixtures; kill/restart and duplicate-delivery tests end with identical

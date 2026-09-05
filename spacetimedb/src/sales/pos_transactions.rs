@@ -1051,9 +1051,10 @@ pub fn create_pos_order(
 // cold_eligible_at concept), this is the "real" protocol every future
 // mutable archive candidate follows:
 //
-//   1. worker reads (id, archive_version, cold_eligible_at, full payload);
-//   2. worker UPSERTs into PG, verifies the write;
-//   3. worker calls this reducer with the values it read in step 1;
+//   1. the C5 finalization service reads (id, archive_version,
+//      cold_eligible_at, full payload);
+//   2. it verifies the durable PG copy;
+//   3. it calls this reducer with the values it read in step 1;
 //   4. this reducer re-reads the row and deletes only if archive_version and
 //      cold_eligible_at are BOTH still exactly what the worker saw — proving
 //      no business mutation (or rehydration) happened in between.
@@ -1064,10 +1065,10 @@ pub fn create_pos_order(
 // check exists anyway because a future mutator could change that, and the
 // finalize reducer must not silently stop protecting the row.
 
-/// Internal: delete a `pos_order` row once the pos-order cold drainer has
-/// durably UPSERTed and verified the exact same version in `cold_pos_order`.
+/// Internal: delete a `pos_order` row once the C5 finalization path has
+/// durably verified the exact same version.
 ///
-/// Called only by the registered pos-order drainer identity (see
+/// Called only by the registered C5 finalization identity (see
 /// `core::cold_tier_identity`), never by frontend clients.
 #[spacetimedb::reducer]
 pub fn finalize_pos_order_archive(
@@ -1093,7 +1094,7 @@ pub fn finalize_pos_order_archive(
         crate::core::cold_tier_identity::POS_ORDER_COLD_DRAINER_SERVICE,
     ) {
         return Err(
-            "finalize_pos_order_archive: caller is not the registered pos-order cold-drainer identity"
+            "finalize_pos_order_archive: caller is not the registered C5 pos-order finalization identity"
                 .to_string(),
         );
     }
@@ -1113,7 +1114,7 @@ pub fn finalize_pos_order_archive(
 /// The version-check/deletion logic, split out so tests can exercise it
 /// directly — same reasoning as `audit::finalize_audit_log_archive_checked`:
 /// a single reducer invocation can't fake `ctx.sender()` as the registered
-/// drainer identity, so the identity gate is tested separately.
+/// finalization identity, so the identity gate is tested separately.
 pub(crate) fn finalize_pos_order_archive_checked(
     ctx: &ReducerContext,
     id: u64,

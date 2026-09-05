@@ -81,9 +81,8 @@ pub async fn merged_rows(stdb: &StdbClient, organization_id: u64) -> Result<Vec<
             return Err(ApiError::unavailable(error.context("load complete audit history")));
         }
     };
-    // The finalize race window (drainer UPSERTed to PG, STDB row not yet
-    // deleted) can put the same id in both stores briefly; prefer hot, since
-    // it's the current authoritative copy until finalize completes.
+    // Until C5 cooling/finalization is enabled, STDB remains authoritative for
+    // rows that have not yet been finalized; prefer it when both stores match.
     let (merged, _) = super::merge_hot_cold_u64(
         hot_rows,
         cold_rows,

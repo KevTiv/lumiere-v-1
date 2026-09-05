@@ -22,7 +22,6 @@
 //!    boolean operator precedence bugs.
 //! 3. `page` must be bounded — archive-capable reads are never unbounded.
 
-pub mod audit_drainer;
 pub mod audit_read;
 pub mod commit_projection;
 pub mod conventions;
@@ -32,7 +31,6 @@ pub mod ledger;
 pub mod migrate;
 pub mod pg_codec;
 pub mod pg_pool;
-pub mod pos_order_drainer;
 pub mod pos_order_read;
 pub mod projection_observability;
 pub mod projection_worker;

@@ -44,16 +44,6 @@ pub async fn run_expense_integration_worker() -> anyhow::Result<()> {
     expense_integration_worker::serve().await
 }
 
-/// Run the standalone audit-log cold-tier drainer service.
-pub async fn run_audit_cold_drainer() -> anyhow::Result<()> {
-    cold_tier::audit_drainer::serve().await
-}
-
-/// Run the standalone pos-order cold-tier drainer service.
-pub async fn run_pos_order_cold_drainer() -> anyhow::Result<()> {
-    cold_tier::pos_order_drainer::serve().await
-}
-
 /// Run the standalone bounded SpacetimeDB-to-PostgreSQL projection worker.
 pub async fn run_projection_worker() -> anyhow::Result<()> {
     cold_tier::projection_worker::serve().await

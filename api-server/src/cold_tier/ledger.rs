@@ -8,7 +8,7 @@
 //! transfers actually completed.
 //!
 //! One row per `(resource, row_id)` — re-attempts (retry after a crash, or a
-//! racing duplicate drainer) UPSERT the same row rather than accumulating
+//! racing duplicate projector/finalizer) UPSERT the same row rather than accumulating
 //! history, since the ledger's job is "is this row's archive transfer
 //! durable and finalized", not an append-only audit trail of attempts.
 
@@ -37,7 +37,7 @@ CREATE INDEX IF NOT EXISTS archive_transfer_org ON archive_transfer (organizatio
 /// Record (or re-record, on retry) that `resource`/`row_id` was UPSERTed into
 /// its cold table with `payload_checksum`. Does not touch `stdb_finalized_at`
 /// if that row is already finalized — a retry of the PG-write step must not
-/// un-finalize a row that a concurrent drainer already finished.
+/// un-finalize a row that a concurrent C5 finalization already finished.
 pub async fn record_transfer(
     pool: &Pool,
     resource: &str,

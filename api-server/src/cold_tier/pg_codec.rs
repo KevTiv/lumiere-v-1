@@ -1,12 +1,9 @@
 //! Generic STDB-row → PG-bind-value mapper, driven by `codec-manifest.json`.
 //!
-//! `audit_log`'s drainer (`audit_drainer.rs`) hand-writes per-field
-//! extraction/binding/checksum code — tractable for its 14 columns, but
-//! `pos_order` has ~50, and every future archive candidate (`sale_order`,
-//! `account_move`, ...) will too. This module builds the UPSERT and its
-//! bind values generically from the column list `lumiere-codegen` already
-//! emits, so a new drainer only needs to say *which* table, not re-derive
-//! per-field decode logic.
+//! The generic projection and read paths use the generated column metadata
+//! instead of hand-written per-table extraction/binding/checksum code. This
+//! keeps the shared codec correct as tables grow and lets the manifest select
+//! the table without re-deriving per-field decode logic.
 //!
 //! ## What this does NOT decide
 //!
@@ -239,7 +236,7 @@ impl PgValue {
 ///
 /// Never coerces a missing/malformed value to a default — an error here
 /// means the batch item is skipped and logged loudly, not silently zeroed
-/// (matches the same rule `audit_drainer.rs` follows).
+/// (the projection and read paths follow the same rule).
 pub fn decode_row(columns: &[ColumnCodec], row: &Value) -> Result<Vec<PgValue>> {
     columns
         .iter()
@@ -343,7 +340,7 @@ fn null_value_for(pg_type: &str) -> Result<PgValue> {
 /// (optionally `0x`-prefixed) or a JSON array of 32 byte numbers. See the
 /// same acceptance rule (and the reason for it — this hasn't been verified
 /// against a live module's actual SQL-endpoint JSON shape yet) documented
-/// on `audit_drainer::identity_hex_and_bytes`.
+/// on the projection identity decoder.
 fn decode_identity_bytes(v: &Value) -> Result<Vec<u8>> {
     match v {
         Value::String(s) => {

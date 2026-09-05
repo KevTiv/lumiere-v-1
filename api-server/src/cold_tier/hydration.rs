@@ -84,8 +84,8 @@ pub struct PosOrderHydrationPlan {
 
 /// Build a validated hydration plan from durable rows.
 ///
-/// The root checksum is checked against the checksum stored by the C5
-/// drainer. Child membership is exact: missing, extra, duplicate, cross-org,
+/// The root checksum is checked against the durable cold-tier row. Child
+/// membership is exact: missing, extra, duplicate, cross-org,
 /// cross-company, or wrong-parent rows all fail closed.
 pub fn build_pos_order_plan(
     context: HydrationContext,

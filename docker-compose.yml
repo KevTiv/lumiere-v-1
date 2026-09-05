@@ -154,58 +154,6 @@ services:
       - "8093"
     restart: unless-stopped
 
-  audit-cold-drainer:
-    build:
-      context: .
-      dockerfile: Dockerfile.rust
-      args:
-        BIN: audit-cold-drainer
-    environment:
-      NODE_ENV: production
-      STDB_HOST: ${STDB_HOST:-https://maincloud.spacetimedb.com}
-      STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE}
-      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN}
-      # This service's only job is draining to Postgres, so PG here is
-      # required (not optional the way it is for api-server) — fails closed
-      # rather than idling silently with nothing to do.
-      PG_HOST: ${PG_HOST:?set PG_HOST}
-      PG_PORT: ${PG_PORT:-5432}
-      PG_DATABASE: ${PG_DATABASE:-lumiere}
-      PG_USER: ${PG_USER:-lumiere}
-      PG_PASSWORD: ${PG_PASSWORD:?set PG_PASSWORD}
-      PG_TLS_MODE: ${PG_TLS_MODE:-require}
-      LUMIERE_AUDIT_DRAINER_POLL_SECS: ${LUMIERE_AUDIT_DRAINER_POLL_SECS:-5}
-      LUMIERE_AUDIT_DRAINER_BATCH: ${LUMIERE_AUDIT_DRAINER_BATCH:-200}
-      LUMIERE_AUDIT_DRAINER_PORT: 8094
-    expose:
-      - "8094"
-    restart: unless-stopped
-
-  pos-order-cold-drainer:
-    build:
-      context: .
-      dockerfile: Dockerfile.rust
-      args:
-        BIN: pos-order-cold-drainer
-    environment:
-      NODE_ENV: production
-      STDB_HOST: ${STDB_HOST:-https://maincloud.spacetimedb.com}
-      STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE}
-      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN}
-      # Same reasoning as audit-cold-drainer: PG is this service's only job.
-      PG_HOST: ${PG_HOST:?set PG_HOST}
-      PG_PORT: ${PG_PORT:-5432}
-      PG_DATABASE: ${PG_DATABASE:-lumiere}
-      PG_USER: ${PG_USER:-lumiere}
-      PG_PASSWORD: ${PG_PASSWORD:?set PG_PASSWORD}
-      PG_TLS_MODE: ${PG_TLS_MODE:-require}
-      LUMIERE_POS_ORDER_DRAINER_POLL_SECS: ${LUMIERE_POS_ORDER_DRAINER_POLL_SECS:-5}
-      LUMIERE_POS_ORDER_DRAINER_BATCH: ${LUMIERE_POS_ORDER_DRAINER_BATCH:-200}
-      LUMIERE_POS_ORDER_DRAINER_PORT: 8095
-    expose:
-      - "8095"
-    restart: unless-stopped
-
   projection-worker:
     build:
       context: .
