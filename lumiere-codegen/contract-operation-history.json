@@ -4410,25 +4410,9 @@
       "name": "sync_hub_devices",
       "shape_fingerprint": "sha256:d0cf3c90772652dffaa9cc02a9fb241c3c5754ff58ee6cbf6f818f0e504aa365"
     },
-    "erp.test_finalize_deletes_on_checksum_match": {
-      "name": "test_finalize_deletes_on_checksum_match",
-      "shape_fingerprint": "sha256:eba1d7f2f8f2d771537d3cd894a6baf285dcb7056a7de49c7eb847a86b4af4b0"
-    },
-    "erp.test_finalize_is_idempotent_when_already_gone": {
-      "name": "test_finalize_is_idempotent_when_already_gone",
-      "shape_fingerprint": "sha256:9d4727a53f2218ffeb9c3137b5f9f36b705cb3a0f38c23785354986150ed35ab"
-    },
-    "erp.test_finalize_refuses_on_checksum_mismatch": {
-      "name": "test_finalize_refuses_on_checksum_mismatch",
-      "shape_fingerprint": "sha256:727319ec473268c6614099699272d58ab2fb02e51201974cb5b2297621a81e74"
-    },
-    "erp.test_finalize_rejects_checksum_from_a_different_row": {
-      "name": "test_finalize_rejects_checksum_from_a_different_row",
-      "shape_fingerprint": "sha256:88f74cfe383187ed4c7210126cf37bda03674a3c13327e3a3945ce99b0626441"
-    },
-    "erp.test_finalize_rejects_unregistered_caller": {
-      "name": "test_finalize_rejects_unregistered_caller",
-      "shape_fingerprint": "sha256:31ef17c49e8707b4fa5f18c786023527c72e637441f6a367a3bcf875e20281ef"
+    "erp.test_bootstrap_new_tenant_records_complete_commit": {
+      "name": "test_bootstrap_new_tenant_records_complete_commit",
+      "shape_fingerprint": "sha256:c943c334517ca155a7e7873a256d784aa0ad7e3fedac089d5ffdba6e34db3f83"
     },
     "erp.test_iot_device": {
       "name": "test_iot_device",
@@ -4441,6 +4425,10 @@
     "erp.test_pos_order_finalize_is_idempotent_when_already_gone": {
       "name": "test_pos_order_finalize_is_idempotent_when_already_gone",
       "shape_fingerprint": "sha256:1ad294f8867e0d993b6098094bd81effbe75c626efea7c4ed5ae85828bebf99f"
+    },
+    "erp.test_pos_order_finalize_refuses_before_terminal_window": {
+      "name": "test_pos_order_finalize_refuses_before_terminal_window",
+      "shape_fingerprint": "sha256:211cf286ee5022a1eb2b8eae346358af9b7e692400741330a69187f880669015"
     },
     "erp.test_pos_order_finalize_refuses_on_cold_eligible_at_mismatch": {
       "name": "test_pos_order_finalize_refuses_on_cold_eligible_at_mismatch",
@@ -5291,6 +5279,11 @@
     "erp.run_core_audit_finalize_test",
     "erp.store_sso_user_credential",
     "erp.store_user_credential",
+    "erp.test_finalize_deletes_on_checksum_match",
+    "erp.test_finalize_is_idempotent_when_already_gone",
+    "erp.test_finalize_refuses_on_checksum_mismatch",
+    "erp.test_finalize_rejects_checksum_from_a_different_row",
+    "erp.test_finalize_rejects_unregistered_caller",
     "erp.update_user_password"
   ],
   "compatibility_exceptions": [

@@ -392,16 +392,15 @@ and dependency safety are proven.
   code path.
 - `audit_log` is fail-closed as `always_hot`: its ordinary append paths do not
   yet emit an `organization_commit`/`organization_row_change`, so an exact
-  projection watermark cannot be proven. The former finalizer signature is a
-  compatibility tombstone that always rejects deletion. The legacy PostgreSQL
-  migration and hot+cold read remain available for already archived dev data.
+  projection watermark cannot be proven. The former finalizer and its test
+  reducers are removed, and their immutable operation IDs are retired. The
+  legacy PostgreSQL migration and hot+cold read remain available for already
+  archived data.
 - `spacetimedb/src/core/cold_tier.rs` provides the shared fail-closed gate for
   policy, age/window, terminal state, open obligations, workflow state, hot
   dependencies, rebuildability, durable watermark, archive version, schema
   version, and contract version, with child-first aggregate deletion.
-- A reducer fixture asserts that the retired audit finalizer cannot delete a
-  hot row and currently compiles with the module test surface. POS fixtures
-  cover exact archive version, the thirty-day terminal
+- POS fixtures cover exact archive version, the thirty-day terminal
   window, non-terminal state, open
   obligations, active workflow, missing child membership, watermark/schema
   mismatch, idempotency, and caller identity; the POS grouped suite passed on
