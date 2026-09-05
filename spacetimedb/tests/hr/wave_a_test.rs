@@ -782,13 +782,20 @@ pub fn test_leave_rejects_cross_company_leave_type(ctx: &ReducerContext) -> Resu
     ensure_test_superuser(ctx)?;
 
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&fixture.company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
     create_company(
         ctx,
         fixture.organization_id,
         CreateCompanyParams {
             name: "HR SoftFK Company B".to_string(),
             code: format!("HRB-{}", fixture.company_id),
-            currency_id: 1,
+            currency_id,
             fiscal_year_end_month: 12,
             fiscal_year_end_day: 31,
             is_parent: false,

@@ -4,7 +4,7 @@
 /// into warehouse stock while syncing `qty_received` / `receipt_status`.
 use spacetimedb::{ReducerContext, Table};
 
-use crate::core::organization::CompanyScopeParams;
+use crate::core::organization::{company, CompanyScopeParams};
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::{
@@ -28,6 +28,13 @@ pub fn test_receipt_increases_quant(ctx: &ReducerContext) -> Result<(), String> 
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
 
     create_contact(
         ctx,
@@ -95,7 +102,7 @@ pub fn test_receipt_increases_quant(ctx: &ReducerContext) -> Result<(), String> 
         CreatePurchaseOrderParams {
             company_id: Some(company_id),
             partner_id: vendor_id,
-            currency_id: 1,
+            currency_id,
             origin: Some("Quant receipt PO".to_string()),
             partner_ref: Some("QTY-RCV-001".to_string()),
             notes: None,
@@ -247,6 +254,13 @@ pub fn test_delivery_decreases_reserved_or_moves_quant(ctx: &ReducerContext) -> 
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
 
     let product = ctx
         .db
@@ -261,7 +275,7 @@ pub fn test_delivery_decreases_reserved_or_moves_quant(ctx: &ReducerContext) -> 
         CreatePricelistParams {
             company_id: None,
             name: "Quant Delivery Pricelist".to_string(),
-            currency_id: 1,
+            currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -283,7 +297,7 @@ pub fn test_delivery_decreases_reserved_or_moves_quant(ctx: &ReducerContext) -> 
             partner_invoice_id: fixture.partner_id,
             partner_shipping_id: fixture.partner_id,
             pricelist_id,
-            currency_id: 1,
+            currency_id,
             warehouse_id: fixture.warehouse_id,
             order_lines: vec![CreateSaleOrderLineParams {
                 product_id: fixture.product_id,

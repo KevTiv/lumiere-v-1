@@ -550,13 +550,20 @@ fn delegation(
 }
 
 fn seed_second_company(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, String> {
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&fixture.company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
     create_company(
         ctx,
         fixture.organization_id,
         CreateCompanyParams {
             name: format!("Workflow Company {}", ctx.rng().gen::<u64>()),
             code: format!("WF{}", ctx.rng().gen::<u32>()),
-            currency_id: 1,
+            currency_id,
             fiscal_year_end_month: 12,
             fiscal_year_end_day: 31,
             is_parent: false,

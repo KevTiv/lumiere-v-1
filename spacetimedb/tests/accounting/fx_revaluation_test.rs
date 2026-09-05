@@ -15,6 +15,7 @@ use crate::accounting::journal_entries::{account_move, account_move_line, Accoun
 use crate::accounting::payments::{
     account_payment, create_payment, post_payment, CreatePaymentParams,
 };
+use crate::core::organization::company;
 use crate::core::reference::{currency, Currency};
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{AccountInternalGroup, JournalType, PartnerType, PaymentType};
@@ -26,6 +27,13 @@ pub fn test_fx_revaluation_posts_balanced_move(ctx: &ReducerContext) -> Result<(
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let company_currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
     let sek = if let Some(currency) = ctx
         .db
         .currency()
@@ -130,7 +138,7 @@ pub fn test_fx_revaluation_posts_balanced_move(ctx: &ReducerContext) -> Result<(
                 name: "FX Revaluation".to_string(),
                 code: journal_code,
                 type_: JournalType::General,
-                currency_id: Some(1),
+                currency_id: Some(company_currency_id),
                 default_account_id: None,
                 suspense_account_id: None,
                 loss_account_id: Some(loss_id),
@@ -186,7 +194,7 @@ pub fn test_fx_revaluation_posts_balanced_move(ctx: &ReducerContext) -> Result<(
     };
 
     let mut company_currency_params = params.clone();
-    company_currency_params.currency_id = 1;
+    company_currency_params.currency_id = company_currency_id;
     if run_fx_revaluation(ctx, org_id, company_id, company_currency_params).is_ok() {
         return Err("FX revaluation accepted the company currency as foreign currency".to_string());
     }
@@ -315,7 +323,7 @@ pub fn test_fx_revaluation_posts_balanced_move(ctx: &ReducerContext) -> Result<(
         .ok_or("foreign invoice fixture missing")?;
     ctx.db.account_move().id().update(AccountMove {
         currency_id: sek_currency_id,
-        company_currency_id: 1,
+        company_currency_id,
         ..foreign_invoice
     });
 

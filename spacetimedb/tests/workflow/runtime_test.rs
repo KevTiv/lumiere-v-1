@@ -2,6 +2,7 @@
 
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::organization::company;
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::purchasing::purchase_orders::{
@@ -397,13 +398,20 @@ fn seed_purchase_order_subject(
         })
         .map(|c| c.id)
         .ok_or_else(|| format!("vendor contact {tag} missing"))?;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&fixture.company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
     create_purchase_order(
         ctx,
         fixture.organization_id,
         CreatePurchaseOrderParams {
             company_id: Some(fixture.company_id),
             partner_id: vendor_id,
-            currency_id: 1,
+            currency_id,
             origin: Some(tag.to_string()),
             partner_ref: None,
             notes: None,

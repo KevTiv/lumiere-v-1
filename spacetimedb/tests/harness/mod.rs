@@ -47,7 +47,9 @@ use crate::core::reference::{
     create_currency, create_uom, create_uom_category, currency, seed_currency_for_organization,
     uom, uom_cat, CreateCurrencyParams, CreateUomCategoryParams, CreateUomParams,
 };
-use crate::core::users::{find_user_profile_for_identity, user_profile, UserProfile};
+use crate::core::users::{
+    find_user_profile_for_identity, find_user_profile_for_organization, user_profile, UserProfile,
+};
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::crm::CRM_MULTI_COMPANY_FLAG;
 use crate::inventory::product::{create_product, product, CreateProductParams};
@@ -126,36 +128,11 @@ impl OrgFixture {
         // Organization creation establishes the caller's membership and
         // organization-owned profile. Promote only after that profile exists;
         // fresh C0 databases intentionally have no global/sentinel profile.
-        ensure_test_superuser(ctx)?;
+        ensure_test_superuser_for_organization(ctx, organization_id)?;
         // Canonical reference rows are tenant-owned. Seed them only after the
         // organization exists so tests never depend on global/sentinel rows.
-        seed_currency_for_organization(ctx, organization_id, "USD")?;
+        let currency_id = seed_currency_for_organization(ctx, organization_id, "USD")?.id;
         seed_currency_for_organization(ctx, organization_id, "EUR")?;
-        let currency_id = create_currency(
-            ctx,
-            organization_id,
-            format!("T{suffix}"),
-            CreateCurrencyParams {
-                name: "Harness currency".to_string(),
-                symbol: "¤".to_string(),
-                decimal_places: 2,
-                rounding_factor: 0.01,
-                position: "before".to_string(),
-                active: true,
-                metadata: Some(r#"{"harness":"minimal"}"#.to_string()),
-            },
-        )
-        .and_then(|_| {
-            ctx.db
-                .currency()
-                .iter()
-                .find(|currency| {
-                    currency.organization_id == organization_id
-                        && currency.code == format!("T{suffix}")
-                })
-                .map(|currency| currency.id)
-                .ok_or_else(|| "Harness: currency not found after create".to_string())
-        })?;
 
         create_company(
             ctx,
@@ -1550,6 +1527,19 @@ pub fn ensure_test_superuser(ctx: &ReducerContext) -> Result<(), String> {
             ..profile
         });
     }
+    Ok(())
+}
+
+fn ensure_test_superuser_for_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<(), String> {
+    let profile = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
+        .ok_or("Harness organization profile not found")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: true,
+        ..profile
+    });
     Ok(())
 }
 

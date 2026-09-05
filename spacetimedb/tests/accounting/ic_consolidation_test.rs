@@ -23,6 +23,15 @@ use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{ConsolidationState, IntercompanyDocumentModel, RuleType};
 
+fn company_currency_id(ctx: &ReducerContext, company_id: u64) -> Result<u64, String> {
+    ctx.db
+        .company()
+        .id()
+        .find(&company_id)
+        .map(|company| company.currency_id)
+        .ok_or_else(|| format!("Company {company_id} not found"))
+}
+
 pub fn test_intercompany_rule_requires_same_org(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture_a = OrgFixture::seed_minimal(ctx)?;
@@ -59,6 +68,7 @@ pub fn test_intercompany_rule_requires_same_org(ctx: &ReducerContext) -> Result<
 pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    let currency_id = company_currency_id(ctx, fixture.company_id)?;
 
     create_company(
         ctx,
@@ -66,7 +76,7 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
         CreateCompanyParams {
             name: "Subsidiary IC".to_string(),
             code: format!("SUB-{}", fixture.company_id),
-            currency_id: 1,
+            currency_id,
             fiscal_year_end_month: 12,
             fiscal_year_end_day: 31,
             is_parent: false,
@@ -152,7 +162,7 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
                             name: "IC origin journal".to_string(),
                             code: journal_code.clone(),
                             type_: JournalType::General,
-                            currency_id: Some(1),
+                            currency_id: Some(currency_id),
                             default_account_id: None,
                             suspense_account_id: None,
                             loss_account_id: None,
@@ -240,7 +250,7 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
             origin_document_model: IntercompanyDocumentModel::AccountMove,
             destination_company_id: sub_company_id,
             amount: 250.0,
-            currency_id: 1,
+            currency_id,
             transaction_type: RuleType::Invoice,
             auto_process: false,
             requires_approval: false,
@@ -266,7 +276,7 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
             account_type: "asset".to_string(),
             company_ids: vec![fixture.company_id, sub_company_id],
             consolidation_rate: 1.0,
-            currency_id: 1,
+            currency_id,
             elimination_account_id: None,
             is_intercompany: true,
             elimination_method: Some("full".to_string()),
@@ -288,7 +298,7 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
         SetConsolidationCompanyRateParams {
             company_id: fixture.company_id,
             period_id: fixture.fiscal_year_id,
-            currency_id: 1,
+            currency_id,
             exchange_rate: 1.0,
             rate_type: "average".to_string(),
             effective_date: ctx.timestamp,
@@ -326,7 +336,7 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
             date_from: ctx.timestamp,
             date_to: ctx.timestamp + Duration::from_secs(86_400),
             company_ids: vec![fixture.company_id, sub_company_id],
-            currency_id: 1,
+            currency_id,
             exchange_rate: 1.0,
             exchange_rate_date: Some(ctx.timestamp),
             notes: None,
@@ -361,7 +371,7 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
             counterparty_company_id: Some(sub_company_id),
             debit: amount,
             credit: 0.0,
-            currency_id: 1,
+            currency_id,
             amount_currency: amount,
             elimination_type: "intercompany_receivable".to_string(),
             reference: Some("A4-smoke".to_string()),
@@ -381,7 +391,7 @@ pub fn test_intercompany_elimination_nets_to_zero(ctx: &ReducerContext) -> Resul
             counterparty_company_id: Some(fixture.company_id),
             debit: 0.0,
             credit: amount,
-            currency_id: 1,
+            currency_id,
             amount_currency: amount,
             elimination_type: "intercompany_payable".to_string(),
             reference: Some("A4-smoke".to_string()),
@@ -673,6 +683,7 @@ pub fn test_process_intercompany_transaction_rejects_cross_tenant_destination(
     let fixture_a = OrgFixture::seed_minimal(ctx)?;
     let fixture_b = OrgFixture::seed_minimal(ctx)?;
     let sibling_a2 = super::helpers::seed_sibling_company(ctx, &fixture_a)?;
+    let currency_id = company_currency_id(ctx, fixture_a.company_id)?;
 
     let origin_move =
         super::helpers::create_balanced_customer_invoice(ctx, &fixture_a, 731.29, true)?;
@@ -686,7 +697,7 @@ pub fn test_process_intercompany_transaction_rejects_cross_tenant_destination(
             origin_document_model: IntercompanyDocumentModel::AccountMove,
             destination_company_id: sibling_a2,
             amount: 731.29,
-            currency_id: 1,
+            currency_id,
             transaction_type: RuleType::Invoice,
             notes: None,
             auto_process: false,

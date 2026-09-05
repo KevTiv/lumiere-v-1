@@ -3,6 +3,7 @@
 use spacetimedb::rand::Rng;
 use spacetimedb::{Identity, ReducerContext, Table};
 
+use crate::core::organization::company;
 use crate::core::permissions::{role, sod_conflict_rule, Role, SodConflictRule};
 use crate::core::users::{user_organization, user_profile, UserOrganization, UserProfile};
 use crate::purchasing::purchase_orders::{purchase_order, PurchaseOrder};
@@ -134,7 +135,7 @@ fn gate_creates_and_converges_real_guarded_action(ctx: &ReducerContext) -> Resul
     }
     publish_workflow_version(ctx, fixture.organization_id, version.id, revision)?;
 
-    let order = insert_draft_purchase_order(ctx, &fixture, nonce);
+    let order = insert_draft_purchase_order(ctx, &fixture, nonce)?;
     let request = RequestGuardedActionParams {
         company_id: fixture.company_id,
         action: GuardedActionKey::SendPurchaseOrder,
@@ -518,8 +519,15 @@ fn insert_draft_purchase_order(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     nonce: u64,
-) -> PurchaseOrder {
-    ctx.db.purchase_order().insert(PurchaseOrder {
+) -> Result<PurchaseOrder, String> {
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&fixture.company_id)
+        .map(|company| company.currency_id)
+        .ok_or("Harness company not found")?;
+    Ok(ctx.db.purchase_order().insert(PurchaseOrder {
         id: 0,
         organization_id: fixture.organization_id,
         name: Some(format!("WF-GATE-{nonce}")),
@@ -530,7 +538,7 @@ fn insert_draft_purchase_order(
         date_approve: None,
         partner_id: fixture.partner_id,
         dest_address_id: None,
-        currency_id: 1,
+        currency_id,
         payment_term_id: None,
         fiscal_position_id: None,
         date_planned: None,
@@ -574,7 +582,7 @@ fn insert_draft_purchase_order(
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         metadata: Some(r#"{"test":"guarded-task-gate"}"#.to_string()),
-    })
+    }))
 }
 
 struct SeededTask {

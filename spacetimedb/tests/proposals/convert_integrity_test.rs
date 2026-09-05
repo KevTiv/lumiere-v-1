@@ -1,6 +1,7 @@
 //! R5: proposal → SO convert derives UoM from product; missing product fail-closed.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::organization::company;
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::core::reference::{create_uom, uom, CreateUomParams};
 use crate::inventory::product::{product, Product};
@@ -15,6 +16,15 @@ use crate::sales::sales_core::{sale_order, sale_order_line};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::DiscountPolicy;
 
+fn company_currency_id(ctx: &ReducerContext, company_id: u64) -> Result<u64, String> {
+    ctx.db
+        .company()
+        .id()
+        .find(&company_id)
+        .map(|company| company.currency_id)
+        .ok_or_else(|| format!("Company {company_id} not found"))
+}
+
 fn create_awarded_proposal(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
@@ -27,7 +37,7 @@ fn create_awarded_proposal(
         CreateProposalParams {
             title: title.to_string(),
             client_name: "Acme R5".to_string(),
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, fixture.company_id)?,
             value: 1_000.0,
             deadline: None,
             description: None,
@@ -66,7 +76,7 @@ fn seed_pricelist(ctx: &ReducerContext, fixture: &OrgFixture, name: &str) -> Res
         CreatePricelistParams {
             company_id: None,
             name: name.to_string(),
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, fixture.company_id)?,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;

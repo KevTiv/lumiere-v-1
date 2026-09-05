@@ -8,6 +8,7 @@ use crate::accounting::journal_entries::{
     account_move, add_account_move_line, AccountMove, AddAccountMoveLineParams,
 };
 use crate::accounting::payments::{account_payment, AccountPayment};
+use crate::core::organization::company;
 use crate::purchasing::purchase_orders::{purchase_order, PurchaseOrder};
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{
@@ -199,6 +200,13 @@ fn replays_all_seven_actions_and_rejects_changed_revision(
 
 fn executes_payment_and_order_once(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&fixture.company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
     let (bank_journal_id, _bank_account_id) =
         crate::accounting_tests::helpers::seed_bank_journal(ctx, &fixture)?;
     let payment = ctx.db.account_payment().insert(AccountPayment {
@@ -211,7 +219,7 @@ fn executes_payment_and_order_once(ctx: &ReducerContext) -> Result<(), String> {
         partner_type: PartnerType::Customer,
         partner_id: fixture.partner_id,
         amount: 12.34,
-        currency_id: 1,
+        currency_id,
         date: ctx.timestamp,
         journal_id: bank_journal_id,
         ref_: Some("workflow action test".to_string()),
@@ -265,7 +273,7 @@ fn executes_payment_and_order_once(ctx: &ReducerContext) -> Result<(), String> {
         return Err("payment replay created a second accounting effect".to_string());
     }
 
-    let order = insert_draft_purchase_order(ctx, &fixture);
+    let order = insert_draft_purchase_order(ctx, &fixture)?;
     let order_action = GuardedActionKey::SendPurchaseOrder;
     let order_input = GuardedActionInput::SendPurchaseOrder { order_id: order.id };
     let order_snapshot = snapshot_guarded_action(
@@ -301,9 +309,16 @@ fn executes_payment_and_order_once(ctx: &ReducerContext) -> Result<(), String> {
 
 fn rejects_unbalanced_locked_and_cross_company_actions(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&fixture.company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
     let (journal_id, _bank_account_id) =
         crate::accounting_tests::helpers::seed_bank_journal(ctx, &fixture)?;
-    let unbalanced = insert_draft_move(ctx, &fixture, journal_id, "WF-UNBALANCED");
+    let unbalanced = insert_draft_move(ctx, &fixture, journal_id, currency_id, "WF-UNBALANCED");
     add_test_move_line(ctx, &fixture, unbalanced.id, 10.0, 0.0, 1)?;
     let action = GuardedActionKey::PostAccountMove;
     let input = GuardedActionInput::PostAccountMove {
@@ -357,7 +372,7 @@ fn rejects_unbalanced_locked_and_cross_company_actions(ctx: &ReducerContext) -> 
         return Err(format!("unexpected cross-company error: {cross_company}"));
     }
 
-    let locked = insert_draft_move(ctx, &fixture, journal_id, "WF-LOCKED");
+    let locked = insert_draft_move(ctx, &fixture, journal_id, currency_id, "WF-LOCKED");
     add_test_move_line(ctx, &fixture, locked.id, 10.0, 10.0, 1)?;
     let locked_input = GuardedActionInput::PostAccountMove { move_id: locked.id };
     let locked_snapshot = snapshot_guarded_action(
@@ -421,8 +436,18 @@ fn execution_params(
     }
 }
 
-fn insert_draft_purchase_order(ctx: &ReducerContext, fixture: &OrgFixture) -> PurchaseOrder {
-    ctx.db.purchase_order().insert(PurchaseOrder {
+fn insert_draft_purchase_order(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+) -> Result<PurchaseOrder, String> {
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&fixture.company_id)
+        .map(|company| company.currency_id)
+        .ok_or("Harness company not found")?;
+    Ok(ctx.db.purchase_order().insert(PurchaseOrder {
         id: 0,
         organization_id: fixture.organization_id,
         name: Some("WF-PO".to_string()),
@@ -433,7 +458,7 @@ fn insert_draft_purchase_order(ctx: &ReducerContext, fixture: &OrgFixture) -> Pu
         date_approve: None,
         partner_id: fixture.partner_id,
         dest_address_id: None,
-        currency_id: 1,
+        currency_id,
         payment_term_id: None,
         fiscal_position_id: None,
         date_planned: None,
@@ -477,13 +502,14 @@ fn insert_draft_purchase_order(ctx: &ReducerContext, fixture: &OrgFixture) -> Pu
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         metadata: Some(r#"{"test":"guarded-action"}"#.to_string()),
-    })
+    }))
 }
 
 fn insert_draft_move(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     journal_id: u64,
+    currency_id: u64,
     name: &str,
 ) -> AccountMove {
     ctx.db.account_move().insert(AccountMove {
@@ -516,8 +542,8 @@ fn insert_draft_move(
         medium_id: None,
         company_id: fixture.company_id,
         journal_id,
-        currency_id: 1,
-        company_currency_id: 1,
+        currency_id,
+        company_currency_id: currency_id,
         amount_untaxed: 0.0,
         amount_tax: 0.0,
         amount_total: 0.0,

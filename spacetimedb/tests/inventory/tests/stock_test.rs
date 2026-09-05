@@ -5,6 +5,7 @@
 /// and quantity updates directly until warehouse graph is seeded in harness.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::organization::company;
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::inventory::stock::{
     create_stock_quant, move_stock_quant, stock_quant, update_stock_quant_quantity,
@@ -17,6 +18,13 @@ pub fn test_stock_quant_create(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&fixture.company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
 
     let location_id = fixture.location_id;
     let initial_qty = 5.0;
@@ -44,7 +52,7 @@ pub fn test_stock_quant_create(ctx: &ReducerContext) -> Result<(), String> {
             cost: 10.0,
             cost_method: Some("standard".to_string()),
             accounting_date: None,
-            currency_id: Some(1),
+            currency_id: Some(currency_id),
             accounting_entry_ids: vec![],
             metadata: Some(r#"{"test":"stock_quant_create"}"#.to_string()),
         },
