@@ -2,8 +2,8 @@
   "version": 1,
   "canonical_plan": "docs/plans/core-vertical-deployability-pruning-plan.md",
   "last_verified": {
-    "date": "2026-09-04",
-    "commit": "f2762621b"
+    "date": "2026-09-05",
+    "commit": "fa2bdab09"
   },
   "relation_census": {
     "application": 458,
@@ -60,8 +60,21 @@
     },
     "C5": {
       "status": "partial",
-      "evidence": ["four relations are currently cooling-enabled"],
-      "required": ["review every eligible relation", "manifest-driven finalization", "semantic negative fixtures"]
+      "evidence": [
+        "lumiere-codegen/storage-policy-manifest.json contains 463 unique reviewed policy entries; the Rust validator enforces exact 463-table coverage, aggregate/archive coherence, semantic eligibility fields, and reviewed fixture coverage",
+        "29 reviewed fixtures cover every module/storage-class pair currently used by the 22 modules",
+        "the policy-derived archive subset contains exactly audit_log (pg_first, append_only) and pos_order (terminal_window, versioned); pos_order_line and pos_payment inherit the reviewed POS parent archive",
+        "the retired independent archive-candidate input has no live code path; archive generation consumes the total storage-policy census",
+        "spacetimedb/src/core/cold_tier.rs implements policy, age/window, terminal-state, obligation, workflow, hot-dependency, rebuildability, durable-watermark, archive-version, schema-version, and contract-version gates with child-first aggregate deletion",
+      "live grouped reducer fixtures passed on a freshly published disposable local STDB database: audit covers checksum match/mismatch, cross-row rejection, idempotency, and caller identity; POS covers the thirty-day terminal window, terminal state, obligations, workflow, missing children, watermark/schema/version mismatch, idempotency, and caller identity",
+      "api-server/src/cold_tier/finalization_worker parses the pinned manifest, rejects unknown table/reducer/mode mappings, dispatches deterministically, and aggregates candidate statistics with focused parser/dispatch tests",
+      "real PostgreSQL tests prove archive_transfer compare-and-set retries, bounded pending reads, finalization/reconciliation, and rejection of a malformed pre-existing ledger schema",
+      "scripts/bootstrap-storage-policies.mjs write mode reproduces reviewed fixtures plus semantic/archive metadata and passes --check"
+      ],
+      "required": [
+      "publish an immutable lumiere-contracts release containing the updated 463-table reviewed provenance, update the Cargo.toml:21 pin from v0.3.29, and verify release fingerprints; v0.3.29 already has 463 policies and the same two archive candidates but predates the C5 reviewed-provenance ratchet",
+      "run one disposable STDB plus PostgreSQL end-to-end finalization drill through the registered projection_worker identity, proving archive durability/checksum/version/watermark before reducer deletion for audit_log and pos_order"
+      ]
     },
     "C6": {
       "status": "partial",
