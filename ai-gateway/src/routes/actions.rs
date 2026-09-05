@@ -572,15 +572,10 @@ async fn fetch_grounding_snapshots(
     }
     let actor = ActorCredentials::new(req.stdb_token.clone(), req.identity_hex.clone())
         .map_err(|error| AppError::Forbidden(error.to_string()))?;
-    let snapshots = fetch_authorized_live_snapshots(
-        state,
-        &actor,
-        org_id,
-        req.company_id,
-        &candidates,
-    )
-        .await
-        .map_err(|error| AppError::Internal(error.to_string()))?;
+    let snapshots =
+        fetch_authorized_live_snapshots(state, &actor, org_id, req.company_id, &candidates)
+            .await
+            .map_err(|error| AppError::Internal(error.to_string()))?;
     Ok((!snapshots.is_empty()).then_some(snapshots))
 }
 

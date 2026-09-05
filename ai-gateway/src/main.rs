@@ -249,6 +249,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/health", get(routes::health::health))
+        .route("/health/ready", get(routes::health::health_ready))
         .merge(v1_routes)
         .layer(TraceLayer::new_for_http())
         .layer(cors)

@@ -178,8 +178,7 @@ fn validate_bootstrap(b: &BootstrapTenantBody) -> Result<(), ApiError> {
         ));
     }
     if b.default_company_currency_id == 0
-        && b
-            .default_company_currency_code
+        && b.default_company_currency_code
             .as_deref()
             .map(str::trim)
             .unwrap_or_default()
@@ -231,7 +230,7 @@ async fn bootstrap_tenant_post(
 
     let arg = reducer_arg(&body);
 
-    let payload = serde_json::to_value(&arg).map_err(|e| ApiError::Internal(e.to_string()))?;
+    let payload = serde_json::to_value(&arg).map_err(ApiError::internal)?;
     let client = state.client_with_token(&session.stdb_token);
     match client
         .call_reducer(stdb_client::reducer_call!(
@@ -241,7 +240,7 @@ async fn bootstrap_tenant_post(
         .await
     {
         Ok(()) => Ok(Json(json!({ "ok": true }))),
-        Err(e) => Err(ApiError::Internal(e.to_string())),
+        Err(e) => Err(ApiError::internal(e)),
     }
 }
 

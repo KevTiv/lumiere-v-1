@@ -10,11 +10,27 @@ import type {
   ModuleConfigInput,
 } from "@lumiere/stdb/types"
 
-import { formValue as field, optionalBigIntU64, u64IdArrayFromForm } from "./form-coercion"
+import { formValue as field, optionalBigIntU64, u64IdArrayFromForm, unwrapSome } from "./form-coercion"
+import { parseStrictU64 } from "./u64"
 
 function requiredBigIntU64(v: unknown): bigint | null {
-  const b = optionalBigIntU64(v)
-  return b === undefined ? null : b
+  const unwrapped = unwrapSome(v)
+  const isNoneEnvelope =
+    v != null &&
+    typeof v === "object" &&
+    !Array.isArray(v) &&
+    Object.keys(v).length === 1 &&
+    Object.prototype.hasOwnProperty.call(v, "none")
+  if (
+    unwrapped == null ||
+    (typeof unwrapped === "string" && unwrapped.trim() === "") ||
+    isNoneEnvelope
+  ) return null
+  // A supplied but malformed required ID must not silently select a context
+  // default.  Only genuinely absent values are eligible for that fallback.
+  const b = parseStrictU64(v)
+  if (b === undefined) throw new RangeError("invalid required u64")
+  return b
 }
 
 function num(v: unknown, fallback = 0): number {

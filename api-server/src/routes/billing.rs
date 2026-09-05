@@ -49,10 +49,7 @@ async fn get_billing_account(
     let sql = format!(
         "SELECT id, organization_id, plan_tier, seat_count, status, trial_ends_at, metadata FROM billing_account WHERE organization_id = {org_id}"
     );
-    let rows = client
-        .query_sql(&sql)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
     Ok(Json(json!({ "data": rows })))
 }
 
@@ -65,10 +62,7 @@ async fn patch_billing_account(
     let (session, org_id) = require_org_session(&state, &headers, &cookies).await?;
     let client = state.client_with_token(&session.stdb_token);
     let sql = format!("SELECT id FROM billing_account WHERE organization_id = {org_id}");
-    let rows = client
-        .query_sql(&sql)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
     let Some(row) = rows.first() else {
         return Err(ApiError::NotFound("Billing account not found".into()));
     };
@@ -90,7 +84,7 @@ async fn patch_billing_account(
             json!([org_id, billing_id, params]),
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok(Json(json!({ "ok": true })))
 }
 

@@ -119,7 +119,16 @@ impl Paths {
             erp_org_sql_rust_out: staging_manifests.join("erp-org-sql.json"),
 
             query_exec_non_registry_json: assets.join("query_exec_non_registry.json"),
-            query_exec_rs: repo_root.join("api-server/src/query_exec.rs"),
+            // Keep the audit compatible with the planned module split while preferring the
+            // current flat source when both paths exist during a transition.
+            query_exec_rs: {
+                let flat = repo_root.join("api-server/src/query_exec.rs");
+                if flat.is_file() {
+                    flat
+                } else {
+                    repo_root.join("api-server/src/query_exec/mod.rs")
+                }
+            },
 
             stdb_bindings_dir: contracts_staging_dir.join("bindings"),
             schema_manifest_out: staging_manifests.join("lumiere-schema-manifest.json"),

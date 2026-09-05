@@ -156,6 +156,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn audit_hash_preserves_oid_namespace_and_canonical_bytes() {
+        let value =
+            serde_json::json!({"z": false, "n": -7, "a": [3, 1, {"z": "é\n\"", "a": null}]});
+        assert_eq!(
+            hash_value(&value),
+            "uuid-v5:c8f367bc-151c-5782-a0c0-89184b24d5ad"
+        );
+    }
+
+    #[test]
     fn hashes_are_stable_across_object_key_order() {
         assert_eq!(
             hash_value(&serde_json::json!({"a": 1, "b": 2})),

@@ -54,7 +54,10 @@ pub async fn serve(spec: IntegrationWorkerSpec) -> anyhow::Result<()> {
         .collect::<Vec<_>>();
 
     let state = Arc::new(AppState::new(config));
-    let ready = Arc::new(AtomicBool::new(!org_ids.is_empty()));
+    // Configuration alone does not prove that the SpacetimeDB dependency and
+    // reducer are reachable. Readiness becomes true only after one successful
+    // batch, matching the other API-server workers.
+    let ready = Arc::new(AtomicBool::new(false));
     let worker_state = state.clone();
     let worker_ready = ready.clone();
     let orgs = org_ids.clone();
@@ -63,9 +66,7 @@ pub async fn serve(spec: IntegrationWorkerSpec) -> anyhow::Result<()> {
     let env_prefix = spec.env_prefix;
     tokio::spawn(async move {
         if orgs.is_empty() {
-            tracing::warn!(
-                "{log_label} idle: set LUMIERE_{env_prefix}_WORKER_ORG_IDS"
-            );
+            tracing::warn!("{log_label} idle: set LUMIERE_{env_prefix}_WORKER_ORG_IDS");
             return;
         }
         loop {
@@ -86,19 +87,21 @@ pub async fn serve(spec: IntegrationWorkerSpec) -> anyhow::Result<()> {
             "/health/ready",
             get(move || {
                 let ready = ready.clone();
-                async move {
-                    if ready.load(Ordering::Relaxed) {
-                        StatusCode::OK
-                    } else {
-                        StatusCode::SERVICE_UNAVAILABLE
-                    }
-                }
+                async move { readiness_status(ready.load(Ordering::Relaxed)) }
             }),
         );
     let listener = tokio::net::TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], port))).await?;
     tracing::info!(port, "{log_label} listening");
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+fn readiness_status(ready: bool) -> StatusCode {
+    if ready {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    }
 }
 
 async fn process_batch(
@@ -117,4 +120,16 @@ async fn process_batch(
             .await?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::readiness_status;
+    use axum::http::StatusCode;
+
+    #[test]
+    fn integration_worker_is_unready_until_a_batch_succeeds() {
+        assert_eq!(readiness_status(false), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(readiness_status(true), StatusCode::OK);
+    }
 }

@@ -2,8 +2,7 @@ use serde_json::{json, Value};
 
 use crate::{
     harness::{
-        fetch_authorized_live_snapshots, resolve_snapshot_candidates,
-        HARNESS_MAX_LIVE_SNAPSHOTS,
+        fetch_authorized_live_snapshots, resolve_snapshot_candidates, HARNESS_MAX_LIVE_SNAPSHOTS,
     },
     retrieval_policy::optional_retrieval,
     tools::types::{live_snapshot_citation, ToolContext, ToolOutput, ToolResult},
@@ -12,12 +11,22 @@ use crate::{
 fn authorized_result_summary(snapshot_count: usize, retrieval_degraded: bool) -> String {
     format!(
         "Resolved {snapshot_count} authorized scoped snapshot(s){}",
-        if retrieval_degraded { " (degraded)" } else { "" }
+        if retrieval_degraded {
+            " (degraded)"
+        } else {
+            ""
+        }
     )
 }
 
-fn build_authorized_output(snapshots: Vec<crate::harness::LiveSnapshot>, retrieval_degraded: bool) -> ToolOutput {
-    let citations = snapshots.iter().map(live_snapshot_citation).collect::<Vec<_>>();
+fn build_authorized_output(
+    snapshots: Vec<crate::harness::LiveSnapshot>,
+    retrieval_degraded: bool,
+) -> ToolOutput {
+    let citations = snapshots
+        .iter()
+        .map(live_snapshot_citation)
+        .collect::<Vec<_>>();
     let summary = authorized_result_summary(snapshots.len(), retrieval_degraded);
     let row_count = snapshots.len() as u32;
 
@@ -58,17 +67,18 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
 
     let mut retrieval_degraded = false;
     let company_result = match ctx.providers().embedder.embed(query).await {
-        Ok(query_vector) => ctx
-            .vector_store()
-            .search(
-                query_vector,
-                ctx.org_id,
-                ctx.company_id,
-                None,
-                limit,
-                score_threshold,
-            )
-            .await,
+        Ok(query_vector) => {
+            ctx.vector_store()
+                .search(
+                    query_vector,
+                    ctx.org_id,
+                    ctx.company_id,
+                    None,
+                    limit,
+                    score_threshold,
+                )
+                .await
+        }
         Err(error) => Err(error),
     };
     if let Err(error) = &company_result {
@@ -92,20 +102,11 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
     retrieval_degraded |= org_outcome.degraded;
     let org_hits = org_outcome.value;
 
-    let candidates = resolve_snapshot_candidates(
-        None,
-        &company_hits,
-        &org_hits,
-        HARNESS_MAX_LIVE_SNAPSHOTS,
-    );
-    let snapshot_result = fetch_authorized_live_snapshots(
-        &ctx.state,
-        actor,
-        ctx.org_id,
-        ctx.company_id,
-        &candidates,
-    )
-    .await;
+    let candidates =
+        resolve_snapshot_candidates(None, &company_hits, &org_hits, HARNESS_MAX_LIVE_SNAPSHOTS);
+    let snapshot_result =
+        fetch_authorized_live_snapshots(&ctx.state, actor, ctx.org_id, ctx.company_id, &candidates)
+            .await;
     if let Err(error) = &snapshot_result {
         tracing::warn!(error = %error, "ERP authoritative retrieval unavailable");
     }

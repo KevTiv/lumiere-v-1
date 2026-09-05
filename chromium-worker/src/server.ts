@@ -1,5 +1,6 @@
 import http from "node:http";
 import puppeteer from "puppeteer-core";
+import { checkBrowserReady } from "./readiness.mjs";
 
 const PORT = Number(process.env.PORT ?? 8090);
 const EXECUTABLE_PATH =
@@ -89,6 +90,18 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && req.url === "/health") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: true, service: "chromium-worker-v1" }));
+      return;
+    }
+
+    if (req.method === "GET" && req.url === "/health/ready") {
+      try {
+        await checkBrowserReady(getBrowser);
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true, service: "chromium-worker-v1", ready: true }));
+      } catch {
+        res.writeHead(503, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: "not ready" }));
+      }
       return;
     }
 

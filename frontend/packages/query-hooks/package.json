@@ -14,6 +14,7 @@
     "./erp-ai-selection-context": "./src/erp-ai-selection-context.tsx",
     "./hooks/hr": "./src/hooks/hr/index.ts",
     "./hooks/inventory": "./src/hooks/inventory/index.ts",
+    "./hooks/accounting": "./src/hooks/accounting/index.ts",
     "./hooks/*": "./src/hooks/*.ts"
   },
   "scripts": {

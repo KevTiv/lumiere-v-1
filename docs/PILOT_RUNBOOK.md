@@ -228,18 +228,32 @@ Artifacts land in `.tmp/stdb-backups/` (override with `BACKUP_DIR`). See [`ENVIR
 
 | Service | Endpoint | Expected |
 |---------|----------|----------|
-| **api-server** | `GET http://<api-host>:8082/health` | HTTP 200 (`api-server/src/http_app.rs`) |
+| **api-server liveness** | `GET http://<api-host>:8082/health` | HTTP 200 without dependency checks |
+| **api-server readiness** | `GET http://<api-host>:8082/health/ready` | HTTP 200 only when PostgreSQL, SpacetimeDB, and the configured AI gateway are ready |
 | **ai-gateway** | `GET http://<ai-gateway-host>:8080/health` | JSON `{"status":"ok","service":"lumiere-ai-gateway"}` (`ai-gateway/src/routes/health.rs`) |
-| **AI via web BFF** | `GET /api/ai/health` (authenticated) | Proxies ai-gateway; see [`frontend/web/app/api/ai/health/route.ts`](../frontend/web/app/api/ai/health/route.ts) |
+| **ai-gateway readiness** | `GET http://<ai-gateway-host>:8080/health/ready` | HTTP 200 only when SpacetimeDB, primary Qdrant, configured provider settings, Ollama metadata, and any configured Kong readiness endpoint are ready |
+| **chromium-worker liveness** | `GET http://<chromium-host>:8090/health` | HTTP 200 when the worker process is listening |
+| **chromium-worker readiness** | `GET http://<chromium-host>:8090/health/ready` | HTTP 200 only after a bounded Chromium launch/connect check |
+| **AI via web BFF** | `GET /api/ai/health` (authenticated) | Proxies ai-gateway readiness; see [`frontend/web/app/api/ai/health/route.ts`](../frontend/web/app/api/ai/health/route.ts) |
 | **Web (compose)** | `curl -fsS $NEXT_PUBLIC_APP_URL` | HTML shell loads |
 | **SpacetimeDB** | `spacetime server ping` or `curl -fsS $STDB_HOST/v1/identity -X POST` | Reachable |
 
-In Docker Compose, api-server and ai-gateway are not port-published — exec into the network or check from a sibling container:
+In Docker Compose, api-server and ai-gateway are not port-published. Probe from
+an operator or sibling container on the Compose network; slim production images
+do not guarantee that `curl` is installed.
 
 ```bash
-docker compose exec api-server curl -fsS http://127.0.0.1:8082/health
-docker compose exec ai-gateway curl -fsS http://127.0.0.1:8080/health
+# Run from the host, or from a sibling container with Node 18+ on the Compose network.
+node scripts/check-compose-readiness.mjs \
+  --api http://<api-host>:8082/health/ready \
+  --ai http://<ai-gateway-host>:8080/health/ready \
+  --probe chromium=http://<chromium-host>:8090/health/ready
 ```
+
+The probe uses only Node's built-in `fetch`, applies a bounded timeout, and exits non-zero
+if any dependency is not ready. Add repeatable `--probe NAME=URL` arguments for
+worker readiness endpoints. All probes start in parallel. Use `curl` directly
+only when it is available.
 
 Kong (`:8000`) does not expose a dedicated `/health` route in [`infra/kong/kong.yml`](../infra/kong/kong.yml); use service-level checks above.
 

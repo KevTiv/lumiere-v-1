@@ -531,8 +531,6 @@ fn string_array(row: &Value, field: &str) -> Option<Vec<String>> {
         })
 }
 
-
-
 fn semver_major(value: &str) -> Option<u32> {
     value.split('.').next()?.parse().ok()
 }

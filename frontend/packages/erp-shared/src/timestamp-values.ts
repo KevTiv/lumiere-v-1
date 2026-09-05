@@ -44,7 +44,7 @@ export function isoToDate(iso: string): Date | null {
  */
 export function stdbTimestampToDate(raw: unknown): Date | null {
   if (raw == null) return null
-  if (raw instanceof Date) return raw
+  if (raw instanceof Date) return Number.isNaN(raw.getTime()) ? null : raw
   if (typeof raw === "object" && raw !== null) {
     const micros =
       (raw as { microsSinceUnixEpoch?: unknown }).microsSinceUnixEpoch ??
@@ -79,6 +79,10 @@ export function compatNumberToDate(raw: unknown): Date | null {
  * for null/invalid) to match the existing audit-log contract.
  */
 export function timestampToIso(raw: unknown): string {
-  const date = stdbTimestampToDate(raw) ?? compatNumberToDate(raw)
+  // The audit boundary historically coerces Date to a number before applying
+  // its legacy unit threshold. Keep that oddity out of typed entity adapters.
+  const date = raw instanceof Date
+    ? compatNumberToDate(raw.getTime())
+    : stdbTimestampToDate(raw) ?? compatNumberToDate(raw)
   return (date ?? new Date(0)).toISOString()
 }

@@ -13,6 +13,7 @@ This doc summarizes how **SpacetimeDB**, **Next.js**, **api-server**, and **gate
 | `LUMIERE_API_SERVER_URL` | Next `lib/api-server-forward.ts` | Internal base URL of the Rust api-server for Next routes that still perform local side effects before proxying (e.g. `http://api-server:8082`). In development, defaults to `http://127.0.0.1:8082` if unset. |
 | `LUMIERE_REDUCER_ALLOWLIST` | api-server | `strict` (production default) blocks bootstrap/test/import reducers on `POST /v1/call/{reducer}`; `off` disables filtering (local dev / e2e). |
 | `AI_GATEWAY_URL` | api-server | Internal AI gateway base URL. Required in production; must not be `localhost`. |
+| `AI_GATEWAY_REQUIRED` | api-server | Whether `/health/ready` requires the AI gateway (`true`/`false` or `1`/`0`). Defaults to `true` in production and `false` outside production. |
 | `STDB_TOKEN` | ai-gateway, iot-gateway | Service token for SpacetimeDB HTTP API (distinct from per-user tokens). |
 | `AI_CERTIFICATION_STDB_TOKEN` | ai-gateway | Dedicated SpacetimeDB token whose identity alone may claim and complete certification jobs. Required with `AI_CERTIFICATION_RUNTIME_HASH`. |
 | `AI_CERTIFICATION_RUNTIME_HASH` | ai-gateway | Immutable executor build/profile digest (`sha256:` plus 64 lowercase hex characters). Required with `AI_CERTIFICATION_STDB_TOKEN`. |
@@ -25,6 +26,7 @@ This doc summarizes how **SpacetimeDB**, **Next.js**, **api-server**, and **gate
 | `MISTRAL_API_KEY` / `GOOGLE_API_KEY` | Provider keys for LLM + embed when configured on `AiAgent` or `EMBEDDING_PROVIDER` |
 | `OLLAMA_URL` | Local Ollama for embed, vision, and chat |
 | `KONG_LLM_URL` | Optional internal Kong AI route for LLM chat (else direct provider HTTP) |
+| `KONG_LLM_READINESS_URL` | Optional exact non-generative Kong readiness endpoint; probed with `KONG_LLM_SERVICE_TOKEN` when set |
 | `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | BFF → gateway auth header |
 | `AI_CERTIFICATION_POLL_SECS` | Certification queue poll interval; defaults to `5` |
 | `AI_CERTIFICATION_BATCH_SIZE` | Maximum jobs considered per poll; defaults to `10` |
@@ -33,6 +35,19 @@ This doc summarizes how **SpacetimeDB**, **Next.js**, **api-server**, and **gate
 Tenant LLM provider/model selection is stored in SpacetimeDB `AiAgent` rows (Mistral, Gemini, Ollama).
 
 ## Modes
+
+### Health semantics
+
+The api-server exposes `GET /health` as liveness only; it does not contact SpacetimeDB or
+the AI gateway. `GET /health/ready` checks PostgreSQL readiness and SpacetimeDB, and checks
+the configured AI gateway when `AI_GATEWAY_REQUIRED=true`. Production defaults this
+switch to `true`; development defaults to `false` unless explicitly overridden.
+The development Compose stack explicitly enables it because that stack includes
+the AI gateway and its required stores.
+AI-gateway readiness uses Ollama's non-generative metadata endpoint and an exact
+operator-supplied `KONG_LLM_READINESS_URL` when configured. Mistral, Gemini,
+Unstructured, and Tavily are configuration-validated or runtime-observed;
+readiness never sends a billable model/search request.
 
 ### Local SpacetimeDB (`spacetime start`)
 

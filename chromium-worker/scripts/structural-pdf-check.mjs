@@ -7,6 +7,22 @@ const baseUrl = process.env.CHROMIUM_WORKER_URL ?? "http://127.0.0.1:8090";
 const outputDir = process.env.PDF_STRUCTURAL_OUTPUT ?? await mkdtemp(join(tmpdir(), "lumiere-pdf-"));
 await mkdir(outputDir, { recursive: true });
 
+async function waitForReady(url, timeoutMs = 30_000, intervalMs = 500) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError = "no response";
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(`${url}/health/ready`);
+      if (response.ok) return;
+      lastError = `HTTP ${response.status}`;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  throw new Error(`Chromium worker readiness failed after ${timeoutMs}ms: ${lastError}`);
+}
+
 const fixtures = [
   ["Daily Business Summary", "Sales"],
   ["Cash & Mobile Money", "Accounts"],
@@ -26,6 +42,8 @@ function html(title, label, longTable = false) {
   ).join("");
   return `<!doctype html><html><head><style>@page { size:A4; margin:16mm 12mm; } body{font:12px Arial} table{width:100%;border-collapse:collapse} th,td{border:1px solid #999;padding:4px} thead{display:table-header-group}</style></head><body><h1>${title}</h1><p>Cutoff: 2026-07-12 UTC local day</p><p>Total: 400.00</p><table><thead><tr><th>${label}</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
 }
+
+await waitForReady(baseUrl);
 
 for (const [index, [title, label]] of fixtures.entries()) {
   const response = await fetch(`${baseUrl}/v1/render/pdf`, {

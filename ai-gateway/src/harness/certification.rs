@@ -1729,6 +1729,16 @@ mod tests {
     }
 
     #[test]
+    fn evidence_hash_preserves_canonical_json_golden_vector() {
+        let value =
+            serde_json::json!({"z": false, "n": -7, "a": [3, 1, {"z": "é\n\"", "a": null}]});
+        assert_eq!(
+            hash_value(&value),
+            "sha256:a42c8067e7ddb3cd4e102f6b8ba61ef954aa74210de0fa10b1b10fc48a8c2c80"
+        );
+    }
+
+    #[test]
     fn sha256_matches_known_vector() {
         assert_eq!(
             sha256_prefixed(b"abc"),

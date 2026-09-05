@@ -191,12 +191,11 @@ fn read_meta(path: &Path) -> Result<BlobMeta, ApiError> {
 
 fn write_meta(path: &Path, meta: &BlobMeta) -> Result<(), ApiError> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| ApiError::Internal(e.to_string()))?;
+        fs::create_dir_all(parent).map_err(ApiError::internal)?;
     }
-    let json = serde_json::to_vec_pretty(meta).map_err(|e| ApiError::Internal(e.to_string()))?;
-    let mut f = fs::File::create(path).map_err(|e| ApiError::Internal(e.to_string()))?;
-    f.write_all(&json)
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let json = serde_json::to_vec_pretty(meta).map_err(ApiError::internal)?;
+    let mut f = fs::File::create(path).map_err(ApiError::internal)?;
+    f.write_all(&json).map_err(ApiError::internal)?;
     Ok(())
 }
 
@@ -326,9 +325,9 @@ async fn upload(
     }
 
     if let Some(parent) = bin_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| ApiError::Internal(e.to_string()))?;
+        fs::create_dir_all(parent).map_err(ApiError::internal)?;
     }
-    fs::write(&bin_path, &body).map_err(|e| ApiError::Internal(e.to_string()))?;
+    fs::write(&bin_path, &body).map_err(ApiError::internal)?;
 
     let mut hasher = Sha256::new();
     hasher.update(&body);
@@ -379,7 +378,7 @@ async fn complete(
         ));
     }
 
-    let bytes = fs::read(&bin_path).map_err(|e| ApiError::Internal(e.to_string()))?;
+    let bytes = fs::read(&bin_path).map_err(ApiError::internal)?;
     let len = bytes.len() as u64;
     let mut hasher = Sha256::new();
     hasher.update(&bytes);
@@ -477,7 +476,7 @@ async fn ocr_extract(
             "blob not ready for OCR extract".into(),
         ));
     }
-    let bytes = fs::read(&bin_path).map_err(|e| ApiError::Internal(e.to_string()))?;
+    let bytes = fs::read(&bin_path).map_err(ApiError::internal)?;
     let extracted_text = extract_text_for_index(&meta.content_type, &bytes);
     let needs_external_ocr = extracted_text.is_none();
 

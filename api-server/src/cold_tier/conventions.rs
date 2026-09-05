@@ -139,6 +139,41 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn canonical_payload_bytes_and_checksum_match_golden_vector() {
+        let value = json!({"z": false, "n": -7, "a": [3, 1, {"z": "é\n\"", "a": null}]});
+        let bytes = serde_json::to_vec(&canonicalize_json(&value)).expect("JSON value");
+        assert_eq!(
+            bytes,
+            r#"{"a":[3,1,{"a":null,"z":"é\n\""}],"n":-7,"z":false}"#.as_bytes()
+        );
+        assert_eq!(
+            compute_payload_checksum_canonical(&value),
+            "a42c8067e7ddb3cd4e102f6b8ba61ef954aa74210de0fa10b1b10fc48a8c2c80"
+        );
+        assert_ne!(
+            compute_payload_checksum_canonical(&value),
+            compute_payload_checksum_canonical(
+                &json!({"z": false, "n": -7, "a": [1, 3, {"z": "é\n\"", "a": null}]})
+            )
+        );
+    }
+
+    #[test]
+    fn identifiers_are_validated_before_quoting() {
+        for valid in ["audit_log", "column_2", "_internal", "2"] {
+            assert_eq!(
+                quote_identifier(valid).expect("valid identifier"),
+                format!("\"{valid}\"")
+            );
+        }
+        assert!(validate_identifier(&"a".repeat(128)).is_ok());
+        assert!(validate_identifier(&"a".repeat(129)).is_err());
+        for invalid in ["", "Audit", "a.b", "a b", "a\"b", "a;b", "é", "a--b"] {
+            assert!(quote_identifier(invalid).is_err(), "accepted {invalid:?}");
+        }
+    }
+
+    #[test]
     fn checksum_is_sha256_hex() {
         let input = br#"{"id":42}"#;
         let checksum = compute_payload_checksum(input);

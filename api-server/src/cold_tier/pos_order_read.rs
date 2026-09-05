@@ -36,10 +36,8 @@ pub struct Page {
 
 /// Resolve one merged, bounded page of `pos_order` rows.
 ///
-/// If the cold (PG) read fails, this does not fail the request — it falls
-/// back to the hot tail alone and logs loudly, so the failure is observable
-/// without silently claiming the page is complete (same rule `audit_read.rs`
-/// follows for the same reason).
+/// Cold-store failure rejects the request: returning the hot tail could omit
+/// orders and incorrectly terminate pagination.
 pub async fn merged_page(
     stdb: &StdbClient,
     organization_id: u64,
@@ -78,23 +76,13 @@ pub async fn merged_page(
     let cold_rows = match cold_result {
         Ok(rows) => rows,
         Err(error) => {
-            tracing::error!(
-                %error,
-                organization_id,
-                "pos-orders cold read failed; falling back to hot tail only"
-            );
-            Vec::new()
+            return Err(ApiError::unavailable(error.context("load complete POS order page")));
         }
     };
 
-    let (merged, has_more) = super::merge_hot_cold_u64(
-        hot_rows,
-        cold_rows,
-        "id",
-        OrderDirection::Desc,
-        limit,
-    )
-    .map_err(|error| ApiError::Internal(error.to_string()))?;
+    let (merged, has_more) =
+        super::merge_hot_cold_u64(hot_rows, cold_rows, "id", OrderDirection::Desc, limit)
+            .map_err(ApiError::internal)?;
 
     let next_cursor = if has_more {
         merged
@@ -134,21 +122,16 @@ fn row_id(row: &Value) -> Option<u64> {
 }
 
 async fn query_hot(stdb: &StdbClient, plan: &ResourceReadPlan) -> Result<Vec<Value>, ApiError> {
-    let (sql, binds) =
-        super::compile_stdb_sql(plan).map_err(|e| ApiError::Internal(e.to_string()))?;
+    let (sql, binds) = super::compile_stdb_sql(plan).map_err(ApiError::internal)?;
     let sql = super::inline_stdb_literals(&sql, &binds);
-    stdb.query_sql(&sql)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))
+    stdb.query_sql(&sql).await.map_err(ApiError::internal)
 }
 
 async fn query_cold(
     columns: &[pg_codec::ColumnCodec],
     plan: &ResourceReadPlan,
 ) -> anyhow::Result<Vec<Value>> {
-    let Some(pool) = pg_pool::shared_pool() else {
-        return Ok(Vec::new());
-    };
+    let pool = pg_pool::required_pool()?;
 
     let (sql, binds) = super::compile_pg_sql(plan)?;
     let owned_binds = scalar_binds_to_pg(&binds);
@@ -176,12 +159,11 @@ mod tests {
     #[test]
     fn hot_ids_win_on_dedupe_like_audit_read() {
         let hot = vec![json!({"id": 5}), json!({"id": 3})];
-        let (merged, _) = merge_hot_cold_rows(
-            hot,
-            vec![json!({"id": 5}), json!({"id": 1})],
-            10,
+        let (merged, _) = merge_hot_cold_rows(hot, vec![json!({"id": 5}), json!({"id": 1})], 10);
+        assert_eq!(
+            merged,
+            vec![json!({"id": 5}), json!({"id": 3}), json!({"id": 1})]
         );
-        assert_eq!(merged, vec![json!({"id": 5}), json!({"id": 3}), json!({"id": 1})]);
     }
 
     #[test]

@@ -69,6 +69,19 @@ test("parseStrictU64 handles Option::Some envelopes", () => {
   assert.equal(parseStrictU64({ some: "" }), undefined)
 })
 
+test("parseStrictU64 terminates on arrays, malformed envelopes, and cycles", () => {
+  const cycle: Record<string, unknown> = {}
+  cycle.self = cycle
+  const someCycle: Record<string, unknown> = {}
+  someCycle.some = someCycle
+  assert.equal(parseStrictU64({}), undefined)
+  assert.equal(parseStrictU64([]), undefined)
+  assert.equal(parseStrictU64({ none: [] }), undefined)
+  assert.equal(parseStrictU64({ some: [], extra: true }), undefined)
+  assert.equal(parseStrictU64(cycle), undefined)
+  assert.equal(parseStrictU64(someCycle), undefined)
+})
+
 test("parseStrictU64 handles grouped/underscore strings", () => {
   assert.equal(parseStrictU64("1_000_000"), 1000000n)
   assert.equal(parseStrictU64("1,000"), 1000n)

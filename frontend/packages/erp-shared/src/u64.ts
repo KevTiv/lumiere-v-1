@@ -15,18 +15,25 @@ const U64_MAX = 18446744073709551615n
 /** Accepted scalar ID input types for strict conversion. */
 export type ScalarId = bigint | number | string
 
-/** Unwrap the wire representation of `Option::Some`, leaving every other value intact. */
-function unwrapSome(value: unknown): unknown {
-  if (
-    value != null &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    Object.keys(value as Record<string, unknown>).length === 1 &&
-    Object.prototype.hasOwnProperty.call(value, "some")
-  ) {
-    return (value as { some: unknown }).some
+const MAX_OPTION_DEPTH = 32
+
+/**
+ * Parse an Option envelope without treating arbitrary objects as recursive
+ * values.  Form payloads can contain arrays, malformed envelopes, or cycles;
+ * none of those are valid scalar IDs and must terminate as invalid input.
+ */
+function optionValue(value: object): { kind: "some" | "none" | "invalid"; value?: unknown } {
+  try {
+    if (Array.isArray(value)) return { kind: "invalid" }
+    const keys = Object.keys(value)
+    if (keys.length === 1 && keys[0] === "some") {
+      return { kind: "some", value: (value as { some: unknown }).some }
+    }
+    if (keys.length === 1 && keys[0] === "none") return { kind: "none" }
+  } catch {
+    // Proxies/getters are not trusted scalar input.
   }
-  return value
+  return { kind: "invalid" }
 }
 
 /**
@@ -35,10 +42,18 @@ function unwrapSome(value: unknown): unknown {
  * Handles `Option::Some` envelopes.
  */
 export function parseStrictU64(v: unknown): bigint | undefined {
+  return parseStrictU64Bounded(v, 0, new WeakSet<object>())
+}
+
+function parseStrictU64Bounded(v: unknown, depth: number, seen: WeakSet<object>): bigint | undefined {
   if (v == null || v === "") return undefined
   if (typeof v === "bigint") return v >= 0n && v <= U64_MAX ? v : undefined
   if (typeof v === "object") {
-    return parseStrictU64(unwrapSome(v))
+    if (depth >= MAX_OPTION_DEPTH || seen.has(v)) return undefined
+    seen.add(v)
+    const option = optionValue(v)
+    if (option.kind !== "some") return undefined
+    return parseStrictU64Bounded(option.value, depth + 1, seen)
   }
   if (typeof v === "number") {
     if (!Number.isFinite(v) || v < 0) return undefined

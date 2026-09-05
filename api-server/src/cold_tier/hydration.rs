@@ -239,7 +239,7 @@ pub async fn hydrate_pos_order_if_absent(
     stdb: &StdbClient,
     plan: &PosOrderHydrationPlan,
 ) -> Result<bool, ApiError> {
-    let id = order_id(&plan.order).map_err(|e| ApiError::Internal(e.to_string()))?;
+    let id = order_id(&plan.order).map_err(ApiError::internal)?;
     let sql = format!(
         "SELECT id, organization_id, company_id FROM `{TABLE}` \
          WHERE organization_id = {} AND id = {} LIMIT 1",
@@ -267,17 +267,17 @@ pub async fn hydrate_pos_order_if_absent(
         plan.schema_version,
         plan.archive_version,
         plan.root_checksum,
-        serde_json::to_string(&plan.order).map_err(|e| ApiError::Internal(e.to_string()))?,
+        serde_json::to_string(&plan.order).map_err(ApiError::internal)?,
         plan.lines
             .iter()
             .map(|row| serde_json::to_string(row))
             .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|e| ApiError::Internal(e.to_string()))?,
+            .map_err(ApiError::internal)?,
         plan.payments
             .iter()
             .map(|row| serde_json::to_string(row))
             .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|e| ApiError::Internal(e.to_string()))?,
+            .map_err(ApiError::internal)?,
     ]);
     stdb.call_reducer(stdb_client::reducer_call!(
         "hydrate_pos_order_aggregate",

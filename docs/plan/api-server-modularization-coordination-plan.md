@@ -1,6 +1,8 @@
 # API-server modularization: coordinated implementation plan
 
-Status: Ready for implementation; no refactor work has been completed by this document.
+Status: IN PROGRESS. Corrective implementation began 2026-09-05 against `221f2fe3`.
+Current evidence and remaining gates: [Luna integration log](code-ownership-luna-integration-log.md).
+`IMPLEMENTED` below means source ownership has moved, not that service-backed acceptance is complete.
 Created: 2026-09-04.
 Scope: `api-server/src`, its focused tests, and source-inspecting codegen tooling affected by file moves.
 Execution owner: The primary agent session implementing this plan (the coordinator).
@@ -332,27 +334,27 @@ Every task starts with a current source inventory and ends with coordinator acce
 
 | ID | Assignment | Dependencies | Exclusive implementation scope | Status |
 | --- | --- | --- | --- | --- |
-| M00 | Baseline, ownership ledger, test inventory | None | Coordinator; read-only baseline plus ledger | PENDING |
-| M01 | Repair resource dispatch audit and negative fixtures | M00 | Coordinator or delegated tooling owner; `lumiere-codegen/src/query_exec_audit`, relevant path wiring | PENDING |
-| M02 | Extract existing test modules/helpers | M00 | One source module per assignment; coordinate destinations with later owner | PENDING |
-| M10 | HTTP assembly, query/operation adapters, commands | M00 | `http_app`, new HTTP adapters and `commands`; coordinator wires shared roots | PENDING |
-| M11 | Authentication flow modules | M00 | `routes/auth.rs` and `routes/auth/` | PENDING |
-| M12 | Report service modules | M00 | `reports/service.rs` and `reports/service/` | PENDING |
-| M13 | Report renderer modules | M12 | `reports/render.rs` and `reports/render/` | PENDING |
-| M20 | Query support and authoritative modules | M01, M10 | `query_exec` conversion; coordinator owns dispatcher and root exports | PENDING |
-| M21 | Query domain extraction batches | M20 | One domain transfer at a time from dispatcher to named owner | PENDING |
-| M30 | Cold read foundation | M00 | Coordinator-owned `cold_tier/mod.rs` conversion and new foundation files | PENDING |
-| M31 | Atomic commit projection modules | M30 | `cold_tier/commit_projection` conversion | PENDING |
-| M32 | Reconstruction modules | M30 | `cold_tier/reconstruction` conversion | PENDING |
-| M33 | Projection worker modules | M31 | `cold_tier/projection_worker` conversion | PENDING |
-| M40 | Workflow reads | M21 | `workflow_reads` conversion | PENDING |
-| M41 | Workflow worker | M00; M02 for this file if assigned | `workflow_worker` conversion | PENDING |
-| M42 | Realtime modules | M21, M10 | `realtime`; coordinator retains build-script integration | PENDING |
-| M50 | CRM route modules | M21 | `routes/crm` conversion | PENDING |
-| M51 | Document adapters and renderers | M13, M21 | `routes/documents`, `document_render`; coordinator declares root | PENDING |
-| M52 | Platform control modules | M11 | `platform_control` conversion | PENDING |
-| M60 | Session/org extractor and selected caller migration | M10, M11, M21 | Coordinator stages `web_session` plus selected callers | PENDING |
-| M90 | Integrated review, tests, docs and final handoff | All required tasks | Coordinator | PENDING |
+| M00 | Baseline, ownership ledger, test inventory | None | Coordinator; read-only baseline plus ledger | ACCEPTED |
+| M01 | Repair resource dispatch audit and negative fixtures | M00 | Coordinator or delegated tooling owner; `lumiere-codegen/src/query_exec_audit`, relevant path wiring | IMPLEMENTED — six focused audit tests pass |
+| M02 | Extract existing test modules/helpers | M00 | One source module per assignment; coordinate destinations with later owner | FOLDED INTO module tasks; original fixtures retained |
+| M10 | HTTP assembly, query/operation adapters, commands | M00 | `http_app`, new HTTP adapters and `commands`; coordinator wires shared roots | IMPLEMENTED — API host gates pass; service gates separate |
+| M11 | Authentication flow modules | M00 | `routes/auth.rs` and `routes/auth/` | IMPLEMENTED — API host gates pass; service gates separate |
+| M12 | Report service modules | M00 | `reports/service.rs` and `reports/service/` | IMPLEMENTED — API host gates pass; service gates separate |
+| M13 | Report renderer modules | M12 | `reports/render.rs` and `reports/render/` | IMPLEMENTED — API host gates pass; service gates separate |
+| M20 | Query support and authoritative modules | M01, M10 | `query_exec` conversion; coordinator owns dispatcher and root exports | IMPLEMENTED — API host gates pass; service gates separate |
+| M21 | Query domain extraction batches | M20 | One domain transfer at a time from dispatcher to named owner | IMPLEMENTED — HR/registered/CRM owners integrated; live gates separate |
+| M30 | Cold read foundation | M00 | Coordinator-owned `cold_tier/mod.rs` conversion and new foundation files | IMPLEMENTED — focused API tests pass |
+| M31 | Atomic commit projection modules | M30 | `cold_tier/commit_projection` conversion | IMPLEMENTED — opt-in PG gate pending |
+| M32 | Reconstruction modules | M30 | `cold_tier/reconstruction` conversion | IMPLEMENTED — service-backed gate pending |
+| M33 | Projection worker modules | M31 | `cold_tier/projection_worker` conversion | IMPLEMENTED — per-organization operation extracted; API host gates pass |
+| M40 | Workflow reads | M21 | `workflow_reads` conversion | IMPLEMENTED — domain/scope modules integrated; live gates separate |
+| M41 | Workflow worker | M00; M02 for this file if assigned | `workflow_worker` conversion | IMPLEMENTED — API host gates pass; service gates separate |
+| M42 | Realtime modules | M21, M10 | `realtime`; coordinator retains build-script integration | IMPLEMENTED — planning/bridge/socket split; existing lifecycle preserved |
+| M50 | CRM route modules | M21 | `routes/crm` conversion | IMPLEMENTED — API host gates pass; service gates separate |
+| M51 | Document adapters and renderers | M13, M21 | `routes/documents`, `document_render`; coordinator declares root | IMPLEMENTED — API host gates pass; service gates separate |
+| M52 | Platform control modules | M11 | `platform_control` conversion | IMPLEMENTED — API host gates pass; service gates separate |
+| M60 | Session/org extractor and selected caller migration | M10, M11, M21 | Coordinator stages `web_session` plus selected callers | IMPLEMENTED — four equivalent GET handlers; wider migration separate |
+| M90 | Integrated review, tests, docs and final handoff | All required tasks | Coordinator | IN PROGRESS |
 
 M02 is opportunistic: if extraction would cause double-moving tests, fold it into the relevant module task and record that decision. Never run M02 concurrently with its production module owner.
 

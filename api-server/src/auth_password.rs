@@ -33,31 +33,30 @@ pub fn is_usable_admin_token(raw: &str) -> bool {
 }
 
 pub fn encrypt_token(key: &[u8; 32], plaintext: &str) -> Result<String, ApiError> {
-    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| ApiError::Internal(e.to_string()))?;
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(ApiError::internal)?;
     let mut iv = [0u8; 12];
     rand::thread_rng().fill_bytes(&mut iv);
     let nonce = Nonce::from_slice(&iv);
     let mut ciphertext = cipher
         .encrypt(nonce, plaintext.as_bytes())
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        // aes_gcm::Error does not implement std::error::Error with these features.
+        .map_err(|error| ApiError::Internal(error.to_string()))?;
     let mut combined = iv.to_vec();
     combined.append(&mut ciphertext);
     Ok(STANDARD.encode(&combined))
 }
 
 pub fn decrypt_token(key: &[u8; 32], b64: &str) -> Result<String, ApiError> {
-    let combined = STANDARD
-        .decode(b64.trim())
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let combined = STANDARD.decode(b64.trim()).map_err(ApiError::internal)?;
     if combined.len() < 13 {
         return Err(ApiError::Internal("invalid encrypted token payload".into()));
     }
     let (iv, ct) = combined.split_at(12);
-    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| ApiError::Internal(e.to_string()))?;
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(ApiError::internal)?;
     let plain = cipher
         .decrypt(Nonce::from_slice(iv), ct)
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-    String::from_utf8(plain).map_err(|e| ApiError::Internal(e.to_string()))
+        .map_err(|error| ApiError::Internal(error.to_string()))?;
+    String::from_utf8(plain).map_err(ApiError::internal)
 }
 
 pub fn now_micros() -> i128 {
@@ -188,7 +187,7 @@ pub async fn find_credential_by_email(
 ) -> Result<Option<StdbCredential>, ApiError> {
     let row = platform_control::find_user_credential_by_email(platform_pool()?, email)
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     row.as_ref().map(parse_credential).transpose()
 }
 
@@ -201,7 +200,7 @@ pub async fn find_credential_by_platform_id(
         .map_err(|e| ApiError::Internal(format!("invalid platform credential id: {e}")))?;
     let row = platform_control::find_user_credential_by_platform_id(platform_pool()?, &platform_id)
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     row.as_ref().map(parse_credential).transpose()
 }
 
@@ -241,10 +240,7 @@ pub async fn find_invite_by_token_hash(
     let sql = format!(
         "SELECT id, organization_id, role_id, email, token_hash, invited_by, expires_at, accepted_at FROM user_invite WHERE token_hash = '{safe}'"
     );
-    let rows = client
-        .query_sql(&sql)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
     Ok(rows.first().and_then(|r| parse_invite(r)))
 }
 
@@ -296,7 +292,7 @@ pub async fn find_reset_token_by_hash(
 ) -> Result<Option<StdbResetToken>, ApiError> {
     let row = platform_control::find_password_reset_token(platform_pool()?, token_hash)
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     row.as_ref().map(parse_reset_token).transpose()
 }
 
@@ -309,10 +305,7 @@ pub async fn get_role_name_in_organization(
     let sql = format!(
         "SELECT name FROM role WHERE id = {role_id} AND organization_id = {organization_id}"
     );
-    let rows = client
-        .query_sql(&sql)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
     Ok(rows
         .first()
         .and_then(|r| r.get("name"))

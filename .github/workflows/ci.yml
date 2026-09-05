@@ -30,6 +30,8 @@ jobs:
         run: python3 scripts/ci-change-scope.py --github-output "$GITHUB_OUTPUT"
       - name: Test change classifier
         run: python3 -B -m unittest discover -s scripts/tests
+      - name: Test external readiness probe
+        run: node scripts/tests/test-compose-readiness.mjs
 
   stdb-check:
     name: SpacetimeDB check
@@ -105,8 +107,14 @@ jobs:
       - name: Verify generated TypeScript matches Rust registry
         run: make check-codegen
 
+      - name: Ownership and required-test guardrails
+        run: |
+          python3 scripts/test-code-ownership.py
+          python3 scripts/check-code-ownership.py
+          python3 scripts/test-required-cargo-tests.py
+
       - name: api-server reducer contract tests
-        run: cargo test --locked -p api-server --lib http_app::tests
+        run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib commands::tests
 
       - name: C3 PostgreSQL projection matrix
         env:
@@ -117,10 +125,10 @@ jobs:
           PG_USER: lumiere
           PG_PASSWORD: lumiere
           PG_TLS_MODE: disable
-        run: cargo test --locked -p api-server --lib cold_tier::commit_projection::tests::postgres_manifest_matrix -- --nocapture
+        run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::commit_projection::tests::postgres_manifest_matrix -- --nocapture
 
       - name: ai-gateway unit tests
-        run: cargo test --locked -p ai-gateway health_returns
+        run: cargo test --locked -p ai-gateway --bin gateway
 
   contracts-drift:
     name: Contracts drift
@@ -237,6 +245,8 @@ jobs:
 
       - name: Start trusted Chromium renderer
         run: docker run -d --name chromium-worker -p 8090:8090 lumiere-chromium-worker
+      - name: Validate Chromium readiness helper
+        run: node --test chromium-worker/src/readiness.test.mjs
       - name: Install PDF text extractor
         run: sudo apt-get update && sudo apt-get install -y poppler-utils
       - name: Validate deterministic report fixtures

@@ -56,3 +56,50 @@ pub(crate) fn canonicalize(value: &Value) -> Value {
         other => other.clone(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn canonical_bytes_preserve_unicode_escaping_and_array_order() {
+        let value = json!({"z": false, "n": -7, "a": [3, 1, {"z": "é\n\"", "a": null}]});
+        assert_eq!(
+            serde_json::to_vec(&canonicalize(&value)).expect("JSON value"),
+            r#"{"a":[3,1,{"a":null,"z":"é\n\""}],"n":-7,"z":false}"#.as_bytes()
+        );
+    }
+
+    #[test]
+    fn row_ids_preserve_alias_priority_and_unsigned_bounds() {
+        for value in [json!(0), json!(u64::MAX), json!("18446744073709551615")] {
+            assert!(row_u64(&json!({"company_id": value}), "companyId", "company_id").is_some());
+        }
+        for value in [
+            json!(-1),
+            json!(1.5),
+            json!("18446744073709551616"),
+            json!({}),
+            Value::Null,
+        ] {
+            assert_eq!(
+                row_u64(
+                    &json!({"companyId": value, "company_id": 42}),
+                    "companyId",
+                    "company_id"
+                ),
+                None
+            );
+        }
+        assert_eq!(
+            row_u64(
+                &json!({"companyId": 0, "company_id": 42}),
+                "companyId",
+                "company_id"
+            ),
+            Some(0)
+        );
+        assert_eq!(row_u64(&json!({}), "companyId", "company_id"), None);
+    }
+}

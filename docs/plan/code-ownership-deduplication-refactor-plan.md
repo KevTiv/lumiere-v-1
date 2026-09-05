@@ -1,6 +1,9 @@
 # Code ownership, deduplication, and modularization: implementation handoff
 
-Status: **PLANNED — implementation has not started under this document.**
+Status: **IN PROGRESS — corrective integration and remaining modularization.**
+Current evidence: [Luna integration log](code-ownership-luna-integration-log.md).
+Earlier acceptance notes below are historical implementation reports, not proof
+that all adoption, behavior, and live-service gates have passed.
 Created: 2026-09-05.
 Authoring checkout: `e17680f04`; substantial unrelated working-tree changes were present.
 Audience: a Sonnet/GLM implementation session, with or without subagent support.
@@ -218,31 +221,31 @@ Every task begins with source/caller refresh and ends with integrated acceptance
 | Task | Deliverable | Dependencies | State |
 | --- | --- | --- | --- |
 | D00 | Current inventory, baseline, ownership ledger | None | ACCEPTED |
-| D01 | Behavioral contracts and interface decisions | D00 | ACCEPTED |
-| D10 | Strict ID parsing and caller migration | D01 | ACCEPTED |
-| D11 | Row/timestamp contracts and audit helper adoption | D01; D10 for shared numeric parsing | ACCEPTED |
-| D12 | Contact normalization parity | D01 | ACCEPTED |
-| D13 | CSV parsing contract/parity | D01 | ACCEPTED |
-| D20 | Accounting/tax/analytic relation ownership | D01 | ACCEPTED |
-| D21 | HR/subscription relation ownership | D01 | ACCEPTED |
-| D22 | Journal-line constructor ownership | D20; serialize overlapping D21 files | ACCEPTED |
-| D23 | FX metadata ownership | D20/D22 where source files overlap | ACCEPTED |
-| D24 | Workflow receipt ownership | D01 | ACCEPTED |
-| D25 | Integration-worker lifecycle | D01 | ACCEPTED |
-| D30 | AI route helper adoption and preparation | D10/D11 decisions applicable to routes | ACCEPTED |
-| D31 | Rust wire decoder ownership | D01; coordinate API M20 before paths move | ACCEPTED |
-| D32 | Canonical JSON deduplication | D01; cold-tier move order fixed by coordinator | ACCEPTED |
-| D33 | Identifier/case conversion contracts | D01; coordinate D31/D32 source ownership | ACCEPTED |
-| D34 | Navigation catalog and presentation adoption | D01 | ACCEPTED |
-| D35 | Shadow HR policy/AI registry disposition | D00/D01 | ACCEPTED |
-| D36 | HTTP error/auth boundary cleanup | D01; coordinate M10/M11/M21/M60 | ACCEPTED |
-| D37 | Warning/stub/PDF disposition | D00/D01 | ACCEPTED |
-| D40 | Existing API modularization M-task execution | D00/D01; per-module prerequisite gate below | PLANNED |
-| D41 | Frontend hook/utility segmentation | Relevant D10/D11/D30/D34 acceptance | IN PROGRESS |
-| D42 | Bounded domain wave-file segmentation | Relevant D20–D24 acceptance | PLANNED |
-| D50 | CI/E2E setup consolidation | D00; tooling path inventory from D40–D42 | ACCEPTED |
-| D60 | Ownership checks, documentation, discovery checks | Each relevant family accepted; incremental | ACCEPTED |
-| D90 | Final integrated verification and handoff | All required tasks accepted | PLANNED |
+| D01 | Behavioral contracts and interface decisions | D00 | PARTIAL — product-policy decision pending |
+| D10 | Strict ID parsing and caller migration | D01 | CORRECTED — focused tests pass |
+| D11 | Row/timestamp contracts and audit helper adoption | D01; D10 for shared numeric parsing | PARTIAL — selected consumers migrated |
+| D12 | Contact normalization parity | D01 | IMPLEMENTED — cross-universe parity pending |
+| D13 | CSV parsing contract/parity | D01 | IMPLEMENTED — malformed-input parity pending |
+| D20 | Accounting/tax/analytic relation ownership | D01 | IMPLEMENTED — persisted acceptance pending |
+| D21 | HR/subscription relation ownership | D01 | IMPLEMENTED — persisted acceptance pending |
+| D22 | Journal-line constructor ownership | D20; serialize overlapping D21 files | IMPLEMENTED — domain acceptance pending |
+| D23 | FX metadata ownership | D20/D22 where source files overlap | IMPLEMENTED — domain acceptance pending |
+| D24 | Workflow receipt ownership | D01 | IMPLEMENTED — persisted acceptance pending |
+| D25 | Integration-worker lifecycle | D01 | IMPLEMENTED — lifecycle acceptance pending |
+| D30 | AI route helper adoption and preparation | D10/D11 decisions applicable to routes | PARTIAL — ID tests pass; route preparation evidence pending |
+| D31 | Rust wire decoder ownership | D01; coordinate API M20 before paths move | IMPLEMENTED — focused decoder tests pass |
+| D32 | Canonical JSON deduplication | D01; cold-tier move order fixed by coordinator | PARTIAL — API/AI golden vectors pass; reducer parity pending |
+| D33 | Identifier/case conversion contracts | D01; coordinate D31/D32 source ownership | IMPLEMENTED — focused convention tests pass |
+| D34 | Navigation catalog and presentation adoption | D01 | IMPLEMENTED — navigation acceptance pending |
+| D35 | Shadow HR policy/AI registry disposition | D00/D01 | HISTORICAL IMPLEMENTATION — see execution record |
+| D36 | HTTP error/auth boundary cleanup | D01; coordinate M10/M11/M21/M60 | IMPLEMENTED — source errors retained; M60 selected GET callers integrated |
+| D37 | Warning/stub/PDF disposition | D00/D01 | PARTIAL — callback seam repaired; stub policy pending |
+| D40 | Existing API modularization M-task execution | D00/D01; per-module prerequisite gate below | IN PROGRESS — see M-task ledger |
+| D41 | Frontend hook/utility segmentation | Relevant D10/D11/D30/D34 acceptance | IMPLEMENTED — integrated frontend checks pass |
+| D42 | Bounded domain wave-file segmentation | Relevant D20–D24 acceptance | IMPLEMENTED — standalone library/test targets compile; live gates pending |
+| D50 | CI/E2E setup consolidation | D00; tooling path inventory from D40–D42 | HISTORICAL IMPLEMENTATION — separate DX ledger applies |
+| D60 | Ownership checks, documentation, discovery checks | Each relevant family accepted; incremental | PARTIAL — structural owner and nonempty-test guards added; broader semantic checks separate |
+| D90 | Final integrated verification and handoff | All required tasks accepted | IN PROGRESS — final and service-backed gates outstanding |
 
 Suggested waves, not permission for file conflicts:
 

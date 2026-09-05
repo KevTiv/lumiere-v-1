@@ -336,7 +336,6 @@ fn row_string(row: &Value, camel: &str, snake: Option<&str>) -> Option<String> {
         .map(str::to_string)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

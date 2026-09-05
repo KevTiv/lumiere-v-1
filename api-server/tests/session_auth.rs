@@ -14,6 +14,7 @@ fn test_config(server_token: Option<&str>, dev_mock_org_id: Option<u64>) -> Conf
         cors_origins: vec![],
         dev_mock_org_id,
         ai_gateway_url: "http://127.0.0.1:3001".into(),
+        ai_gateway_required: false,
         workos_client_id: None,
         stdb_credential_encryption_key: None,
         resend_api_key: None,

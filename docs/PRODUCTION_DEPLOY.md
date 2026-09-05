@@ -47,6 +47,7 @@ Set `NODE_ENV=production` or `LUMIERE_ENV=production`. **api-server refuses to s
 | `STDB_MODULE` or `NEXT_PUBLIC_STDB_MODULE` | yes | Database name |
 | `STDB_SERVER_TOKEN` | yes | Non-empty |
 | `AI_GATEWAY_URL` | yes | Internal ai-gateway base URL; must not contain `localhost` or `127.0.0.1` |
+| `AI_GATEWAY_REQUIRED` | optional (default true) | `/health/ready` fails unless the AI gateway responds successfully. Set false only for an intentional degraded deployment. |
 | `STDB_HOST` or `NEXT_PUBLIC_STDB_HOST` | recommended | Defaults to maincloud if unset |
 | `CORS_ORIGINS` | recommended | Comma-separated origins for credentialed browser calls |
 | `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | yes (compose) | BFF → gateway auth |
@@ -55,6 +56,27 @@ Set `NODE_ENV=production` or `LUMIERE_ENV=production`. **api-server refuses to s
 | `RESEND_API_KEY` | optional | Transactional email |
 
 In compose, `AI_GATEWAY_URL` is wired to `http://ai-gateway:8080`.
+
+The api-server endpoints have separate purposes: `/health` is liveness-only, while
+`/health/ready` checks PostgreSQL, SpacetimeDB, and the configured AI gateway. Production
+compose sets `AI_GATEWAY_REQUIRED=true`. The slim Rust images do not contain `curl`, so
+compose does not add an in-container healthcheck dependency gate. Run the host/sibling
+probe instead:
+
+```bash
+node scripts/check-compose-readiness.mjs \
+  --api http://api-server:8082/health/ready \
+  --ai http://ai-gateway:8080/health/ready \
+  --probe owner-report=http://owner-report-worker:8091/health/ready \
+  --probe workflow=http://workflow-worker:8093/health/ready \
+  --probe audit-drainer=http://audit-cold-drainer:8094/health/ready \
+  --probe pos-drainer=http://pos-order-cold-drainer:8095/health/ready \
+  --probe projection=http://projection-worker:8096/health/ready \
+  --probe chromium=http://chromium-worker:8090/health/ready
+```
+
+When running the probe from a sibling container, use Compose service DNS names such as
+`chromium-worker`; host-side probes should use published or externally routed hostnames.
 
 ## Service: web (Next.js)
 
@@ -87,6 +109,13 @@ Realtime WebSocket: Kong/same-origin deployments use `wss://<host>/v1/realtime/w
 | `STDB_HOST` | recommended | Defaults in gateway dev config only |
 
 Provider keys (`MISTRAL_API_KEY`, `GOOGLE_API_KEY`, etc.) depend on tenant `AiAgent` rows and `EMBEDDING_PROVIDER`.
+
+The gateway exposes `/health` for process liveness and `/health/ready` for a
+bounded, read-only SpacetimeDB and primary-Qdrant check. Readiness also validates
+configured provider credentials/endpoints and calls only safe Ollama `/api/tags`
+and the operator-supplied `KONG_LLM_READINESS_URL`. It never generates text,
+vision output, searches, or embeddings. Monitor Mistral, Gemini, Unstructured,
+and Tavily runtime errors separately because their readiness is configuration-only.
 
 Before enabling certification for an organization, an active platform
 superuser must call `register_ai_skill_certification_runtime_profile` directly

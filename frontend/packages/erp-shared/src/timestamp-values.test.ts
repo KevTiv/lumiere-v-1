@@ -67,6 +67,10 @@ test("stdbTimestampToDate passes through Date objects", () => {
   assert.equal(d, date)
 })
 
+test("stdbTimestampToDate rejects invalid Date objects", () => {
+  assert.equal(stdbTimestampToDate(new Date("invalid")), null)
+})
+
 test("stdbTimestampToDate returns null for unrecognized shapes", () => {
   assert.equal(stdbTimestampToDate(null), null)
   assert.equal(stdbTimestampToDate(undefined), null)

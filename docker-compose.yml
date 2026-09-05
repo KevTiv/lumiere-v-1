@@ -70,6 +70,7 @@ services:
       NEXT_PUBLIC_STDB_MODULE: ${NEXT_PUBLIC_STDB_MODULE:-}
       STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN}
       AI_GATEWAY_URL: http://ai-gateway:8080
+      AI_GATEWAY_REQUIRED: "true"
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:8000}
       LUMIERE_AI_GATEWAY_INTERNAL_SECRET: ${LUMIERE_AI_GATEWAY_INTERNAL_SECRET:?set LUMIERE_AI_GATEWAY_INTERNAL_SECRET}
@@ -79,9 +80,9 @@ services:
       WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID:-}
       LUMIERE_REPORT_RENDERER_URL: http://chromium-worker:8090
       LUMIERE_REPORT_ARTIFACT_DIR: /var/lib/lumiere/owner-reports
-      # Cold-tier storage (docs/plans/sliding-window-cold-tier.md). Optional: if
-      # unset, audit-log reads fall back to hot-only (see cold_tier::pg_pool).
-      # Point at the managed Postgres instance once provisioned; PG_TLS_MODE
+      # Cold-tier storage (docs/plans/sliding-window-cold-tier.md). Readiness and
+      # PG-backed reads fail closed when this durable store is unavailable.
+      # Point at the managed Postgres instance; PG_TLS_MODE
       # must be "require" here since NODE_ENV=production fails closed otherwise.
       PG_HOST: ${PG_HOST:-}
       PG_PORT: ${PG_PORT:-5432}
@@ -259,6 +260,7 @@ services:
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       KONG_LLM_URL: ${KONG_LLM_URL:-}
       KONG_LLM_SERVICE_TOKEN: ${KONG_LLM_SERVICE_TOKEN:-}
+      KONG_LLM_READINESS_URL: ${KONG_LLM_READINESS_URL:-}
     expose:
       - "8080"
     restart: unless-stopped

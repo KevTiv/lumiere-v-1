@@ -133,7 +133,7 @@ async fn accounts_post(
             json!([org_id, body])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Account created successfully" } })),
@@ -238,7 +238,7 @@ async fn payment_accounts_post(
             json!([org_id, params])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Payment account created successfully" } })),
@@ -263,7 +263,7 @@ async fn payment_account_put(
             json!([org_id, id, body])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok(Json(
         json!({ "data": { "message": "Payment account updated successfully" } }),
     ))
@@ -286,7 +286,7 @@ async fn payment_account_archive(
             json!([org_id, id])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok(Json(
         json!({ "data": { "message": "Payment account archived successfully" } }),
     ))
@@ -377,7 +377,7 @@ async fn payment_transactions_post(
             json!([org_id, params])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Payment transaction created successfully" } })),
@@ -402,7 +402,7 @@ async fn payment_transaction_put(
             json!([org_id, id, body])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok(Json(
         json!({ "data": { "message": "Payment transaction updated successfully" } }),
     ))
@@ -425,7 +425,7 @@ async fn payment_transaction_post(
             json!([org_id, id])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok(Json(
         json!({ "data": { "message": "Payment transaction posted successfully" } }),
     ))
@@ -448,7 +448,7 @@ async fn payment_transaction_void(
             json!([org_id, id])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok(Json(
         json!({ "data": { "message": "Payment transaction voided successfully" } }),
     ))
@@ -491,7 +491,7 @@ async fn payment_transaction_fee_post(
             json!([org_id, params])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Payment fee added successfully" } })),
@@ -516,7 +516,7 @@ async fn payment_transaction_allocate_post(
             json!([org_id, body])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Payment allocated successfully" } })),
@@ -541,7 +541,7 @@ async fn payment_transaction_reverse_post(
             json!([org_id, id, body])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok(Json(
         json!({ "data": { "message": "Payment transaction reversed successfully" } }),
     ))

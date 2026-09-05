@@ -144,7 +144,12 @@ pub fn resolve_snapshot_candidates(
         let Some(entity_type) = content_type_to_entity(&hit.record.resource_kind) else {
             continue;
         };
-        let Some(entity_id) = hit.record.resource_id.parse::<u64>().ok().filter(|id| *id > 0)
+        let Some(entity_id) = hit
+            .record
+            .resource_id
+            .parse::<u64>()
+            .ok()
+            .filter(|id| *id > 0)
         else {
             continue;
         };
@@ -625,9 +630,15 @@ mod tests {
 
     #[test]
     fn unauthorized_resolver_statuses_hide_candidates() {
-        assert!(resolver_status_hides_candidate(reqwest::StatusCode::UNAUTHORIZED));
-        assert!(resolver_status_hides_candidate(reqwest::StatusCode::FORBIDDEN));
-        assert!(resolver_status_hides_candidate(reqwest::StatusCode::NOT_FOUND));
+        assert!(resolver_status_hides_candidate(
+            reqwest::StatusCode::UNAUTHORIZED
+        ));
+        assert!(resolver_status_hides_candidate(
+            reqwest::StatusCode::FORBIDDEN
+        ));
+        assert!(resolver_status_hides_candidate(
+            reqwest::StatusCode::NOT_FOUND
+        ));
         assert!(!resolver_status_hides_candidate(
             reqwest::StatusCode::INTERNAL_SERVER_ERROR
         ));

@@ -287,7 +287,11 @@ mod tests {
         for table in ["alpha", "zeta"] {
             fs::write(
                 bindings.join(format!("{table}_table.rs")),
-                "pub trait AlphaTableAccess {}",
+                if table == "alpha" {
+                    "use spacetimedb_sdk::TableWithPrimaryKey;\npub trait AlphaTableAccess {}"
+                } else {
+                    "pub trait ZetaTableAccess {}"
+                },
             )
             .unwrap();
             fs::write(
@@ -311,6 +315,17 @@ mod tests {
         assert_eq!(first, second);
         assert!(first.find("\"alpha\"").unwrap() < first.find("\"zeta\"").unwrap());
         assert!(first.contains("\"doc_folder\""));
+        // Keep a populated fixture here: generation must emit the callback
+        // seam consumed by realtime/mod.rs for every insert/delete arm. This
+        // prevents a test with an empty staging directory from passing while
+        // silently dropping invalidation wiring.
+        assert!(first.contains("pub(crate) fn wire_realtime_table_callbacks"));
+        assert_eq!(
+            first.matches("crate::realtime::notify_row_change").count(),
+            7,
+            "each populated fixture table must emit insert/delete invalidations, plus alpha update"
+        );
+        assert!(first.contains("notify_row_change(&tx, \"update\", \"alpha\""));
         let output = root.join("out.rs");
         write_if_changed(&output, first.as_bytes()).unwrap();
         let before = fs::metadata(&output).unwrap().modified().unwrap();

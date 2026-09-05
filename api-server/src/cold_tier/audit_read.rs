@@ -43,10 +43,8 @@ const READ_COLUMNS: &[&str] = &[
 /// Merge cold + hot audit-log rows for `organization_id`, in the same shape
 /// and bound (`id DESC`, top 500) the hot-only endpoint has always returned.
 ///
-/// If the cold (PG) read fails, this does not fail the request — it falls
-/// back to the hot tail alone and bumps `audit_cold_read_failures_total`, so
-/// the failure is observable (alertable) without silently claiming the
-/// result is complete history the way a swallowed error would.
+/// Cold-store failure rejects the request. A hot-only result would conceal
+/// missing history behind the normal successful response contract.
 pub async fn merged_rows(stdb: &StdbClient, organization_id: u64) -> Result<Vec<Value>, ApiError> {
     let all_columns = pg_codec::load_columns(CODEC_MANIFEST_JSON, "audit_log")
         .map_err(|e| ApiError::Internal(format!("load audit_log codec columns: {e}")))?;
@@ -70,19 +68,17 @@ pub async fn merged_rows(stdb: &StdbClient, organization_id: u64) -> Result<Vec<
             cursor: None,
         },
     };
-    let (hot_sql, hot_binds) =
-        super::compile_stdb_sql(&plan).map_err(|e| ApiError::Internal(e.to_string()))?;
+    let (hot_sql, hot_binds) = super::compile_stdb_sql(&plan).map_err(ApiError::internal)?;
     let hot_rows = stdb
         .query_sql(&super::inline_stdb_literals(&hot_sql, &hot_binds))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
 
     let cold_rows = match query_cold_rows(&columns, &plan).await {
         Ok(rows) => rows,
         Err(error) => {
             metrics::inc_audit_cold_read_failure();
-            tracing::error!(%error, organization_id, "audit-log cold read failed; falling back to hot tail only");
-            Vec::new()
+            return Err(ApiError::unavailable(error.context("load complete audit history")));
         }
     };
     // The finalize race window (drainer UPSERTed to PG, STDB row not yet
@@ -95,7 +91,7 @@ pub async fn merged_rows(stdb: &StdbClient, organization_id: u64) -> Result<Vec<
         OrderDirection::Desc,
         PageSpec::AUDIT_LOG_DEFAULT_LIMIT,
     )
-    .map_err(|error| ApiError::Internal(error.to_string()))?;
+    .map_err(ApiError::internal)?;
     Ok(merged)
 }
 
@@ -103,9 +99,7 @@ async fn query_cold_rows(
     columns: &[pg_codec::ColumnCodec],
     plan: &ResourceReadPlan,
 ) -> anyhow::Result<Vec<Value>> {
-    let Some(pool) = pg_pool::shared_pool() else {
-        return Ok(Vec::new());
-    };
+    let pool = pg_pool::required_pool()?;
     let client = pool.get().await?;
     let (sql, binds) = super::compile_pg_sql(plan)?;
     let owned_binds = scalar_binds_to_pg(&binds);
@@ -133,6 +127,9 @@ mod tests {
             10,
         )
         .unwrap();
-        assert_eq!(merged, vec![json!({"id": 5}), json!({"id": 3}), json!({"id": 1})]);
+        assert_eq!(
+            merged,
+            vec![json!({"id": 5}), json!({"id": 3}), json!({"id": 1})]
+        );
     }
 }
