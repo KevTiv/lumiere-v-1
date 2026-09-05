@@ -311,12 +311,7 @@ fn decode_column(col: &ColumnCodec, raw: &Value) -> Result<PgValue> {
             PgValue::Bytea(Some(bytes))
         }
         "JSONB" => PgValue::JsonbText(Some(serde_json::to_string(raw)?)),
-        "TEXT" => {
-            let s = raw
-                .as_str()
-                .ok_or_else(|| anyhow!("expected string, got {raw}"))?;
-            PgValue::Text(Some(s.to_string()))
-        }
+        "TEXT" => PgValue::Text(Some(decode_text_or_unit_variant(raw)?)),
         other => anyhow::bail!("unhandled pg_type '{other}'"),
     })
 }
@@ -375,6 +370,27 @@ fn decode_bigint_or_timestamp(raw: &Value) -> Result<i64> {
     micros
         .as_i64()
         .ok_or_else(|| anyhow!("expected i64 timestamp micros, got {micros}"))
+}
+
+fn decode_text_or_unit_variant(raw: &Value) -> Result<String> {
+    if let Some(s) = raw.as_str() {
+        return Ok(s.to_owned());
+    }
+
+    let Value::Object(obj) = raw else {
+        anyhow::bail!("expected string or unit variant, got {raw}");
+    };
+    if obj.len() != 1 {
+        anyhow::bail!("expected single-key unit variant, got {raw}");
+    }
+
+    let (variant, payload) = obj.iter().next().expect("object length checked above");
+    let is_empty_array = payload.as_array().is_some_and(Vec::is_empty);
+    let is_empty_object = payload.as_object().is_some_and(serde_json::Map::is_empty);
+    if !is_empty_array && !is_empty_object {
+        anyhow::bail!("expected empty unit variant payload, got {raw}");
+    }
+    Ok(variant.clone())
 }
 
 fn null_value_for(pg_type: &str) -> Result<PgValue> {
@@ -670,6 +686,48 @@ mod tests {
             some_values[8],
             PgValue::BigInt(Some(1_781_987_714_525_004))
         ));
+    }
+
+    #[test]
+    fn decodes_text_unit_variants_and_preserves_jsonb_objects() {
+        let mut array_variant = sample_row();
+        array_variant["uid"] = json!({ "Opened": [] });
+        let values = decode_row(&cols(), &array_variant).unwrap();
+        assert!(matches!(
+            values[2],
+            PgValue::Text(Some(ref value)) if value == "Opened"
+        ));
+
+        let mut object_variant = sample_row();
+        object_variant["uid"] = json!({ "Closed": {} });
+        let values = decode_row(&cols(), &object_variant).unwrap();
+        assert!(matches!(
+            values[2],
+            PgValue::Text(Some(ref value)) if value == "Closed"
+        ));
+
+        let mut jsonb_object = sample_row();
+        jsonb_object["lines"] = json!({ "Opened": [] });
+        let values = decode_row(&cols(), &jsonb_object).unwrap();
+        assert!(matches!(
+            values[5],
+            PgValue::JsonbText(Some(ref value)) if value == r#"{"Opened":[]}"#
+        ));
+    }
+
+    #[test]
+    fn rejects_malformed_text_unit_variants() {
+        let mut malformed = sample_row();
+        malformed["uid"] = json!({ "Opened": [1] });
+        let err = format!("{:#}", decode_row(&cols(), &malformed).unwrap_err());
+        assert!(err
+            .to_string()
+            .contains("expected empty unit variant payload"));
+
+        let mut multi_key = sample_row();
+        multi_key["uid"] = json!({ "Opened": [], "Closed": [] });
+        let err = format!("{:#}", decode_row(&cols(), &multi_key).unwrap_err());
+        assert!(err.to_string().contains("expected single-key unit variant"));
     }
 
     #[test]
