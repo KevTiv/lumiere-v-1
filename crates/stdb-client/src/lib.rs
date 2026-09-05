@@ -262,6 +262,22 @@ fn is_timestamp_product(atype: &Value) -> bool {
     elements.len() == 1 && element_name(&elements[0]) == "__timestamp_micros_since_unix_epoch__"
 }
 
+fn is_identity_product(atype: &Value) -> bool {
+    let Some(elements) = atype
+        .get("Product")
+        .and_then(|p| p.get("elements"))
+        .and_then(|e| e.as_array())
+    else {
+        return false;
+    };
+    elements.len() == 1
+        && element_name(&elements[0]) == "__identity__"
+        && elements[0]
+            .get("algebraic_type")
+            .and_then(|t| t.get("U256"))
+            .is_some()
+}
+
 fn is_empty_payload(v: &Value) -> bool {
     match v {
         Value::Array(a) => a.is_empty(),
@@ -345,6 +361,14 @@ fn unwrap_sats_typed(v: &Value, algebraic_type: Option<&Value>) -> Value {
             if let Value::Array(arr) = v {
                 if let Some(micros) = arr.first().and_then(|x| x.as_i64()) {
                     return serde_json::json!({ "microsSinceUnixEpoch": micros });
+                }
+            }
+        }
+
+        if is_identity_product(atype) {
+            if let Value::Array(arr) = v {
+                if let Some(identity) = arr.first().and_then(Value::as_str) {
+                    return Value::String(identity.to_owned());
                 }
             }
         }
@@ -543,5 +567,36 @@ mod tests {
             json!({ "microsSinceUnixEpoch": 1781987714525004_i64 })
         );
         assert!(row["metadata"].is_null());
+    }
+
+    #[test]
+    fn unwraps_identity_product_to_hex_string() {
+        let identity = format!("0x{}", "ab".repeat(32));
+        let body = format!(
+            r#"[
+              {{
+                "schema": {{
+                  "elements": [
+                    {{
+                      "name": {{ "some": "actor_identity" }},
+                      "algebraic_type": {{
+                        "Product": {{
+                          "elements": [
+                            {{
+                              "name": {{ "some": "__identity__" }},
+                              "algebraic_type": {{ "U256": [] }}
+                            }}
+                          ]
+                        }}
+                      }}
+                    }}
+                  ]
+                }},
+                "rows": [[ ["{identity}"] ]]
+              }}
+            ]"#
+        );
+        let rows = parse_sats_sql_response(&body).expect("parse");
+        assert_eq!(rows[0]["actorIdentity"], json!(identity));
     }
 }
