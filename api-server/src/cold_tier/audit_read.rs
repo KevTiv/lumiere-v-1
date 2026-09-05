@@ -78,7 +78,9 @@ pub async fn merged_rows(stdb: &StdbClient, organization_id: u64) -> Result<Vec<
         Ok(rows) => rows,
         Err(error) => {
             metrics::inc_audit_cold_read_failure();
-            return Err(ApiError::unavailable(error.context("load complete audit history")));
+            return Err(ApiError::unavailable(
+                error.context("load complete audit history"),
+            ));
         }
     };
     // Until C5 cooling/finalization is enabled, STDB remains authoritative for

@@ -131,6 +131,13 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: platform_control::PLATFORM_RESET_TOKEN_BINDING_DDL,
     },
+    Migration {
+        version: 10,
+        name: "organization_commit_protocol_upgrade",
+        change_set: 2,
+        phase: MigrationPhase::Expand,
+        sql: ORGANIZATION_COMMIT_PROTOCOL_UPGRADE_SQL,
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.
@@ -171,6 +178,156 @@ create table if not exists lumiere_platform.schema_migration (
 const MIGRATION_LOCK_KEY: i64 = 0x4c554d49455245;
 const DURABLE_SCHEMA_MANIFEST_JSON: &str = lumiere_contracts::manifests::DURABLE_PG_SCHEMA_MANIFEST;
 const POSTGRES_IDENTIFIER_MAX_BYTES: usize = 63;
+
+/// Adopt the column types, indexes, and protocol constraints that C4 declares
+/// for C3 heap relations.
+///
+/// The C3 projection worker created these tables with `CREATE TABLE IF NOT
+/// EXISTS`, so the C4 baseline could not add constraints when it adopted an
+/// existing relation. PostgreSQL has no `ADD CONSTRAINT IF NOT EXISTS`; each
+/// guarded block is therefore deliberately idempotent for both legacy and
+/// fresh databases. The tax-deadline index is renamed only when its C3 shape
+/// is non-unique, freeing the canonical name for the required unique index.
+/// The parent unique key is added before the child foreign key that references
+/// it.
+const ORGANIZATION_COMMIT_PROTOCOL_UPGRADE_SQL: &str = r#"
+do $lumiere$
+begin
+    if to_regclass('organization_row_change') is not null
+       and exists (
+           select 1
+           from pg_catalog.pg_attribute
+           where attrelid = to_regclass('organization_row_change')
+             and attname = 'row_identity_json'
+             and not attisdropped
+             and atttypid <> 'jsonb'::regtype
+       ) then
+        alter table "organization_row_change"
+            alter column "row_identity_json" type jsonb
+            using "row_identity_json"::jsonb;
+    end if;
+end
+$lumiere$;
+
+do $lumiere$
+begin
+    if to_regclass('organization_row_change') is not null
+       and exists (
+           select 1
+           from pg_catalog.pg_attribute
+           where attrelid = to_regclass('organization_row_change')
+             and attname = 'row_json'
+             and not attisdropped
+             and atttypid <> 'jsonb'::regtype
+       ) then
+        alter table "organization_row_change"
+            alter column "row_json" type jsonb
+            using "row_json"::jsonb;
+    end if;
+end
+$lumiere$;
+
+do $lumiere$
+begin
+    if exists (
+        select 1
+        from pg_catalog.pg_class index_relation
+        join pg_catalog.pg_index index_definition
+          on index_definition.indexrelid = index_relation.oid
+        where index_relation.oid = to_regclass('tax_deadline_status_job_organization_id')
+          and not index_definition.indisunique
+    ) then
+        alter index "tax_deadline_status_job_organization_id"
+            rename to "tax_deadline_status_job_organization_id_legacy";
+    end if;
+end
+$lumiere$;
+
+create unique index if not exists "tax_deadline_status_job_organization_id"
+    on "tax_deadline_status_job" ("organization_id");
+
+do $lumiere$
+begin
+    if to_regclass('organization_commit') is not null
+       and not exists (
+           select 1
+           from pg_catalog.pg_constraint
+           where conrelid = to_regclass('organization_commit')
+             and conname = 'organization_commit_org_sequence_key'
+       ) then
+        alter table "organization_commit"
+            add constraint "organization_commit_org_sequence_key"
+            unique ("organization_id", "sequence");
+    end if;
+end
+$lumiere$;
+
+do $lumiere$
+begin
+    if to_regclass('organization_row_change') is not null
+       and not exists (
+           select 1
+           from pg_catalog.pg_constraint
+           where conrelid = to_regclass('organization_row_change')
+             and conname = 'organization_row_change_commit_fk'
+       ) then
+        alter table "organization_row_change"
+            add constraint "organization_row_change_commit_fk"
+            foreign key ("organization_id", "commit_sequence")
+            references "organization_commit" ("organization_id", "sequence");
+    end if;
+end
+$lumiere$;
+
+do $lumiere$
+begin
+    if to_regclass('organization_row_change') is not null
+       and not exists (
+           select 1
+           from pg_catalog.pg_constraint
+           where conrelid = to_regclass('organization_row_change')
+             and conname = 'organization_row_change_commit_ordinal_key'
+       ) then
+        alter table "organization_row_change"
+            add constraint "organization_row_change_commit_ordinal_key"
+            unique ("organization_id", "commit_sequence", "ordinal");
+    end if;
+end
+$lumiere$;
+
+do $lumiere$
+begin
+    if to_regclass('organization_row_change') is not null
+       and not exists (
+           select 1
+           from pg_catalog.pg_constraint
+           where conrelid = to_regclass('organization_row_change')
+             and conname = 'organization_row_change_kind_check'
+       ) then
+        alter table "organization_row_change"
+            add constraint "organization_row_change_kind_check"
+            check ("change_kind" in ('upsert', 'delete'));
+    end if;
+end
+$lumiere$;
+
+do $lumiere$
+begin
+    if to_regclass('organization_row_change') is not null
+       and not exists (
+           select 1
+           from pg_catalog.pg_constraint
+           where conrelid = to_regclass('organization_row_change')
+             and conname = 'organization_row_change_payload_check'
+       ) then
+        alter table "organization_row_change"
+            add constraint "organization_row_change_payload_check"
+            check (("change_kind" = 'upsert' and "row_json" is not null)
+                or ("change_kind" = 'delete' and "row_json" is null));
+    end if;
+end
+$lumiere$;
+"#;
 
 fn postgres_identifier(identifier: &str) -> String {
     identifier
@@ -726,6 +883,58 @@ mod tests {
                 .iter()
                 .all(|previous| previous.name != migration.name));
         }
+    }
+
+    #[test]
+    fn organization_commit_protocol_upgrade_is_additive_and_idempotent() {
+        let migration = MIGRATIONS
+            .iter()
+            .find(|migration| migration.name == "organization_commit_protocol_upgrade")
+            .expect("protocol upgrade migration is shipped");
+        assert_eq!(migration.version, 10);
+        assert_eq!(migration.change_set, 2);
+        assert_eq!(migration.phase, MigrationPhase::Expand);
+        assert!(migration.sql.contains("to_regclass('organization_commit')"));
+        assert!(migration
+            .sql
+            .contains("to_regclass('organization_row_change')"));
+        for column in ["row_identity_json", "row_json"] {
+            assert!(
+                migration
+                    .sql
+                    .contains(&format!("alter column \"{column}\" type jsonb")),
+                "missing JSONB adoption for {column}"
+            );
+        }
+        for constraint in [
+            "organization_commit_org_sequence_key",
+            "organization_row_change_commit_fk",
+            "organization_row_change_commit_ordinal_key",
+            "organization_row_change_kind_check",
+            "organization_row_change_payload_check",
+        ] {
+            assert!(migration.sql.contains(constraint), "missing {constraint}");
+        }
+        assert_eq!(migration.sql.matches("and not exists (").count(), 5);
+        assert_eq!(migration.sql.matches("and exists (").count(), 2);
+        assert!(migration
+            .sql
+            .contains("tax_deadline_status_job_organization_id_legacy"));
+        assert!(migration.sql.contains(
+            "create unique index if not exists \"tax_deadline_status_job_organization_id\""
+        ));
+        assert!(!migration.sql.contains("drop table"));
+        assert!(!migration.sql.contains("create table"));
+        assert!(
+            migration
+                .sql
+                .find("organization_commit_org_sequence_key")
+                .expect("parent key")
+                < migration
+                    .sql
+                    .find("organization_row_change_commit_fk")
+                    .expect("child foreign key")
+        );
     }
 
     #[test]
