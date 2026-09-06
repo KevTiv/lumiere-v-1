@@ -1,281 +1,156 @@
-//! Emit `erp-org-sql.json` from `ERP_ORG_SQL` in `erp-subscriptions.ts`.
+//! Validate structural organization-subscription policies and emit target views.
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ErpOrgSqlRow {
-    pub map_key: String,
-    pub resource_key: String,
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SubscriptionQueryPolicyManifest {
+    pub schema_version: u32,
+    pub resources: BTreeMap<String, SubscriptionQueryPolicy>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SubscriptionQueryPolicy {
     pub table: String,
-    pub extra_where: String,
-    pub order_by: String,
+    pub predicates: Vec<Predicate>,
+    pub order_by: Vec<OrderBy>,
 }
 
-fn extract_erp_org_sql_block(ts: &str) -> Option<&str> {
-    let start = ts.find("const ERP_ORG_SQL")?;
-    let after = &ts[start..];
-    let brace = after.find('{')? + start + 1;
-    let mut depth = 1i32;
-    let mut i = brace;
-    let bytes = ts.as_bytes();
-    while i < ts.len() && depth > 0 {
-        match bytes[i] {
-            b'{' => depth += 1,
-            b'}' => depth -= 1,
-            _ => {}
-        }
-        i += 1;
-    }
-    if depth != 0 {
-        return None;
-    }
-    Some(&ts[brace..i - 1])
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Predicate {
+    pub field: String,
+    pub operator: String,
+    pub value: Value,
 }
 
-fn split_map_entries(block: &str) -> Vec<(String, String)> {
-    let mut out = Vec::new();
-    let mut i = 0usize;
-    let bytes = block.as_bytes();
-    while i < block.len() {
-        while i < block.len() && bytes[i].is_ascii_whitespace() {
-            i += 1;
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OrderBy {
+    pub field: String,
+    pub direction: String,
+}
+
+fn is_identifier(value: &str) -> bool {
+    let mut chars = value.chars();
+    matches!(chars.next(), Some(first) if first == '_' || first.is_ascii_lowercase())
+        && chars.all(|character| {
+            character == '_' || character.is_ascii_lowercase() || character.is_ascii_digit()
+        })
+}
+
+pub fn parse_and_validate(
+    policy_json: &str,
+    registry_json: &str,
+) -> Result<SubscriptionQueryPolicyManifest> {
+    let policy: SubscriptionQueryPolicyManifest =
+        serde_json::from_str(policy_json).context("parse subscription-query-policies.json")?;
+    if policy.schema_version != 1 {
+        bail!(
+            "subscription query policy has unsupported schema version {}",
+            policy.schema_version
+        );
+    }
+    let registry: Value = serde_json::from_str(registry_json).context("parse resource registry")?;
+    let registry = registry
+        .as_object()
+        .context("resource registry root must be an object")?;
+    let mut tables = BTreeSet::new();
+    for (resource, descriptor) in &policy.resources {
+        let registry_entry = registry.get(resource).with_context(|| {
+            format!("subscription query policy references unknown resource {resource}")
+        })?;
+        let registry_table = registry_entry
+            .get("table")
+            .and_then(Value::as_str)
+            .with_context(|| format!("resource {resource} has no registry table"))?;
+        if descriptor.table != registry_table {
+            bail!(
+                "resource {resource} policy table {} does not match registry table {registry_table}",
+                descriptor.table
+            );
         }
-        if i >= block.len() {
-            break;
+        if !is_identifier(&descriptor.table) {
+            bail!("resource {resource} has unsafe table identifier");
         }
-        let rest = &block[i..];
-        let (map_key, key_len) = if let Some(stripped) = rest.strip_prefix('"') {
-            let end = stripped.find('"').unwrap_or(stripped.len());
-            (stripped[..end].to_string(), 1 + end + 1)
-        } else {
-            let end = rest
-                .find(|c: char| !c.is_ascii_alphanumeric() && c != '-')
-                .unwrap_or(rest.len());
-            (rest[..end].to_string(), end)
-        };
-        let after_key = &rest[key_len..];
-        let Some(colon) = after_key.find(':') else {
-            i += 1;
-            continue;
-        };
-        let after_colon = after_key[colon + 1..].trim_start();
-        if !after_colon.starts_with("(id") {
-            i += 1;
-            continue;
-        }
-        let entry_start = i + key_len + colon + 1;
-        let mut j = entry_start;
-        let mut paren = 0i32;
-        let mut seen_arrow = false;
-        while j < block.len() {
-            let ch = block.as_bytes()[j];
-            if ch == b'(' {
-                paren += 1;
-            } else if ch == b')' {
-                paren -= 1;
-            } else if ch == b'>' && paren == 0 {
-                seen_arrow = true;
-            } else if ch == b',' && paren <= 0 && seen_arrow {
-                break;
+        for predicate in &descriptor.predicates {
+            if !is_identifier(&predicate.field) || predicate.operator != "eq" {
+                bail!("resource {resource} has unsafe predicate");
             }
-            j += 1;
-        }
-        let body = &block[entry_start..j].trim();
-        out.push((map_key, body.to_string()));
-        i = j + 1;
-    }
-    out
-}
-
-fn extract_quoted_string(s: &str) -> Option<(String, usize)> {
-    let s = s.trim_start();
-    if !s.starts_with('"') {
-        return None;
-    }
-    let mut out = String::new();
-    let mut esc = false;
-    for (idx, ch) in s[1..].char_indices() {
-        if esc {
-            out.push(ch);
-            esc = false;
-            continue;
-        }
-        match ch {
-            '\\' => esc = true,
-            '"' => return Some((out, idx + 2)),
-            c => out.push(c),
-        }
-    }
-    None
-}
-
-fn parse_call_string_args(call_body: &str) -> Vec<String> {
-    let mut args = Vec::new();
-    let mut i = 0usize;
-    let bytes = call_body.as_bytes();
-    while i < call_body.len() {
-        while i < call_body.len() && bytes[i].is_ascii_whitespace() {
-            i += 1;
-        }
-        if i >= call_body.len() {
-            break;
-        }
-        if call_body[i..].starts_with('"') {
-            if let Some((s, consumed)) = extract_quoted_string(&call_body[i..]) {
-                args.push(s);
-                i += consumed;
-            } else {
-                break;
+            if !predicate.value.is_boolean() && !predicate.value.is_string() {
+                bail!("resource {resource} predicate values must be strings or booleans");
             }
-        } else {
-            let mut depth = 0i32;
-            while i < call_body.len() {
-                match bytes[i] {
-                    b'(' | b'{' | b'[' => depth += 1,
-                    b')' | b'}' | b']' => {
-                        if depth == 0 {
-                            break;
-                        }
-                        depth -= 1;
-                    }
-                    b',' if depth == 0 => break,
-                    _ => {}
-                }
-                i += 1;
+        }
+        for order in &descriptor.order_by {
+            if !is_identifier(&order.field) || !matches!(order.direction.as_str(), "asc" | "desc") {
+                bail!("resource {resource} has unsafe ordering");
             }
-            args.push(String::new());
         }
-        while i < call_body.len() && bytes[i].is_ascii_whitespace() {
-            i += 1;
-        }
-        if i < call_body.len() && bytes[i] == b',' {
-            i += 1;
-        } else {
-            break;
-        }
+        tables.insert(descriptor.table.as_str());
     }
-    args
+    if policy.resources.is_empty() || tables.is_empty() {
+        bail!("subscription query policy must not be empty");
+    }
+    Ok(policy)
 }
 
-fn parse_select_org_scoped(entry_body: &str) -> Option<(String, String, String, String)> {
-    let idx = entry_body.find("selectOrgScopedSql(")?;
-    let after = &entry_body[idx + "selectOrgScopedSql(".len()..];
-    let mut depth = 1i32;
-    let mut end = 0usize;
-    for (off, ch) in after.char_indices() {
-        match ch {
-            '(' => depth += 1,
-            ')' => {
-                depth -= 1;
-                if depth == 0 {
-                    end = off;
-                    break;
-                }
-            }
-            _ => {}
-        }
-    }
-    if depth != 0 {
-        return None;
-    }
-    let args = parse_call_string_args(&after[..end]);
-    if args.len() < 5 {
-        return None;
-    }
-    let resource_key = args[0].clone();
-    let table = args[1].clone();
-    let extra_where = args[4].clone();
-    let order_by = args.get(5).cloned().unwrap_or_default();
-    Some((resource_key, table, extra_where, order_by))
+pub fn emit_manifest(policy: &SubscriptionQueryPolicyManifest) -> Result<String> {
+    serde_json::to_string_pretty(policy)
+        .map(|json| format!("{json}\n"))
+        .context("serialize organization subscription descriptor manifest")
 }
 
-/// Parse `ERP_ORG_SQL` entries from `erp-subscriptions.ts`.
-pub fn parse_erp_org_sql(ts: &str) -> Result<Vec<ErpOrgSqlRow>> {
-    let block = extract_erp_org_sql_block(ts)
-        .context("ERP_ORG_SQL block not found in erp-subscriptions.ts")?;
-    let mut rows = Vec::new();
-    for (map_key, body) in split_map_entries(block) {
-        let (resource_key, table, extra_where, order_by) = parse_select_org_scoped(&body)
-            .with_context(|| format!("parse selectOrgScopedSql for map key \"{map_key}\""))?;
-        rows.push(ErpOrgSqlRow {
-            map_key,
-            resource_key,
-            table,
-            extra_where,
-            order_by,
-        });
-    }
-    Ok(rows)
-}
-
-pub fn emit_erp_org_sql_json(ts: &str) -> Result<String> {
-    let rows = parse_erp_org_sql(ts)?;
-    let mut arr = Vec::new();
-    for row in rows {
-        arr.push(serde_json::json!({
-            "mapKey": row.map_key,
-            "resource_key": row.resource_key,
-            "table": row.table,
-            "extra_where": row.extra_where,
-            "order_by": row.order_by,
-        }));
-    }
-    serde_json::to_string_pretty(&Value::Array(arr))
-        .map(|s| format!("{s}\n"))
-        .context("serialize erp-org-sql.json")
-}
-
-pub fn registry_keys(registry_json: &str) -> Result<BTreeMap<String, ()>, String> {
-    let root: Value = serde_json::from_str(registry_json)
-        .map_err(|e| format!("parse resource_registry.json: {e}"))?;
-    let Some(obj) = root.as_object() else {
-        return Err("resource_registry.json root must be object".into());
-    };
-    Ok(obj.keys().map(|k| (k.clone(), ())).collect())
+pub fn emit_typescript(policy: &SubscriptionQueryPolicyManifest) -> Result<String> {
+    let descriptors = serde_json::to_string_pretty(&policy.resources)
+        .context("serialize organization subscription TypeScript descriptors")?;
+    Ok(format!(
+        "// @generated by lumiere-codegen — do not edit.\n\n\
+export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {descriptors} as const;\n\n\
+export type OrgSubscriptionResourceKey = keyof typeof ORG_SUBSCRIPTION_QUERY_DESCRIPTORS;\n"
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    const REGISTRY: &str = r#"{"orders":{"table":"sale_order"}}"#;
+
     #[test]
-    fn parses_multiline_select_org_scoped() {
-        let src = r#"
-const ERP_ORG_SQL = {
-  "budget-lines": (id, fa) =>
-    selectOrgScopedSql(
-      "budget-lines",
-      "crossovered_budget_lines",
-      id,
-      fa,
-      "",
-      " ORDER BY general_budget_id ASC, id ASC",
-    ),
-  budgets: (id, fa) =>
-    selectOrgScopedSql("budgets", "crossovered_budget", id, fa, ""),
-};
-"#;
-        let rows = parse_erp_org_sql(src).expect("parse");
-        assert_eq!(rows.len(), 2);
-        assert_eq!(rows[0].map_key, "budget-lines");
-        assert_eq!(rows[0].resource_key, "budget-lines");
-        assert_eq!(rows[0].table, "crossovered_budget_lines");
-        assert_eq!(rows[0].order_by, " ORDER BY general_budget_id ASC, id ASC");
-        assert_eq!(rows[1].map_key, "budgets");
+    fn validates_and_emits_structural_policy() {
+        let source = r#"{
+            "schema_version": 1,
+            "resources": {
+                "orders": {
+                    "table": "sale_order",
+                    "predicates": [{"field":"active","operator":"eq","value":true}],
+                    "order_by": [{"field":"id","direction":"desc"}]
+                }
+            }
+        }"#;
+        let policy = parse_and_validate(source, REGISTRY).expect("valid policy");
+        let typescript = emit_typescript(&policy).expect("TypeScript descriptors");
+        assert!(typescript.contains("ORG_SUBSCRIPTION_QUERY_DESCRIPTORS"));
+        assert!(!typescript.contains("SELECT"));
     }
 
     #[test]
-    fn parses_repo_erp_subscriptions_file() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../frontend/packages/stdb/src/queries/erp-subscriptions.ts");
-        let ts = std::fs::read_to_string(&path).expect("read erp-subscriptions.ts");
-        let rows = parse_erp_org_sql(&ts).expect("parse ERP_ORG_SQL");
-        assert!(
-            rows.len() >= 90,
-            "expected ~97 ERP_ORG_SQL rows, got {}",
-            rows.len()
-        );
+    fn rejects_raw_or_unbounded_policy_shapes() {
+        let unsafe_operator = r#"{
+            "schema_version": 1,
+            "resources": {
+                "orders": {
+                    "table": "sale_order",
+                    "predicates": [{"field":"active","operator":"raw","value":true}],
+                    "order_by": []
+                }
+            }
+        }"#;
+        let error = parse_and_validate(unsafe_operator, REGISTRY).expect_err("raw operator");
+        assert!(error.to_string().contains("unsafe predicate"));
     }
 }

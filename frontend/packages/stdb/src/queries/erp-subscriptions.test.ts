@@ -34,6 +34,35 @@ describe("ACC-RI-012: account-payment-term-lines live subscription", () => {
   })
 })
 
+describe("C8 generated organization subscription compiler", () => {
+  it("compiles reviewed predicates and ordering from structural metadata", () => {
+    const sql = subscriptionQueriesForResource("proposal-templates", {
+      organizationId: 42,
+    })
+    assert.ok(sql)
+    assert.match(sql![0], /FROM proposal_template\b/)
+    assert.match(sql![0], /organization_id\s*=\s*42/)
+    assert.match(sql![0], /is_active\s*=\s*true/)
+    assert.match(sql![0], /ORDER BY name ASC/)
+  })
+
+  it("keeps workflow predicates in the generated policy", () => {
+    const sql = subscriptionQueriesForResource("timesheets-to-validate", {
+      organizationId: 42,
+    })
+    assert.ok(sql)
+    assert.match(sql![0], /FROM project_timesheet\b/)
+    assert.match(sql![0], /validation_status\s*=\s*'draft'/)
+  })
+
+  it("fails closed for unknown resources", () => {
+    assert.equal(
+      subscriptionQueriesForResource("not-a-resource", { organizationId: 42 }),
+      null,
+    )
+  })
+})
+
 describe("CRM-RI-007: company-scoped live subscriptions", () => {
   it("never emits direct SQL for private CRM tables", () => {
     for (const resource of [
