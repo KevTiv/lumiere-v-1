@@ -8,13 +8,15 @@ use super::status::{
     classify_apply_error, oldest_unprojected_at, projection_heads, record_failure, record_success,
     ProjectionFailureKind,
 };
-use super::ProjectionDrainStats;
+use super::{ProjectionDrainBudget, ProjectionDrainStats};
 use super::{CURSOR_SCAN_AFTER, MAX_CHANGES_PER_COMMIT, PROJECTION_CODEC_MANIFEST_JSON};
 use anyhow::{anyhow, bail, Context, Result};
 use deadpool_postgres::Pool;
+use futures_util::{stream, StreamExt};
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::sync::atomic::Ordering;
+use std::time::{Duration, Instant};
 use stdb_client::StdbClient;
 
 pub async fn drain_batch(
@@ -22,7 +24,23 @@ pub async fn drain_batch(
     pool: &Pool,
     batch_size: u32,
 ) -> Result<ProjectionDrainStats> {
+    drain_batch_with_budget(stdb, pool, batch_size, ProjectionDrainBudget::default()).await
+}
+
+pub async fn drain_batch_with_budget(
+    stdb: &StdbClient,
+    pool: &Pool,
+    batch_size: u32,
+    budget: ProjectionDrainBudget,
+) -> Result<ProjectionDrainStats> {
     require_server_identity(stdb)?;
+    if budget.max_commits_per_organization == 0
+        || budget.max_bytes_per_organization == 0
+        || budget.max_elapsed_per_organization.is_zero()
+        || budget.max_concurrent_organizations == 0
+    {
+        bail!("projection drain budgets must be positive");
+    }
     // Cursor rows are private protocol tables. The worker's StdbClient must
     // use the configured server/admin identity; see `serve`, which rejects
     // startup when STDB_SERVER_TOKEN is absent.
@@ -45,20 +63,71 @@ pub async fn drain_batch(
             CURSOR_SCAN_AFTER.store(organization_id, Ordering::Relaxed);
         }
     }
-    let mut stats = ProjectionDrainStats {
-        organizations: cursors.len(),
-        ..Default::default()
-    };
+    let max_concurrency = budget
+        .max_concurrent_organizations
+        .min(cursors.len().max(1));
+    let results = stream::iter(cursors.into_iter().map(|cursor| {
+        let stdb = stdb.clone();
+        let pool = pool.clone();
+        async move { drain_organization(&stdb, &pool, cursor, budget).await }
+    }))
+    .buffer_unordered(max_concurrency)
+    .collect::<Vec<_>>()
+    .await;
 
-    for cursor in cursors {
-        drain_organization(stdb, pool, cursor, &mut stats).await;
-    }
-
-    Ok(stats)
+    Ok(results
+        .into_iter()
+        .fold(ProjectionDrainStats::default(), |mut total, stats| {
+            total.organizations += stats.organizations;
+            total.commits += stats.commits;
+            total.already_applied += stats.already_applied;
+            total.failed += stats.failed;
+            total.bytes += stats.bytes;
+            total.backlog_remaining |= stats.backlog_remaining;
+            total
+        }))
 }
 
-/// Apply one cursor without changing batch fairness or per-cursor failure accounting.
+/// Catch one organization up without monopolizing a worker pass.
 async fn drain_organization(
+    stdb: &StdbClient,
+    pool: &Pool,
+    cursor: Value,
+    budget: ProjectionDrainBudget,
+) -> ProjectionDrainStats {
+    let started = Instant::now();
+    let mut stats = ProjectionDrainStats {
+        organizations: 1,
+        ..Default::default()
+    };
+    loop {
+        if budget_exhausted(&stats, started.elapsed(), budget) {
+            stats.backlog_remaining = true;
+            break;
+        }
+        let before_progress = stats.commits + stats.already_applied;
+        let before_failed = stats.failed;
+        drain_one_commit(stdb, pool, cursor.clone(), &mut stats).await;
+        if stats.failed != before_failed || stats.commits + stats.already_applied == before_progress
+        {
+            break;
+        }
+    }
+    stats
+}
+
+fn budget_exhausted(
+    stats: &ProjectionDrainStats,
+    elapsed: Duration,
+    budget: ProjectionDrainBudget,
+) -> bool {
+    stats.commits + stats.already_applied >= budget.max_commits_per_organization
+        || stats.bytes >= budget.max_bytes_per_organization
+        || elapsed >= budget.max_elapsed_per_organization
+}
+
+/// Apply one exact next commit while preserving its atomic ordered boundary.
+async fn drain_one_commit(
     stdb: &StdbClient,
     pool: &Pool,
     cursor: Value,
@@ -204,6 +273,7 @@ async fn drain_organization(
             return;
         }
     };
+    let mut projected_bytes = serde_json::to_vec(&commit_row).map_or(0, |bytes| bytes.len());
     let commit = match parse_commit(&commit_row) {
         Ok(commit) => commit,
         Err(error) => {
@@ -280,6 +350,12 @@ async fn drain_organization(
             return;
         }
     };
+    projected_bytes = projected_bytes.saturating_add(
+        changes
+            .iter()
+            .map(|row| serde_json::to_vec(row).map_or(0, |bytes| bytes.len()))
+            .sum::<usize>(),
+    );
     let changes = match normalize_changes(
         changes,
         organization_id,
@@ -345,6 +421,7 @@ async fn drain_organization(
         }
         Ok(commit_projection::ProjectionResult::Applied) => {
             stats.commits += 1;
+            stats.bytes = stats.bytes.saturating_add(projected_bytes);
             let oldest = if stdb_head > next_sequence {
                 oldest_unprojected_at(stdb, organization_id, next_sequence.saturating_add(1)).await
             } else {
@@ -359,6 +436,7 @@ async fn drain_organization(
         }
         Ok(commit_projection::ProjectionResult::AlreadyApplied) => {
             stats.already_applied += 1;
+            stats.bytes = stats.bytes.saturating_add(projected_bytes);
             let oldest = if stdb_head > next_sequence {
                 oldest_unprojected_at(stdb, organization_id, next_sequence.saturating_add(1)).await
             } else {
@@ -499,5 +577,24 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("outside requested"));
+    }
+
+    #[test]
+    fn catch_up_budget_bounds_commits_bytes_and_elapsed_time() {
+        let budget = ProjectionDrainBudget {
+            max_commits_per_organization: 2,
+            max_bytes_per_organization: 100,
+            max_elapsed_per_organization: Duration::from_millis(10),
+            max_concurrent_organizations: 3,
+        };
+        let mut stats = ProjectionDrainStats::default();
+        assert!(!budget_exhausted(&stats, Duration::ZERO, budget));
+        stats.commits = 2;
+        assert!(budget_exhausted(&stats, Duration::ZERO, budget));
+        stats.commits = 0;
+        stats.bytes = 100;
+        assert!(budget_exhausted(&stats, Duration::ZERO, budget));
+        stats.bytes = 0;
+        assert!(budget_exhausted(&stats, Duration::from_millis(10), budget));
     }
 }

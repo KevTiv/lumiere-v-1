@@ -48,6 +48,13 @@ pub struct ColumnCodec {
 pub fn load_columns(codec_manifest_json: &str, table: &str) -> Result<Vec<ColumnCodec>> {
     let manifest: Value =
         serde_json::from_str(codec_manifest_json).context("parse codec-manifest.json")?;
+    load_columns_from_manifest(&manifest, table)
+}
+
+pub(crate) fn load_columns_from_manifest(
+    manifest: &Value,
+    table: &str,
+) -> Result<Vec<ColumnCodec>> {
     let cols = manifest["tables"][table]["columns"]
         .as_array()
         .ok_or_else(|| anyhow!("codec-manifest.json: table '{table}' has no 'columns' array"))?;

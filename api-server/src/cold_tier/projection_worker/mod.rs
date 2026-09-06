@@ -42,7 +42,7 @@ mod source;
 mod status;
 
 /// Read a bounded set of organization cursors and apply each exact next commit.
-pub use drain::drain_batch;
+pub use drain::{drain_batch, drain_batch_with_budget};
 pub use relations::ensure_projection_relations;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -51,6 +51,28 @@ pub struct ProjectionDrainStats {
     pub commits: usize,
     pub already_applied: usize,
     pub failed: usize,
+    pub bytes: usize,
+    pub backlog_remaining: bool,
+}
+
+/// Fairness and resource ceilings for one projection pass.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProjectionDrainBudget {
+    pub max_commits_per_organization: usize,
+    pub max_bytes_per_organization: usize,
+    pub max_elapsed_per_organization: Duration,
+    pub max_concurrent_organizations: usize,
+}
+
+impl Default for ProjectionDrainBudget {
+    fn default() -> Self {
+        Self {
+            max_commits_per_organization: 100,
+            max_bytes_per_organization: 16 * 1024 * 1024,
+            max_elapsed_per_organization: Duration::from_millis(500),
+            max_concurrent_organizations: 8,
+        }
+    }
 }
 
 fn require_server_identity(stdb: &StdbClient) -> Result<()> {
@@ -89,7 +111,7 @@ pub async fn serve() -> Result<()> {
         config.stdb_server_token.as_deref(),
         config.stdb_finalization_token.as_deref(),
     )?;
-    let poll_secs = std::env::var("LUMIERE_PROJECTION_WORKER_POLL_SECS")
+    let idle_poll_secs = std::env::var("LUMIERE_PROJECTION_WORKER_POLL_SECS")
         .ok()
         .and_then(|value| value.parse().ok())
         .filter(|value| *value > 0)
@@ -99,11 +121,40 @@ pub async fn serve() -> Result<()> {
         .and_then(|value| value.parse().ok())
         .filter(|value| *value > 0)
         .unwrap_or(100u32);
+    let projection_budget = ProjectionDrainBudget {
+        max_commits_per_organization: std::env::var("LUMIERE_PROJECTION_MAX_COMMITS_PER_ORG")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(100),
+        max_bytes_per_organization: std::env::var("LUMIERE_PROJECTION_MAX_BYTES_PER_ORG")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(16 * 1024 * 1024),
+        max_elapsed_per_organization: Duration::from_millis(
+            std::env::var("LUMIERE_PROJECTION_MAX_MILLIS_PER_ORG")
+                .ok()
+                .and_then(|value| value.parse().ok())
+                .filter(|value| *value > 0)
+                .unwrap_or(500),
+        ),
+        max_concurrent_organizations: std::env::var("LUMIERE_PROJECTION_ORG_CONCURRENCY")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(8),
+    };
     let finalization_batch = std::env::var("LUMIERE_FINALIZATION_WORKER_BATCH")
         .ok()
         .and_then(|value| value.parse().ok())
         .filter(|value| *value > 0 && *value <= 200)
         .unwrap_or(100u32);
+    let finalization_poll_secs = std::env::var("LUMIERE_FINALIZATION_WORKER_POLL_SECS")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(5u64);
     let port = std::env::var("LUMIERE_PROJECTION_WORKER_PORT")
         .ok()
         .and_then(|value| value.parse().ok())
@@ -119,22 +170,22 @@ pub async fn serve() -> Result<()> {
     finalization_worker::parse_archive_manifest(finalization_worker::ARCHIVE_MANIFEST_JSON)
         .context("validate generated C5 archive manifest")?;
 
-    let ready = Arc::new(AtomicBool::new(false));
-    let worker_ready = ready.clone();
-    let worker_state = state;
-    let worker_finalization_stdb = finalization_stdb;
+    let projection_ready = Arc::new(AtomicBool::new(false));
+    let finalization_ready = Arc::new(AtomicBool::new(false));
+    let worker_ready = projection_ready.clone();
+    let worker_state = state.clone();
     let worker_pool = pool.clone();
     tokio::spawn(async move {
         loop {
-            match drain_batch(&worker_state.stdb, &worker_pool, batch).await {
+            let backlog_remaining = match drain_batch_with_budget(
+                &worker_state.stdb,
+                &worker_pool,
+                batch,
+                projection_budget,
+            )
+            .await
+            {
                 Ok(stats) => {
-                    let finalization = finalization_worker::drain_batch(
-                        &worker_state.stdb,
-                        &worker_finalization_stdb,
-                        &worker_pool,
-                        finalization_batch,
-                    )
-                    .await;
                     let persisted_quarantine =
                         match projection_observability::read_projection_statuses(&worker_pool).await
                         {
@@ -149,32 +200,53 @@ pub async fn serve() -> Result<()> {
                                 true
                             }
                         };
-                    let finalization_failed = match &finalization {
-                        Ok(finalization_stats) => finalization_stats.failed > 0,
-                        Err(error) => {
-                            tracing::error!(%error, "manifest-driven C5 finalization batch failed");
-                            true
-                        }
-                    };
                     worker_ready.store(
-                        stats.failed == 0 && !persisted_quarantine && !finalization_failed,
+                        stats.failed == 0 && !persisted_quarantine,
                         Ordering::Relaxed,
                     );
                     if stats.commits > 0 || stats.already_applied > 0 {
                         tracing::info!(?stats, "projection worker batch complete");
                     }
-                    if let Ok(finalization_stats) = finalization {
-                        if finalization_stats.read > 0 {
-                            tracing::info!(?finalization_stats, "C5 finalization batch complete");
-                        }
-                    }
+                    stats.backlog_remaining
                 }
                 Err(error) => {
                     worker_ready.store(false, Ordering::Relaxed);
                     tracing::error!(%error, "projection worker batch failed");
+                    false
+                }
+            };
+            if backlog_remaining {
+                tokio::task::yield_now().await;
+            } else {
+                tokio::time::sleep(Duration::from_secs(idle_poll_secs)).await;
+            }
+        }
+    });
+    let finalizer_ready = finalization_ready.clone();
+    let finalizer_state = state;
+    let finalizer_pool = pool.clone();
+    tokio::spawn(async move {
+        loop {
+            match finalization_worker::drain_batch(
+                &finalizer_state.stdb,
+                &finalization_stdb,
+                &finalizer_pool,
+                finalization_batch,
+            )
+            .await
+            {
+                Ok(stats) => {
+                    finalizer_ready.store(stats.failed == 0, Ordering::Relaxed);
+                    if stats.read > 0 {
+                        tracing::info!(?stats, "C5 finalization batch complete");
+                    }
+                }
+                Err(error) => {
+                    finalizer_ready.store(false, Ordering::Relaxed);
+                    tracing::error!(%error, "manifest-driven C5 finalization batch failed");
                 }
             }
-            tokio::time::sleep(Duration::from_secs(poll_secs)).await;
+            tokio::time::sleep(Duration::from_secs(finalization_poll_secs)).await;
         }
     });
     let app = Router::new()
@@ -198,9 +270,12 @@ pub async fn serve() -> Result<()> {
         .route(
             "/health/ready",
             get(move || {
-                let ready = ready.clone();
+                let projection_ready = projection_ready.clone();
+                let finalization_ready = finalization_ready.clone();
                 async move {
-                    if ready.load(Ordering::Relaxed) {
+                    if projection_ready.load(Ordering::Relaxed)
+                        && finalization_ready.load(Ordering::Relaxed)
+                    {
                         StatusCode::OK
                     } else {
                         StatusCode::SERVICE_UNAVAILABLE

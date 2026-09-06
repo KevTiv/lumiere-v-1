@@ -1,8 +1,11 @@
-use super::apply::apply_commit;
+use super::apply::{apply_commit, insert_changes};
 use super::checksum::{
     canonical_json, change_checksum, commit_checksum, commit_id, projection_plan,
 };
-use super::prepare::{load_projection_codec, validate_commit, validate_sequence};
+use super::prepare::{
+    cached_projection_codec, load_projection_codec, projection_codecs, validate_commit,
+    validate_sequence,
+};
 use super::sql::build_upsert_sql;
 use super::*;
 use crate::cold_tier::conventions::quote_identifier;
@@ -12,7 +15,8 @@ use anyhow::{anyhow, bail, Context, Result};
 use deadpool_postgres::Pool;
 use serde_json::{json, Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use tokio_postgres::types::ToSql;
 
 mod legacy_worker_parity;
 
@@ -186,6 +190,135 @@ fn rejects_non_projected_codec_modes() {
 }
 
 #[test]
+fn pinned_projection_codecs_are_parsed_once_and_reused() {
+    let manifest = projection_worker::PROJECTION_CODEC_MANIFEST_JSON;
+    let parsed = projection_codecs(manifest).expect("pinned projection codecs");
+    assert_eq!(parsed.len(), 452);
+    let table = parsed.keys().next().expect("at least one codec");
+    let cached = cached_projection_codec(table).expect("cached projection codec");
+    assert_eq!(cached.table_name, *table);
+    assert_eq!(cached.primary_key, parsed[table].primary_key);
+    assert_eq!(cached.columns.len(), parsed[table].columns.len());
+}
+
+#[test]
+#[ignore = "performance evidence; run explicitly with --ignored --nocapture"]
+fn benchmark_pinned_projection_codec_cache() {
+    let manifest = projection_worker::PROJECTION_CODEC_MANIFEST_JSON;
+    let table = projection_codecs(manifest)
+        .unwrap()
+        .into_keys()
+        .next()
+        .expect("at least one projected table");
+    let parse_iterations = 20u128;
+    let parse_started = Instant::now();
+    for _ in 0..parse_iterations {
+        std::hint::black_box(load_projection_codec(manifest, &table).unwrap());
+    }
+    let parse_ns = parse_started.elapsed().as_nanos() / parse_iterations;
+
+    std::hint::black_box(cached_projection_codec(&table).unwrap());
+    let cache_iterations = 20_000u128;
+    let cache_started = Instant::now();
+    for _ in 0..cache_iterations {
+        std::hint::black_box(cached_projection_codec(&table).unwrap());
+    }
+    let cache_ns = cache_started.elapsed().as_nanos() / cache_iterations;
+    eprintln!(
+        "projection_codec_benchmark={{\"parse_ns_per_lookup\":{parse_ns},\"cached_ns_per_lookup\":{cache_ns}}}"
+    );
+}
+
+#[tokio::test]
+async fn postgres_journal_batch_benchmark() -> Result<()> {
+    if std::env::var("C3_BENCH_PG").as_deref() != Ok("1") {
+        eprintln!("skipping postgres_journal_batch_benchmark (set C3_BENCH_PG=1 to run)");
+        return Ok(());
+    }
+    let config = pg_pool::PgConfig::from_env()?;
+    let pool = pg_pool::build_pool(&config)?;
+    let mut client = pool.get().await?;
+    client
+        .batch_execute(
+            "CREATE TEMP TABLE organization_row_change (
+                id TEXT PRIMARY KEY,
+                organization_id NUMERIC(20,0) NOT NULL,
+                commit_sequence NUMERIC(20,0) NOT NULL,
+                ordinal BIGINT NOT NULL,
+                table_name TEXT NOT NULL,
+                row_identity_json JSONB NOT NULL,
+                change_kind TEXT NOT NULL,
+                row_json JSONB,
+                checksum TEXT NOT NULL
+            ) ON COMMIT PRESERVE ROWS",
+        )
+        .await?;
+    let codec = load_projection_codec(&manifest(), "parent")?;
+    let changes = (0..1_000u32)
+        .map(|ordinal| PreparedChange {
+            input: OrganizationRowChangeInput {
+                id: format!("7:1:{ordinal}"),
+                organization_id: 7,
+                commit_sequence: 1,
+                ordinal,
+                table_name: "parent".into(),
+                row_identity_json: format!("{{\"id\":{ordinal}}}"),
+                change_kind: "upsert".into(),
+                row_json: Some(format!(
+                    "{{\"id\":{ordinal},\"name\":\"row\",\"organization_id\":7}}"
+                )),
+                checksum: "0".repeat(64),
+            },
+            codec: codec.clone(),
+            values: Vec::new(),
+            key_value: PgValue::NumericText(Some(ordinal.to_string())),
+        })
+        .collect::<Vec<_>>();
+
+    let baseline = client.transaction().await?;
+    let baseline_started = Instant::now();
+    for change in &changes {
+        let organization_id = change.input.organization_id.to_string();
+        let sequence = change.input.commit_sequence.to_string();
+        let ordinal = i64::from(change.input.ordinal);
+        let row = change.input.row_json.as_deref();
+        let params: [&(dyn ToSql + Sync); 9] = [
+            &change.input.id,
+            &organization_id,
+            &sequence,
+            &ordinal,
+            &change.input.table_name,
+            &change.input.row_identity_json,
+            &change.input.change_kind,
+            &row,
+            &change.input.checksum,
+        ];
+        baseline
+            .execute(
+                "INSERT INTO organization_row_change
+                 (id, organization_id, commit_sequence, ordinal, table_name,
+                  row_identity_json, change_kind, row_json, checksum)
+                 VALUES ($1, $2::TEXT::NUMERIC, $3::TEXT::NUMERIC, $4, $5,
+                         $6::TEXT::JSONB, $7, $8::TEXT::JSONB, $9)",
+                &params,
+            )
+            .await?;
+    }
+    let baseline_micros = baseline_started.elapsed().as_micros();
+    baseline.rollback().await?;
+
+    let batched = client.transaction().await?;
+    let batched_started = Instant::now();
+    insert_changes(&batched, &changes).await?;
+    let batched_micros = batched_started.elapsed().as_micros();
+    batched.rollback().await?;
+    eprintln!(
+        "projection_journal_benchmark={{\"rows\":1000,\"per_row_micros\":{baseline_micros},\"batched_micros\":{batched_micros}}}"
+    );
+    Ok(())
+}
+
+#[test]
 fn matrix_skips_storage_snapshot_and_external_reference_modes() {
     let entries = manifest_matrix(7).expect("checked-in projection manifests");
     assert!(entries.iter().all(|entry| matches!(
@@ -227,10 +360,10 @@ fn atomic_plan_inserts_and_applies_all_changes_before_watermark() {
     assert_eq!(
         plan,
         vec![
+            "lock_organization_cursor",
             "lock_watermark",
             "insert_commit",
-            "insert_change:0",
-            "insert_change:1",
+            "insert_changes_ordered",
             "apply_change:0",
             "apply_change:1",
             "advance_watermark",
