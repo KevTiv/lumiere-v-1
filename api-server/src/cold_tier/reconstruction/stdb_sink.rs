@@ -3,13 +3,14 @@
 use super::super::{pg_codec, reconciliation};
 use super::catalog::RestoreTable;
 use super::integrity::{
-    canonical_json, digest_rows, quote_identifier, require_server_identity, validate_run_id,
+    canonical_json, identity_text, quote_identifier, require_server_identity, validate_run_id,
+    OrderedDigest,
 };
 use super::protocol::{
     ApplyDisposition, DurableWatermark, ReconstructionFence, ReconstructionSink, RestoreRow,
     TableDigest,
 };
-use super::MAX_DIGEST_ROWS;
+use super::MAX_BATCH_SIZE;
 use anyhow::{bail, Context, Result};
 use deadpool_postgres::Pool;
 use serde_json::{json, Value};
@@ -168,24 +169,46 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
             .map(|column| quote_identifier(stdb_sql_field_name(&column.name)))
             .collect::<Vec<_>>()
             .join(", ");
-        let sql = format!(
-            "SELECT {projection} FROM {} WHERE {} = {} LIMIT {}",
-            quote_identifier(&table.table),
-            quote_identifier(&table.organization_column),
-            fence.organization_id,
-            MAX_DIGEST_ROWS + 1,
-        );
-        let rows = self.read_stdb.query_sql_sats(&sql).await.with_context(|| {
-            format!("read STDB reconstruction digest relation '{}'", table.table)
-        })?;
-        if rows.len() > MAX_DIGEST_ROWS {
-            bail!("STDB reconstruction digest exceeds bounded row limit");
+        let primary = columns
+            .iter()
+            .find(|column| column.name == table.primary_key)
+            .context("generated codec lacks reconstruction primary key")?;
+        let mut after = None;
+        let mut digest = OrderedDigest::new(&table.primary_key);
+        loop {
+            let comparison = after
+                .as_ref()
+                .map(|identity| stdb_identity_comparison(identity, table, &primary.pg_type))
+                .transpose()?
+                .unwrap_or_default();
+            let sql = format!(
+                "SELECT {projection} FROM {table_name} WHERE {organization_column} = {organization_id}{comparison} ORDER BY {primary_key} ASC LIMIT {limit}",
+                table_name = quote_identifier(&table.table),
+                organization_column = quote_identifier(&table.organization_column),
+                organization_id = fence.organization_id,
+                primary_key = quote_identifier(&table.primary_key),
+                limit = MAX_BATCH_SIZE,
+            );
+            let rows = self.read_stdb.query_sql_sats(&sql).await.with_context(|| {
+                format!("read STDB reconstruction digest relation '{}'", table.table)
+            })?;
+            let is_last = rows.len() < MAX_BATCH_SIZE as usize;
+            for row in rows {
+                let row = normalize_stdb_digest_row(&columns, row)?;
+                let primary_key = pg_codec::snake_to_camel(&table.primary_key);
+                let primary_value = row
+                    .get(&primary_key)
+                    .cloned()
+                    .context("normalized reconstruction row lacks primary key")?;
+                let identity = json!({table.primary_key.clone(): primary_value});
+                digest.push(&identity, &row)?;
+                after = Some(identity);
+            }
+            if is_last {
+                break;
+            }
         }
-        let rows = rows
-            .into_iter()
-            .map(|row| normalize_stdb_digest_row(&columns, row))
-            .collect::<Result<Vec<_>>>()?;
-        digest_rows(&rows)
+        Ok(digest.finish())
     }
 
     async fn prepare_recreated_state(
@@ -240,6 +263,23 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
         )
         .await
     }
+}
+
+fn stdb_identity_comparison(
+    identity: &Value,
+    table: &RestoreTable,
+    pg_type: &str,
+) -> Result<String> {
+    let value = identity_text(identity, &table.primary_key)?;
+    let literal = match pg_type {
+        "NUMERIC(20,0)" => value,
+        "TEXT" => format!("'{}'", value.replace('\'', "''")),
+        other => bail!("unsupported reconstruction primary key type '{other}'"),
+    };
+    Ok(format!(
+        " AND {} > {literal}",
+        quote_identifier(&table.primary_key)
+    ))
 }
 
 fn canonical_stdb_row_json(columns: &[pg_codec::ColumnCodec], row: &Value) -> Result<String> {

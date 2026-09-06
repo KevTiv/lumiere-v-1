@@ -7,7 +7,6 @@
 pub const RECONSTRUCTION_MANIFEST_JSON: &str =
     lumiere_contracts::manifests::RECONSTRUCTION_MANIFEST;
 const MAX_BATCH_SIZE: u32 = 256;
-const MAX_DIGEST_ROWS: usize = 100_000;
 
 mod catalog;
 mod coordinator;
@@ -21,6 +20,7 @@ mod stdb_sink;
 pub use catalog::{RestoreCatalog, RestoreTable};
 pub use coordinator::{reconstruct_organization, reconstruct_organization_once};
 pub use coverage::{capture_coverage_snapshot, ReconstructionCoverageReport};
+pub(crate) use integrity::{identity_text, OrderedDigest};
 pub use operator::run_organization_reconstruction;
 pub(crate) use stdb_sink::{normalize_stdb_digest_row, stdb_sql_field_name};
 #[cfg(test)]

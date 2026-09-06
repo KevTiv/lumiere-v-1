@@ -29,6 +29,7 @@ fn watermark() -> DurableWatermark {
 
 fn digest(rows: u64) -> TableDigest {
     TableDigest {
+        format_version: 1,
         row_count: rows,
         checksum: "b".repeat(64),
     }
@@ -595,6 +596,7 @@ impl ReconstructionSink for RecoverySink {
             .get(&table.table)
             .cloned()
             .unwrap_or_else(|| TableDigest {
+                format_version: 1,
                 row_count: 0,
                 checksum: hex::encode(Sha256::digest(b"")),
             }))

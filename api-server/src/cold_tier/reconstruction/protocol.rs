@@ -20,6 +20,7 @@ pub struct RestoreRow {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TableDigest {
+    pub format_version: u32,
     pub row_count: u64,
     pub checksum: String,
 }

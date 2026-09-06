@@ -11,16 +11,19 @@
 use anyhow::{anyhow, bail, Context, Result};
 use deadpool_postgres::Pool;
 use serde_json::Value;
+#[cfg(test)]
 use sha2::{Digest, Sha256};
 use stdb_client::StdbClient;
 
 use super::pg_codec::{self, ColumnCodec};
-use super::reconstruction::{normalize_stdb_digest_row, stdb_sql_field_name};
+use super::reconstruction::{
+    identity_text, normalize_stdb_digest_row, stdb_sql_field_name, OrderedDigest, TableDigest,
+};
 
 const PROJECTION_CODEC_MANIFEST_JSON: &str =
     lumiere_contracts::manifests::PROJECTION_CODEC_MANIFEST;
 const RECONSTRUCTION_MANIFEST_JSON: &str = lumiere_contracts::manifests::RECONSTRUCTION_MANIFEST;
-const MAX_ROWS_PER_TABLE: usize = 100_000;
+const RECONCILIATION_PAGE_SIZE: u32 = 256;
 
 #[derive(Debug, Clone)]
 struct ReconciliationRelation {
@@ -36,6 +39,7 @@ struct ReconciliationRelation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TableReconciliation {
     pub table: String,
+    pub digest_format_version: u32,
     pub postgres_count: usize,
     pub stdb_count: usize,
     pub postgres_checksum: String,
@@ -97,74 +101,26 @@ pub async fn reconcile_organization(
     let mut tables = Vec::with_capacity(relations.len());
 
     for relation in relations {
-        let projection = relation
-            .columns
-            .iter()
-            .map(|column| {
-                let name = quote_identifier(&column.name);
-                match column.pg_type.as_str() {
-                    "NUMERIC(20,0)" | "JSONB" => format!("{name}::TEXT"),
-                    _ => name,
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
-        let pg_table = quote_identifier(&relation.table);
-        let pg_organization_column = quote_identifier(&relation.organization_column);
-        let pg_primary_key = quote_identifier(&relation.primary_key);
-        let pg_sql = format!(
-            "SELECT {projection} FROM {table} WHERE {organization_column} = \
-             $1::TEXT::NUMERIC ORDER BY {primary_key} ASC LIMIT {limit}",
-            table = pg_table,
-            organization_column = pg_organization_column,
-            primary_key = pg_primary_key,
-            limit = MAX_ROWS_PER_TABLE + 1,
-        );
-        let pg_rows = client
-            .query(&pg_sql, &[&organization_text])
-            .await
-            .with_context(|| format!("read PG reconciliation relation '{}'", relation.table))?;
-        if pg_rows.len() > MAX_ROWS_PER_TABLE {
+        let postgres = pg_relation_digest(&client, &relation, &organization_text).await?;
+        let stdb_digest = stdb_relation_digest(stdb, &relation, organization_id).await?;
+        if postgres.format_version != stdb_digest.format_version {
             bail!(
-                "PG reconciliation relation '{}' exceeds the bounded row limit {}",
-                relation.table,
-                MAX_ROWS_PER_TABLE
+                "reconciliation digest format mismatch for '{}'",
+                relation.table
             );
         }
-        let pg_values = pg_rows
-            .iter()
-            .map(|row| pg_codec::row_to_hot_json(&relation.columns, row))
-            .collect::<Result<Vec<_>>>()?;
-
-        let stdb_projection = relation
-            .columns
-            .iter()
-            .map(|column| quote_identifier(stdb_sql_field_name(&column.name)))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let stdb_sql = format!(
-            "SELECT {stdb_projection} FROM {table} WHERE {organization_column} = \
-             {organization_id} LIMIT {limit}",
-            table = quote_identifier(&relation.table),
-            organization_column = quote_identifier(&relation.organization_column),
-            limit = MAX_ROWS_PER_TABLE + 1,
-        );
-        let stdb_values = stdb
-            .query_sql_sats(&stdb_sql)
-            .await
-            .with_context(|| format!("read STDB reconciliation relation '{}'", relation.table))?
-            .into_iter()
-            .map(|row| normalize_stdb_digest_row(&relation.columns, row))
-            .collect::<Result<Vec<_>>>()?;
-        if stdb_values.len() > MAX_ROWS_PER_TABLE {
-            bail!(
-                "STDB reconciliation relation '{}' exceeds the bounded row limit {}",
-                relation.table,
-                MAX_ROWS_PER_TABLE
-            );
-        }
-
-        tables.push(compare_rows(&relation.table, &pg_values, &stdb_values)?);
+        let postgres_count = usize::try_from(postgres.row_count)
+            .context("PostgreSQL reconciliation row count exceeds platform size")?;
+        let stdb_count = usize::try_from(stdb_digest.row_count)
+            .context("STDB reconciliation row count exceeds platform size")?;
+        tables.push(TableReconciliation {
+            table: relation.table,
+            digest_format_version: postgres.format_version,
+            postgres_count,
+            stdb_count,
+            postgres_checksum: postgres.checksum,
+            stdb_checksum: stdb_digest.checksum,
+        });
     }
 
     Ok(OrganizationReconciliation {
@@ -172,6 +128,141 @@ pub async fn reconcile_organization(
         watermark,
         tables,
     })
+}
+
+async fn pg_relation_digest(
+    client: &tokio_postgres::Client,
+    relation: &ReconciliationRelation,
+    organization_id: &str,
+) -> Result<TableDigest> {
+    let projection = relation
+        .columns
+        .iter()
+        .map(|column| {
+            let name = quote_identifier(&column.name);
+            match column.pg_type.as_str() {
+                "NUMERIC(20,0)" | "JSONB" => format!("{name}::TEXT"),
+                _ => name,
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let primary = relation
+        .columns
+        .iter()
+        .find(|column| column.name == relation.primary_key)
+        .context("reconciliation relation lacks primary-key codec")?;
+    let mut after: Option<Value> = None;
+    let mut digest = OrderedDigest::new(&relation.primary_key);
+    loop {
+        let after_text = after
+            .as_ref()
+            .map(|identity| identity_text(identity, &relation.primary_key))
+            .transpose()?;
+        let comparison = match (after_text.as_ref(), primary.pg_type.as_str()) {
+            (None, _) => String::new(),
+            (Some(_), "NUMERIC(20,0)") => format!(
+                " AND {} > $2::TEXT::NUMERIC",
+                quote_identifier(&relation.primary_key)
+            ),
+            (Some(_), "TEXT") => {
+                format!(" AND {} > $2", quote_identifier(&relation.primary_key))
+            }
+            (Some(_), other) => bail!("unsupported reconciliation primary key type '{other}'"),
+        };
+        let sql = format!(
+            "SELECT {projection} FROM {table} WHERE {organization_column} = $1::TEXT::NUMERIC{comparison} ORDER BY {primary_key} ASC LIMIT {RECONCILIATION_PAGE_SIZE}",
+            table = quote_identifier(&relation.table),
+            organization_column = quote_identifier(&relation.organization_column),
+            primary_key = quote_identifier(&relation.primary_key),
+        );
+        let rows = if let Some(after) = after_text.as_ref() {
+            client.query(&sql, &[&organization_id, after]).await
+        } else {
+            client.query(&sql, &[&organization_id]).await
+        }
+        .with_context(|| format!("read PG reconciliation relation '{}'", relation.table))?;
+        let is_last = rows.len() < RECONCILIATION_PAGE_SIZE as usize;
+        for row in &rows {
+            let value = pg_codec::row_to_hot_json(&relation.columns, row)?;
+            let primary_key = pg_codec::snake_to_camel(&relation.primary_key);
+            let primary_value = value
+                .get(&primary_key)
+                .cloned()
+                .context("PG reconciliation row lacks primary key")?;
+            let identity = serde_json::json!({relation.primary_key.clone(): primary_value});
+            digest.push(&identity, &value)?;
+            after = Some(identity);
+        }
+        if is_last {
+            break;
+        }
+    }
+    Ok(digest.finish())
+}
+
+async fn stdb_relation_digest(
+    stdb: &StdbClient,
+    relation: &ReconciliationRelation,
+    organization_id: u64,
+) -> Result<TableDigest> {
+    let projection = relation
+        .columns
+        .iter()
+        .map(|column| quote_identifier(stdb_sql_field_name(&column.name)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let primary = relation
+        .columns
+        .iter()
+        .find(|column| column.name == relation.primary_key)
+        .context("reconciliation relation lacks primary-key codec")?;
+    let mut after: Option<Value> = None;
+    let mut digest = OrderedDigest::new(&relation.primary_key);
+    loop {
+        let comparison = after
+            .as_ref()
+            .map(|identity| {
+                let value = identity_text(identity, &relation.primary_key)?;
+                let literal = match primary.pg_type.as_str() {
+                    "NUMERIC(20,0)" => value,
+                    "TEXT" => format!("'{}'", value.replace('\'', "''")),
+                    other => bail!("unsupported reconciliation primary key type '{other}'"),
+                };
+                Ok(format!(
+                    " AND {} > {literal}",
+                    quote_identifier(&relation.primary_key)
+                ))
+            })
+            .transpose()?
+            .unwrap_or_default();
+        let sql = format!(
+            "SELECT {projection} FROM {table} WHERE {organization_column} = {organization_id}{comparison} ORDER BY {primary_key} ASC LIMIT {RECONCILIATION_PAGE_SIZE}",
+            table = quote_identifier(&relation.table),
+            organization_column = quote_identifier(&relation.organization_column),
+            primary_key = quote_identifier(&relation.primary_key),
+        );
+        let rows = stdb
+            .query_sql_sats(&sql)
+            .await
+            .with_context(|| format!("read STDB reconciliation relation '{}'", relation.table))?;
+        let is_last = rows.len() < RECONCILIATION_PAGE_SIZE as usize;
+        for row in rows {
+            let value = normalize_stdb_digest_row(&relation.columns, row)?;
+            let primary_key = pg_codec::snake_to_camel(&relation.primary_key);
+            let primary_value = value
+                .get(&primary_key)
+                .cloned()
+                .context("STDB reconciliation row lacks primary key")?;
+            let identity = serde_json::json!({relation.primary_key.clone(): primary_value});
+            digest.push(&identity, &value)?;
+            after = Some(identity);
+        }
+        if is_last {
+            break;
+        }
+    }
+    Ok(digest.finish())
 }
 
 async fn verify_declared_watermark(
@@ -290,9 +381,11 @@ fn load_relations(
     Ok(relations)
 }
 
+#[cfg(test)]
 fn compare_rows(table: &str, postgres: &[Value], stdb: &[Value]) -> Result<TableReconciliation> {
     Ok(TableReconciliation {
         table: table.to_owned(),
+        digest_format_version: 1,
         postgres_count: postgres.len(),
         stdb_count: stdb.len(),
         postgres_checksum: rows_checksum(postgres)?,
@@ -300,6 +393,7 @@ fn compare_rows(table: &str, postgres: &[Value], stdb: &[Value]) -> Result<Table
     })
 }
 
+#[cfg(test)]
 fn rows_checksum(rows: &[Value]) -> Result<String> {
     let mut canonical_rows = rows
         .iter()
@@ -314,6 +408,7 @@ fn rows_checksum(rows: &[Value]) -> Result<String> {
     Ok(hex::encode(digest.finalize()))
 }
 
+#[cfg(test)]
 fn canonical_json(value: &Value) -> Result<String> {
     serde_json::to_string(&super::conventions::canonicalize_json(value))
         .context("serialize canonical reconciliation row")

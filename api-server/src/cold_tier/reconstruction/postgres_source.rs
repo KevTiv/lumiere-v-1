@@ -2,9 +2,9 @@
 
 use super::super::pg_codec;
 use super::catalog::RestoreTable;
-use super::integrity::{canonical_checksum, digest_rows, identity_text, quote_identifier};
+use super::integrity::{canonical_checksum, identity_text, quote_identifier, OrderedDigest};
 use super::protocol::{DurableWatermark, ReconstructionSource, RestoreRow, TableDigest};
-use super::{MAX_BATCH_SIZE, MAX_DIGEST_ROWS};
+use super::MAX_BATCH_SIZE;
 use anyhow::{anyhow, bail, Context, Result};
 use deadpool_postgres::Pool;
 use serde_json::{json, Value};
@@ -141,8 +141,28 @@ impl ReconstructionSource for PgReconstructionSource {
         watermark: &DurableWatermark,
         table: &RestoreTable,
     ) -> Result<TableDigest> {
-        let rows = load_all_pg_rows(self, organization_id, watermark, table).await?;
-        digest_rows(&rows)
+        let mut digest = OrderedDigest::new(&table.primary_key);
+        let mut after = None;
+        loop {
+            let batch = self
+                .load_batch(
+                    organization_id,
+                    watermark,
+                    table,
+                    after.as_ref(),
+                    MAX_BATCH_SIZE,
+                )
+                .await?;
+            let is_last = batch.len() < MAX_BATCH_SIZE as usize;
+            for row in &batch {
+                digest.push(&row.identity, &row.row)?;
+            }
+            after = batch.last().map(|row| row.identity.clone());
+            if is_last {
+                break;
+            }
+        }
+        Ok(digest.finish())
     }
 }
 
@@ -155,35 +175,4 @@ async fn ensure_watermark(
         bail!("durable watermark changed during reconstruction");
     }
     Ok(())
-}
-
-async fn load_all_pg_rows(
-    source: &PgReconstructionSource,
-    organization_id: u64,
-    watermark: &DurableWatermark,
-    table: &RestoreTable,
-) -> Result<Vec<Value>> {
-    let mut values = Vec::new();
-    let mut after = None;
-    loop {
-        let batch = source
-            .load_batch(
-                organization_id,
-                watermark,
-                table,
-                after.as_ref(),
-                MAX_BATCH_SIZE,
-            )
-            .await?;
-        if values.len() + batch.len() > MAX_DIGEST_ROWS {
-            bail!("PG reconstruction digest exceeds bounded row limit");
-        }
-        let is_last = batch.len() < MAX_BATCH_SIZE as usize;
-        after = batch.last().map(|row| row.identity.clone());
-        values.extend(batch.into_iter().map(|row| row.row));
-        if is_last {
-            break;
-        }
-    }
-    Ok(values)
 }
