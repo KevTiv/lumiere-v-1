@@ -39,9 +39,18 @@ HISTORY_FIELDS = {
     "retired_ids",
     "compatibility_exceptions",
 }
+HISTORY_V3_FIELDS = HISTORY_FIELDS | {"revisions"}
 FINGERPRINT_FIELDS = {"algorithm", "canonicalization"}
 OPERATION_HISTORY_FIELDS = {"name", "shape_fingerprint"}
 EXCEPTION_FIELDS = {"operation_id", "previous_fingerprint", "current_fingerprint", "reason"}
+REVISION_FIELDS = {
+    "previous_release",
+    "previous_ir_sha256",
+    "previous_operations_fingerprint",
+    "current_operations_fingerprint",
+    "operation_count",
+    "reason",
+}
 
 
 class OperationHistoryError(ValueError):
@@ -179,6 +188,12 @@ def shape_fingerprint(
     ).hexdigest()
 
 
+def operation_set_fingerprint(operations: dict[str, dict[str, Any]]) -> str:
+    """Fingerprint an ordered operation-history map for a bounded bulk revision."""
+
+    return "sha256:" + hashlib.sha256(_canonical_json(operations)).hexdigest()
+
+
 def _validate_operation_id(operation_id: Any, label: str) -> str:
     if not isinstance(operation_id, str) or not OPERATION_ID.fullmatch(operation_id):
         fail(f"{label} must be a canonical erp.* operation ID")
@@ -205,8 +220,12 @@ def _current_operations(ir: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 def _validate_history(history: dict[str, Any]) -> None:
-    _exact_fields(history, HISTORY_FIELDS, "operation history")
-    if history["schema_version"] != 2:
+    schema_version = history.get("schema_version")
+    if schema_version == 2:
+        _exact_fields(history, HISTORY_FIELDS, "operation history")
+    elif schema_version == 3:
+        _exact_fields(history, HISTORY_V3_FIELDS, "operation history")
+    else:
         fail(f"unsupported operation history schema_version {history['schema_version']!r}")
     if history["ir_version"] != 2:
         fail(f"operation history must target IR v2, got {history['ir_version']!r}")
@@ -252,6 +271,40 @@ def _validate_history(history: dict[str, Any]) -> None:
                 fail(f"compatibility exception {index} has invalid {field}")
         if not isinstance(exception["reason"], str) or not exception["reason"].strip():
             fail(f"compatibility exception {index} reason must be non-empty")
+    revisions = _array(history.get("revisions", []), "revisions")
+    previous_current: str | None = None
+    for index, raw_revision in enumerate(revisions):
+        revision = _object(raw_revision, f"history revision {index}")
+        _exact_fields(revision, REVISION_FIELDS, f"history revision {index}")
+        if not isinstance(revision["previous_release"], str) or not revision[
+            "previous_release"
+        ].strip():
+            fail(f"history revision {index} previous_release must be non-empty")
+        for field in (
+            "previous_ir_sha256",
+            "previous_operations_fingerprint",
+            "current_operations_fingerprint",
+        ):
+            if not isinstance(revision[field], str) or not SHA256.fullmatch(
+                revision[field]
+            ):
+                fail(f"history revision {index} has invalid {field}")
+        if not isinstance(revision["operation_count"], int) or revision[
+            "operation_count"
+        ] < 1:
+            fail(f"history revision {index} operation_count must be positive")
+        if not isinstance(revision["reason"], str) or not revision["reason"].strip():
+            fail(f"history revision {index} reason must be non-empty")
+        if (
+            previous_current is not None
+            and revision["previous_operations_fingerprint"] != previous_current
+        ):
+            fail(f"history revision {index} does not continue the fingerprint chain")
+        previous_current = revision["current_operations_fingerprint"]
+    if revisions:
+        current_fingerprint = operation_set_fingerprint(operations)
+        if revisions[-1]["current_operations_fingerprint"] != current_fingerprint:
+            fail("latest history revision does not bind the recorded operation baseline")
 
 
 def verify(
@@ -307,6 +360,21 @@ def verify(
         )
     if set(exceptions) & retired:
         fail("compatibility exceptions cannot target retired IDs")
+    actual_operations = {
+        operation_id: {
+            "name": current[operation_id]["name"],
+            "shape_fingerprint": shape_fingerprint(current[operation_id], type_names),
+        }
+        for operation_id in sorted(current_ids & historical_ids)
+    }
+    previous_revision_match = False
+    if allow_previous_compatibility and current_ids == historical_ids:
+        actual_set_fingerprint = operation_set_fingerprint(actual_operations)
+        previous_revision_match = any(
+            revision["operation_count"] == len(actual_operations)
+            and revision["previous_operations_fingerprint"] == actual_set_fingerprint
+            for revision in history.get("revisions", [])
+        )
     for operation_id in sorted(current_ids & historical_ids):
         operation = current[operation_id]
         entry = historical[operation_id]
@@ -317,6 +385,8 @@ def verify(
             )
         actual = shape_fingerprint(operation, type_names)
         expected = entry["shape_fingerprint"]
+        if previous_revision_match:
+            continue
         if actual == expected:
             if operation_id in exceptions:
                 exception = exceptions[operation_id]
@@ -361,7 +431,7 @@ def build_history_from_value(ir: dict[str, Any]) -> dict[str, Any]:
         for operation_id, operation in sorted(current.items())
     }
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "ir_version": 2,
         "fingerprint": {
             "algorithm": "sha256",
@@ -370,7 +440,56 @@ def build_history_from_value(ir: dict[str, Any]) -> dict[str, Any]:
         "operations": operations,
         "retired_ids": [],
         "compatibility_exceptions": [],
+        "revisions": [],
     }
+
+
+def advance_history(
+    ir_path: Path,
+    history_path: Path,
+    *,
+    previous_release: str,
+    previous_ir_sha256: str,
+    reason: str,
+) -> dict[str, Any]:
+    """Advance every operation shape as one exact, release-bound revision."""
+
+    previous = _load_json(history_path, "operation history")
+    _validate_history(previous)
+    current = build_history(ir_path)
+    previous_operations = copy.deepcopy(previous["operations"])
+    for exception in previous["compatibility_exceptions"]:
+        operation_id = exception["operation_id"]
+        if operation_id in previous_operations:
+            previous_operations[operation_id]["shape_fingerprint"] = exception[
+                "current_fingerprint"
+            ]
+    if set(previous_operations) != set(current["operations"]):
+        fail("bulk history revision requires an unchanged active operation ID set")
+    for operation_id, entry in previous_operations.items():
+        if entry["name"] != current["operations"][operation_id]["name"]:
+            fail(f"bulk history revision cannot rename {operation_id}")
+    if not SHA256.fullmatch(previous_ir_sha256):
+        fail("bulk history revision previous_ir_sha256 is invalid")
+    if not previous_release.strip() or not reason.strip():
+        fail("bulk history revision release and reason must be non-empty")
+    current["retired_ids"] = previous["retired_ids"]
+    current["revisions"] = list(previous.get("revisions", []))
+    current["revisions"].append(
+        {
+            "previous_release": previous_release,
+            "previous_ir_sha256": previous_ir_sha256,
+            "previous_operations_fingerprint": operation_set_fingerprint(
+                previous_operations
+            ),
+            "current_operations_fingerprint": operation_set_fingerprint(
+                current["operations"]
+            ),
+            "operation_count": len(current["operations"]),
+            "reason": reason,
+        }
+    )
+    return current
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -383,13 +502,50 @@ def main(argv: list[str] | None = None) -> int:
         help="write a deterministic history from the IR before verifying it",
     )
     parser.add_argument(
+        "--advance-history-from-release",
+        metavar="TAG",
+        help="replace the baseline with one exact bulk revision from an immutable release",
+    )
+    parser.add_argument(
+        "--previous-ir-sha256",
+        help="sha256:<hex> checksum of the immutable previous release IR",
+    )
+    parser.add_argument(
+        "--revision-reason",
+        help="authored reason for a bulk history revision",
+    )
+    parser.add_argument(
         "--allow-previous-compatibility",
         action="store_true",
         help="allow a pinned release IR to match the previous side of an explicit compatibility exception",
     )
     args = parser.parse_args(argv)
     try:
-        if args.write_history:
+        revision_values = (
+            args.advance_history_from_release,
+            args.previous_ir_sha256,
+            args.revision_reason,
+        )
+        if args.write_history and any(revision_values):
+            fail("--write-history cannot be combined with bulk revision options")
+        if any(revision_values) and not all(revision_values):
+            fail("bulk history revision requires release, IR checksum, and reason")
+        if args.advance_history_from_release:
+            args.history.write_text(
+                json.dumps(
+                    advance_history(
+                        args.ir,
+                        args.history,
+                        previous_release=args.advance_history_from_release,
+                        previous_ir_sha256=args.previous_ir_sha256,
+                        reason=args.revision_reason,
+                    ),
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        elif args.write_history:
             args.history.write_text(
                 json.dumps(build_history(args.ir), indent=2) + "\n", encoding="utf-8"
             )
