@@ -8,6 +8,12 @@
 
 ## 1. Objective
 
+Before runtime UI composition is activated, use the
+[module-by-module maintainability plan](../plan/module-by-module-maintainability-plan.md)
+to establish typed feature ownership and prove human composition over existing
+UI pieces. Its cleanup acceptance is separate from this plan's runtime
+validation, authorization, versioning, and activation gates.
+
 Converge Lumiere's planned renderer-neutral frontend architecture and AI harness around one reusable unit of user work:
 
 ```text

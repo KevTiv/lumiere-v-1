@@ -11,6 +11,11 @@ Execution owner: the primary implementation session, responsible for reviewing a
 
 ## 1. Start here
 
+For bounded execution by one agent per module/session, use the
+[module-by-module maintainability plan](module-by-module-maintainability-plan.md).
+It reuses this document's ownership decisions and tracks current per-module
+adoption and evidence; it does not replace the D-task destination map.
+
 This is a repo-grounded execution plan, not permission to launch all work at once. Read it completely, refresh the evidence, then work through accepted dependencies. A historical count, file path, line number, warning, or passing test is not a current baseline.
 
 The desired result is a codebase where a business rule or wire-format behavior has an identifiable owner, callers use that owner, and large modules are divided by coherent responsibilities. Adding a utility while leaving its copies in production is not completion. Moving duplicated logic into several smaller files is not completion either.
