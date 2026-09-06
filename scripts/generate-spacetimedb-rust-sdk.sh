@@ -29,9 +29,9 @@ set -e
 # generated keyword fields. Inspect diagnostics independently of the exit code:
 # only the known keyword parse error is recoverable, and any other `error:` line
 # remains fatal even when the CLI returns zero.
-expected_keyword_errors="$({ grep '^error: expected identifier, found keyword `[^`]*`$' "$LOG_FILE" || true; } | wc -l | tr -d ' ')"
-unexpected_errors="$({ grep '^error:' "$LOG_FILE" || true; } | \
-  grep -Ev '^error: expected identifier, found keyword `[^`]+`$' || true)"
+expected_keyword_errors="$({ grep -E 'error: expected identifier, found keyword `[^`]+`' "$LOG_FILE" || true; } | wc -l | tr -d ' ')"
+unexpected_errors="$({ grep 'error:' "$LOG_FILE" || true; } | \
+  grep -Ev 'error: expected identifier, found keyword `[^`]+`' || true)"
 
 if [[ -n "$unexpected_errors" || ( "$generate_status" -ne 0 && "$expected_keyword_errors" -eq 0 ) ]]; then
   echo "SpacetimeDB Rust generation had unexpected errors:" >&2

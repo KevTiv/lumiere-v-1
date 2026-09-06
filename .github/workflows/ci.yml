@@ -139,8 +139,8 @@ jobs:
       - name: SpacetimeDB Rust generator recovery test
         run: bash scripts/test-generate-spacetimedb-rust-sdk.sh
 
-      - name: Verify generated TypeScript matches Rust registry
-        run: make check-codegen
+      - name: Verify pinned generated contracts and source policy
+        run: make check-codegen-pinned
 
       - name: Ownership and required-test guardrails
         run: |
@@ -185,14 +185,11 @@ jobs:
         with:
           version: ${{ env.SPACETIME_CLI_VERSION }}
 
-      # Fails when the live SpacetimeDB module schema has changed but nobody
-      # ran `make publish-contracts` to release the corresponding
-      # lumiere-contracts tag — the drift check make check-codegen alone
-      # can't catch, since check-codegen only compares against whatever
-      # bindings are already in .contracts-staging/. See
-      # docs/plans/contracts-extraction-execution-plan.md.
-      - name: Verify STDB module matches pinned lumiere-contracts release
-        run: make check-contracts-drift
+      # Regenerate bindings from the checked-out module source. Deployment
+      # compatibility is a separate environment gate and must not make source
+      # CI depend on a mutable Maincloud database.
+      - name: Verify STDB source matches pinned lumiere-contracts release
+        run: make check-contracts-source-drift
 
   frontend:
     name: Frontend

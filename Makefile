@@ -103,7 +103,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running \
 	init-stack docker-dev docker-dev-iot \
-	codegen check-codegen check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-reducer-contracts-drift check-contracts-drift \
+	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift \
 	clean-contracts-live-staging lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
@@ -975,6 +975,21 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 		crates/stdb-auth/assets/query_exec_non_registry.json || \
 		(echo "Generated artifacts are out of date. Run: make generate-stdb-ts-sdk && make codegen" && exit 1)
 
+# CI-safe validation for a previously published immutable contract. Source-to-
+# contract regeneration belongs to check-contracts-source-drift; this target
+# must not couple ordinary Rust checks to whichever module is currently deployed.
+check-codegen-pinned: check-operation-history check-release-compatibility check-tenant-ownership check-c2-commit-coverage lint-reducer-call-literals
+	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean
+	python3 lumiere-codegen/tests/test_contract_ir_pin.py
+	node scripts/bootstrap-storage-policies.mjs --check
+	@node scripts/validate-subscription-census.mjs --check
+	@git diff --exit-code -- \
+		frontend/packages/stdb/src/query-resource-row-type.json \
+		crates/stdb-client/src/generated_reducer_contract.rs \
+		crates/stdb-auth/assets/resource_registry.json \
+		crates/stdb-auth/assets/query_exec_non_registry.json || \
+		(echo "Checked-in generated artifacts are out of date" && exit 1)
+
 # Populates .contracts-staging/{bindings,manifests} from the currently
 # pinned lumiere-contracts git dependency instead of a live `spacetime
 # generate` run. Use this when the schema hasn't changed and you just need
@@ -1011,7 +1026,6 @@ contracts-staging-from-pinned:
 	cp -R "$$CHECKOUT/packages/contracts/src/generated/." .contracts-staging/ts/generated/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" .contracts-staging/ts/; \
-	STDB_MODULE="$(STDB_MODULE)" bash scripts/schema-snapshot.sh; \
 	echo "contracts-staging-from-pinned: populated .contracts-staging/ from $$CHECKOUT"
 
 # CI-safe reducer drift check. Unlike full bindings drift, schema retrieval is
@@ -1023,6 +1037,21 @@ check-reducer-contracts-drift: schema-snapshot codegen
 		exit 1; \
 	fi; \
 	diff "$$CHECKOUT/manifests/reducer-manifest.json" .contracts-staging/manifests/reducer-manifest.json
+
+# CI source check that does not depend on a separately deployed module. The
+# live deployment compatibility check remains available as check-contracts-drift.
+check-contracts-source-drift: clean-contracts-live-staging generate-stdb-rust-sdk generate-stdb-ts-sdk
+	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
+	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
+		echo "check-contracts-source-drift: could not resolve pinned contracts" >&2; \
+		exit 1; \
+	fi; \
+	diff -rq "$$CHECKOUT/crates/lumiere-contracts/src/bindings" .contracts-staging/bindings && \
+	diff -rq \
+		-x query-registry.ts -x operation-inputs.ts -x operation-descriptors.ts \
+		-x operations.ts -x resources.ts -x resource-codecs.ts -x wire-codecs.ts \
+		"$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
+	echo "check-contracts-source-drift: source bindings match pinned lumiere-contracts release"
 
 # Bindings + the seven generated manifests now live in lumiere-contracts, not in
 # this repo. This target regenerates them into .contracts-staging/ from the
