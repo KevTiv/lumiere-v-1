@@ -40,6 +40,7 @@ pub struct OrganizationReconstructionFence {
     pub run_id: String,
     pub placement_generation: u64,
     pub target_watermark: u64,
+    pub target_commit_checksum: String,
     pub state: String,
     pub started_at: Timestamp,
     pub updated_at: Timestamp,
@@ -120,6 +121,7 @@ pub fn begin_organization_reconstruction(
     run_id: String,
     placement_generation: u64,
     target_watermark: u64,
+    target_commit_checksum: String,
 ) -> Result<(), String> {
     require_reconstructor(ctx, organization_id)?;
     validate_identity(
@@ -128,12 +130,14 @@ pub fn begin_organization_reconstruction(
         placement_generation,
         target_watermark,
     )?;
+    validate_commit_checksum(&target_commit_checksum)?;
 
     let table = ctx.db.organization_reconstruction_fence();
     if let Some(existing) = table.organization_id().find(&organization_id) {
         if existing.run_id == run_id
             && existing.placement_generation == placement_generation
             && existing.target_watermark == target_watermark
+            && existing.target_commit_checksum == target_commit_checksum
             && (existing.state == ACTIVE || existing.state == FAILED)
         {
             table
@@ -165,6 +169,7 @@ pub fn begin_organization_reconstruction(
                 run_id,
                 placement_generation,
                 target_watermark,
+                target_commit_checksum,
                 state: ACTIVE.to_string(),
                 started_at: ctx.timestamp,
                 updated_at: ctx.timestamp,
@@ -182,6 +187,7 @@ pub fn begin_organization_reconstruction(
         run_id,
         placement_generation,
         target_watermark,
+        target_commit_checksum,
         state: ACTIVE.to_string(),
         started_at: ctx.timestamp,
         updated_at: ctx.timestamp,
@@ -347,12 +353,14 @@ pub fn complete_organization_reconstruction(
     run_id: String,
     placement_generation: u64,
     verified_watermark: u64,
+    verified_commit_checksum: String,
 ) -> Result<(), String> {
     require_reconstructor(ctx, organization_id)?;
     let mut fence = exact_fence(ctx, organization_id, &run_id)?;
     if fence.state != ACTIVE
         || fence.placement_generation != placement_generation
         || fence.target_watermark != verified_watermark
+        || fence.target_commit_checksum != verified_commit_checksum
         || fence.current_restore_order.is_some()
         || fence.last_completed_restore_order
             != crate::generated_reconstruction_apply::GENERATED_FINAL_RESTORE_ORDER
@@ -574,6 +582,13 @@ fn validate_identity(
     Ok(())
 }
 
+fn validate_commit_checksum(checksum: &str) -> Result<(), String> {
+    if checksum.len() != 64 || !checksum.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("reconstruction commit checksum must be 64 hexadecimal characters".into());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -585,6 +600,13 @@ mod tests {
         assert!(validate_identity(7, "restore/7", 3, 42).is_err());
         assert!(validate_identity(7, "restore-7-42", 0, 42).is_err());
         assert!(validate_identity(7, "restore-7-42", 3, 0).is_err());
+    }
+
+    #[test]
+    fn reconstruction_commit_checksum_is_exact_sha256_hex() {
+        assert!(validate_commit_checksum(&"a5".repeat(32)).is_ok());
+        assert!(validate_commit_checksum("sha256:not-the-wire-format").is_err());
+        assert!(validate_commit_checksum(&"a".repeat(63)).is_err());
     }
 
     #[test]

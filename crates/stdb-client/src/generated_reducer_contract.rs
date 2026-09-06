@@ -496,6 +496,7 @@ const PARAMS_99: &[ReducerParam] = &[
     ReducerParam { name: "run_id", kind: ScalarKind::String, ref_target: None },
     ReducerParam { name: "placement_generation", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "target_watermark", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "target_commit_checksum", kind: ScalarKind::String, ref_target: None },
 ];
 const PARAMS_100: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -826,6 +827,7 @@ const PARAMS_168: &[ReducerParam] = &[
     ReducerParam { name: "run_id", kind: ScalarKind::String, ref_target: None },
     ReducerParam { name: "placement_generation", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "verified_watermark", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "verified_commit_checksum", kind: ScalarKind::String, ref_target: None },
 ];
 const PARAMS_169: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },

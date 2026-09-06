@@ -142,11 +142,10 @@ pub async fn reconcile_organization(
             .collect::<Vec<_>>()
             .join(", ");
         let stdb_sql = format!(
-            "SELECT {stdb_projection} FROM `{table}` WHERE {organization_column} = \
-             {organization_id} ORDER BY {primary_key} ASC LIMIT {limit}",
+            "SELECT {stdb_projection} FROM {table} WHERE {organization_column} = \
+             {organization_id} LIMIT {limit}",
             table = relation.table,
             organization_column = relation.organization_column,
-            primary_key = relation.primary_key,
             limit = MAX_ROWS_PER_TABLE + 1,
         );
         let stdb_values = stdb

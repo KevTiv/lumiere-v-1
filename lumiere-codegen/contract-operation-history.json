@@ -5288,6 +5288,18 @@
   ],
   "compatibility_exceptions": [
     {
+      "operation_id": "erp.begin_organization_reconstruction",
+      "previous_fingerprint": "sha256:db3cf299d996c5a56cb4e9bad3e87b867f3bcf52ba24d702ed9aed590eeee33c",
+      "current_fingerprint": "sha256:0bf37be1a868cbffacafaaf6e88f0a7488dc49788d0d387a99c40d269ca77944",
+      "reason": "bind reconstruction start to the exact durable commit checksum as well as its sequence"
+    },
+    {
+      "operation_id": "erp.complete_organization_reconstruction",
+      "previous_fingerprint": "sha256:336e78b48815aa44878eff7a53b81c4fd8537aa054d87415f5c88669be920310",
+      "current_fingerprint": "sha256:0e3f350d7e931d1b1b6b72b88570653447757c63d060aff6dc304a4b26bb53e1",
+      "reason": "verify reconstruction completion against the exact durable commit checksum"
+    },
+    {
       "operation_id": "erp.configure_contact_identity_verification_authority",
       "previous_fingerprint": "sha256:9bdfa90c80390e20efa391ba5fe809b2bff3b52ad8605aa0d043f4f2ab3d4580",
       "current_fingerprint": "sha256:6219e24c1993e4a3d291f608fe40e1ce112a45201a532bb9865d98966cd8aedd",

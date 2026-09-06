@@ -12,12 +12,14 @@ const MAX_DIGEST_ROWS: usize = 100_000;
 mod catalog;
 mod coordinator;
 mod integrity;
+mod operator;
 mod postgres_source;
 mod protocol;
 mod stdb_sink;
 
 pub use catalog::{RestoreCatalog, RestoreTable};
 pub use coordinator::{reconstruct_organization, reconstruct_organization_once};
+pub use operator::run_organization_reconstruction;
 #[cfg(test)]
 #[path = "tests/mod.rs"]
 mod tests;

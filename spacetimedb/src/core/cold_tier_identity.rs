@@ -74,29 +74,28 @@ pub fn register_cold_tier_service_identity(
     service_name: String,
     identity: Identity,
 ) -> Result<(), String> {
-    require_superuser(ctx)?;
-
-    let organization = ctx
-        .db
-        .organization()
-        .id()
-        .find(&organization_id)
-        .ok_or("Organization not found")?;
-    if organization.id == 0 || organization.organization_id != organization.id {
-        return Err("Organization has invalid server-owned identity".to_string());
+    if organization_id == 0 {
+        return Err("organization_id must be non-zero".to_string());
     }
-
     let platform_id = validate_platform_id(&platform_id)?;
-
     let service_name = service_name.trim().to_string();
     if service_name.is_empty() {
         return Err("service_name is required".to_string());
     }
-    if identity == ctx.sender() {
-        return Err(
-            "cold-tier service identity must be distinct from the registering administrator"
-                .to_string(),
-        );
+
+    if let Some(organization) = ctx.db.organization().id().find(&organization_id) {
+        require_superuser(ctx)?;
+        if organization.id == 0 || organization.organization_id != organization.id {
+            return Err("Organization has invalid server-owned identity".to_string());
+        }
+        if identity == ctx.sender() {
+            return Err(
+                "cold-tier service identity must be distinct from the registering administrator"
+                    .to_string(),
+            );
+        }
+    } else {
+        require_empty_target_reconstruction_bootstrap(ctx, &service_name, identity)?;
     }
 
     let active: Vec<_> = ctx
@@ -130,6 +129,50 @@ pub fn register_cold_tier_service_identity(
             retired_at: None,
         });
 
+    Ok(())
+}
+
+/// Permit the dedicated reconstructor to bind itself before an organization
+/// restore creates any ERP rows. The identity is a build-time public allowlist,
+/// not a secret embedded in the module. No other service can use this path and
+/// it closes as soon as the destination contains an organization row.
+fn require_empty_target_reconstruction_bootstrap(
+    ctx: &ReducerContext,
+    service_name: &str,
+    identity: Identity,
+) -> Result<(), String> {
+    if identity == Identity::ZERO {
+        return Err("reconstruction bootstrap identity must be non-zero".to_string());
+    }
+    if service_name != ORGANIZATION_RECONSTRUCTOR_SERVICE || identity != ctx.sender() {
+        return Err("Organization not found".to_string());
+    }
+    if ctx.db.organization().iter().next().is_some() {
+        return Err("reconstruction bootstrap requires an empty destination".to_string());
+    }
+    let configured = option_env!("LUMIERE_RECONSTRUCTION_BOOTSTRAP_IDENTITY")
+        .ok_or("reconstruction bootstrap identity is not configured")?;
+    validate_reconstruction_bootstrap_identity(configured, &ctx.sender().to_hex().to_string())
+}
+
+fn validate_reconstruction_bootstrap_identity(
+    configured: &str,
+    sender_hex: &str,
+) -> Result<(), String> {
+    let configured = configured
+        .trim()
+        .strip_prefix("0x")
+        .unwrap_or(configured.trim());
+    let sender_hex = sender_hex
+        .trim()
+        .strip_prefix("0x")
+        .unwrap_or(sender_hex.trim());
+    if configured.len() != 64 || !configured.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("reconstruction bootstrap identity must be 64 hexadecimal characters".into());
+    }
+    if !configured.eq_ignore_ascii_case(sender_hex) {
+        return Err("caller is not the configured reconstruction bootstrap identity".into());
+    }
     Ok(())
 }
 
@@ -179,7 +222,7 @@ fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::validate_platform_id;
+    use super::{validate_platform_id, validate_reconstruction_bootstrap_identity};
 
     #[test]
     fn platform_binding_id_must_be_opaque_and_bounded() {
@@ -190,5 +233,18 @@ mod tests {
         assert!(validate_platform_id("").is_err());
         assert!(validate_platform_id("org/service").is_err());
         assert!(validate_platform_id(&"x".repeat(257)).is_err());
+    }
+
+    #[test]
+    fn reconstruction_bootstrap_identity_is_exact_and_well_formed() {
+        let identity = "ab".repeat(32);
+        assert!(validate_reconstruction_bootstrap_identity(&identity, &identity).is_ok());
+        assert!(validate_reconstruction_bootstrap_identity(
+            &format!("0x{}", identity.to_uppercase()),
+            &identity,
+        )
+        .is_ok());
+        assert!(validate_reconstruction_bootstrap_identity("not-an-identity", &identity).is_err());
+        assert!(validate_reconstruction_bootstrap_identity(&"cd".repeat(32), &identity).is_err());
     }
 }

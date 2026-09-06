@@ -56,6 +56,14 @@ pub async fn run_storage_migrations() -> anyhow::Result<()> {
     cold_tier::migrate::ensure_schema(&pool).await
 }
 
+/// Run one trusted PostgreSQL-to-SpacetimeDB organization reconstruction.
+pub async fn run_organization_reconstruction(organization_id: u64) -> anyhow::Result<()> {
+    let report =
+        cold_tier::reconstruction::run_organization_reconstruction(organization_id).await?;
+    println!("{}", serde_json::to_string_pretty(&report)?);
+    Ok(())
+}
+
 /// Run the standalone project payroll/calendar/e-invoice intent worker service.
 pub async fn run_project_integration_worker() -> anyhow::Result<()> {
     project_integration_worker::serve().await

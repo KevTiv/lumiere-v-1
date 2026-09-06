@@ -177,6 +177,28 @@ impl OrganizationPlacement {
         })
     }
 
+    /// Construct a recovery target from trusted server configuration.
+    ///
+    /// This is crate-visible so HTTP and client input types cannot construct a
+    /// placement or choose a fencing generation.
+    pub(crate) fn reconstruction_target(
+        organization_id: u64,
+        cell_id: CellId,
+        generation: PlacementGeneration,
+        durable_store: DurableStoreId,
+    ) -> Result<Self, PlacementError> {
+        if organization_id == 0 {
+            return Err(PlacementError::InvalidOrganization);
+        }
+        Ok(Self {
+            organization_id,
+            cell_id,
+            generation,
+            lifecycle: OrganizationLifecycle::Reactivating,
+            durable_store,
+        })
+    }
+
     /// Return the organization governed by this placement.
     #[must_use]
     pub const fn organization_id(&self) -> u64 {

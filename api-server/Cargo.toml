@@ -38,6 +38,10 @@ path = "src/bin/projection-worker.rs"
 name = "storage-migrate"
 path = "src/bin/storage-migrate.rs"
 
+[[bin]]
+name = "reconstruct-organization"
+path = "src/bin/reconstruct-organization.rs"
+
 [dependencies]
 lumiere-contracts = { workspace = true, features = ["bindings"] }
 anyhow.workspace = true

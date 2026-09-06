@@ -15,10 +15,13 @@ classification and dependency order:
 
 ## Trusted restore protocol
 
-1. Resolve the destination placement generation and PostgreSQL projection watermark on the
-   server. The organization, placement, table names, columns, and watermark are not client input.
+1. Resolve the destination placement generation and PostgreSQL projection watermark in the
+   operator process. The placement, table names, columns, and watermark are not client input.
 2. Register the destination's `organization_reconstructor` service identity, then call
-   `begin_organization_reconstruction`. This creates the organization writer fence.
+   `begin_organization_reconstruction`. A freshly cleared destination may self-register only when
+   the caller matches the `LUMIERE_RECONSTRUCTION_BOOTSTRAP_IDENTITY` compiled into that module;
+   this value is a public identity allowlist, not a secret. The bootstrap path closes as soon as
+   an organization row exists. This creates the organization writer fence.
 3. Read each manifest relation from PostgreSQL at the declared watermark in strict primary-key
    order. Submit batches of at most 256 rows and 4 MiB through
    `apply_organization_reconstruction_batch`.
@@ -26,7 +29,7 @@ classification and dependency order:
    retries are accepted through deterministic receipts; a conflicting retry or primary-key value
    aborts the transaction.
 5. Compare PostgreSQL and SpacetimeDB counts and canonical checksums for every projected
-   organization relation. Both stores must still report the declared watermark.
+   organization relation. The fence binds both the exact durable sequence and its commit checksum.
 6. Validate the generated recreated-state set, run module smoke assertions, and call
    `complete_organization_reconstruction` only after reconciliation succeeds. Completion rebuilds
    policy and project-margin caches idempotently inside the fenced STDB transaction, verifies their
@@ -37,6 +40,41 @@ actor, or as-of inputs cannot currently be reproduced at the durable watermark. 
 `policy_snapshot` and `project_margin_snapshot` are rebuilt; fence and receipt rows remain
 target-local. This prevents a successful drill from silently replacing point-in-time evidence with
 new values computed at recovery time.
+
+`cold_tier_service_identity` is also target-local recreated state. The operator registers the
+destination reconstructor through the empty-target allowlist; privileged source-cell service
+identities are never copied into the destination.
+
+## Operator command
+
+The `reconstruct-organization` binary is the only application entrypoint. It accepts an
+organization ID, but resolves the durable watermark itself and obtains placement only from
+server environment. There is no HTTP/session route.
+
+Required configuration:
+
+- `STDB_HOST` and `STDB_MODULE` identify the destination.
+- `STDB_RECONSTRUCTION_TOKEN` is the dedicated reconstructor JWT and must differ from
+  `STDB_SERVER_TOKEN`. `STDB_RECONSTRUCTION_IDENTITY` is its server-issued 64-hex SpacetimeDB
+  identity; it is explicit because an OIDC JWT subject is not a SpacetimeDB identity.
+- `RECONSTRUCTION_PLACEMENT_GENERATION`, `RECONSTRUCTION_CELL_ID`, and
+  `RECONSTRUCTION_DURABLE_STORE_ID` are trusted placement configuration.
+- `RECONSTRUCTION_RUN_ID` is optional for a new run and required to resume the exact failed run.
+
+Build a disposable destination with the reconstructor identity allowlisted, publish it, then run:
+
+```bash
+LUMIERE_RECONSTRUCTION_BOOTSTRAP_IDENTITY=<64-hex-reconstructor-identity> \
+  spacetime build --module-path spacetimedb
+
+cargo run -p api-server --bin reconstruct-organization -- <organization-id>
+```
+
+For the failure/resume portion of a local recovery exercise, set a stable
+`RECONSTRUCTION_RUN_ID`, acknowledge `C7_DISPOSABLE_STDB=1`, use a loopback target named with the
+`lumiere-c7-` prefix, and run `scripts/c7-reconstruction-drill.sh <organization-id>`. The script
+injects one failure after a batch has committed, resumes the same run, then repeats with a fresh
+run ID. It deliberately does not publish, clear, or select a database on the operator's behalf.
 
 If any restore or reconciliation step fails, call `fail_organization_reconstruction` with the
 same run ID or leave the active fence in place. Resume only the same run after the fault is fixed;

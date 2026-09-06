@@ -14,6 +14,7 @@
   "table_actions": {
     "ai_agent_run_policy_snapshot": "restore",
     "capacity_forecast_snapshot": "restore",
+    "cold_tier_service_identity": "recreate",
     "crm_forecast_snapshot": "restore",
     "hr_labor_cost_snapshot": "restore",
     "organization_reconstruction_batch_receipt": "recreate",
@@ -23,6 +24,7 @@
     "resource_utilisation_snapshot": "restore"
   },
   "recreated_state": {
+    "cold_tier_service_identity": "Register target-local platform service bindings through trusted operator workflows; never restore privileged identities from a source cell.",
     "derived_rebuildable": "Recompute from restored canonical rows after durable restoration completes.",
     "organization_reconstruction_batch_receipt": "Create target-local idempotency receipts while applying the current reconstruction run; never restore receipts from a source cell.",
     "organization_reconstruction_fence": "Acquire a fresh target-local writer fence for the reconstruction run; never restore a stale source-cell fence."
