@@ -1,0 +1,37 @@
+{
+  "gate": "C7",
+  "date": "2026-09-06",
+  "source_commit": "f57f919cc974d3ca04aa683046e7b16b0f8b66b4",
+  "contracts_release": "v0.3.32",
+  "runtime": {
+    "spacetimedb": "2.8.2",
+    "target": "disposable local database",
+    "postgresql": "14.20 disposable local cluster",
+    "organization_id": 42,
+    "placement_generation": 1,
+    "watermark_sequence": 1,
+    "watermark_commit_checksum": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "fixture": {
+    "business_rows": 1,
+    "protocol_rows": 1,
+    "business_tables": ["account_account"],
+    "protocol_tables": ["organization_commit_cursor"]
+  },
+  "results": {
+    "committed_failure_injected": true,
+    "same_run_resumed": true,
+    "fresh_run_repeated": true,
+    "restored_tables": 458,
+    "restored_rows": 2,
+    "recreated_tables": 5,
+    "excluded_tables": 0,
+    "counts_and_checksums_verified": true,
+    "duplicate_rows_observed": false
+  },
+  "remaining_acceptance": [
+    "repeat with representative persisted rows from every enabled module",
+    "include deleted rows, relationship identifiers, totals, audit links, and idempotency records",
+    "continue lead-to-cash and procure-to-pay after reconstruction"
+  ]
+}

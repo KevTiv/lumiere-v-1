@@ -2,7 +2,9 @@
 
 use super::super::{pg_codec, reconciliation};
 use super::catalog::RestoreTable;
-use super::integrity::{canonical_json, digest_rows, require_server_identity, validate_run_id};
+use super::integrity::{
+    canonical_json, digest_rows, quote_identifier, require_server_identity, validate_run_id,
+};
 use super::protocol::{
     ApplyDisposition, DurableWatermark, ReconstructionFence, ReconstructionSink, RestoreRow,
     TableDigest,
@@ -156,17 +158,19 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
         )?;
         let projection = columns
             .iter()
-            .map(|column| column.name.as_str())
+            .map(|column| quote_identifier(&column.name))
             .collect::<Vec<_>>()
             .join(", ");
         let sql = format!(
             "SELECT {projection} FROM {} WHERE {} = {} LIMIT {}",
-            table.table,
-            table.organization_column,
+            quote_identifier(&table.table),
+            quote_identifier(&table.organization_column),
             fence.organization_id,
             MAX_DIGEST_ROWS + 1,
         );
-        let rows = self.stdb.query_sql(&sql).await?;
+        let rows = self.stdb.query_sql(&sql).await.with_context(|| {
+            format!("read STDB reconstruction digest relation '{}'", table.table)
+        })?;
         if rows.len() > MAX_DIGEST_ROWS {
             bail!("STDB reconstruction digest exceeds bounded row limit");
         }

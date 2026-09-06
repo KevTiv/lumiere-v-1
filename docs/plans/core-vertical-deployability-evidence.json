@@ -101,8 +101,16 @@
     },
     "C7": {
       "status": "partial",
-      "evidence": ["C7-R1 reconstruction and C7-R2 placement focused tests pass"],
-      "required": ["trusted operator entrypoint", "real PostgreSQL to disposable STDB drill", "workflow continuation"]
+      "evidence": [
+        "C7-R1 reconstruction and C7-R2 placement focused tests pass",
+        "trusted operator-only reconstruction resolves placement configuration and the exact PostgreSQL sequence plus commit checksum without an HTTP/session route",
+        "lumiere-contracts v0.3.32 classifies 458 relations for restore and five target-local relations for recreation, including privileged service bindings",
+        "the 2026-09-06 disposable PostgreSQL 14.20 to SpacetimeDB 2.8.2 drill injected a post-commit failure, resumed the same run, repeated with a fresh run ID, and verified 458 table digests without duplicate rows"
+      ],
+      "required": [
+        "repeat the real drill with representative persisted rows from every enabled module, including deletes, relationships, totals, audit links, and idempotency records",
+        "continue lead-to-cash and procure-to-pay after reconstruction"
+      ]
     },
     "C8": {
       "status": "blocked",

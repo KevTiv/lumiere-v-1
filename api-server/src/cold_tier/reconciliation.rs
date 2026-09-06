@@ -138,14 +138,14 @@ pub async fn reconcile_organization(
         let stdb_projection = relation
             .columns
             .iter()
-            .map(|column| column.name.as_str())
+            .map(|column| quote_identifier(&column.name))
             .collect::<Vec<_>>()
             .join(", ");
         let stdb_sql = format!(
             "SELECT {stdb_projection} FROM {table} WHERE {organization_column} = \
              {organization_id} LIMIT {limit}",
-            table = relation.table,
-            organization_column = relation.organization_column,
+            table = quote_identifier(&relation.table),
+            organization_column = quote_identifier(&relation.organization_column),
             limit = MAX_ROWS_PER_TABLE + 1,
         );
         let stdb_values = stdb
