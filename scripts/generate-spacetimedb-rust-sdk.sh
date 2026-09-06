@@ -7,8 +7,18 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="${1:-$ROOT/.contracts-staging/bindings}"
 MODULE_DIR="${2:-$ROOT/spacetimedb}"
 SPACETIME_BIN="${SPACETIME_BIN:-spacetime}"
+GENERATE_WASM="${STDB_GENERATE_WASM:-}"
 LOG_FILE="$(mktemp "${TMPDIR:-/tmp}/lumiere-stdb-rust-generate.XXXXXX.log")"
 trap 'rm -f "$LOG_FILE"' EXIT
+
+if [[ -z "$GENERATE_WASM" ]]; then
+  "$SPACETIME_BIN" build --module-path "$MODULE_DIR"
+  GENERATE_WASM="$MODULE_DIR/target/wasm32-unknown-unknown/release/lumiere_v1.wasm"
+fi
+if [[ ! -s "$GENERATE_WASM" ]]; then
+  echo "SpacetimeDB generation source WASM is missing: $GENERATE_WASM" >&2
+  exit 1
+fi
 
 # Bindings are a complete generated snapshot. Clean the exact output directory
 # first so reducers removed from the module cannot survive as stale APIs and so
@@ -21,7 +31,7 @@ set +e
   --include-private \
   --lang rust \
   --out-dir "$OUT_DIR" \
-  --module-path "$MODULE_DIR" 2>&1 | tee "$LOG_FILE"
+  --bin-path "$GENERATE_WASM" 2>&1 | tee "$LOG_FILE"
 generate_status="${PIPESTATUS[0]}"
 set -e
 
