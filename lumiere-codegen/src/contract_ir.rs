@@ -10,7 +10,8 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
 use std::process::Command;
 
 const IR_VERSION: u32 = 2;
@@ -67,6 +68,30 @@ struct OperationIdentityManifest {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct OperationClassificationManifest {
+    version: u32,
+    operations: BTreeMap<String, OperationClassification>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OperationClassification {
+    semantic_kind: String,
+    client_facing: bool,
+    idempotency: String,
+    codec: OperationCodec,
+    evidence: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OperationCodec {
+    id: String,
+    version: u32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ResourceScopeManifest {
     schema_version: u32,
     resources: BTreeMap<String, ResourceScopeMetadata>,
@@ -114,7 +139,9 @@ pub fn run(
         serde_json::from_str(&read_to_string(&paths.contract_operation_ids_json)?)
             .with_context(|| format!("parse {}", paths.contract_operation_ids_json.display()))?;
     let operation_ids = locked_operation_ids(&base.operations, identity_manifest)?;
-    let operations = v2_operations(&base.operations, &operation_ids)?;
+    let classifications =
+        operation_classifications(&paths.operation_contracts_dir, &base.operations)?;
+    let operations = v2_operations(&base.operations, &operation_ids, &classifications)?;
     let resource_scope_manifest: ResourceScopeManifest =
         serde_json::from_str(&read_to_string(&paths.resource_scope_metadata_json)?)
             .with_context(|| format!("parse {}", paths.resource_scope_metadata_json.display()))?;
@@ -271,6 +298,7 @@ fn locked_operation_ids(
 fn v2_operations(
     operations: &[Value],
     operation_ids: &BTreeMap<String, String>,
+    classifications: &BTreeMap<String, OperationClassification>,
 ) -> Result<Vec<Value>> {
     operations
         .iter()
@@ -299,23 +327,45 @@ fn v2_operations(
             let operation_id = operation_ids
                 .get(name)
                 .with_context(|| format!("operation {name} has no locked contract operation id"))?;
+            let classification = classifications
+                .get(name)
+                .with_context(|| format!("operation {name} has no authored contract classification"))?;
+            let application_exposure = application
+                .get("exposure")
+                .and_then(Value::as_str)
+                .unwrap_or("denied");
+            let expected_client_facing = application_exposure == "session";
+            if classification.client_facing != expected_client_facing {
+                bail!(
+                    "operation {name} client_facing={} conflicts with authored exposure {application_exposure}",
+                    classification.client_facing
+                );
+            }
+            let authorization_scope = application.get("scope").cloned().unwrap_or(Value::Null);
             Ok(serde_json::json!({
                 "application": application,
+                "authorization": {
+                    "scope": authorization_scope,
+                    "status": "classified",
+                },
+                "client_facing": classification.client_facing,
+                "classification_evidence": classification.evidence,
                 "codec": {
-                    "id": Value::Null,
-                    "status": "unassigned",
-                    "version": Value::Null,
+                    "id": classification.codec.id,
+                    "status": "assigned",
+                    "version": classification.codec.version,
                 },
                 "contract_operation_id": operation_id,
                 "contract_operation_id_status": "locked",
                 "idempotency": {
-                    "status": "unclassified",
+                    "status": "classified",
+                    "value": classification.idempotency,
                 },
                 "input": input,
                 "invalidates": invalidates,
                 "kind": {
-                    "status": "unclassified",
-                    "value": Value::Null,
+                    "status": "classified",
+                    "value": classification.semantic_kind,
                 },
                 "name": name,
                 "output": {
@@ -331,6 +381,100 @@ fn v2_operations(
             }))
         })
         .collect()
+}
+
+fn operation_classifications(
+    directory: &std::path::Path,
+    operations: &[Value],
+) -> Result<BTreeMap<String, OperationClassification>> {
+    let mut paths = fs::read_dir(directory)
+        .with_context(|| format!("read operation classifications {}", directory.display()))?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<std::io::Result<Vec<_>>>()?;
+    paths.retain(|path| path.extension().and_then(|value| value.to_str()) == Some("json"));
+    paths.sort();
+    if paths.is_empty() {
+        bail!(
+            "operation classification directory is empty: {}",
+            directory.display()
+        );
+    }
+
+    let operation_names = operations
+        .iter()
+        .map(|operation| value_name(operation, "operation").map(str::to_owned))
+        .collect::<Result<BTreeSet<_>>>()?;
+    let mut classifications = BTreeMap::new();
+    for path in paths {
+        let manifest: OperationClassificationManifest =
+            serde_json::from_str(&read_to_string(&path)?)
+                .with_context(|| format!("parse {}", path.display()))?;
+        if manifest.version != 1 {
+            bail!(
+                "{} has unsupported version {}",
+                path.display(),
+                manifest.version
+            );
+        }
+        for (name, classification) in manifest.operations {
+            validate_operation_classification(&name, &classification)?;
+            if classifications
+                .insert(name.clone(), classification)
+                .is_some()
+            {
+                bail!("operation {name} is classified by more than one shard");
+            }
+        }
+    }
+
+    let classified_names = classifications.keys().cloned().collect::<BTreeSet<_>>();
+    if operation_names != classified_names {
+        let missing = operation_names
+            .difference(&classified_names)
+            .take(20)
+            .cloned()
+            .collect::<Vec<_>>();
+        let stale = classified_names
+            .difference(&operation_names)
+            .take(20)
+            .cloned()
+            .collect::<Vec<_>>();
+        bail!(
+            "operation classifications do not match operations; missing(first 20)={missing:?}, stale(first 20)={stale:?}"
+        );
+    }
+    Ok(classifications)
+}
+
+fn validate_operation_classification(
+    name: &str,
+    classification: &OperationClassification,
+) -> Result<()> {
+    if !matches!(
+        classification.semantic_kind.as_str(),
+        "command" | "operator" | "test" | "internal"
+    ) {
+        bail!(
+            "operation {name} has invalid semantic kind {}",
+            classification.semantic_kind
+        );
+    }
+    if !matches!(
+        classification.idempotency.as_str(),
+        "idempotent" | "request_guarded" | "state_guarded" | "non_idempotent" | "not_applicable"
+    ) {
+        bail!(
+            "operation {name} has invalid idempotency {}",
+            classification.idempotency
+        );
+    }
+    if classification.codec.id != "spacetimedb-sats-json" || classification.codec.version != 1 {
+        bail!("operation {name} must use spacetimedb-sats-json codec version 1");
+    }
+    if classification.evidence.trim().is_empty() {
+        bail!("operation {name} classification evidence is empty");
+    }
+    Ok(())
 }
 
 fn v2_operation_input(operation_name: &str, application: &Value) -> Result<Value> {
@@ -843,6 +987,8 @@ mod tests {
             "kind": "reducer",
             "application": {
                 "name": "create_order",
+                "exposure": "session",
+                "scope": {"organization": {"parameter": "organization_id", "position": 0}},
                 "params": [
                     {"name": "organization_id", "kind": "u64"},
                     {"name": "params", "kind": "ref", "ref_target": "CreateOrderParams"}
@@ -854,17 +1000,33 @@ mod tests {
         });
         let operation_ids =
             BTreeMap::from([("create_order".to_owned(), "erp.create_order".to_owned())]);
-        let operations = v2_operations(&[operation], &operation_ids).unwrap();
+        let classifications = BTreeMap::from([(
+            "create_order".to_owned(),
+            OperationClassification {
+                semantic_kind: "command".to_owned(),
+                client_facing: true,
+                idempotency: "non_idempotent".to_owned(),
+                codec: OperationCodec {
+                    id: "spacetimedb-sats-json".to_owned(),
+                    version: 1,
+                },
+                evidence: "fixture classification".to_owned(),
+            },
+        )]);
+        let operations = v2_operations(&[operation], &operation_ids, &classifications).unwrap();
         let operation = &operations[0];
         assert_eq!(operation["contract_operation_id"], "erp.create_order");
         assert_eq!(operation["contract_operation_id_status"], "locked");
-        assert_eq!(operation["kind"]["status"], "unclassified");
+        assert_eq!(operation["kind"]["status"], "classified");
+        assert_eq!(operation["kind"]["value"], "command");
         assert_eq!(operation["source_kind"], "reducer");
         assert_eq!(operation["target"]["kind"], "spacetimedb_reducer");
         assert_eq!(operation["input"]["type_reference"], "CreateOrderParams");
         assert_eq!(operation["output"]["kind"], "unit");
-        assert_eq!(operation["codec"]["status"], "unassigned");
-        assert_eq!(operation["idempotency"]["status"], "unclassified");
+        assert_eq!(operation["codec"]["status"], "assigned");
+        assert_eq!(operation["codec"]["id"], "spacetimedb-sats-json");
+        assert_eq!(operation["idempotency"]["status"], "classified");
+        assert_eq!(operation["authorization"]["status"], "classified");
     }
 
     #[test]
@@ -886,8 +1048,8 @@ mod tests {
         });
         let operation_ids =
             BTreeMap::from([("create_order".to_owned(), "erp.create_order".to_owned())]);
-        let error =
-            v2_operations(&[operation], &operation_ids).expect_err("duplicate positions must fail");
+        let error = v2_operations(&[operation], &operation_ids, &BTreeMap::new())
+            .expect_err("duplicate positions must fail");
         assert!(error
             .to_string()
             .contains("repeats client field position 0"));
@@ -904,6 +1066,59 @@ mod tests {
             .expect_err("missing and stale identity entries must fail");
         assert!(error.to_string().contains("missing=[\"create_order\"]"));
         assert!(error.to_string().contains("stale=[\"stale_order\"]"));
+    }
+
+    #[test]
+    fn operation_classification_requires_exact_census() {
+        let root = std::env::temp_dir().join(format!(
+            "lumiere-operation-classifications-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(
+            root.join("core.json"),
+            r#"{
+              "version": 1,
+              "operations": {
+                "create_order": {
+                  "semantic_kind": "command",
+                  "client_facing": true,
+                  "idempotency": "non_idempotent",
+                  "codec": {"id": "spacetimedb-sats-json", "version": 1},
+                  "evidence": "reviewed reducer body"
+                }
+              }
+            }"#,
+        )
+        .unwrap();
+        let operations = vec![serde_json::json!({"name": "create_order"})];
+        let classifications = operation_classifications(&root, &operations).unwrap();
+        assert_eq!(classifications.len(), 1);
+
+        let missing = vec![
+            serde_json::json!({"name": "create_order"}),
+            serde_json::json!({"name": "cancel_order"}),
+        ];
+        let error = operation_classifications(&root, &missing).unwrap_err();
+        assert!(error.to_string().contains("cancel_order"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn operation_classification_rejects_invalid_policy() {
+        let classification = OperationClassification {
+            semantic_kind: "mutation-ish".to_owned(),
+            client_facing: true,
+            idempotency: "probably".to_owned(),
+            codec: OperationCodec {
+                id: "ad-hoc-json".to_owned(),
+                version: 1,
+            },
+            evidence: String::new(),
+        };
+        let error = validate_operation_classification("create_order", &classification)
+            .expect_err("unknown policy must fail closed");
+        assert!(error.to_string().contains("semantic kind"));
     }
 
     #[test]

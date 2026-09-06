@@ -1,0 +1,3015 @@
+{
+  "operations": {
+    "acknowledge_iot_action": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/actions.rs:278 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "activate_consignment_agreement": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/consignment.rs:37 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "add_article_member": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/knowledge.rs:693 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "add_document_version": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/documents.rs:827 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "add_helpdesk_team_member": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/helpdesk/tickets.rs:310 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "add_member_to_quality_team": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:1448 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "add_rule_to_nomenclature": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/barcode.rs:624 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "apply_document_legal_hold": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/legal_hold.rs:85 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "apply_pending_project_integration_intents": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/psa_advanced.rs:1826 reducer body shows request/idempotency key or intent guard; denied.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "operator"
+    },
+    "apply_project_change_order": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/psa_advanced.rs:912 reducer body shows current-state or membership guard; denied.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "operator"
+    },
+    "apply_project_integration_intent": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/psa_advanced.rs:1735 reducer body shows request/idempotency key or intent guard; denied.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "operator"
+    },
+    "apply_warehouse_sync_intent": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse_sync.rs:244 reducer body shows request/idempotency key or intent guard; session-exposed.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "operator"
+    },
+    "assign_quality_alert": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:900 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "assign_stock_move": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:2669 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "assign_stock_picking": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:3040 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "assign_task_users": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/tasks.rs:1498 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "assign_ticket": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/helpdesk/tickets.rs:741 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "assign_user_to_picking": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:3785 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "block_serial": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/tracking.rs:814 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "block_workcenter": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/work_centers.rs:373 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "cancel_manufacturing_order": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:1145 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "cancel_quality_alert": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:994 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "cancel_stock_move": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:2786 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "cancel_stock_package": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/packing.rs:431 reducer body shows current-state or membership guard; denied.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "internal"
+    },
+    "cancel_stock_picking": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:3717 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "check_mo_availability": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:588 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "claim_hub_with_token": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/registry.rs:192 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "clear_document_presence": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/presence.rs:97 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "clear_inventory_audit_violations": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/audit.rs:255 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "clear_knowledge_article_presence": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/presence.rs:168 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "close_ticket": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/helpdesk/tickets.rs:779 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "complete_document_signature_request": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/esign.rs:153 reducer body shows current-state or membership guard; denied.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "internal"
+    },
+    "complete_picking_wave": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse_operations.rs:551 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "complete_productivity_log": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/work_centers.rs:656 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "compute_bom_cost": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs:962 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "confirm_manufacturing_order": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:534 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "confirm_stock_move": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:2617 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "confirm_stock_package": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/packing.rs:316 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "confirm_stock_picking": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:2970 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "consume_mo_materials": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:717 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "operator"
+    },
+    "create_adjustment_reason": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/inventory_adjustments.rs:555 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_barcode_nomenclature": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/barcode.rs:510 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_barcode_rule": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/barcode.rs:189 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_bom": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs:443 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_cycle_count_plan": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/cycle_count.rs:163 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_document": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/documents.rs:698 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_document_folder": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/documents.rs:583 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_document_signature_request": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/esign.rs:96 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_document_template": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/templates.rs:154 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_fleet_vehicle": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/fleet/fleet.rs:324 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_fleet_vehicle_service_type": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/fleet/fleet.rs:397 reducer body shows append-only insert/event or accumulated side effect; denied.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "internal"
+    },
+    "create_google_drive_connection": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/integrations/google_drive.rs:149 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_helpdesk_sla": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/helpdesk/tickets.rs:438 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_helpdesk_stage": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/helpdesk/tickets.rs:394 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_helpdesk_team": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/helpdesk/tickets.rs:267 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_inventory_adjustment": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/inventory_adjustments.rs:377 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_inventory_close": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/inventory_close.rs:429 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_inventory_integration_intent": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/integration.rs:85 reducer body shows request/idempotency key or intent guard; session-exposed.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "command"
+    },
+    "create_iot_action": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/actions.rs:127 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_iot_alert": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/alerts.rs:153 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_knowledge_article": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/knowledge.rs:305 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_knowledge_category": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/knowledge.rs:188 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_loss_category": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/work_centers.rs:475 reducer body shows append-only insert/event or accumulated side effect; denied.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "internal"
+    },
+    "create_mail_template": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/templates.rs:277 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_manufacturing_order": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:429 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_packaging_material": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse_operations.rs:703 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_picking_wave": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse_operations.rs:247 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_pos_terminal": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/fleet/fleet.rs:587 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_product": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/product.rs:510 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_product_category": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/product_category.rs:99 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_product_packaging": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/product.rs:1169 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_product_supplier_info": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/product.rs:1030 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_product_variant": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/product.rs:898 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_project": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/projects.rs:455 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_project_change_order": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/psa_advanced.rs:841 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_project_integration_intent": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/psa_advanced.rs:1621 reducer body shows request/idempotency key or intent guard; session-exposed.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "command"
+    },
+    "create_project_milestone": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/milestones.rs:150 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_project_rate_card": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/rate_cards.rs:357 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_project_rate_card_line": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/rate_cards.rs:540 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_project_revenue_line": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/psa_advanced.rs:1447 reducer body shows append-only insert/event or accumulated side effect; denied.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "internal"
+    },
+    "create_project_revenue_schedule": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/psa_advanced.rs:1370 reducer body shows append-only insert/event or accumulated side effect; denied.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "internal"
+    },
+    "create_project_task_stage": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/task_stages.rs:76 reducer body shows append-only insert/event or accumulated side effect; denied.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "internal"
+    },
+    "create_public_holiday": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/capacity.rs:803 reducer body shows append-only insert/event or accumulated side effect; denied.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "internal"
+    },
+    "create_quality_alert": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:774 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_quality_alert_reason": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:1050 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_quality_check": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:332 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_quality_point": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:1182 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_quality_team": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:1355 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_replenishment_rule": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/replenishment.rs:559 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_resource_allocation": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/capacity.rs:1036 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_routing_workcenter": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs:873 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_stock_inventory": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/inventory_adjustments.rs:263 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_stock_inventory_line": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/inventory_adjustments.rs:461 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_stock_location": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse.rs:645 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_stock_move": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:2487 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_stock_package": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/packing.rs:186 reducer body shows append-only insert/event or accumulated side effect; denied.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "internal"
+    },
+    "create_stock_picking": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:2874 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_stock_production_lot": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/tracking.rs:328 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_stock_production_serial": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/tracking.rs:553 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_stock_quant": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:1911 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_stock_route": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse.rs:830 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_stock_rule": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse.rs:983 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_task": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/tasks.rs:544 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_ticket": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/helpdesk/tickets.rs:544 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_traceability_record": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/tracking.rs:970 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_traceability_report": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/tracking.rs:1034 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_warehouse": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse.rs:443 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_warehouse_sync_intent": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse_sync.rs:175 reducer body shows request/idempotency key or intent guard; session-exposed.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "command"
+    },
+    "create_warehouse_task": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse_operations.rs:322 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_whatsapp_business_account": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/integrations/whatsapp_business.rs:247 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_workcenter": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/work_centers.rs:213 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "create_working_calendar": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/capacity.rs:664 reducer body shows append-only insert/event or accumulated side effect; denied.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "internal"
+    },
+    "create_workorder": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:1242 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "delete_barcode_nomenclature": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/barcode.rs:707 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_barcode_rule": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/barcode.rs:289 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_bom": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs:717 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_document": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/documents.rs:1098 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_document_folder": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/documents.rs:1513 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_integration": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/integrations/mod.rs:143 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_iot_device": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/registry.rs:649 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_iot_hub": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/registry.rs:597 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_knowledge_article": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/knowledge.rs:820 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_knowledge_category": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/knowledge.rs:908 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_product": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/product.rs:835 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_product_category": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/product_category.rs:234 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_project_milestone": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/milestones.rs:291 reducer body shows current-state or membership guard; denied.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "internal"
+    },
+    "delete_quality_alert_reason": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:1138 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_quality_point": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:1303 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_quality_team": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:1545 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_resource_allocation": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/capacity.rs:1242 reducer body shows current-state or membership guard; denied.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "internal"
+    },
+    "delete_stock_location": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse.rs:773 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_stock_production_lot": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/tracking.rs:444 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_stock_production_serial": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/tracking.rs:852 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_stock_route": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse.rs:933 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_stock_rule": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse.rs:1096 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_warehouse": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse.rs:583 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "delete_whatsapp_business_account": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/integrations/whatsapp_business.rs:856 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "done_stock_move": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:2721 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "done_stock_package": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/packing.rs:363 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "execute_cross_dock": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/cross_dock.rs:147 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "execute_directed_putaway": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/putaway.rs:135 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "execute_replenishment_rule": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/replenishment.rs:746 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "explode_bom": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs:1002 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "fail_iot_action": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/actions.rs:309 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "fail_project_integration_intent": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/psa_advanced.rs:1771 reducer body shows request/idempotency key or intent guard; denied.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "operator"
+    },
+    "fail_quality_check": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:555 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "fail_warehouse_sync_intent": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse_sync.rs:341 reducer body shows request/idempotency key or intent guard; session-exposed.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "operator"
+    },
+    "finish_manufacturing_order": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:905 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "operator"
+    },
+    "finish_workorder": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:1409 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "generate_hub_pairing_token": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/registry.rs:157 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "link_device_to_location": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/integrations.rs:102 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "link_device_to_pos": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/integrations.rs:167 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "link_device_to_quality_check": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/integrations.rs:232 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "link_device_to_workcenter": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/integrations.rs:37 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "link_subcontractor_cost_to_project": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/psa_advanced.rs:1231 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "lock_document": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/documents.rs:980 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "lock_knowledge_article": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/knowledge.rs:535 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "log_timesheet": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/timesheets.rs:414 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "log_workcenter_productivity": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/work_centers.rs:561 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "mark_action_sent": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/actions.rs:232 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "move_stock_quant": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:2312 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "open_quality_alert": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:838 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "pack_moves_into_package": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/packing.rs:226 reducer body shows current-state or membership guard; denied.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "operator"
+    },
+    "pack_stock_picking": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/packing.rs:479 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "pass_quality_check": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:467 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "post_cycle_count_adjustments": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/cycle_count.rs:504 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "process_inventory_adjustment": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/inventory_adjustments.rs:658 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "operator"
+    },
+    "process_pending_scans": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/barcode.rs:474 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "produce_manufacturing_order": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:670 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "purge_expired_documents": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/regional.rs:229 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "queue_mail_from_template": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/templates.rs:414 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "receive_consignment_stock": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/consignment.rs:76 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "recognize_project_revenue": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/psa_advanced.rs:1543 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "record_barcode_scan": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/barcode.rs:338 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "record_cycle_count_line": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/cycle_count.rs:316 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "record_document_view": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/documents.rs:1560 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "record_google_drive_sync": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/integrations/google_drive.rs:316 reducer body shows append-only insert/event or accumulated side effect; denied.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "record_google_drive_sync_error": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/integrations/google_drive.rs:353 reducer body shows append-only insert/event or accumulated side effect; denied.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "record_inventory_integration_result": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/integration.rs:160 reducer body shows request/idempotency key or intent guard; session-exposed.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "operator"
+    },
+    "record_telemetry": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/telemetry.rs:109 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "record_telemetry_batch": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/telemetry.rs:181 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "record_whatsapp_health_check": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/integrations/whatsapp_business.rs:680 reducer body shows append-only insert/event or accumulated side effect; denied.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "record_whatsapp_message_sent": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/integrations/whatsapp_business.rs:661 reducer body shows append-only insert/event or accumulated side effect; denied.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "refresh_capacity_forecast": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/psa_advanced.rs:727 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "refresh_inventory_exceptions": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/exceptions.rs:331 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "refresh_project_earned_value": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/psa_advanced.rs:1161 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "refresh_project_margin": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/project_accounting.rs:777 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "refresh_resource_capacity": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/capacity.rs:1274 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "refresh_resource_utilisation": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/project_accounting.rs:802 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "refresh_sale_order_promise_dates": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/atp_promise.rs:350 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "register_iot_device": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/registry.rs:494 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "register_iot_hub": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/registry.rs:267 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "reject_timesheets": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/timesheets.rs:972 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "release_document_legal_hold": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/legal_hold.rs:156 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "internal"
+    },
+    "release_picking_wave": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse_operations.rs:395 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "remove_article_member": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/knowledge.rs:755 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "remove_helpdesk_team_member": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/helpdesk/tickets.rs:358 reducer body shows current-state or membership guard; denied.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "internal"
+    },
+    "remove_member_from_quality_team": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:1499 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "remove_rule_from_nomenclature": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/barcode.rs:673 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "reopen_inventory_close": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/inventory_close.rs:631 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "reopen_ticket": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/helpdesk/tickets.rs:817 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "reopen_timesheets": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/timesheets.rs:1067 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "reserve_serial": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/tracking.rs:688 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "reserve_stock_quant": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:2077 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "resolve_inventory_audit_violation": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/audit.rs:327 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "resolve_inventory_exception": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/exceptions.rs:376 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "resolve_iot_alert": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/alerts.rs:100 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "restore_document": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/documents.rs:1213 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "restore_product_category": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/product_category.rs:299 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "retry_iot_action": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/actions.rs:331 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "run_cartonization": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse_operations.rs:924 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "run_document_retention_purge": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/regional.rs:272 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "run_helpdesk_sla_check": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/helpdesk/tickets.rs:647 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "run_inventory_close": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/inventory_close.rs:484 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "operator"
+    },
+    "run_inventory_preflight_audit": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/audit.rs:136 reducer body shows current-state or membership guard; denied.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "operator"
+    },
+    "run_traceability_report": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/tracking.rs:1081 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "operator"
+    },
+    "schedule_document_retention_purge": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/regional.rs:263 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "seed_pack_holidays": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/capacity.rs:935 reducer body shows append-only insert/event or accumulated side effect; denied.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "set_article_published": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/knowledge.rs:633 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "set_document_index_content": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/regional.rs:56 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "set_document_retention": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/regional.rs:113 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "set_google_drive_conflict_policy": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/drive_sync.rs:364 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "internal"
+    },
+    "set_iot_threshold": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/telemetry.rs:231 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "set_project_active": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/projects.rs:883 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "set_task_parent": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/tasks.rs:1319 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "set_whatsapp_primary_account": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/integrations/whatsapp_business.rs:753 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "solve_quality_alert": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:940 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "start_cycle_count_session": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/cycle_count.rs:230 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "start_manufacturing_order": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:616 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "start_quality_check": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:413 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "start_timesheet_timer": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/timesheets.rs:514 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "start_workorder": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:1348 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "stop_timesheet_timer": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/timesheets.rs:699 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "sync_external_file_to_document": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/drive_sync.rs:89 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "operator"
+    },
+    "sync_hub_devices": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/registry.rs:360 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "operator"
+    },
+    "test_iot_device": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/actions.rs:200 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "toggle_project_favorite": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/projects.rs:952 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "unblock_workcenter": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/work_centers.rs:423 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "unlink_device": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/integrations.rs:293 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "unlock_document": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/documents.rs:1045 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "unlock_knowledge_article": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/knowledge.rs:589 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "unreserve_stock_quant": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:2140 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_barcode_nomenclature": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/barcode.rs:573 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_barcode_rule": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/barcode.rs:247 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_bom": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs:650 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_device_status": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/registry.rs:549 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "update_document": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/documents.rs:1269 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_document_folder": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/documents.rs:1398 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "update_document_presence": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/presence.rs:78 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_document_template": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/templates.rs:235 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "internal"
+    },
+    "update_fleet_vehicle": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/fleet/fleet.rs:442 reducer body shows current-state or membership guard; denied.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "internal"
+    },
+    "update_google_drive_connection": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/integrations/google_drive.rs:212 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_google_drive_credentials": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/integrations/google_drive.rs:305 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_hub_heartbeat": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/iot/registry.rs:330 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_integration_status": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/integrations/mod.rs:35 reducer body shows current-state or membership guard; denied.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "internal"
+    },
+    "update_knowledge_article": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/knowledge.rs:488 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_knowledge_article_presence": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/presence.rs:147 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "internal"
+    },
+    "update_knowledge_category": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/knowledge.rs:271 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_mail_template": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/templates.rs:356 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "internal"
+    },
+    "update_pos_terminal": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/fleet/fleet.rs:630 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "update_product": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/product.rs:649 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_product_category": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/product_category.rs:192 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_product_inventory_data": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/product.rs:790 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_product_packaging": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/product.rs:1241 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_product_pricing": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/product.rs:727 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_product_supplier_info": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/product.rs:1106 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_product_variant": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/product.rs:984 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_project": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/projects.rs:840 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_project_milestone": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/milestones.rs:258 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "internal"
+    },
+    "update_project_rate_card": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/rate_cards.rs:471 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "internal"
+    },
+    "update_project_rate_card_line": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/rate_cards.rs:670 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "internal"
+    },
+    "update_public_holiday": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/capacity.rs:882 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "internal"
+    },
+    "update_quality_alert_reason": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:1101 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_quality_point": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:1257 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_quality_team": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/quality.rs:1407 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_resource_allocation": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/capacity.rs:1174 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "internal"
+    },
+    "update_stock_inventory_state": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/inventory_adjustments.rs:599 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "update_stock_location": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse.rs:722 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_stock_production_lot": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/tracking.rs:400 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_stock_production_serial": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/tracking.rs:616 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "update_stock_quant_quantity": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:2002 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_stock_route": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse.rs:886 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_stock_rule": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse.rs:1055 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_task": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/tasks.rs:1270 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "update_task_state": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/tasks.rs:810 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "update_ticket": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/helpdesk/tickets.rs:689 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_vehicle_position": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/fleet/fleet.rs:520 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "update_warehouse": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse.rs:526 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_warehouse_task_status": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/warehouse_operations.rs:623 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "update_whatsapp_business_account": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/integrations/whatsapp_business.rs:417 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_whatsapp_credentials": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/integrations/whatsapp_business.rs:472 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_whatsapp_quality_score": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/integrations/whatsapp_business.rs:573 reducer body shows append-only insert/event or accumulated side effect; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "command"
+    },
+    "update_whatsapp_verification_status": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/integrations/whatsapp_business.rs:503 reducer body shows append-only insert/event or accumulated side effect; denied.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "internal"
+    },
+    "update_workcenter": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/work_centers.rs:302 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_working_calendar": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/capacity.rs:757 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "internal"
+    },
+    "upsert_warehouse_geo": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/fleet/fleet.rs:693 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "use_serial": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/tracking.rs:743 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "validate_cycle_count": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/cycle_count.rs:385 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "validate_stock_picking": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:3126 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "validate_stock_picking_backorder": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:3159 reducer body shows current-state or membership guard; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "validate_timesheets": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/projects/timesheets.rs:841 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    }
+  },
+  "version": 1
+}
