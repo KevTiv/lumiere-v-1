@@ -1,6 +1,7 @@
 //! Manifest decoding and prepared-change validation.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::OnceLock;
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{Map, Value};
@@ -16,10 +17,23 @@ use super::{
     ProjectionMode, SequenceDisposition, CHANGE_SCHEMA_VERSION, CONTRACT_VERSION,
 };
 
+static PROJECTION_CODEC_CACHE: OnceLock<Result<BTreeMap<String, ProjectionCodec>, String>> =
+    OnceLock::new();
+
 pub(super) fn validate_commit(
     manifest_json: &str,
     commit: &OrganizationCommitEnvelope,
     changes: &[OrganizationRowChangeInput],
+) -> Result<Vec<PreparedChange>> {
+    validate_commit_with_loader(commit, changes, |table_name| {
+        load_projection_codec(manifest_json, table_name)
+    })
+}
+
+fn validate_commit_with_loader(
+    commit: &OrganizationCommitEnvelope,
+    changes: &[OrganizationRowChangeInput],
+    load_codec: impl Fn(&str) -> Result<ProjectionCodec>,
 ) -> Result<Vec<PreparedChange>> {
     if commit.id != commit_id(commit.organization_id, commit.sequence) {
         bail!("organization commit id does not match organization and sequence");
@@ -60,7 +74,7 @@ pub(super) fn validate_commit(
         {
             bail!("organization row change id does not match commit scope and ordinal");
         }
-        let codec = load_projection_codec(manifest_json, &input.table_name)?;
+        let codec = load_codec(&input.table_name)?;
         let identity = parse_canonical_json(&input.row_identity_json, "row identity")?;
         let identity_object = identity
             .as_object()
@@ -143,6 +157,13 @@ pub(super) fn validate_commit(
     Ok(prepared)
 }
 
+pub(super) fn validate_commit_cached(
+    commit: &OrganizationCommitEnvelope,
+    changes: &[OrganizationRowChangeInput],
+) -> Result<Vec<PreparedChange>> {
+    validate_commit_with_loader(commit, changes, cached_projection_codec)
+}
+
 pub(super) fn validate_full_row(
     codec: &ProjectionCodec,
     identity: &Value,
@@ -207,6 +228,42 @@ pub(super) fn load_projection_codec(
 ) -> Result<ProjectionCodec> {
     let manifest: Value =
         serde_json::from_str(manifest_json).context("parse projection codec manifest")?;
+    projection_codec_from_manifest(&manifest, table_name)
+}
+
+pub(super) fn cached_projection_codec(table_name: &str) -> Result<ProjectionCodec> {
+    let codecs = PROJECTION_CODEC_CACHE.get_or_init(|| {
+        projection_codecs(super::super::projection_worker::PROJECTION_CODEC_MANIFEST_JSON)
+            .map_err(|error| error.to_string())
+    });
+    let codecs = codecs
+        .as_ref()
+        .map_err(|error| anyhow!("cached projection codec manifest is invalid: {error}"))?;
+    codecs
+        .get(table_name)
+        .cloned()
+        .ok_or_else(|| anyhow!("projection codec has no table '{table_name}'"))
+}
+
+pub(super) fn projection_codecs(manifest_json: &str) -> Result<BTreeMap<String, ProjectionCodec>> {
+    let manifest: Value =
+        serde_json::from_str(manifest_json).context("parse projection codec manifest")?;
+    let tables = manifest
+        .get("tables")
+        .and_then(Value::as_object)
+        .context("projection codec manifest lacks tables")?;
+    tables
+        .iter()
+        .filter_map(|(table_name, entry)| {
+            (entry.get("projection_mode").and_then(Value::as_str) != Some("snapshot")).then(|| {
+                projection_codec_from_manifest(&manifest, table_name)
+                    .map(|codec| (table_name.clone(), codec))
+            })
+        })
+        .collect()
+}
+
+fn projection_codec_from_manifest(manifest: &Value, table_name: &str) -> Result<ProjectionCodec> {
     let entry = manifest
         .get("tables")
         .and_then(|tables| tables.get(table_name))
@@ -255,7 +312,7 @@ pub(super) fn load_projection_codec(
     if conventions::validate_identifier(primary_key).is_err() {
         bail!("projection codec has unsafe primary-key identifier");
     }
-    let columns = pg_codec::load_columns(manifest_json, table_name)?;
+    let columns = pg_codec::load_columns_from_manifest(manifest, table_name)?;
     if columns.is_empty() || !columns.iter().any(|column| column.name == primary_key) {
         bail!("projection codec primary key is not present in columns");
     }

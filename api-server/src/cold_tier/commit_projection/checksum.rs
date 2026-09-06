@@ -14,11 +14,15 @@ static LOCKED_OPERATION_IDS: OnceLock<Result<BTreeSet<String>, String>> = OnceLo
 
 #[cfg(test)]
 pub(super) fn projection_plan(change_kinds: &[&str]) -> Vec<String> {
-    let mut plan = vec!["lock_watermark", "insert_commit"]
-        .into_iter()
-        .map(str::to_string)
-        .collect::<Vec<_>>();
-    plan.extend((0..change_kinds.len()).map(|ordinal| format!("insert_change:{ordinal}")));
+    let mut plan = vec![
+        "lock_organization_cursor",
+        "lock_watermark",
+        "insert_commit",
+        "insert_changes_ordered",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect::<Vec<_>>();
     plan.extend((0..change_kinds.len()).map(|ordinal| format!("apply_change:{ordinal}")));
     plan.push("advance_watermark".to_string());
     plan.push("commit".to_string());
