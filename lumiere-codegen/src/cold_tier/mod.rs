@@ -284,7 +284,31 @@ fn emit_ddl(
             .with_context(|| {
                 format!("archive candidates[{index}].cold_table is missing or empty")
             })?;
-        let cfg = pg_ddl_emit::ArchiveCandidateConfig { table, cold_table };
+        let scope = cand["scope"]
+            .as_object()
+            .with_context(|| format!("archive candidates[{index}].scope must be an object"))?;
+        let mut read_path_columns = Vec::new();
+        for role in ["organization_id", "company_id"] {
+            if let Some(column) = scope.get(role).and_then(Value::as_str) {
+                read_path_columns.push(column.to_owned());
+            }
+        }
+        for order in cand["order_by"]
+            .as_array()
+            .with_context(|| format!("archive candidates[{index}].order_by must be an array"))?
+        {
+            let column = order["column"].as_str().with_context(|| {
+                format!("archive candidates[{index}].order_by column is missing")
+            })?;
+            if !read_path_columns.iter().any(|existing| existing == column) {
+                read_path_columns.push(column.to_owned());
+            }
+        }
+        let cfg = pg_ddl_emit::ArchiveCandidateConfig {
+            table,
+            cold_table,
+            read_path_columns,
+        };
         let ddl = pg_ddl_emit::emit_cold_table_ddl(schema_manifest, &cfg)
             .with_context(|| format!("generating DDL for '{table}' → '{cold_table}'"))?;
         let ddl_path = paths.cold_ddl_dir.join(format!("{cold_table}.sql"));
