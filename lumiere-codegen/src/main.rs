@@ -21,6 +21,7 @@ mod erp_org_sql;
 mod frontend_registry;
 mod paths;
 mod query_exec_audit;
+mod read_ir;
 mod reducer_contract;
 mod support;
 
@@ -45,6 +46,7 @@ fn main() -> Result<()> {
     query_exec_audit::run(&paths, &registry_text)?;
     cold_tier::run(&paths)?;
     reducer_contract::run(&paths)?;
+    read_ir::run(&paths)?;
     contract_ir::run(&paths, &registry_text, source_provenance)?;
 
     Ok(())

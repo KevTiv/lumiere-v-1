@@ -166,6 +166,8 @@ fn persistence_contract(paths: &Paths) -> Result<Value> {
     let projection: Value =
         serde_json::from_str(&read_to_string(&paths.projection_codec_manifest_out)?)
             .context("parse generated projection-codec-manifest.json")?;
+    let reads: Value = serde_json::from_str(&read_to_string(&paths.read_descriptor_manifest_out)?)
+        .context("parse generated read-plan-descriptors.json")?;
     Ok(serde_json::json!({
         "schema_version": 1,
         "authority": {
@@ -193,6 +195,7 @@ fn persistence_contract(paths: &Paths) -> Result<Value> {
             "audit_relation": "separate_schema_not_reconstruction_source"
         },
         "storage": storage,
+        "reads": reads,
         "postgresql": {
             "archive": archive,
             "codec": codec,
