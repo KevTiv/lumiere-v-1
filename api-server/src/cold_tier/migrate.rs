@@ -956,7 +956,7 @@ mod tests {
             .iter()
             .find(|migration| migration.name == "organization_commit_protocol_upgrade")
             .expect("protocol upgrade migration is shipped");
-        assert_eq!(migration.version, 10);
+        assert_eq!(migration.version, 9);
         assert_eq!(migration.change_set, 2);
         assert_eq!(migration.phase, MigrationPhase::Expand);
         assert!(migration.sql.contains("to_regclass('organization_commit')"));

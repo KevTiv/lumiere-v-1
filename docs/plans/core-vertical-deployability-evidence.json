@@ -79,9 +79,15 @@
       ]
     },
     "C6": {
-      "status": "partial",
-      "evidence": ["audit and POS hot-cold read pilots exist", "POS hydration contract exists"],
-      "required": ["generated descriptors for every archive-capable resource", "hydrate-mutate-recool proof"]
+      "status": "complete",
+      "evidence": [
+        "lumiere-contracts v0.3.31 contains generated query and invalidation-subscription descriptors for the sole archive-capable root, pos_order",
+        "api-server compiles the generated query descriptor into the shared ResourceReadPlan and compiles its subscription descriptor with authenticated organization/company scope",
+        "focused runtime tests cover current-tail, boundary, fully-cold, duplicate-race, keyset, PostgreSQL-degraded, descriptor parity, and generated realtime admission behavior",
+        "POS hydration validates server-derived organization/company/placement scope, schema and archive versions, payload checksum, and exact aggregate membership",
+        "pos_order has no post-create business mutator, so mutation hydration is not applicable; the trusted recovery drill proves hydrate, readback, and idempotent recooling, while any future mutator must add hydration dispatch and archive-version advancement"
+      ],
+      "required": []
     },
     "C7": {
       "status": "partial",

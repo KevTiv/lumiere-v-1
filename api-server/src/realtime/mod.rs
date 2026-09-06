@@ -144,6 +144,12 @@ mod tests {
     }
 
     #[test]
+    fn generated_cold_resource_is_a_valid_realtime_key() {
+        validate_resources(&["pos-orders".to_string()])
+            .expect("generated invalidation resource must be accepted");
+    }
+
+    #[test]
     fn realtime_authorization_keeps_bootstrap_and_drops_ungranted_domain_resources() {
         let requested = vec!["auth".to_string(), "contacts".to_string()];
         assert_eq!(

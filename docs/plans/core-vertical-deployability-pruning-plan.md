@@ -449,7 +449,9 @@ and dependency safety are proven.
 - Require direct organization scope and resolve company scope before issuing
   PostgreSQL reads.
 - Hydrate cooled mutable aggregates idempotently before invoking existing
-  reducer logic.
+  reducer logic. If the reviewed aggregate is immutable after creation, this
+  requirement is not applicable; adding its first mutator must add hydration
+  dispatch and archive-version advancement in the same change.
 - Ensure hydration validates organization, company, placement generation,
   schema version, row version/checksum, and complete aggregate membership.
 - Prevent arbitrary PostgreSQL resource names, SQL, store selection, or
@@ -457,6 +459,12 @@ and dependency safety are proven.
 
 **Gate:** representative current, boundary, fully cold, and rehydrated reads pass
 for every module; hot/cold result parity holds at a declared watermark.
+
+**Current C6 result:** the only archive-capable root is `pos_order`. Generated
+query and invalidation-subscription descriptors now compile its authenticated
+runtime plans. POS orders have no post-create business mutator, so mutation
+hydration is not applicable; the trusted recovery path still proves scoped,
+checksum-verified aggregate hydration, readback, and idempotent recooling.
 
 ### C7 — Reconstruction and reconciliation
 

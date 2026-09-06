@@ -1,4 +1,4 @@
-//! Trusted cold-tier hydration for mutable aggregates.
+//! Trusted cold-tier hydration for aggregate recovery.
 //!
 //! Hydration is intentionally an API-server operation: Postgres is read only
 //! after the server has resolved the tenant placement, and SpacetimeDB stays
@@ -289,8 +289,10 @@ pub async fn hydrate_pos_order_if_absent(
 }
 
 /// Resolve the server-owned durable placement, load the exact aggregate, and
-/// atomically upsert it into STDB. Business endpoints call this before their
-/// existing reducer when a mutable POS order is no longer hot.
+/// atomically upsert it into STDB. `pos_order` is currently immutable after
+/// creation, so this is an operator/recovery boundary rather than a hidden
+/// prelude to a business mutation. Any future POS-order mutator must call this
+/// boundary before its existing reducer logic and bump `archive_version`.
 ///
 /// The public inputs are identities only. The durable store, table set,
 /// generation, schema, version, checksum, and reducer payload all remain

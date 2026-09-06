@@ -7,7 +7,9 @@ use axum::extract::ws::{Message, WebSocket};
 use serde_json::json;
 
 use crate::error::ApiError;
-use crate::query_exec::{company_ids_for_organization, crm_resource, resolve_crm_company_id};
+use crate::query_exec::{
+    company_ids_for_organization, crm_resource, resolve_crm_company_id, resolve_sales_company_id,
+};
 use crate::session::ApiSession;
 use crate::state::AppState;
 use stdb_auth::{create_client_subscriptions, SubscriptionQueryContext};
@@ -132,9 +134,29 @@ pub(super) async fn handle_realtime_socket(
         .filter(|resource| crm_resource(resource.trim()))
         .cloned()
         .collect();
+    let generated_resource_keys =
+        match crate::cold_tier::read_descriptor::subscription_resource_keys() {
+            Ok(resources) => resources.into_iter().collect::<HashSet<_>>(),
+            Err(error) => {
+                let _ = socket
+                    .send(Message::Text(
+                        json!({ "type": "error", "error": format!("generated subscription descriptors: {error}") })
+                            .to_string(),
+                    ))
+                    .await;
+                return;
+            }
+        };
+    let generated_resources: Vec<String> = resources
+        .iter()
+        .filter(|resource| generated_resource_keys.contains(resource.trim()))
+        .cloned()
+        .collect();
     let non_crm_resources: Vec<String> = resources
         .iter()
-        .filter(|resource| !crm_resource(resource.trim()))
+        .filter(|resource| {
+            !crm_resource(resource.trim()) && !generated_resource_keys.contains(resource.trim())
+        })
         .cloned()
         .collect();
     let mut resolved_crm_company_id = None;
@@ -180,6 +202,45 @@ pub(super) async fn handle_realtime_socket(
                             let _ = socket
                                 .send(Message::Text(
                                     json!({ "type": "error", "error": format!("subscription SQL: {e}") })
+                                        .to_string(),
+                                ))
+                                .await;
+                            return;
+                        }
+                    }
+                }
+            }
+            if !generated_resources.is_empty() {
+                let allowed_company_id = match resolve_sales_company_id(
+                    &session_client,
+                    session_org,
+                    &session.identity_hex,
+                    sub.active_company_id,
+                )
+                .await
+                {
+                    Ok(company_id) => company_id,
+                    Err(_) => {
+                        let _ = socket
+                            .send(Message::Text(
+                                json!({ "type": "error", "error": "activeCompanyId is not permitted for this session" })
+                                    .to_string(),
+                            ))
+                            .await;
+                        return;
+                    }
+                };
+                for resource in &generated_resources {
+                    match crate::cold_tier::read_descriptor::compile_subscription_sql(
+                        resource,
+                        session_org,
+                        Some(allowed_company_id),
+                    ) {
+                        Ok(query) => queries.push(query),
+                        Err(error) => {
+                            let _ = socket
+                                .send(Message::Text(
+                                    json!({ "type": "error", "error": format!("generated subscription descriptor: {error}") })
                                         .to_string(),
                                 ))
                                 .await;

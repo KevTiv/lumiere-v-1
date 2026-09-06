@@ -53,10 +53,14 @@ pub(super) fn subscription_select_all(sql: &str) -> Result<String, ApiError> {
 }
 
 pub(super) fn validate_resources(requested: &[String]) -> Result<(), ApiError> {
-    let allowed: HashSet<String> = subscription_resource_keys_vec()
+    let mut allowed: HashSet<String> = subscription_resource_keys_vec()
         .into_iter()
         .chain(full_client_subscription_resources_vec())
         .collect();
+    allowed.extend(
+        crate::cold_tier::read_descriptor::subscription_resource_keys()
+            .map_err(ApiError::internal)?,
+    );
     for r in requested {
         let t = r.trim();
         if t.is_empty() || !allowed.contains(t) {

@@ -33,6 +33,7 @@ pub mod pg_pool;
 pub mod pos_order_read;
 pub mod projection_observability;
 pub mod projection_worker;
+pub mod read_descriptor;
 pub mod reconciliation;
 pub mod reconstruction;
 
@@ -62,7 +63,12 @@ mod tests {
         ResourceReadPlan {
             resource: "pos-orders".into(),
             table: "pos_order".into(),
-            projection: vec!["id".into(), "organization_id".into(), "status".into()],
+            projection: vec![
+                "id".into(),
+                "organization_id".into(),
+                "company_id".into(),
+                "state".into(),
+            ],
             organization_id: 42,
             company_id: Some(7),
             predicates: vec![],
@@ -156,7 +162,12 @@ mod tests {
     #[test]
     fn projection_cast_suffix_applies_for_pg_and_strips_for_stdb() {
         let mut plan = pos_order_plan();
-        plan.projection = vec!["id::TEXT".into(), "organization_id".into(), "action".into()];
+        plan.projection = vec![
+            "id::TEXT".into(),
+            "organization_id".into(),
+            "company_id".into(),
+            "state".into(),
+        ];
 
         let (pg_sql, _) = compile_pg_sql(&plan).unwrap();
         assert!(pg_sql.contains("\"id\"::TEXT"), "SQL: {pg_sql}");
@@ -170,7 +181,7 @@ mod tests {
     fn inline_stdb_literals_substitutes_in_order() {
         let mut plan = pos_order_plan();
         plan.predicates.push(ReadPredicate::Eq {
-            column: "action".into(),
+            column: "state".into(),
             value: ScalarValue::Text("it's fine".into()),
         });
         let (sql, binds) = compile_stdb_sql(&plan).unwrap();
@@ -201,7 +212,7 @@ mod tests {
     #[test]
     fn arbitrary_projection_cast_is_rejected() {
         let mut plan = pos_order_plan();
-        plan.projection.push("action::JSONB".into());
+        plan.projection.push("metadata::JSONB".into());
         assert!(compile_pg_sql(&plan).is_err());
     }
 

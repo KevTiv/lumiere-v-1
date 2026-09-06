@@ -15,15 +15,12 @@ use stdb_client::StdbClient;
 use crate::error::ApiError;
 
 use super::{
-    cursor, pg_codec, pg_pool, scalar_binds_to_pg, OrderDirection, PageSpec, ReadOrder,
-    ResourceReadPlan, ScalarValue,
+    cursor, pg_codec, pg_pool, scalar_binds_to_pg, OrderDirection, PageSpec, ResourceReadPlan,
+    ScalarValue,
 };
 
 const TABLE: &str = "pos_order";
 const CODEC_MANIFEST_JSON: &str = lumiere_contracts::manifests::CODEC_MANIFEST;
-
-pub const DEFAULT_LIMIT: u32 = 100;
-pub const MAX_LIMIT: u32 = 500;
 
 pub struct Page {
     pub rows: Vec<Value>,
@@ -43,27 +40,23 @@ pub async fn merged_page(
 ) -> Result<Page, ApiError> {
     let columns = pg_codec::load_columns(CODEC_MANIFEST_JSON, TABLE)
         .map_err(|e| ApiError::Internal(format!("load pos_order codec columns: {e}")))?;
-    let projection = pg_codec::projection_with_pg_casts(&columns);
-
-    let limit = limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
-    let fetch_limit = limit.saturating_add(1);
-
-    let order = vec![ReadOrder {
-        column: "id".to_string(),
-        direction: OrderDirection::Desc,
-    }];
-    let plan = ResourceReadPlan {
-        resource: "pos-orders".to_string(),
-        table: TABLE.to_string(),
-        projection,
+    let plan = super::read_descriptor::compile_query_plan(
+        "pos-orders",
         organization_id,
         company_id,
-        predicates: vec![],
-        order,
+        cursor_str,
+        limit,
+        &columns,
+    )
+    .map_err(ApiError::internal)?;
+    let limit = plan.page.limit;
+    let fetch_limit = limit.saturating_add(1);
+    let plan = ResourceReadPlan {
         page: PageSpec {
             limit: fetch_limit,
-            cursor: cursor_str,
+            cursor: plan.page.cursor.clone(),
         },
+        ..plan
     };
 
     let (hot_result, cold_result) =
@@ -153,6 +146,7 @@ async fn query_cold(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cold_tier::ReadOrder;
     use serde_json::json;
 
     const READ_DESCRIPTOR_POLICY_JSON: &str =
@@ -191,7 +185,7 @@ mod tests {
         let descriptor = &policy["descriptors"][0];
         assert_eq!(descriptor["resource"], "pos-orders");
         assert_eq!(descriptor["table"], TABLE);
-        assert_eq!(descriptor["max_limit"], MAX_LIMIT);
+        assert_eq!(descriptor["max_limit"], 500);
         assert_eq!(descriptor["order_by"][0]["column"], "id");
         assert_eq!(descriptor["order_by"][0]["direction"], "desc");
     }
