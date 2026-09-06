@@ -55,14 +55,14 @@ class OwnershipGuardrailTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for relative in CHECKER.REQUIRED_MODULE_FILES:
-                if relative == "api-server/src/cold_tier/audit_read.rs":
+                if relative == "api-server/src/cold_tier/read_descriptor.rs":
                     continue
                 path = root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.touch()
             errors = CHECKER.check_repo(root)
             self.assertIn(
-                "required module owner is missing: api-server/src/cold_tier/audit_read.rs",
+                "required module owner is missing: api-server/src/cold_tier/read_descriptor.rs",
                 errors,
             )
 

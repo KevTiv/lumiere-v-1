@@ -19,9 +19,10 @@ REQUIRED_MODULE_FILES = (
     "api-server/src/realtime/bridge.rs",
     "api-server/src/realtime/socket.rs",
     "api-server/src/realtime/subscription.rs",
-    # Preserve the cold-read owners. Existence does not prove their behavior;
+    # Preserve the generated descriptor and active cold-read owners. Existence
+    # does not prove their behavior;
     # fail-closed merge semantics require separate runtime tests.
-    "api-server/src/cold_tier/audit_read.rs",
+    "api-server/src/cold_tier/read_descriptor.rs",
     "api-server/src/cold_tier/pos_order_read.rs",
 )
 
