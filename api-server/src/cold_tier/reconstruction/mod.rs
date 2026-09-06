@@ -11,6 +11,7 @@ const MAX_DIGEST_ROWS: usize = 100_000;
 
 mod catalog;
 mod coordinator;
+mod coverage;
 mod integrity;
 mod operator;
 mod postgres_source;
@@ -19,7 +20,9 @@ mod stdb_sink;
 
 pub use catalog::{RestoreCatalog, RestoreTable};
 pub use coordinator::{reconstruct_organization, reconstruct_organization_once};
+pub use coverage::{capture_coverage_snapshot, ReconstructionCoverageReport};
 pub use operator::run_organization_reconstruction;
+pub(crate) use stdb_sink::{normalize_stdb_digest_row, stdb_sql_field_name};
 #[cfg(test)]
 #[path = "tests/mod.rs"]
 mod tests;

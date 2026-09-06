@@ -16,7 +16,7 @@ use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::cold_tier::codec_emit::pg_type_for;
+use super::codec_emit::durable_pg_type;
 use crate::cold_tier::schema_ir::{GeneratedTableSchema, LumiereSchemaManifest};
 
 pub const DURABLE_MIGRATION_VERSION: u32 = 1;
@@ -156,18 +156,6 @@ pub(super) fn effective_access_path<'a>(table: &str, requested: &'a str) -> &'a 
         "organization_index"
     } else {
         requested
-    }
-}
-
-fn durable_pg_type<'a>(
-    table: &str,
-    column: &str,
-    ty: &'a crate::cold_tier::schema_ir::GeneratedType,
-) -> &'a str {
-    if table == "organization_row_change" && matches!(column, "row_identity_json" | "row_json") {
-        "JSONB"
-    } else {
-        pg_type_for(ty)
     }
 }
 

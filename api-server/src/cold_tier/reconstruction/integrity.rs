@@ -42,7 +42,12 @@ pub(super) fn validate_rows(
         }
         let current = identity_key(&row.identity, &table.primary_key)?;
         if previous.as_ref().is_some_and(|value| value >= &current) {
-            bail!("restore rows are not in strict primary-key order");
+            bail!(
+                "restore rows for '{}' are not in strict primary-key order: previous={:?}, current={:?}",
+                table.table,
+                previous,
+                current
+            );
         }
         previous = Some(current);
     }

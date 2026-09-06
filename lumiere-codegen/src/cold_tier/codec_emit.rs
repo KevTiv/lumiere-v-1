@@ -242,17 +242,32 @@ fn build_columns(schema: &GeneratedTableSchema) -> Vec<Value> {
         .columns
         .iter()
         .map(|col| {
+            let durable_json = is_durable_json_column(&schema.sql_name, &col.sql_name);
             serde_json::json!({
                 "name": col.name,
                 "stdb_type": format!("{:?}", col.ty),
-                "pg_type": pg_type_for(&col.ty),
+                "pg_type": durable_pg_type(&schema.sql_name, &col.sql_name, &col.ty),
                 "nullable": col.nullable,
-                "pg_bind": pg_bind_fn(&col.ty),
-                "pg_from": pg_from_fn(&col.ty),
-                "api_json": api_json_repr(&col.ty),
+                "pg_bind": if durable_json { "to_sql_jsonb" } else { pg_bind_fn(&col.ty) },
+                "pg_from": if durable_json { "from_sql_jsonb_to_object" } else { pg_from_fn(&col.ty) },
+                "api_json": if durable_json { "object" } else { api_json_repr(&col.ty) },
             })
         })
         .collect()
+}
+
+fn is_durable_json_column(table: &str, column: &str) -> bool {
+    table == "organization_row_change" && matches!(column, "row_identity_json" | "row_json")
+}
+
+/// Resolve deliberate durable-store overrides before falling back to the
+/// canonical SpacetimeDB-to-PostgreSQL type mapping.
+pub(super) fn durable_pg_type<'a>(table: &str, column: &str, ty: &'a GeneratedType) -> &'a str {
+    if is_durable_json_column(table, column) {
+        "JSONB"
+    } else {
+        pg_type_for(ty)
+    }
 }
 
 /// Map a `GeneratedType` to the Postgres DDL type string (must match pg_ddl_emit.rs).
@@ -530,6 +545,61 @@ mod tests {
             emit_projection_codec_manifest(&candidates_json(), &manifest, &missing).unwrap_err();
 
         assert!(error.to_string().contains("audit_log"));
+    }
+
+    #[test]
+    fn projection_protocol_json_columns_match_durable_schema() {
+        let manifest = LumiereSchemaManifest {
+            version: 1,
+            tables: vec![GeneratedTableSchema {
+                rust_name: "OrganizationRowChange".into(),
+                sql_name: "organization_row_change".into(),
+                primary_key: GeneratedPrimaryKey {
+                    column_name: "id".into(),
+                    ty: GeneratedType::U64,
+                },
+                columns: vec![
+                    GeneratedColumn {
+                        name: "id".into(),
+                        sql_name: "id".into(),
+                        ty: GeneratedType::U64,
+                        nullable: false,
+                    },
+                    GeneratedColumn {
+                        name: "row_identity_json".into(),
+                        sql_name: "row_identity_json".into(),
+                        ty: GeneratedType::String,
+                        nullable: false,
+                    },
+                    GeneratedColumn {
+                        name: "row_json".into(),
+                        sql_name: "row_json".into(),
+                        ty: GeneratedType::String,
+                        nullable: true,
+                    },
+                ],
+                indexes: vec![],
+            }],
+            enum_types: vec![],
+        };
+        let policies = projection_policies(&manifest);
+        let out =
+            emit_projection_codec_manifest("{\"candidates\":[]}", &manifest, &policies).unwrap();
+        let parsed: Value = serde_json::from_str(&out).unwrap();
+        let columns = parsed["tables"]["organization_row_change"]["columns"]
+            .as_array()
+            .unwrap();
+
+        for name in ["row_identity_json", "row_json"] {
+            let column = columns
+                .iter()
+                .find(|column| column["name"] == name)
+                .unwrap();
+            assert_eq!(column["pg_type"], "JSONB");
+            assert_eq!(column["pg_bind"], "to_sql_jsonb");
+            assert_eq!(column["pg_from"], "from_sql_jsonb_to_object");
+            assert_eq!(column["api_json"], "object");
+        }
     }
 
     #[test]

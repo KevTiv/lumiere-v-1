@@ -92,15 +92,17 @@ impl ReconstructionSource for PgReconstructionSource {
             (None, _) => String::new(),
             (Some(_), "NUMERIC(20,0)") => {
                 format!(
-                    " AND {} > $2::TEXT::NUMERIC",
+                    " AND source.{} > $2::TEXT::NUMERIC",
                     quote_identifier(&table.primary_key)
                 )
             }
-            (Some(_), "TEXT") => format!(" AND {} > $2", quote_identifier(&table.primary_key)),
+            (Some(_), "TEXT") => {
+                format!(" AND source.{} > $2", quote_identifier(&table.primary_key))
+            }
             (Some(_), other) => bail!("unsupported reconstruction primary key type '{other}'"),
         };
         let sql = format!(
-            "SELECT {projection} FROM {table_name} WHERE {organization_column} = $1::TEXT::NUMERIC{comparison} ORDER BY {primary_key} ASC LIMIT {limit}",
+            "SELECT {projection} FROM {table_name} AS source WHERE source.{organization_column} = $1::TEXT::NUMERIC{comparison} ORDER BY source.{primary_key} ASC LIMIT {limit}",
             table_name = quote_identifier(&table.table),
             organization_column = quote_identifier(&table.organization_column),
             primary_key = quote_identifier(&table.primary_key),

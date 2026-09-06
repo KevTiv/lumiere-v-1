@@ -5,7 +5,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 required=(C7_DISPOSABLE_STDB STDB_HOST STDB_MODULE STDB_RECONSTRUCTION_TOKEN \
-  STDB_RECONSTRUCTION_IDENTITY \
+  STDB_RECONSTRUCTION_READ_TOKEN STDB_RECONSTRUCTION_IDENTITY \
   RECONSTRUCTION_PLACEMENT_GENERATION RECONSTRUCTION_CELL_ID \
   RECONSTRUCTION_DURABLE_STORE_ID RECONSTRUCTION_RUN_ID)
 for name in "${required[@]}"; do
@@ -61,6 +61,15 @@ if [[ "$failure_status" -eq 0 ]] || ! grep -Fq \
 fi
 
 # Resume the exact failed run, then prove a new run does not duplicate rows.
-"${reconstruction_command[@]}" "$organization_id"
-RECONSTRUCTION_RUN_ID="${RECONSTRUCTION_RUN_ID}-repeat" \
+if [[ -n "${C7_RESUME_REPORT:-}" ]]; then
+  "${reconstruction_command[@]}" "$organization_id" | tee "${C7_RESUME_REPORT}"
+else
   "${reconstruction_command[@]}" "$organization_id"
+fi
+if [[ -n "${C7_REPEAT_REPORT:-}" ]]; then
+  RECONSTRUCTION_RUN_ID="${RECONSTRUCTION_RUN_ID}-repeat" \
+    "${reconstruction_command[@]}" "$organization_id" | tee "${C7_REPEAT_REPORT}"
+else
+  RECONSTRUCTION_RUN_ID="${RECONSTRUCTION_RUN_ID}-repeat" \
+    "${reconstruction_command[@]}" "$organization_id"
+fi

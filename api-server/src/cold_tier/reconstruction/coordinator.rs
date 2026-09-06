@@ -19,6 +19,7 @@ use stdb_client::StdbClient;
 /// whole-organization PG/STDB reconciliation succeeds.
 pub async fn reconstruct_organization_once(
     stdb: &StdbClient,
+    read_stdb: &StdbClient,
     pool: &Pool,
     target: &OrganizationPlacement,
     requested: DurableWatermark,
@@ -30,7 +31,7 @@ pub async fn reconstruct_organization_once(
     let organization_id = target.organization_id();
     let placement_generation = target.generation().get();
     let source = PgReconstructionSource::new(pool.clone());
-    let sink = StdbReconstructionSink::new(stdb, pool, run_id, placement_generation)?;
+    let sink = StdbReconstructionSink::new(stdb, read_stdb, pool, run_id, placement_generation)?;
     let catalog = RestoreCatalog::generated()?;
     match reconstruct_organization(
         &source,

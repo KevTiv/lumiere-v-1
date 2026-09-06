@@ -34,12 +34,12 @@ pub(super) fn parse_canonical_json(text: &str, label: &str) -> Result<Value> {
     Ok(value)
 }
 
-pub(super) fn canonical_json(value: &Value) -> Result<String> {
+pub(crate) fn canonical_json(value: &Value) -> Result<String> {
     serde_json::to_string(&super::super::conventions::canonicalize_json(value))
         .context("serialize canonical JSON")
 }
 
-pub(super) fn change_checksum(table: &str, identity: &str, kind: &str, row: &str) -> String {
+pub(crate) fn change_checksum(table: &str, identity: &str, kind: &str, row: &str) -> String {
     sha256_hex(format!("{table}\n{identity}\n{kind}\n{row}").as_bytes())
 }
 
@@ -47,6 +47,17 @@ pub(super) fn commit_checksum(
     commit: &OrganizationCommitEnvelope,
     changes: &[PreparedChange],
 ) -> String {
+    commit_checksum_from_changes(
+        commit,
+        changes.iter().map(|change| change.input.checksum.as_str()),
+    )
+}
+
+pub(crate) fn commit_checksum_from_changes<'a>(
+    commit: &OrganizationCommitEnvelope,
+    change_checksums: impl IntoIterator<Item = &'a str>,
+) -> String {
+    let change_checksums = change_checksums.into_iter().collect::<Vec<_>>();
     let fields = [
         commit.organization_id.to_string(),
         commit.sequence.to_string(),
@@ -56,7 +67,7 @@ pub(super) fn commit_checksum(
         commit.contract_version.clone(),
         commit.occurred_at_micros.to_string(),
         commit.actor_identity_hex.clone(),
-        changes.len().to_string(),
+        change_checksums.len().to_string(),
     ];
     let mut digest = Sha256::new();
     for field in fields {
@@ -64,8 +75,8 @@ pub(super) fn commit_checksum(
         digest.update(b":");
         digest.update(field.as_bytes());
     }
-    for change in changes {
-        digest.update(change.input.checksum.as_bytes());
+    for checksum in change_checksums {
+        digest.update(checksum.as_bytes());
     }
     hex::encode(digest.finalize())
 }

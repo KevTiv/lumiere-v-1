@@ -31,6 +31,7 @@ struct SourceTable {
     rust_path: String,
     rust_type: String,
     accessor: String,
+    primary_key_auto_inc: bool,
 }
 
 struct SourceFile {
@@ -119,6 +120,36 @@ pub(crate) fn apply_generated_reconstruction_row(
 }
 
 fn emit_arm(table: &Table, source: &SourceTable) -> String {
+    let insert = if source.primary_key_auto_inc {
+        format!(
+            r#"                let desired_id = row.{primary_key};
+                loop {{
+                    let spacetimedb_sats::serde::SerdeWrapper(candidate) =
+                        serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<{rust_type}>>(row_json)
+                            .map_err(|error| format!("invalid canonical row JSON for {table_name}: {{error}}"))?;
+                    let inserted = rows.insert({rust_type} {{
+                        {primary_key}: 0,
+                        ..candidate
+                    }});
+                    if inserted.{primary_key} == desired_id {{
+                        break Ok(GeneratedApplyOutcome::Inserted);
+                    }}
+                    let generated_id = inserted.{primary_key};
+                    rows.{primary_key}().delete(&generated_id);
+                    if generated_id > desired_id {{
+                        break Err(format!(
+                            "reconstruction sequence for {table_name} advanced past restored primary key {{desired_id}}"
+                        ));
+                    }}
+                }}"#,
+            primary_key = table.primary_key,
+            rust_type = source.rust_type,
+            table_name = table.table,
+        )
+    } else {
+        "                rows.insert(row);\n                Ok(GeneratedApplyOutcome::Inserted)"
+            .to_string()
+    };
     format!(
         r#"        {table_name:?} => {{
             use crate::{rust_path}::{{{accessor} as _, {rust_type}}};
@@ -144,8 +175,7 @@ fn emit_arm(table: &Table, source: &SourceTable) -> String {
                     Err("reconstruction primary-key conflict with different row data".to_string())
                 }}
             }} else {{
-                rows.insert(row);
-                Ok(GeneratedApplyOutcome::Inserted)
+{insert}
             }}
         }},
 "#,
@@ -155,6 +185,7 @@ fn emit_arm(table: &Table, source: &SourceTable) -> String {
         rust_type = source.rust_type,
         organization_column = table.organization_column,
         primary_key = table.primary_key,
+        insert = insert,
     )
 }
 
@@ -166,7 +197,10 @@ fn locate_table_source(table: &Table, root: &Path, files: &[SourceFile]) -> Resu
                 || canonical_name(&accessor) == canonical_name(&table.table)
                 || canonical_name(&rust_type) == canonical_name(&table.rust_type)
             {
-                matches.push((&file.path, accessor, rust_type));
+                let primary_key_auto_inc = file
+                    .compact
+                    .contains(&format!("#[auto_inc]pub{}:", table.primary_key));
+                matches.push((&file.path, accessor, rust_type, primary_key_auto_inc));
             }
         }
     }
@@ -182,6 +216,7 @@ fn locate_table_source(table: &Table, root: &Path, files: &[SourceFile]) -> Resu
         rust_path: module_path(root, matches[0].0)?,
         accessor: matches[0].1.clone(),
         rust_type: matches[0].2.clone(),
+        primary_key_auto_inc: matches[0].3,
     })
 }
 
@@ -324,5 +359,27 @@ mod tests {
             declared_tables(&compact),
             vec![("iot_action".to_string(), "IoTAction".to_string())]
         );
+    }
+
+    #[test]
+    fn emits_sequence_consuming_restore_for_auto_increment_primary_key() {
+        let root = std::env::temp_dir().join(format!(
+            "lumiere-reconstruction-sequence-{}",
+            std::process::id()
+        ));
+        let module = root.join("workflow");
+        fs::create_dir_all(&module).unwrap();
+        fs::write(
+            module.join("runtime.rs"),
+            "#[spacetimedb::table(accessor = workflow_instance)]\npub struct WorkflowInstance { #[primary_key] #[auto_inc] pub id: u64, pub organization_id: u64 }",
+        )
+        .unwrap();
+        let manifest = r#"{"version":1,"tables":[{"table":"workflow_instance","rust_type":"WorkflowInstance","stdb_table_accessor":"workflow_instance","organization_column":"organization_id","primary_key":"id","restore_order":1}]}"#;
+        let output = emit_reconstruction_apply(manifest, &root).unwrap();
+        assert!(output.contains("let desired_id = row.id;"));
+        assert!(output.contains("SerdeWrapper(candidate)"));
+        assert!(output.contains("id: 0,"));
+        assert!(output.contains("rows.id().delete(&generated_id);"));
+        let _ = fs::remove_dir_all(root);
     }
 }

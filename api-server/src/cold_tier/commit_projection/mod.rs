@@ -9,6 +9,7 @@ mod sql;
 mod tests;
 
 pub use apply::apply_commit;
+pub(crate) use checksum::{canonical_json, change_checksum, commit_checksum_from_changes};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrganizationCommitEnvelope {

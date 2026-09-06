@@ -17,6 +17,7 @@ use stdb_config::{
 };
 
 const RECONSTRUCTION_TOKEN_ENV: &str = "STDB_RECONSTRUCTION_TOKEN";
+const RECONSTRUCTION_READ_TOKEN_ENV: &str = "STDB_RECONSTRUCTION_READ_TOKEN";
 const RECONSTRUCTION_IDENTITY_ENV: &str = "STDB_RECONSTRUCTION_IDENTITY";
 const PLACEMENT_GENERATION_ENV: &str = "RECONSTRUCTION_PLACEMENT_GENERATION";
 const CELL_ID_ENV: &str = "RECONSTRUCTION_CELL_ID";
@@ -38,10 +39,11 @@ pub async fn run_organization_reconstruction(organization_id: u64) -> Result<Rec
         .context("resolve exact durable reconstruction watermark")?;
     let target = settings.target(organization_id)?;
     let stdb = StdbClient::new(settings.stdb_host, settings.stdb_module, settings.token);
+    let read_stdb = stdb.with_token(settings.read_token);
     let run_id = configured_run_id(organization_id)?;
     eprintln!("starting C7 reconstruction run {run_id}");
     ensure_reconstructor_binding(&stdb, organization_id, &settings.identity).await?;
-    reconstruct_organization_once(&stdb, &pool, &target, watermark, run_id).await
+    reconstruct_organization_once(&stdb, &read_stdb, &pool, &target, watermark, run_id).await
 }
 
 async fn ensure_reconstructor_binding(
@@ -115,6 +117,7 @@ struct ReconstructionSettings {
     stdb_host: String,
     stdb_module: String,
     token: String,
+    read_token: String,
     identity: String,
     cell_id: CellId,
     durable_store: DurableStoreId,
@@ -129,6 +132,10 @@ impl ReconstructionSettings {
         let stdb_module = env_stdb_module_or_next_public()
             .context("STDB_MODULE or NEXT_PUBLIC_STDB_MODULE is required")?;
         let token = required_env(RECONSTRUCTION_TOKEN_ENV)?;
+        let read_token = required_env(RECONSTRUCTION_READ_TOKEN_ENV)?;
+        if token == read_token {
+            bail!("STDB_RECONSTRUCTION_READ_TOKEN must be distinct from the reconstructor token");
+        }
         if std::env::var("STDB_SERVER_TOKEN").ok().as_deref() == Some(token.as_str()) {
             bail!("STDB_RECONSTRUCTION_TOKEN must be distinct from STDB_SERVER_TOKEN");
         }
@@ -139,6 +146,7 @@ impl ReconstructionSettings {
             stdb_host,
             stdb_module,
             token,
+            read_token,
             identity: normalize_identity(&required_env(RECONSTRUCTION_IDENTITY_ENV)?)?,
             cell_id: CellId::new(required_env(CELL_ID_ENV)?)?,
             durable_store: DurableStoreId::new(required_env(DURABLE_STORE_ID_ENV)?)?,

@@ -20,6 +20,7 @@ use stdb_client::{ReducerCall, StdbClient};
 /// run identity used by every reducer call.
 pub struct StdbReconstructionSink<'a> {
     stdb: &'a StdbClient,
+    read_stdb: &'a StdbClient,
     pool: &'a Pool,
     run_id: String,
     placement_generation: u64,
@@ -30,11 +31,16 @@ pub struct StdbReconstructionSink<'a> {
 impl<'a> StdbReconstructionSink<'a> {
     pub fn new(
         stdb: &'a StdbClient,
+        read_stdb: &'a StdbClient,
         pool: &'a Pool,
         run_id: impl Into<String>,
         placement_generation: u64,
     ) -> Result<Self> {
         require_server_identity(stdb)?;
+        require_server_identity(read_stdb)?;
+        if stdb.token() == read_stdb.token() {
+            bail!("reconstruction reducer and verification identities must be distinct");
+        }
         let run_id = run_id.into();
         validate_run_id(&run_id)?;
         if placement_generation == 0 {
@@ -49,6 +55,7 @@ impl<'a> StdbReconstructionSink<'a> {
         )?;
         Ok(Self {
             stdb,
+            read_stdb,
             pool,
             run_id,
             placement_generation,
@@ -158,7 +165,7 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
         )?;
         let projection = columns
             .iter()
-            .map(|column| quote_identifier(&column.name))
+            .map(|column| quote_identifier(stdb_sql_field_name(&column.name)))
             .collect::<Vec<_>>()
             .join(", ");
         let sql = format!(
@@ -168,12 +175,16 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
             fence.organization_id,
             MAX_DIGEST_ROWS + 1,
         );
-        let rows = self.stdb.query_sql(&sql).await.with_context(|| {
+        let rows = self.read_stdb.query_sql_sats(&sql).await.with_context(|| {
             format!("read STDB reconstruction digest relation '{}'", table.table)
         })?;
         if rows.len() > MAX_DIGEST_ROWS {
             bail!("STDB reconstruction digest exceeds bounded row limit");
         }
+        let rows = rows
+            .into_iter()
+            .map(|row| normalize_stdb_digest_row(&columns, row))
+            .collect::<Result<Vec<_>>>()?;
         digest_rows(&rows)
     }
 
@@ -197,7 +208,7 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
 
     async fn verify_before_release(&self, fence: &ReconstructionFence) -> Result<()> {
         let report = reconciliation::reconcile_organization(
-            self.stdb,
+            self.read_stdb,
             self.pool,
             fence.organization_id,
             fence.watermark.sequence,
@@ -244,9 +255,167 @@ fn canonical_stdb_row_json(columns: &[pg_codec::ColumnCodec], row: &Value) -> Re
         let value = source
             .get(&api_key)
             .with_context(|| format!("reconstruction row lacks generated column '{api_key}'"))?;
-        stdb_row.insert(column.name.clone(), value.clone());
+        stdb_row.insert(
+            rust_field_name(&column.name).to_owned(),
+            durable_value_to_sats(column, value)?,
+        );
     }
     canonical_json(&Value::Object(stdb_row))
+}
+
+fn rust_field_name(column_name: &str) -> &str {
+    match column_name {
+        "cost_per_1_k_tokens" => "cost_per_1k_tokens",
+        "iso_3" => "iso3",
+        "kpi_1_month_mrr" => "kpi_1month_mrr",
+        "kpi_3_months_mrr" => "kpi_3months_mrr",
+        "kpi_12_months_mrr" => "kpi_12months_mrr",
+        "normalized_e_164" => "normalized_e164",
+        "ref" => "ref_",
+        "show_lots_m_2_o" => "show_lots_m2o",
+        "street_2" => "street2",
+        "type" => "type_",
+        name => name,
+    }
+}
+
+pub(crate) fn stdb_sql_field_name(column_name: &str) -> &str {
+    match column_name {
+        "cost_per_1_k_tokens" => "cost_per_1k_tokens",
+        "iso_3" => "iso3",
+        "kpi_1_month_mrr" => "kpi_1month_mrr",
+        "kpi_3_months_mrr" => "kpi_3months_mrr",
+        "kpi_12_months_mrr" => "kpi_12months_mrr",
+        "normalized_e_164" => "normalized_e164",
+        "show_lots_m_2_o" => "show_lots_m2o",
+        "street_2" => "street2",
+        name => name,
+    }
+}
+
+pub(crate) fn normalize_stdb_digest_row(
+    columns: &[pg_codec::ColumnCodec],
+    row: Value,
+) -> Result<Value> {
+    let mut source = row
+        .as_object()
+        .cloned()
+        .context("STDB reconstruction digest row must be an object")?;
+    let mut durable = serde_json::Map::new();
+    for column in columns {
+        let durable_key = pg_codec::snake_to_camel(&column.name);
+        let stdb_key = stdb_sql_field_name(&column.name);
+        let value = source.remove(stdb_key).with_context(|| {
+            format!("STDB reconstruction digest row lacks generated column '{stdb_key}'")
+        })?;
+        durable.insert(durable_key, canonical_sats_to_durable(column, value)?);
+    }
+    Ok(Value::Object(durable))
+}
+
+fn canonical_sats_to_durable(column: &pg_codec::ColumnCodec, value: Value) -> Result<Value> {
+    let value = if column.nullable {
+        let object = value
+            .as_object()
+            .context("nullable STDB digest value must be a canonical SATS Option")?;
+        if object.len() != 1 {
+            bail!("nullable STDB digest value must have one SATS Option variant");
+        }
+        if object.contains_key("none") {
+            return Ok(Value::Null);
+        }
+        object
+            .get("some")
+            .cloned()
+            .context("nullable STDB digest value lacks some/none variant")?
+    } else {
+        value
+    };
+
+    if column.pg_type == "JSONB" && column.stdb_type == "String" {
+        let json = value
+            .as_str()
+            .context("canonical STDB protocol JSON digest value must be a string")?;
+        return serde_json::from_str(json).context("parse canonical STDB protocol JSON digest");
+    }
+
+    match column.stdb_type.as_str() {
+        "Identity" => {
+            let identity = value
+                .get("__identity__")
+                .and_then(Value::as_str)
+                .context("canonical STDB Identity digest value is malformed")?;
+            Ok(Value::String(identity.trim_start_matches("0x").to_owned()))
+        }
+        "Timestamp" => {
+            let micros = value
+                .get("__timestamp_micros_since_unix_epoch__")
+                .and_then(Value::as_i64)
+                .context("canonical STDB Timestamp digest value is malformed")?;
+            Ok(json!({"microsSinceUnixEpoch": micros}))
+        }
+        kind if kind.starts_with("Enum(") => {
+            let object = value
+                .as_object()
+                .context("canonical STDB enum digest value must be an object")?;
+            if object.len() != 1 {
+                bail!("canonical STDB enum digest value must contain one variant");
+            }
+            Ok(Value::String(
+                object
+                    .keys()
+                    .next()
+                    .expect("length checked above")
+                    .to_owned(),
+            ))
+        }
+        _ => Ok(value),
+    }
+}
+
+fn durable_value_to_sats(column: &pg_codec::ColumnCodec, value: &Value) -> Result<Value> {
+    let value = if value.is_null() {
+        Value::Null
+    } else if column.pg_type == "JSONB" && column.stdb_type == "String" {
+        Value::String(
+            serde_json::to_string(value).context("serialize durable protocol JSON for STDB")?,
+        )
+    } else {
+        match column.stdb_type.as_str() {
+            "Identity" => {
+                let identity = value
+                    .as_str()
+                    .context("durable Identity must be a hexadecimal string")?;
+                json!({"__identity__": format!("0x{}", identity.trim_start_matches("0x"))})
+            }
+            "Timestamp" => {
+                let micros = value
+                    .get("microsSinceUnixEpoch")
+                    .or_else(|| value.get("__timestamp_micros_since_unix_epoch__"))
+                    .and_then(Value::as_i64)
+                    .context("durable Timestamp must contain signed microseconds")?;
+                json!({"__timestamp_micros_since_unix_epoch__": micros})
+            }
+            kind if kind.starts_with("Enum(") => {
+                let variant = value
+                    .as_str()
+                    .context("durable enum must be stored as its variant name")?;
+                json!({pg_codec::stdb_enum_variant(variant): []})
+            }
+            _ => value.clone(),
+        }
+    };
+    if column.nullable {
+        if value.is_null() {
+            Ok(json!({"none": []}))
+        } else {
+            Ok(json!({"some": value}))
+        }
+    } else if value.is_null() {
+        bail!("non-nullable durable value is null for '{}'", column.name)
+    } else {
+        Ok(value)
+    }
 }
 
 fn failure_injection_enabled(
@@ -269,9 +438,12 @@ fn failure_injection_enabled(
 
 #[cfg(test)]
 mod tests {
-    use super::{canonical_stdb_row_json, failure_injection_enabled};
+    use super::{
+        canonical_sats_to_durable, canonical_stdb_row_json, durable_value_to_sats,
+        failure_injection_enabled, normalize_stdb_digest_row, rust_field_name, stdb_sql_field_name,
+    };
     use crate::cold_tier::pg_codec;
-    use serde_json::json;
+    use serde_json::{json, Value};
 
     #[test]
     fn failure_injection_is_disposable_and_loopback_only() {
@@ -301,5 +473,128 @@ mod tests {
         )
         .unwrap();
         assert_eq!(encoded, r#"{"next_sequence":"2","organization_id":"42"}"#);
+    }
+
+    #[test]
+    fn durable_scalars_restore_canonical_sats_wrappers() {
+        let nullable_enum = pg_codec::ColumnCodec {
+            name: "state".to_owned(),
+            pg_type: "TEXT".to_owned(),
+            stdb_type: "Enum(\"State\")".to_owned(),
+            nullable: true,
+        };
+        assert_eq!(
+            durable_value_to_sats(&nullable_enum, &json!("Posted")).unwrap(),
+            json!({"some": {"Posted": []}})
+        );
+        assert_eq!(pg_codec::stdb_enum_variant("none"), "None");
+        assert_eq!(
+            durable_value_to_sats(&nullable_enum, &Value::Null).unwrap(),
+            json!({"none": []})
+        );
+
+        let timestamp = pg_codec::ColumnCodec {
+            name: "created_at".to_owned(),
+            pg_type: "BIGINT".to_owned(),
+            stdb_type: "Timestamp".to_owned(),
+            nullable: false,
+        };
+        assert_eq!(
+            durable_value_to_sats(&timestamp, &json!({"microsSinceUnixEpoch": 42})).unwrap(),
+            json!({"__timestamp_micros_since_unix_epoch__": 42})
+        );
+    }
+
+    #[test]
+    fn protocol_jsonb_round_trips_through_stdb_string() {
+        let protocol_json = pg_codec::ColumnCodec {
+            name: "row_identity_json".to_owned(),
+            pg_type: "JSONB".to_owned(),
+            stdb_type: "String".to_owned(),
+            nullable: false,
+        };
+        let durable = json!({"id": 42});
+        let sats = durable_value_to_sats(&protocol_json, &durable).unwrap();
+        assert_eq!(sats, json!(r#"{"id":42}"#));
+        assert_eq!(
+            canonical_sats_to_durable(&protocol_json, sats).unwrap(),
+            durable
+        );
+    }
+
+    #[test]
+    fn reconstruction_escapes_generated_rust_keyword_fields() {
+        assert_eq!(rust_field_name("type"), "type_");
+        assert_eq!(rust_field_name("ref"), "ref_");
+        assert_eq!(stdb_sql_field_name("type"), "type");
+        assert_eq!(rust_field_name("organization_id"), "organization_id");
+    }
+
+    #[test]
+    fn reconstruction_maps_generated_digit_boundary_names() {
+        for (generated, stdb) in [
+            ("cost_per_1_k_tokens", "cost_per_1k_tokens"),
+            ("iso_3", "iso3"),
+            ("kpi_1_month_mrr", "kpi_1month_mrr"),
+            ("kpi_3_months_mrr", "kpi_3months_mrr"),
+            ("kpi_12_months_mrr", "kpi_12months_mrr"),
+            ("normalized_e_164", "normalized_e164"),
+            ("show_lots_m_2_o", "show_lots_m2o"),
+            ("street_2", "street2"),
+        ] {
+            assert_eq!(rust_field_name(generated), stdb);
+            assert_eq!(stdb_sql_field_name(generated), stdb);
+        }
+    }
+
+    #[test]
+    fn reconstruction_digest_normalizes_identity_to_durable_hex() {
+        let columns = vec![pg_codec::ColumnCodec {
+            name: "create_uid".to_owned(),
+            pg_type: "BYTEA".to_owned(),
+            stdb_type: "Identity".to_owned(),
+            nullable: true,
+        }];
+        assert_eq!(
+            normalize_stdb_digest_row(
+                &columns,
+                json!({"create_uid": {"some": {"__identity__": format!("0x{}", "ab".repeat(32))}}}),
+            )
+            .unwrap(),
+            json!({"createUid": "ab".repeat(32)})
+        );
+        assert_eq!(
+            normalize_stdb_digest_row(&columns, json!({"create_uid": {"none": []}})).unwrap(),
+            json!({"createUid": null})
+        );
+    }
+
+    #[test]
+    fn reconstruction_digest_maps_stdb_digit_boundary_to_durable_name() {
+        let columns = vec![pg_codec::ColumnCodec {
+            name: "cost_per_1_k_tokens".to_owned(),
+            pg_type: "DOUBLE PRECISION".to_owned(),
+            stdb_type: "F64".to_owned(),
+            nullable: false,
+        }];
+        assert_eq!(
+            normalize_stdb_digest_row(&columns, json!({"cost_per_1k_tokens": 0.003})).unwrap(),
+            json!({"costPer1KTokens": 0.003})
+        );
+    }
+
+    #[test]
+    fn reconstruction_digest_preserves_nested_canonical_sats() {
+        let columns = vec![pg_codec::ColumnCodec {
+            name: "user_ids".to_owned(),
+            pg_type: "JSONB".to_owned(),
+            stdb_type: "Vec(Identity)".to_owned(),
+            nullable: false,
+        }];
+        let identities = json!([{"__identity__": format!("0x{}", "cd".repeat(32))}]);
+        assert_eq!(
+            normalize_stdb_digest_row(&columns, json!({"user_ids": identities.clone()})).unwrap(),
+            json!({"userIds": identities})
+        );
     }
 }

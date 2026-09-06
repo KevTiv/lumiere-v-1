@@ -105,11 +105,13 @@
         "C7-R1 reconstruction and C7-R2 placement focused tests pass",
         "trusted operator-only reconstruction resolves placement configuration and the exact PostgreSQL sequence plus commit checksum without an HTTP/session route",
         "lumiere-contracts v0.3.32 classifies 458 relations for restore and five target-local relations for recreation, including privileged service bindings",
-        "the 2026-09-06 disposable PostgreSQL 14.20 to SpacetimeDB 2.8.2 drill injected a post-commit failure, resumed the same run, repeated with a fresh run ID, and verified 458 table digests without duplicate rows"
+        "the 2026-09-06 disposable PostgreSQL 14.20 to SpacetimeDB 2.8.2 all-module drill populated all 22 enabled modules across 202 source tables and 1710 rows, including relationship identifiers, totals, audit links, idempotency records, and an activity delete tombstone",
+        "the all-module drill injected a post-commit failure, resumed the same run, repeated all 458 restored table digests with a fresh run ID, verified the exact sequence/checksum watermark, recreated five target-local relations, and retained 934 idempotent batch receipts",
+        "generated restore dispatch advances all 445 auto-increment sequences while recreating exact persisted IDs, preventing post-recovery identifier collisions",
+        "after reconstruction, sale order 2 continued from draft to sale and purchase order 2 continued from draft to purchase; duplicate confirmations were rejected by state guards with workflow-instance and stock-picking counts unchanged"
       ],
       "required": [
-        "repeat the real drill with representative persisted rows from every enabled module, including deletes, relationships, totals, audit links, and idempotency records",
-        "continue lead-to-cash and procure-to-pay after reconstruction"
+        "publish and pin the next immutable lumiere-contracts release containing the corrected durable JSONB codec metadata"
       ]
     },
     "C8": {

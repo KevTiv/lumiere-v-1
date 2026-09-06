@@ -15,6 +15,7 @@ use sha2::{Digest, Sha256};
 use stdb_client::StdbClient;
 
 use super::pg_codec::{self, ColumnCodec};
+use super::reconstruction::{normalize_stdb_digest_row, stdb_sql_field_name};
 
 const PROJECTION_CODEC_MANIFEST_JSON: &str =
     lumiere_contracts::manifests::PROJECTION_CODEC_MANIFEST;
@@ -138,7 +139,7 @@ pub async fn reconcile_organization(
         let stdb_projection = relation
             .columns
             .iter()
-            .map(|column| quote_identifier(&column.name))
+            .map(|column| quote_identifier(stdb_sql_field_name(&column.name)))
             .collect::<Vec<_>>()
             .join(", ");
         let stdb_sql = format!(
@@ -149,9 +150,12 @@ pub async fn reconcile_organization(
             limit = MAX_ROWS_PER_TABLE + 1,
         );
         let stdb_values = stdb
-            .query_sql(&stdb_sql)
+            .query_sql_sats(&stdb_sql)
             .await
-            .with_context(|| format!("read STDB reconciliation relation '{}'", relation.table))?;
+            .with_context(|| format!("read STDB reconciliation relation '{}'", relation.table))?
+            .into_iter()
+            .map(|row| normalize_stdb_digest_row(&relation.columns, row))
+            .collect::<Result<Vec<_>>>()?;
         if stdb_values.len() > MAX_ROWS_PER_TABLE {
             bail!(
                 "STDB reconciliation relation '{}' exceeds the bounded row limit {}",

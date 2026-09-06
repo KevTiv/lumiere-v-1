@@ -54,15 +54,23 @@ pub fn load_columns(codec_manifest_json: &str, table: &str) -> Result<Vec<Column
 
     cols.iter()
         .map(|c| {
+            let name = c["name"]
+                .as_str()
+                .ok_or_else(|| anyhow!("codec-manifest.json: column missing 'name'"))?;
+            let mut pg_type = c["pg_type"]
+                .as_str()
+                .ok_or_else(|| anyhow!("codec-manifest.json: column missing 'pg_type'"))?;
+            // These C2 protocol fields are strings in STDB but canonical
+            // JSONB in the durable PostgreSQL schema. Older pinned codec
+            // manifests omitted that deliberate storage override.
+            if table == "organization_row_change"
+                && matches!(name, "row_identity_json" | "row_json")
+            {
+                pg_type = "JSONB";
+            }
             Ok(ColumnCodec {
-                name: c["name"]
-                    .as_str()
-                    .ok_or_else(|| anyhow!("codec-manifest.json: column missing 'name'"))?
-                    .to_string(),
-                pg_type: c["pg_type"]
-                    .as_str()
-                    .ok_or_else(|| anyhow!("codec-manifest.json: column missing 'pg_type'"))?
-                    .to_string(),
+                name: name.to_string(),
+                pg_type: pg_type.to_string(),
                 stdb_type: c["stdb_type"]
                     .as_str()
                     .ok_or_else(|| anyhow!("codec-manifest.json: column missing 'stdb_type'"))?
@@ -158,9 +166,23 @@ fn read_pg_column(col: &ColumnCodec, row: &Row, i: usize) -> Result<Value> {
         }
         "TEXT" => {
             let s: Option<String> = row.try_get(i)?;
-            s.map(Value::String).unwrap_or(Value::Null)
+            s.map(|value| {
+                if col.stdb_type.starts_with("Enum(") {
+                    Value::String(stdb_enum_variant(&value))
+                } else {
+                    Value::String(value)
+                }
+            })
+            .unwrap_or(Value::Null)
         }
         other => anyhow::bail!("unhandled pg_type '{other}' on read"),
+    })
+}
+
+pub(crate) fn stdb_enum_variant(variant: &str) -> String {
+    let mut chars = variant.chars();
+    chars.next().map_or_else(String::new, |first| {
+        first.to_uppercase().collect::<String>() + chars.as_str()
     })
 }
 
@@ -613,6 +635,28 @@ mod tests {
             "coldEligibleAt": { "microsSinceUnixEpoch": 1_781_987_714_525_004_i64 },
             "archiveVersion": 1,
         })
+    }
+
+    #[test]
+    fn protocol_json_columns_use_durable_jsonb_override() {
+        let manifest = r#"{
+          "tables": {
+            "organization_row_change": {
+              "columns": [
+                {"name":"row_identity_json","pg_type":"TEXT","stdb_type":"String","nullable":false},
+                {"name":"row_json","pg_type":"TEXT","stdb_type":"String","nullable":true}
+              ]
+            }
+          }
+        }"#;
+        let columns = load_columns(manifest, "organization_row_change").unwrap();
+        assert!(columns.iter().all(|column| column.pg_type == "JSONB"));
+    }
+
+    #[test]
+    fn enum_variant_names_use_rust_casing() {
+        assert_eq!(stdb_enum_variant("none"), "None");
+        assert_eq!(stdb_enum_variant("Posted"), "Posted");
     }
 
     #[test]

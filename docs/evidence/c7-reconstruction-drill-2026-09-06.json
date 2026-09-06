@@ -1,37 +1,92 @@
 {
   "gate": "C7",
   "date": "2026-09-06",
-  "source_commit": "f57f919cc974d3ca04aa683046e7b16b0f8b66b4",
+  "source_revision": "this evidence file's containing commit",
   "contracts_release": "v0.3.32",
   "runtime": {
     "spacetimedb": "2.8.2",
     "target": "disposable local database",
     "postgresql": "14.20 disposable local cluster",
-    "organization_id": 42,
+    "organization_id": 1,
     "placement_generation": 1,
-    "watermark_sequence": 1,
-    "watermark_commit_checksum": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "watermark_sequence": 2,
+    "watermark_commit_checksum": "a6aa2998c8e74667bcb5854d36dcd426e1da41db759cdb590209febee3869cd5"
   },
   "fixture": {
-    "business_rows": 1,
-    "protocol_rows": 1,
-    "business_tables": ["account_account"],
-    "protocol_tables": ["organization_commit_cursor"]
+    "enabled_modules": 22,
+    "populated_tables": 202,
+    "source_rows": 1710,
+    "projection_commits": 2,
+    "projected_row_changes": 1713,
+    "relationship_values": 3541,
+    "total_values": 208,
+    "audit_rows": 667,
+    "durable_idempotency_records": 1715,
+    "deleted_row": { "table": "activity", "id": 1 },
+    "module_row_counts": {
+      "accounting": 98,
+      "ai": 42,
+      "analytics": 12,
+      "core": 719,
+      "crm": 24,
+      "data_ops": 1,
+      "documents": 6,
+      "expenses": 1,
+      "fleet": 1,
+      "forms": 3,
+      "helpdesk": 8,
+      "hr": 36,
+      "integrations": 2,
+      "inventory": 36,
+      "iot": 2,
+      "manufacturing": 15,
+      "projects": 14,
+      "proposals": 6,
+      "purchasing": 5,
+      "sales": 13,
+      "subscriptions": 3,
+      "workflow": 663
+    }
   },
-  "results": {
+  "reconstruction": {
     "committed_failure_injected": true,
     "same_run_resumed": true,
     "fresh_run_repeated": true,
+    "resume_run_id": "c7-all-modules-20260906-sequences",
+    "repeat_run_id": "c7-all-modules-20260906-sequences-repeat",
     "restored_tables": 458,
-    "restored_rows": 2,
     "recreated_tables": 5,
     "excluded_tables": 0,
     "counts_and_checksums_verified": true,
-    "duplicate_rows_observed": false
+    "deleted_row_absent": true,
+    "delete_tombstone_present": true,
+    "batch_receipts": 934,
+    "separate_reconstructor_and_read_identities": true
+  },
+  "workflow_continuation": {
+    "lead_to_cash": {
+      "sale_order_id": 2,
+      "before": "draft",
+      "after": "sale",
+      "first_call_succeeded": true
+    },
+    "procure_to_pay": {
+      "purchase_order_id": 2,
+      "before": "draft",
+      "after": "purchase",
+      "first_call_succeeded": true
+    },
+    "duplicate_calls_rejected_by_state_guard": true,
+    "workflow_instance_count_before_and_after_duplicate_calls": 1,
+    "stock_picking_count_before_and_after_duplicate_calls": 1
+  },
+  "results": {
+    "all_module_drill_passed": true,
+    "workflow_continuation_passed": true,
+    "auto_increment_sequences_advanced_during_restore": true,
+    "duplicate_effects_observed": false
   },
   "remaining_acceptance": [
-    "repeat with representative persisted rows from every enabled module",
-    "include deleted rows, relationship identifiers, totals, audit links, and idempotency records",
-    "continue lead-to-cash and procure-to-pay after reconstruction"
+    "publish and pin the next immutable lumiere-contracts release containing the corrected durable JSONB codec metadata"
   ]
 }
