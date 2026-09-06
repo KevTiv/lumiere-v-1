@@ -117,6 +117,7 @@ struct SubscriptionCensus {
 #[serde(rename_all = "camelCase")]
 struct SubscriptionCensusEntry {
     resource: String,
+    source: SubscriptionCensusSource,
     scope: String,
     delivery_mode: String,
     predicate_class: String,
@@ -126,6 +127,12 @@ struct SubscriptionCensusEntry {
     source_class: String,
     reconnect_class: String,
     access_path: Value,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SubscriptionCensusSource {
+    table: String,
 }
 
 pub fn run(
@@ -185,6 +192,10 @@ pub fn run(
         &subscription_census,
         &subscription_query_policies.resources,
     )?;
+    write_file(
+        &paths.query_row_map_ts_out,
+        &emit_query_row_map(&resources, &base.tables, &base.types, &subscription_census)?,
+    )?;
     let persistence = persistence_contract(paths)?;
     let semantic = SemanticContract {
         operations: &operations,
@@ -212,7 +223,76 @@ pub fn run(
     )?;
     println!("Wrote {}", paths.contract_ir_out.display());
     println!("Wrote {}", paths.contract_ir_checksum_out.display());
+    println!("Wrote {}", paths.query_row_map_ts_out.display());
     Ok(())
+}
+
+fn emit_query_row_map(
+    resources: &[Value],
+    tables: &[Value],
+    types: &[IndexedType],
+    subscription_census: &SubscriptionCensus,
+) -> Result<String> {
+    let mut rows = BTreeMap::new();
+    for resource in resources {
+        let name = value_name(resource, "resource")?;
+        let row_type = resource
+            .get("row")
+            .and_then(|row| row.get("type_reference"))
+            .and_then(Value::as_str)
+            .with_context(|| format!("resource {name} has no row type reference"))?;
+        rows.insert(name, row_type);
+    }
+    let type_names_by_index = types
+        .iter()
+        .map(|item| (item.index, item.names.as_slice()))
+        .collect::<BTreeMap<_, _>>();
+    let mut row_type_by_table = BTreeMap::new();
+    for table in tables {
+        let table_name = value_name(table, "table")?;
+        let type_index = table
+            .get("product_type_ref")
+            .and_then(Value::as_u64)
+            .with_context(|| format!("table {table_name} has no product_type_ref"))?
+            as usize;
+        let names = type_names_by_index
+            .get(&type_index)
+            .with_context(|| format!("table {table_name} references unknown type {type_index}"))?;
+        if names.len() != 1 {
+            bail!("table {table_name} must resolve to exactly one named row type");
+        }
+        row_type_by_table.insert(table_name, names[0].as_str());
+    }
+    for entry in &subscription_census.entries {
+        if rows.contains_key(entry.resource.as_str()) {
+            continue;
+        }
+        if let Some(row_type) = row_type_by_table.get(entry.source.table.as_str()) {
+            rows.insert(entry.resource.as_str(), *row_type);
+        }
+    }
+    let imports = rows.values().copied().collect::<BTreeSet<_>>();
+    let mut output = String::from(
+        "/** @generated from canonical contract IR v2. Do not edit. */\nimport type {\n",
+    );
+    for row_type in imports {
+        output.push_str("  ");
+        output.push_str(row_type);
+        output.push_str(",\n");
+    }
+    output.push_str("} from \"./types\"\n\nexport interface QueryRowMap {\n");
+    for (name, row_type) in rows {
+        output.push_str("  ");
+        output.push_str(&serde_json::to_string(name)?);
+        output.push_str(": ");
+        output.push_str(row_type);
+        output.push_str("\n");
+    }
+    output.push_str(
+        "}\n\nexport type QueryRowResourceKey = keyof QueryRowMap\n\n\
+         export type QueryRowFor<K extends QueryRowResourceKey> = QueryRowMap[K]\n",
+    );
+    Ok(output)
 }
 
 fn persistence_contract(paths: &Paths) -> Result<Value> {
@@ -1488,6 +1568,9 @@ mod tests {
             schema_version: 1,
             entries: vec![SubscriptionCensusEntry {
                 resource: "orders".to_owned(),
+                source: SubscriptionCensusSource {
+                    table: "sale_order".to_owned(),
+                },
                 scope: "organization+company".to_owned(),
                 delivery_mode: "invalidation-only".to_owned(),
                 predicate_class: "none".to_owned(),

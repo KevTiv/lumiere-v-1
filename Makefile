@@ -970,6 +970,7 @@ check-c2-commit-coverage:
 check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-policy check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals
 	@git add -N \
 		frontend/packages/stdb/src/query-resource-row-type.json \
+		frontend/packages/stdb/src/query-row-map.ts \
 		frontend/packages/stdb/src/generated/org-subscription-descriptors.ts \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
@@ -977,6 +978,7 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 		2>/dev/null || true
 	@git diff --exit-code -- \
 		frontend/packages/stdb/src/query-resource-row-type.json \
+		frontend/packages/stdb/src/query-row-map.ts \
 		frontend/packages/stdb/src/generated/org-subscription-descriptors.ts \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
@@ -992,6 +994,7 @@ check-codegen-pinned: check-operation-history check-release-compatibility check-
 	node scripts/bootstrap-storage-policies.mjs --check
 	@git diff --exit-code -- \
 		frontend/packages/stdb/src/query-resource-row-type.json \
+		frontend/packages/stdb/src/query-row-map.ts \
 		frontend/packages/stdb/src/generated/org-subscription-descriptors.ts \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \

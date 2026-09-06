@@ -4,38 +4,16 @@ import { useMemo } from "react"
 
 import {
   mapOrgPermissionRowsToPolicyRules,
-  type BackendOrgPermissionRow,
 } from "@lumiere/ui"
 import type { PolicyRule } from "@lumiere/ui"
 import { useStdbQuery, useStdbReducer } from "@lumiere/query-hooks/hooks/stdb"
+import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
 
-export interface PolicySnapshotRow {
-  id?: number | string
-  organizationId?: number
-  organization_id?: number
-  userIdentity?: string
-  user_identity?: string
-  roleId?: number
-  role_id?: number
-  roleName?: string
-  role_name?: string
-  rolePermissions?: string[]
-  role_permissions?: string[]
-  orgPermissionGrants?: unknown[]
-  org_permission_grants?: unknown[]
-  fieldPermissions?: unknown[]
-  field_permissions?: unknown[]
-  isSuperuser?: boolean
-  is_superuser?: boolean
-  versionHash?: string
-  version_hash?: string
-  refreshedAt?: unknown
-  refreshed_at?: unknown
-}
-
-function readVersionHash(row: PolicySnapshotRow | undefined): string | undefined {
+function readVersionHash(
+  row: QueryRowFor<"policy-snapshots"> | undefined,
+): string | undefined {
   if (!row) return undefined
-  const hash = row.versionHash ?? row.version_hash
+  const hash = row.versionHash
   return typeof hash === "string" && hash.length > 0 ? hash : undefined
 }
 
@@ -67,10 +45,10 @@ export function usePolicySnapshot(
   const refreshSnapshot = useStdbReducer("refresh_policy_snapshot")
 
   const orgPolicyRules = useMemo<PolicyRule[]>(() => {
-    return mapOrgPermissionRowsToPolicyRules(orgPermissions as BackendOrgPermissionRow[])
+    return mapOrgPermissionRowsToPolicyRules(orgPermissions)
   }, [orgPermissions])
 
-  const snapshot = (snapshots[0] ?? undefined) as PolicySnapshotRow | undefined
+  const snapshot = snapshots[0]
   const versionHash = readVersionHash(snapshot)
 
   return {

@@ -1,11 +1,4 @@
-/**
- * @generated from query-resource-row-type.json (lumiere-codegen). Do not edit by hand;
- * re-run `make codegen` and regenerate this file's import/map body instead.
- *
- * Resources without a generated row type (or whose codegen-reported type name no
- * longer resolves — see `STALE_ROW_TYPE_RESOURCES` in lumiere-codegen output) fall
- * back to `Record<string, unknown>` via `QueryRowFor`.
- */
+/** @generated from canonical contract IR v2. Do not edit. */
 import type {
   AccountAccount,
   AccountAccountType,
@@ -33,12 +26,14 @@ import type {
   AiAgent,
   AiDocumentProcessingJob,
   AiInsight,
+  AiReducerAllowlist,
   AiSkill,
   AiTeamMember,
   AiTeamMemberSkill,
   AmortizationLine,
   AmortizationSchedule,
   AnalyticsMetric,
+  AssignmentRule,
   AuditLog,
   AuditRule,
   BankMatchCandidate,
@@ -46,6 +41,7 @@ import type {
   BarcodeRule,
   BudgetPost,
   CalendarEvent,
+  CapacityForecastSnapshot,
   CartonizationResult,
   CommodityPriceIndex,
   Company,
@@ -54,8 +50,21 @@ import type {
   ConsolidationEliminationEntry,
   ConsolidationJournal,
   Contact,
+  ContactCategory,
+  ContactCategoryAssignment,
+  ContactCommunicationPreference,
+  ContactDuplicateCandidate,
+  ContactPhoneIdentity,
+  ContactRelationship,
+  ContactRelationshipInsight,
+  ContactRoleAssignment,
   ContactSegment,
+  ContactSegmentRule,
   ContactTag,
+  ContactTagAssignment,
+  CrmConversation,
+  CrmConversationMessage,
+  CrmForecastSnapshot,
   CrossoveredBudget,
   CrossoveredBudgetLines,
   Dashboard,
@@ -69,33 +78,59 @@ import type {
   DeliveryPriceRule,
   Document,
   DocumentFolder,
+  DocumentTemplate,
+  DocumentVersion,
   ExpenseCardStatementLine,
   FieldPermission,
   FinancialReport,
   FleetVehicle,
   FormConfig,
   FormConfigField,
+  FormFieldLabel,
   FormRoleConfig,
   FxRevaluationRun,
   HelpdeskSla,
   HelpdeskStage,
   HelpdeskTeam,
   HelpdeskTicket,
+  HrApplicant,
+  HrAttendance,
+  HrBenefitEnrollment,
+  HrBenefitPlan,
+  HrCapacityForecast,
+  HrCompensationEvent,
   HrContract,
   HrDepartment,
   HrEmployee,
+  HrEmployeeDocument,
+  HrEmployeeSkill,
   HrExpense,
   HrExpenseAdvance,
+  HrExpenseMileageRate,
+  HrExpensePerDiemRate,
   HrExpensePolicyException,
   HrExpenseReceipt,
   HrExpenseSheet,
+  HrGlobalAssignment,
+  HrIntegrationIntent,
   HrJobPosition,
+  HrLaborCostSnapshot,
   HrLeave,
   HrLeaveType,
+  HrOnboardingProgress,
+  HrOnboardingTemplate,
+  HrOnboardingTemplateItem,
   HrPayrollStructure,
   HrPayslip,
+  HrPerformanceCycle,
+  HrPerformanceGoal,
+  HrPerformanceReview,
   HrResource,
   HrSalaryRule,
+  HrShiftOptJob,
+  HrSkill,
+  HrStatutoryId,
+  HrWorkSchedule,
   ImportJob,
   IntercompanyRule,
   IntercompanyTransaction,
@@ -112,30 +147,59 @@ import type {
   KnowledgeArticle,
   KnowledgeArticleCategory,
   Lead,
+  LeadLostReason,
+  LeadScore,
+  LeadScoreFactor,
+  LeadSource,
   MailFollower,
   MailMessage,
+  MailTemplate,
+  MessageBatch,
+  MessageTemplate,
   MrpBom,
   MrpBomLine,
   MrpProduction,
   MrpRoutingWorkcenter,
   MrpWorkcenter,
   MrpWorkorder,
+  OperationalMessage,
   Opportunity,
+  OpportunityLine,
+  OpportunityPresence,
   OpportunityStage,
+  OrgPermission,
   PackagingMaterial,
   PartnerCreditControl,
+  PaymentAccount,
+  PaymentFee,
+  PaymentReconciliation,
+  PaymentReversal,
+  PaymentTransaction,
   PickingWave,
+  PolicySnapshot,
   PosConfig,
   PosLoyaltyCard,
   PosLoyaltyProgram,
   PosPaymentMethod,
   PosSession,
   PosTerminal,
+  PrivacyConsent,
   Product,
   ProductCategory,
   ProductPricelist,
   ProductPricelistItem,
+  ProjectBaseline,
+  ProjectChangeOrder,
+  ProjectEarnedValueSnapshot,
+  ProjectIntegrationIntent,
+  ProjectMarginSnapshot,
+  ProjectMilestone,
   ProjectProject,
+  ProjectRateCard,
+  ProjectRateCardLine,
+  ProjectRevenueLine,
+  ProjectRevenueSchedule,
+  ProjectSubcontractorCost,
   ProjectTask,
   ProjectTimesheet,
   Proposal,
@@ -153,6 +217,7 @@ import type {
   ProposalSourceDoc,
   ProposalTemplate,
   ProposalVersion,
+  PublicHoliday,
   PurchaseApprovalDelegate,
   PurchaseBlanketOrder,
   PurchaseBlanketOrderLine,
@@ -162,12 +227,22 @@ import type {
   PurchaseOrderLine,
   PurchaseRequisition,
   PurchaseRequisitionLine,
+  PurchaseReturn,
+  PurchaseReturnLine,
+  PurchaseRfq,
+  PurchaseRfqBid,
+  PurchaseRfqLine,
   PurchasingIntegrationIntent,
   QualityAlert,
   QualityCheck,
+  QualityTeam,
+  RecordCustomFieldValue,
   ReplenishmentRule,
   ReportTemplate,
   ResPartnerBank,
+  ResourceAllocation,
+  ResourceCapacitySnapshot,
+  ResourceUtilisationSnapshot,
   ReturnOrder,
   ReturnOrderLine,
   RevenueRecognitionRule,
@@ -175,7 +250,9 @@ import type {
   SaleCommission,
   SaleOrder,
   SaleOrderLine,
+  SavedReport,
   ScheduledReport,
+  SegmentMember,
   SerialLotTraceability,
   ShippingMethod,
   SodConflictRule,
@@ -195,9 +272,21 @@ import type {
   StockRule,
   StockTraceabilityReport,
   Subscription,
+  SubscriptionAmendment,
   SubscriptionBillingRun,
+  SubscriptionBundle,
+  SubscriptionBundleItem,
+  SubscriptionCollection,
+  SubscriptionCommitment,
+  SubscriptionEntitlement,
   SubscriptionLine,
+  SubscriptionPaymentIntent,
   SubscriptionPlan,
+  SubscriptionPriceIndex,
+  SubscriptionPriceTier,
+  SubscriptionTaxSettleIntent,
+  SubscriptionUsageCharge,
+  SubscriptionUsageEvent,
   SupplierIntakeRequest,
   TaxDeadline,
   TaxJurisdiction,
@@ -219,7 +308,11 @@ import type {
   WarehouseSyncIntent,
   WarehouseTask,
   Workflow,
+  WorkflowEdge,
   WorkflowInstance,
+  WorkflowNode,
+  WorkflowVersion,
+  WorkingCalendar,
 } from "./types"
 
 export interface QueryRowMap {
@@ -241,6 +334,7 @@ export interface QueryRowMap {
   "ai-agents": AiAgent
   "ai-document-processing-jobs": AiDocumentProcessingJob
   "ai-insights": AiInsight
+  "ai-reducer-allowlist": AiReducerAllowlist
   "ai-skills": AiSkill
   "ai-team-member-skills": AiTeamMemberSkill
   "ai-team-members": AiTeamMember
@@ -250,28 +344,49 @@ export interface QueryRowMap {
   "analytic-distribution-models": AccountAnalyticDistributionModel
   "analytic-lines": AccountAnalyticLine
   "analytics-metrics": AnalyticsMetric
+  "applicants": HrApplicant
+  "assignment-rules": AssignmentRule
+  "attendance": HrAttendance
   "audit-log": AuditLog
   "audit-rules": AuditRule
+  "auth-role-table": Role
   "bank-match-candidates": BankMatchCandidate
   "bank-statement-lines": AccountBankStatementLine
   "bank-statements": AccountBankStatement
   "barcode-nomenclatures": BarcodeNomenclature
   "barcode-rules": BarcodeRule
+  "benefit-enrollments": HrBenefitEnrollment
+  "benefit-plans": HrBenefitPlan
   "budget-lines": CrossoveredBudgetLines
   "budget-posts": BudgetPost
   "budgets": CrossoveredBudget
   "calendar-events": CalendarEvent
+  "capacity-forecast-by-employee": CapacityForecastSnapshot
   "cartonization-results": CartonizationResult
   "commodity-price-indexes": CommodityPriceIndex
   "companies": Company
+  "compensation-events": HrCompensationEvent
   "consignment-agreements": ConsignmentAgreement
   "consolidation-accounts": ConsolidationAccount
   "consolidation-elimination-entries": ConsolidationEliminationEntry
   "consolidation-journals": ConsolidationJournal
+  "contact-categories": ContactCategory
+  "contact-category-assignments": ContactCategoryAssignment
+  "contact-communication-preferences": ContactCommunicationPreference
+  "contact-duplicate-candidates": ContactDuplicateCandidate
+  "contact-phone-identities": ContactPhoneIdentity
+  "contact-relationship-insights": ContactRelationshipInsight
+  "contact-relationships": ContactRelationship
+  "contact-role-assignments": ContactRoleAssignment
+  "contact-segment-rules": ContactSegmentRule
   "contact-segments": ContactSegment
+  "contact-tag-assignments": ContactTagAssignment
   "contact-tags": ContactTag
   "contacts": Contact
   "contracts": HrContract
+  "crm-conversation-messages": CrmConversationMessage
+  "crm-conversations": CrmConversation
+  "crm-forecast-snapshots": CrmForecastSnapshot
   "dashboard-widgets": DashboardWidget
   "dashboards": Dashboard
   "data-classification-rules": DataClassificationRule
@@ -283,15 +398,24 @@ export interface QueryRowMap {
   "delivery-price-rules": DeliveryPriceRule
   "departments": HrDepartment
   "depreciation-lines": AccountAssetDepreciationLine
+  "direct-reports": HrEmployee
   "document-folders": DocumentFolder
+  "document-templates": DocumentTemplate
+  "document-versions": DocumentVersion
   "documents": Document
+  "documents-deleted": Document
+  "employee-documents": HrEmployeeDocument
   "employees": HrEmployee
   "expense-advances": HrExpenseAdvance
   "expense-card-statement-unmatched": ExpenseCardStatementLine
+  "expense-mileage-rates": HrExpenseMileageRate
+  "expense-per-diem-rates": HrExpensePerDiemRate
   "expense-policy-exceptions": HrExpensePolicyException
   "expense-receipts": HrExpenseReceipt
   "expense-sheets": HrExpenseSheet
+  "expense-sheets-to-approve": HrExpenseSheet
   "expenses": HrExpense
+  "expenses-missing-receipt": HrExpense
   "field-permissions": FieldPermission
   "financial-reports": FinancialReport
   "fiscal-years": AccountFiscalYear
@@ -299,13 +423,20 @@ export interface QueryRowMap {
   "fleet-vehicles": FleetVehicle
   "form-config-fields": FormConfigField
   "form-configs": FormConfig
+  "form-field-labels": FormFieldLabel
   "form-role-configs": FormRoleConfig
   "fx-revaluation-runs": FxRevaluationRun
+  "global-assignments": HrGlobalAssignment
   "helpdesk-slas": HelpdeskSla
   "helpdesk-stages": HelpdeskStage
   "helpdesk-teams": HelpdeskTeam
   "helpdesk-tickets": HelpdeskTicket
+  "hr-capacity-forecast": HrCapacityForecast
+  "hr-employee-skills": HrEmployeeSkill
+  "hr-integration-intents": HrIntegrationIntent
   "hr-resources": HrResource
+  "hr-skills": HrSkill
+  "hr-statutory-ids": HrStatutoryId
   "import-jobs": ImportJob
   "intercompany-rules": IntercompanyRule
   "intercompany-transactions": IntercompanyTransaction
@@ -325,29 +456,56 @@ export interface QueryRowMap {
   "job-positions": HrJobPosition
   "knowledge-articles": KnowledgeArticle
   "knowledge-categories": KnowledgeArticleCategory
+  "labor-cost-snapshots": HrLaborCostSnapshot
   "landed-cost-lines": StockLandedCostLines
   "landed-costs": StockLandedCost
+  "lead-lost-reasons": LeadLostReason
+  "lead-score-factors": LeadScoreFactor
+  "lead-scores": LeadScore
+  "lead-sources": LeadSource
   "leads": Lead
   "leave-requests": HrLeave
   "leave-types": HrLeaveType
+  "leaves-to-approve": HrLeave
   "mail-followers": MailFollower
   "mail-messages": MailMessage
+  "mail-templates": MailTemplate
+  "message-batches": MessageBatch
+  "message-templates": MessageTemplate
   "mrp-bom-lines": MrpBomLine
   "mrp-boms": MrpBom
   "mrp-productions": MrpProduction
   "mrp-routing-workcenters": MrpRoutingWorkcenter
   "mrp-workcenters": MrpWorkcenter
   "mrp-workorders": MrpWorkorder
+  "my-employee": HrEmployee
+  "onboarding-progress": HrOnboardingProgress
+  "onboarding-template-items": HrOnboardingTemplateItem
+  "onboarding-templates": HrOnboardingTemplate
+  "operational-messages": OperationalMessage
   "opportunities": Opportunity
+  "opportunity-lines": OpportunityLine
+  "opportunity-presence": OpportunityPresence
   "opportunity-stages": OpportunityStage
+  "org-permissions": OrgPermission
   "packaging-materials": PackagingMaterial
   "partner-banks": ResPartnerBank
   "partner-credit-controls": PartnerCreditControl
   "partner-credit-holds": PartnerCreditControl
+  "payment-accounts": PaymentAccount
+  "payment-fees": PaymentFee
+  "payment-reconciliations": PaymentReconciliation
+  "payment-reversals": PaymentReversal
+  "payment-transactions": PaymentTransaction
   "payroll-structures": HrPayrollStructure
   "payslips": HrPayslip
+  "payslips-to-export": HrPayslip
+  "performance-cycles": HrPerformanceCycle
+  "performance-goals": HrPerformanceGoal
+  "performance-reviews": HrPerformanceReview
   "picking-batches": StockPickingBatch
   "picking-waves": PickingWave
+  "policy-snapshots": PolicySnapshot
   "pos-configs": PosConfig
   "pos-loyalty-cards": PosLoyaltyCard
   "pos-loyalty-programs": PosLoyaltyProgram
@@ -356,8 +514,20 @@ export interface QueryRowMap {
   "pos-terminals": PosTerminal
   "pricelist-items": ProductPricelistItem
   "pricelists": ProductPricelist
+  "privacy-consent": PrivacyConsent
   "product-categories": ProductCategory
   "products": Product
+  "project-baselines": ProjectBaseline
+  "project-change-orders": ProjectChangeOrder
+  "project-earned-value-by-project": ProjectEarnedValueSnapshot
+  "project-integration-intents": ProjectIntegrationIntent
+  "project-margin-by-project": ProjectMarginSnapshot
+  "project-milestones": ProjectMilestone
+  "project-rate-card-lines": ProjectRateCardLine
+  "project-rate-cards": ProjectRateCard
+  "project-revenue-lines": ProjectRevenueLine
+  "project-revenue-schedules": ProjectRevenueSchedule
+  "project-subcontractor-costs": ProjectSubcontractorCost
   "projects": ProjectProject
   "proposal-analyses": ProposalAnalysis
   "proposal-bid-decisions": ProposalBidDecision
@@ -374,6 +544,7 @@ export interface QueryRowMap {
   "proposal-templates": ProposalTemplate
   "proposal-versions": ProposalVersion
   "proposals": Proposal
+  "public-holidays": PublicHoliday
   "purchase-approval-delegates": PurchaseApprovalDelegate
   "purchase-blanket-order-lines": PurchaseBlanketOrderLine
   "purchase-blanket-orders": PurchaseBlanketOrder
@@ -386,11 +557,21 @@ export interface QueryRowMap {
   "purchase-orders-to-approve": PurchaseOrder
   "purchase-requisition-lines": PurchaseRequisitionLine
   "purchase-requisitions": PurchaseRequisition
+  "purchase-return-lines": PurchaseReturnLine
+  "purchase-returns": PurchaseReturn
+  "purchase-rfq-bids": PurchaseRfqBid
+  "purchase-rfq-lines": PurchaseRfqLine
+  "purchase-rfqs": PurchaseRfq
   "purchasing-integration-intents": PurchasingIntegrationIntent
   "quality-alerts": QualityAlert
   "quality-checks": QualityCheck
+  "quality-teams": QualityTeam
+  "record-custom-field-values": RecordCustomFieldValue
   "replenishment-rules": ReplenishmentRule
   "report-templates": ReportTemplate
+  "resource-allocations": ResourceAllocation
+  "resource-capacity-by-employee": ResourceCapacitySnapshot
+  "resource-utilisation-by-employee": ResourceUtilisationSnapshot
   "return-order-lines": ReturnOrderLine
   "return-orders": ReturnOrder
   "revenue-recognition-rules": RevenueRecognitionRule
@@ -401,8 +582,11 @@ export interface QueryRowMap {
   "sale-order-lines": SaleOrderLine
   "sale-orders": SaleOrder
   "sale-orders-to-approve": SaleOrder
+  "saved-reports": SavedReport
   "scheduled-reports": ScheduledReport
+  "segment-members": SegmentMember
   "serial-lot-traceability": SerialLotTraceability
+  "shift-opt-jobs": HrShiftOptJob
   "shipping-methods": ShippingMethod
   "sod-conflict-rules": SodConflictRule
   "stock-cycle-counts": StockCycleCount
@@ -417,9 +601,25 @@ export interface QueryRowMap {
   "stock-routes": StockRoute
   "stock-rules": StockRule
   "stock-traceability-reports": StockTraceabilityReport
+  "subscription-amend-pending": SubscriptionCollection
+  "subscription-amendments": SubscriptionAmendment
   "subscription-billing-runs": SubscriptionBillingRun
+  "subscription-bundle-items": SubscriptionBundleItem
+  "subscription-bundles": SubscriptionBundle
+  "subscription-collections": SubscriptionCollection
+  "subscription-commitments": SubscriptionCommitment
+  "subscription-due-to-bill": SubscriptionCollection
+  "subscription-entitlements": SubscriptionEntitlement
   "subscription-lines": SubscriptionLine
+  "subscription-past-due": SubscriptionCollection
+  "subscription-payment-intents": SubscriptionPaymentIntent
   "subscription-plans": SubscriptionPlan
+  "subscription-price-indexes": SubscriptionPriceIndex
+  "subscription-price-tiers": SubscriptionPriceTier
+  "subscription-rating-backlog": SubscriptionUsageEvent
+  "subscription-tax-settle-intents": SubscriptionTaxSettleIntent
+  "subscription-usage-charges": SubscriptionUsageCharge
+  "subscription-usage-events": SubscriptionUsageEvent
   "subscriptions": Subscription
   "supplier-intakes": SupplierIntakeRequest
   "tasks": ProjectTask
@@ -428,6 +628,8 @@ export interface QueryRowMap {
   "tax-jurisdictions": TaxJurisdiction
   "tax-schedules": TaxSchedule
   "timesheets": ProjectTimesheet
+  "timesheets-to-validate": ProjectTimesheet
+  "timesheets-unbilled": ProjectTimesheet
   "trial-balances": TrialBalance
   "uoms": Uom
   "user-custom-fields": UserCustomField
@@ -446,19 +648,15 @@ export interface QueryRowMap {
   "warehouse-sync-intents-pending": WarehouseSyncIntent
   "warehouse-tasks": WarehouseTask
   "warehouses": Warehouse
+  "work-schedules": HrWorkSchedule
+  "workflow-edges": WorkflowEdge
   "workflow-instances": WorkflowInstance
+  "workflow-nodes": WorkflowNode
+  "workflow-versions": WorkflowVersion
   "workflows": Workflow
+  "working-calendars": WorkingCalendar
 }
 
 export type QueryRowResourceKey = keyof QueryRowMap
 
-/**
- * Row type for a query resource. Known resources resolve to their generated
- * row type; anything else (including resources lumiere-codegen has not yet
- * mapped) falls back to `Record<string, unknown>` so existing untyped callers
- * keep compiling while resources migrate incrementally.
- */
-export type QueryRowFor<K extends string> = K extends QueryRowResourceKey
-  ? QueryRowMap[K]
-  : Record<string, unknown>
-
+export type QueryRowFor<K extends QueryRowResourceKey> = QueryRowMap[K]

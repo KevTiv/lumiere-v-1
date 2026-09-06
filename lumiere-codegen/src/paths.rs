@@ -22,6 +22,7 @@ pub struct Paths {
     pub sql_columns_rust_out: PathBuf,
     pub query_resource_row_type_asset: PathBuf,
     pub query_resource_row_type_out: PathBuf,
+    pub query_row_map_ts_out: PathBuf,
 
     // ── erp_org_sql ──────────────────────────────────────────────────────
     pub subscription_query_policy_json: PathBuf,
@@ -120,6 +121,7 @@ impl Paths {
             query_resource_row_type_asset: assets.join("query-resource-row-type.json"),
             query_resource_row_type_out: frontend
                 .join("packages/stdb/src/query-resource-row-type.json"),
+            query_row_map_ts_out: frontend.join("packages/stdb/src/query-row-map.ts"),
 
             subscription_query_policy_json: manifest_dir.join("subscription-query-policies.json"),
             org_subscription_descriptors_ts_out: frontend
