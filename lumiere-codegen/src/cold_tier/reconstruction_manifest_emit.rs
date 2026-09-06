@@ -506,13 +506,9 @@ mod tests {
             "aggregate":{"parent":null}
         }]});
         let override_policy = r#"{"version":1,"same_level_order":"table_ascending","relationship_source":"storage_policy.aggregate.parent","durability_actions":{"durable_business_record":"restore"},"table_actions":{"orders":"retores"},"recreated_state":{},"excluded_state":{}}"#;
-        let error = emit_reconstruction_manifest(
-            override_policy,
-            &schema,
-            &storage,
-            &durable(&["orders"]),
-        )
-        .unwrap_err();
+        let error =
+            emit_reconstruction_manifest(override_policy, &schema, &storage, &durable(&["orders"]))
+                .unwrap_err();
         assert!(error
             .to_string()
             .contains("unsupported reconstruction action 'retores'"));

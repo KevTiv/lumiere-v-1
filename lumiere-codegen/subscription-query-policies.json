@@ -1,0 +1,2087 @@
+{
+  "schema_version": 1,
+  "resources": {
+    "account-accounts": {
+      "table": "account_account",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "code",
+          "direction": "asc"
+        }
+      ]
+    },
+    "account-account-types": {
+      "table": "account_account_type",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "name",
+          "direction": "asc"
+        }
+      ]
+    },
+    "account-groups": {
+      "table": "account_group",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "level",
+          "direction": "asc"
+        },
+        {
+          "field": "name",
+          "direction": "asc"
+        }
+      ]
+    },
+    "account-journals": {
+      "table": "account_journal",
+      "predicates": [],
+      "order_by": []
+    },
+    "account-move-lines": {
+      "table": "account_move_line",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "move_id",
+          "direction": "asc"
+        },
+        {
+          "field": "sequence",
+          "direction": "asc"
+        }
+      ]
+    },
+    "account-moves": {
+      "table": "account_move",
+      "predicates": [],
+      "order_by": []
+    },
+    "account-taxes": {
+      "table": "account_tax",
+      "predicates": [],
+      "order_by": []
+    },
+    "budgets": {
+      "table": "crossovered_budget",
+      "predicates": [],
+      "order_by": []
+    },
+    "budget-lines": {
+      "table": "crossovered_budget_lines",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "general_budget_id",
+          "direction": "asc"
+        },
+        {
+          "field": "id",
+          "direction": "asc"
+        }
+      ]
+    },
+    "budget-posts": {
+      "table": "budget_post",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "name",
+          "direction": "asc"
+        }
+      ]
+    },
+    "analytic-accounts": {
+      "table": "account_analytic_account",
+      "predicates": [],
+      "order_by": []
+    },
+    "tax-groups": {
+      "table": "account_tax_group",
+      "predicates": [],
+      "order_by": []
+    },
+    "tax-jurisdictions": {
+      "table": "tax_jurisdiction",
+      "predicates": [],
+      "order_by": []
+    },
+    "tax-schedules": {
+      "table": "tax_schedule",
+      "predicates": [],
+      "order_by": []
+    },
+    "tax-deadlines": {
+      "table": "tax_deadline",
+      "predicates": [],
+      "order_by": []
+    },
+    "bank-statements": {
+      "table": "account_bank_statement",
+      "predicates": [],
+      "order_by": []
+    },
+    "bank-statement-lines": {
+      "table": "account_bank_statement_line",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "asc"
+        }
+      ]
+    },
+    "bank-match-candidates": {
+      "table": "bank_match_candidate",
+      "predicates": [],
+      "order_by": []
+    },
+    "account-reconciliation-widgets": {
+      "table": "account_reconciliation_widget",
+      "predicates": [],
+      "order_by": []
+    },
+    "account-payments": {
+      "table": "account_payment",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "account-payment-terms": {
+      "table": "account_payment_term",
+      "predicates": [],
+      "order_by": []
+    },
+    "account-payment-term-lines": {
+      "table": "account_payment_term_line",
+      "predicates": [],
+      "order_by": []
+    },
+    "payment-accounts": {
+      "table": "payment_account",
+      "predicates": [],
+      "order_by": []
+    },
+    "payment-transactions": {
+      "table": "payment_transaction",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "payment-fees": {
+      "table": "payment_fee",
+      "predicates": [],
+      "order_by": []
+    },
+    "payment-reconciliations": {
+      "table": "payment_reconciliation",
+      "predicates": [],
+      "order_by": []
+    },
+    "payment-reversals": {
+      "table": "payment_reversal",
+      "predicates": [],
+      "order_by": []
+    },
+    "analytic-lines": {
+      "table": "account_analytic_line",
+      "predicates": [],
+      "order_by": []
+    },
+    "analytic-distribution-models": {
+      "table": "account_analytic_distribution_model",
+      "predicates": [],
+      "order_by": []
+    },
+    "sale-orders": {
+      "table": "sale_order",
+      "predicates": [],
+      "order_by": []
+    },
+    "sale-orders-to-approve": {
+      "table": "sale_order",
+      "predicates": [],
+      "order_by": []
+    },
+    "sale-order-lines": {
+      "table": "sale_order_line",
+      "predicates": [],
+      "order_by": []
+    },
+    "sale-commissions": {
+      "table": "sale_commission",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "sale-commissions-pending": {
+      "table": "sale_commission",
+      "predicates": [
+        {
+          "field": "state",
+          "operator": "eq",
+          "value": "accrued"
+        }
+      ],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "return-orders": {
+      "table": "return_order",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "return-order-lines": {
+      "table": "return_order_line",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "return_order_id",
+          "direction": "asc"
+        },
+        {
+          "field": "id",
+          "direction": "asc"
+        }
+      ]
+    },
+    "pos-loyalty-programs": {
+      "table": "pos_loyalty_program",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "pos-loyalty-cards": {
+      "table": "pos_loyalty_card",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "pricelists": {
+      "table": "product_pricelist",
+      "predicates": [],
+      "order_by": []
+    },
+    "pricelist-items": {
+      "table": "product_pricelist_item",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "pricelist_id",
+          "direction": "asc"
+        },
+        {
+          "field": "sequence",
+          "direction": "asc"
+        }
+      ]
+    },
+    "leads": {
+      "table": "lead",
+      "predicates": [],
+      "order_by": []
+    },
+    "lead-sources": {
+      "table": "lead_source",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "sequence",
+          "direction": "asc"
+        }
+      ]
+    },
+    "lead-lost-reasons": {
+      "table": "lead_lost_reason",
+      "predicates": [],
+      "order_by": []
+    },
+    "opportunities": {
+      "table": "opportunity",
+      "predicates": [],
+      "order_by": []
+    },
+    "opportunity-stages": {
+      "table": "opp_stage",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "sequence",
+          "direction": "asc"
+        }
+      ]
+    },
+    "opportunity-lines": {
+      "table": "opportunity_line",
+      "predicates": [],
+      "order_by": []
+    },
+    "opportunity-presence": {
+      "table": "opportunity_presence",
+      "predicates": [],
+      "order_by": []
+    },
+    "contacts": {
+      "table": "contact",
+      "predicates": [],
+      "order_by": []
+    },
+    "contact-phone-identities": {
+      "table": "contact_phone_identity",
+      "predicates": [],
+      "order_by": []
+    },
+    "contact-role-assignments": {
+      "table": "contact_role_assignment",
+      "predicates": [],
+      "order_by": []
+    },
+    "contact-tags": {
+      "table": "contact_tag",
+      "predicates": [],
+      "order_by": []
+    },
+    "contact-tag-assignments": {
+      "table": "contact_tag_assignment",
+      "predicates": [],
+      "order_by": []
+    },
+    "contact-categories": {
+      "table": "contact_category",
+      "predicates": [],
+      "order_by": []
+    },
+    "contact-category-assignments": {
+      "table": "contact_category_assignment",
+      "predicates": [],
+      "order_by": []
+    },
+    "contact-segments": {
+      "table": "contact_segment",
+      "predicates": [],
+      "order_by": []
+    },
+    "segment-members": {
+      "table": "segment_member",
+      "predicates": [],
+      "order_by": []
+    },
+    "contact-relationships": {
+      "table": "contact_relationship",
+      "predicates": [],
+      "order_by": []
+    },
+    "contact-duplicate-candidates": {
+      "table": "contact_duplicate_candidate",
+      "predicates": [],
+      "order_by": []
+    },
+    "assignment-rules": {
+      "table": "assignment_rule",
+      "predicates": [],
+      "order_by": []
+    },
+    "activities": {
+      "table": "activity",
+      "predicates": [],
+      "order_by": []
+    },
+    "utm-campaigns": {
+      "table": "utm_campaign",
+      "predicates": [],
+      "order_by": []
+    },
+    "utm-media": {
+      "table": "utm_medium",
+      "predicates": [],
+      "order_by": []
+    },
+    "utm-sources": {
+      "table": "utm_source",
+      "predicates": [],
+      "order_by": []
+    },
+    "privacy-consent": {
+      "table": "privacy_consent",
+      "predicates": [],
+      "order_by": []
+    },
+    "contact-communication-preferences": {
+      "table": "contact_communication_preference",
+      "predicates": [],
+      "order_by": []
+    },
+    "crm-forecast-snapshots": {
+      "table": "crm_forecast_snapshot",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "lead-scores": {
+      "table": "lead_score",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "lead-score-factors": {
+      "table": "lead_score_factor",
+      "predicates": [],
+      "order_by": []
+    },
+    "contact-segment-rules": {
+      "table": "contact_segment_rule",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "sequence",
+          "direction": "asc"
+        }
+      ]
+    },
+    "contact-relationship-insights": {
+      "table": "contact_relationship_insight",
+      "predicates": [],
+      "order_by": []
+    },
+    "crm-conversations": {
+      "table": "crm_conversation",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "crm-conversation-messages": {
+      "table": "crm_conversation_message",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "asc"
+        }
+      ]
+    },
+    "projects": {
+      "table": "project_project",
+      "predicates": [],
+      "order_by": []
+    },
+    "tasks": {
+      "table": "project_task",
+      "predicates": [],
+      "order_by": []
+    },
+    "timesheets": {
+      "table": "project_timesheet",
+      "predicates": [],
+      "order_by": []
+    },
+    "timesheets-to-validate": {
+      "table": "project_timesheet",
+      "predicates": [
+        {
+          "field": "validation_status",
+          "operator": "eq",
+          "value": "draft"
+        }
+      ],
+      "order_by": []
+    },
+    "timesheets-unbilled": {
+      "table": "project_timesheet",
+      "predicates": [
+        {
+          "field": "validation_status",
+          "operator": "eq",
+          "value": "validated"
+        },
+        {
+          "field": "timesheet_invoice_type",
+          "operator": "eq",
+          "value": "billable"
+        }
+      ],
+      "order_by": []
+    },
+    "project-rate-cards": {
+      "table": "project_rate_card",
+      "predicates": [],
+      "order_by": []
+    },
+    "project-rate-card-lines": {
+      "table": "project_rate_card_line",
+      "predicates": [],
+      "order_by": []
+    },
+    "working-calendars": {
+      "table": "working_calendar",
+      "predicates": [],
+      "order_by": []
+    },
+    "public-holidays": {
+      "table": "public_holiday",
+      "predicates": [],
+      "order_by": []
+    },
+    "resource-allocations": {
+      "table": "resource_allocation",
+      "predicates": [],
+      "order_by": []
+    },
+    "resource-capacity-by-employee": {
+      "table": "resource_capacity_snapshot",
+      "predicates": [],
+      "order_by": []
+    },
+    "project-margin-by-project": {
+      "table": "project_margin_snapshot",
+      "predicates": [],
+      "order_by": []
+    },
+    "resource-utilisation-by-employee": {
+      "table": "resource_utilisation_snapshot",
+      "predicates": [],
+      "order_by": []
+    },
+    "project-milestones": {
+      "table": "project_milestone",
+      "predicates": [],
+      "order_by": []
+    },
+    "capacity-forecast-by-employee": {
+      "table": "capacity_forecast_snapshot",
+      "predicates": [],
+      "order_by": []
+    },
+    "project-baselines": {
+      "table": "project_baseline",
+      "predicates": [],
+      "order_by": []
+    },
+    "project-change-orders": {
+      "table": "project_change_order",
+      "predicates": [],
+      "order_by": []
+    },
+    "project-earned-value-by-project": {
+      "table": "project_earned_value_snapshot",
+      "predicates": [],
+      "order_by": []
+    },
+    "project-subcontractor-costs": {
+      "table": "project_subcontractor_cost",
+      "predicates": [],
+      "order_by": []
+    },
+    "project-revenue-schedules": {
+      "table": "project_revenue_schedule",
+      "predicates": [],
+      "order_by": []
+    },
+    "project-revenue-lines": {
+      "table": "project_revenue_line",
+      "predicates": [],
+      "order_by": []
+    },
+    "project-integration-intents": {
+      "table": "project_integration_intent",
+      "predicates": [],
+      "order_by": []
+    },
+    "hr-resources": {
+      "table": "hr_resource",
+      "predicates": [],
+      "order_by": []
+    },
+    "hr-skills": {
+      "table": "hr_skill",
+      "predicates": [],
+      "order_by": []
+    },
+    "hr-employee-skills": {
+      "table": "hr_employee_skill",
+      "predicates": [],
+      "order_by": []
+    },
+    "onboarding-templates": {
+      "table": "hr_onboarding_template",
+      "predicates": [
+        {
+          "field": "active",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "order_by": []
+    },
+    "onboarding-template-items": {
+      "table": "hr_onboarding_template_item",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "sequence",
+          "direction": "asc"
+        },
+        {
+          "field": "id",
+          "direction": "asc"
+        }
+      ]
+    },
+    "onboarding-progress": {
+      "table": "hr_onboarding_progress",
+      "predicates": [],
+      "order_by": []
+    },
+    "performance-cycles": {
+      "table": "hr_performance_cycle",
+      "predicates": [
+        {
+          "field": "active",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "order_by": []
+    },
+    "performance-goals": {
+      "table": "hr_performance_goal",
+      "predicates": [],
+      "order_by": []
+    },
+    "performance-reviews": {
+      "table": "hr_performance_review",
+      "predicates": [],
+      "order_by": []
+    },
+    "benefit-plans": {
+      "table": "hr_benefit_plan",
+      "predicates": [
+        {
+          "field": "active",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "order_by": []
+    },
+    "benefit-enrollments": {
+      "table": "hr_benefit_enrollment",
+      "predicates": [],
+      "order_by": []
+    },
+    "employee-documents": {
+      "table": "hr_employee_document",
+      "predicates": [
+        {
+          "field": "active",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "order_by": []
+    },
+    "products": {
+      "table": "product",
+      "predicates": [],
+      "order_by": []
+    },
+    "product-categories": {
+      "table": "product_category",
+      "predicates": [],
+      "order_by": []
+    },
+    "uoms": {
+      "table": "uom",
+      "predicates": [],
+      "order_by": []
+    },
+    "stock-quants": {
+      "table": "stock_quant",
+      "predicates": [],
+      "order_by": []
+    },
+    "stock-pickings": {
+      "table": "stock_picking",
+      "predicates": [],
+      "order_by": []
+    },
+    "warehouses": {
+      "table": "warehouse",
+      "predicates": [],
+      "order_by": []
+    },
+    "inventory-adjustments": {
+      "table": "inventory_adjustment",
+      "predicates": [],
+      "order_by": []
+    },
+    "stock-locations": {
+      "table": "stock_location",
+      "predicates": [],
+      "order_by": []
+    },
+    "stock-moves": {
+      "table": "stock_move",
+      "predicates": [],
+      "order_by": []
+    },
+    "stock-production-lots": {
+      "table": "stock_production_lot",
+      "predicates": [],
+      "order_by": []
+    },
+    "stock-production-serials": {
+      "table": "stock_production_serial",
+      "predicates": [],
+      "order_by": []
+    },
+    "stock-cycle-counts": {
+      "table": "stock_cycle_count",
+      "predicates": [],
+      "order_by": []
+    },
+    "stock-inventories": {
+      "table": "stock_inventory",
+      "predicates": [],
+      "order_by": []
+    },
+    "stock-routes": {
+      "table": "stock_route",
+      "predicates": [],
+      "order_by": []
+    },
+    "stock-rules": {
+      "table": "stock_rule",
+      "predicates": [],
+      "order_by": []
+    },
+    "picking-waves": {
+      "table": "picking_wave",
+      "predicates": [],
+      "order_by": []
+    },
+    "warehouse-tasks": {
+      "table": "warehouse_task",
+      "predicates": [],
+      "order_by": []
+    },
+    "warehouse-3d-zones": {
+      "table": "warehouse_3_d_zone",
+      "predicates": [],
+      "order_by": []
+    },
+    "quality-checks": {
+      "table": "quality_check",
+      "predicates": [],
+      "order_by": []
+    },
+    "quality-alerts": {
+      "table": "quality_alert",
+      "predicates": [],
+      "order_by": []
+    },
+    "replenishment-rules": {
+      "table": "replenishment_rule",
+      "predicates": [],
+      "order_by": []
+    },
+    "barcode-rules": {
+      "table": "barcode_rule",
+      "predicates": [],
+      "order_by": []
+    },
+    "barcode-nomenclatures": {
+      "table": "barcode_nomenclature",
+      "predicates": [],
+      "order_by": []
+    },
+    "adjustment-reasons": {
+      "table": "adjustment_reason",
+      "predicates": [],
+      "order_by": []
+    },
+    "serial-lot-traceability": {
+      "table": "serial_lot_traceability",
+      "predicates": [],
+      "order_by": []
+    },
+    "stock-traceability-reports": {
+      "table": "stock_traceability_report",
+      "predicates": [],
+      "order_by": []
+    },
+    "stock-packages": {
+      "table": "stock_package",
+      "predicates": [],
+      "order_by": []
+    },
+    "packaging-materials": {
+      "table": "packaging_material",
+      "predicates": [],
+      "order_by": []
+    },
+    "cartonization-results": {
+      "table": "cartonization_result",
+      "predicates": [],
+      "order_by": []
+    },
+    "inventory-exceptions": {
+      "table": "inventory_exception",
+      "predicates": [
+        {
+          "field": "state",
+          "operator": "eq",
+          "value": "open"
+        }
+      ],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "inventory-exceptions-short-atp": {
+      "table": "inventory_exception",
+      "predicates": [
+        {
+          "field": "state",
+          "operator": "eq",
+          "value": "open"
+        },
+        {
+          "field": "exception_type",
+          "operator": "eq",
+          "value": "short_atp"
+        }
+      ],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "inventory-exceptions-expired-lots": {
+      "table": "inventory_exception",
+      "predicates": [
+        {
+          "field": "state",
+          "operator": "eq",
+          "value": "open"
+        },
+        {
+          "field": "exception_type",
+          "operator": "eq",
+          "value": "expired_lot"
+        }
+      ],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "inventory-exceptions-open-qc": {
+      "table": "inventory_exception",
+      "predicates": [
+        {
+          "field": "state",
+          "operator": "eq",
+          "value": "open"
+        },
+        {
+          "field": "exception_type",
+          "operator": "eq",
+          "value": "open_qc"
+        }
+      ],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "warehouse-sync-intents": {
+      "table": "warehouse_sync_intent",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "warehouse-sync-intents-pending": {
+      "table": "warehouse_sync_intent",
+      "predicates": [
+        {
+          "field": "status",
+          "operator": "eq",
+          "value": "pending"
+        }
+      ],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "purchase-orders": {
+      "table": "purchase_order",
+      "predicates": [],
+      "order_by": []
+    },
+    "purchase-orders-to-approve": {
+      "table": "purchase_order",
+      "predicates": [],
+      "order_by": []
+    },
+    "purchase-orders-partial-receipt": {
+      "table": "purchase_order",
+      "predicates": [
+        {
+          "field": "receipt_status",
+          "operator": "eq",
+          "value": "partial"
+        }
+      ],
+      "order_by": []
+    },
+    "purchase-order-lines": {
+      "table": "purchase_order_line",
+      "predicates": [],
+      "order_by": []
+    },
+    "purchase-order-lines-over-billed": {
+      "table": "purchase_order_line",
+      "predicates": [
+        {
+          "field": "match_state",
+          "operator": "eq",
+          "value": "over_billed"
+        }
+      ],
+      "order_by": []
+    },
+    "landed-costs": {
+      "table": "stock_landed_cost",
+      "predicates": [],
+      "order_by": []
+    },
+    "landed-cost-lines": {
+      "table": "stock_landed_cost_lines",
+      "predicates": [],
+      "order_by": []
+    },
+    "supplier-intakes": {
+      "table": "supplier_intake_request",
+      "predicates": [],
+      "order_by": []
+    },
+    "partner-banks": {
+      "table": "res_partner_bank",
+      "predicates": [],
+      "order_by": []
+    },
+    "purchase-requisitions": {
+      "table": "purchase_requisition",
+      "predicates": [],
+      "order_by": []
+    },
+    "purchase-requisition-lines": {
+      "table": "purchase_requisition_line",
+      "predicates": [],
+      "order_by": []
+    },
+    "purchase-rfqs": {
+      "table": "purchase_rfq",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "purchase-rfq-lines": {
+      "table": "purchase_rfq_line",
+      "predicates": [],
+      "order_by": []
+    },
+    "purchase-rfq-bids": {
+      "table": "purchase_rfq_bid",
+      "predicates": [],
+      "order_by": []
+    },
+    "purchase-returns": {
+      "table": "purchase_return",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "purchase-return-lines": {
+      "table": "purchase_return_line",
+      "predicates": [],
+      "order_by": []
+    },
+    "purchase-blanket-orders": {
+      "table": "purchase_blanket_order",
+      "predicates": [],
+      "order_by": []
+    },
+    "purchase-blanket-order-lines": {
+      "table": "purchase_blanket_order_line",
+      "predicates": [],
+      "order_by": []
+    },
+    "purchase-blanket-releases": {
+      "table": "purchase_blanket_release",
+      "predicates": [],
+      "order_by": []
+    },
+    "purchase-contracts": {
+      "table": "purchase_contract",
+      "predicates": [],
+      "order_by": []
+    },
+    "vendor-scorecards": {
+      "table": "vendor_scorecard",
+      "predicates": [],
+      "order_by": []
+    },
+    "vendor-risk-flags": {
+      "table": "vendor_risk_flag",
+      "predicates": [],
+      "order_by": []
+    },
+    "consignment-agreements": {
+      "table": "consignment_agreement",
+      "predicates": [],
+      "order_by": []
+    },
+    "purchase-approval-delegates": {
+      "table": "purchase_approval_delegate",
+      "predicates": [],
+      "order_by": []
+    },
+    "commodity-price-indexes": {
+      "table": "commodity_price_index",
+      "predicates": [],
+      "order_by": []
+    },
+    "purchasing-integration-intents": {
+      "table": "purchasing_integration_intent",
+      "predicates": [],
+      "order_by": []
+    },
+    "mrp-productions": {
+      "table": "mrp_production",
+      "predicates": [],
+      "order_by": []
+    },
+    "mrp-boms": {
+      "table": "mrp_bom",
+      "predicates": [],
+      "order_by": []
+    },
+    "mrp-workorders": {
+      "table": "mrp_workorder",
+      "predicates": [],
+      "order_by": []
+    },
+    "mrp-workcenters": {
+      "table": "mrp_workcenter",
+      "predicates": [],
+      "order_by": []
+    },
+    "mrp-routing-workcenters": {
+      "table": "mrp_routing_workcenter",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "workcenter_id",
+          "direction": "asc"
+        },
+        {
+          "field": "sequence",
+          "direction": "asc"
+        }
+      ]
+    },
+    "employees": {
+      "table": "hr_employee",
+      "predicates": [
+        {
+          "field": "is_active",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "order_by": []
+    },
+    "my-employee": {
+      "table": "hr_employee",
+      "predicates": [
+        {
+          "field": "is_active",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "order_by": []
+    },
+    "direct-reports": {
+      "table": "hr_employee",
+      "predicates": [
+        {
+          "field": "is_active",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "order_by": []
+    },
+    "departments": {
+      "table": "hr_department",
+      "predicates": [],
+      "order_by": []
+    },
+    "job-positions": {
+      "table": "hr_job_position",
+      "predicates": [],
+      "order_by": []
+    },
+    "applicants": {
+      "table": "hr_applicant",
+      "predicates": [],
+      "order_by": []
+    },
+    "leave-types": {
+      "table": "hr_leave_type",
+      "predicates": [],
+      "order_by": []
+    },
+    "payroll-structures": {
+      "table": "hr_payroll_structure",
+      "predicates": [],
+      "order_by": []
+    },
+    "salary-rules": {
+      "table": "hr_salary_rule",
+      "predicates": [],
+      "order_by": []
+    },
+    "leave-requests": {
+      "table": "hr_leave",
+      "predicates": [],
+      "order_by": []
+    },
+    "leaves-to-approve": {
+      "table": "hr_leave",
+      "predicates": [],
+      "order_by": []
+    },
+    "contracts": {
+      "table": "hr_contract",
+      "predicates": [],
+      "order_by": []
+    },
+    "attendance": {
+      "table": "hr_attendance",
+      "predicates": [],
+      "order_by": []
+    },
+    "compensation-events": {
+      "table": "hr_compensation_event",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "effective_from",
+          "direction": "desc"
+        }
+      ]
+    },
+    "work-schedules": {
+      "table": "hr_work_schedule",
+      "predicates": [],
+      "order_by": []
+    },
+    "labor-cost-snapshots": {
+      "table": "hr_labor_cost_snapshot",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "period_start",
+          "direction": "desc"
+        },
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "shift-opt-jobs": {
+      "table": "hr_shift_opt_job",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "created_at",
+          "direction": "desc"
+        },
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "global-assignments": {
+      "table": "hr_global_assignment",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "date_from",
+          "direction": "desc"
+        },
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "hr-capacity-forecast": {
+      "table": "hr_capacity_forecast",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "period_start",
+          "direction": "desc"
+        },
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "payslips": {
+      "table": "hr_payslip",
+      "predicates": [],
+      "order_by": []
+    },
+    "payslips-to-export": {
+      "table": "hr_payslip",
+      "predicates": [],
+      "order_by": []
+    },
+    "hr-integration-intents": {
+      "table": "hr_integration_intent",
+      "predicates": [
+        {
+          "field": "status",
+          "operator": "eq",
+          "value": "pending"
+        }
+      ],
+      "order_by": []
+    },
+    "financial-reports": {
+      "table": "financial_report",
+      "predicates": [],
+      "order_by": []
+    },
+    "trial-balances": {
+      "table": "trial_balance",
+      "predicates": [],
+      "order_by": []
+    },
+    "saved-reports": {
+      "table": "saved_report",
+      "predicates": [],
+      "order_by": []
+    },
+    "report-templates": {
+      "table": "report_template",
+      "predicates": [],
+      "order_by": []
+    },
+    "scheduled-reports": {
+      "table": "scheduled_report",
+      "predicates": [],
+      "order_by": []
+    },
+    "analytics-metrics": {
+      "table": "analytics_metric",
+      "predicates": [],
+      "order_by": []
+    },
+    "dashboards": {
+      "table": "dashboard",
+      "predicates": [],
+      "order_by": []
+    },
+    "dashboard-widgets": {
+      "table": "dashboard_widget",
+      "predicates": [],
+      "order_by": []
+    },
+    "documents": {
+      "table": "document",
+      "predicates": [
+        {
+          "field": "is_deleted",
+          "operator": "eq",
+          "value": false
+        }
+      ],
+      "order_by": []
+    },
+    "documents-deleted": {
+      "table": "document",
+      "predicates": [
+        {
+          "field": "is_deleted",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "order_by": []
+    },
+    "document-folders": {
+      "table": "doc_folder",
+      "predicates": [],
+      "order_by": []
+    },
+    "document-versions": {
+      "table": "document_version",
+      "predicates": [],
+      "order_by": []
+    },
+    "document-templates": {
+      "table": "document_template",
+      "predicates": [],
+      "order_by": []
+    },
+    "mail-templates": {
+      "table": "mail_template",
+      "predicates": [],
+      "order_by": []
+    },
+    "knowledge-articles": {
+      "table": "knowledge_article",
+      "predicates": [],
+      "order_by": []
+    },
+    "knowledge-categories": {
+      "table": "kb_category",
+      "predicates": [],
+      "order_by": []
+    },
+    "helpdesk-tickets": {
+      "table": "helpdesk_ticket",
+      "predicates": [],
+      "order_by": []
+    },
+    "helpdesk-teams": {
+      "table": "helpdesk_team",
+      "predicates": [],
+      "order_by": []
+    },
+    "helpdesk-stages": {
+      "table": "helpdesk_stage",
+      "predicates": [],
+      "order_by": []
+    },
+    "helpdesk-slas": {
+      "table": "helpdesk_sla",
+      "predicates": [],
+      "order_by": []
+    },
+    "subscriptions": {
+      "table": "subscription",
+      "predicates": [],
+      "order_by": []
+    },
+    "sod-conflict-rules": {
+      "table": "sod_conflict_rule",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "fx-revaluation-runs": {
+      "table": "fx_revaluation_run",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "amortization-schedules": {
+      "table": "amortization_schedule",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "amortization-lines": {
+      "table": "amortization_line",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "schedule_id",
+          "direction": "asc"
+        },
+        {
+          "field": "sequence",
+          "direction": "asc"
+        }
+      ]
+    },
+    "partner-credit-controls": {
+      "table": "partner_credit_control",
+      "predicates": [],
+      "order_by": []
+    },
+    "partner-credit-holds": {
+      "table": "partner_credit_control",
+      "predicates": [
+        {
+          "field": "payment_hold",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "order_by": []
+    },
+    "delegated-admin-scopes": {
+      "table": "delegated_admin_scope",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "subscription-plans": {
+      "table": "subscription_plan",
+      "predicates": [],
+      "order_by": []
+    },
+    "subscription-lines": {
+      "table": "subscription_line",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "subscription_id",
+          "direction": "asc"
+        },
+        {
+          "field": "id",
+          "direction": "asc"
+        }
+      ]
+    },
+    "subscription-billing-runs": {
+      "table": "subscription_billing_run",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "subscription-amendments": {
+      "table": "subscription_amendment",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "subscription_id",
+          "direction": "asc"
+        },
+        {
+          "field": "version",
+          "direction": "desc"
+        }
+      ]
+    },
+    "subscription-usage-events": {
+      "table": "subscription_usage_event",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "subscription-usage-charges": {
+      "table": "subscription_usage_charge",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "subscription-price-tiers": {
+      "table": "subscription_price_tier",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "plan_id",
+          "direction": "asc"
+        },
+        {
+          "field": "sequence",
+          "direction": "asc"
+        }
+      ]
+    },
+    "subscription-commitments": {
+      "table": "subscription_commitment",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "subscription-bundles": {
+      "table": "subscription_bundle",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "subscription-bundle-items": {
+      "table": "subscription_bundle_item",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "bundle_id",
+          "direction": "asc"
+        },
+        {
+          "field": "sequence",
+          "direction": "asc"
+        }
+      ]
+    },
+    "subscription-rating-backlog": {
+      "table": "subscription_usage_event",
+      "predicates": [
+        {
+          "field": "status",
+          "operator": "eq",
+          "value": "pending"
+        }
+      ],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "asc"
+        }
+      ]
+    },
+    "subscription-collections": {
+      "table": "subscription_collection",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "subscription-entitlements": {
+      "table": "subscription_entitlement",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "subscription-payment-intents": {
+      "table": "subscription_payment_intent",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "subscription-tax-settle-intents": {
+      "table": "subscription_tax_settle_intent",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "subscription-price-indexes": {
+      "table": "subscription_price_index",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "index_code",
+          "direction": "asc"
+        },
+        {
+          "field": "period_key",
+          "direction": "desc"
+        }
+      ]
+    },
+    "subscription-due-to-bill": {
+      "table": "subscription_collection",
+      "predicates": [
+        {
+          "field": "due_to_bill",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "asc"
+        }
+      ]
+    },
+    "subscription-past-due": {
+      "table": "subscription_collection",
+      "predicates": [
+        {
+          "field": "past_due",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "asc"
+        }
+      ]
+    },
+    "subscription-amend-pending": {
+      "table": "subscription_collection",
+      "predicates": [
+        {
+          "field": "amend_pending",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "asc"
+        }
+      ]
+    },
+    "deferred-revenue-schedules": {
+      "table": "deferred_revenue_schedule",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "deferred-revenue-lines": {
+      "table": "deferred_revenue_line",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "schedule_id",
+          "direction": "asc"
+        },
+        {
+          "field": "sequence",
+          "direction": "asc"
+        }
+      ]
+    },
+    "revenue-recognition-rules": {
+      "table": "revenue_recognition_rule",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "priority",
+          "direction": "desc"
+        },
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "proposals": {
+      "table": "proposal",
+      "predicates": [],
+      "order_by": []
+    },
+    "proposal-sections": {
+      "table": "proposal_section",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "sequence",
+          "direction": "asc"
+        }
+      ]
+    },
+    "proposal-line-items": {
+      "table": "proposal_line_item",
+      "predicates": [],
+      "order_by": []
+    },
+    "proposal-versions": {
+      "table": "proposal_version",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "version_number",
+          "direction": "desc"
+        }
+      ]
+    },
+    "proposal-source-docs": {
+      "table": "proposal_source_doc",
+      "predicates": [],
+      "order_by": []
+    },
+    "proposal-presence": {
+      "table": "proposal_presence",
+      "predicates": [],
+      "order_by": []
+    },
+    "proposal-comments": {
+      "table": "proposal_comment",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "proposal-bid-decisions": {
+      "table": "proposal_bid_decision",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "proposal-templates": {
+      "table": "proposal_template",
+      "predicates": [
+        {
+          "field": "is_active",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "order_by": [
+        {
+          "field": "name",
+          "direction": "asc"
+        }
+      ]
+    },
+    "proposal-clauses": {
+      "table": "proposal_clause",
+      "predicates": [
+        {
+          "field": "is_active",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "order_by": [
+        {
+          "field": "clause_key",
+          "direction": "asc"
+        }
+      ]
+    },
+    "proposal-compliance-requirements": {
+      "table": "proposal_compliance_requirement",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "sequence",
+          "direction": "asc"
+        }
+      ]
+    },
+    "proposal-analyses": {
+      "table": "proposal_analysis",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "proposal-procurement-scores": {
+      "table": "proposal_procurement_score",
+      "predicates": [],
+      "order_by": []
+    },
+    "proposal-integration-intents": {
+      "table": "proposal_integration_intent",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "proposal-clarifications": {
+      "table": "proposal_clarification",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "id",
+          "direction": "desc"
+        }
+      ]
+    },
+    "fleet-vehicles": {
+      "table": "fleet_vehicle",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "name",
+          "direction": "asc"
+        }
+      ]
+    },
+    "warehouse-geo": {
+      "table": "warehouse_geo",
+      "predicates": [],
+      "order_by": []
+    },
+    "pos-terminals": {
+      "table": "pos_terminal",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "name",
+          "direction": "asc"
+        }
+      ]
+    },
+    "calendar-events": {
+      "table": "calendar_event",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "start",
+          "direction": "asc"
+        }
+      ]
+    },
+    "mail-messages": {
+      "table": "mail_message",
+      "predicates": [],
+      "order_by": []
+    },
+    "expenses": {
+      "table": "hr_expense",
+      "predicates": [],
+      "order_by": []
+    },
+    "expense-sheets": {
+      "table": "expense_sheet",
+      "predicates": [],
+      "order_by": []
+    },
+    "expense-sheets-to-approve": {
+      "table": "expense_sheet",
+      "predicates": [],
+      "order_by": []
+    },
+    "expenses-missing-receipt": {
+      "table": "hr_expense",
+      "predicates": [
+        {
+          "field": "has_receipt",
+          "operator": "eq",
+          "value": false
+        }
+      ],
+      "order_by": []
+    },
+    "expense-receipts": {
+      "table": "hr_expense_receipt",
+      "predicates": [],
+      "order_by": []
+    },
+    "expense-card-statement-unmatched": {
+      "table": "expense_card_statement_line",
+      "predicates": [
+        {
+          "field": "status",
+          "operator": "eq",
+          "value": "unmatched"
+        }
+      ],
+      "order_by": []
+    },
+    "expense-advances": {
+      "table": "hr_expense_advance",
+      "predicates": [],
+      "order_by": []
+    },
+    "expense-policy-exceptions": {
+      "table": "hr_expense_policy_exception",
+      "predicates": [],
+      "order_by": []
+    },
+    "expense-mileage-rates": {
+      "table": "hr_expense_mileage_rate",
+      "predicates": [
+        {
+          "field": "active",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "order_by": []
+    },
+    "expense-per-diem-rates": {
+      "table": "hr_expense_per_diem_rate",
+      "predicates": [
+        {
+          "field": "active",
+          "operator": "eq",
+          "value": true
+        }
+      ],
+      "order_by": []
+    },
+    "iot-devices": {
+      "table": "iot_device",
+      "predicates": [],
+      "order_by": []
+    },
+    "iot-hubs": {
+      "table": "iot_hub",
+      "predicates": [],
+      "order_by": []
+    },
+    "iot-alerts": {
+      "table": "iot_alert",
+      "predicates": [],
+      "order_by": []
+    },
+    "iot-actions": {
+      "table": "iot_action",
+      "predicates": [],
+      "order_by": []
+    },
+    "iot-telemetry": {
+      "table": "iot_telemetry",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "recorded_at",
+          "direction": "desc"
+        }
+      ]
+    },
+    "iot-thresholds": {
+      "table": "iot_threshold",
+      "predicates": [],
+      "order_by": []
+    },
+    "iot-pairing-tokens": {
+      "table": "iot_pairing_token",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "created_at",
+          "direction": "desc"
+        }
+      ]
+    }
+  }
+}

@@ -113,12 +113,20 @@ def main() -> None:
         operation_names.add(name)
         kind = operation.get("kind")
         source_kind = operation.get("source_kind", kind)
-        if (
+        legacy_classification = (
+            isinstance(kind, dict)
+            and kind.get("status") == "unclassified"
+            and kind.get("value") is None
+        )
+        if legacy_classification:
+            if not args.allow_legacy_v2:
+                fail(f"operation {name} must declare a classified semantic kind")
+        elif (
             not isinstance(kind, dict)
-            or kind.get("status") != "unclassified"
-            or kind.get("value") is not None
+            or kind.get("status") != "classified"
+            or kind.get("value") not in {"command", "operator", "test", "internal"}
         ):
-            fail(f"operation {name} must declare semantic kind as unclassified")
+            fail(f"operation {name} has invalid semantic kind classification")
         application = operation.get("application")
         if source_kind == "reducer" and (not isinstance(application, dict) or application.get("name") != name):
             fail(f"reducer operation {name} application contract does not match")
@@ -183,16 +191,56 @@ def main() -> None:
             ):
                 fail(f"operation {name} must declare unresolved output")
             codec = operation.get("codec")
-            if (
-                not isinstance(codec, dict)
-                or codec.get("status") != "unassigned"
-                or codec.get("id") is not None
-                or codec.get("version") is not None
-            ):
-                fail(f"operation {name} must declare codec as unassigned")
+            legacy_codec = (
+                isinstance(codec, dict)
+                and codec.get("status") == "unassigned"
+                and codec.get("id") is None
+                and codec.get("version") is None
+            )
+            if legacy_codec:
+                if not args.allow_legacy_v2:
+                    fail(f"operation {name} must declare an assigned codec")
+            elif codec != {
+                "id": "spacetimedb-sats-json",
+                "status": "assigned",
+                "version": 1,
+            }:
+                fail(f"operation {name} has invalid codec assignment")
             idempotency = operation.get("idempotency")
-            if not isinstance(idempotency, dict) or idempotency.get("status") != "unclassified":
-                fail(f"operation {name} must declare idempotency status")
+            legacy_idempotency = (
+                isinstance(idempotency, dict)
+                and idempotency.get("status") == "unclassified"
+                and idempotency.get("value") is None
+            )
+            if legacy_idempotency:
+                if not args.allow_legacy_v2:
+                    fail(f"operation {name} must declare classified idempotency")
+            elif (
+                not isinstance(idempotency, dict)
+                or idempotency.get("status") != "classified"
+                or idempotency.get("value") not in {
+                    "idempotent",
+                    "request_guarded",
+                    "state_guarded",
+                    "non_idempotent",
+                    "not_applicable",
+                }
+            ):
+                fail(f"operation {name} has invalid idempotency classification")
+            if not legacy_classification:
+                expected_client_facing = (
+                    isinstance(application, dict)
+                    and application.get("exposure") == "session"
+                )
+                if operation.get("client_facing") is not expected_client_facing:
+                    fail(f"operation {name} client_facing conflicts with exposure")
+                authorization = operation.get("authorization")
+                expected_scope = application.get("scope") if isinstance(application, dict) else None
+                if authorization != {"scope": expected_scope, "status": "classified"}:
+                    fail(f"operation {name} has invalid authorization classification")
+                evidence = operation.get("classification_evidence")
+                if not isinstance(evidence, str) or not evidence.strip():
+                    fail(f"operation {name} has no classification evidence")
         invalidates = operation.get("invalidates")
         if not isinstance(invalidates, list) or any(
             resource not in resource_names for resource in invalidates
@@ -221,31 +269,43 @@ def main() -> None:
         ):
             fail(f"resource {name} has invalid invalidated_by references")
         scope = resource.get("scope")
-        unclassified_scope = {
-            "company_field": None,
-            "kind": "unclassified",
-            "organization_field": None,
+        allowed_scope_kinds = {
+            "global",
+            "identity",
+            "organization",
+            "organization_company",
+            "organization_identity",
+            "organization_optional_company",
+            "organization_via_company",
+            "organization_via_parent",
         }
-        optional_company_scope = (
-            isinstance(scope, dict)
-            and set(scope) == {"company_field", "kind", "organization_field"}
-            and scope.get("kind") == "organization_optional_company"
-            and isinstance(scope.get("organization_field"), str)
-            and bool(scope["organization_field"])
-            and isinstance(scope.get("company_field"), str)
-            and bool(scope["company_field"])
-        )
-        if scope != unclassified_scope and not optional_company_scope:
+        if (
+            not isinstance(scope, dict)
+            or scope.get("kind") not in allowed_scope_kinds
+            or scope.get("kind") == "unclassified"
+        ):
             fail(f"resource {name} has invalid scope classification")
         query = resource.get("query")
         if (
             not isinstance(query, dict)
-            or query.get("status") != "unclassified"
+            or query.get("status") != "classified"
+            or query.get("authorization") != "server-enforced"
+            or query.get("result_type_reference") != row_ref
             or query.get("input_type_reference") is not None
             or query.get("filter_type_reference") is not None
             or query.get("cursor_type_reference") is not None
         ):
             fail(f"resource {name} must declare query classification status")
+        subscription = resource.get("subscription")
+        if (
+            not isinstance(subscription, dict)
+            or subscription.get("status") not in {"classified", "not-client-facing"}
+            or not isinstance(subscription.get("realtime"), bool)
+            or subscription.get("delivery_mode") not in {"invalidation-only", "bff-only"}
+            or subscription.get("delivery_mode") == "bff-only"
+            and subscription.get("realtime")
+        ):
+            fail(f"resource {name} has invalid subscription classification")
 
     persistence = ir.get("persistence")
     if persistence is not None:

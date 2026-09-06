@@ -1,6 +1,5 @@
 "use client"
 
-
 /**
  * CRM hooks — Phase 4 of API Gateway Refactor
  *
@@ -14,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, fetchQueryList, coalesceQueryInitialData, rqBigIntKey, type QueryRows } from "../http"
 import { invalidateResourceQueries, useSubscriptionAwareQuery } from "../subscription-query"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
 import type {
   Activity,
   Contact,
@@ -144,7 +144,7 @@ export function useContacts(
 /** Phone, WhatsApp, and mobile-money identities for CRM contacts. */
 export function useContactPhoneIdentities(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: QueryRowFor<"contact-phone-identities">[],
 ) {
   return useSubscriptionAwareQuery("contact-phone-identities", organizationId, {
     initialData,
@@ -154,7 +154,7 @@ export function useContactPhoneIdentities(
 /** Explicit commercial and operational roles assigned to CRM contacts. */
 export function useContactRoleAssignments(
   organizationId: bigint,
-  initialData?: QueryRows,
+  initialData?: QueryRowFor<"contact-role-assignments">[],
 ) {
   return useSubscriptionAwareQuery("contact-role-assignments", organizationId, {
     initialData,
@@ -918,23 +918,38 @@ export function useCrmCsvImportMutations(organizationId: bigint) {
 
 // ── Wave 1–2 CRM extensions ───────────────────────────────────────────────────
 
-export function usePrivacyConsents(organizationId: bigint, initialData?: QueryRows) {
+export function usePrivacyConsents(
+  organizationId: bigint,
+  initialData?: QueryRowFor<"privacy-consent">[],
+) {
   return useSubscriptionAwareQuery("privacy-consent", organizationId, { initialData })
 }
 
-export function useContactRelationships(organizationId: bigint, initialData?: QueryRows) {
+export function useContactRelationships(
+  organizationId: bigint,
+  initialData?: QueryRowFor<"contact-relationships">[],
+) {
   return useSubscriptionAwareQuery("contact-relationships", organizationId, { initialData })
 }
 
-export function useOpportunityPresence(organizationId: bigint, initialData?: QueryRows) {
+export function useOpportunityPresence(
+  organizationId: bigint,
+  initialData?: QueryRowFor<"opportunity-presence">[],
+) {
   return useSubscriptionAwareQuery("opportunity-presence", organizationId, { initialData })
 }
 
-export function useCrmForecastSnapshots(organizationId: bigint, initialData?: QueryRows) {
+export function useCrmForecastSnapshots(
+  organizationId: bigint,
+  initialData?: QueryRowFor<"crm-forecast-snapshots">[],
+) {
   return useSubscriptionAwareQuery("crm-forecast-snapshots", organizationId, { initialData })
 }
 
-export function useAssignmentRules(organizationId: bigint, initialData?: QueryRows) {
+export function useAssignmentRules(
+  organizationId: bigint,
+  initialData?: QueryRowFor<"assignment-rules">[],
+) {
   return useSubscriptionAwareQuery("assignment-rules", organizationId, { initialData })
 }
 
@@ -993,14 +1008,20 @@ export function useCreateOpportunityStage(organizationId: bigint) {
   })
 }
 
-export function useLeadSources(organizationId: bigint, initialData?: QueryRows) {
+export function useLeadSources(
+  organizationId: bigint,
+  initialData?: QueryRowFor<"lead-sources">[],
+) {
   return useSubscriptionAwareQuery("lead-sources", organizationId, {
     initialData,
     staleTime: 60_000,
   })
 }
 
-export function useLeadLostReasons(organizationId: bigint, initialData?: QueryRows) {
+export function useLeadLostReasons(
+  organizationId: bigint,
+  initialData?: QueryRowFor<"lead-lost-reasons">[],
+) {
   return useSubscriptionAwareQuery("lead-lost-reasons", organizationId, {
     initialData,
     staleTime: 60_000,
@@ -1160,29 +1181,47 @@ export function useCreateForecastSnapshot(organizationId: bigint) {
 
 // ── Deferred CRM foundations ──────────────────────────────────────────────────
 
-export function useLeadScores(organizationId: bigint, initialData?: QueryRows) {
+export function useLeadScores(
+  organizationId: bigint,
+  initialData?: QueryRowFor<"lead-scores">[],
+) {
   return useSubscriptionAwareQuery("lead-scores", organizationId, { initialData })
 }
 
-export function useLeadScoreFactors(organizationId: bigint, initialData?: QueryRows) {
+export function useLeadScoreFactors(
+  organizationId: bigint,
+  initialData?: QueryRowFor<"lead-score-factors">[],
+) {
   return useSubscriptionAwareQuery("lead-score-factors", organizationId, { initialData })
 }
 
-export function useContactSegmentRules(organizationId: bigint, initialData?: QueryRows) {
+export function useContactSegmentRules(
+  organizationId: bigint,
+  initialData?: QueryRowFor<"contact-segment-rules">[],
+) {
   return useSubscriptionAwareQuery("contact-segment-rules", organizationId, { initialData })
 }
 
-export function useContactRelationshipInsights(organizationId: bigint, initialData?: QueryRows) {
+export function useContactRelationshipInsights(
+  organizationId: bigint,
+  initialData?: QueryRowFor<"contact-relationship-insights">[],
+) {
   return useSubscriptionAwareQuery("contact-relationship-insights", organizationId, {
     initialData,
   })
 }
 
-export function useCrmConversations(organizationId: bigint, initialData?: QueryRows) {
+export function useCrmConversations(
+  organizationId: bigint,
+  initialData?: QueryRowFor<"crm-conversations">[],
+) {
   return useSubscriptionAwareQuery("crm-conversations", organizationId, { initialData })
 }
 
-export function useCrmConversationMessages(organizationId: bigint, initialData?: QueryRows) {
+export function useCrmConversationMessages(
+  organizationId: bigint,
+  initialData?: QueryRowFor<"crm-conversation-messages">[],
+) {
   return useSubscriptionAwareQuery("crm-conversation-messages", organizationId, {
     initialData,
   })

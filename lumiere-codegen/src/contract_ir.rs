@@ -4,13 +4,15 @@
 //! Consumers receive a complete immutable JSON document and must not inspect
 //! or clone mutable `lumiere-v-1` source while generating packages.
 
+use crate::erp_org_sql::{parse_and_validate, SubscriptionQueryPolicy};
 use crate::paths::Paths;
 use crate::support::{read_to_string, write_file};
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
 use std::process::Command;
 
 const IR_VERSION: u32 = 2;
@@ -67,6 +69,30 @@ struct OperationIdentityManifest {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct OperationClassificationManifest {
+    version: u32,
+    operations: BTreeMap<String, OperationClassification>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OperationClassification {
+    semantic_kind: String,
+    client_facing: bool,
+    idempotency: String,
+    codec: OperationCodec,
+    evidence: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OperationCodec {
+    id: String,
+    version: u32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ResourceScopeManifest {
     schema_version: u32,
     resources: BTreeMap<String, ResourceScopeMetadata>,
@@ -78,6 +104,35 @@ struct ResourceScopeMetadata {
     kind: String,
     organization_field: String,
     company_field: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SubscriptionCensus {
+    schema_version: u32,
+    entries: Vec<SubscriptionCensusEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SubscriptionCensusEntry {
+    resource: String,
+    source: SubscriptionCensusSource,
+    scope: String,
+    delivery_mode: String,
+    predicate_class: String,
+    expected_cardinality: String,
+    latency_class: String,
+    update_fanout: String,
+    source_class: String,
+    reconnect_class: String,
+    access_path: Value,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SubscriptionCensusSource {
+    table: String,
 }
 
 pub fn run(
@@ -114,10 +169,19 @@ pub fn run(
         serde_json::from_str(&read_to_string(&paths.contract_operation_ids_json)?)
             .with_context(|| format!("parse {}", paths.contract_operation_ids_json.display()))?;
     let operation_ids = locked_operation_ids(&base.operations, identity_manifest)?;
-    let operations = v2_operations(&base.operations, &operation_ids)?;
+    let classifications =
+        operation_classifications(&paths.operation_contracts_dir, &base.operations)?;
+    let operations = v2_operations(&base.operations, &operation_ids, &classifications)?;
     let resource_scope_manifest: ResourceScopeManifest =
         serde_json::from_str(&read_to_string(&paths.resource_scope_metadata_json)?)
             .with_context(|| format!("parse {}", paths.resource_scope_metadata_json.display()))?;
+    let subscription_census: SubscriptionCensus =
+        serde_json::from_str(&read_to_string(&paths.subscription_census_json)?)
+            .with_context(|| format!("parse {}", paths.subscription_census_json.display()))?;
+    let subscription_query_policies = parse_and_validate(
+        &read_to_string(&paths.subscription_query_policy_json)?,
+        registry_text,
+    )?;
     let resources = v2_resources(
         &base.resources,
         &row_types,
@@ -125,6 +189,12 @@ pub fn run(
         &base.types,
         &operations,
         resource_scope_manifest,
+        &subscription_census,
+        &subscription_query_policies.resources,
+    )?;
+    write_file(
+        &paths.query_row_map_ts_out,
+        &emit_query_row_map(&resources, &base.tables, &base.types, &subscription_census)?,
     )?;
     let persistence = persistence_contract(paths)?;
     let semantic = SemanticContract {
@@ -153,7 +223,76 @@ pub fn run(
     )?;
     println!("Wrote {}", paths.contract_ir_out.display());
     println!("Wrote {}", paths.contract_ir_checksum_out.display());
+    println!("Wrote {}", paths.query_row_map_ts_out.display());
     Ok(())
+}
+
+fn emit_query_row_map(
+    resources: &[Value],
+    tables: &[Value],
+    types: &[IndexedType],
+    subscription_census: &SubscriptionCensus,
+) -> Result<String> {
+    let mut rows = BTreeMap::new();
+    for resource in resources {
+        let name = value_name(resource, "resource")?;
+        let row_type = resource
+            .get("row")
+            .and_then(|row| row.get("type_reference"))
+            .and_then(Value::as_str)
+            .with_context(|| format!("resource {name} has no row type reference"))?;
+        rows.insert(name, row_type);
+    }
+    let type_names_by_index = types
+        .iter()
+        .map(|item| (item.index, item.names.as_slice()))
+        .collect::<BTreeMap<_, _>>();
+    let mut row_type_by_table = BTreeMap::new();
+    for table in tables {
+        let table_name = value_name(table, "table")?;
+        let type_index = table
+            .get("product_type_ref")
+            .and_then(Value::as_u64)
+            .with_context(|| format!("table {table_name} has no product_type_ref"))?
+            as usize;
+        let names = type_names_by_index
+            .get(&type_index)
+            .with_context(|| format!("table {table_name} references unknown type {type_index}"))?;
+        if names.len() != 1 {
+            bail!("table {table_name} must resolve to exactly one named row type");
+        }
+        row_type_by_table.insert(table_name, names[0].as_str());
+    }
+    for entry in &subscription_census.entries {
+        if rows.contains_key(entry.resource.as_str()) {
+            continue;
+        }
+        if let Some(row_type) = row_type_by_table.get(entry.source.table.as_str()) {
+            rows.insert(entry.resource.as_str(), *row_type);
+        }
+    }
+    let imports = rows.values().copied().collect::<BTreeSet<_>>();
+    let mut output = String::from(
+        "/** @generated from canonical contract IR v2. Do not edit. */\nimport type {\n",
+    );
+    for row_type in imports {
+        output.push_str("  ");
+        output.push_str(row_type);
+        output.push_str(",\n");
+    }
+    output.push_str("} from \"./types\"\n\nexport interface QueryRowMap {\n");
+    for (name, row_type) in rows {
+        output.push_str("  ");
+        output.push_str(&serde_json::to_string(name)?);
+        output.push_str(": ");
+        output.push_str(row_type);
+        output.push_str("\n");
+    }
+    output.push_str(
+        "}\n\nexport type QueryRowResourceKey = keyof QueryRowMap\n\n\
+         export type QueryRowFor<K extends QueryRowResourceKey> = QueryRowMap[K]\n",
+    );
+    Ok(output)
 }
 
 fn persistence_contract(paths: &Paths) -> Result<Value> {
@@ -271,6 +410,7 @@ fn locked_operation_ids(
 fn v2_operations(
     operations: &[Value],
     operation_ids: &BTreeMap<String, String>,
+    classifications: &BTreeMap<String, OperationClassification>,
 ) -> Result<Vec<Value>> {
     operations
         .iter()
@@ -299,23 +439,45 @@ fn v2_operations(
             let operation_id = operation_ids
                 .get(name)
                 .with_context(|| format!("operation {name} has no locked contract operation id"))?;
+            let classification = classifications
+                .get(name)
+                .with_context(|| format!("operation {name} has no authored contract classification"))?;
+            let application_exposure = application
+                .get("exposure")
+                .and_then(Value::as_str)
+                .unwrap_or("denied");
+            let expected_client_facing = application_exposure == "session";
+            if classification.client_facing != expected_client_facing {
+                bail!(
+                    "operation {name} client_facing={} conflicts with authored exposure {application_exposure}",
+                    classification.client_facing
+                );
+            }
+            let authorization_scope = application.get("scope").cloned().unwrap_or(Value::Null);
             Ok(serde_json::json!({
                 "application": application,
+                "authorization": {
+                    "scope": authorization_scope,
+                    "status": "classified",
+                },
+                "client_facing": classification.client_facing,
+                "classification_evidence": classification.evidence,
                 "codec": {
-                    "id": Value::Null,
-                    "status": "unassigned",
-                    "version": Value::Null,
+                    "id": classification.codec.id,
+                    "status": "assigned",
+                    "version": classification.codec.version,
                 },
                 "contract_operation_id": operation_id,
                 "contract_operation_id_status": "locked",
                 "idempotency": {
-                    "status": "unclassified",
+                    "status": "classified",
+                    "value": classification.idempotency,
                 },
                 "input": input,
                 "invalidates": invalidates,
                 "kind": {
-                    "status": "unclassified",
-                    "value": Value::Null,
+                    "status": "classified",
+                    "value": classification.semantic_kind,
                 },
                 "name": name,
                 "output": {
@@ -331,6 +493,100 @@ fn v2_operations(
             }))
         })
         .collect()
+}
+
+fn operation_classifications(
+    directory: &std::path::Path,
+    operations: &[Value],
+) -> Result<BTreeMap<String, OperationClassification>> {
+    let mut paths = fs::read_dir(directory)
+        .with_context(|| format!("read operation classifications {}", directory.display()))?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<std::io::Result<Vec<_>>>()?;
+    paths.retain(|path| path.extension().and_then(|value| value.to_str()) == Some("json"));
+    paths.sort();
+    if paths.is_empty() {
+        bail!(
+            "operation classification directory is empty: {}",
+            directory.display()
+        );
+    }
+
+    let operation_names = operations
+        .iter()
+        .map(|operation| value_name(operation, "operation").map(str::to_owned))
+        .collect::<Result<BTreeSet<_>>>()?;
+    let mut classifications = BTreeMap::new();
+    for path in paths {
+        let manifest: OperationClassificationManifest =
+            serde_json::from_str(&read_to_string(&path)?)
+                .with_context(|| format!("parse {}", path.display()))?;
+        if manifest.version != 1 {
+            bail!(
+                "{} has unsupported version {}",
+                path.display(),
+                manifest.version
+            );
+        }
+        for (name, classification) in manifest.operations {
+            validate_operation_classification(&name, &classification)?;
+            if classifications
+                .insert(name.clone(), classification)
+                .is_some()
+            {
+                bail!("operation {name} is classified by more than one shard");
+            }
+        }
+    }
+
+    let classified_names = classifications.keys().cloned().collect::<BTreeSet<_>>();
+    if operation_names != classified_names {
+        let missing = operation_names
+            .difference(&classified_names)
+            .take(20)
+            .cloned()
+            .collect::<Vec<_>>();
+        let stale = classified_names
+            .difference(&operation_names)
+            .take(20)
+            .cloned()
+            .collect::<Vec<_>>();
+        bail!(
+            "operation classifications do not match operations; missing(first 20)={missing:?}, stale(first 20)={stale:?}"
+        );
+    }
+    Ok(classifications)
+}
+
+fn validate_operation_classification(
+    name: &str,
+    classification: &OperationClassification,
+) -> Result<()> {
+    if !matches!(
+        classification.semantic_kind.as_str(),
+        "command" | "operator" | "test" | "internal"
+    ) {
+        bail!(
+            "operation {name} has invalid semantic kind {}",
+            classification.semantic_kind
+        );
+    }
+    if !matches!(
+        classification.idempotency.as_str(),
+        "idempotent" | "request_guarded" | "state_guarded" | "non_idempotent" | "not_applicable"
+    ) {
+        bail!(
+            "operation {name} has invalid idempotency {}",
+            classification.idempotency
+        );
+    }
+    if classification.codec.id != "spacetimedb-sats-json" || classification.codec.version != 1 {
+        bail!("operation {name} must use spacetimedb-sats-json codec version 1");
+    }
+    if classification.evidence.trim().is_empty() {
+        bail!("operation {name} classification evidence is empty");
+    }
+    Ok(())
 }
 
 fn v2_operation_input(operation_name: &str, application: &Value) -> Result<Value> {
@@ -393,6 +649,8 @@ fn v2_resources(
     types: &[IndexedType],
     operations: &[Value],
     scope_manifest: ResourceScopeManifest,
+    subscription_census: &SubscriptionCensus,
+    subscription_query_policies: &BTreeMap<String, SubscriptionQueryPolicy>,
 ) -> Result<Vec<Value>> {
     if scope_manifest.schema_version != 1 {
         bail!(
@@ -413,6 +671,42 @@ fn v2_resources(
         }
         if scope.organization_field.is_empty() || scope.company_field.is_empty() {
             bail!("resource {name} scope fields must not be empty");
+        }
+    }
+    if subscription_census.schema_version != 1 {
+        bail!(
+            "subscription census has unsupported schema version {}",
+            subscription_census.schema_version
+        );
+    }
+    let mut subscriptions = BTreeMap::new();
+    let virtual_subscription_resources = [
+        "auth",
+        "auth-role-table",
+        "org-permissions",
+        "policy-snapshots",
+    ]
+    .into_iter()
+    .collect::<BTreeSet<_>>();
+    for entry in &subscription_census.entries {
+        if !resource_names.contains(entry.resource.as_str())
+            && !virtual_subscription_resources.contains(entry.resource.as_str())
+        {
+            bail!(
+                "subscription census references unknown resource {}",
+                entry.resource
+            );
+        }
+        if subscriptions
+            .insert(entry.resource.as_str(), entry)
+            .is_some()
+        {
+            bail!("subscription census repeats resource {}", entry.resource);
+        }
+    }
+    for resource in subscription_query_policies.keys() {
+        if !resource_names.contains(resource.as_str()) {
+            bail!("subscription query policy references unknown resource {resource}");
         }
     }
     let row_type_names = types
@@ -495,33 +789,108 @@ fn v2_resources(
             }
             let mut writers = invalidated_by.remove(resource.name.as_str()).unwrap_or_default();
             writers.sort_unstable();
+            let subscription = subscriptions.get(resource.name.as_str()).copied();
+            let query_plan = subscription_query_policies
+                .get(&resource.name)
+                .map(serde_json::to_value)
+                .transpose()
+                .context("serialize subscription query plan")?;
+            let ownership_fields = resource
+                .contract
+                .get("mandatory")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .chain(
+                    resource
+                        .contract
+                        .get("default_restricted")
+                        .and_then(Value::as_array)
+                        .into_iter()
+                        .flatten(),
+                )
+                .filter_map(Value::as_str)
+                .collect::<BTreeSet<_>>();
+            let has_organization = ownership_fields.contains("organization_id");
+            let company_field = ownership_fields.iter().find(|field| {
+                matches!(
+                    **field,
+                    "company_id"
+                        | "company_ids"
+                        | "source_company_id"
+                        | "destination_company_id"
+                        | "origin_company_id"
+                )
+            });
+            let has_company = company_field.is_some();
             let scope = if let Some(scope) = scope_manifest.resources.get(&resource.name) {
                 serde_json::json!({
                     "company_field": scope.company_field,
                     "kind": scope.kind,
                     "organization_field": scope.organization_field,
                 })
+            } else if let Some(subscription) = subscription {
+                serde_json::json!({
+                    "company_field": company_field.map_or(Value::Null, |field| Value::String((*field).to_owned())),
+                    "identity_field": if subscription.scope.contains("identity") { Value::String("trusted_identity".to_owned()) } else { Value::Null },
+                    "kind": subscription.scope.replace('+', "_"),
+                    "organization_field": if has_organization { Value::String("organization_id".to_owned()) } else { Value::Null },
+                    "resolution": if subscription.scope == "global" { "global" } else if subscription.scope == "identity" { "trusted_context" } else if has_organization && (!subscription.scope.contains("company") || has_company) { "direct" } else { "server_parent_or_context" },
+                    "source": "subscription_census",
+                })
             } else {
                 serde_json::json!({
-                    "company_field": Value::Null,
-                    "kind": "unclassified",
-                    "organization_field": Value::Null,
+                    "company_field": company_field.map_or(Value::Null, |field| Value::String((*field).to_owned())),
+                    "identity_field": Value::Null,
+                    "kind": match (has_organization, has_company) {
+                        (true, true) => "organization_company",
+                        (true, false) => "organization",
+                        (false, true) => "organization_via_company",
+                        (false, false) => "organization_via_parent",
+                    },
+                    "organization_field": if has_organization { Value::String("organization_id".to_owned()) } else { Value::Null },
+                    "resolution": if has_organization { "direct" } else { "server_parent_or_context" },
+                    "source": "resource_registry",
                 })
             };
+            let subscription_contract = subscription.map_or_else(
+                || serde_json::json!({
+                    "delivery_mode": "bff-only",
+                    "query_plan": query_plan,
+                    "realtime": false,
+                    "status": "not-client-facing",
+                }),
+                |entry| serde_json::json!({
+                    "access_path": entry.access_path,
+                    "delivery_mode": entry.delivery_mode,
+                    "expected_cardinality": entry.expected_cardinality,
+                    "latency_class": entry.latency_class,
+                    "predicate_class": entry.predicate_class,
+                    "query_plan": query_plan,
+                    "realtime": entry.delivery_mode != "bff-only",
+                    "reconnect_class": entry.reconnect_class,
+                    "source_class": entry.source_class,
+                    "status": "classified",
+                    "update_fanout": entry.update_fanout,
+                }),
+            );
             Ok(serde_json::json!({
                 "contract": resource.contract,
                 "invalidated_by": writers,
                 "name": resource.name,
                 "query": {
+                    "authorization": "server-enforced",
                     "cursor_type_reference": Value::Null,
                     "filter_type_reference": Value::Null,
                     "input_type_reference": Value::Null,
-                    "status": "unclassified",
+                    "result_type_reference": row_type,
+                    "status": "classified",
                 },
                 "row": {
                     "type_reference": row_type,
                 },
                 "scope": scope,
+                "subscription": subscription_contract,
                 "source": {
                     "kind": if derived_row_type.is_some() { "table" } else { "unresolved" },
                     "table_reference": table,
@@ -843,6 +1212,8 @@ mod tests {
             "kind": "reducer",
             "application": {
                 "name": "create_order",
+                "exposure": "session",
+                "scope": {"organization": {"parameter": "organization_id", "position": 0}},
                 "params": [
                     {"name": "organization_id", "kind": "u64"},
                     {"name": "params", "kind": "ref", "ref_target": "CreateOrderParams"}
@@ -854,17 +1225,33 @@ mod tests {
         });
         let operation_ids =
             BTreeMap::from([("create_order".to_owned(), "erp.create_order".to_owned())]);
-        let operations = v2_operations(&[operation], &operation_ids).unwrap();
+        let classifications = BTreeMap::from([(
+            "create_order".to_owned(),
+            OperationClassification {
+                semantic_kind: "command".to_owned(),
+                client_facing: true,
+                idempotency: "non_idempotent".to_owned(),
+                codec: OperationCodec {
+                    id: "spacetimedb-sats-json".to_owned(),
+                    version: 1,
+                },
+                evidence: "fixture classification".to_owned(),
+            },
+        )]);
+        let operations = v2_operations(&[operation], &operation_ids, &classifications).unwrap();
         let operation = &operations[0];
         assert_eq!(operation["contract_operation_id"], "erp.create_order");
         assert_eq!(operation["contract_operation_id_status"], "locked");
-        assert_eq!(operation["kind"]["status"], "unclassified");
+        assert_eq!(operation["kind"]["status"], "classified");
+        assert_eq!(operation["kind"]["value"], "command");
         assert_eq!(operation["source_kind"], "reducer");
         assert_eq!(operation["target"]["kind"], "spacetimedb_reducer");
         assert_eq!(operation["input"]["type_reference"], "CreateOrderParams");
         assert_eq!(operation["output"]["kind"], "unit");
-        assert_eq!(operation["codec"]["status"], "unassigned");
-        assert_eq!(operation["idempotency"]["status"], "unclassified");
+        assert_eq!(operation["codec"]["status"], "assigned");
+        assert_eq!(operation["codec"]["id"], "spacetimedb-sats-json");
+        assert_eq!(operation["idempotency"]["status"], "classified");
+        assert_eq!(operation["authorization"]["status"], "classified");
     }
 
     #[test]
@@ -886,8 +1273,8 @@ mod tests {
         });
         let operation_ids =
             BTreeMap::from([("create_order".to_owned(), "erp.create_order".to_owned())]);
-        let error =
-            v2_operations(&[operation], &operation_ids).expect_err("duplicate positions must fail");
+        let error = v2_operations(&[operation], &operation_ids, &BTreeMap::new())
+            .expect_err("duplicate positions must fail");
         assert!(error
             .to_string()
             .contains("repeats client field position 0"));
@@ -904,6 +1291,59 @@ mod tests {
             .expect_err("missing and stale identity entries must fail");
         assert!(error.to_string().contains("missing=[\"create_order\"]"));
         assert!(error.to_string().contains("stale=[\"stale_order\"]"));
+    }
+
+    #[test]
+    fn operation_classification_requires_exact_census() {
+        let root = std::env::temp_dir().join(format!(
+            "lumiere-operation-classifications-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(
+            root.join("core.json"),
+            r#"{
+              "version": 1,
+              "operations": {
+                "create_order": {
+                  "semantic_kind": "command",
+                  "client_facing": true,
+                  "idempotency": "non_idempotent",
+                  "codec": {"id": "spacetimedb-sats-json", "version": 1},
+                  "evidence": "reviewed reducer body"
+                }
+              }
+            }"#,
+        )
+        .unwrap();
+        let operations = vec![serde_json::json!({"name": "create_order"})];
+        let classifications = operation_classifications(&root, &operations).unwrap();
+        assert_eq!(classifications.len(), 1);
+
+        let missing = vec![
+            serde_json::json!({"name": "create_order"}),
+            serde_json::json!({"name": "cancel_order"}),
+        ];
+        let error = operation_classifications(&root, &missing).unwrap_err();
+        assert!(error.to_string().contains("cancel_order"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn operation_classification_rejects_invalid_policy() {
+        let classification = OperationClassification {
+            semantic_kind: "mutation-ish".to_owned(),
+            client_facing: true,
+            idempotency: "probably".to_owned(),
+            codec: OperationCodec {
+                id: "ad-hoc-json".to_owned(),
+                version: 1,
+            },
+            evidence: String::new(),
+        };
+        let error = validate_operation_classification("create_order", &classification)
+            .expect_err("unknown policy must fail closed");
+        assert!(error.to_string().contains("semantic kind"));
     }
 
     #[test]
@@ -1007,6 +1447,11 @@ mod tests {
                 schema_version: 1,
                 resources: BTreeMap::new(),
             },
+            &SubscriptionCensus {
+                schema_version: 1,
+                entries: Vec::new(),
+            },
+            &BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(output[0]["row"]["type_reference"], "SaleOrder");
@@ -1015,8 +1460,8 @@ mod tests {
             output[0]["invalidated_by"],
             serde_json::json!(["erp.create_order"])
         );
-        assert_eq!(output[0]["scope"]["kind"], "unclassified");
-        assert_eq!(output[0]["query"]["status"], "unclassified");
+        assert_eq!(output[0]["scope"]["kind"], "organization_via_parent");
+        assert_eq!(output[0]["query"]["status"], "classified");
     }
 
     #[test]
@@ -1042,6 +1487,11 @@ mod tests {
                 schema_version: 1,
                 resources: BTreeMap::new(),
             },
+            &SubscriptionCensus {
+                schema_version: 1,
+                entries: Vec::new(),
+            },
+            &BTreeMap::new(),
         )
         .expect_err("unknown row type must fail");
         assert!(error.to_string().contains("unknown row type MissingRow"));
@@ -1081,6 +1531,11 @@ mod tests {
                 schema_version: 1,
                 resources: BTreeMap::from([("account-account-types".to_owned(), scope)]),
             },
+            &SubscriptionCensus {
+                schema_version: 1,
+                entries: Vec::new(),
+            },
+            &BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -1090,6 +1545,75 @@ mod tests {
                 "kind": "organization_optional_company",
                 "organization_field": "organization_id",
             })
+        );
+    }
+
+    #[test]
+    fn v2_resource_emits_subscription_classification_from_census() {
+        let resources = vec![NamedContract {
+            name: "orders".to_owned(),
+            contract: serde_json::json!({
+                "table": "sale_order",
+                "mandatory": ["id", "organization_id", "company_id"]
+            }),
+        }];
+        let row_types = BTreeMap::from([("orders".to_owned(), "SaleOrder".to_owned())]);
+        let tables = vec![serde_json::json!({"name": "sale_order", "product_type_ref": 0})];
+        let types = vec![IndexedType {
+            index: 0,
+            names: vec!["SaleOrder".to_owned()],
+            definition: serde_json::json!({"Product": {"elements": []}}),
+        }];
+        let census = SubscriptionCensus {
+            schema_version: 1,
+            entries: vec![SubscriptionCensusEntry {
+                resource: "orders".to_owned(),
+                source: SubscriptionCensusSource {
+                    table: "sale_order".to_owned(),
+                },
+                scope: "organization+company".to_owned(),
+                delivery_mode: "invalidation-only".to_owned(),
+                predicate_class: "none".to_owned(),
+                expected_cardinality: "bounded-page".to_owned(),
+                latency_class: "interactive".to_owned(),
+                update_fanout: "medium".to_owned(),
+                source_class: "canonical-table".to_owned(),
+                reconnect_class: "on-demand".to_owned(),
+                access_path: serde_json::json!({
+                    "status": "approved",
+                    "key": "organization_company_id"
+                }),
+            }],
+        };
+        let output = v2_resources(
+            &resources,
+            &row_types,
+            &tables,
+            &types,
+            &[],
+            ResourceScopeManifest {
+                schema_version: 1,
+                resources: BTreeMap::new(),
+            },
+            &census,
+            &BTreeMap::from([(
+                "orders".to_owned(),
+                SubscriptionQueryPolicy {
+                    table: "sale_order".to_owned(),
+                    predicates: Vec::new(),
+                    order_by: Vec::new(),
+                },
+            )]),
+        )
+        .unwrap();
+
+        assert_eq!(output[0]["scope"]["kind"], "organization_company");
+        assert_eq!(output[0]["scope"]["resolution"], "direct");
+        assert_eq!(output[0]["subscription"]["status"], "classified");
+        assert_eq!(output[0]["subscription"]["realtime"], true);
+        assert_eq!(
+            output[0]["subscription"]["query_plan"]["table"],
+            "sale_order"
         );
     }
 
@@ -1112,6 +1636,11 @@ mod tests {
                     },
                 )]),
             },
+            &SubscriptionCensus {
+                schema_version: 1,
+                entries: Vec::new(),
+            },
+            &BTreeMap::new(),
         )
         .expect_err("unknown scoped resource must fail");
         assert!(error

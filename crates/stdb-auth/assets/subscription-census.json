@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "status": "SQ-0 census foundation; live acceptance/access-path mapping pending",
+  "status": "C8 canonical subscription classification; live acceptance/access-path mapping pending",
   "authoritativeResourceSet": {
-    "source": "frontend/packages/stdb/src/queries/erp-subscriptions.ts:SUBSCRIPTION_RESOURCE_KEYS",
+    "source": "crates/stdb-auth/assets/subscription-census.json:entries",
     "count": 273
   },
   "rustCompatibility": {

@@ -22,6 +22,7 @@ class ContractIrPinTest(unittest.TestCase):
         commit_stream_extra=None,
         projection_extra=False,
         projection_primary_key="id",
+        operations=None,
     ):
         temp = tempfile.TemporaryDirectory()
         root = Path(temp.name) / "ir"
@@ -117,7 +118,7 @@ class ContractIrPinTest(unittest.TestCase):
             },
         }
         semantic = {
-            "operations": [],
+            "operations": operations or [],
             "resources": [],
             "tables": tables,
             "types": [],
@@ -218,6 +219,65 @@ class ContractIrPinTest(unittest.TestCase):
         result = self._run(ir_path, pin_path)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("primary key disagrees with storage policy", result.stderr)
+
+    def test_operation_requires_complete_classification(self):
+        operation = {
+            "application": {
+                "client_input": {"fields": []},
+                "exposure": "denied",
+                "name": "internal_probe",
+                "params": [],
+                "scope": None,
+            },
+            "authorization": {"scope": None, "status": "classified"},
+            "client_facing": False,
+            "classification_evidence": "reviewed internal reducer",
+            "codec": {
+                "id": "spacetimedb-sats-json",
+                "status": "assigned",
+                "version": 1,
+            },
+            "contract_operation_id": "erp.internal_probe",
+            "contract_operation_id_status": "locked",
+            "idempotency": {"status": "classified", "value": "not_applicable"},
+            "input": {
+                "kind": "operation_parameters",
+                "parameter_positions": [],
+                "type_reference": None,
+            },
+            "invalidates": [],
+            "kind": {"status": "classified", "value": "internal"},
+            "name": "internal_probe",
+            "output": {"kind": "unit", "type_reference": None},
+            "schema": {"name": "internal_probe"},
+            "source_kind": "reducer",
+            "target": {"kind": "spacetimedb_reducer", "name": "internal_probe"},
+        }
+        temp, ir_path, pin_path = self._fixture(operations=[operation])
+        self.addCleanup(temp.cleanup)
+        valid = self._run(ir_path, pin_path)
+        self.assertEqual(valid.returncode, 0, valid.stderr)
+
+        ir = json.loads(ir_path.read_text())
+        ir["operations"][0]["classification_evidence"] = ""
+        semantic = {key: value for key, value in ir.items() if key not in {
+            "ir_version", "source_commit", "source_dirty", "schema_hash"
+        }}
+        ir["schema_hash"] = "sha256:" + hashlib.sha256(
+            json.dumps(semantic, separators=(",", ":")).encode()
+        ).hexdigest()
+        raw = json.dumps(ir, indent=2).encode() + b"\n"
+        ir_path.write_bytes(raw)
+        ir_path.with_suffix(ir_path.suffix + ".sha256").write_text(
+            f"{hashlib.sha256(raw).hexdigest()}  {ir_path.name}\n"
+        )
+        pin = json.loads(pin_path.read_text())
+        pin["artifact_sha256"] = hashlib.sha256(raw).hexdigest()
+        pin["schema_hash"] = ir["schema_hash"]
+        pin_path.write_text(json.dumps(pin, indent=2) + "\n")
+        invalid = self._run(ir_path, pin_path)
+        self.assertNotEqual(invalid.returncode, 0)
+        self.assertIn("classification evidence", invalid.stderr)
 
     def test_commit_stream_requires_dependency_safe_row_order(self):
         temp, ir_path, pin_path = self._fixture(

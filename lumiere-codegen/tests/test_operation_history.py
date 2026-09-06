@@ -211,6 +211,73 @@ class OperationHistoryTests(unittest.TestCase):
                 allow_previous_compatibility=True,
             )
 
+    def test_bulk_revision_binds_previous_release_and_new_baseline(self):
+        previous = ir_with(operation())
+        current_operation = operation()
+        current_operation["application"]["semantic_kind"] = "command"
+        current = ir_with(current_operation)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            current_ir_path = root / "current.json"
+            previous_ir_path = root / "previous.json"
+            history_path = root / "history.json"
+            current_ir_path.write_text(json.dumps(current), encoding="utf-8")
+            previous_ir_path.write_text(json.dumps(previous), encoding="utf-8")
+            history_path.write_text(
+                json.dumps(MODULE.build_history_from_value(previous)), encoding="utf-8"
+            )
+
+            advanced = MODULE.advance_history(
+                current_ir_path,
+                history_path,
+                previous_release="v0.3.33",
+                previous_ir_sha256="sha256:" + "a" * 64,
+                reason="classify every operation contract",
+            )
+            history_path.write_text(json.dumps(advanced), encoding="utf-8")
+
+            MODULE.verify(current_ir_path, history_path)
+            MODULE.verify(
+                previous_ir_path,
+                history_path,
+                allow_previous_compatibility=True,
+            )
+            self.assertEqual(advanced["schema_version"], 3)
+            self.assertEqual(advanced["revisions"][0]["operation_count"], 1)
+
+    def test_bulk_revision_does_not_allow_an_unbound_previous_shape(self):
+        previous = ir_with(operation())
+        current_operation = operation()
+        current_operation["application"]["semantic_kind"] = "command"
+        current = ir_with(current_operation)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            current_ir_path = root / "current.json"
+            tampered_ir_path = root / "tampered.json"
+            history_path = root / "history.json"
+            current_ir_path.write_text(json.dumps(current), encoding="utf-8")
+            history_path.write_text(
+                json.dumps(MODULE.build_history_from_value(previous)), encoding="utf-8"
+            )
+            advanced = MODULE.advance_history(
+                current_ir_path,
+                history_path,
+                previous_release="v0.3.33",
+                previous_ir_sha256="sha256:" + "a" * 64,
+                reason="classify every operation contract",
+            )
+            history_path.write_text(json.dumps(advanced), encoding="utf-8")
+            tampered = copy.deepcopy(previous)
+            tampered["operations"][0]["target"]["name"] = "other_reducer"
+            tampered_ir_path.write_text(json.dumps(tampered), encoding="utf-8")
+
+            with self.assertRaisesRegex(MODULE.OperationHistoryError, "unapproved shape"):
+                MODULE.verify(
+                    tampered_ir_path,
+                    history_path,
+                    allow_previous_compatibility=True,
+                )
+
     def verify_value(self, ir, history):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

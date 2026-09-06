@@ -1,0 +1,4685 @@
+{
+  "version": 1,
+  "operations": {
+    "acknowledge_insight": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/intelligence.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "add_form_field": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/forms/mod.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "add_org_member": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/users.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "add_performance_goal": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/performance.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "add_user_custom_field": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/forms/mod.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "add_user_to_organization": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/users.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "add_widget_to_dashboard": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/dashboards.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "add_workflow_human_task_comment": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/approvals.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "append_ai_agent_run_step": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skills.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "append_ai_chat_message": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/chat.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "apply_global_migrations": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/migrations.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "apply_hr_integration_intent": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/integrations.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "apply_org_migrations": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/migrations.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "apply_organization_reconstruction_batch": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/reconstruction.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "apply_pending_hr_integration_intents": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/integrations.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "approve_ai_action_draft": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/action_drafts.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "approve_document_processing_job": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/intelligence.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "approve_leave": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/leaves.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "archive_ai_chat_session": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/chat.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "archive_employee": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/employees.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "assign_benefit_enrollment": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/benefits.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "assign_onboarding_template": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/onboarding.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "assign_role": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/permissions.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "assign_team_member_skill": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skills.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "audit_manufacturing_data": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/manufacturing_imports.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "backfill_external_ids": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/organization.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "begin_organization_reconstruction": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/reconstruction.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "bind_password_reset_token": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/auth.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "bind_user_credential": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/auth.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "bind_user_profile": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/auth.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "bootstrap_new_tenant": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/organization.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "cancel_ai_agent_run": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skills.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "cancel_contract": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/contracts.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "cancel_message_batch": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/operational_messaging.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "cancel_payslip": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/payroll.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "cancel_queue_job": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/queue.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "cancel_workflow": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/runtime.rs: body delegates through an explicit replay/idempotency receipt guard"
+    },
+    "cancel_workflow_outbox": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/delivery.rs: body delegates through an explicit replay/idempotency receipt guard"
+    },
+    "cancel_workflow_timer": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/delivery.rs: body delegates through an explicit replay/idempotency receipt guard"
+    },
+    "claim_ai_skill_certification": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skill_registry.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "claim_queue_job": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/queue.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "claim_workflow_human_task": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/approvals.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "clone_workflow_version_to_draft": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/definitions.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "complete_ai_agent_run": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skills.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "complete_ai_skill_certification": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skill_registry.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "complete_document_processing_job": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/intelligence.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "complete_offboarding_item": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/offboarding.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "complete_onboarding_item": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/onboarding.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "complete_organization_reconstruction": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/reconstruction.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "complete_performance_review": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/performance.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "complete_queue_job": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/queue.rs: body delegates through an explicit replay/idempotency receipt guard"
+    },
+    "complete_scheduled_owner_report_run": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/reports.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "confirm_payslip": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/payroll.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "create_ai_action_draft": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/action_drafts.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_ai_agent": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/agents.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_ai_agent_run": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skills.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_ai_chat_session": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/chat.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_ai_insight": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/intelligence.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_ai_reducer_allowlist": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/reducer_allowlist.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_ai_skill": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skills.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_ai_skill_certification_environment": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skill_registry.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "create_ai_skill_fixture": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skill_registry.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_ai_skill_version": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skill_registry.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_ai_team_member": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/agents.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_analytics_metric": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/reports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_attendance_punch": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/attendance.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_audit_rule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/audit.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_benefit_plan": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/benefits.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_billing_account": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/billing.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "create_company": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/organization.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_contract": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/contracts.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_country": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/reference.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_currency": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/reference.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_currency_rate": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/reference.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_dashboard": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/dashboards.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_dashboard_widget": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/dashboards.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_data_classification": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/privacy.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_data_classification_rule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/privacy.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_department": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/employees.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_document_processing_job": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/intelligence.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_employee": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/employees.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_form_configuration": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/forms/mod.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "create_hr_applicant": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/recruitment.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_hr_employee_document": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/documents.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_hr_employee_skill": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/skills.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "create_hr_global_assignment": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/global_assignment.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_hr_integration_intent": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/integrations.rs: body delegates through an explicit replay/idempotency receipt guard"
+    },
+    "create_hr_labor_cost_snapshot": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/wfm.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_hr_shift_opt_job": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/wfm.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_hr_skill": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/skills.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_invoice_reminder_batch": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/operational_messaging.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_job_position": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/employees.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_leave_request": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/leaves.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_leave_type": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/leaves.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_message_batch": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/operational_messaging.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_message_template": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/operational_messaging.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_onboarding_template": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/onboarding.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_operational_message": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/operational_messaging.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_organization": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/organization.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_payroll_export_intent": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/payroll.rs: body delegates through an explicit replay/idempotency receipt guard"
+    },
+    "create_payroll_structure": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/payroll.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_payslip": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/payroll.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_performance_cycle": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/performance.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_report_template": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/reports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_role": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/permissions.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_salary_rule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/payroll.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_saved_report": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/reports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_scheduled_report": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/reports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_sod_conflict_rule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/permissions.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_statutory_id": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/country_pack_hr.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "create_uom": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/reference.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_uom_category": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/reference.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_uom_conversion": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/reference.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_user_invite": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/auth.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_user_session": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/users.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_utm_campaign": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/utm.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_utm_medium": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/utm.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_utm_source": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/utm.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_warehouse_3_d_zone": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "create_warehouse_3_d_zone: IR schema/exposure is locked as a session command; no reducer definition is present, so classification fails closed"
+    },
+    "create_work_schedule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/attendance.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_workflow": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/definitions.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_workflow_delegation": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/authorization.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "create_workflow_migration_plan": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/migration.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "decide_workflow_human_task": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/approvals.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "delete_ai_reducer_allowlist": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/reducer_allowlist.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "delete_company": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/organization.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "delete_form_field": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/forms/mod.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "delete_hr_employee_document": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/documents.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "delete_hr_employee_skill": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/skills.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "delete_hr_global_assignment": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/global_assignment.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "delete_import_mapping_template": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/import_mapping_templates.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "delete_record_custom_field_values": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/forms/mod.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "delete_saved_report": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/reports.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "delete_search_embedding": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/intelligence.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "delete_statutory_id": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/country_pack_hr.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "delete_user_custom_field": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/forms/mod.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "delete_warehouse_3_d_zone": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "delete_warehouse_3_d_zone: IR schema/exposure is locked as a session state mutation; no reducer definition is present, so classification fails closed"
+    },
+    "delete_workflow_edge": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/definitions.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "delete_workflow_node": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/definitions.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "dev_promote_caller_superuser": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/auth.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "dismiss_insight": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/intelligence.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "dispatch_due_owner_reports": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/reports.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "end_user_session": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/users.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "enqueue_job": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/queue.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "ensure_dev_admin": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/seed.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "execute_retention_purge": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/privacy.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "expire_ai_action_drafts": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/action_drafts.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "expire_contract": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/contracts.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "fail_ai_skill_certification": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skill_registry.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "fail_organization_reconstruction": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/reconstruction.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "fail_scheduled_owner_report_run": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/reports.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "finalize_import_assistant_job": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/import_mapping_templates.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "fire_workflow_timer": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/delivery.rs: body delegates through an explicit replay/idempotency receipt guard"
+    },
+    "get_form_configuration": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/forms/mod.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "get_organization_form_configs": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/forms/mod.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "grant_delegated_admin_scope": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/permissions.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "grant_field_permission": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/permissions.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "grant_permission": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/permissions.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "identity_connected": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/lib.rs: lifecycle reducer has no client retry mutation semantics"
+    },
+    "identity_disconnected": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/lib.rs: lifecycle reducer has no client retry mutation semantics"
+    },
+    "import_account_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/accounting_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_account_move_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/accounting_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_account_move_line_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/accounting_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_ai_agent_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/ai_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_analytic_account_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/accounting_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_analytics_metric_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/analytics_imports.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "import_bom_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/manufacturing_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_bom_line_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/manufacturing_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_budget_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/accounting_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_budget_line_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/accounting_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_company_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/core_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_contact_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/crm_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_country_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/core_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_currency_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/core_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_currency_rate_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/core_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_expense_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/expenses_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_expense_sheet_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/expenses_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_helpdesk_sla_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/helpdesk_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_helpdesk_stage_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/helpdesk_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_helpdesk_team_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/helpdesk_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_helpdesk_ticket_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/helpdesk_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_hr_contract_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/hr_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_hr_department_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/hr_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_hr_employee_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/hr_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_hr_job_position_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/hr_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_hr_leave_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/hr_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_hr_leave_type_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/hr_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_hr_payroll_structure_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/hr_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_hr_payslip_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/hr_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_hr_resource_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/hr_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_hr_salary_rule_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/hr_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_knowledge_article_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/document_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_knowledge_category_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/document_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_lead_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/crm_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_lot_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/inventory_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_manufacturing_order_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/manufacturing_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_opportunity_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/crm_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_product_category_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/inventory_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_product_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/inventory_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_product_variant_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/inventory_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_project_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/project_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_purchase_order_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/purchasing_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_purchase_order_line_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/purchasing_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_report_template_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/analytics_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_role_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/core_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_sale_order_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/sales_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_sale_order_line_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/sales_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_stock_location_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/inventory_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_stock_quant_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/inventory_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_subscription_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/subscription_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_subscription_plan_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/subscription_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_supplier_info_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/purchasing_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_task_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/project_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_tax_rate_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/accounting_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_timesheet_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/project_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_uom_category_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/core_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_uom_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/core_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_warehouse_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/inventory_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_workcenter_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/manufacturing_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "import_workflow_csv": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/workflow_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "init": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/lib.rs: lifecycle reducer has no client retry mutation semantics"
+    },
+    "initialize_default_form_configs": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/forms/mod.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "invalidate_workflow_human_task": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/approvals.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "log_audit_event": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/audit.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "log_hr_pii_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/pii.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "mark_embedding_synced": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/intelligence.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "mark_invite_accepted": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/auth.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "mark_mail_message_delivered": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/messaging.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "mark_onboarding_done": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/onboarding.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "mark_password_reset_token_projection_used": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/auth.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "migrate_all_organizations": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/forms/migrations.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "migrate_workflow_instance": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/migration.rs: body delegates through an explicit replay/idempotency receipt guard"
+    },
+    "open_contract": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/contracts.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "post_internal_note": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/messaging.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "post_message": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/messaging.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "post_payslip": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/payroll.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "preflight_workflow_migration": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/migration.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "project_user_profile": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/auth.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "promote_ai_skill_version": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skill_registry.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "publish_form_configuration": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/forms/mod.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "publish_workflow_version": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/definitions.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "rebuild_manufacturing_associations": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/manufacturing_imports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "recompute_workflow_timers_for_calendar": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/packs.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "record_ai_agent_run_policy_snapshot": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skill_registry.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "record_ai_spend": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/agents.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "record_generated_owner_report": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/reports.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "record_hr_integration_result": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/integrations.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "record_message_copied": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/operational_messaging.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "record_payroll_export_result": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/payroll.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "record_platform_migration_binding": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/migrations.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "record_privacy_consent": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/privacy.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "record_report_run": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/reports.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "record_workflow_outbox_result": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/delivery.rs: body delegates through an explicit replay/idempotency receipt guard"
+    },
+    "refresh_hr_capacity_forecast": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/wfm.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "refresh_policy_snapshot": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/permissions.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "refuse_leave": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/leaves.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "register_ai_skill_certification_runtime_profile": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skill_registry.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "register_cold_tier_service_identity": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/cold_tier_identity.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "register_queue_worker": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/queue.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "reject_ai_action_draft": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/action_drafts.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "remove_user_from_organization": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/users.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "renew_queue_job_lease": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/queue.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "request_ai_skill_certification": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skill_registry.rs: body delegates through an explicit replay/idempotency receipt guard"
+    },
+    "request_embedding_job": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/intelligence.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "reset_leave_to_draft": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/leaves.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "retire_workflow_version": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/definitions.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "retry_dead_letter_queue_job": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/queue.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "review_message_batch": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/operational_messaging.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "revoke_delegated_admin_scope": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/permissions.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "revoke_field_permission": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/permissions.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "revoke_permission": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/permissions.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "revoke_role": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/permissions.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "revoke_workflow_delegation": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/authorization.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "rollback_ai_skill_release": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skill_registry.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "rollback_import_job": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/import_tracker.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "run_ai_document_processing_job_document_relation_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/ai/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_ai_embedding_org_isolation_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/ai/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_ai_insight_org_scope_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/ai/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_all_ai_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/ai/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_all_analytics_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/analytics/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_all_core_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/core/tests/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_all_domain_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/lib.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_all_fleet_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_all_fleet_tests: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_all_helpdesk_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_all_helpdesk_tests: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_all_hr_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/hr/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_all_integrations_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_all_integrations_tests: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_all_inventory_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_all_inventory_tests: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_all_iot_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_all_iot_tests: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_all_manufacturing_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_all_manufacturing_tests: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_all_platform_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_all_projects_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_all_projects_tests: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_all_workflow_deterministic_core_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/workflow/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_all_workflow_foundation_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/workflow/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_all_workflow_human_effect_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/workflow/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_analytics_cross_company_widget_add_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/analytics/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_analytics_dashboard_company_scope_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/analytics/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_c_0_organization_ownership_backfill": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_c_0_organization_ownership_backfill: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_core_operational_messaging_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/core/tests/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_core_permissions_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/core/tests/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_core_sod_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/core/tests/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_country_pack_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_data_ops_commit_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/data_ops/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_documents_folder_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_documents_wave_a_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_documents_wave_b_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_documents_wave_c_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_documents_wave_d_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_documents_wave_e_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_fleet_gap_fixes_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_fleet_gap_fixes_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_fleet_relational_integrity_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_fleet_relational_integrity_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_fleet_wave_a_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_fleet_wave_a_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_forms_custom_field_invalid_model_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_forms_custom_field_record_existence_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_forms_custom_field_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_helpdesk_relational_integrity_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_helpdesk_relational_integrity_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_helpdesk_ticket_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_hr_leave_type_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_hr_wave_a_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/hr/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_integrations_gap_fixes_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_integrations_gap_fixes_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_3_pl_asn_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_3_pl_asn_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_adjustment_company_derived_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_adjustment_company_derived_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_adjustment_process_idempotency_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_adjustment_process_idempotency_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_adjustment_product_negative_matrix_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_adjustment_product_negative_matrix_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_adjustment_reason_negative_matrix_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_adjustment_reason_negative_matrix_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_adjustment_requires_valid_reason_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_adjustment_requires_valid_reason_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_adjustment_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_adjustment_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_atp_fail_closed_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_atp_fail_closed_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_cartonization_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_cartonization_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_close_lock_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_close_lock_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_close_no_gl_on_create_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_close_no_gl_on_create_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_close_reopen_blocked_gl_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_close_reopen_blocked_gl_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_close_valuation_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_close_valuation_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_company_isolation_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_company_isolation_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_consignment_atp_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_consignment_atp_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_cross_dock_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_cross_dock_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_delivery_quant_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_delivery_quant_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_directed_putaway_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_directed_putaway_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_exception_queues_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_exception_queues_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_expired_lot_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_expired_lot_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_fefo_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_fefo_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_integration_applied_guard_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_integration_applied_guard_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_integration_result_fk_relations_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_integration_result_fk_relations_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_lot_reserve_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_lot_reserve_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_lot_validate_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_lot_validate_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_multi_wh_promise_atp_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_multi_wh_promise_atp_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_packing_workflow_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_packing_workflow_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_product_category_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_product_category_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_product_update_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_product_update_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_qc_quarantine_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_qc_quarantine_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_receipt_average_costing_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_receipt_average_costing_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_receipt_fifo_layers_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_receipt_fifo_layers_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_receipt_quant_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_receipt_quant_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_replenishment_demand_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_replenishment_demand_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_replenishment_relation_negative_matrix_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_replenishment_relation_negative_matrix_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_replenishment_rule_not_found_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_replenishment_rule_not_found_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_serial_id_validate_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_serial_id_validate_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_serial_reserve_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_serial_reserve_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_server_owns_state_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_server_owns_state_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_stock_inventory_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_stock_inventory_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_stock_quant_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_stock_quant_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_uom_conversion_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_uom_conversion_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_warehouse_sync_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_warehouse_sync_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_inventory_wave_release_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_inventory_wave_release_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_iot_relational_integrity_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_iot_relational_integrity_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_manufacturing_consume_materials_cross_org_component_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_manufacturing_consume_materials_cross_org_component_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_manufacturing_loss_category_create_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_manufacturing_loss_category_create_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_manufacturing_loss_category_invalid_category_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_manufacturing_loss_category_invalid_category_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_manufacturing_productivity_relational_integrity_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_manufacturing_productivity_relational_integrity_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_manufacturing_workcenter_create_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_manufacturing_workcenter_create_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_manufacturing_workcenter_cross_org_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_manufacturing_workcenter_cross_org_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_manufacturing_workcenter_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_manufacturing_workorder_workcenter_integrity_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_manufacturing_workorder_workcenter_integrity_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_owner_report_schedule": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/reports.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "run_projects_wave_a_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_projects_wave_a_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_projects_wave_c_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_projects_wave_c_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_projects_wave_d_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_projects_wave_d_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_projects_wave_e_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_projects_wave_e_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_projects_wave_f_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "run_projects_wave_f_test: IR schema/exposure is locked as a denied test reducer; no client retry semantics apply"
+    },
+    "run_queue_foundation_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/core/tests/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_subscription_plan_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_tenant_isolation_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_workflow_action_registry_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/workflow/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_workflow_authorization_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/workflow/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_workflow_definition_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_workflow_delivery_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/workflow/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_workflow_evaluator_simulation_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/workflow/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_workflow_human_task_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/workflow/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_workflow_migration_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/workflow/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_workflow_runtime_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/workflow/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "save_import_mapping_template": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/import_mapping_templates.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "seed_dev_data": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/seed.rs: body delegates through an explicit replay/idempotency receipt guard"
+    },
+    "seed_hr_country_pack_overlays": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/country_pack_hr.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "seed_organization_form_configs": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/forms/migrations.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "set_ai_agent_active": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/agents.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "set_ai_reducer_allowlist_enabled": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/reducer_allowlist.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "set_ai_skill_active": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skills.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "set_billing_status": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/billing.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "set_company_country_pack": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/country_pack.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "set_company_vertical_pack": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/organization.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "set_contact_communication_preference": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/operational_messaging.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "set_form_field_label": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/forms/mod.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "set_form_role_config": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/forms/mod.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "set_record_custom_field_values": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/forms/mod.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "set_workflow_candidate_group_member": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/approvals.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "set_workflow_migration_plan_active": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/migration.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "share_dashboard": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/dashboards.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "signal_workflow": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/runtime.rs: body delegates through an explicit replay/idempotency receipt guard"
+    },
+    "simulate_workflow": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/simulation.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "start_offboarding": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/offboarding.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "start_workflow": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/runtime.rs: body delegates through an explicit replay/idempotency receipt guard"
+    },
+    "submit_leave": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/leaves.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "submit_performance_review": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/performance.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "subscribe_to_record": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/messaging.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "test_bootstrap_new_tenant_records_complete_commit": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/core/tests/bootstrap_commit_test.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "test_queue_job_edge_cases": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/core/tests/queue_tests.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "test_queue_system": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/core/tests/queue_tests.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "test_worker_edge_cases": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/core/tests/queue_tests.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "unassign_team_member_skill": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skills.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "unenroll_benefit_enrollment": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/benefits.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "unsubscribe_from_record": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/messaging.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "update_ai_action_draft_params": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/action_drafts.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "update_ai_agent": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/agents.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_ai_chat_session_title": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/chat.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_ai_reducer_allowlist": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/reducer_allowlist.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "update_audit_rule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/audit.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_billing_account": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/billing.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_company": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/organization.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_company_address": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/organization.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_company_business": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/organization.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_company_hierarchy": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/organization.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_contract": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/contracts.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_department": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/employees.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_employee": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/employees.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_form_field": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/forms/mod.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_hr_applicant": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/recruitment.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_hr_employee_skill": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/skills.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_hr_global_assignment": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/global_assignment.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_hr_skill": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/skills.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_job_position": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/employees.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_leave_type": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/leaves.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_message_template": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/operational_messaging.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_metric_values": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/reports.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_org_member_details": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/users.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_org_member_role": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/users.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_organization": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/organization.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_owner_report_schedule": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/reports.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_report_template": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/reports.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_role": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/permissions.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_saved_report": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/reports.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_sod_conflict_rule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/permissions.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_statutory_id": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/hr/country_pack_hr.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_user_email": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/auth.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_user_organization_status": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/users.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_user_profile": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/users.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_utm_campaign": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/utm.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_utm_medium": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/utm.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_utm_source": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/utm.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_warehouse_3_d_zone": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "update_warehouse_3_d_zone: IR schema/exposure is locked as a session state mutation; no reducer definition is present, so classification fails closed"
+    },
+    "update_widget_layout": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/analytics/dashboards.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "update_workflow_draft": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/definitions.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "upsert_ai_skill": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skills.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "upsert_ai_skill_config": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skills.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "upsert_organization_settings": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/organization.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "upsert_search_embedding": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/intelligence.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "upsert_workflow_edge": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/definitions.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "upsert_workflow_node": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/definitions.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "validate_c_0_organization_ownership_backfill": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "validate_c_0_organization_ownership_backfill: IR schema/exposure is locked as an operator-only migration hook; no reducer definition is present, so classification fails closed"
+    },
+    "worker_heartbeat": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/queue.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    }
+  }
+}

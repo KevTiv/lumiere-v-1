@@ -1,0 +1,5475 @@
+{
+  "version": 1,
+  "operations": {
+    "accept_sale_order_quotation": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/sales_core.rs: reducer checks current state or duplicate before transition"
+    },
+    "accrue_sale_commission": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_extensions.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "activate_pos_config": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pos_config.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "activate_revenue_recognition_rule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/reducers.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "activate_subscription": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/reducers.rs: reducer checks current state or duplicate before transition"
+    },
+    "activate_subscription_plan": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_wave_c.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "add_account_move_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: reducer checks current state or duplicate before transition"
+    },
+    "add_contact_categories": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "add_contact_to_segment": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/segments.rs: reducer checks current state or duplicate before transition"
+    },
+    "add_landed_cost_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/landed_costs.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "add_proposal_comment": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer checks current state or duplicate before transition"
+    },
+    "add_proposal_line_item": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer checks current state or duplicate before transition"
+    },
+    "add_proposal_source_doc": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "add_purchase_order_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "add_purchase_requisition_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "add_purchase_rfq_bid": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/sourcing.rs: reducer checks current state or duplicate before transition"
+    },
+    "add_purchase_rfq_line": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/sourcing.rs: denied reducer checks state/replays existing state"
+    },
+    "add_subscription_bundle_item": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_bundles.rs: denied internal reducer mutates domain/integration state"
+    },
+    "advance_subscription_dunning": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_dunning.rs: reducer checks current state or duplicate before transition"
+    },
+    "allocate_payment_transaction": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payment_management.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "amend_subscription": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_wave_c.rs: reducer checks current state or duplicate before transition"
+    },
+    "answer_proposal_clarification": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: denied internal reducer mutates domain/integration state"
+    },
+    "append_crm_conversation_message": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/inbox.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "apply_expense_advance_to_sheet": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_wave_d.rs: reducer checks current state or duplicate before transition"
+    },
+    "apply_expense_integration_intent": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_wave_d.rs: reducer checks current state or duplicate before transition"
+    },
+    "apply_index_linked_renewal": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_price_index.rs: denied reducer checks state/replays existing state"
+    },
+    "apply_landed_costs": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/landed_costs.rs: reducer checks current state or duplicate before transition"
+    },
+    "apply_omnichannel_allocation": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_advanced.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "apply_pending_expense_integration_intents": {
+      "semantic_kind": "operator",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_wave_e.rs: maintenance/backfill operator reducer is denied to sessions"
+    },
+    "apply_proposal_analysis": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "apply_proposal_template": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer checks current state or duplicate before transition"
+    },
+    "apply_reconciliation_rules": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_reconciliation.rs: reducer checks current state or duplicate before transition"
+    },
+    "apply_sale_order_options": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_extensions.rs: reducer checks current state or duplicate before transition"
+    },
+    "apply_sale_promotion_to_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_extensions.rs: reducer checks current state or duplicate before transition"
+    },
+    "apply_subscription_bundle": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_bundles.rs: denied internal reducer mutates domain/integration state"
+    },
+    "apply_subscription_payment_intent": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_payment.rs: denied reducer checks state/replays existing state"
+    },
+    "apply_subscription_tax_settle_intent": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_payment.rs: denied reducer checks state/replays existing state"
+    },
+    "approve_bank_statement_import": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_reconciliation.rs: reducer checks current state or duplicate before transition"
+    },
+    "approve_expense_policy_exception": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_wave_d.rs: reducer checks current state or duplicate before transition"
+    },
+    "approve_expense_sheet": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expenses.rs: request_guarded_action gates the transition"
+    },
+    "approve_intercompany_transaction": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/intercompany.rs: reducer checks current state or duplicate before transition"
+    },
+    "approve_proposal": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer checks current state or duplicate before transition"
+    },
+    "approve_purchase_requisition": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "approve_supplier_intake": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/vendor_management.rs: reducer checks current state or duplicate before transition"
+    },
+    "archive_contact_category": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: reducer checks current state or duplicate before transition"
+    },
+    "archive_contact_identity": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contact_identities.rs: reducer checks current state or duplicate before transition"
+    },
+    "archive_financial_report": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/financial_statements.rs: reducer checks current state or duplicate before transition"
+    },
+    "archive_payment_account": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payment_management.rs: reducer checks current state or duplicate before transition"
+    },
+    "assign_contact_role": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contact_roles.rs: reducer checks current state or duplicate before transition"
+    },
+    "assign_tag_to_contact": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: reducer checks current state or duplicate before transition"
+    },
+    "award_purchase_rfq_bid": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/sourcing.rs: reducer checks current state or duplicate before transition"
+    },
+    "backfill_consolidation_organization_ownership": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/consolidation.rs: denied internal reducer mutates domain/integration state"
+    },
+    "backfill_fiscal_period_organization_ownership": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fiscal_periods.rs: denied internal reducer mutates domain/integration state"
+    },
+    "backfill_fixed_asset_organization_ownership": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fixed_assets.rs: denied internal reducer mutates domain/integration state"
+    },
+    "backfill_intercompany_organization_ownership": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/intercompany.rs: denied internal reducer mutates domain/integration state"
+    },
+    "bill_project_milestone": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: denied reducer checks state/replays existing state"
+    },
+    "bill_timesheets": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: reducer checks current state or duplicate before transition"
+    },
+    "cancel_account_move": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: reducer checks current state or duplicate before transition"
+    },
+    "cancel_budget": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/budgeting.rs: reducer checks current state or duplicate before transition"
+    },
+    "cancel_consolidation": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/consolidation.rs: reducer checks current state or duplicate before transition"
+    },
+    "cancel_intercompany_transaction": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/intercompany.rs: reducer checks current state or duplicate before transition"
+    },
+    "cancel_landed_cost": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/landed_costs.rs: reducer checks current state or duplicate before transition"
+    },
+    "cancel_payment": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payments.rs: reducer checks current state or duplicate before transition"
+    },
+    "cancel_picking_batch": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/delivery_shipping.rs: reducer checks current state or duplicate before transition"
+    },
+    "cancel_purchase_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "cancel_purchase_requisition": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "cancel_return_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/return_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "cancel_sale_commission": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_extensions.rs: reducer checks current state or duplicate before transition"
+    },
+    "cancel_sale_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/sales_core.rs: reducer checks current state or duplicate before transition"
+    },
+    "cancel_subscription": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_wave_c.rs: reducer checks current state or duplicate before transition"
+    },
+    "cleanup_stale_proposal_presence": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: maintenance/backfill operator reducer is denied to sessions"
+    },
+    "clear_contact_categories": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "clear_landed_cost_field": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/landed_costs.rs: denied reducer checks state/replays existing state"
+    },
+    "clear_opportunity_presence": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/presence.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "clear_partner_bank_field": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/vendor_management.rs: denied reducer checks state/replays existing state"
+    },
+    "clear_proposal_presence": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "clear_purchase_order_field": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: denied reducer checks state/replays existing state"
+    },
+    "clear_purchase_order_line_field": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: denied reducer checks state/replays existing state"
+    },
+    "clear_supplier_intake_field": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/vendor_management.rs: denied reducer checks state/replays existing state"
+    },
+    "clear_vendor_risk_reason": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/procurement_advanced.rs: denied reducer checks state/replays existing state"
+    },
+    "close_account_asset": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fixed_assets.rs: reducer checks current state or duplicate before transition"
+    },
+    "close_account_period": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fiscal_periods.rs: reducer checks current state or duplicate before transition"
+    },
+    "close_fiscal_year": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fiscal_periods.rs: reducer checks current state or duplicate before transition"
+    },
+    "close_pos_session": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pos_transactions.rs: reducer checks current state or duplicate before transition"
+    },
+    "close_purchase_requisition": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "close_subscription": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/reducers.rs: reducer checks current state or duplicate before transition"
+    },
+    "complete_activity": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/activities.rs: reducer checks current state or duplicate before transition"
+    },
+    "complete_intercompany_transaction": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/intercompany.rs: reducer checks current state or duplicate before transition"
+    },
+    "complete_picking_batch": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/delivery_shipping.rs: reducer checks current state or duplicate before transition"
+    },
+    "complete_proposal_integration_intent": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: denied reducer checks state/replays existing state"
+    },
+    "complete_tax_deadline": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/tax_management.rs: reducer checks current state or duplicate before transition"
+    },
+    "compute_depreciation_board": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fixed_assets.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "compute_invoice_totals": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "compute_landed_costs": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/landed_costs.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "compute_pos_session_totals": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pos_transactions.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "compute_purchase_order_line_totals": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "compute_purchase_order_totals": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "compute_so_totals": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/sales_core.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "configure_contact_identity_verification_authority": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contact_identities.rs: denied internal reducer mutates domain/integration state"
+    },
+    "confirm_account_asset": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fixed_assets.rs: reducer checks current state or duplicate before transition"
+    },
+    "confirm_budget": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/budgeting.rs: reducer checks current state or duplicate before transition"
+    },
+    "confirm_purchase_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: request_guarded_action gates the transition"
+    },
+    "confirm_purchase_return": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_returns.rs: reducer checks current state or duplicate before transition"
+    },
+    "confirm_return_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/return_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "confirm_sales_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/sales_core.rs: request_guarded_action gates the transition"
+    },
+    "convert_lead_to_customer": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/leads.rs: reducer checks current state or duplicate before transition"
+    },
+    "convert_opportunity_to_sale_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/opportunities.rs: reducer checks current state or duplicate before transition"
+    },
+    "convert_proposal_to_project": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer checks current state or duplicate before transition"
+    },
+    "convert_proposal_to_sale_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer checks current state or duplicate before transition"
+    },
+    "convert_purchase_requisition_to_po": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "create_account_account": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/chart_of_accounts.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_account_account_type": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/chart_of_accounts.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_account_asset": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fixed_assets.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "create_account_bank_statement": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_reconciliation.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_account_bank_statement_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_reconciliation.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_account_group": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/chart_of_accounts.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_account_journal": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/chart_of_accounts.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_account_move": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "create_account_period": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fiscal_periods.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_account_reconciliation_widget": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_reconciliation.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_account_tax": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/tax_management.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_account_tax_group": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/tax_management.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_activity": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/activities.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_amortization_schedule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/amortization.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_analytic_account": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/analytic_accounting.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_analytic_distribution_model": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/analytic_accounting.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_analytic_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/analytic_accounting.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_assignment_rule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/segments.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_bad_debt_write_off": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/credit_control.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_bill_from_purchase_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_budget_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/budgeting.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_budget_post": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/budgeting.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_calendar_event": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/activities.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_consignment_agreement": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/procurement_advanced.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_consolidation_account": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/consolidation.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_consolidation_journal": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/consolidation.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_contact": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_contact_category": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_contact_identity": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contact_identities.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_contact_relationship": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_contact_segment": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/segments.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_contact_tag": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_credit_note_from_invoice": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: reducer checks current state or duplicate before transition"
+    },
+    "create_credit_note_from_return_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/return_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "create_crossovered_budget": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/budgeting.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_deferred_revenue_schedule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/reducers.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_delivery_carrier": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/delivery_shipping.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_delivery_price_rule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/delivery_shipping.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_depreciation_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fixed_assets.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "create_elimination_entry": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/consolidation.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_exchange_order_from_return": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_extensions.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_expense": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expenses.rs: client_request_id returns before duplicate expense writes"
+    },
+    "create_expense_advance": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_wave_d.rs: client_request_id returns before duplicate advance writes"
+    },
+    "create_expense_card_statement_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_wave_e.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_expense_integration_intent": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_wave_d.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "create_expense_project_rebill": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_depth.rs: client_request_id returns before duplicate rebill writes"
+    },
+    "create_expense_receipt": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expenses.rs: helper client_request_id returns existing receipt before insert"
+    },
+    "create_expense_reimbursement_payment": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expenses.rs: client_request_id returns before duplicate reimbursement"
+    },
+    "create_expense_sheet": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expenses.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_financial_report": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/financial_statements.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_fiscal_position": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_extensions.rs: denied internal reducer mutates domain/integration state"
+    },
+    "create_fiscal_position_tax": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_extensions.rs: denied internal reducer mutates domain/integration state"
+    },
+    "create_fiscal_year": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fiscal_periods.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_forecast_snapshot": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/forecast.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_incoterm": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_extensions.rs: denied internal reducer mutates domain/integration state"
+    },
+    "create_intercompany_rule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/intercompany.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_intercompany_transaction": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/intercompany.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_invoice_from_sale_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_landed_cost": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/landed_costs.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_lead": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/leads.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_lead_lost_reason": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/leads.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_lead_source": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/leads.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_loyalty_card": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pos_transactions.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_loyalty_program": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pos_config.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_opportunity": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/opportunities.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_opportunity_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/opportunities.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_opportunity_stage": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/opportunities.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_partner_bank": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/vendor_management.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_payment": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payments.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "create_payment_account": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payment_management.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_payment_fee": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payment_management.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_payment_method": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pos_config.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_payment_term": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payment_terms.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_payment_term_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payment_terms.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_payment_transaction": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payment_management.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_picking_batch": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/delivery_shipping.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_pos_config": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pos_config.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_pos_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pos_transactions.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_pricelist": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pricelists.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_pricelist_item": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pricelists.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_proposal": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_proposal_clarification": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: denied internal reducer mutates domain/integration state"
+    },
+    "create_proposal_clause": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: denied internal reducer mutates domain/integration state"
+    },
+    "create_proposal_integration_intent": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "create_proposal_template": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_purchase_blanket_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/procurement_advanced.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_purchase_contract": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/procurement_advanced.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_purchase_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_purchase_requisition": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_purchase_return": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_returns.rs: reducer checks current state or duplicate before transition"
+    },
+    "create_purchase_rfq": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/sourcing.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_purchasing_integration_intent": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/procurement_advanced.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "create_return_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/return_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "create_revenue_recognition_rule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/reducers.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_sale_commission_plan": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_advanced.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_sale_commission_plan_split": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_advanced.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_sale_contract": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_advanced.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_sale_cpq_constraint": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_advanced.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_sale_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/sales_core.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_sale_order_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/sales_core.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_sale_order_option": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_extensions.rs: denied internal reducer mutates domain/integration state"
+    },
+    "create_sale_promotion": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_extensions.rs: denied internal reducer mutates domain/integration state"
+    },
+    "create_sales_integration_intent": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_advanced.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "create_shipping_method": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/delivery_shipping.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_subscription_bundle": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_bundles.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_subscription_from_sale_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/reducers.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_subscription_payment_intent": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_payment.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "create_subscription_plan": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/reducers.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_subscription_price_tier": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_pricing.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_subscription_tax_settle_intent": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_payment.rs: denied reducer checks state/replays existing state"
+    },
+    "create_tax_deadline": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/tax_management.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_tax_jurisdiction": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/tax_management.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_tax_schedule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/tax_management.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_trial_balance_entry": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/financial_statements.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_vendor_credit_from_purchase_return": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_returns.rs: reducer checks current state or duplicate before transition"
+    },
+    "crm_integrity_inventory": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/crm/integrity_inventory.rs: denied integrity test reducer runs CRM invariant checks"
+    },
+    "deactivate_pos_config": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pos_config.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "deactivate_revenue_recognition_rule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/reducers.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "deactivate_subscription_plan": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_wave_c.rs: reducer checks current state or duplicate before transition"
+    },
+    "delete_account_asset": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fixed_assets.rs: reducer checks current state or duplicate before transition"
+    },
+    "delete_account_bank_statement": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_reconciliation.rs: reducer checks current state or duplicate before transition"
+    },
+    "delete_account_bank_statement_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_reconciliation.rs: reducer checks current state or duplicate before transition"
+    },
+    "delete_account_move_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: reducer checks current state or duplicate before transition"
+    },
+    "delete_account_period": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fiscal_periods.rs: reducer checks current state or duplicate before transition"
+    },
+    "delete_account_reconciliation_widget": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_reconciliation.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "delete_analytic_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/analytic_accounting.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "delete_budget_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/budgeting.rs: reducer checks current state or duplicate before transition"
+    },
+    "delete_calendar_event": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/activities.rs: reducer checks current state or duplicate before transition"
+    },
+    "delete_contact": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "delete_financial_report": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/financial_statements.rs: reducer checks current state or duplicate before transition"
+    },
+    "delete_fiscal_year": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fiscal_periods.rs: reducer checks current state or duplicate before transition"
+    },
+    "delete_intercompany_rule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/intercompany.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "delete_landed_cost": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/landed_costs.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "delete_lead": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/leads.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "delete_partner_bank": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/vendor_management.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "delete_payment_term": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payment_terms.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "delete_payment_term_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payment_terms.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "delete_pricelist": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pricelists.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "delete_pricelist_item": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pricelists.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "delete_proposal_line_item": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "delete_proposal_section": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "delete_proposal_source_doc": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "delete_sale_order_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/sales_core.rs: reducer checks current state or duplicate before transition"
+    },
+    "delete_sale_order_option": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_extensions.rs: denied internal reducer mutates domain/integration state"
+    },
+    "delete_supplier_intake": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/vendor_management.rs: reducer checks current state or duplicate before transition"
+    },
+    "delete_tax_deadline": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/tax_management.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "deprecate_account_account": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/chart_of_accounts.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "dispose_account_asset": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fixed_assets.rs: reducer checks current state or duplicate before transition"
+    },
+    "done_budget": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/budgeting.rs: reducer checks current state or duplicate before transition"
+    },
+    "end_contact_relationship": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: reducer checks current state or duplicate before transition"
+    },
+    "end_contact_role": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contact_roles.rs: reducer checks current state or duplicate before transition"
+    },
+    "error_intercompany_transaction": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/intercompany.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "evaluate_dynamic_segment": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/segments.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "export_financial_report": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/financial_statements.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "fail_expense_integration_intent": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_wave_d.rs: denied reducer checks state/replays existing state"
+    },
+    "fail_proposal_integration_intent": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: denied reducer checks state/replays existing state"
+    },
+    "fail_subscription_payment_intent": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_payment.rs: denied reducer checks state/replays existing state"
+    },
+    "finalize_pos_order_archive": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pos_transactions.rs: maintenance/backfill operator reducer is denied to sessions"
+    },
+    "find_duplicate_contacts": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/duplicate.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "generate_eu_vat_report": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/financial_statements.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "generate_financial_report": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/financial_statements.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "generate_subscription_invoice": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/reducers.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "grant_subscription_entitlement": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_entitlements.rs: denied reducer checks state/replays existing state"
+    },
+    "hold_supplier_intake": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/vendor_management.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "hydrate_pos_order_aggregate": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pos_transactions.rs: maintenance/backfill operator reducer is denied to sessions"
+    },
+    "ingest_subscription_usage_event": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_usage.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "invoice_po_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "link_proposal_version_esign": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: denied reducer creates a timestamped e-sign intent"
+    },
+    "lock_purchase_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "lock_sale_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/sales_core.rs: reducer checks current state or duplicate before transition"
+    },
+    "match_bank_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_reconciliation.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "match_elimination_entries": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/consolidation.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "match_expense_card_statement_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_wave_e.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "merge_contacts": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/duplicate.rs: reducer checks current state or duplicate before transition"
+    },
+    "open_account_period": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fiscal_periods.rs: reducer checks current state or duplicate before transition"
+    },
+    "open_crm_conversation": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/inbox.rs: reducer checks current state or duplicate before transition"
+    },
+    "open_fiscal_year": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fiscal_periods.rs: reducer checks current state or duplicate before transition"
+    },
+    "open_pos_session": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pos_transactions.rs: reducer checks current state or duplicate before transition"
+    },
+    "pause_subscription": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_wave_c.rs: reducer checks current state or duplicate before transition"
+    },
+    "pay_subscription_invoice": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/reducers.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "post_account_bank_statement": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_reconciliation.rs: reducer checks current state or duplicate before transition"
+    },
+    "post_account_move": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: request_guarded_action gates the transition"
+    },
+    "post_expense_sheet": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expenses.rs: client_request_id returns before duplicate posting"
+    },
+    "post_invoice": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: reducer checks current state or duplicate before transition"
+    },
+    "post_landed_costs": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/landed_costs.rs: reducer checks current state or duplicate before transition"
+    },
+    "post_payment": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payments.rs: request_guarded_action gates the transition"
+    },
+    "post_payment_transaction": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payment_management.rs: request_guarded_action gates the transition"
+    },
+    "post_realized_fx_gain_loss": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fx_revaluation.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "process_consolidation": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/consolidation.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "process_intercompany_transaction": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/intercompany.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "purchasing_integrity_inventory": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/purchasing/integrity_inventory.rs: denied integrity test reducer runs purchasing invariant checks"
+    },
+    "rate_subscription_usage_events": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_usage.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "rebase_deferred_schedules_for_subscription": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_deferred.rs: denied reducer checks state/replays existing state"
+    },
+    "receive_crm_provider_message": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/inbox.rs: denied reducer checks state/replays existing state"
+    },
+    "receive_po_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "recognize_amortization_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/amortization.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "recognize_deferred_revenue": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/reducers.rs: reducer checks current state or duplicate before transition"
+    },
+    "recompute_lead_score": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/lead_scoring.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "recompute_relationship_insights": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/relationship_intel.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "reconcile_account_bank_statement_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_reconciliation.rs: reducer checks current state or duplicate before transition"
+    },
+    "reconcile_payment_with_invoice": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: reducer checks current state or duplicate before transition"
+    },
+    "record_contact_identity_verification_proof": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contact_identities.rs: denied reducer checks state/replays existing state"
+    },
+    "record_crm_provider_delivery": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/inbox.rs: denied reducer checks state/replays existing state"
+    },
+    "record_proposal_bid_decision": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "record_purchasing_integration_result": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/procurement_advanced.rs: reducer checks current state or duplicate before transition"
+    },
+    "record_sales_integration_result": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_advanced.rs: reducer checks current state or duplicate before transition"
+    },
+    "record_subscription_payment_failure": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_dunning.rs: reducer checks current state or duplicate before transition"
+    },
+    "refresh_subscription_exception_flags": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_exceptions.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "refresh_tax_deadline_statuses": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/tax_management.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "refuse_expense_sheet": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expenses.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "register_crm_provider_principal": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/inbox.rs: denied internal reducer mutates domain/integration state"
+    },
+    "register_payment_on_invoice": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payments.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "reject_expense_policy_exception": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_wave_d.rs: reducer checks current state or duplicate before transition"
+    },
+    "reject_supplier_intake": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/vendor_management.rs: reducer checks current state or duplicate before transition"
+    },
+    "release_blanket_to_po": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/procurement_advanced.rs: idempotency key and fingerprint return before duplicate release"
+    },
+    "remove_contact_categories": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "remove_landed_cost_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/landed_costs.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "remove_purchase_order_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "renew_subscription": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_wave_c.rs: reducer checks current state or duplicate before transition"
+    },
+    "reorder_proposal_line_items": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "replace_contact_categories": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "request_expense_policy_exception": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_wave_d.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "resolve_proposal_comment": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "resolve_proposal_section_conflict": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "restore_proposal_version": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer checks current state or duplicate before transition"
+    },
+    "resume_subscription": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_wave_c.rs: reducer checks current state or duplicate before transition"
+    },
+    "retry_intercompany_transaction": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/intercompany.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "reverse_payment_transaction": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payment_management.rs: request_guarded_action gates the transition"
+    },
+    "reverse_sale_commission_settlement": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_extensions.rs: reducer checks current state or duplicate before transition"
+    },
+    "review_supplier_intake": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/vendor_management.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "revoke_subscription_entitlement": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_entitlements.rs: denied reducer checks state/replays existing state"
+    },
+    "run_accounting_budgeting_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/accounting/mod.rs: denied test reducer invokes accounting test assertions"
+    },
+    "run_accounting_fixed_asset_ownership_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/accounting/mod.rs: denied test reducer invokes accounting test assertions"
+    },
+    "run_accounting_fx_revaluation_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/domain_test_reducers.rs: denied test reducer invokes accounting test assertions"
+    },
+    "run_accounting_ic_consolidation_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/domain_test_reducers.rs: denied test reducer invokes accounting test assertions"
+    },
+    "run_accounting_ownership_backfill": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/ownership_backfill.rs: maintenance/backfill operator reducer is denied to sessions"
+    },
+    "run_accounting_payment_cancel_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/accounting/mod.rs: denied test reducer invokes accounting test assertions"
+    },
+    "run_accounting_payment_management_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/domain_test_reducers.rs: denied test reducer invokes accounting test assertions"
+    },
+    "run_accounting_payment_multi_invoice_residual_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/domain_test_reducers.rs: denied test reducer invokes accounting test assertions"
+    },
+    "run_accounting_payment_reconcile_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/accounting/mod.rs: denied test reducer invokes accounting test assertions"
+    },
+    "run_accounting_payment_term_update_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/domain_test_reducers.rs: denied test reducer invokes accounting test assertions"
+    },
+    "run_accounting_period_lock_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/accounting/mod.rs: denied test reducer invokes accounting test assertions"
+    },
+    "run_accounting_post_invoice_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/accounting/mod.rs: denied test reducer invokes accounting test assertions"
+    },
+    "run_accounting_posted_immutability_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/accounting/mod.rs: denied test reducer invokes accounting test assertions"
+    },
+    "run_accounting_trial_balance_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/accounting/mod.rs: denied test reducer invokes accounting test assertions"
+    },
+    "run_all_accounting_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/accounting/mod.rs: denied test reducer invokes all accounting assertions"
+    },
+    "run_all_crm_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/crm/mod.rs: denied test reducer invokes all CRM assertions"
+    },
+    "run_all_expenses_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/expenses/mod.rs: denied test reducer invokes all expenses assertions"
+    },
+    "run_all_proposals_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/proposals/mod.rs: denied test reducer invokes all proposals assertions"
+    },
+    "run_all_purchasing_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/purchasing/mod.rs: denied test reducer invokes all purchasing assertions"
+    },
+    "run_all_sales_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes all sales assertions"
+    },
+    "run_all_subscriptions_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/subscriptions/mod.rs: denied test reducer invokes all subscriptions assertions"
+    },
+    "run_crm_contact_identity_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/domain_test_reducers.rs: denied test reducer invokes crm test assertions"
+    },
+    "run_crm_contact_update_delete_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/crm/mod.rs: denied test reducer invokes crm test assertions"
+    },
+    "run_crm_deferred_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/crm/mod.rs: denied test reducer invokes crm test assertions"
+    },
+    "run_crm_opportunity_convert_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/crm/mod.rs: denied test reducer invokes crm test assertions"
+    },
+    "run_crm_persisted_integrity_smoke_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/crm/integrity_inventory.rs: denied smoke-test reducer validates persisted CRM integrity"
+    },
+    "run_crm_relational_fk_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/crm/mod.rs: denied test reducer invokes crm test assertions"
+    },
+    "run_crm_relationship_admin_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/crm/mod.rs: denied test reducer invokes crm test assertions"
+    },
+    "run_crm_wave_2_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "locked IR schema/exposure lists this denied test reducer; current source name is absent, fail-closed"
+    },
+    "run_expenses_wave_a_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/expenses/mod.rs: denied test reducer invokes expenses test assertions"
+    },
+    "run_expenses_wave_b_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/expenses/mod.rs: denied test reducer invokes expenses test assertions"
+    },
+    "run_expenses_wave_c_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/expenses/mod.rs: denied test reducer invokes expenses test assertions"
+    },
+    "run_expenses_wave_d_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/expenses/mod.rs: denied test reducer invokes expenses test assertions"
+    },
+    "run_expenses_wave_e_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/expenses/mod.rs: denied test reducer invokes expenses test assertions"
+    },
+    "run_expenses_wave_f_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/expenses/mod.rs: denied test reducer invokes expenses test assertions"
+    },
+    "run_expenses_wave_g_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/expenses/mod.rs: denied test reducer invokes expenses test assertions"
+    },
+    "run_fx_revaluation": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fx_revaluation.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "run_fx_revaluation_batch": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fx_revaluation.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "run_pos_order_finalize_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_proposals_convert_integrity_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/proposals/mod.rs: denied test reducer invokes proposals test assertions"
+    },
+    "run_proposals_wave_a_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/proposals/mod.rs: denied test reducer invokes proposals test assertions"
+    },
+    "run_proposals_wave_d_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/proposals/mod.rs: denied test reducer invokes proposals test assertions"
+    },
+    "run_purchasing_bill_balanced_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/purchasing/mod.rs: denied test reducer invokes purchasing test assertions"
+    },
+    "run_purchasing_company_isolation_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/purchasing/mod.rs: denied test reducer invokes purchasing test assertions"
+    },
+    "run_purchasing_incoming_picking_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/purchasing/mod.rs: denied test reducer invokes purchasing test assertions"
+    },
+    "run_purchasing_lot_receive_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/purchasing/mod.rs: denied test reducer invokes purchasing test assertions"
+    },
+    "run_purchasing_phase_0_containment_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "locked IR schema/exposure lists this denied test reducer; current source name is absent, fail-closed"
+    },
+    "run_purchasing_phase_0_fixture_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "locked IR schema/exposure lists this denied test reducer; current source name is absent, fail-closed"
+    },
+    "run_purchasing_phase_1_landed_costs_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "locked IR schema/exposure lists this denied test reducer; current source name is absent, fail-closed"
+    },
+    "run_purchasing_phase_1_purchase_orders_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "locked IR schema/exposure lists this denied test reducer; current source name is absent, fail-closed"
+    },
+    "run_purchasing_phase_1_relational_integrity_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "locked IR schema/exposure lists this denied test reducer; current source name is absent, fail-closed"
+    },
+    "run_purchasing_phase_1_returns_advanced_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "locked IR schema/exposure lists this denied test reducer; current source name is absent, fail-closed"
+    },
+    "run_purchasing_phase_2_blanket_release_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "locked IR schema/exposure lists this denied test reducer; current source name is absent, fail-closed"
+    },
+    "run_purchasing_wave_c_smoke_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/purchasing/mod.rs: denied test reducer invokes purchasing test assertions"
+    },
+    "run_purchasing_wave_e_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/purchasing/mod.rs: denied test reducer invokes purchasing test assertions"
+    },
+    "run_sales_atp_shortfall_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_backorder_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_cancel_cross_org_rejected_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_cancel_done_rejected_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_cancel_invoiced_rejected_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_cancel_nonexistent_rejected_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_commission_accrue_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_commission_clawback_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_commission_settle_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_company_isolation_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_credit_hold_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_dropship_confirm_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_exchange_from_return_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_fiscal_remap_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_fx_fail_closed_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_ghost_product_fail_closed_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_line_update_delete_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_lock_blocks_update_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_oms_extensions_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_order_cancel_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/domain_test_reducers.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_order_delivery_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_order_invoice_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_order_update_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/domain_test_reducers.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_pricelist_apply_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_pricelist_company_scope_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_send_quotation_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/mod.rs: denied test reducer invokes sales test assertions"
+    },
+    "run_sales_sla_escalation": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_advanced.rs: denied internal reducer mutates domain/integration state"
+    },
+    "run_subscriptions_wave_a_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/subscriptions/mod.rs: denied test reducer invokes subscriptions test assertions"
+    },
+    "run_subscriptions_wave_b_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/subscriptions/mod.rs: denied test reducer invokes subscriptions test assertions"
+    },
+    "run_subscriptions_wave_c_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/subscriptions/mod.rs: denied test reducer invokes subscriptions test assertions"
+    },
+    "run_subscriptions_wave_d_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/subscriptions/mod.rs: denied test reducer invokes subscriptions test assertions"
+    },
+    "run_subscriptions_wave_e_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/subscriptions/mod.rs: denied test reducer invokes subscriptions test assertions"
+    },
+    "save_proposal_version": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "schedule_sales_sla_escalation": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_advanced.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "schedule_tax_deadline_updates": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/tax_management.rs: reducer checks current state or duplicate before transition"
+    },
+    "seed_statutory_expense_mileage_rates": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_depth.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "send_purchase_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: request_guarded_action gates the transition"
+    },
+    "send_sale_order_quotation": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/sales_core.rs: reducer checks current state or duplicate before transition"
+    },
+    "set_analytic_account_active": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/analytic_accounting.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "set_asset_active": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fixed_assets.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "set_commodity_price_index": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/procurement_advanced.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "set_consolidation_company_rate": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/consolidation.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "set_contact_segment_rules": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/segments.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "set_expense_allocations": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_depth.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "set_expense_fraud_hold": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_wave_d.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "set_intercompany_rule_active": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/intercompany.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "set_purchase_approval_delegate": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/procurement_advanced.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "set_subscription_commitment": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_pricing.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "set_vendor_risk_flag": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/procurement_advanced.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "settle_sale_commissions": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_extensions.rs: reducer checks current state or duplicate before transition"
+    },
+    "setup_fiscal_calendar": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fiscal_periods.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "stage_bank_statement_import": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_reconciliation.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "start_picking_batch": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/delivery_shipping.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "submit_expense": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expenses.rs: reducer checks current state or duplicate before transition"
+    },
+    "submit_expense_sheet": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expenses.rs: reducer checks current state or duplicate before transition"
+    },
+    "submit_purchase_requisition": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: reducer checks current state or duplicate before transition"
+    },
+    "submit_supplier_intake": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/vendor_management.rs: reducer checks current state or duplicate before transition"
+    },
+    "test_pos_order_finalize_deletes_on_version_match": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/pos_order_finalize_test.rs: denied test reducer invokes sales test assertions"
+    },
+    "test_pos_order_finalize_is_idempotent_when_already_gone": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/pos_order_finalize_test.rs: denied test reducer invokes sales test assertions"
+    },
+    "test_pos_order_finalize_refuses_before_terminal_window": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/pos_order_finalize_test.rs: denied test reducer invokes sales test assertions"
+    },
+    "test_pos_order_finalize_refuses_on_cold_eligible_at_mismatch": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/pos_order_finalize_test.rs: denied test reducer invokes sales test assertions"
+    },
+    "test_pos_order_finalize_refuses_on_version_mismatch": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/pos_order_finalize_test.rs: denied test reducer invokes sales test assertions"
+    },
+    "test_pos_order_finalize_rejects_unregistered_caller": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/sales/pos_order_finalize_test.rs: denied test reducer invokes sales test assertions"
+    },
+    "unlock_purchase_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "unlock_sale_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/sales_core.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "unmatch_elimination_entry": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/consolidation.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "unmatch_expense_card_statement_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_wave_e.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "unreconciled_account_bank_statement_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_reconciliation.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "update_account_account": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/chart_of_accounts.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_account_account_type": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/chart_of_accounts.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_account_asset": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fixed_assets.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_account_bank_statement": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_reconciliation.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_account_bank_statement_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_reconciliation.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_account_group": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/chart_of_accounts.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_account_journal": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/chart_of_accounts.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_account_move_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_account_period": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fiscal_periods.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_account_reconciliation_widget": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_reconciliation.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_account_tax": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/tax_management.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_account_tax_group": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/tax_management.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_analytic_account": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/analytic_accounting.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_analytic_distribution_model": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/analytic_accounting.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_analytic_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/analytic_accounting.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_assignment_rule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/segments.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_budget_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/budgeting.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_budget_line_actuals": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/budgeting.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_budget_post": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/budgeting.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_calendar_event": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/activities.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_consolidation_account": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/consolidation.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_contact": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_contact_address": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_contact_business": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_contact_category": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_contact_details": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_contact_identity": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contact_identities.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_contact_parent": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contacts.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_crm_conversation": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/inbox.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_crossovered_budget": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/budgeting.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_expense": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expenses.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_financial_report": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/financial_statements.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_fiscal_year": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/fiscal_periods.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_intercompany_rule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/intercompany.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_landed_cost": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/landed_costs.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_lead": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/leads.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_lead_address": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/leads.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_lead_details": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/leads.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_lead_lost_reason": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/leads.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_lead_revenue": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/leads.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_lead_source": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/leads.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_opportunity": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/opportunities.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_opportunity_presence": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/presence.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_opportunity_stage": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/opportunities.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_partner_bank": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/vendor_management.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_payment_account": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payment_management.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_payment_term": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payment_terms.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_payment_term_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payment_terms.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_payment_transaction": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payment_management.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_po_invoice_status": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_po_receipt_status": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_pricelist": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/pricelists.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_proposal": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_proposal_line_item": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_proposal_presence": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_proposal_source_doc": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_proposal_status": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_purchase_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_purchase_order_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/purchase_orders.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_sale_order": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/sales_core.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_sale_order_line": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/sales_core.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_sale_order_option": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "sales/oms_extensions.rs: denied reducer checks state/replays existing state"
+    },
+    "update_subscription_plan": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_wave_c.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_supplier_intake": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/vendor_management.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_tax_deadline": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/tax_management.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_tax_deadlines": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/tax_management.rs: maintenance/backfill operator reducer is denied to sessions"
+    },
+    "update_tax_jurisdiction": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/tax_management.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "update_tax_schedule": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/tax_management.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "upsert_expense_mileage_rate": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_depth.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "upsert_expense_per_diem_rate": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expense_depth.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "upsert_expense_policy": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "expenses/expenses.rs: denied reducer checks state/replays existing state"
+    },
+    "upsert_partner_credit_control": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/credit_control.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "upsert_proposal_compliance_requirement": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "upsert_proposal_procurement_score": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "upsert_proposal_section": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "proposals/proposals.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "upsert_subscription_price_index": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "subscriptions/subscription_price_index.rs: denied reducer checks state/replays existing state"
+    },
+    "upsert_vendor_scorecard": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/procurement_advanced.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "validate_accounting_ownership_backfill": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/ownership_backfill.rs: maintenance/backfill operator reducer is denied to sessions"
+    },
+    "validate_budget": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/budgeting.rs: reducer checks current state or duplicate before transition"
+    },
+    "validate_consolidation": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/consolidation.rs: reducer checks current state or duplicate before transition"
+    },
+    "verify_contact_identity": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "crm/contact_identities.rs: reducer checks current state or duplicate before transition"
+    },
+    "void_payment_transaction": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payment_management.rs: reducer checks current state or duplicate before transition"
+    },
+    "waive_tax_deadline": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/tax_management.rs: reducer checks current state or duplicate before transition"
+    }
+  }
+}

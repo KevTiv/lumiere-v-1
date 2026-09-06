@@ -22,9 +22,11 @@ pub struct Paths {
     pub sql_columns_rust_out: PathBuf,
     pub query_resource_row_type_asset: PathBuf,
     pub query_resource_row_type_out: PathBuf,
+    pub query_row_map_ts_out: PathBuf,
 
     // ── erp_org_sql ──────────────────────────────────────────────────────
-    pub erp_subscriptions_ts: PathBuf,
+    pub subscription_query_policy_json: PathBuf,
+    pub org_subscription_descriptors_ts_out: PathBuf,
     pub erp_org_sql_rust_out: PathBuf,
 
     // ── query_exec_audit ─────────────────────────────────────────────────
@@ -54,7 +56,9 @@ pub struct Paths {
     pub reducer_exposure_json: PathBuf,
     pub company_scope_metadata_json: PathBuf,
     pub contract_operation_ids_json: PathBuf,
+    pub operation_contracts_dir: PathBuf,
     pub resource_scope_metadata_json: PathBuf,
+    pub subscription_census_json: PathBuf,
     pub reducer_manifest_out: PathBuf,
     pub reducer_contract_rust_out: PathBuf,
 
@@ -117,8 +121,11 @@ impl Paths {
             query_resource_row_type_asset: assets.join("query-resource-row-type.json"),
             query_resource_row_type_out: frontend
                 .join("packages/stdb/src/query-resource-row-type.json"),
+            query_row_map_ts_out: frontend.join("packages/stdb/src/query-row-map.ts"),
 
-            erp_subscriptions_ts: frontend.join("packages/stdb/src/queries/erp-subscriptions.ts"),
+            subscription_query_policy_json: manifest_dir.join("subscription-query-policies.json"),
+            org_subscription_descriptors_ts_out: frontend
+                .join("packages/stdb/src/generated/org-subscription-descriptors.ts"),
             erp_org_sql_rust_out: staging_manifests.join("erp-org-sql.json"),
 
             query_exec_non_registry_json: assets.join("query_exec_non_registry.json"),
@@ -156,7 +163,9 @@ impl Paths {
             reducer_exposure_json: manifest_dir.join("reducer-exposure.json"),
             company_scope_metadata_json: manifest_dir.join("company-scope-metadata.json"),
             contract_operation_ids_json: manifest_dir.join("contract-operation-ids.json"),
+            operation_contracts_dir: manifest_dir.join("operation-contracts"),
             resource_scope_metadata_json: manifest_dir.join("resource-scope-metadata.json"),
+            subscription_census_json: assets.join("subscription-census.json"),
             reducer_manifest_out: staging_manifests.join("reducer-manifest.json"),
             reducer_contract_rust_out: repo_root
                 .join("crates/stdb-client/src/generated_reducer_contract.rs"),
