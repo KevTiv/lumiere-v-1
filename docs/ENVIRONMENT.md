@@ -63,6 +63,13 @@ readiness never sends a billable model/search request.
 
 - Set `STDB_HOST` / `NEXT_PUBLIC_STDB_HOST` to `https://maincloud.spacetimedb.com` (or `wss://` — it is normalized).
 - Set `STDB_MODULE` and `NEXT_PUBLIC_STDB_MODULE` to your published database name.
+- `make cloud-publish` builds once, publishes the CLI-optimized artifact after
+  removing non-runtime name/producer metadata, validates it, and fails locally
+  if it exceeds the guarded upload size.
+- The standalone module release profile uses size optimization, fat LTO, one
+  codegen unit, symbol stripping, and aborting panics before Binaryen runs.
+- Override `STDB_REMOTE_SERVER` with a configured standalone server nickname or
+  URL to use the same publish flow without Maincloud.
 
 ### Production (api-server)
 
@@ -103,6 +110,14 @@ Or use Makefile cloud targets with overrides:
 
 ```bash
 make publish-cloud STDB_MODULE=lumiere-staging STDB_CLOUD_MODULE=lumiere-staging
+```
+
+For a standalone remote server, supply the server explicitly:
+
+```bash
+make cloud-publish \
+  STDB_REMOTE_SERVER=https://stdb.example.com \
+  STDB_CLOUD_MODULE=lumiere-production
 ```
 
 **Data and seeding:** staging uses its own module — no production data. Seed tenants via the normal onboarding flow (`/onboarding` → `POST /api/bootstrap/tenant`). Do **not** rely on `seed_dev_data` in strict mode; use the dedicated bootstrap route (see [`PILOT_RUNBOOK.md`](PILOT_RUNBOOK.md) §2.1).

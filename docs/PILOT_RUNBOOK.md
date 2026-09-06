@@ -146,11 +146,16 @@ The SpacetimeDB CLI **does not** ship `backup`, `restore`, `dump`, or `export` s
 |-----------|------------------|
 | **Monitor** | Dashboard: `https://spacetimedb.com/@<username>/<STDB_MODULE>` (see workspace SpacetimeDB rules) |
 | **Tail logs** | `make logs-cloud` → `spacetime logs $(STDB_CLOUD_MODULE) --server maincloud` |
-| **Module update** | `make publish-cloud` (schema migration; preserves data unless reducer requires clear) |
-| **Destructive reset** | `make publish-cloud-clear` → `spacetime publish … --server maincloud --clear-database -y` — **wipes all tenants** |
+| **Module update** | `make publish-cloud` builds and size-checks the stripped optimized WASM before publishing; preserves data unless the schema requires a clear |
+| **Destructive reset** | `make publish-cloud-clear` publishes the same checked artifact with `--clear-database` — **wipes all tenants** |
 | **Ad-hoc read** | `spacetime sql <STDB_MODULE> "SELECT …" --server maincloud` (CLI marks `sql` as unstable) |
 
 There is no documented maincloud point-in-time restore in-repo. Treat `publish-cloud-clear` as irreversible for pilot data. Coordinate with SpacetimeDB maincloud support for hosted backup expectations before promising RPO/RTO to pilots.
+
+The cloud targets accept `STDB_REMOTE_SERVER=<nickname-or-url>`, so a durable
+standalone SpacetimeDB deployment can replace Maincloud without changing the
+application contract. Persistent storage, TLS, backups, and availability for
+that server remain deployment responsibilities.
 
 ### 3.2 Local (`spacetime start`)
 

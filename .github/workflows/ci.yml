@@ -185,11 +185,28 @@ jobs:
         with:
           version: ${{ env.SPACETIME_CLI_VERSION }}
 
-      # Regenerate bindings from the checked-out module source. Deployment
-      # compatibility is a separate environment gate and must not make source
-      # CI depend on a mutable Maincloud database.
-      - name: Verify STDB source matches pinned lumiere-contracts release
-        run: make check-contracts-source-drift
+      - name: Start standalone SpacetimeDB
+        run: |
+          nohup spacetime start --listen-addr 127.0.0.1:3000 > /tmp/lumiere-ci-stdb.log 2>&1 &
+          for attempt in {1..60}; do
+            if curl -fsS -X POST http://127.0.0.1:3000/v1/identity >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/lumiere-ci-stdb.log
+          exit 1
+
+      - name: Publish production module to standalone SpacetimeDB
+        run: spacetime publish lumiere-ci-contracts --module-path spacetimedb --server local --delete-data=always -y --no-config
+
+      # Full source/schema/manifest comparison against an isolated database;
+      # CI correctness does not depend on a mutable Maincloud deployment.
+      - name: Verify standalone STDB matches pinned lumiere-contracts release
+        env:
+          STDB_SCHEMA_SERVER: local
+          STDB_SCHEMA_HOST: http://127.0.0.1:3000
+        run: make check-contracts-drift STDB_MODULE=lumiere-ci-contracts
 
   frontend:
     name: Frontend

@@ -16,6 +16,7 @@ STDB_MODULE        ?= lumiere-v1-j1uo0
 STDB_CLOUD_MODULE  ?= lumiere-v1-j1uo0
 # Local SpacetimeDB HTTP base (default maincloud; e2e-smoke overrides to local)
 STDB_HOST          ?= https://maincloud.spacetimedb.com
+STDB_REMOTE_SERVER ?= maincloud
 # Local E2E: always use the local SpacetimeDB server (see e2e-smoke target)
 E2E_STDB_HOST      ?= http://127.0.0.1:3000
 # Local Playwright stack uses its own module name (--no-config) so it is not tied to
@@ -111,12 +112,12 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	local-start local-stop local-publish local-reset local-test local-logs \
 	stack-init stack-up stack-up-iot stack-down \
 	codegen-all codegen-check api-run \
-	cloud-publish cloud-reset cloud-test cloud-logs
+	cloud-wasm cloud-publish cloud-reset cloud-test cloud-logs
 
 help-legacy:
 	@echo "Usage: make <target>"
 	@echo ""
-	@echo "  setup                Install wasm32 target and wasm-opt (one-time)"
+	@echo "  setup                Install wasm32 target, wasm-opt, and wasm-tools (one-time)"
 	@echo "  check                Run cargo check (fast type-check, no linking)"
 	@echo "  check-env            Print STDB_MODULE / STDB_CLOUD_MODULE / STDB_HOST (Makefile defaults)"
 	@echo "  check-env-prod       Validate production env vars (exit 1 if required vars missing)"
@@ -173,7 +174,7 @@ endef
 help:
 	@printf "Usage: make <target> [VARIABLE=value]\n\n"
 	@printf "Setup and diagnostics\n"
-	$(call print-command,setup,Install the stable WASM target and wasm-opt.)
+	$(call print-command,setup,Install the stable WASM target, wasm-opt, and wasm-tools.)
 	$(call print-command,check-env,Print the resolved SpacetimeDB module and host variables.)
 	$(call print-command,api-run,Run only the Rust API using api-server/.env.local.)
 	@printf "\n"
@@ -230,11 +231,13 @@ help-e2e:
 setup:
 	rustup target add wasm32-unknown-unknown --toolchain stable
 	brew install binaryen || true
+	brew install wasm-tools || true
 
 check-env:
 	@echo "STDB_MODULE=$(STDB_MODULE)"
 	@echo "STDB_CLOUD_MODULE=$(STDB_CLOUD_MODULE)"
 	@echo "STDB_HOST=$(STDB_HOST)"
+	@echo "STDB_REMOTE_SERVER=$(STDB_REMOTE_SERVER)"
 	@echo "DB (local publish target)=$(DB)"
 	@echo "DB_CLOUD=$(DB_CLOUD)"
 
@@ -1117,16 +1120,18 @@ api-server-run:
 # ── Cloud / production SpacetimeDB ───────────────────────────────────────────
 
 publish-cloud:
-	spacetime publish $(DB_CLOUD) --module-path $(MODULE) --server maincloud
+	bash scripts/build-stdb-publish-wasm.sh "$(MODULE)"
+	spacetime publish $(DB_CLOUD) --bin-path $(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.publish.wasm --server $(STDB_REMOTE_SERVER)
 
 publish-cloud-clear:
-	spacetime publish $(DB_CLOUD) --module-path $(MODULE) --server maincloud --clear-database -y
+	bash scripts/build-stdb-publish-wasm.sh "$(MODULE)"
+	spacetime publish $(DB_CLOUD) --bin-path $(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.publish.wasm --server $(STDB_REMOTE_SERVER) --clear-database -y
 
 call-tests-cloud:
-	spacetime call $(DB_CLOUD) run_all_core_tests --server maincloud
+	spacetime call $(DB_CLOUD) run_all_core_tests --server $(STDB_REMOTE_SERVER)
 
 logs-cloud:
-	spacetime logs $(DB_CLOUD) --server maincloud
+	spacetime logs $(DB_CLOUD) --server $(STDB_REMOTE_SERVER)
 
 # ── Scoped command names ─────────────────────────────────────────────────────
 #
@@ -1137,6 +1142,8 @@ module-check: check
 module-build: build
 module-generate-ts: generate-stdb-ts-sdk
 module-generate-rust: generate-stdb-rust-sdk
+cloud-wasm:
+	bash scripts/build-stdb-publish-wasm.sh "$(MODULE)"
 
 local-start: start
 local-stop: stop

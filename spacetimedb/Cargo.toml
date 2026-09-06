@@ -26,3 +26,12 @@ chrono-tz = "0.10"
 # Standalone workspace root so `cargo build --target wasm32-unknown-unknown` (used by
 # `spacetime generate`) does not inherit the repo root workspace membership error.
 [workspace]
+
+# The module is distributed as one large WASM binary. Optimize for upload size
+# before the CLI's Binaryen pass; service binaries use the separate root profile.
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
