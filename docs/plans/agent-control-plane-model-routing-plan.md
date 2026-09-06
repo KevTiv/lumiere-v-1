@@ -474,7 +474,18 @@ Start deterministic:
 - action risk/confirmation enforcement;
 - sandbox produced no ERP mutation side effect.
 
-A semantic verifier may later check prose-to-evidence consistency.
+Material prose claims require support checking before final presentation, under
+the shared [harness evidence contract](./ai-harness-completion-plan.md#7-evidence-intellectual-provenance-and-knowledge-contract)
+and M2 gate. Record deterministic, model-assisted and human review separately;
+semantic model checks are fallible and do not confer domain approval. Missing or
+ambiguous support triggers bounded retrieval, qualification, abstention or
+required review; provider fallback and streaming cannot bypass this gate.
+
+The context compiler must retain versioned source, contribution, claim and
+decision references through compaction/resume. Artifact memory also includes
+reviewed non-executable knowledge entries. Component-level lineage, source-change
+invalidation and authorized source/decision inspection follow M1 and M3–M5 of
+the same plan; execution traces or recipe reuse alone do not satisfy them.
 
 ---
 
@@ -546,7 +557,10 @@ This should guide product investment before manually building speculative user w
 
 ## 17. Replay/resume/fork semantics
 
-Support later:
+Basic interrupt/reconnect/resume and checkpoint-based alternative comparison are
+required for base harness M3/M6, under the
+[interactive execution contract](./ai-harness-completion-plan.md#8-interactive-execution-and-recovery).
+Advanced provider/sandbox replay may follow separately. The shared primitives are:
 
 ```text
 resume task from durable artifacts/events
@@ -563,6 +577,20 @@ Rules:
 - stale dataset handles cannot silently be reused;
 - forks get new task/correlation roots;
 - sandbox snapshot reuse is runtime implementation detail, not semantic replay.
+
+Persist required questions and user steering as versioned decision inputs;
+independent authorized steps may proceed while dependent work waits. Checked
+compaction restores objective, constraints, source/decision refs, unresolved
+questions, effect state and budgets from durable records. Structured diagnostics
+drive bounded candidate repair, and non-progress detection stops repeated failed
+approaches before budget exhaustion. Interruption reconciles uncertain in-flight
+effects before resuming; a fork never inherits execution approval.
+
+Investigate/Design/Draft/Review mode profiles restrict capabilities within server
+authorization. Delegated specialists and lifecycle extensions require separate
+harness M8/M9 admission, including parent budget reservations, cancellation,
+typed outputs and required/optional extension failure policy. Base admission
+must not depend on enabling either capability.
 
 ---
 
@@ -603,6 +631,8 @@ AI/sandbox traffic must have separate admission so sandbox spikes cannot starve 
 - [ ] separate acquisition executor from sandbox executor;
 - [ ] enforce model/tool/data/sandbox/time budgets;
 - [ ] add structured SSE status events.
+- [ ] integrate harness AIH-20–24 durable questions, bounded repair/non-progress,
+  checked compaction and session controls before base M6 admission.
 
 ### ACP1 — Daytona + Python orchestration
 
@@ -620,6 +650,8 @@ AI/sandbox traffic must have separate admission so sandbox spikes cannot starve 
 - [ ] persist evidence/program/document/chart/spreadsheet metadata;
 - [ ] build context compiler from objective + schemas + evidence + artifacts;
 - [ ] add deterministic claim/evidence verification;
+- [ ] satisfy harness M1–M3 source/decision capture, prose support and inspection
+  gates before final-answer admission;
 - [ ] add action-trace/debug UI sourced from durable events;
 - [ ] measure model-context reduction against raw-result baseline.
 
@@ -630,6 +662,8 @@ AI/sandbox traffic must have separate admission so sandbox spikes cannot starve 
 - [ ] record reuse success/correction metrics;
 - [ ] define reviewed SkillDraft/SkillVersion format over program/runtime/capability refs;
 - [ ] require fresh authorization/dataset acquisition per reuse;
+- [ ] satisfy harness M4/M5 knowledge review and source-change gates before
+  knowledge/recipe publication; repeated success is not domain approval;
 - [ ] prove sandbox state/snapshots are not required for skill execution.
 
 ### ACP4 — scaling and model economics

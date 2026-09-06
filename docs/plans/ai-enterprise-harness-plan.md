@@ -10,6 +10,21 @@ defined in
 agents never receive unrestricted tenant data, shared-database SQL authority,
 secrets, process filesystem access, or unreviewed network access.
 
+Evidence-backed answers and the human intellectual foundations of generated work
+follow the [completion plan's shared contract](./ai-harness-completion-plan.md#7-evidence-intellectual-provenance-and-knowledge-contract)
+and [M0–M9 acceptance gates](./ai-harness-completion-plan.md#milestones-and-acceptance-criteria).
+This includes original authorship, discussion contributions, claims/decisions,
+component lineage, reviewed knowledge and source-change handling. Flat citations,
+successful execution or skill certification alone do not establish domain
+correctness. These proposed requirements remain deferred from first core
+deployability under the active core plan; no implementation completion is implied.
+
+Base M0–M7 now include durable questions/steering, diagnostic repair, non-progress
+detection, checked compaction and session interrupt/resume/compare. Later M8/M9
+admit bounded specialists and typed lifecycle extensions independently; disabled
+optional capabilities do not block the single-agent base. These adaptations and
+their OpenCode source references are recorded in completion-plan §8.
+
 ## Current Codebase References
 
 - `ai-gateway/src/main.rs`: current `/v1/skills/run`, `/v1/actions/draft`, RAG,

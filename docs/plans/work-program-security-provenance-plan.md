@@ -322,6 +322,29 @@ human correction refs
 
 A model-generated summary is not a substitute for source provenance.
 
+Implement the shared [harness evidence and intellectual provenance contract](./ai-harness-completion-plan.md#7-evidence-intellectual-provenance-and-knowledge-contract)
+and M1–M5 gates. `ExternalSourceRef` must resolve to a versioned source and exact
+passage; preserve original author/organization and edition separately from the
+user/agent contribution that introduced it. Unknown metadata remains unknown.
+Artifact provenance must additionally resolve claims, decisions/adaptations and
+versioned component bindings, including parent links after edits or forks.
+
+Source origin, verification outcome, domain approval and applicability are
+independent dimensions. Neither derived output nor approved publication silently
+upgrades the truth of its premises. Required source changes/retractions and
+permission revocations invalidate dependent knowledge/artifact reuse and caches;
+historical inspection remains scoped and subject to retention/tombstones.
+Completeness of a manifest alone does not satisfy claim support or domain review.
+
+The [interactive harness contract](./ai-harness-completion-plan.md#8-interactive-execution-and-recovery)
+also binds questions, steering, diagnostics and compaction to versioned decisions
+and candidates. Replies/mode changes cannot grant authority; fork/resume cannot
+replay business effects or restore old grants. Specialist tasks share bounded
+parent reservations and capability subsets. Lifecycle extensions require M9
+admission with pinned versions/order, timeouts, idempotency and failure policy;
+optional failures degrade visibly and required checks fail closed. Reauthorize
+transformed calls and prohibit hooks from rewriting trusted actor context.
+
 ---
 
 ## 12. Revocation and emergency blocking
