@@ -17,9 +17,10 @@
       "status": "complete",
       "evidence": [
         "the immutable lumiere-contracts v0.3.31 schema passes scripts/verify-tenant-ownership.py with 458/458 application relations, 5/5 protocol relations, 463 organization-owned relations, and zero platform-global relations",
-        "the current optimized WASM (sha256:aafef98e0a6c01aa23fc5f7c4b5636a7afad260c003650dc1aa0562fa8c64835) was published to disposable in-memory local SpacetimeDB 2.8.2 database c200213618e579e5753bae8bab3fa4be608177523d1ef76f7f8474a4896f640c on 2026-09-06",
-        "run_tenant_isolation_tests persisted distinct C0 Org A and Org B rows and passed organization isolation checks for the five platform bindings/projections and six organization-seeded reference concepts",
-        "run_c_0_organization_ownership_backfill completed twice for organization 1; both persisted runs scanned 41 rows, backfilled 0, and left 0 unresolved rows, proving idempotent no-op behavior on the current owned dataset",
+        "the current optimized WASM (sha256:aafef98e0a6c01aa23fc5f7c4b5636a7afad260c003650dc1aa0562fa8c64835) was published to disposable in-memory local SpacetimeDB 2.8.2 database c200e2ddda2e2b737553cb45a1a243efd43b66081926fed6c6974611e77baf3f on 2026-09-06",
+        "run_tenant_isolation_tests persisted distinct C0 Org A and Org B rows and passed organization isolation checks for the three identity bindings/projections and six organization-seeded reference concepts covered by that fixture",
+        "explicit cold_tier_service_identity and schema_migration projections were persisted for C0 Org A and Org B, proving direct organization ownership for the two operator-managed platform bindings in addition to the automated isolation fixture",
+        "run_c_0_organization_ownership_backfill completed twice for organization 1 after every repaired table type was populated; both persisted runs scanned 43 rows, backfilled 0, and left 0 unresolved rows, proving idempotent no-op behavior on the current owned dataset",
         "validate_c_0_organization_ownership_backfill passed after each run and accounting_ownership_backfill_issue contained zero rows"
       ],
       "required": []
