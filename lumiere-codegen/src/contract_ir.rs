@@ -4,6 +4,7 @@
 //! Consumers receive a complete immutable JSON document and must not inspect
 //! or clone mutable `lumiere-v-1` source while generating packages.
 
+use crate::erp_org_sql::{parse_and_validate, SubscriptionQueryPolicy};
 use crate::paths::Paths;
 use crate::support::{read_to_string, write_file};
 use anyhow::{bail, Context, Result};
@@ -170,6 +171,10 @@ pub fn run(
     let subscription_census: SubscriptionCensus =
         serde_json::from_str(&read_to_string(&paths.subscription_census_json)?)
             .with_context(|| format!("parse {}", paths.subscription_census_json.display()))?;
+    let subscription_query_policies = parse_and_validate(
+        &read_to_string(&paths.subscription_query_policy_json)?,
+        registry_text,
+    )?;
     let resources = v2_resources(
         &base.resources,
         &row_types,
@@ -178,6 +183,7 @@ pub fn run(
         &operations,
         resource_scope_manifest,
         &subscription_census,
+        &subscription_query_policies.resources,
     )?;
     let persistence = persistence_contract(paths)?;
     let semantic = SemanticContract {
@@ -564,6 +570,7 @@ fn v2_resources(
     operations: &[Value],
     scope_manifest: ResourceScopeManifest,
     subscription_census: &SubscriptionCensus,
+    subscription_query_policies: &BTreeMap<String, SubscriptionQueryPolicy>,
 ) -> Result<Vec<Value>> {
     if scope_manifest.schema_version != 1 {
         bail!(
@@ -615,6 +622,11 @@ fn v2_resources(
             .is_some()
         {
             bail!("subscription census repeats resource {}", entry.resource);
+        }
+    }
+    for resource in subscription_query_policies.keys() {
+        if !resource_names.contains(resource.as_str()) {
+            bail!("subscription query policy references unknown resource {resource}");
         }
     }
     let row_type_names = types
@@ -698,6 +710,11 @@ fn v2_resources(
             let mut writers = invalidated_by.remove(resource.name.as_str()).unwrap_or_default();
             writers.sort_unstable();
             let subscription = subscriptions.get(resource.name.as_str()).copied();
+            let query_plan = subscription_query_policies
+                .get(&resource.name)
+                .map(serde_json::to_value)
+                .transpose()
+                .context("serialize subscription query plan")?;
             let ownership_fields = resource
                 .contract
                 .get("mandatory")
@@ -759,6 +776,7 @@ fn v2_resources(
             let subscription_contract = subscription.map_or_else(
                 || serde_json::json!({
                     "delivery_mode": "bff-only",
+                    "query_plan": query_plan,
                     "realtime": false,
                     "status": "not-client-facing",
                 }),
@@ -768,6 +786,7 @@ fn v2_resources(
                     "expected_cardinality": entry.expected_cardinality,
                     "latency_class": entry.latency_class,
                     "predicate_class": entry.predicate_class,
+                    "query_plan": query_plan,
                     "realtime": entry.delivery_mode != "bff-only",
                     "reconnect_class": entry.reconnect_class,
                     "source_class": entry.source_class,
@@ -1352,6 +1371,7 @@ mod tests {
                 schema_version: 1,
                 entries: Vec::new(),
             },
+            &BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(output[0]["row"]["type_reference"], "SaleOrder");
@@ -1391,6 +1411,7 @@ mod tests {
                 schema_version: 1,
                 entries: Vec::new(),
             },
+            &BTreeMap::new(),
         )
         .expect_err("unknown row type must fail");
         assert!(error.to_string().contains("unknown row type MissingRow"));
@@ -1434,6 +1455,7 @@ mod tests {
                 schema_version: 1,
                 entries: Vec::new(),
             },
+            &BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -1491,6 +1513,14 @@ mod tests {
                 resources: BTreeMap::new(),
             },
             &census,
+            &BTreeMap::from([(
+                "orders".to_owned(),
+                SubscriptionQueryPolicy {
+                    table: "sale_order".to_owned(),
+                    predicates: Vec::new(),
+                    order_by: Vec::new(),
+                },
+            )]),
         )
         .unwrap();
 
@@ -1498,6 +1528,10 @@ mod tests {
         assert_eq!(output[0]["scope"]["resolution"], "direct");
         assert_eq!(output[0]["subscription"]["status"], "classified");
         assert_eq!(output[0]["subscription"]["realtime"], true);
+        assert_eq!(
+            output[0]["subscription"]["query_plan"]["table"],
+            "sale_order"
+        );
     }
 
     #[test]
@@ -1523,6 +1557,7 @@ mod tests {
                 schema_version: 1,
                 entries: Vec::new(),
             },
+            &BTreeMap::new(),
         )
         .expect_err("unknown scoped resource must fail");
         assert!(error

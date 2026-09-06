@@ -2,13 +2,15 @@
 
 mod emit;
 
+pub(crate) use emit::{parse_and_validate, SubscriptionQueryPolicy};
+
 use crate::paths::Paths;
 use crate::support::{read_to_string, write_file};
 use anyhow::Result;
 
 pub fn run(paths: &Paths, registry_text: &str) -> Result<()> {
     let policy_json = read_to_string(&paths.subscription_query_policy_json)?;
-    let policy = emit::parse_and_validate(&policy_json, registry_text)?;
+    let policy = parse_and_validate(&policy_json, registry_text)?;
     write_file(&paths.erp_org_sql_rust_out, &emit::emit_manifest(&policy)?)?;
     write_file(
         &paths.org_subscription_descriptors_ts_out,

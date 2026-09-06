@@ -24,15 +24,28 @@ pub struct SubscriptionQueryPolicy {
 #[serde(deny_unknown_fields)]
 pub struct Predicate {
     pub field: String,
-    pub operator: String,
+    pub operator: PredicateOperator,
     pub value: Value,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PredicateOperator {
+    Eq,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OrderBy {
     pub field: String,
-    pub direction: String,
+    pub direction: OrderDirection,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OrderDirection {
+    Asc,
+    Desc,
 }
 
 fn is_identifier(value: &str) -> bool {
@@ -78,7 +91,7 @@ pub fn parse_and_validate(
             bail!("resource {resource} has unsafe table identifier");
         }
         for predicate in &descriptor.predicates {
-            if !is_identifier(&predicate.field) || predicate.operator != "eq" {
+            if !is_identifier(&predicate.field) || predicate.operator != PredicateOperator::Eq {
                 bail!("resource {resource} has unsafe predicate");
             }
             if !predicate.value.is_boolean() && !predicate.value.is_string() {
@@ -86,7 +99,7 @@ pub fn parse_and_validate(
             }
         }
         for order in &descriptor.order_by {
-            if !is_identifier(&order.field) || !matches!(order.direction.as_str(), "asc" | "desc") {
+            if !is_identifier(&order.field) {
                 bail!("resource {resource} has unsafe ordering");
             }
         }
@@ -151,6 +164,6 @@ mod tests {
             }
         }"#;
         let error = parse_and_validate(unsafe_operator, REGISTRY).expect_err("raw operator");
-        assert!(error.to_string().contains("unsafe predicate"));
+        assert!(format!("{error:#}").contains("unknown variant `raw`"));
     }
 }
