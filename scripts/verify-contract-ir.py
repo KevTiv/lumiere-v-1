@@ -269,31 +269,43 @@ def main() -> None:
         ):
             fail(f"resource {name} has invalid invalidated_by references")
         scope = resource.get("scope")
-        unclassified_scope = {
-            "company_field": None,
-            "kind": "unclassified",
-            "organization_field": None,
+        allowed_scope_kinds = {
+            "global",
+            "identity",
+            "organization",
+            "organization_company",
+            "organization_identity",
+            "organization_optional_company",
+            "organization_via_company",
+            "organization_via_parent",
         }
-        optional_company_scope = (
-            isinstance(scope, dict)
-            and set(scope) == {"company_field", "kind", "organization_field"}
-            and scope.get("kind") == "organization_optional_company"
-            and isinstance(scope.get("organization_field"), str)
-            and bool(scope["organization_field"])
-            and isinstance(scope.get("company_field"), str)
-            and bool(scope["company_field"])
-        )
-        if scope != unclassified_scope and not optional_company_scope:
+        if (
+            not isinstance(scope, dict)
+            or scope.get("kind") not in allowed_scope_kinds
+            or scope.get("kind") == "unclassified"
+        ):
             fail(f"resource {name} has invalid scope classification")
         query = resource.get("query")
         if (
             not isinstance(query, dict)
-            or query.get("status") != "unclassified"
+            or query.get("status") != "classified"
+            or query.get("authorization") != "server-enforced"
+            or query.get("result_type_reference") != row_ref
             or query.get("input_type_reference") is not None
             or query.get("filter_type_reference") is not None
             or query.get("cursor_type_reference") is not None
         ):
             fail(f"resource {name} must declare query classification status")
+        subscription = resource.get("subscription")
+        if (
+            not isinstance(subscription, dict)
+            or subscription.get("status") not in {"classified", "not-client-facing"}
+            or not isinstance(subscription.get("realtime"), bool)
+            or subscription.get("delivery_mode") not in {"invalidation-only", "bff-only"}
+            or subscription.get("delivery_mode") == "bff-only"
+            and subscription.get("realtime")
+        ):
+            fail(f"resource {name} has invalid subscription classification")
 
     persistence = ir.get("persistence")
     if persistence is not None:

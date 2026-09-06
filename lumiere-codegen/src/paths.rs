@@ -56,6 +56,7 @@ pub struct Paths {
     pub contract_operation_ids_json: PathBuf,
     pub operation_contracts_dir: PathBuf,
     pub resource_scope_metadata_json: PathBuf,
+    pub subscription_census_json: PathBuf,
     pub reducer_manifest_out: PathBuf,
     pub reducer_contract_rust_out: PathBuf,
 
@@ -159,6 +160,7 @@ impl Paths {
             contract_operation_ids_json: manifest_dir.join("contract-operation-ids.json"),
             operation_contracts_dir: manifest_dir.join("operation-contracts"),
             resource_scope_metadata_json: manifest_dir.join("resource-scope-metadata.json"),
+            subscription_census_json: assets.join("subscription-census.json"),
             reducer_manifest_out: staging_manifests.join("reducer-manifest.json"),
             reducer_contract_rust_out: repo_root
                 .join("crates/stdb-client/src/generated_reducer_contract.rs"),

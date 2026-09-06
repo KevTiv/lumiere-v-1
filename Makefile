@@ -948,6 +948,10 @@ check-operation-history:
 	python3 scripts/verify-operation-history.py
 	python3 -m unittest lumiere-codegen/tests/test_operation_history.py
 
+check-c8-contract-ratchet:
+	@node scripts/validate-subscription-census.mjs --check
+	@node scripts/validate-c8-contract-ratchet.mjs
+
 check-release-compatibility:
 	python3 scripts/verify-release-manifest.py
 	python3 -m unittest scripts/test_verify_release_manifest.py
@@ -963,8 +967,7 @@ check-c2-commit-coverage:
 	python3 scripts/verify-c2-commit-coverage.py
 	python3 lumiere-codegen/tests/test_c2_commit_coverage.py
 
-check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-policy check-c2-commit-coverage lint-reducer-call-literals
-	@node scripts/validate-subscription-census.mjs --check
+check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-policy check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals
 	@git add -N \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		crates/stdb-client/src/generated_reducer_contract.rs \
@@ -981,11 +984,10 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 # CI-safe validation for a previously published immutable contract. Source-to-
 # contract regeneration belongs to check-contracts-source-drift; this target
 # must not couple ordinary Rust checks to whichever module is currently deployed.
-check-codegen-pinned: check-operation-history check-release-compatibility check-tenant-ownership check-c2-commit-coverage lint-reducer-call-literals
+check-codegen-pinned: check-operation-history check-release-compatibility check-tenant-ownership check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean
 	python3 lumiere-codegen/tests/test_contract_ir_pin.py
 	node scripts/bootstrap-storage-policies.mjs --check
-	@node scripts/validate-subscription-census.mjs --check
 	@git diff --exit-code -- \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		crates/stdb-client/src/generated_reducer_contract.rs \

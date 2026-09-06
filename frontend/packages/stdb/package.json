@@ -19,6 +19,7 @@
     "./warehouse-3d": "./src/warehouse-3d-types.ts",
     "./generated/types": "./src/generated/types.ts",
     "./generated/query-registry": "./src/generated/query-registry.ts",
+    "./generated/subscription-descriptors": "./src/generated/subscription-descriptors.ts",
     "./field-policy": "./src/field-policy.ts",
     "./live": "./src/live/index.ts",
     "./stored-dashboard-model-registry": "./src/stored-dashboard-model-registry.ts",
