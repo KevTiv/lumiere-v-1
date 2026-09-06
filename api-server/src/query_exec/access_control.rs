@@ -57,6 +57,16 @@ pub(super) async fn read_audit_rules(
     return Ok(rows);
 }
 
+pub(super) async fn read_audit_log(
+    client: &StdbClient,
+    organization_id: u64,
+) -> Result<Vec<Value>, ApiError> {
+    let sql = format!(
+        "SELECT id, organization_id, company_id, table_name, record_id, action, old_values, new_values, session_id, ip_address, user_agent, timestamp FROM audit_log WHERE organization_id = {organization_id} ORDER BY id DESC LIMIT 500"
+    );
+    client.query_sql(&sql).await.map_err(ApiError::internal)
+}
+
 pub(super) async fn read_org_permissions(
     client: &StdbClient,
     organization_id: u64,

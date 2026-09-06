@@ -14,8 +14,6 @@ use super::{
 /// `$2`, …) in the same order as the returned vec.  Errors if `plan.page.cursor`
 /// is set but malformed, or doesn't decode against `plan.order`.
 ///
-/// Phase 0: skeleton only — full implementation comes in Phase 1 alongside the
-/// audit-log read-path migration.
 pub fn compile_stdb_sql(
     plan: &ResourceReadPlan,
 ) -> Result<(String, Vec<ScalarValue>), cursor::CursorError> {
@@ -26,7 +24,6 @@ pub fn compile_stdb_sql(
 ///
 /// Returns `(sql_text, bind_values)` — same contract as [`compile_stdb_sql`].
 ///
-/// Phase 0: skeleton only — full implementation comes in Phase 1.
 pub fn compile_pg_sql(
     plan: &ResourceReadPlan,
 ) -> Result<(String, Vec<ScalarValue>), cursor::CursorError> {

@@ -64,7 +64,7 @@
         "lumiere-codegen/storage-policy-manifest.json contains 463 unique reviewed policy entries; the Rust validator enforces exact 463-table coverage, aggregate/archive coherence, semantic eligibility fields, and reviewed fixture coverage",
         "29 reviewed fixtures cover every module/storage-class pair currently used by the 22 modules",
         "the policy-derived archive subset contains exactly one root, pos_order (terminal_window, versioned); pos_order_line and pos_payment inherit the reviewed POS parent archive",
-        "audit_log is fail-closed as always_hot because ordinary audit appends do not emit exact organization commit and watermark evidence; the obsolete finalizer and test reducers are removed with immutable operation-ID tombstones while legacy cold reads and migration remain available",
+        "audit_log is fail-closed as always_hot because ordinary audit appends do not emit exact organization commit and watermark evidence; the unused cold migration/read path and obsolete finalizer/test reducers are removed, with immutable operation-ID tombstones retained",
         "the retired independent archive-candidate input has no live code path; archive generation consumes the total storage-policy census",
         "spacetimedb/src/core/cold_tier.rs implements policy, age/window, terminal-state, obligation, workflow, hot-dependency, rebuildability, durable-watermark, archive-version, schema-version, and contract-version gates with child-first aggregate deletion",
         "POS runtime fixtures cover the thirty-day terminal window, terminal state, obligations, workflow, missing children, watermark/schema/version mismatch, idempotency, and caller identity",

@@ -38,7 +38,6 @@ pub fn archive_read_descriptor(
     resource: &str,
 ) -> Result<ArchiveReadDescriptor, cursor::CursorError> {
     let (api_resource, source_table) = match resource {
-        "audit-log" => ("audit-log", "audit_log"),
         "pos-orders" => ("pos-orders", "pos_order"),
         _ => {
             return Err(cursor::CursorError::InvalidPlan(format!(

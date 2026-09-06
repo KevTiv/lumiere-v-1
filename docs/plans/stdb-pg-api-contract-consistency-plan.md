@@ -81,9 +81,9 @@ Two compilers means every cold-tier promotion is a rewrite rather than a manifes
 The historical audit and POS drainers implemented the same shape — read hot
 tail, encode via codec manifest, upsert into PG, call a finalize reducer, and
 advance a watermark — twice, divergently. The current archive manifest has
-one active root (`pos_order`); `audit_log` remains a compatibility-only cold
-read/migration surface and is not an active finalization candidate. The
-manifest still carries everything a generic drainer needs for a coolable
+one active root (`pos_order`). The unused audit cold-read and migration surface
+was removed because it never reached production. The manifest carries
+everything a generic drainer needs for a coolable
 candidate (`cold_table`, `finalize_reducer`, `mode`, `order_by`, `primary_key`,
 `scope_columns`, `pg_ddl_file`).
 

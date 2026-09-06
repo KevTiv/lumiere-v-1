@@ -7,7 +7,7 @@
 /// [`super::compile_pg_sql`].
 #[derive(Debug, Clone)]
 pub struct ResourceReadPlan {
-    /// Registry resource key, e.g. `"audit-log"`.
+    /// Registry resource key, e.g. `"pos-orders"`.
     pub resource: String,
     /// SQL table name in both STDB and PG (they share the logical schema).
     pub table: String,
@@ -84,9 +84,4 @@ pub struct PageSpec {
     /// Opaque cursor for keyset pagination (encoded as the value of the
     /// deterministic order key at the last row of the previous page).
     pub cursor: Option<String>,
-}
-
-impl PageSpec {
-    /// Default page size used by the audit-log read path.
-    pub const AUDIT_LOG_DEFAULT_LIMIT: u32 = 500;
 }

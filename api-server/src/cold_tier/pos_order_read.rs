@@ -1,11 +1,7 @@
 //! `pos_order` read merge: `cold_pos_order` (PG) ∪ `pos_order` (STDB tail).
 //!
-//! The first resource to actually exercise `ResourceReadPlan`/
-//! `compile_stdb_sql`/`compile_pg_sql` end-to-end — `audit_log`'s Phase 1
-//! read merge (`audit_read.rs`) was deliberately hand-rolled since it never
-//! needed real pagination (bounded top-500, no cursor). `pos_order` has no
-//! pre-existing read contract to preserve, so this is a from-scratch
-//! keyset-paginated design.
+//! This resource exercises `ResourceReadPlan`/`compile_stdb_sql`/
+//! `compile_pg_sql` end-to-end with keyset pagination.
 //!
 //! Standard `limit + 1` probe for `has_more`: both the hot and cold queries
 //! ask for one more row than the caller requested, and the presence of that
@@ -216,7 +212,7 @@ mod tests {
     }
 
     #[test]
-    fn hot_ids_win_on_dedupe_like_audit_read() {
+    fn hot_ids_win_on_dedupe() {
         let hot = vec![json!({"id": 5}), json!({"id": 3})];
         let (merged, _) = merge_hot_cold_rows(hot, vec![json!({"id": 5}), json!({"id": 1})], 10);
         assert_eq!(

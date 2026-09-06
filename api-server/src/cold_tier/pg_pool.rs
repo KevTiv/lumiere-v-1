@@ -187,10 +187,8 @@ fn rustls_config() -> Result<rustls::ClientConfig> {
 
 /// Process-wide cold-tier PG pool, built lazily on first use.
 ///
-/// Reads used by resource read paths (e.g. the audit-log merge in
-/// `cold_tier::audit_read`) call this instead of threading a pool through
-/// every `execute_resource_query*` call site — those call sites serve ~40
-/// resources and only one currently needs PG.
+/// Cold resource reads call this instead of threading a pool through every
+/// `execute_resource_query*` call site.
 ///
 /// The legacy optional accessor represents pool initialization, not permission
 /// to serve incomplete data. PG-dependent reads must use [`required_pool`].

@@ -93,9 +93,8 @@ to a value from 1 through 200 (default 100).
 
 The current policy has one active archive root: `pos_order`; its reviewed
 `pos_order_line` and `pos_payment` children inherit the aggregate archive.
-`audit_log` is `always_hot` for active writes. Its legacy cold schema/read
-compatibility remains only for already-archived development data, and it is
-not an active finalization candidate.
+`audit_log` is `always_hot`; its retired cold schema, read merge, drainer, and
+finalizer are not part of the deployable application.
 
 The worker uses `STDB_SERVER_TOKEN` only for private source/commit-table reads
 and uses `STDB_FINALIZATION_TOKEN` only for finalizer reducer calls. Both must

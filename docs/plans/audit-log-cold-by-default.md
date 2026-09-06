@@ -9,9 +9,9 @@
 > current C5 policy has exactly one archive root: `pos_order` (with its reviewed
 > children). `audit_log` is `always_hot` because ordinary audit appends do not
 > emit the exact organization commit and projection-watermark evidence needed
-> for safe deletion. The compatibility `cold_audit_log` schema/read path and
-> migration remain available for already-archived development data, but no
-> active audit drainer or audit finalizer is part of the archive candidate set.
+> for safe deletion. Because no production database used the proposal, its
+> cold schema, read path, migration, drainer, and finalizer were removed rather
+> than retained as development-only compatibility code.
 
 ---
 

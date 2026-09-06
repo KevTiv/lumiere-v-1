@@ -10,9 +10,8 @@
 //! ## Relationship to existing code
 //!
 //! Today `query_exec.rs` and `stdb-auth` inline the resolution of org scope,
-//! field restrictions, and resource-specific predicates.  Phase 0 introduces
-//! these types as the target representation; Phase 1+ migrates the audit-log
-//! read path to use them.
+//! field restrictions, and resource-specific predicates. These types are the
+//! shared representation for resources that are actually archive-capable.
 //!
 //! ## Non-negotiable invariants (from the plan)
 //!
@@ -22,7 +21,6 @@
 //!    boolean operator precedence bugs.
 //! 3. `page` must be bounded — archive-capable reads are never unbounded.
 
-pub mod audit_read;
 pub mod commit_projection;
 pub mod conventions;
 pub mod cursor;
@@ -60,11 +58,11 @@ pub use read_validation::validate_resource_read_plan;
 mod tests {
     use super::*;
 
-    fn audit_plan() -> ResourceReadPlan {
+    fn pos_order_plan() -> ResourceReadPlan {
         ResourceReadPlan {
-            resource: "audit-log".into(),
-            table: "audit_log".into(),
-            projection: vec!["id".into(), "organization_id".into(), "action".into()],
+            resource: "pos-orders".into(),
+            table: "pos_order".into(),
+            projection: vec!["id".into(), "organization_id".into(), "status".into()],
             organization_id: 42,
             company_id: Some(7),
             predicates: vec![],
@@ -73,7 +71,7 @@ mod tests {
                 direction: OrderDirection::Desc,
             }],
             page: PageSpec {
-                limit: PageSpec::AUDIT_LOG_DEFAULT_LIMIT,
+                limit: 500,
                 cursor: None,
             },
         }
@@ -81,7 +79,7 @@ mod tests {
 
     #[test]
     fn pg_sql_contains_org_scope() {
-        let plan = audit_plan();
+        let plan = pos_order_plan();
         let (sql, binds) = compile_pg_sql(&plan).unwrap();
         assert!(
             sql.contains("\"organization_id\" = $1::NUMERIC"),
@@ -94,23 +92,23 @@ mod tests {
 
     #[test]
     fn pg_sql_contains_order_and_limit() {
-        let plan = audit_plan();
+        let plan = pos_order_plan();
         let (sql, _) = compile_pg_sql(&plan).unwrap();
-        assert!(sql.contains("FROM \"cold_audit_log\""), "SQL: {sql}");
+        assert!(sql.contains("FROM \"cold_pos_order\""), "SQL: {sql}");
         assert!(sql.contains("ORDER BY \"id\" DESC"), "SQL: {sql}");
         assert!(sql.contains("LIMIT 500"), "SQL: {sql}");
     }
 
     #[test]
     fn stdb_sql_uses_question_mark_placeholders() {
-        let plan = audit_plan();
+        let plan = pos_order_plan();
         let (sql, _) = compile_stdb_sql(&plan).unwrap();
         assert!(sql.contains("`organization_id` = ?"), "SQL: {sql}");
     }
 
     #[test]
     fn or_predicate_is_parenthesised() {
-        let mut plan = audit_plan();
+        let mut plan = pos_order_plan();
         plan.predicates.push(ReadPredicate::Or(
             Box::new(ReadPredicate::IsNull {
                 column: "company_id".into(),
@@ -129,7 +127,7 @@ mod tests {
 
     #[test]
     fn in_predicate_with_empty_values_compiles_to_false() {
-        let mut plan = audit_plan();
+        let mut plan = pos_order_plan();
         plan.predicates.push(ReadPredicate::In {
             column: "company_id".into(),
             values: vec![],
@@ -140,7 +138,7 @@ mod tests {
 
     #[test]
     fn cursor_applies_keyset_predicate() {
-        let mut plan = audit_plan();
+        let mut plan = pos_order_plan();
         let cursor = cursor::encode_cursor(&plan.order, &[ScalarValue::U64(100)]).unwrap();
         plan.page.cursor = Some(cursor);
         let (sql, binds) = compile_pg_sql(&plan).unwrap();
@@ -150,14 +148,14 @@ mod tests {
 
     #[test]
     fn malformed_cursor_is_rejected() {
-        let mut plan = audit_plan();
+        let mut plan = pos_order_plan();
         plan.page.cursor = Some("not-a-valid-cursor!!".into());
         assert!(compile_pg_sql(&plan).is_err());
     }
 
     #[test]
     fn projection_cast_suffix_applies_for_pg_and_strips_for_stdb() {
-        let mut plan = audit_plan();
+        let mut plan = pos_order_plan();
         plan.projection = vec!["id::TEXT".into(), "organization_id".into(), "action".into()];
 
         let (pg_sql, _) = compile_pg_sql(&plan).unwrap();
@@ -170,7 +168,7 @@ mod tests {
 
     #[test]
     fn inline_stdb_literals_substitutes_in_order() {
-        let mut plan = audit_plan();
+        let mut plan = pos_order_plan();
         plan.predicates.push(ReadPredicate::Eq {
             column: "action".into(),
             value: ScalarValue::Text("it's fine".into()),
@@ -185,14 +183,14 @@ mod tests {
 
     #[test]
     fn arbitrary_resource_and_table_are_rejected_before_sql_emission() {
-        let mut plan = audit_plan();
+        let mut plan = pos_order_plan();
         plan.resource = "caller-selected-table".into();
         assert!(matches!(
             compile_pg_sql(&plan),
             Err(cursor::CursorError::InvalidPlan(_))
         ));
 
-        let mut plan = audit_plan();
+        let mut plan = pos_order_plan();
         plan.table = "audit_log; DROP TABLE company".into();
         assert!(matches!(
             compile_stdb_sql(&plan),
@@ -202,7 +200,7 @@ mod tests {
 
     #[test]
     fn arbitrary_projection_cast_is_rejected() {
-        let mut plan = audit_plan();
+        let mut plan = pos_order_plan();
         plan.projection.push("action::JSONB".into());
         assert!(compile_pg_sql(&plan).is_err());
     }
