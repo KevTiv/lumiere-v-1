@@ -82,7 +82,7 @@ async fn sale_order_put(
             json!([org_id, company_id, order_id, params]),
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
 
     let orders = execute_resource_query(
         &client,
@@ -128,7 +128,7 @@ async fn sale_order_delete(
             json!([org_id, order_id, reason])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
 
     Ok(Json(
         json!({ "data": { "message": "Sale order cancelled successfully" } }),

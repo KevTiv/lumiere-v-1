@@ -16,6 +16,7 @@ STDB_MODULE        ?= lumiere-v1-j1uo0
 STDB_CLOUD_MODULE  ?= lumiere-v1-j1uo0
 # Local SpacetimeDB HTTP base (default maincloud; e2e-smoke overrides to local)
 STDB_HOST          ?= https://maincloud.spacetimedb.com
+STDB_REMOTE_SERVER ?= maincloud
 # Local E2E: always use the local SpacetimeDB server (see e2e-smoke target)
 E2E_STDB_HOST      ?= http://127.0.0.1:3000
 # Local Playwright stack uses its own module name (--no-config) so it is not tied to
@@ -29,6 +30,7 @@ E2E_SUITE          ?= full
 # Single-spec iteration (e2e-single-test / e2e-single)
 E2E_SPEC           ?= mvp-lead-to-cash.spec.ts
 E2E_GREP           ?=
+E2E_ONLY_SPEC      ?=
 E2E_WORKERS        ?= 1
 # Some interactive shells in Cursor can inherit a literal "$$PATH"; use a known-good command path for E2E orchestration.
 E2E_PATH           ?= /Users/kevintivert/.nvm/versions/node/v21.7.0/bin:/Users/kevintivert/.cargo/bin:/Users/kevintivert/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
@@ -100,9 +102,9 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	generate-stdb-ts-sdk generate-stdb-rust-sdk schema-snapshot \
 	e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
-	e2e-crm-isolation \
+	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running \
 	init-stack docker-dev docker-dev-iot \
-	codegen check-codegen check-contract-ir check-tenant-ownership check-storage-policy check-reducer-contracts-drift check-contracts-drift \
+	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift \
 	clean-contracts-live-staging lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
@@ -110,12 +112,12 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	local-start local-stop local-publish local-reset local-test local-logs \
 	stack-init stack-up stack-up-iot stack-down \
 	codegen-all codegen-check api-run \
-	cloud-publish cloud-reset cloud-test cloud-logs
+	cloud-wasm cloud-publish cloud-reset cloud-test cloud-logs
 
 help-legacy:
 	@echo "Usage: make <target>"
 	@echo ""
-	@echo "  setup                Install wasm32 target and wasm-opt (one-time)"
+	@echo "  setup                Install wasm32 target, wasm-opt, and wasm-tools (one-time)"
 	@echo "  check                Run cargo check (fast type-check, no linking)"
 	@echo "  check-env            Print STDB_MODULE / STDB_CLOUD_MODULE / STDB_HOST (Makefile defaults)"
 	@echo "  check-env-prod       Validate production env vars (exit 1 if required vars missing)"
@@ -136,7 +138,9 @@ help-legacy:
 	@echo "  e2e-smoke-test       Pre-build Next.js, start web, Playwright (requires setup; E2E_SUITE=full|p0)"
 	@echo "  e2e-playwright-only  Playwright only when STDB, api-server, and Next.js are already running"
 	@echo "  e2e-single           setup + one Playwright spec (E2E_SPEC, E2E_GREP, E2E_WORKERS=1)"
-	@echo "  e2e-single-test      one spec only — requires e2e-smoke-setup (rebuilds Next, --workers=1)"
+	@echo "  e2e-single-test      one spec; matching local Next builds are reused (--workers=1)"
+	@echo "  e2e-web-dev          prepare API/STDB and keep Next dev running in this terminal"
+	@echo "  e2e-single-running   one spec against an existing stack; no build/publish/seed"
 	@echo "  e2e-p2p              Wave 3 gate: procure-to-pay golden path (mvp-procure-to-pay.spec.ts)"
 	@echo "  e2e-mvp-golden       Both MVP golden paths (lead-to-cash + procure-to-pay, fresh DB)"
 	@echo "  generate-stdb-rust-sdk  Regenerate api-server Rust STDB client bindings (+ keyword fix)"
@@ -148,8 +152,11 @@ help-legacy:
 	@echo "  codegen                 Extract canonical contract IR plus local runtime/audit artifacts"
 	@echo "  check-codegen           Fail if generated artifacts drift from sources (CI). Requires .contracts-staging/ (see contracts-staging-from-pinned)"
 	@echo "  check-contract-ir       Validate the versioned IR envelope and both SHA-256 hashes"
+	@echo "  check-operation-history Fail on reused operation IDs or unapproved contract-shape changes"
+	@echo "  check-release-compatibility Validate pinned IR, contracts, PG migration, services, and deployment generation"
 	@echo "  check-tenant-ownership  Validate C0 direct organization ownership (required by check-codegen)"
 	@echo "  check-storage-policy    Validate C1 all-table storage census (required by check-codegen)"
+	@echo "  check-c2-commit-coverage Validate registered C2 reducer commit coverage (required by check-codegen)"
 	@echo "  check-reducer-contracts-drift  CI-safe live-schema drift check for reducer-manifest.json"
 	@echo "  check-contracts-drift   Full bindings/manifests drift check (requires spacetime CLI)"
 	@echo "  publish-contracts VERSION=x.y.z  Transitional release: publish canonical IR plus current generated packages"
@@ -167,7 +174,7 @@ endef
 help:
 	@printf "Usage: make <target> [VARIABLE=value]\n\n"
 	@printf "Setup and diagnostics\n"
-	$(call print-command,setup,Install the stable WASM target and wasm-opt.)
+	$(call print-command,setup,Install the stable WASM target, wasm-opt, and wasm-tools.)
 	$(call print-command,check-env,Print the resolved SpacetimeDB module and host variables.)
 	$(call print-command,api-run,Run only the Rust API using api-server/.env.local.)
 	@printf "\n"
@@ -208,11 +215,14 @@ help-e2e:
 	$(call print-command,e2e-smoke-setup,Database publish plus reducer checks fixture seed and API only.)
 	$(call print-command,e2e-smoke-test,Build web and run Playwright; requires e2e-smoke-setup.)
 	$(call print-command,e2e-playwright-only,Run Playwright against already-running services.)
+	$(call print-command,e2e-web-dev,Prepare API/STDB then keep Next dev running in this terminal.)
+	$(call print-command,e2e-single-running,One spec against a running stack without building or seeding.)
 	$(call print-command,e2e-single,Setup plus one spec; E2E_SPEC=<file> and E2E_GREP=<pattern>.)
 	$(call print-command,e2e-single-test,One spec against an existing E2E setup.)
 	$(call print-command,e2e-p2p,Procure-to-pay golden-path spec.)
 	$(call print-command,e2e-mvp-golden,Lead-to-cash and procure-to-pay gates.)
 	$(call print-command,e2e-crm-isolation,Fresh live CRM organization/company read-isolation gate.)
+	$(call print-command,e2e-dx-test,Validate local E2E fingerprint and API binary helpers.)
 	$(call print-command,e2e-wipe-local-stdb,DESTRUCTIVE: delete all local SpacetimeDB data.)
 	@printf "\nUseful inputs: E2E_CLEAR_DB=1, E2E_SUITE=p0, E2E_SPEC=<file>, E2E_GREP=<pattern>.\n"
 
@@ -221,11 +231,13 @@ help-e2e:
 setup:
 	rustup target add wasm32-unknown-unknown --toolchain stable
 	brew install binaryen || true
+	brew install wasm-tools || true
 
 check-env:
 	@echo "STDB_MODULE=$(STDB_MODULE)"
 	@echo "STDB_CLOUD_MODULE=$(STDB_CLOUD_MODULE)"
 	@echo "STDB_HOST=$(STDB_HOST)"
+	@echo "STDB_REMOTE_SERVER=$(STDB_REMOTE_SERVER)"
 	@echo "DB (local publish target)=$(DB)"
 	@echo "DB_CLOUD=$(DB_CLOUD)"
 
@@ -250,14 +262,16 @@ stop:
 	spacetime stop
 
 publish:
-	sudo LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish $(DB) --module-path $(MODULE) --server local -y
+	cd $(MODULE) && LUMIERE_ENABLE_DEV_REDUCERS=1 cargo build --locked --target wasm32-unknown-unknown --release
+	spacetime publish $(DB) --bin-path $(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm --server local -y
 
 
 generate-stdb-ts-sdk:
 	bash scripts/generate-spacetimedb-ts-sdk.sh ".contracts-staging/ts/generated" "$(MODULE)"
 
 publish-clear:
-	LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish $(DB) --module-path $(MODULE) --server local --clear-database -y
+	cd $(MODULE) && LUMIERE_ENABLE_DEV_REDUCERS=1 cargo build --locked --target wasm32-unknown-unknown --release
+	spacetime publish $(DB) --bin-path $(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm --server local --clear-database -y
 
 # A test target must terminate. Use `local-logs` separately when diagnosis is
 # needed; `logs` intentionally tails forever.
@@ -291,6 +305,10 @@ e2e-smoke-setup:
 		LOG_DIR="$$ROOT/.tmp/e2e"; \
 		mkdir -p "$$LOG_DIR"; \
 		E2E_STDB_HOST="$${E2E_STDB_HOST:-http://127.0.0.1:3000}"; \
+		if [ -z "$${STDB_CREDENTIAL_ENCRYPTION_KEY:-}" ] && [ -f "$$LOG_DIR/env.sh" ]; then \
+			STDB_CREDENTIAL_ENCRYPTION_KEY="$$(. "$$LOG_DIR/env.sh"; printf "%s" "$${STDB_CREDENTIAL_ENCRYPTION_KEY:-}")"; \
+			export STDB_CREDENTIAL_ENCRYPTION_KEY; \
+		fi; \
 		if [ -z "$${STDB_CREDENTIAL_ENCRYPTION_KEY:-}" ]; then \
 			STDB_CREDENTIAL_ENCRYPTION_KEY="$$(openssl rand -hex 32)"; \
 			export STDB_CREDENTIAL_ENCRYPTION_KEY; \
@@ -317,7 +335,7 @@ e2e-smoke-setup:
 		echo "[e2e] Logging in to local SpacetimeDB (database owner for private-table SQL)..."; \
 		E2E_STDB_HOST="$$E2E_STDB_HOST" node "$$ROOT/scripts/e2e-local-stdb-token.mjs" --login-only; \
 		STDB_HASH_FILE="$$LOG_DIR/stdb.hash"; \
-		CUR_STDB_HASH="$$( { find "$$ROOT/spacetimedb/src" -type f -name "*.rs" 2>/dev/null; ls "$$ROOT/spacetimedb/Cargo.toml" "$$ROOT/spacetimedb/Cargo.lock" 2>/dev/null; } | sort | xargs -I{} shasum -a 256 {} 2>/dev/null | shasum -a 256 | cut -d" " -f1 )"; \
+		CUR_STDB_HASH="$$(E2E_BUILD_MODULE="$(E2E_DB)" E2E_BUILD_HOST="$$E2E_STDB_HOST" "$$ROOT/scripts/e2e-dx.sh" stdb-fingerprint)"; \
 		STDB_FAST_PATH=0; \
 		if [ "$${E2E_CLEAR_DB:-0}" != "1" ] && [ "$${E2E_FORCE_REBUILD:-0}" != "1" ] && [ -f "$$STDB_HASH_FILE" ] && [ "$$(cat "$$STDB_HASH_FILE")" = "$$CUR_STDB_HASH" ] && spacetime describe "$(E2E_DB)" --server local --no-config >/dev/null 2>&1; then \
 			STDB_FAST_PATH=1; \
@@ -325,6 +343,7 @@ e2e-smoke-setup:
 		if [ "$$STDB_FAST_PATH" = "1" ]; then \
 			echo "[e2e] spacetimedb/ unchanged since last publish — skipping publish + reducer tests + fixture reseed (set E2E_FORCE_REBUILD=1 or E2E_CLEAR_DB=1 to force)."; \
 		else \
+			rm -f "$$STDB_HASH_FILE"; \
 			echo "[e2e] Publishing local database $(E2E_DB) (--no-config)..."; \
 			if [ "$${E2E_CLEAR_DB:-0}" = "1" ]; then \
 				echo "[e2e] E2E_CLEAR_DB=1: clearing module data (--clear-database)"; \
@@ -348,7 +367,6 @@ e2e-smoke-setup:
 				fi; \
 			done; \
 			echo "[e2e] Domain reducer tests passed."; \
-			echo "$$CUR_STDB_HASH" >"$$STDB_HASH_FILE"; \
 		fi; \
 		echo "[e2e] Obtaining local SpacetimeDB owner token (with private-table SQL preflight)..."; \
 		STDB_SERVER_TOKEN="$$(E2E_STDB_HOST="$$E2E_STDB_HOST" STDB_MODULE="$(E2E_DB)" node "$$ROOT/scripts/e2e-local-stdb-token.mjs")"; \
@@ -360,15 +378,15 @@ e2e-smoke-setup:
 		if [ "$$STDB_FAST_PATH" = "1" ]; then \
 			echo "[e2e] Skipping fixture reseed (spacetimedb/ unchanged; reusing existing DB data)."; \
 		else \
-			echo "[e2e] Seeding smoke fixture (seed_dev_data) and browser test user..."; \
+			echo "[e2e] Seeding smoke fixture (seed_dev_data)..."; \
 			cd "$$ROOT/frontend/web"; \
 			STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
-			set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
-			STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
 			cd "$$ROOT"; \
+			echo "$$CUR_STDB_HASH" >"$$STDB_HASH_FILE"; \
 		fi; \
 		API_HASH_FILE="$$LOG_DIR/api.hash"; \
-		CUR_API_HASH="$$( { find "$$ROOT/api-server/src" "$$ROOT/crates" -type f -name "*.rs" 2>/dev/null; ls "$$ROOT/api-server/Cargo.toml" "$$ROOT/Cargo.lock" 2>/dev/null; } | sort | xargs -I{} shasum -a 256 {} 2>/dev/null | shasum -a 256 | cut -d" " -f1 )"; \
+		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
+		CUR_API_HASH="$$(STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" E2E_BUILD_MODULE="$(E2E_DB)" E2E_BUILD_HOST="$$E2E_STDB_HOST" E2E_BUILD_API_PORT="$(E2E_API_PORT)" E2E_BUILD_WEB_PORT="$(E2E_WEB_PORT)" "$$ROOT/scripts/e2e-dx.sh" api-fingerprint)"; \
 		API_HEALTHY=0; \
 		curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1 && API_HEALTHY=1; \
 		if [ "$${E2E_FORCE_REBUILD:-0}" != "1" ] && [ "$$API_HEALTHY" = "1" ] && [ -f "$$API_HASH_FILE" ] && [ "$$(cat "$$API_HASH_FILE")" = "$$CUR_API_HASH" ]; then \
@@ -381,7 +399,7 @@ e2e-smoke-setup:
 				sleep 1; \
 			fi; \
 			echo "[e2e] Building api-server (first run may take a few minutes)..."; \
-			cargo build -p api-server -q; \
+			scripts/e2e-dx.sh api-build; \
 			set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
 			echo "[e2e] Starting api-server on :$(E2E_API_PORT)..."; \
 			LUMIERE_E2E=1 \
@@ -393,7 +411,7 @@ e2e-smoke-setup:
 			STDB_HOST="$$E2E_STDB_HOST" \
 			NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 			CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
-			nohup cargo run -p api-server -q >>"$$LOG_DIR/api-server.log" 2>&1 & \
+			nohup scripts/e2e-dx.sh api-run >>"$$LOG_DIR/api-server.log" 2>&1 & \
 			API_PID="$$!"; \
 			disown "$$API_PID" 2>/dev/null || true; \
 			for i in {1..180}; do \
@@ -406,6 +424,13 @@ e2e-smoke-setup:
 			done; \
 			echo "$$CUR_API_HASH" >"$$API_HASH_FILE"; \
 		fi; \
+		echo "[e2e] Applying checksum-verified PostgreSQL migrations..."; \
+		"$$ROOT/scripts/e2e-dx.sh" storage-migrate; \
+		echo "[e2e] Seeding browser test user through the running API server..."; \
+		cd "$$ROOT/frontend/web"; \
+		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
+		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
+		cd "$$ROOT"; \
 		{ \
 			printf "export E2E_STDB_TOKEN=%q\n" "$$E2E_STDB_TOKEN"; \
 			printf "export STDB_CREDENTIAL_ENCRYPTION_KEY=%q\n" "$$STDB_CREDENTIAL_ENCRYPTION_KEY"; \
@@ -440,7 +465,7 @@ e2e-smoke-test:
 		fi; \
 		echo "[e2e] Building api-server..."; \
 		cd "$$ROOT"; \
-		cargo build -p api-server -q; \
+		scripts/e2e-dx.sh api-build; \
 		if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then \
 			echo "[e2e] Restarting api-server on :$(E2E_API_PORT)..."; \
 			lsof -ti:"$(E2E_API_PORT)" | xargs kill >/dev/null 2>&1 || true; \
@@ -457,7 +482,7 @@ e2e-smoke-test:
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
-		nohup cargo run -p api-server -q >>"$$LOG_DIR/api-server.log" 2>&1 & \
+		nohup scripts/e2e-dx.sh api-run >>"$$LOG_DIR/api-server.log" 2>&1 & \
 		for i in {1..60}; do \
 			if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then break; fi; \
 			sleep 1; \
@@ -485,7 +510,7 @@ e2e-smoke-test:
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
-		pnpm exec next build; \
+		"$$ROOT/scripts/e2e-dx.sh" frontend-build; \
 		echo "[e2e] Starting Next.js on :$(E2E_WEB_PORT)..."; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
@@ -529,6 +554,10 @@ e2e-smoke-test:
 
 e2e-single: e2e-smoke-setup e2e-single-test
 
+# Focused, dependency-free validation of local DX helpers.
+e2e-dx-test:
+	bash scripts/test-e2e-dx.sh
+
 # Phase 2 CRM authorization gate: ephemeral tenants, persisted rows, HTTP reads, and WS subscriptions.
 e2e-crm-isolation:
 	@$(MAKE) e2e-single E2E_CLEAR_DB=1 E2E_SPEC=crm-read-isolation.spec.ts E2E_GREP= E2E_WORKERS=1
@@ -566,14 +595,15 @@ e2e-single-test:
 		fi; \
 		cd "$$ROOT"; \
 		API_HASH_FILE="$$LOG_DIR/api.hash"; \
-		CUR_API_HASH="$$( { find "$$ROOT/api-server/src" "$$ROOT/crates" -type f -name "*.rs" 2>/dev/null; ls "$$ROOT/api-server/Cargo.toml" "$$ROOT/Cargo.lock" 2>/dev/null; } | sort | xargs -I{} shasum -a 256 {} 2>/dev/null | shasum -a 256 | cut -d" " -f1 )"; \
+		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
+		CUR_API_HASH="$$(STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" E2E_BUILD_MODULE="$(E2E_DB)" E2E_BUILD_HOST="$$E2E_STDB_HOST" E2E_BUILD_API_PORT="$(E2E_API_PORT)" E2E_BUILD_WEB_PORT="$(E2E_WEB_PORT)" "$$ROOT/scripts/e2e-dx.sh" api-fingerprint)"; \
 		API_HEALTHY=0; \
 		curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1 && API_HEALTHY=1; \
 		if [ "$${E2E_FORCE_REBUILD:-0}" != "1" ] && [ "$$API_HEALTHY" = "1" ] && [ -f "$$API_HASH_FILE" ] && [ "$$(cat "$$API_HASH_FILE")" = "$$CUR_API_HASH" ]; then \
 			echo "[e2e] api-server unchanged and already running on :$(E2E_API_PORT) — reusing it (set E2E_FORCE_REBUILD=1 to force a rebuild)."; \
 		else \
 			echo "[e2e] Building api-server..."; \
-			cargo build -p api-server -q; \
+			scripts/e2e-dx.sh api-build; \
 			if [ "$$API_HEALTHY" = "1" ]; then \
 				echo "[e2e] Restarting api-server on :$(E2E_API_PORT)..."; \
 				lsof -ti:"$(E2E_API_PORT)" | xargs kill >/dev/null 2>&1 || true; \
@@ -590,7 +620,7 @@ e2e-single-test:
 			STDB_HOST="$$E2E_STDB_HOST" \
 			NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 			CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
-			cargo run -p api-server -q >"$$LOG_DIR/api-server.log" 2>&1 & \
+			scripts/e2e-dx.sh api-run >"$$LOG_DIR/api-server.log" 2>&1 & \
 			for i in {1..60}; do \
 				if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then break; fi; \
 				sleep 1; \
@@ -620,7 +650,7 @@ e2e-single-test:
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
-		pnpm exec next build; \
+		"$$ROOT/scripts/e2e-dx.sh" frontend-build; \
 		echo "[e2e] Starting Next.js on :$(E2E_WEB_PORT)..."; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
@@ -661,8 +691,26 @@ e2e-single-test:
 		echo "[e2e] Single-spec test passed."; \
 	'
 
+e2e-single-running:
+	@$(MAKE) e2e-playwright-only E2E_ONLY_SPEC="$(E2E_SPEC)"
+
+# Foreground development server; Ctrl-C stops only this web process. The API
+# and local database prepared by setup remain available for the next session.
+e2e-web-dev: e2e-smoke-setup
+	@env PATH="$(E2E_PATH):$$PATH" /bin/bash -c 'set -euo pipefail; \
+		ROOT="$$(pwd)"; \
+		set -a; . "$$ROOT/.tmp/e2e/env.sh"; \
+		[ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
+		cd "$$ROOT/frontend/web"; \
+		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" \
+		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" \
+		NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" \
+		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_API_GATEWAY_URL="" \
+		pnpm exec next dev --hostname 127.0.0.1 --port $(E2E_WEB_PORT); \
+	'
+
 e2e-playwright-only:
-	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" /bin/bash -c 'set -euo pipefail; \
+	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_ONLY_SPEC="$(E2E_ONLY_SPEC)" E2E_GREP="$(E2E_GREP)" E2E_WORKERS="$(E2E_WORKERS)" /bin/bash -c 'set -euo pipefail; \
 		ROOT="$$(pwd)"; \
 		LOG_DIR="$$ROOT/.tmp/e2e"; \
 		if [ -f "$$LOG_DIR/env.sh" ]; then set -a; . "$$LOG_DIR/env.sh"; set +a; fi; \
@@ -678,6 +726,9 @@ e2e-playwright-only:
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
 		E2E_PNPM_SCRIPT="test:e2e"; \
 		if [ "$${E2E_SUITE:-full}" = "p0" ]; then E2E_PNPM_SCRIPT="test:e2e:p0"; fi; \
+		PW_ARGS=(--workers "$$E2E_WORKERS"); \
+		if [ -n "$$E2E_ONLY_SPEC" ]; then PW_ARGS+=("tests/e2e/$$E2E_ONLY_SPEC"); fi; \
+		if [ -n "$$E2E_GREP" ]; then PW_ARGS+=(--grep "$$E2E_GREP"); fi; \
 		echo "[e2e] Running Playwright only ($${E2E_SUITE:-full} suite)..."; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
@@ -690,7 +741,7 @@ e2e-playwright-only:
 		STDB_HOST="$${E2E_STDB_HOST:-http://127.0.0.1:3000}" \
 		NEXT_PUBLIC_STDB_HOST="$${E2E_STDB_HOST:-http://127.0.0.1:3000}" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
-		pnpm run "$$E2E_PNPM_SCRIPT"; \
+		pnpm run "$$E2E_PNPM_SCRIPT" "$${PW_ARGS[@]}"; \
 		echo "[e2e] Smoke tests passed."; \
 	'
 
@@ -769,12 +820,10 @@ e2e-smoke:
 			echo "[e2e] Failed to obtain local SpacetimeDB owner token (see messages above)"; \
 			exit 1; \
 		fi; \
-		echo "[e2e] Seeding smoke fixture (seed_dev_data) and browser test user..."; \
+		echo "[e2e] Seeding smoke fixture (seed_dev_data)..."; \
 		cd "$$ROOT/frontend/web"; \
 		E2E_STDB_TOKEN="$$STDB_SERVER_TOKEN"; \
 		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run e2e-seed-fixture; \
-		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
-		STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
 		cd "$$ROOT"; \
 		if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then \
 			echo "[e2e] Stopping existing api-server on :$(E2E_API_PORT) for e2e env..."; \
@@ -782,8 +831,10 @@ e2e-smoke:
 			sleep 1; \
 		fi; \
 		echo "[e2e] Building api-server (first run may take a few minutes)..."; \
-		cargo build -p api-server -q; \
+		scripts/e2e-dx.sh api-build; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
+		echo "[e2e] Applying checksum-verified PostgreSQL migrations..."; \
+		scripts/e2e-dx.sh storage-migrate; \
 		echo "[e2e] Starting api-server on :$(E2E_API_PORT)..."; \
 		LUMIERE_E2E=1 \
 		PORT="$(E2E_API_PORT)" \
@@ -794,7 +845,7 @@ e2e-smoke:
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		CORS_ORIGINS="http://127.0.0.1:$(E2E_WEB_PORT),http://localhost:$(E2E_WEB_PORT)" \
-		cargo run -p api-server -q >"$$LOG_DIR/api-server.log" 2>&1 & \
+		scripts/e2e-dx.sh api-run >"$$LOG_DIR/api-server.log" 2>&1 & \
 		API_PID="$$!"; \
 		for i in {1..180}; do \
 			if curl -fsS "http://127.0.0.1:$(E2E_API_PORT)/health" >/dev/null 2>&1; then break; fi; \
@@ -804,6 +855,11 @@ e2e-smoke:
 				exit 1; \
 			fi; \
 		done; \
+		echo "[e2e] Seeding browser test user through the running API server..."; \
+		cd "$$ROOT/frontend/web"; \
+		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
+		LUMIERE_API_SERVER_URL="http://127.0.0.1:$(E2E_API_PORT)" STDB_SERVER_TOKEN="$$E2E_STDB_TOKEN" STDB_MODULE="$(E2E_DB)" NEXT_PUBLIC_STDB_MODULE="$(E2E_DB)" STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" pnpm run seed-test-user; \
+		cd "$$ROOT"; \
 		if curl -fsS "http://127.0.0.1:$(E2E_WEB_PORT)" >/dev/null 2>&1; then \
 			echo "[e2e] Stopping existing Next.js on :$(E2E_WEB_PORT)..."; \
 			lsof -ti:"$(E2E_WEB_PORT)" | xargs kill >/dev/null 2>&1 || true; \
@@ -821,7 +877,7 @@ e2e-smoke:
 		STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" \
 		NEXT_PUBLIC_API_GATEWAY_URL="" \
-		pnpm exec next build; \
+		"$$ROOT/scripts/e2e-dx.sh" frontend-build; \
 		echo "[e2e] Starting Next.js on :$(E2E_WEB_PORT)..."; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
@@ -885,6 +941,16 @@ codegen: schema-snapshot
 check-contract-ir: codegen
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json
 	python3 lumiere-codegen/tests/test_contract_ir_pin.py
+	python3 scripts/verify-operation-history.py
+	python3 scripts/verify-release-manifest.py
+
+check-operation-history:
+	python3 scripts/verify-operation-history.py
+	python3 -m unittest lumiere-codegen/tests/test_operation_history.py
+
+check-release-compatibility:
+	python3 scripts/verify-release-manifest.py
+	python3 -m unittest scripts/test_verify_release_manifest.py
 
 check-tenant-ownership:
 	python3 scripts/verify-tenant-ownership.py .contracts-staging/manifests/lumiere-schema-manifest.json
@@ -893,22 +959,39 @@ check-tenant-ownership:
 check-storage-policy: codegen
 	node scripts/bootstrap-storage-policies.mjs --check
 
-check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-policy lint-reducer-call-literals
+check-c2-commit-coverage:
+	python3 scripts/verify-c2-commit-coverage.py
+	python3 lumiere-codegen/tests/test_c2_commit_coverage.py
+
+check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-policy check-c2-commit-coverage lint-reducer-call-literals
 	@node scripts/validate-subscription-census.mjs --check
 	@git add -N \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
 		crates/stdb-auth/assets/query_exec_non_registry.json \
-		api-server/src/generated/pg_ddl/ \
 		2>/dev/null || true
 	@git diff --exit-code -- \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
-		crates/stdb-auth/assets/query_exec_non_registry.json \
-		api-server/src/generated/pg_ddl/ || \
+		crates/stdb-auth/assets/query_exec_non_registry.json || \
 		(echo "Generated artifacts are out of date. Run: make generate-stdb-ts-sdk && make codegen" && exit 1)
+
+# CI-safe validation for a previously published immutable contract. Source-to-
+# contract regeneration belongs to check-contracts-source-drift; this target
+# must not couple ordinary Rust checks to whichever module is currently deployed.
+check-codegen-pinned: check-operation-history check-release-compatibility check-tenant-ownership check-c2-commit-coverage lint-reducer-call-literals
+	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean
+	python3 lumiere-codegen/tests/test_contract_ir_pin.py
+	node scripts/bootstrap-storage-policies.mjs --check
+	@node scripts/validate-subscription-census.mjs --check
+	@git diff --exit-code -- \
+		frontend/packages/stdb/src/query-resource-row-type.json \
+		crates/stdb-client/src/generated_reducer_contract.rs \
+		crates/stdb-auth/assets/resource_registry.json \
+		crates/stdb-auth/assets/query_exec_non_registry.json || \
+		(echo "Checked-in generated artifacts are out of date" && exit 1)
 
 # Populates .contracts-staging/{bindings,manifests} from the currently
 # pinned lumiere-contracts git dependency instead of a live `spacetime
@@ -936,7 +1019,7 @@ contracts-staging-from-pinned:
 	rm -rf .contracts-staging; \
 	mkdir -p .contracts-staging/bindings .contracts-staging/manifests .contracts-staging/ts/generated .contracts-staging/ir; \
 	cp -R "$$CHECKOUT/crates/lumiere-contracts/src/bindings/." .contracts-staging/bindings/; \
-	cp "$$CHECKOUT/manifests/"*.json .contracts-staging/manifests/; \
+	cp -R "$$CHECKOUT/manifests/." .contracts-staging/manifests/; \
 	if [ -d "$$CHECKOUT/ir" ]; then cp -R "$$CHECKOUT/ir/." .contracts-staging/ir/; fi; \
 	V2_PIN="$$CHECKOUT/ir/PIN-v2.json"; \
 	if [ ! -f "$$V2_PIN" ]; then V2_PIN="$$CHECKOUT/ir/PIN.json"; fi; \
@@ -946,7 +1029,6 @@ contracts-staging-from-pinned:
 	cp -R "$$CHECKOUT/packages/contracts/src/generated/." .contracts-staging/ts/generated/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" .contracts-staging/ts/; \
-	STDB_MODULE="$(STDB_MODULE)" bash scripts/schema-snapshot.sh; \
 	echo "contracts-staging-from-pinned: populated .contracts-staging/ from $$CHECKOUT"
 
 # CI-safe reducer drift check. Unlike full bindings drift, schema retrieval is
@@ -958,6 +1040,21 @@ check-reducer-contracts-drift: schema-snapshot codegen
 		exit 1; \
 	fi; \
 	diff "$$CHECKOUT/manifests/reducer-manifest.json" .contracts-staging/manifests/reducer-manifest.json
+
+# CI source check that does not depend on a separately deployed module. The
+# live deployment compatibility check remains available as check-contracts-drift.
+check-contracts-source-drift: clean-contracts-live-staging generate-stdb-rust-sdk generate-stdb-ts-sdk
+	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
+	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
+		echo "check-contracts-source-drift: could not resolve pinned contracts" >&2; \
+		exit 1; \
+	fi; \
+	diff -rq "$$CHECKOUT/crates/lumiere-contracts/src/bindings" .contracts-staging/bindings && \
+	diff -rq \
+		-x query-registry.ts -x operation-inputs.ts -x operation-descriptors.ts \
+		-x operations.ts -x resources.ts -x resource-codecs.ts -x wire-codecs.ts \
+		"$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
+	echo "check-contracts-source-drift: source bindings match pinned lumiere-contracts release"
 
 # Bindings + the seven generated manifests now live in lumiere-contracts, not in
 # this repo. This target regenerates them into .contracts-staging/ from the
@@ -979,7 +1076,11 @@ check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-std
 	V2_PIN="$$CHECKOUT/ir/PIN-v2.json"; \
 	if [ ! -f "$$V2_PIN" ]; then V2_PIN="$$CHECKOUT/ir/PIN.json"; fi; \
 	diff -rq "$$CHECKOUT/crates/lumiere-contracts/src/bindings" .contracts-staging/bindings && \
-	for manifest in .contracts-staging/manifests/*.json; do diff "$$CHECKOUT/manifests/$$(basename "$$manifest")" "$$manifest" || exit 1; done && \
+	while IFS= read -r manifest; do \
+		rel="$${manifest#.contracts-staging/manifests/}"; \
+		diff "$$CHECKOUT/manifests/$$rel" "$$manifest" || exit 1; \
+	done < <(find .contracts-staging/manifests -type f \( -name '*.json' -o -name '*.sql' \) \
+		! -name 'application-operations.json' ! -name 'resource-registry.json' | LC_ALL=C sort) && \
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean --expect-schema-hash-from "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" && \
 	python3 scripts/verify-contract-ir.py "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" --require-clean --expect-pin-from "$$V2_PIN" && \
 	python3 "$$CHECKOUT/scripts/generate-from-ir.py" --check && \
@@ -1014,21 +1115,23 @@ lint-accounting-currency-refs:
 
 # Starts only the Rust API with its service-local environment file.
 api-server-run:
-	source api-server/.env.local && cargo run -p api-server
+	source api-server/.env.local && scripts/e2e-dx.sh api-build && scripts/e2e-dx.sh api-run
 
 # ── Cloud / production SpacetimeDB ───────────────────────────────────────────
 
 publish-cloud:
-	spacetime publish $(DB_CLOUD) --module-path $(MODULE) --server maincloud
+	bash scripts/build-stdb-publish-wasm.sh "$(MODULE)"
+	spacetime publish $(DB_CLOUD) --bin-path $(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.publish.wasm --server $(STDB_REMOTE_SERVER)
 
 publish-cloud-clear:
-	spacetime publish $(DB_CLOUD) --module-path $(MODULE) --server maincloud --clear-database -y
+	bash scripts/build-stdb-publish-wasm.sh "$(MODULE)"
+	spacetime publish $(DB_CLOUD) --bin-path $(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.publish.wasm --server $(STDB_REMOTE_SERVER) --clear-database -y
 
 call-tests-cloud:
-	spacetime call $(DB_CLOUD) run_all_core_tests --server maincloud
+	spacetime call $(DB_CLOUD) run_all_core_tests --server $(STDB_REMOTE_SERVER)
 
 logs-cloud:
-	spacetime logs $(DB_CLOUD) --server maincloud
+	spacetime logs $(DB_CLOUD) --server $(STDB_REMOTE_SERVER)
 
 # ── Scoped command names ─────────────────────────────────────────────────────
 #
@@ -1039,6 +1142,8 @@ module-check: check
 module-build: build
 module-generate-ts: generate-stdb-ts-sdk
 module-generate-rust: generate-stdb-rust-sdk
+cloud-wasm:
+	bash scripts/build-stdb-publish-wasm.sh "$(MODULE)"
 
 local-start: start
 local-stop: stop

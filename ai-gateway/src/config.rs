@@ -53,6 +53,8 @@ pub struct Config {
     /// When set, chat completions go through Kong AI Gateway (OpenAI-compatible).
     pub kong_llm_url: Option<String>,
     pub kong_llm_service_token: Option<String>,
+    /// Optional exact, non-generative endpoint used by `/health/ready`.
+    pub kong_llm_readiness_url: Option<String>,
 
     // ── Context layer (vision / parser) ──────────────────────────────────────
     pub vision_provider: String,
@@ -171,6 +173,9 @@ impl Config {
                 .ok()
                 .filter(|v| !v.trim().is_empty()),
             kong_llm_service_token: std::env::var("KONG_LLM_SERVICE_TOKEN").ok(),
+            kong_llm_readiness_url: std::env::var("KONG_LLM_READINESS_URL")
+                .ok()
+                .filter(|v| !v.trim().is_empty()),
 
             vision_provider: std::env::var("VISION_PROVIDER")
                 .unwrap_or_else(|_| "ollama".to_string()),

@@ -25,19 +25,25 @@ use crate::core::reference::{country, create_country, currency, CreateCountryPar
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::JournalType;
 
-fn ensure_us_country(ctx: &ReducerContext) -> Result<(), String> {
-    if ctx.db.country().code().find(&"US".to_string()).is_some() {
+fn ensure_us_country(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+    if ctx
+        .db
+        .country()
+        .iter()
+        .any(|country| country.organization_id == organization_id && country.code == "US")
+    {
         return Ok(());
     }
     let usd_currency_id = ctx
         .db
         .currency()
-        .code()
-        .find(&"USD".to_string())
+        .iter()
+        .find(|currency| currency.organization_id == organization_id && currency.code == "USD")
         .ok_or("USD currency is not seeded")?
         .id;
     create_country(
         ctx,
+        organization_id,
         "US".to_string(),
         CreateCountryParams {
             name: "United States".to_string(),
@@ -113,9 +119,9 @@ pub fn test_update_tax_jurisdiction_rejects_cross_tenant(
     ctx: &ReducerContext,
 ) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
-    ensure_us_country(ctx)?;
     let fixture_a = OrgFixture::seed_minimal(ctx)?;
     let fixture_b = OrgFixture::seed_minimal(ctx)?;
+    ensure_us_country(ctx, fixture_a.organization_id)?;
 
     create_tax_jurisdiction(
         ctx,

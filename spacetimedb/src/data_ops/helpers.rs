@@ -7,11 +7,14 @@ use spacetimedb::Timestamp;
 
 /// Split a raw CSV string into (headers, rows).
 /// Each row is a Vec<String> with one entry per column.
+/// Headers are lowercased for case-insensitive lookup by reducers.
+/// Blank lines are NOT filtered — callers that need to skip empty rows
+/// must do so explicitly. Row numbers correspond 1:1 to input lines.
 pub fn parse_csv(csv: &str) -> Result<(Vec<String>, Vec<Vec<String>>), String> {
     let mut lines = csv.lines();
     let header_line = lines.next().ok_or("CSV is empty")?;
-    let headers: Vec<String> = header_line
-        .split(',')
+    let headers: Vec<String> = split_csv_row(header_line)
+        .into_iter()
         .map(|h| h.trim().to_lowercase())
         .collect();
     let rows: Vec<Vec<String>> = lines.map(|line| split_csv_row(line)).collect();

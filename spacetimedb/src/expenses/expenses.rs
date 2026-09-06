@@ -5,14 +5,14 @@
 /// (Dr expense / Cr employee payable) with optional reimbursement clearing.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::analytic_accounting::account_analytic_account;
-use crate::accounting::chart_of_accounts::{account_account, account_journal};
+use crate::accounting::chart_of_accounts::{account_journal};
+use crate::accounting::line_params::{journal_line_params, validate_company_account};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line, AccountMove,
-    AddAccountMoveLineParams,
 };
 use crate::accounting::tax_management::{account_tax, account_tax_group};
+use crate::accounting::relations::require_analytic_account;
 use crate::core::country_pack::pack_expense_evidence_rules;
 use crate::core::organization::{company, company_id_from_scope};
 use crate::core::reference::{
@@ -284,35 +284,6 @@ pub struct UpsertExpensePolicyParams {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-/// EXP-014: analytic_account_id is stored on expense lines but was never
-/// validated against the org/company-scoped account_analytic_account table —
-/// mirrors require_project_analytic_account in projects/projects.rs (PRJ-003).
-fn require_expense_analytic_account(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    company_id: u64,
-    analytic_account_id: Option<u64>,
-) -> Result<(), String> {
-    let Some(analytic_account_id) = analytic_account_id else {
-        return Ok(());
-    };
-    let account = ctx
-        .db
-        .account_analytic_account()
-        .id()
-        .find(&analytic_account_id)
-        .ok_or("Analytic account not found")?;
-    if account.organization_id != organization_id || account.company_id != company_id {
-        return Err(
-            "Analytic account does not belong to this organization and company".to_string(),
-        );
-    }
-    if !account.active {
-        return Err("Analytic account is inactive".to_string());
-    }
-    Ok(())
-}
 
 /// Every attachment id must reference a real `hr_expense_receipt` for the same org/company/employee.
 /// Rejects `0`. Historically stubbed `1` is only accepted when that receipt row actually exists.
@@ -673,7 +644,7 @@ fn compute_tax_recovery_for_line(
             ));
         }
         let account_id = tax_recoverable_account(ctx, tax.tax_group_id, default_tax_account_id)?;
-        validate_account(ctx, company_id, account_id, "Tax recoverable")?;
+        validate_company_account(ctx, company_id, account_id, "Tax recoverable")?;
 
         let (tax_amt, reduce_base) = match tax.amount_type {
             TaxAmountType::Percent => {
@@ -720,73 +691,6 @@ fn employee_remittance_partner(ctx: &ReducerContext, employee_id: u64) -> Option
         .id()
         .find(&employee_id)
         .and_then(|e| e.work_contact_partner_id)
-}
-
-fn empty_line_params(
-    account_id: u64,
-    name: String,
-    debit: f64,
-    credit: f64,
-    sequence: u32,
-) -> AddAccountMoveLineParams {
-    AddAccountMoveLineParams {
-        account_id,
-        name,
-        debit,
-        credit,
-        sequence,
-        quantity: if debit > 0.0 || credit > 0.0 {
-            1.0
-        } else {
-            0.0
-        },
-        price_unit: debit.max(credit),
-        discount: 0.0,
-        tax_ids: vec![],
-        partner_id: None,
-        product_id: None,
-        product_uom_id: None,
-        product_category_id: None,
-        analytic_account_id: None,
-        analytic_tag_ids: vec![],
-        display_type: None,
-        is_downpayment: false,
-        exclude_from_invoice_tab: false,
-        blocked: false,
-        group_tax_id: None,
-        tax_line_id: None,
-        tax_group_id: None,
-        tax_repartition_line_id: None,
-        tax_audit: None,
-        reconcile_model_id: None,
-        payment_id: None,
-        statement_line_id: None,
-        matching_number: None,
-        matching_label: None,
-        expected_pay_date: None,
-        expected_pay_date_currency_id: None,
-        expected_pay_date_amount: 0.0,
-        expected_pay_date_residual: 0.0,
-        metadata: None,
-    }
-}
-
-fn validate_account(
-    ctx: &ReducerContext,
-    company_id: u64,
-    account_id: u64,
-    label: &str,
-) -> Result<(), String> {
-    let account = ctx
-        .db
-        .account_account()
-        .id()
-        .find(&account_id)
-        .ok_or_else(|| format!("{label} account not found"))?;
-    if account.company_id != company_id {
-        return Err(format!("{label} account does not belong to this company"));
-    }
-    Ok(())
 }
 
 // ── Reducers: Expenses ────────────────────────────────────────────────────────
@@ -841,7 +745,7 @@ pub fn create_expense(
 
     // EXP-014: analytic_account_id, when provided, must exist and belong to
     // this organization/company.
-    require_expense_analytic_account(ctx, organization_id, company_id, params.analytic_account_id)?;
+    require_analytic_account(ctx, organization_id, company_id, params.analytic_account_id)?;
 
     let (
         line_kind,
@@ -1901,31 +1805,31 @@ pub fn post_expense_sheet(
     if params.payable_account_id == params.default_expense_account_id {
         return Err("Expense and payable accounts must differ".to_string());
     }
-    validate_account(ctx, company_id, params.payable_account_id, "Payable")?;
-    validate_account(
+    validate_company_account(ctx, company_id, params.payable_account_id, "Payable")?;
+    validate_company_account(
         ctx,
         company_id,
         params.default_expense_account_id,
         "Expense",
     )?;
     if let Some(tax_acct) = params.default_tax_account_id {
-        validate_account(ctx, company_id, tax_acct, "Tax recoverable")?;
+        validate_company_account(ctx, company_id, tax_acct, "Tax recoverable")?;
         if tax_acct == params.payable_account_id {
             return Err("Tax and payable accounts must differ".to_string());
         }
     }
     if let Some(card_acct) = params.card_liability_account_id {
-        validate_account(ctx, company_id, card_acct, "Card liability")?;
+        validate_company_account(ctx, company_id, card_acct, "Card liability")?;
         if card_acct == params.payable_account_id || card_acct == params.default_expense_account_id
         {
             return Err("Card liability account must differ from expense/payable".to_string());
         }
     }
     if let Some(adv_acct) = params.advance_account_id {
-        validate_account(ctx, company_id, adv_acct, "Advance")?;
+        validate_company_account(ctx, company_id, adv_acct, "Advance")?;
     }
     if let Some(fx_acct) = params.fx_fee_account_id {
-        validate_account(ctx, company_id, fx_acct, "FX fee")?;
+        validate_company_account(ctx, company_id, fx_acct, "FX fee")?;
     }
 
     let journal = ctx
@@ -1994,7 +1898,7 @@ pub fn post_expense_sheet(
             ));
         }
         let account_id = line.account_id.unwrap_or(params.default_expense_account_id);
-        validate_account(ctx, company_id, account_id, "Expense line")?;
+        validate_company_account(ctx, company_id, account_id, "Expense line")?;
         let base_company = line.total_amount * rate;
         let (expense_debit, line_tax, tax_lines) = compute_tax_recovery_for_line(
             ctx,
@@ -2190,7 +2094,7 @@ pub fn post_expense_sheet(
         price_unit,
     ) in prepared_expense_lines
     {
-        let mut line_params = empty_line_params(account_id, line_name, expense_debit, 0.0, seq);
+        let mut line_params = journal_line_params(account_id, line_name, expense_debit, 0.0, seq);
         line_params.product_id = product_id;
         line_params.analytic_account_id = analytic_account_id;
         line_params.tax_ids = tax_ids;
@@ -2201,7 +2105,7 @@ pub fn post_expense_sheet(
         seq += 1;
     }
     for tax_line in prepared_tax_lines {
-        let mut line_params = empty_line_params(
+        let mut line_params = journal_line_params(
             tax_line.account_id,
             tax_line.label,
             tax_line.amount_company,
@@ -2214,7 +2118,7 @@ pub fn post_expense_sheet(
         seq += 1;
     }
     if payable_credit > 0.0001 {
-        let mut payable_params = empty_line_params(
+        let mut payable_params = journal_line_params(
             params.payable_account_id,
             format!("Employee payable — {}", sheet.name),
             0.0,
@@ -2229,7 +2133,7 @@ pub fn post_expense_sheet(
         let fx_acct = params
             .fx_fee_account_id
             .ok_or("fx_fee_account_id is required")?;
-        let mut fx_params = empty_line_params(
+        let mut fx_params = journal_line_params(
             fx_acct,
             format!("Card FX fee — {}", sheet.name),
             fx_fee_company,
@@ -2244,7 +2148,7 @@ pub fn post_expense_sheet(
         let card_acct = params
             .card_liability_account_id
             .ok_or("card_liability_account_id is required")?;
-        let mut card_params = empty_line_params(
+        let mut card_params = journal_line_params(
             card_acct,
             format!("Corporate card liability — {}", sheet.name),
             0.0,
@@ -2259,7 +2163,7 @@ pub fn post_expense_sheet(
         let adv_acct = params
             .advance_account_id
             .ok_or("advance_account_id is required")?;
-        let mut adv_params = empty_line_params(
+        let mut adv_params = journal_line_params(
             adv_acct,
             format!("Expense advance applied — {}", sheet.name),
             0.0,
@@ -2388,8 +2292,8 @@ pub fn create_expense_reimbursement_payment(
     if params.payable_account_id == params.liquidity_account_id {
         return Err("Payable and liquidity accounts must differ".to_string());
     }
-    validate_account(ctx, company_id, params.payable_account_id, "Payable")?;
-    validate_account(ctx, company_id, params.liquidity_account_id, "Liquidity")?;
+    validate_company_account(ctx, company_id, params.payable_account_id, "Payable")?;
+    validate_company_account(ctx, company_id, params.liquidity_account_id, "Liquidity")?;
     let journal = ctx
         .db
         .account_journal()
@@ -2509,7 +2413,7 @@ pub fn create_expense_reimbursement_payment(
         ),
     });
 
-    let mut clear_payable = empty_line_params(
+    let mut clear_payable = journal_line_params(
         params.payable_account_id,
         format!("Clear employee payable — {}", sheet.name),
         amount,
@@ -2518,7 +2422,7 @@ pub fn create_expense_reimbursement_payment(
     );
     clear_payable.partner_id = partner_id;
     insert_draft_account_move_line(ctx, &reimb_move, clear_payable)?;
-    let mut liquidity = empty_line_params(
+    let mut liquidity = journal_line_params(
         params.liquidity_account_id,
         format!("Reimbursement payment — {}", sheet.name),
         0.0,

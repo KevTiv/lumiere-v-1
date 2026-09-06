@@ -7,7 +7,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 use crate::core::country_pack::{
     company_enabled_pack_keys, country_pack_definition, CountryPackDefinition,
 };
-use crate::core::organization::company_id_from_scope;
+use crate::core::organization::{company_id_from_scope, organization};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::employees::hr_employee;
 use crate::hr::leaves::{hr_leave_type, HrLeaveType};
@@ -15,16 +15,23 @@ use crate::projects::capacity::{public_holiday, PublicHoliday};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
-/// Global catalog of default leave categories per country pack (not org-scoped).
+/// Organization-seeded defaults of leave categories per country pack.
 #[spacetimedb::table(
     accessor = hr_country_pack_leave_default,
     public,
-    index(accessor = hr_leave_default_by_pack, btree(columns = [pack_key]))
+    index(
+        accessor = hr_leave_default_by_pack,
+        btree(columns = [organization_id, pack_key])
+    ),
+    index(accessor = hr_leave_default_by_organization, btree(columns = [organization_id]))
 )]
 pub struct HrCountryPackLeaveDefault {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
+    pub organization_id: u64,
+    #[unique]
+    pub organization_pack_code_key: String,
     pub pack_key: String,
     pub name: String,
     pub code: String,
@@ -140,12 +147,22 @@ fn hr_holiday_seed_rows() -> Vec<(&'static str, &'static str, i64)> {
 }
 
 pub(crate) fn seed_hr_country_pack_leave_catalog(ctx: &ReducerContext) {
+    let organization_ids: Vec<u64> = ctx.db.organization().iter().map(|org| org.id).collect();
+    for organization_id in organization_ids {
+        seed_hr_country_pack_leave_catalog_for_organization(ctx, organization_id);
+    }
+}
+
+pub(crate) fn seed_hr_country_pack_leave_catalog_for_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) {
     for (pack_key, name, code, max_leaves, sort_order) in leave_default_catalog_rows() {
         let exists = ctx
             .db
             .hr_country_pack_leave_default()
             .hr_leave_default_by_pack()
-            .filter(&pack_key.to_string())
+            .filter((&organization_id, &pack_key.to_string()))
             .any(|row| row.code == code);
         if exists {
             continue;
@@ -154,6 +171,8 @@ pub(crate) fn seed_hr_country_pack_leave_catalog(ctx: &ReducerContext) {
             .hr_country_pack_leave_default()
             .insert(HrCountryPackLeaveDefault {
                 id: 0,
+                organization_id,
+                organization_pack_code_key: format!("{organization_id}:{pack_key}:{code}"),
                 pack_key: pack_key.to_string(),
                 name: name.to_string(),
                 code: code.to_string(),
@@ -192,7 +211,7 @@ fn materialize_leave_types_for_pack(
         .db
         .hr_country_pack_leave_default()
         .hr_leave_default_by_pack()
-        .filter(&pack_key.to_string())
+        .filter((&organization_id, &pack_key.to_string()))
     {
         let exists = ctx
             .db
@@ -294,7 +313,9 @@ fn validate_statutory_id_kind(
     }
     let mut allowed: Vec<String> = Vec::new();
     for pack_key in enabled {
-        if let Some(def) = ctx.db.country_pack_definition().pack_key().find(&pack_key) {
+        if let Some(def) = ctx.db.country_pack_definition().iter().find(|definition| {
+            definition.organization_id == organization_id && definition.pack_key == pack_key
+        }) {
             allowed.extend(pack_statutory_id_kinds(&def));
         }
     }

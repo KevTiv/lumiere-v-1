@@ -6,6 +6,7 @@
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{IntegrationStatus, SyncStatus};
 
@@ -768,9 +769,13 @@ pub fn set_whatsapp_primary_account(
         .filter(|a| a.is_primary && a.deleted_at.is_none())
         .collect();
 
+    let mut changes = Vec::with_capacity(existing_primary.len() + 1);
+    let mut existing_primary = existing_primary;
+    existing_primary.sort_by_key(|account| account.id);
     for account in existing_primary {
         if account.id != account_id {
-            ctx.db
+            let updated = ctx
+                .db
                 .whatsapp_business_account()
                 .id()
                 .update(WhatsAppBusinessAccount {
@@ -778,12 +783,18 @@ pub fn set_whatsapp_primary_account(
                     updated_at: ctx.timestamp,
                     ..account
                 });
+            changes.push(RowChange::upsert_stdb_row(
+                "whatsapp_business_account",
+                serde_json::json!({"id": updated.id}),
+                &updated,
+            )?);
         }
     }
 
     let account_company_id = account.company_id;
 
-    ctx.db
+    let updated = ctx
+        .db
         .whatsapp_business_account()
         .id()
         .update(WhatsAppBusinessAccount {
@@ -791,6 +802,21 @@ pub fn set_whatsapp_primary_account(
             updated_at: ctx.timestamp,
             ..account
         });
+    changes.push(RowChange::upsert_stdb_row(
+        "whatsapp_business_account",
+        serde_json::json!({"id": updated.id}),
+        &updated,
+    )?);
+
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.set_whatsapp_primary_account".to_string(),
+            correlation_id: format!("whatsapp-primary:{organization_id}:{account_id}"),
+            changes,
+        },
+    )?;
 
     write_audit_log_v2(
         ctx,

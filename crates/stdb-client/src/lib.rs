@@ -21,6 +21,25 @@ pub enum StdbClientError {
     Parse(String),
 }
 
+impl StdbClientError {
+    /// Return the numeric upstream status when the HTTP status string is
+    /// parseable (SpacetimeDB may use non-standard statuses such as 530).
+    pub fn status_code(&self) -> Option<u16> {
+        let Self::Http(status, _) = self else {
+            return None;
+        };
+        status.split_whitespace().next()?.parse().ok()
+    }
+
+    /// Return the upstream response body for HTTP failures.
+    pub fn response_body(&self) -> Option<&str> {
+        match self {
+            Self::Http(_, body) => Some(body),
+            Self::Parse(_) => None,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct StdbClient {
     http: std::sync::Arc<reqwest::Client>,
@@ -92,6 +111,19 @@ impl StdbClient {
 
     /// Run SQL and return rows as JSON objects with camelCase keys (SATS Option unwrapped).
     pub async fn query_sql(&self, sql: &str) -> Result<Vec<Value>> {
+        let body = self.query_sql_body(sql).await?;
+        parse_sats_sql_response(&body).context("parse SATS-SQL JSON")
+    }
+
+    /// Run SQL and retain canonical SATS wrappers with snake_case field names.
+    /// Reconstruction fixtures use this when values must survive a durable
+    /// store round trip and later deserialize through `SerdeWrapper<T>`.
+    pub async fn query_sql_sats(&self, sql: &str) -> Result<Vec<Value>> {
+        let body = self.query_sql_body(sql).await?;
+        parse_sats_sql_response_canonical(&body).context("parse canonical SATS-SQL JSON")
+    }
+
+    async fn query_sql_body(&self, sql: &str) -> Result<String> {
         let url = format!("{}/v1/database/{}/sql", self.base_url, self.module);
         let resp = self
             .http
@@ -109,8 +141,7 @@ impl StdbClient {
             return Err(StdbClientError::Http(status, body).into());
         }
 
-        let body = resp.text().await.context("read SQL body")?;
-        parse_sats_sql_response(&body).context("parse SATS-SQL JSON")
+        resp.text().await.context("read SQL body")
     }
 
     pub async fn query_table(&self, table: &str) -> Result<Vec<Value>> {
@@ -262,6 +293,22 @@ fn is_timestamp_product(atype: &Value) -> bool {
     elements.len() == 1 && element_name(&elements[0]) == "__timestamp_micros_since_unix_epoch__"
 }
 
+fn is_identity_product(atype: &Value) -> bool {
+    let Some(elements) = atype
+        .get("Product")
+        .and_then(|p| p.get("elements"))
+        .and_then(|e| e.as_array())
+    else {
+        return false;
+    };
+    elements.len() == 1
+        && element_name(&elements[0]) == "__identity__"
+        && elements[0]
+            .get("algebraic_type")
+            .and_then(|t| t.get("U256"))
+            .is_some()
+}
+
 fn is_empty_payload(v: &Value) -> bool {
     match v {
         Value::Array(a) => a.is_empty(),
@@ -348,6 +395,14 @@ fn unwrap_sats_typed(v: &Value, algebraic_type: Option<&Value>) -> Value {
                 }
             }
         }
+
+        if is_identity_product(atype) {
+            if let Value::Array(arr) = v {
+                if let Some(identity) = arr.first().and_then(Value::as_str) {
+                    return Value::String(identity.to_owned());
+                }
+            }
+        }
     }
 
     v.clone()
@@ -399,9 +454,138 @@ pub fn parse_sats_sql_response(body: &str) -> Result<Vec<Value>> {
     Ok(out)
 }
 
+/// Decode SQL rows without erasing SATS sum/product wrappers.
+pub fn parse_sats_sql_response_canonical(body: &str) -> Result<Vec<Value>> {
+    let root: Value =
+        serde_json::from_str(body).map_err(|error| StdbClientError::Parse(error.to_string()))?;
+    let result = root
+        .as_array()
+        .and_then(|results| results.first())
+        .ok_or_else(|| StdbClientError::Parse("expected non-empty result array".into()))?;
+    let elements = result["schema"]["elements"]
+        .as_array()
+        .ok_or_else(|| StdbClientError::Parse("missing schema.elements".into()))?;
+    let rows = result["rows"]
+        .as_array()
+        .ok_or_else(|| StdbClientError::Parse("missing rows".into()))?;
+    rows.iter()
+        .map(|row| {
+            let cells = row
+                .as_array()
+                .ok_or_else(|| StdbClientError::Parse("row not array".into()))?;
+            let mut object = serde_json::Map::new();
+            for (index, element) in elements.iter().enumerate() {
+                let name = element_name(element);
+                if name.is_empty() {
+                    continue;
+                }
+                let cell = cells
+                    .get(index)
+                    .ok_or_else(|| StdbClientError::Parse(format!("row lacks cell {index}")))?;
+                let algebraic_type = element.get("algebraic_type").ok_or_else(|| {
+                    StdbClientError::Parse(format!("column '{name}' lacks algebraic type"))
+                })?;
+                object.insert(name, encode_canonical_sats(cell, algebraic_type)?);
+            }
+            Ok(Value::Object(object))
+        })
+        .collect::<std::result::Result<Vec<_>, StdbClientError>>()
+        .map_err(Into::into)
+}
+
+fn encode_canonical_sats(
+    value: &Value,
+    algebraic_type: &Value,
+) -> std::result::Result<Value, StdbClientError> {
+    if let Some(sum) = algebraic_type.get("Sum") {
+        let cells = value
+            .as_array()
+            .filter(|cells| cells.len() == 2)
+            .ok_or_else(|| StdbClientError::Parse("sum value must be [tag, payload]".into()))?;
+        let tag = cells[0]
+            .as_u64()
+            .ok_or_else(|| StdbClientError::Parse("sum tag must be unsigned".into()))?
+            as usize;
+        let variant = sum["variants"]
+            .as_array()
+            .and_then(|variants| variants.get(tag))
+            .ok_or_else(|| StdbClientError::Parse(format!("sum tag {tag} is out of bounds")))?;
+        let name = variant_name_from_element(variant)
+            .ok_or_else(|| StdbClientError::Parse("sum variant lacks name".into()))?;
+        let variant_type = variant.get("algebraic_type").ok_or_else(|| {
+            StdbClientError::Parse(format!("sum variant '{name}' lacks algebraic type"))
+        })?;
+        let canonical_name = if is_option_sum(sum) {
+            name
+        } else {
+            sats_unit_enum_tag(&name)
+        };
+        return Ok(
+            serde_json::json!({canonical_name: encode_canonical_sats(&cells[1], variant_type)?}),
+        );
+    }
+    if let Some(product) = algebraic_type.get("Product") {
+        let elements = product["elements"]
+            .as_array()
+            .ok_or_else(|| StdbClientError::Parse("product lacks elements".into()))?;
+        let cells = value
+            .as_array()
+            .ok_or_else(|| StdbClientError::Parse("product value must be an array".into()))?;
+        if elements.is_empty() {
+            return Ok(Value::Array(Vec::new()));
+        }
+        if cells.len() != elements.len() {
+            return Err(StdbClientError::Parse("product cell count mismatch".into()));
+        }
+        let named = elements
+            .iter()
+            .all(|element| !element_name(element).is_empty());
+        if named {
+            let mut object = serde_json::Map::new();
+            for (element, cell) in elements.iter().zip(cells) {
+                let name = element_name(element);
+                let element_type = element.get("algebraic_type").ok_or_else(|| {
+                    StdbClientError::Parse(format!("product field '{name}' lacks type"))
+                })?;
+                object.insert(name, encode_canonical_sats(cell, element_type)?);
+            }
+            return Ok(Value::Object(object));
+        }
+        return elements
+            .iter()
+            .zip(cells)
+            .map(|(element, cell)| {
+                element
+                    .get("algebraic_type")
+                    .ok_or_else(|| StdbClientError::Parse("tuple element lacks type".into()))
+                    .and_then(|kind| encode_canonical_sats(cell, kind))
+            })
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map(Value::Array);
+    }
+    if let Some(element_type) = algebraic_type.get("Array") {
+        return value
+            .as_array()
+            .ok_or_else(|| StdbClientError::Parse("array value must be an array".into()))?
+            .iter()
+            .map(|item| encode_canonical_sats(item, element_type))
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map(Value::Array);
+    }
+    if algebraic_type.get("Ref").is_some() {
+        return Err(StdbClientError::Parse(
+            "SQL result contains unresolved algebraic type reference".into(),
+        ));
+    }
+    Ok(value.clone())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{encode_reducer_wire_args, parse_sats_sql_response, reducer_contract};
+    use super::{
+        encode_reducer_wire_args, parse_sats_sql_response, parse_sats_sql_response_canonical,
+        reducer_contract,
+    };
     use serde_json::json;
 
     #[test]
@@ -475,6 +659,46 @@ mod tests {
     }
 
     #[test]
+    fn canonical_rows_preserve_option_enum_and_product_wrappers() {
+        let body = r#"[{
+          "schema":{"elements":[
+            {"name":{"some":"state"},"algebraic_type":{"Sum":{"variants":[
+              {"name":{"some":"draft"},"algebraic_type":{"Product":{"elements":[]}}},
+              {"name":{"some":"posted"},"algebraic_type":{"Product":{"elements":[]}}}
+            ]}}},
+            {"name":{"some":"invoice_date"},"algebraic_type":{"Sum":{"variants":[
+              {"name":{"some":"some"},"algebraic_type":{"Product":{"elements":[
+                {"name":{"some":"__timestamp_micros_since_unix_epoch__"},"algebraic_type":{"I64":[]}}
+              ]}}},
+              {"name":{"some":"none"},"algebraic_type":{"Product":{"elements":[]}}}
+            ]}}}
+          ]},
+          "rows":[[[1,[]],[0,[42]]]]
+        }]"#;
+        let rows = parse_sats_sql_response_canonical(body).unwrap();
+        assert_eq!(rows[0]["state"], json!({"Posted": []}));
+        assert_eq!(
+            rows[0]["invoice_date"],
+            json!({"some": {"__timestamp_micros_since_unix_epoch__": 42}})
+        );
+    }
+
+    #[test]
+    fn canonical_rows_distinguish_enum_none_from_option_none() {
+        let body = r#"[{
+          "schema":{"elements":[
+            {"name":{"some":"gateway"},"algebraic_type":{"Sum":{"variants":[
+              {"name":{"some":"none"},"algebraic_type":{"Product":{"elements":[]}}},
+              {"name":{"some":"xor"},"algebraic_type":{"Product":{"elements":[]}}}
+            ]}}}
+          ]},
+          "rows":[[[0,[]]]]
+        }]"#;
+        let rows = parse_sats_sql_response_canonical(body).unwrap();
+        assert_eq!(rows[0]["gateway"], json!({"None": []}));
+    }
+
+    #[test]
     fn unwraps_timestamp_product_and_option_none() {
         let body = r#"[
           {
@@ -543,5 +767,36 @@ mod tests {
             json!({ "microsSinceUnixEpoch": 1781987714525004_i64 })
         );
         assert!(row["metadata"].is_null());
+    }
+
+    #[test]
+    fn unwraps_identity_product_to_hex_string() {
+        let identity = format!("0x{}", "ab".repeat(32));
+        let body = format!(
+            r#"[
+              {{
+                "schema": {{
+                  "elements": [
+                    {{
+                      "name": {{ "some": "actor_identity" }},
+                      "algebraic_type": {{
+                        "Product": {{
+                          "elements": [
+                            {{
+                              "name": {{ "some": "__identity__" }},
+                              "algebraic_type": {{ "U256": [] }}
+                            }}
+                          ]
+                        }}
+                      }}
+                    }}
+                  ]
+                }},
+                "rows": [[ ["{identity}"] ]]
+              }}
+            ]"#
+        );
+        let rows = parse_sats_sql_response(&body).expect("parse");
+        assert_eq!(rows[0]["actorIdentity"], json!(identity));
     }
 }

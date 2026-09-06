@@ -1,22 +1,25 @@
 //! Wave C — mileage/per diem rates, split allocations, project rebill.
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::chart_of_accounts::{account_account, account_journal};
+use crate::accounting::chart_of_accounts::{account_journal};
+use crate::accounting::line_params::{journal_line_params, validate_company_account};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line, AccountMove,
-    AddAccountMoveLineParams,
 };
 use crate::accounting::tax_management::{account_tax, account_tax_group};
 use crate::core::country_pack::company_enabled_pack_keys;
 use crate::core::organization::company_id_from_scope;
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::expenses::expenses::{
     expense_sheet, hr_expense, metadata_str_eq, HrExpense, HrExpenseSheet,
 };
 use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
 };
-use crate::projects::project_accounting::refresh_project_margin_for_projects;
+use crate::projects::project_accounting::{
+    project_margin_snapshot, refresh_project_margin_for_projects,
+};
 use crate::projects::projects::project_project;
 use crate::sales::oms_extensions::remap_taxes_for_fiscal_position;
 use crate::types::{
@@ -205,73 +208,6 @@ fn resolve_tax_payable_account(ctx: &ReducerContext, tax_ids: &[u64]) -> Option<
         }
     }
     None
-}
-
-fn empty_line_params(
-    account_id: u64,
-    name: String,
-    debit: f64,
-    credit: f64,
-    sequence: u32,
-) -> AddAccountMoveLineParams {
-    AddAccountMoveLineParams {
-        account_id,
-        name,
-        debit,
-        credit,
-        sequence,
-        quantity: if debit > 0.0 || credit > 0.0 {
-            1.0
-        } else {
-            0.0
-        },
-        price_unit: debit.max(credit),
-        discount: 0.0,
-        tax_ids: vec![],
-        partner_id: None,
-        product_id: None,
-        product_uom_id: None,
-        product_category_id: None,
-        analytic_account_id: None,
-        analytic_tag_ids: vec![],
-        display_type: None,
-        is_downpayment: false,
-        exclude_from_invoice_tab: false,
-        blocked: false,
-        group_tax_id: None,
-        tax_line_id: None,
-        tax_group_id: None,
-        tax_repartition_line_id: None,
-        tax_audit: None,
-        reconcile_model_id: None,
-        payment_id: None,
-        statement_line_id: None,
-        matching_number: None,
-        matching_label: None,
-        expected_pay_date: None,
-        expected_pay_date_currency_id: None,
-        expected_pay_date_amount: 0.0,
-        expected_pay_date_residual: 0.0,
-        metadata: None,
-    }
-}
-
-fn validate_account(
-    ctx: &ReducerContext,
-    company_id: u64,
-    account_id: u64,
-    label: &str,
-) -> Result<(), String> {
-    let account = ctx
-        .db
-        .account_account()
-        .id()
-        .find(&account_id)
-        .ok_or_else(|| format!("{label} account not found"))?;
-    if account.company_id != company_id {
-        return Err(format!("{label} account does not belong to this company"));
-    }
-    Ok(())
 }
 
 pub(crate) fn allocations_for_expense(
@@ -751,8 +687,8 @@ pub fn create_expense_project_rebill(
     if params.receivable_account_id == params.income_account_id {
         return Err("Receivable and income accounts must differ".to_string());
     }
-    validate_account(ctx, company_id, params.receivable_account_id, "Receivable")?;
-    validate_account(ctx, company_id, params.income_account_id, "Income")?;
+    validate_company_account(ctx, company_id, params.receivable_account_id, "Receivable")?;
+    validate_company_account(ctx, company_id, params.income_account_id, "Income")?;
     let journal = ctx
         .db
         .account_journal()
@@ -943,7 +879,7 @@ pub fn create_expense_project_rebill(
 
     let mut seq = 1u32;
     for (label, amt, analytic_id, _project_id) in income_lines {
-        let mut lp = empty_line_params(params.income_account_id, label, 0.0, amt, seq);
+        let mut lp = journal_line_params(params.income_account_id, label, 0.0, amt, seq);
         lp.analytic_account_id = analytic_id;
         lp.partner_id = Some(partner_id);
         lp.tax_ids = tax_ids.clone();
@@ -953,7 +889,7 @@ pub fn create_expense_project_rebill(
     if amount_tax > 0.0001 {
         let tax_account =
             resolve_tax_payable_account(ctx, &tax_ids).unwrap_or(params.income_account_id);
-        let mut tax_lp = empty_line_params(
+        let mut tax_lp = journal_line_params(
             tax_account,
             format!("Tax on rebill — {}", sheet.name),
             0.0,
@@ -965,7 +901,7 @@ pub fn create_expense_project_rebill(
         insert_draft_account_move_line(ctx, &move_record, tax_lp)?;
         seq += 1;
     }
-    let mut ar = empty_line_params(
+    let mut ar = journal_line_params(
         params.receivable_account_id,
         format!("Customer receivable — {}", sheet.name),
         amount_total,
@@ -1042,7 +978,93 @@ pub fn create_expense_project_rebill(
         },
     );
 
+    let rebill_project_set: std::collections::BTreeSet<u64> =
+        rebill_project_ids.iter().copied().collect();
+    let mut previous_margin_snapshots: Vec<_> = ctx
+        .db
+        .project_margin_snapshot()
+        .iter()
+        .filter(|snapshot| {
+            snapshot.organization_id == organization_id
+                && snapshot.company_id == company_id
+                && rebill_project_set.contains(&snapshot.project_id)
+        })
+        .collect();
+    previous_margin_snapshots.sort_by_key(|snapshot| snapshot.id);
+
     refresh_project_margin_for_projects(ctx, organization_id, company_id, rebill_project_ids);
+
+    let sheet = ctx
+        .db
+        .expense_sheet()
+        .id()
+        .find(&sheet_id)
+        .ok_or("Expense sheet not found after rebill")?;
+    let move_record = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&move_record.id)
+        .ok_or("Rebill move not found after posting")?;
+    let mut changes = vec![
+        RowChange::upsert_stdb_row(
+            "hr_expense_sheet",
+            serde_json::json!({"id": sheet.id}),
+            &sheet,
+        )?,
+        RowChange::upsert_stdb_row(
+            "account_move",
+            serde_json::json!({"id": move_record.id}),
+            &move_record,
+        )?,
+    ];
+    let mut move_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|line| line.move_id == move_record.id)
+        .collect();
+    move_lines.sort_by_key(|line| line.id);
+    for line in move_lines {
+        changes.push(RowChange::upsert_stdb_row(
+            "account_move_line",
+            serde_json::json!({"id": line.id}),
+            &line,
+        )?);
+    }
+    for snapshot in &previous_margin_snapshots {
+        changes.push(RowChange::delete(
+            "project_margin_snapshot",
+            serde_json::json!({"id": snapshot.id}),
+        ));
+    }
+    let mut committed_margin_snapshots: Vec<_> = ctx
+        .db
+        .project_margin_snapshot()
+        .iter()
+        .filter(|snapshot| {
+            snapshot.organization_id == organization_id
+                && snapshot.company_id == company_id
+                && rebill_project_set.contains(&snapshot.project_id)
+        })
+        .collect();
+    committed_margin_snapshots.sort_by_key(|snapshot| snapshot.id);
+    for snapshot in &committed_margin_snapshots {
+        changes.push(RowChange::upsert_stdb_row(
+            "project_margin_snapshot",
+            serde_json::json!({"id": snapshot.id}),
+            snapshot,
+        )?);
+    }
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.create_expense_project_rebill".to_string(),
+            correlation_id: format!("expense-sheet:{sheet_id}:rebill:{}", move_record.id),
+            changes,
+        },
+    )?;
 
     Ok(())
 }

@@ -124,6 +124,24 @@ impl VectorStore {
         Ok(VectorStore { client, collection })
     }
 
+    /// Verify Qdrant is reachable and the configured semantic collection exists.
+    /// This is a read-only readiness probe; it never creates or mutates a collection.
+    pub async fn check_ready(&self) -> Result<()> {
+        let collections = self
+            .client
+            .list_collections()
+            .await
+            .context("list Qdrant collections")?;
+        if !collections
+            .collections
+            .iter()
+            .any(|collection| collection.name == self.collection)
+        {
+            anyhow::bail!("configured Qdrant collection is unavailable");
+        }
+        Ok(())
+    }
+
     /// Create the collection if it does not already exist.
     pub async fn ensure_collection(&self, dim: u64) -> Result<()> {
         let collections = self
@@ -279,7 +297,7 @@ impl VectorStore {
             query_vector,
             bounded_search_limit(limit),
         )
-        .filter(Filter {
+            .filter(Filter {
                 must: conditions,
                 ..Default::default()
             })
@@ -515,5 +533,4 @@ mod tests {
             .await
             .expect("delete test collection");
     }
-
 }

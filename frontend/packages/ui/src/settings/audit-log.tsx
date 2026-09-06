@@ -35,6 +35,7 @@ import { useTranslation } from "@lumiere/i18n"
 import type { AuditLogEntry } from "@/lib/rbac-types"
 import { cn } from "@/lib/utils"
 import { auditActionPillClass } from "@/lib/theme-colors"
+import { auditTimestampToIso } from "@/lib/audit-log-utils"
 import { FormModal } from "../forms/form-modal"
 import { createUserSessionForm, logAuditEventForm } from "../lib/settings-platform-form-configs"
 import { mergeSelectOptionsForFields } from "../lib/form-config-merge"
@@ -49,27 +50,6 @@ const actionIcons: Record<string, React.ReactNode> = {
 
 function actionPillClass(action: string): string {
   return auditActionPillClass[action] ?? auditActionPillClass[action.toLowerCase()] ?? "bg-muted text-muted-foreground"
-}
-
-function timestampToIso(raw: unknown): string {
-  if (raw == null || raw === "") return new Date(0).toISOString()
-  if (typeof raw === "object" && raw !== null) {
-    const micros =
-      (raw as { microsSinceUnixEpoch?: unknown }).microsSinceUnixEpoch ??
-      (raw as { micros_since_unix_epoch?: unknown }).micros_since_unix_epoch
-    if (micros != null) {
-      const numeric = Number(micros)
-      if (Number.isFinite(numeric)) {
-        const date = new Date(numeric / 1000)
-        if (!Number.isNaN(date.getTime())) return date.toISOString()
-      }
-    }
-  }
-  const numeric = Number(raw)
-  if (!Number.isFinite(numeric)) return new Date(0).toISOString()
-  const ms = numeric > 10_000_000_000 ? numeric / 1000 : numeric
-  const date = new Date(ms)
-  return Number.isNaN(date.getTime()) ? new Date(0).toISOString() : date.toISOString()
 }
 
 function formatAuditDetails(row: Record<string, unknown>): string {
@@ -98,7 +78,7 @@ function mapAuditRow(row: Record<string, unknown>): AuditLogEntry {
     action: action ? `${action} · ${tableName}` : tableName,
     resource: tableName,
     details: formatAuditDetails(row),
-    timestamp: timestampToIso(row.timestamp),
+    timestamp: auditTimestampToIso(row.timestamp),
     ip: typeof row.ipAddress === "string" ? row.ipAddress : typeof row.ip_address === "string" ? row.ip_address : undefined,
   }
 }

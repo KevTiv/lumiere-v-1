@@ -6,7 +6,9 @@ use crate::analytics::dashboards::{
     add_widget_to_dashboard, create_dashboard, create_dashboard_widget, dashboard,
     dashboard_widget, CreateDashboardParams, CreateDashboardWidgetParams,
 };
+use crate::analytics::reports::{record_generated_owner_report, RecordGeneratedOwnerReportParams};
 use crate::core::organization::{company, create_company, CreateCompanyParams};
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::WidgetType;
 
@@ -174,7 +176,8 @@ pub fn test_cross_company_widget_add_rejected(ctx: &ReducerContext) -> Result<()
 
     let widget_b_id = create_widget(ctx, &fixture, Some(company_b), "ANL-005 Widget B")?;
 
-    let rejected = add_widget_to_dashboard(ctx, fixture.organization_id, dashboard_a_id, widget_b_id);
+    let rejected =
+        add_widget_to_dashboard(ctx, fixture.organization_id, dashboard_a_id, widget_b_id);
     match rejected {
         Err(ref e) if e.to_lowercase().contains("company") => {}
         other => {
@@ -205,5 +208,68 @@ pub fn test_cross_company_widget_add_rejected(ctx: &ReducerContext) -> Result<()
         return Err("same-company widget add was not persisted".to_string());
     }
 
+    Ok(())
+}
+
+pub fn test_generated_owner_report_records_ordered_commit(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let correlation_id = format!("anl-c2-report:{}", fixture.organization_id);
+    record_generated_owner_report(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        RecordGeneratedOwnerReportParams {
+            report_key: "owner.c2".to_string(),
+            schema_version: 1,
+            parameters_json: "{}".to_string(),
+            source_watermark_json: "{}".to_string(),
+            output_hash: "a".repeat(64),
+            renderer_version: "c2-test".to_string(),
+            artifact_key: format!("c2/{}", fixture.organization_id),
+            artifact_size: 12,
+            correlation_id: correlation_id.clone(),
+            metadata: None,
+        },
+    )?;
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == fixture.organization_id
+                && commit.operation_id == "erp.record_generated_owner_report"
+                && commit.correlation_id == correlation_id
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 3 {
+        return Err(format!(
+            "owner report should emit one three-row organization commit, got {} / {:?}",
+            commits.len(),
+            commits.first().map(|commit| commit.row_change_count)
+        ));
+    }
+    let commit = &commits[0];
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == fixture.organization_id
+                && change.commit_sequence == commit.sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables != ["document", "document_version", "generated_owner_report"] {
+        return Err(format!(
+            "owner report commit row order mismatch: {tables:?}"
+        ));
+    }
     Ok(())
 }

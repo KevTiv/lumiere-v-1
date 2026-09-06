@@ -123,7 +123,9 @@ pub fn run_tenant_isolation_tests(ctx: &ReducerContext) -> Result<(), String> {
     tenant_isolation_test::test_cross_tenant_company_scope_blocked(ctx)
         .map_err(|e| format!("cross_tenant_scope: {e}"))?;
     tenant_isolation_test::test_audit_log_append_only(ctx)
-        .map_err(|e| format!("audit_append_only: {e}"))
+        .map_err(|e| format!("audit_append_only: {e}"))?;
+    tenant_isolation_test::test_platform_bindings_and_reference_isolation(ctx)
+        .map_err(|e| format!("platform_bindings_isolation: {e}"))
 }
 
 #[spacetimedb::reducer]

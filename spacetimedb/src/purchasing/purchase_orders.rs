@@ -8,7 +8,7 @@
 /// | **PurchaseRequisition** | Internal purchase requests/RFQs |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::analytic_accounting::account_analytic_account;
+use crate::accounting::relations::require_analytic_account;
 use crate::accounting::payment_terms::account_payment_term;
 use crate::accounting::tax_management::account_tax;
 use crate::core::organization::{company_id_from_scope, require_company_in_organization};
@@ -478,32 +478,6 @@ fn require_purchase_taxes(
     Ok(())
 }
 
-fn require_analytic_account_for_company(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    company_id: u64,
-    analytic_account_id: Option<u64>,
-) -> Result<(), String> {
-    let Some(analytic_account_id) = analytic_account_id else {
-        return Ok(());
-    };
-    let account = ctx
-        .db
-        .account_analytic_account()
-        .id()
-        .find(&analytic_account_id)
-        .ok_or("Analytic account not found")?;
-    if account.organization_id != organization_id || account.company_id != company_id {
-        return Err(
-            "Analytic account does not belong to this organization and company".to_string(),
-        );
-    }
-    if !account.active {
-        return Err("Analytic account is inactive".to_string());
-    }
-    Ok(())
-}
-
 fn require_product_variant_for_product(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -770,38 +744,6 @@ fn confirm_po_exchange_rate_snapshot(
     Ok((rate, from, to))
 }
 
-fn merge_po_exchange_rate_metadata(
-    existing: &Option<String>,
-    rate: f64,
-    from: &str,
-    to: &str,
-    at: Timestamp,
-) -> Option<String> {
-    let mut metadata = existing
-        .as_ref()
-        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
-        .and_then(|parsed| parsed.as_object().cloned())
-        .unwrap_or_default();
-    metadata.insert("exchange_rate".to_string(), serde_json::json!(rate));
-    metadata.insert(
-        "exchange_rate_from".to_string(),
-        serde_json::Value::String(from.to_string()),
-    );
-    metadata.insert(
-        "exchange_rate_to".to_string(),
-        serde_json::Value::String(to.to_string()),
-    );
-    let at_micros = at
-        .to_duration_since_unix_epoch()
-        .unwrap_or_default()
-        .as_micros() as u64;
-    metadata.insert(
-        "exchange_rate_at_micros".to_string(),
-        serde_json::json!(at_micros),
-    );
-    Some(serde_json::Value::Object(metadata).to_string())
-}
-
 /// Wave C encumbrance MVP: stamp commitment amount on PO metadata at confirm.
 /// Does not mutate crossovered_budget / budget_post (actuals stay on journal post).
 fn merge_po_encumbrance_metadata(existing: &Option<String>, amount_total: f64) -> Option<String> {
@@ -1059,7 +1001,7 @@ pub fn confirm_purchase_order_impl(
 
     let (exchange_rate, fx_from, fx_to) =
         confirm_po_exchange_rate_snapshot(ctx, organization_id, &order)?;
-    let fx_metadata = merge_po_exchange_rate_metadata(
+    let fx_metadata = crate::accounting::fx_metadata::merge_exchange_rate_metadata(
         &order.metadata,
         exchange_rate,
         &fx_from,
@@ -1670,7 +1612,7 @@ pub fn add_purchase_order_line(
         params.product_id,
         params.product_variant_id,
     )?;
-    require_analytic_account_for_company(
+    require_analytic_account(
         ctx,
         organization_id,
         order.company_id,
@@ -1876,7 +1818,7 @@ pub fn update_purchase_order_line(
     let account_analytic_id = params.account_analytic_id.or(line.account_analytic_id);
     let lot_id = params.lot_id.or(line.lot_id);
     require_product_variant_for_product(ctx, organization_id, product_id, product_variant_id)?;
-    require_analytic_account_for_company(
+    require_analytic_account(
         ctx,
         organization_id,
         order.company_id,

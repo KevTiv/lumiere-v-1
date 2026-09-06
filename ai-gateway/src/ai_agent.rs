@@ -244,7 +244,7 @@ async fn fetch_team_member(
     let row = rows.first().context("AI team member not found")?;
 
     let ai_agent_id =
-        u64_field(row, "aiAgentId", "ai_agent_id").context("team member missing ai_agent_id")?;
+        row_u64(row, "aiAgentId", "ai_agent_id").context("team member missing ai_agent_id")?;
 
     Ok(TeamMemberRow {
         ai_agent_id,
@@ -271,12 +271,12 @@ fn parse_agent_row(row: &Value) -> Result<AgentRow> {
     }
 
     Ok(AgentRow {
-        id: u64_field(row, "id", "id").context("agent id")?,
+        id: row_u64(row, "id", "id").context("agent id")?,
         provider: string_field(row, "provider", None).context("agent provider")?,
         model: string_field(row, "model", None).context("agent model")?,
         system_prompt: string_field(row, "systemPrompt", Some("system_prompt")),
         temperature: f64_field(row, "temperature", None).unwrap_or(0.7),
-        max_tokens: u64_field(row, "maxTokens", "max_tokens")
+        max_tokens: row_u64(row, "maxTokens", "max_tokens")
             .map(|v| v as u32)
             .unwrap_or(4096),
         top_p: f64_field(row, "topP", Some("top_p")).unwrap_or(1.0),
@@ -286,7 +286,7 @@ fn parse_agent_row(row: &Value) -> Result<AgentRow> {
         monthly_spend: f64_field(row, "monthlySpend", Some("monthly_spend")).unwrap_or(0.0),
         cost_per_1k_tokens: f64_field(row, "costPer1KTokens", Some("cost_per_1k_tokens"))
             .unwrap_or(0.0),
-        rate_limit_per_minute: u64_field(row, "rateLimitPerMinute", "rate_limit_per_minute")
+        rate_limit_per_minute: row_u64(row, "rateLimitPerMinute", "rate_limit_per_minute")
             .map(|v| v as u32)
             .unwrap_or(0),
     })
@@ -349,12 +349,7 @@ fn validate_provider(provider: &str) -> Result<()> {
     }
 }
 
-fn u64_field(row: &Value, camel: &str, snake: &str) -> Option<u64> {
-    row.get(camel).or_else(|| row.get(snake)).and_then(|v| {
-        v.as_u64()
-            .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
-    })
-}
+use crate::wire_decode::row_u64;
 
 fn f64_field(row: &Value, camel: &str, snake: Option<&str>) -> Option<f64> {
     let v = row.get(camel).or_else(|| snake.and_then(|s| row.get(s)))?;

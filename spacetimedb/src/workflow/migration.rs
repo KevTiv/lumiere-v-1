@@ -392,7 +392,7 @@ pub fn migrate_workflow_instance(
     let input_hash = migrate_input_hash(organization_id, &params, &plan);
     let scope_key = format!("{organization_id}:migration:{}", params.idempotency_key);
 
-    if let Some(receipt) = replay_receipt(ctx, &scope_key, &input_hash)? {
+    if let Some(receipt) = crate::workflow::receipts::replay_command_receipt(ctx, &scope_key, &input_hash)? {
         let _ = receipt;
         return Ok(());
     }
@@ -1287,25 +1287,6 @@ fn plan_mapping_fingerprint(plan: &WorkflowMigrationPlan) -> String {
         fields.push(format!("{}->{}", m.from_edge_key, m.to_edge_key));
     }
     canonical_field_hash(&fields)
-}
-
-fn replay_receipt(
-    ctx: &ReducerContext,
-    scope_key: &str,
-    input_hash: &str,
-) -> Result<Option<WorkflowCommandReceipt>, String> {
-    let Some(receipt) = ctx
-        .db
-        .workflow_command_receipt()
-        .scope_key()
-        .find(scope_key.to_string())
-    else {
-        return Ok(None);
-    };
-    if receipt.input_hash != input_hash {
-        return Err("idempotency key was already used with different input".to_string());
-    }
-    Ok(Some(receipt))
 }
 
 fn preflight_input_hash(organization_id: u64, params: &PreflightWorkflowMigrationParams) -> String {

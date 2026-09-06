@@ -84,7 +84,7 @@ async fn export_statutory(
             body.company_id
         ))
         .await
-        .map_err(|error| ApiError::Internal(error.to_string()))?;
+        .map_err(ApiError::internal)?;
     if company_rows.is_empty() {
         return Err(ApiError::NotFound("company not found".into()));
     }

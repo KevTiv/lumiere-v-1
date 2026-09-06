@@ -1,12 +1,9 @@
 //! Generic STDB-row → PG-bind-value mapper, driven by `codec-manifest.json`.
 //!
-//! `audit_log`'s drainer (`audit_drainer.rs`) hand-writes per-field
-//! extraction/binding/checksum code — tractable for its 14 columns, but
-//! `pos_order` has ~50, and every future archive candidate (`sale_order`,
-//! `account_move`, ...) will too. This module builds the UPSERT and its
-//! bind values generically from the column list `lumiere-codegen` already
-//! emits, so a new drainer only needs to say *which* table, not re-derive
-//! per-field decode logic.
+//! The generic projection and read paths use the generated column metadata
+//! instead of hand-written per-table extraction/binding/checksum code. This
+//! keeps the shared codec correct as tables grow and lets the manifest select
+//! the table without re-deriving per-field decode logic.
 //!
 //! ## What this does NOT decide
 //!
@@ -57,15 +54,23 @@ pub fn load_columns(codec_manifest_json: &str, table: &str) -> Result<Vec<Column
 
     cols.iter()
         .map(|c| {
+            let name = c["name"]
+                .as_str()
+                .ok_or_else(|| anyhow!("codec-manifest.json: column missing 'name'"))?;
+            let mut pg_type = c["pg_type"]
+                .as_str()
+                .ok_or_else(|| anyhow!("codec-manifest.json: column missing 'pg_type'"))?;
+            // These C2 protocol fields are strings in STDB but canonical
+            // JSONB in the durable PostgreSQL schema. Older pinned codec
+            // manifests omitted that deliberate storage override.
+            if table == "organization_row_change"
+                && matches!(name, "row_identity_json" | "row_json")
+            {
+                pg_type = "JSONB";
+            }
             Ok(ColumnCodec {
-                name: c["name"]
-                    .as_str()
-                    .ok_or_else(|| anyhow!("codec-manifest.json: column missing 'name'"))?
-                    .to_string(),
-                pg_type: c["pg_type"]
-                    .as_str()
-                    .ok_or_else(|| anyhow!("codec-manifest.json: column missing 'pg_type'"))?
-                    .to_string(),
+                name: name.to_string(),
+                pg_type: pg_type.to_string(),
                 stdb_type: c["stdb_type"]
                     .as_str()
                     .ok_or_else(|| anyhow!("codec-manifest.json: column missing 'stdb_type'"))?
@@ -161,19 +166,33 @@ fn read_pg_column(col: &ColumnCodec, row: &Row, i: usize) -> Result<Value> {
         }
         "TEXT" => {
             let s: Option<String> = row.try_get(i)?;
-            s.map(Value::String).unwrap_or(Value::Null)
+            s.map(|value| {
+                if col.stdb_type.starts_with("Enum(") {
+                    Value::String(stdb_enum_variant(&value))
+                } else {
+                    Value::String(value)
+                }
+            })
+            .unwrap_or(Value::Null)
         }
         other => anyhow::bail!("unhandled pg_type '{other}' on read"),
+    })
+}
+
+pub(crate) fn stdb_enum_variant(variant: &str) -> String {
+    let mut chars = variant.chars();
+    chars.next().map_or_else(String::new, |first| {
+        first.to_uppercase().collect::<String>() + chars.as_str()
     })
 }
 
 /// A decoded, bindable value for one column.
 #[derive(Debug, Clone)]
 pub enum PgValue {
-    /// u64-domain integer, bound as decimal text and cast `::NUMERIC` —
+    /// u64-domain integer, bound as decimal text and cast `::TEXT::NUMERIC` —
     /// avoids needing a bignum crate just to bind `NUMERIC(20,0)`.
     NumericText(Option<String>),
-    /// Array/struct column, bound as JSON text and cast `::JSONB`.
+    /// Array/struct column, bound as JSON text and cast `::TEXT::JSONB`.
     JsonbText(Option<String>),
     BigInt(Option<i64>),
     Integer(Option<i32>),
@@ -185,15 +204,15 @@ pub enum PgValue {
 }
 
 impl PgValue {
-    fn needs_cast(&self) -> Option<&'static str> {
+    pub(crate) fn needs_cast(&self) -> Option<&'static str> {
         match self {
-            PgValue::NumericText(_) => Some("NUMERIC"),
-            PgValue::JsonbText(_) => Some("JSONB"),
+            PgValue::NumericText(_) => Some("TEXT::NUMERIC"),
+            PgValue::JsonbText(_) => Some("TEXT::JSONB"),
             _ => None,
         }
     }
 
-    fn as_sql(&self) -> &(dyn ToSql + Sync) {
+    pub(crate) fn as_sql(&self) -> &(dyn ToSql + Sync) {
         match self {
             PgValue::NumericText(v) | PgValue::JsonbText(v) | PgValue::Text(v) => v,
             PgValue::BigInt(v) => v,
@@ -239,7 +258,7 @@ impl PgValue {
 ///
 /// Never coerces a missing/malformed value to a default — an error here
 /// means the batch item is skipped and logged loudly, not silently zeroed
-/// (matches the same rule `audit_drainer.rs` follows).
+/// (the projection and read paths follow the same rule).
 pub fn decode_row(columns: &[ColumnCodec], row: &Value) -> Result<Vec<PgValue>> {
     columns
         .iter()
@@ -252,6 +271,15 @@ pub fn decode_row(columns: &[ColumnCodec], row: &Value) -> Result<Vec<PgValue>> 
 }
 
 fn decode_column(col: &ColumnCodec, raw: &Value) -> Result<PgValue> {
+    let raw = if col.nullable {
+        match normalize_nullable_sats_option(raw)? {
+            Some(raw) => raw,
+            None => return Ok(null_value_for(&col.pg_type)?),
+        }
+    } else {
+        raw
+    };
+
     if raw.is_null() {
         if !col.nullable {
             anyhow::bail!("non-nullable but value is null");
@@ -267,14 +295,11 @@ fn decode_column(col: &ColumnCodec, raw: &Value) -> Result<PgValue> {
             PgValue::NumericText(Some(n.to_string()))
         }
         "BIGINT" => {
-            // Timestamp columns arrive as {"microsSinceUnixEpoch": <i64>};
+            // Timestamp columns arrive as either ergonomic
+            // {"microsSinceUnixEpoch": <i64>} or the canonical SATS
+            // {"__timestamp_micros_since_unix_epoch__": <i64>} wrapper;
             // plain integer columns arrive as a raw JSON number.
-            let n = if let Some(micros) = raw.get("microsSinceUnixEpoch").and_then(|v| v.as_i64()) {
-                micros
-            } else {
-                raw.as_i64()
-                    .ok_or_else(|| anyhow!("expected i64-like number or timestamp, got {raw}"))?
-            };
+            let n = decode_bigint_or_timestamp(raw)?;
             PgValue::BigInt(Some(n))
         }
         "INTEGER" => {
@@ -308,14 +333,86 @@ fn decode_column(col: &ColumnCodec, raw: &Value) -> Result<PgValue> {
             PgValue::Bytea(Some(bytes))
         }
         "JSONB" => PgValue::JsonbText(Some(serde_json::to_string(raw)?)),
-        "TEXT" => {
-            let s = raw
-                .as_str()
-                .ok_or_else(|| anyhow!("expected string, got {raw}"))?;
-            PgValue::Text(Some(s.to_string()))
-        }
+        "TEXT" => PgValue::Text(Some(decode_text_or_unit_variant(raw)?)),
         other => anyhow::bail!("unhandled pg_type '{other}'"),
     })
+}
+
+/// Decode one value using generated column metadata. Projection application
+/// uses this for a tombstone key, where a complete row is intentionally absent.
+pub(crate) fn decode_key_value(col: &ColumnCodec, raw: &Value) -> Result<PgValue> {
+    decode_column(col, raw)
+}
+
+/// Unwrap one canonical SATS Option value for nullable columns. Direct JSON
+/// objects remain untouched unless they use an Option key, so JSONB payloads
+/// retain their original shape. Any Option-looking wrapper must be exact.
+fn normalize_nullable_sats_option(raw: &Value) -> Result<Option<&Value>> {
+    let Value::Object(obj) = raw else {
+        return Ok(Some(raw));
+    };
+
+    let has_option_key = obj.contains_key("none") || obj.contains_key("some");
+    if obj.len() != 1 {
+        if has_option_key {
+            anyhow::bail!("expected single-key SATS Option wrapper, got {raw}");
+        }
+        return Ok(Some(raw));
+    }
+
+    if let Some(payload) = obj.get("none") {
+        if !payload.as_array().is_some_and(Vec::is_empty) {
+            anyhow::bail!("expected empty none payload in SATS Option wrapper, got {raw}");
+        }
+        return Ok(None);
+    }
+    if let Some(payload) = obj.get("some") {
+        return Ok(Some(payload));
+    }
+
+    Ok(Some(raw))
+}
+
+fn decode_bigint_or_timestamp(raw: &Value) -> Result<i64> {
+    if let Some(n) = raw.as_i64() {
+        return Ok(n);
+    }
+
+    let Value::Object(obj) = raw else {
+        anyhow::bail!("expected i64-like number or timestamp, got {raw}");
+    };
+    if obj.len() != 1 {
+        anyhow::bail!("expected single-key timestamp wrapper, got {raw}");
+    }
+
+    let micros = obj
+        .get("microsSinceUnixEpoch")
+        .or_else(|| obj.get("__timestamp_micros_since_unix_epoch__"))
+        .ok_or_else(|| anyhow!("expected timestamp wrapper, got {raw}"))?;
+    micros
+        .as_i64()
+        .ok_or_else(|| anyhow!("expected i64 timestamp micros, got {micros}"))
+}
+
+fn decode_text_or_unit_variant(raw: &Value) -> Result<String> {
+    if let Some(s) = raw.as_str() {
+        return Ok(s.to_owned());
+    }
+
+    let Value::Object(obj) = raw else {
+        anyhow::bail!("expected string or unit variant, got {raw}");
+    };
+    if obj.len() != 1 {
+        anyhow::bail!("expected single-key unit variant, got {raw}");
+    }
+
+    let (variant, payload) = obj.iter().next().expect("object length checked above");
+    let is_empty_array = payload.as_array().is_some_and(Vec::is_empty);
+    let is_empty_object = payload.as_object().is_some_and(serde_json::Map::is_empty);
+    if !is_empty_array && !is_empty_object {
+        anyhow::bail!("expected empty unit variant payload, got {raw}");
+    }
+    Ok(variant.clone())
 }
 
 fn null_value_for(pg_type: &str) -> Result<PgValue> {
@@ -334,12 +431,18 @@ fn null_value_for(pg_type: &str) -> Result<PgValue> {
 }
 
 /// Extract raw bytes from an `Identity` cell — accepts a hex string
-/// (optionally `0x`-prefixed) or a JSON array of 32 byte numbers. See the
-/// same acceptance rule (and the reason for it — this hasn't been verified
-/// against a live module's actual SQL-endpoint JSON shape yet) documented
-/// on `audit_drainer::identity_hex_and_bytes`.
+/// (optionally `0x`-prefixed), the canonical SATS single-key object
+/// (`{"__identity__":"0x..."}`), or a JSON array of 32 byte numbers.
+/// Identity objects must contain exactly the canonical `__identity__` key;
+/// malformed or multi-key wrappers are rejected rather than coerced.
 fn decode_identity_bytes(v: &Value) -> Result<Vec<u8>> {
     match v {
+        Value::Object(obj) => {
+            if obj.len() != 1 || !obj.contains_key("__identity__") {
+                anyhow::bail!("expected single-key __identity__ object for Identity, got {v}");
+            }
+            decode_identity_bytes(&obj["__identity__"])
+        }
         Value::String(s) => {
             let stripped = s
                 .strip_prefix("0x")
@@ -434,7 +537,7 @@ pub async fn upsert_row(
     Ok(rows)
 }
 
-fn snake_to_camel(s: &str) -> String {
+pub(crate) fn snake_to_camel(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut upper = false;
     for c in s.chars() {
@@ -535,6 +638,28 @@ mod tests {
     }
 
     #[test]
+    fn protocol_json_columns_use_durable_jsonb_override() {
+        let manifest = r#"{
+          "tables": {
+            "organization_row_change": {
+              "columns": [
+                {"name":"row_identity_json","pg_type":"TEXT","stdb_type":"String","nullable":false},
+                {"name":"row_json","pg_type":"TEXT","stdb_type":"String","nullable":true}
+              ]
+            }
+          }
+        }"#;
+        let columns = load_columns(manifest, "organization_row_change").unwrap();
+        assert!(columns.iter().all(|column| column.pg_type == "JSONB"));
+    }
+
+    #[test]
+    fn enum_variant_names_use_rust_casing() {
+        assert_eq!(stdb_enum_variant("none"), "None");
+        assert_eq!(stdb_enum_variant("Posted"), "Posted");
+    }
+
+    #[test]
     fn decodes_every_pg_type_variant() {
         let values = decode_row(&cols(), &sample_row()).unwrap();
         assert!(matches!(values[0], PgValue::NumericText(Some(ref s)) if s == "42"));
@@ -556,6 +681,155 @@ mod tests {
             PgValue::BigInt(Some(1_781_987_714_525_004))
         ));
         assert!(matches!(values[9], PgValue::NumericText(Some(ref s)) if s == "1"));
+    }
+
+    #[test]
+    fn decodes_canonical_identity_object_wrapper() {
+        let identity = "cd".repeat(32);
+        let mut row = sample_row();
+        row["userId"] = json!({ "__identity__": format!("0x{identity}") });
+
+        let values = decode_row(&cols(), &row).unwrap();
+        match &values[6] {
+            PgValue::Bytea(Some(bytes)) => {
+                assert_eq!(bytes, &hex::decode(identity).unwrap());
+            }
+            other => panic!("expected Bytea, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decodes_canonical_timestamp_object_wrapper() {
+        let mut row = sample_row();
+        row["dateOrder"] = json!({
+            "__timestamp_micros_since_unix_epoch__": 1_781_987_714_525_004_i64,
+        });
+
+        let values = decode_row(&cols(), &row).unwrap();
+        assert!(matches!(
+            values[7],
+            PgValue::BigInt(Some(1_781_987_714_525_004))
+        ));
+    }
+
+    #[test]
+    fn decodes_nullable_sats_option_timestamp_values() {
+        let mut none_row = sample_row();
+        none_row["coldEligibleAt"] = json!({ "none": [] });
+        let none_values = decode_row(&cols(), &none_row).unwrap();
+        assert!(matches!(none_values[8], PgValue::BigInt(None)));
+
+        let mut some_row = sample_row();
+        some_row["coldEligibleAt"] = json!({
+            "some": {
+                "__timestamp_micros_since_unix_epoch__": 1_781_987_714_525_004_i64,
+            }
+        });
+        let some_values = decode_row(&cols(), &some_row).unwrap();
+        assert!(matches!(
+            some_values[8],
+            PgValue::BigInt(Some(1_781_987_714_525_004))
+        ));
+    }
+
+    #[test]
+    fn decodes_text_unit_variants_and_preserves_jsonb_objects() {
+        let mut array_variant = sample_row();
+        array_variant["uid"] = json!({ "Opened": [] });
+        let values = decode_row(&cols(), &array_variant).unwrap();
+        assert!(matches!(
+            values[2],
+            PgValue::Text(Some(ref value)) if value == "Opened"
+        ));
+
+        let mut object_variant = sample_row();
+        object_variant["uid"] = json!({ "Closed": {} });
+        let values = decode_row(&cols(), &object_variant).unwrap();
+        assert!(matches!(
+            values[2],
+            PgValue::Text(Some(ref value)) if value == "Closed"
+        ));
+
+        let mut jsonb_object = sample_row();
+        jsonb_object["lines"] = json!({ "Opened": [] });
+        let values = decode_row(&cols(), &jsonb_object).unwrap();
+        assert!(matches!(
+            values[5],
+            PgValue::JsonbText(Some(ref value)) if value == r#"{"Opened":[]}"#
+        ));
+    }
+
+    #[test]
+    fn rejects_malformed_text_unit_variants() {
+        let mut malformed = sample_row();
+        malformed["uid"] = json!({ "Opened": [1] });
+        let err = format!("{:#}", decode_row(&cols(), &malformed).unwrap_err());
+        assert!(err
+            .to_string()
+            .contains("expected empty unit variant payload"));
+
+        let mut multi_key = sample_row();
+        multi_key["uid"] = json!({ "Opened": [], "Closed": [] });
+        let err = format!("{:#}", decode_row(&cols(), &multi_key).unwrap_err());
+        assert!(err.to_string().contains("expected single-key unit variant"));
+    }
+
+    #[test]
+    fn rejects_malformed_timestamp_object_wrappers() {
+        let mut malformed = sample_row();
+        malformed["dateOrder"] = json!({
+            "__timestamp_micros_since_unix_epoch__": "not-an-integer",
+        });
+        let err = format!("{:#}", decode_row(&cols(), &malformed).unwrap_err());
+        assert!(err.to_string().contains("expected i64 timestamp micros"));
+
+        let mut multi_key = sample_row();
+        multi_key["dateOrder"] = json!({
+            "__timestamp_micros_since_unix_epoch__": 1,
+            "extra": true,
+        });
+        let err = format!("{:#}", decode_row(&cols(), &multi_key).unwrap_err());
+        assert!(err.to_string().contains("single-key timestamp wrapper"));
+    }
+
+    #[test]
+    fn rejects_malformed_nullable_sats_option_wrappers() {
+        let mut malformed_none = sample_row();
+        malformed_none["coldEligibleAt"] = json!({ "none": [1] });
+        let err = format!("{:#}", decode_row(&cols(), &malformed_none).unwrap_err());
+        assert!(err
+            .to_string()
+            .contains("expected empty none payload in SATS Option wrapper"));
+
+        let mut multi_key = sample_row();
+        multi_key["coldEligibleAt"] = json!({ "none": [], "extra": true });
+        let err = format!("{:#}", decode_row(&cols(), &multi_key).unwrap_err());
+        assert!(err
+            .to_string()
+            .contains("expected single-key SATS Option wrapper"));
+
+        let mut non_nullable = sample_row();
+        non_nullable["dateOrder"] = json!({ "none": [] });
+        let err = format!("{:#}", decode_row(&cols(), &non_nullable).unwrap_err());
+        assert!(err.to_string().contains("expected timestamp wrapper"));
+    }
+
+    #[test]
+    fn rejects_malformed_identity_object_wrappers() {
+        let mut malformed = sample_row();
+        malformed["userId"] = json!({ "__identity__": [1, 2, 3] });
+        let err = format!("{:#}", decode_row(&cols(), &malformed).unwrap_err());
+        assert!(err
+            .to_string()
+            .contains("expected 32-byte array for Identity"));
+
+        let mut multi_key = sample_row();
+        multi_key["userId"] = json!({
+            "__identity__": format!("0x{}", "ab".repeat(32)),
+            "extra": true,
+        });
+        let err = format!("{:#}", decode_row(&cols(), &multi_key).unwrap_err());
+        assert!(err.to_string().contains("single-key __identity__ object"));
     }
 
     #[test]

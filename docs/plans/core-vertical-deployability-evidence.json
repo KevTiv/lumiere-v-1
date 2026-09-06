@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "canonical_plan": "docs/plans/core-vertical-deployability-pruning-plan.md",
+  "last_verified": {
+    "date": "2026-09-06",
+    "commit": "6ff9280f7"
+  },
+  "relation_census": {
+    "application": 458,
+    "protocol": 5,
+    "total": 463,
+    "organization_owned": 463,
+    "platform_global": 0
+  },
+  "gates": {
+    "C0": {
+      "status": "complete",
+      "evidence": [
+        "the immutable lumiere-contracts v0.3.31 schema passes scripts/verify-tenant-ownership.py with 458/458 application relations, 5/5 protocol relations, 463 organization-owned relations, and zero platform-global relations",
+        "the current optimized WASM (sha256:aafef98e0a6c01aa23fc5f7c4b5636a7afad260c003650dc1aa0562fa8c64835) was published to disposable in-memory local SpacetimeDB 2.8.2 database c200e2ddda2e2b737553cb45a1a243efd43b66081926fed6c6974611e77baf3f on 2026-09-06",
+        "run_tenant_isolation_tests persisted distinct C0 Org A and Org B rows and passed organization isolation checks for the three identity bindings/projections and six organization-seeded reference concepts covered by that fixture",
+        "explicit cold_tier_service_identity and schema_migration projections were persisted for C0 Org A and Org B, proving direct organization ownership for the two operator-managed platform bindings in addition to the automated isolation fixture",
+        "run_c_0_organization_ownership_backfill completed twice for organization 1 after every repaired table type was populated; both persisted runs scanned 43 rows, backfilled 0, and left 0 unresolved rows, proving idempotent no-op behavior on the current owned dataset",
+        "validate_c_0_organization_ownership_backfill passed after each run and accounting_ownership_backfill_issue contained zero rows"
+      ],
+      "required": []
+    },
+    "C1": {
+      "status": "complete",
+      "evidence": [
+        "scripts/bootstrap-storage-policies.mjs --check passes with 463/463 classified relations against the zero-global C0 ownership model",
+        "the C1 validator rejects absent or duplicate relations, missing direct ownership paths, and invalid parent relationships"
+      ],
+      "required": []
+    },
+    "C2": {
+      "status": "complete",
+      "evidence": [
+        "23 representative reducers cover all 22 enabled modules",
+        "the coverage gate derives the enabled module census from spacetimedb/src/lib.rs and fails closed on missing modules",
+        "bootstrap_new_tenant records the complete ordered tenant graph in one organization commit; static verification and Rust compilation pass",
+        "commit f956f743f strengthens the core fixture to compare every ordered identity and canonical full-row payload with the persisted STDB outcome",
+        "a disposable in-memory SpacetimeDB 2.8.2 runtime execution passed with one erp.bootstrap_new_tenant commit, sequence 1, cursor 2, 63 ordered upserts, and contiguous ordinals 0 through 62",
+        "the validated WASM SHA-256 was 38909fd2788c71dee4c792110723237816957bbaafae1b173ef6c3bc255a6342"
+      ],
+      "required": []
+    },
+    "C3": {
+      "status": "complete",
+      "evidence": [
+        "the manifest-driven projector covers every enabled module with create, update, and delete fixtures derived from the checked-in storage and codec manifests",
+        "a disposable real PostgreSQL run passed the all-module matrix with atomic ordered commits, exact duplicate replay, process-pool restart, durable cursor persistence, visible gap rejection, and quarantine without cursor skipping",
+        "commit db99f1030 adds explicit generic-projector parity for audit_log append-history and pos_order create/update/delete behavior, including stable ledger and cursor counts on duplicate delivery",
+        "commit 5bc0dd700 retires the audit and POS drainer binaries, modules, Compose services, probes, environment settings, and obsolete write/finalize metrics while preserving C5 finalization contracts",
+        "the additive migration in commit 2f1e2eea4 upgrades pre-C4 heap protocol JSON columns, the colliding tax-deadline unique index, and all required organization commit/change constraints; both real PostgreSQL C3 tests pass"
+      ],
+      "required": []
+    },
+    "C4": {
+      "status": "complete",
+      "evidence": [
+        "the pinned v0.3.29 durable schema generates all 463 applicable organization-owned relations with zero platform-global relations plus policy-derived tenant-leading indexes and hash partitions",
+        "the checksum-verified application catalog has ordered expand, project/backfill, verify, and contract phases and is bound as version 10 by the release compatibility manifest",
+        "the real PostgreSQL compatibility drill adopts the C3 heap layout, applies current migrations, applies a future additive migration, starts the current application again without destructive downgrade, and preserves the future relation and row",
+        "the same drill applies a future contract migration and proves that the current application fails closed",
+        "the real PostgreSQL codec fixture round-trips maximum u64, signed timestamp, identity, enum text, vector, and nested-structure values without shape loss",
+        "release compatibility and operation-history verification pass against immutable lumiere-contracts v0.3.29; 1321 operation IDs have fingerprint/tombstone history"
+      ],
+      "required": []
+    },
+    "C5": {
+      "status": "partial",
+      "evidence": [
+        "lumiere-codegen/storage-policy-manifest.json contains 463 unique reviewed policy entries; the Rust validator enforces exact 463-table coverage, aggregate/archive coherence, semantic eligibility fields, and reviewed fixture coverage",
+        "29 reviewed fixtures cover every module/storage-class pair currently used by the 22 modules",
+        "the policy-derived archive subset contains exactly one root, pos_order (terminal_window, versioned); pos_order_line and pos_payment inherit the reviewed POS parent archive",
+        "audit_log is fail-closed as always_hot because ordinary audit appends do not emit exact organization commit and watermark evidence; the unused cold migration/read path and obsolete finalizer/test reducers are removed, with immutable operation-ID tombstones retained",
+        "the retired independent archive-candidate input has no live code path; archive generation consumes the total storage-policy census",
+        "spacetimedb/src/core/cold_tier.rs implements policy, age/window, terminal-state, obligation, workflow, hot-dependency, rebuildability, durable-watermark, archive-version, schema-version, and contract-version gates with child-first aggregate deletion",
+        "POS runtime fixtures cover the thirty-day terminal window, terminal state, obligations, workflow, missing children, watermark/schema/version mismatch, idempotency, and caller identity",
+        "api-server/src/cold_tier/finalization_worker parses the pinned manifest, rejects unknown table/reducer/mode mappings, dispatches deterministically, and aggregates candidate statistics with focused parser/dispatch tests",
+        "real PostgreSQL tests prove archive_transfer compare-and-set retries, bounded pending reads, finalization/reconciliation, and rejection of a malformed pre-existing ledger schema",
+        "scripts/bootstrap-storage-policies.mjs write mode reproduces reviewed fixtures plus semantic/archive metadata and passes --check",
+        "the projection worker uses distinct administrator/source-read and registered-worker/finalizer clients and fails startup closed when either credential is absent or equal",
+        "scripts/c5-finalization-drill.sh and the ignored Rust live test passed against disposable local STDB and PostgreSQL on 2026-09-05, projecting a real create_pos_order commit, hydrating a remapped child-bearing aggregate from canonical commit JSON, finalizing it through a distinct registered worker identity, and verifying child/root deletion plus cold-row and ledger proofs"
+      ],
+      "required": [
+        "publish an immutable lumiere-contracts release containing the updated 463-table reviewed provenance and one-root archive subset, update the Cargo.toml:21 pin from v0.3.29, and verify release fingerprints"
+      ]
+    },
+    "C6": {
+      "status": "complete",
+      "evidence": [
+        "lumiere-contracts v0.3.31 contains generated query and invalidation-subscription descriptors for the sole archive-capable root, pos_order",
+        "api-server compiles the generated query descriptor into the shared ResourceReadPlan and compiles its subscription descriptor with authenticated organization/company scope",
+        "focused runtime tests cover current-tail, boundary, fully-cold, duplicate-race, keyset, PostgreSQL-degraded, descriptor parity, and generated realtime admission behavior",
+        "POS hydration validates server-derived organization/company/placement scope, schema and archive versions, payload checksum, and exact aggregate membership",
+        "pos_order has no post-create business mutator, so mutation hydration is not applicable; the trusted recovery drill proves hydrate, readback, and idempotent recooling, while any future mutator must add hydration dispatch and archive-version advancement"
+      ],
+      "required": []
+    },
+    "C7": {
+      "status": "partial",
+      "evidence": [
+        "C7-R1 reconstruction and C7-R2 placement focused tests pass",
+        "trusted operator-only reconstruction resolves placement configuration and the exact PostgreSQL sequence plus commit checksum without an HTTP/session route",
+        "lumiere-contracts v0.3.32 classifies 458 relations for restore and five target-local relations for recreation, including privileged service bindings",
+        "the 2026-09-06 disposable PostgreSQL 14.20 to SpacetimeDB 2.8.2 all-module drill populated all 22 enabled modules across 202 source tables and 1710 rows, including relationship identifiers, totals, audit links, idempotency records, and an activity delete tombstone",
+        "the all-module drill injected a post-commit failure, resumed the same run, repeated all 458 restored table digests with a fresh run ID, verified the exact sequence/checksum watermark, recreated five target-local relations, and retained 934 idempotent batch receipts",
+        "generated restore dispatch advances all 445 auto-increment sequences while recreating exact persisted IDs, preventing post-recovery identifier collisions",
+        "after reconstruction, sale order 2 continued from draft to sale and purchase order 2 continued from draft to purchase; duplicate confirmations were rejected by state guards with workflow-instance and stock-picking counts unchanged"
+      ],
+      "required": [
+        "publish and pin the next immutable lumiere-contracts release containing the corrected durable JSONB codec metadata"
+      ]
+    },
+    "C8": {
+      "status": "blocked",
+      "evidence": ["1318 operations remain semantically and idempotency unclassified with codecs unassigned"],
+      "required": ["zero unclassified operations", "generated query and subscription adoption", "handwritten bypass denial"]
+    },
+    "C9": {
+      "status": "partial",
+      "evidence": ["resource-specific tenant checks and C7-R2 placement tests exist"],
+      "required": ["single trusted operation context", "Org A/B and Company A1/A2 proof across every data path"]
+    },
+    "C10": {
+      "status": "blocked",
+      "evidence": ["current main P0 Playwright workflow is failing"],
+      "required": ["green lead-to-cash and procure-to-pay", "degraded-mode and failure-path coverage"]
+    },
+    "C11": {
+      "status": "partial",
+      "evidence": ["basic health, readiness, metrics, and projection status exist"],
+      "required": ["dependency-specific readiness", "bounded retry and poison handling", "synthetic checks and recovery runbooks"]
+    }
+  }
+}

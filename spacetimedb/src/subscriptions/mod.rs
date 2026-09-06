@@ -12,7 +12,10 @@
 //! - `recognize_deferred_revenue` – move amounts from deferred → income
 
 pub mod billing_helpers;
+#[path = "subscription_price_index.rs"]
+pub mod price_index;
 pub mod reducers;
+pub mod relations;
 pub mod subscription_wave_c;
 pub mod subscription_wave_d;
 pub mod subscription_wave_e;

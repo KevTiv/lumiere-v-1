@@ -4,16 +4,9 @@
  */
 import 'server-only'
 
-import {
-  callStdbReducer,
-  decryptToken,
-  encryptToken,
-  findCredentialByEmailCaseInsensitive,
-  findCredentialByWorkosUserId,
-  provisionStdbIdentity,
-} from '@/lib/stdb-auth-server'
 import { saveStdbSession } from '@/app/actions/save-stdb-token'
 import { workOsEmailVerified, workOsPrimaryEmail, type WorkOsAuthKitUser } from '@/lib/workos-user-fields'
+import { resolveApiServerBaseUrl } from '@/lib/api-server-forward'
 
 /**
  * Provisions or loads STDB identity and sets `stdb_token` / `stdb_identity` cookies.
@@ -25,36 +18,30 @@ export async function bridgeWorkOsUserToStdbSession(user: WorkOsAuthKitUser): Pr
     throw new Error('WorkOS user is missing email or id')
   }
 
-  const byWorkos = await findCredentialByWorkosUserId(workosUserId)
-  if (byWorkos) {
-    const token = await decryptToken(byWorkos.stdb_token_enc)
-    await saveStdbSession(token, byWorkos.identity)
-    return
+  const base = resolveApiServerBaseUrl()
+  const serviceToken = process.env.STDB_SERVER_TOKEN?.trim()
+  if (!base || !serviceToken) {
+    throw new Error('WorkOS bridge requires LUMIERE_API_SERVER_URL and STDB_SERVER_TOKEN')
   }
-
-  const byEmail = await findCredentialByEmailCaseInsensitive(email)
-  if (byEmail) {
-    const existingWorkos = byEmail.workos_user_id?.trim()
-    if (existingWorkos && existingWorkos !== workosUserId) {
-      throw new Error('This email is already linked to a different SSO identity')
-    }
-    if (!existingWorkos) {
-      await callStdbReducer('link_workos_user', [byEmail.identity, workosUserId])
-    }
-    const token = await decryptToken(byEmail.stdb_token_enc)
-    await saveStdbSession(token, byEmail.identity)
-    return
+  const response = await fetch(`${base}/v1/auth/workos/bridge`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${serviceToken}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      email,
+      workosUserId,
+      emailVerified: workOsEmailVerified(user),
+    }),
+    cache: 'no-store',
+  })
+  if (!response.ok) {
+    throw new Error(`WorkOS platform bridge failed (${response.status})`)
   }
-
-  const { identity, token } = await provisionStdbIdentity()
-  const tokenEnc = await encryptToken(token)
-  const canonicalEmail = email.toLowerCase()
-  await callStdbReducer('store_sso_user_credential', [
-    identity,
-    canonicalEmail,
-    tokenEnc,
-    workosUserId,
-    workOsEmailVerified(user),
-  ])
-  await saveStdbSession(token, identity)
+  const session = (await response.json()) as { token?: string; identity?: string }
+  if (!session.token || !session.identity) {
+    throw new Error('WorkOS platform bridge returned an incomplete STDB session')
+  }
+  await saveStdbSession(session.token, session.identity)
 }

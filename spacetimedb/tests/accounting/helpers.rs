@@ -10,6 +10,7 @@ use crate::accounting::journal_entries::{
     account_move, account_move_line, add_account_move_line, create_account_move, post_invoice,
     AccountMoveLine, AddAccountMoveLineParams, CreateAccountMoveParams,
 };
+use crate::core::organization::company;
 use crate::test_harness::{chart_keys, OrgFixture};
 use crate::types::{
     AccountInternalGroup, AccountMoveState, AccountTypeInternal, JournalType, MoveType,
@@ -131,6 +132,13 @@ pub fn create_balanced_customer_invoice_on_account(
 ) -> Result<u64, String> {
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
     let revenue_id = *fixture
         .chart_account_ids
         .get(chart_keys::REVENUE)
@@ -153,7 +161,7 @@ pub fn create_balanced_customer_invoice_on_account(
                 name: "Test Sales Journal".to_string(),
                 code: journal_code.clone(),
                 type_: JournalType::Sale,
-                currency_id: Some(1),
+                currency_id: Some(currency_id),
                 default_account_id: Some(revenue_id),
                 suspense_account_id: None,
                 loss_account_id: None,
@@ -384,6 +392,13 @@ pub fn patch_receivable_line_type(
 pub fn seed_bank_journal(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<(u64, u64), String> {
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
     let suffix = fixture.company_id;
 
     let type_name = format!("Bank {suffix}");
@@ -474,7 +489,7 @@ pub fn seed_bank_journal(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<(
                 name: "Test Bank Journal".to_string(),
                 code: journal_code.clone(),
                 type_: JournalType::Bank,
-                currency_id: Some(1),
+                currency_id: Some(currency_id),
                 default_account_id: Some(bank_account_id),
                 suspense_account_id: None,
                 loss_account_id: None,
@@ -525,7 +540,13 @@ pub fn seed_sibling_company(ctx: &ReducerContext, fixture: &OrgFixture) -> Resul
         CreateCompanyParams {
             name: format!("Active Company A2 {}", fixture.company_id),
             code: code.clone(),
-            currency_id: 1,
+            currency_id: ctx
+                .db
+                .company()
+                .id()
+                .find(&fixture.company_id)
+                .ok_or("Harness company not found")?
+                .currency_id,
             fiscal_year_end_month: 12,
             fiscal_year_end_day: 31,
             is_parent: false,

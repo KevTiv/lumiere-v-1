@@ -2,7 +2,7 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::{
-    account_account, account_journal, AccountAccount, AccountJournal,
+    account_journal, AccountAccount, AccountJournal,
 };
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::idempotency::{record_result, replayed_result};
@@ -10,6 +10,7 @@ use crate::accounting::journal_entries::{
     account_move, account_move_line, AccountMove, AccountMoveLine,
 };
 use crate::accounting::payments::account_payment;
+use crate::accounting::relations::require_active_account;
 use crate::core::organization::{company, require_company_in_organization};
 use crate::core::reference::require_currency_by_id;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
@@ -118,30 +119,6 @@ struct FxScope {
     loss_account: AccountAccount,
 }
 
-fn load_fx_account(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    company_id: u64,
-    account_id: u64,
-    role: &str,
-) -> Result<AccountAccount, String> {
-    let account = ctx
-        .db
-        .account_account()
-        .id()
-        .find(&account_id)
-        .ok_or_else(|| format!("{role} account not found"))?;
-    if account.organization_id != organization_id || account.company_id != company_id {
-        return Err(format!(
-            "{role} account does not belong to this organization and company"
-        ));
-    }
-    if account.deprecated {
-        return Err(format!("{role} account is deprecated"));
-    }
-    Ok(account)
-}
-
 fn load_fx_scope(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -193,11 +170,11 @@ fn load_fx_scope(
         return Err("journal currency is incompatible with this revaluation".to_string());
     }
 
-    let gain_account = load_fx_account(ctx, organization_id, company_id, gain_account_id, "gain")?;
+    let gain_account = require_active_account(ctx, organization_id, company_id, gain_account_id, "gain")?;
     if gain_account.internal_group != Some(AccountInternalGroup::Income) {
         return Err("gain account must be an income account".to_string());
     }
-    let loss_account = load_fx_account(ctx, organization_id, company_id, loss_account_id, "loss")?;
+    let loss_account = require_active_account(ctx, organization_id, company_id, loss_account_id, "loss")?;
     if loss_account.internal_group != Some(AccountInternalGroup::Expense) {
         return Err("loss account must be an expense account".to_string());
     }
@@ -339,7 +316,7 @@ fn run_fx_revaluation_impl(
     let mut total_gain = 0.0;
     let mut total_loss = 0.0;
     for line in &params.lines {
-        let account = load_fx_account(
+        let account = require_active_account(
             ctx,
             organization_id,
             company_id,
@@ -827,7 +804,7 @@ pub fn post_realized_fx_gain_loss(
         params.gain_account_id,
         params.loss_account_id,
     )?;
-    let clearing_account = load_fx_account(
+    let clearing_account = require_active_account(
         ctx,
         organization_id,
         company_id,

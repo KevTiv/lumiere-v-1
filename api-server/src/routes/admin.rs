@@ -34,10 +34,7 @@ async fn require_superuser(
     let id = normalize_identity_hex_for_sql(&session.identity_hex);
     let sql = format!("SELECT is_superuser FROM user_profile WHERE identity = 0x{id}");
     let client = state.client_with_token(&session.stdb_token);
-    let rows = client
-        .query_sql(&sql)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
     let is_superuser = rows
         .first()
         .and_then(|r| r.get("isSuperuser").or_else(|| r.get("is_superuser")))
@@ -62,7 +59,7 @@ async fn suspend_organization(
     let rows = client
         .query_sql(&billing_sql)
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     let billing_id = rows
         .first()
         .and_then(|row| row.get("id").and_then(|v| v.as_u64()))
@@ -74,7 +71,7 @@ async fn suspend_organization(
             json!([org_id, billing_id, "suspended"]),
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
 
     Ok(Json(
         json!({ "ok": true, "organizationId": org_id, "status": "suspended" }),

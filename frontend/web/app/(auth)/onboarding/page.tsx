@@ -31,6 +31,7 @@ export default function OnboardingPage() {
   const [timezone, setTimezone] = useState("UTC")
   const [currencies, setCurrencies] = useState<BootstrapCurrency[]>([])
   const [currencyId, setCurrencyId] = useState("")
+  const [currencyCode, setCurrencyCode] = useState("")
   const [currenciesLoading, setCurrenciesLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -46,6 +47,7 @@ export default function OnboardingPage() {
         setCurrencies(activeCurrencies)
         const defaultCurrency = activeCurrencies.find((currency) => currency.code === "USD") ?? activeCurrencies[0]
         setCurrencyId(defaultCurrency ? String(defaultCurrency.id) : "")
+        setCurrencyCode(defaultCurrency?.code ?? "")
         if (!defaultCurrency) setError(t("auth.onboarding.errors.failedToCreate"))
       } catch (err) {
         if (!controller.signal.aborted) {
@@ -66,7 +68,7 @@ export default function OnboardingPage() {
     setLoading(true)
     try {
       const selectedCurrencyId = Number(currencyId)
-      if (!Number.isSafeInteger(selectedCurrencyId) || selectedCurrencyId <= 0) {
+      if (!Number.isSafeInteger(selectedCurrencyId) || selectedCurrencyId < 0 || !currencyCode) {
         throw new Error(t("auth.onboarding.errors.failedToCreate"))
       }
       const r = await apiFetch("/api/bootstrap/tenant", {
@@ -91,6 +93,7 @@ export default function OnboardingPage() {
           defaultCompanyName: name,
           defaultCompanyCode: code,
           defaultCompanyCurrencyId: selectedCurrencyId,
+          defaultCompanyCurrencyCode: currencyCode,
           fiscalYearEndMonth: DEFAULT_FISCAL_YEAR_END_MONTH,
           fiscalYearEndDay: DEFAULT_FISCAL_YEAR_END_DAY,
           seedFormConfigs: true,
@@ -179,13 +182,17 @@ export default function OnboardingPage() {
               <Label htmlFor="currency">{t("auth.onboarding.currency")}</Label>
               <select
                 id="currency"
-                value={currencyId}
-                onChange={(e) => setCurrencyId(e.target.value)}
+                value={currencyCode}
+                onChange={(e) => {
+                  const selected = currencies.find((currency) => currency.code === e.target.value)
+                  setCurrencyCode(e.target.value)
+                  setCurrencyId(String(selected?.id ?? 0))
+                }}
                 disabled={currenciesLoading || currencies.length === 0}
                 className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 {currencies.map((currency) => (
-                  <option key={currency.id} value={currency.id}>
+                  <option key={currency.code} value={currency.code}>
                     {currency.code} — {currency.name}
                   </option>
                 ))}

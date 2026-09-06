@@ -146,11 +146,16 @@ The SpacetimeDB CLI **does not** ship `backup`, `restore`, `dump`, or `export` s
 |-----------|------------------|
 | **Monitor** | Dashboard: `https://spacetimedb.com/@<username>/<STDB_MODULE>` (see workspace SpacetimeDB rules) |
 | **Tail logs** | `make logs-cloud` → `spacetime logs $(STDB_CLOUD_MODULE) --server maincloud` |
-| **Module update** | `make publish-cloud` (schema migration; preserves data unless reducer requires clear) |
-| **Destructive reset** | `make publish-cloud-clear` → `spacetime publish … --server maincloud --clear-database -y` — **wipes all tenants** |
+| **Module update** | `make publish-cloud` builds and size-checks the stripped optimized WASM before publishing; preserves data unless the schema requires a clear |
+| **Destructive reset** | `make publish-cloud-clear` publishes the same checked artifact with `--clear-database` — **wipes all tenants** |
 | **Ad-hoc read** | `spacetime sql <STDB_MODULE> "SELECT …" --server maincloud` (CLI marks `sql` as unstable) |
 
 There is no documented maincloud point-in-time restore in-repo. Treat `publish-cloud-clear` as irreversible for pilot data. Coordinate with SpacetimeDB maincloud support for hosted backup expectations before promising RPO/RTO to pilots.
+
+The cloud targets accept `STDB_REMOTE_SERVER=<nickname-or-url>`, so a durable
+standalone SpacetimeDB deployment can replace Maincloud without changing the
+application contract. Persistent storage, TLS, backups, and availability for
+that server remain deployment responsibilities.
 
 ### 3.2 Local (`spacetime start`)
 
@@ -228,18 +233,32 @@ Artifacts land in `.tmp/stdb-backups/` (override with `BACKUP_DIR`). See [`ENVIR
 
 | Service | Endpoint | Expected |
 |---------|----------|----------|
-| **api-server** | `GET http://<api-host>:8082/health` | HTTP 200 (`api-server/src/http_app.rs`) |
+| **api-server liveness** | `GET http://<api-host>:8082/health` | HTTP 200 without dependency checks |
+| **api-server readiness** | `GET http://<api-host>:8082/health/ready` | HTTP 200 only when PostgreSQL, SpacetimeDB, and the configured AI gateway are ready |
 | **ai-gateway** | `GET http://<ai-gateway-host>:8080/health` | JSON `{"status":"ok","service":"lumiere-ai-gateway"}` (`ai-gateway/src/routes/health.rs`) |
-| **AI via web BFF** | `GET /api/ai/health` (authenticated) | Proxies ai-gateway; see [`frontend/web/app/api/ai/health/route.ts`](../frontend/web/app/api/ai/health/route.ts) |
+| **ai-gateway readiness** | `GET http://<ai-gateway-host>:8080/health/ready` | HTTP 200 only when SpacetimeDB, primary Qdrant, configured provider settings, Ollama metadata, and any configured Kong readiness endpoint are ready |
+| **chromium-worker liveness** | `GET http://<chromium-host>:8090/health` | HTTP 200 when the worker process is listening |
+| **chromium-worker readiness** | `GET http://<chromium-host>:8090/health/ready` | HTTP 200 only after a bounded Chromium launch/connect check |
+| **AI via web BFF** | `GET /api/ai/health` (authenticated) | Proxies ai-gateway readiness; see [`frontend/web/app/api/ai/health/route.ts`](../frontend/web/app/api/ai/health/route.ts) |
 | **Web (compose)** | `curl -fsS $NEXT_PUBLIC_APP_URL` | HTML shell loads |
 | **SpacetimeDB** | `spacetime server ping` or `curl -fsS $STDB_HOST/v1/identity -X POST` | Reachable |
 
-In Docker Compose, api-server and ai-gateway are not port-published — exec into the network or check from a sibling container:
+In Docker Compose, api-server and ai-gateway are not port-published. Probe from
+an operator or sibling container on the Compose network; slim production images
+do not guarantee that `curl` is installed.
 
 ```bash
-docker compose exec api-server curl -fsS http://127.0.0.1:8082/health
-docker compose exec ai-gateway curl -fsS http://127.0.0.1:8080/health
+# Run from the host, or from a sibling container with Node 18+ on the Compose network.
+node scripts/check-compose-readiness.mjs \
+  --api http://<api-host>:8082/health/ready \
+  --ai http://<ai-gateway-host>:8080/health/ready \
+  --probe chromium=http://<chromium-host>:8090/health/ready
 ```
+
+The probe uses only Node's built-in `fetch`, applies a bounded timeout, and exits non-zero
+if any dependency is not ready. Add repeatable `--probe NAME=URL` arguments for
+worker readiness endpoints. All probes start in parallel. Use `curl` directly
+only when it is available.
 
 Kong (`:8000`) does not expose a dedicated `/health` route in [`infra/kong/kong.yml`](../infra/kong/kong.yml); use service-level checks above.
 
@@ -361,14 +380,14 @@ GitHub Actions workflow **[E2E smoke](../.github/workflows/e2e-smoke.yml)** runs
 
 | Trigger | Suite | Clear DB |
 |---------|-------|----------|
-| **Pull request** (paths: e2e, Makefile, spacetimedb, api-server) | `p0` only | no |
-| **Push to `main`** | `p0` + `full` | yes |
+| **Pull request** (classifier-selected application/shared/build changes, including frontend) | `p0` only | no |
+| **Push to `main`** (classifier-selected changes) | `full` once, includes P0 | yes |
 | **Weekly schedule** (Mon 08:00 UTC) | `full` | yes |
 | **workflow_dispatch** | operator choice | configurable |
 
-**Required check for merge (operator action):** enable branch protection on **`E2E smoke / Playwright smoke (p0)`**. This is the PR matrix job; GitHub settings are out-of-repo.
+**Required checks for merge (operator action):** prefer the stable **`CI gate`** and **`E2E gate`** job checks from the corresponding workflows. These reject failed/cancelled/missing selected jobs and accept deliberate classifier skips. Existing branch-protection settings are not changed by this branch; migrate any dynamic `Playwright smoke (p0)` requirement through GitHub settings. See the [build and CI guide](guides/build-and-ci-dx.md).
 
-**P0 scope:** 15 spec files under `frontend/web/tests/e2e/` tagged `@p0` (24 tests when listed with `playwright test --grep @p0`). Covers auth shell, module smoke, MVP golden paths, and core mutation suites.
+**P0 scope:** tests tagged `@p0`, excluding `@dev-fixture`. Covers auth shell, module smoke, MVP golden paths, and core mutation suites. Use `pnpm --dir frontend/web exec playwright test --list --grep @p0 --grep-invert @dev-fixture` for the current inventory; counts change as tests are added.
 
 **Reproduce CI P0 locally** (same suite as PRs, without wiping the module):
 

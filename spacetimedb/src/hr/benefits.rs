@@ -2,7 +2,7 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::hr::employees::hr_employee;
+use crate::hr::relations::require_employee_in_scope;
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
@@ -72,27 +72,6 @@ pub struct AssignBenefitEnrollmentParams {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-fn assert_employee_scope(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    company_id: u64,
-    employee_id: u64,
-) -> Result<(), String> {
-    let emp = ctx
-        .db
-        .hr_employee()
-        .id()
-        .find(&employee_id)
-        .ok_or("Employee not found")?;
-    if emp.organization_id != organization_id {
-        return Err("Employee belongs to a different organization".to_string());
-    }
-    if emp.company_id != company_id {
-        return Err("Employee does not belong to this company".to_string());
-    }
-    Ok(())
-}
 
 fn active_enrollment_for(
     ctx: &ReducerContext,
@@ -169,7 +148,7 @@ pub fn assign_benefit_enrollment(
     params: AssignBenefitEnrollmentParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_employee", "create")?;
-    assert_employee_scope(ctx, organization_id, company_id, params.employee_id)?;
+    require_employee_in_scope(ctx, organization_id, company_id, params.employee_id)?;
 
     let plan = ctx
         .db

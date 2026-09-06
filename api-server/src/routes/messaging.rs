@@ -139,7 +139,7 @@ async fn message_templates_post(
             json!([org_id, params])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Message template created successfully" } })),
@@ -164,7 +164,7 @@ async fn message_template_put(
             json!([org_id, id, body])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok(Json(
         json!({ "data": { "message": "Message template updated successfully" } }),
     ))
@@ -237,7 +237,7 @@ async fn operational_messages_post(
             json!([org_id, params])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Operational message created successfully" } })),
@@ -261,7 +261,7 @@ async fn operational_message_copied(
             json!([org_id, id])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok(Json(
         json!({ "data": { "message": "Message copy recorded successfully" } }),
     ))
@@ -321,7 +321,7 @@ async fn message_batches_post(
             json!([org_id, params])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Message batch created successfully" } })),
@@ -346,7 +346,7 @@ async fn message_batch_review(
             json!([org_id, id, body])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok(Json(
         json!({ "data": { "message": "Message batch reviewed successfully" } }),
     ))
@@ -369,7 +369,7 @@ async fn message_batch_cancel(
             json!([org_id, id])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok(Json(
         json!({ "data": { "message": "Message batch cancelled successfully" } }),
     ))
@@ -431,7 +431,7 @@ async fn contact_preferences_put(
             ]),
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok(Json(
         json!({ "data": { "message": "Contact preference updated successfully" } }),
     ))

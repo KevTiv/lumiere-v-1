@@ -1,10 +1,11 @@
 /**
  * Provisions test@email.com / Password123$ with admin org membership (local dev).
  *
- * Mirrors frontend/web/lib/stdb-auth-server.ts + signup + accept-invite reducer calls.
+ * Uses the API server's platform-control credential bootstrap, then creates the
+ * organization-owned SpacetimeDB bindings after membership exists.
  *
  * Before admin reducers, calls `dev_promote_caller_superuser` so the JWT identity used for
- * `STDB_SERVER_TOKEN` gets `user_profile.is_superuser` (required by `store_user_credential`).
+ * `STDB_SERVER_TOKEN` can create membership and binding projections.
  * Publish the module after pulling this reducer; do not expose that reducer on untrusted hosts.
  *
  * Usage (from repo root or frontend/web):
@@ -29,8 +30,6 @@
  * or rely on this script reading that file when STDB_SERVER_TOKEN is unset.
  */
 
-import bcrypt from 'bcryptjs'
-
 import {
   loadEnvLocal,
   getStdbHost,
@@ -50,39 +49,18 @@ const DEV_MINIMAL_ORG_NAME = 'Lumiere Dev Org'
 /** Prefer demo org, then minimal dev org, then lowest id (deterministic). */
 const ORG_NAME_PRIORITY = [DEMO_ORG_NAME, DEV_MINIMAL_ORG_NAME]
 
-function getEncryptionKey() {
-  const hex = process.env['STDB_CREDENTIAL_ENCRYPTION_KEY']?.trim() ?? ''
-  if (hex.length !== 64 || !/^[0-9a-fA-F]+$/.test(hex)) {
-    throw new Error(
-      'STDB_CREDENTIAL_ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes), same as Next.js ' +
-      'frontend/web/lib/stdb-auth-server.ts. Add it to frontend/web/.env.local (or export it). ' +
-      'Generate one with: openssl rand -hex 32',
-    )
-  }
-  const bytes = new Uint8Array(32)
-  for (let i = 0; i < 32; i++) {
-    bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
-  }
-  return bytes
-}
-
-async function encryptToken(plaintext) {
-  const keyBytes = getEncryptionKey()
-  const key = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt'])
-  const iv = crypto.getRandomValues(new Uint8Array(12))
-  const enc = new TextEncoder()
-  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(plaintext))
-  const combined = new Uint8Array(12 + ciphertext.byteLength)
-  combined.set(iv)
-  combined.set(new Uint8Array(ciphertext), 12)
-  return Buffer.from(combined).toString('base64')
-}
-
-async function provisionStdbIdentity(host) {
-  const url = `${host}/v1/identity`
-  const res = await fetch(url, { method: 'POST' })
+async function bootstrapPlatformCredential(adminToken) {
+  const base = (process.env['LUMIERE_API_SERVER_URL'] ?? 'http://127.0.0.1:8082').replace(/\/$/, '')
+  const res = await fetch(`${base}/v1/auth/internal/bootstrap-credential`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${adminToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email: TEST_EMAIL, password: TEST_PASSWORD }),
+  })
   if (!res.ok) {
-    throw new Error(`SpacetimeDB identity provisioning failed: ${res.status} ${await res.text()}`)
+    throw new Error(`Platform credential bootstrap failed: ${res.status} ${await res.text()}`)
   }
   return res.json()
 }
@@ -296,55 +274,12 @@ async function main() {
   await callStdbReducer(host, moduleName, adminToken, 'dev_promote_caller_superuser', [])
   console.log('[seed-test-user] dev_promote_caller_superuser OK (HTTP token identity is superuser).')
 
-  const safeEmail = TEST_EMAIL.replace(/'/g, "''")
-
-  let identityForReducer
-  let existing = []
-  try {
-    existing = await queryStdb(
-      host,
-      moduleName,
-      adminToken,
-      `SELECT identity FROM user_credential WHERE email = '${safeEmail}'`,
-    )
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    if (!msg.includes('private') && !msg.includes('no such table')) {
-      throw e
-    }
-    console.log(
-      '[seed-test-user] user_credential is private; skipping SQL lookup and provisioning credentials.',
-    )
+  const credential = await bootstrapPlatformCredential(adminToken)
+  if (!credential.identity || !credential.platformUserId) {
+    throw new Error('Platform credential bootstrap returned an incomplete binding')
   }
-
-  if (existing.length > 0) {
-    console.log(`[seed-test-user] Credential exists for ${TEST_EMAIL}; skipping store_user_credential.`)
-    identityForReducer = toIdentityReducerArg(existing[0].identity)
-  } else {
-    console.log(`[seed-test-user] Provisioning identity and credentials…`)
-    try {
-      const { identity, token } = await provisionStdbIdentity(host)
-      identityForReducer = toIdentityReducerArg(identity)
-      const passwordHash = bcrypt.hashSync(TEST_PASSWORD, 12)
-      const tokenEnc = await encryptToken(token)
-      await callStdbReducer(host, moduleName, adminToken, 'store_user_credential', [
-        identityForReducer,
-        TEST_EMAIL,
-        passwordHash,
-        tokenEnc,
-      ])
-      console.log('[seed-test-user] store_user_credential OK.')
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      if (msg.includes('Email already registered')) {
-        console.log(
-          `[seed-test-user] ${TEST_EMAIL} already registered (private user_credential table); continuing org/role setup.`,
-        )
-      } else {
-        throw e
-      }
-    }
-  }
+  const identityForReducer = toIdentityReducerArg(credential.identity)
+  console.log('[seed-test-user] Platform credential ready.')
 
   const orgId = await resolveTargetOrg(host, moduleName, adminToken)
 
@@ -374,6 +309,17 @@ async function main() {
       throw e
     }
   }
+
+  await callStdbReducer(host, moduleName, adminToken, 'bind_user_credential', [
+    credential.platformUserId,
+    identityForReducer,
+    TEST_EMAIL,
+  ])
+  await callStdbReducer(host, moduleName, adminToken, 'bind_user_profile', [
+    credential.platformUserId,
+    identityForReducer,
+  ])
+  console.log('[seed-test-user] Organization-owned credential/profile bindings ready.')
 
   await ensureAdminRoleAssignment(host, moduleName, adminToken, identityForReducer, orgId)
 

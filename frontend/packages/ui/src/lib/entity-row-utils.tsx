@@ -6,16 +6,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../components/tooltip"
 import { cn } from "./utils"
 import { entryTableStatusDotClass } from "./theme-colors"
 import type { EntityViewConfig } from "./entity-view-types"
-
-/** Read a row field supporting camelCase and snake_case keys. */
-export function getRowField(row: Record<string, unknown>, key: string): unknown {
-  if (Object.prototype.hasOwnProperty.call(row, key)) return row[key]
-  const snake = key.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
-  if (Object.prototype.hasOwnProperty.call(row, snake)) return row[snake]
-  const camel = key.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
-  if (Object.prototype.hasOwnProperty.call(row, camel)) return row[camel]
-  return undefined
-}
+import { getRowField, formatTimestampLike } from "./entity-row-values"
+export { getRowField, formatTimestampLike } from "./entity-row-values"
 
 export function getEntityRowKey(config: EntityViewConfig): string | undefined {
   const view = config.view
@@ -23,19 +15,6 @@ export function getEntityRowKey(config: EntityViewConfig): string | undefined {
   if (view.mode === "table-or-board") return view.table.rowKey ?? view.board.rowKey
   if (view.mode === "board") return view.rowKey
   return undefined
-}
-
-export function formatTimestampLike(value: unknown): Date | null {
-  if (value instanceof Date) return value
-  if (typeof value === "string" || typeof value === "number") {
-    const d = new Date(value)
-    return Number.isNaN(d.getTime()) ? null : d
-  }
-  if (value != null && typeof value === "object" && "microsSinceUnixEpoch" in value) {
-    const micros = BigInt(String((value as { microsSinceUnixEpoch: unknown }).microsSinceUnixEpoch))
-    return new Date(Number(micros / 1000n))
-  }
-  return null
 }
 
 function formatRelativeTime(date: Date): string {

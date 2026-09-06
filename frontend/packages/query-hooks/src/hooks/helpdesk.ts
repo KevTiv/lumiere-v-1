@@ -22,6 +22,7 @@ import type {
   UpdateTicketParams,
 } from "@lumiere/stdb/types"
 import { encodeIdentity, stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
 
 import {
   finalizeCreateHelpdeskSlaParams,
@@ -30,10 +31,6 @@ import {
   finalizeCreateTicketParams,
   finalizeUpdateTicketParams,
 } from "./helpdesk-params-merge"
-
-function toScalarU64(v: bigint | number | string): bigint {
-  return typeof v === "bigint" ? v : BigInt(String(v))
-}
 
 function helpdeskKeys(organizationId: bigint) {
   const k = rqBigIntKey(organizationId)

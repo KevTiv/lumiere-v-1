@@ -1,4 +1,5 @@
 import type { ImportEntityOption } from "./import-entities"
+import { norm, rowId, rowEmail, rowPhone, rowName } from "@lumiere/erp-shared/contact-matching"
 
 export type ImportDuplicateMatch = {
   rowIndex: number
@@ -16,28 +17,6 @@ export type ImportDuplicateRowState = {
 }
 
 type QueryRow = Record<string, unknown>
-
-function norm(value: unknown): string {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase()
-}
-
-function rowId(row: QueryRow): string {
-  return String(row.id ?? "")
-}
-
-function rowEmail(row: QueryRow): string {
-  return norm(row.email ?? row.emailFrom ?? row.email_from)
-}
-
-function rowPhone(row: QueryRow): string {
-  return norm(row.phone ?? row.mobile ?? row.phoneNumber ?? row.phone_number)
-}
-
-function rowName(row: QueryRow): string {
-  return norm(row.name ?? row.displayName ?? row.display_name)
-}
 
 function isVendorContact(row: QueryRow): boolean {
   return Boolean(row.isVendor ?? row.is_vendor ?? row.isSupplier ?? row.is_supplier)

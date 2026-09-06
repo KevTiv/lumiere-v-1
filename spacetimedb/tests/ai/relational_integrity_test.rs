@@ -3,14 +3,21 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::ai::intelligence::{
-    ai_document_processing_job, ai_insight, create_ai_insight, create_document_processing_job,
-    dismiss_insight, CreateAiInsightParams, CreateDocumentProcessingJobParams,
+    ai_document_processing_job, ai_insight, approve_document_processing_job,
+    complete_document_processing_job, create_ai_insight, create_document_processing_job,
+    dismiss_insight, CompleteDocumentProcessingJobParams, CreateAiInsightParams,
+    CreateDocumentProcessingJobParams,
 };
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::documents::documents::{create_document, document, CreateDocumentParams};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::InsightSeverity;
 
-fn create_test_insight(ctx: &ReducerContext, fixture: &OrgFixture, title: &str) -> Result<u64, String> {
+fn create_test_insight(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    title: &str,
+) -> Result<u64, String> {
     create_ai_insight(
         ctx,
         fixture.organization_id,
@@ -207,6 +214,63 @@ pub fn test_document_processing_job_document_relation(ctx: &ReducerContext) -> R
         .ok_or("valid document processing job was not persisted")?;
     if persisted.document_id != Some(local_doc_id) {
         return Err("valid document_id was not persisted".to_string());
+    }
+
+    complete_document_processing_job(
+        ctx,
+        local.organization_id,
+        Some(local.company_id),
+        persisted.id,
+        CompleteDocumentProcessingJobParams {
+            extracted_data: Some(r#"{"vendor":"C2","total":12.5}"#.to_string()),
+            confidence_score: Some(0.99),
+            model_used: Some("c2-test".to_string()),
+            tokens_used: Some(1),
+            cost: Some(0.0),
+            error_message: None,
+        },
+    )?;
+    approve_document_processing_job(
+        ctx,
+        local.organization_id,
+        Some(local.company_id),
+        persisted.id,
+    )?;
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == local.organization_id
+                && commit.operation_id == "erp.approve_document_processing_job"
+                && commit.correlation_id
+                    == format!("document-processing-job:{}:approve", persisted.id)
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 2 {
+        return Err(format!(
+            "AI approval should emit one two-row organization commit, got {} / {:?}",
+            commits.len(),
+            commits.first().map(|commit| commit.row_change_count)
+        ));
+    }
+    let commit = &commits[0];
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == local.organization_id
+                && change.commit_sequence == commit.sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables != ["document", "ai_document_processing_job"] {
+        return Err(format!("AI approval commit row order mismatch: {tables:?}"));
     }
 
     Ok(())

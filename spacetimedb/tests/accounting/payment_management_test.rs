@@ -17,6 +17,7 @@ use crate::accounting::payment_management::{
 };
 use crate::accounting::payments::account_payment;
 use crate::core::audit::audit_log;
+use crate::core::organization::company;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{
     AccountInternalGroup, PartnerType, PaymentDirection, PaymentFeeBearer, PaymentProviderCode,
@@ -24,6 +25,15 @@ use crate::types::{
 };
 
 use super::helpers::{create_balanced_customer_invoice, seed_bank_journal};
+
+fn company_currency_id(ctx: &ReducerContext, company_id: u64) -> Result<u64, String> {
+    ctx.db
+        .company()
+        .id()
+        .find(&company_id)
+        .map(|company| company.currency_id)
+        .ok_or_else(|| format!("Company {company_id} not found"))
+}
 
 fn seed_payment_fee_account(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, String> {
     let type_name = format!("Payment fee expense {}", fixture.company_id);
@@ -95,7 +105,7 @@ pub fn test_payment_account_lifecycle(ctx: &ReducerContext) -> Result<(), String
             name: "MTN Test Wallet".to_string(),
             provider_label: None,
             reference_raw: Some("+233501234567".to_string()),
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, company_id)?,
             account_journal_id: journal_id,
             fee_account_id: None,
             clearing_account_id: None,
@@ -155,7 +165,7 @@ pub fn test_payment_transaction_duplicate_reference(ctx: &ReducerContext) -> Res
             name: "MTN Wallet".to_string(),
             provider_label: None,
             reference_raw: None,
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, company_id)?,
             account_journal_id: journal_id,
             fee_account_id: None,
             clearing_account_id: None,
@@ -181,7 +191,7 @@ pub fn test_payment_transaction_duplicate_reference(ctx: &ReducerContext) -> Res
         gross_external_amount: 110.0,
         settlement_amount: 100.0,
         net_account_amount: 100.0,
-        currency_id: 1,
+        currency_id: company_currency_id(ctx, company_id)?,
         occurred_at: Some(ctx.timestamp),
         source_entity: None,
         source_entity_id: None,
@@ -213,7 +223,7 @@ pub fn test_payment_transaction_duplicate_reference(ctx: &ReducerContext) -> Res
             name: "Cash Drawer".to_string(),
             provider_label: None,
             reference_raw: None,
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, company_id)?,
             account_journal_id: journal_id,
             fee_account_id: None,
             clearing_account_id: None,
@@ -255,7 +265,7 @@ pub fn test_payment_transaction_post_creates_ledger_payment(
             name: "MTN Wallet".to_string(),
             provider_label: None,
             reference_raw: None,
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, company_id)?,
             account_journal_id: journal_id,
             fee_account_id: None,
             clearing_account_id: None,
@@ -284,7 +294,7 @@ pub fn test_payment_transaction_post_creates_ledger_payment(
             gross_external_amount: 100.0,
             settlement_amount: 100.0,
             net_account_amount: 100.0,
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, company_id)?,
             occurred_at: Some(ctx.timestamp),
             source_entity: None,
             source_entity_id: None,
@@ -418,7 +428,7 @@ pub fn test_payment_transaction_fee_and_void(ctx: &ReducerContext) -> Result<(),
             name: "MTN Wallet".to_string(),
             provider_label: None,
             reference_raw: None,
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, company_id)?,
             account_journal_id: journal_id,
             fee_account_id: Some(fee_account_id),
             clearing_account_id: None,
@@ -447,7 +457,7 @@ pub fn test_payment_transaction_fee_and_void(ctx: &ReducerContext) -> Result<(),
             gross_external_amount: 110.0,
             settlement_amount: 100.0,
             net_account_amount: 100.0,
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, company_id)?,
             occurred_at: Some(ctx.timestamp),
             source_entity: None,
             source_entity_id: None,
@@ -541,7 +551,7 @@ pub fn test_payment_allocation_updates_ledger_and_reverses(
             name: "ACC-RI-004 allocation account".to_string(),
             provider_label: None,
             reference_raw: None,
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, company_id)?,
             account_journal_id: journal_id,
             fee_account_id: None,
             clearing_account_id: None,
@@ -570,7 +580,7 @@ pub fn test_payment_allocation_updates_ledger_and_reverses(
             gross_external_amount: 211.13,
             settlement_amount: 211.13,
             net_account_amount: 211.13,
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, company_id)?,
             occurred_at: Some(ctx.timestamp),
             source_entity: Some("invoice".to_string()),
             source_entity_id: Some(invoice_id),
@@ -603,7 +613,7 @@ pub fn test_payment_allocation_updates_ledger_and_reverses(
         payment_transaction_id: posted.id,
         allocated_move_line_id: invoice_line.id,
         allocated_amount: 211.13,
-        currency_id: 1,
+        currency_id: company_currency_id(ctx, company_id)?,
         write_off_amount: 0.0,
         write_off_account_id: None,
         metadata: Some(r#"{"test":"acc_ri_004"}"#.to_string()),
@@ -784,7 +794,7 @@ pub fn test_payment_account_patch_preserves_and_clears(ctx: &ReducerContext) -> 
             name: "Patch Wallet".to_string(),
             provider_label: Some("ACC-RI-010 label".to_string()),
             reference_raw: Some("P-A1-73129".to_string()),
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, fixture.company_id)?,
             account_journal_id: journal_id,
             fee_account_id: Some(fee_account_id),
             clearing_account_id: Some(clearing_account_id),
@@ -885,7 +895,7 @@ pub fn test_update_payment_account_rejects_cross_tenant_accounts(
             name: "ACC-RI-023 Wallet".to_string(),
             provider_label: Some("ACC-RI-023 label".to_string()),
             reference_raw: Some("P-ACC-RI-023".to_string()),
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, fixture_a.company_id)?,
             account_journal_id: journal_a,
             fee_account_id: Some(fee_account_a),
             clearing_account_id: None,

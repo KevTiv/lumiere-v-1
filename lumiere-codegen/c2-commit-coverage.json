@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "reducers": [
+    {
+      "source": "spacetimedb/src/accounting/journal_entries.rs",
+      "function": "create_invoice_from_sale_order",
+      "operation": "create_invoice_from_sale_order",
+      "operation_id": "erp.create_invoice_from_sale_order",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/ai/intelligence.rs",
+      "function": "approve_document_processing_job",
+      "operation": "approve_document_processing_job",
+      "operation_id": "erp.approve_document_processing_job",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/analytics/reports.rs",
+      "function": "record_generated_owner_report",
+      "operation": "record_generated_owner_report",
+      "operation_id": "erp.record_generated_owner_report",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/core/organization.rs",
+      "function": "record_bootstrap_organization_commit",
+      "operation": "bootstrap_new_tenant",
+      "operation_id": "erp.bootstrap_new_tenant",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/crm/opportunities.rs",
+      "function": "convert_opportunity_to_sale_order",
+      "operation": "convert_opportunity_to_sale_order",
+      "operation_id": "erp.convert_opportunity_to_sale_order",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/data_ops/analytics_imports.rs",
+      "function": "import_analytics_metric_csv",
+      "operation": "import_analytics_metric_csv",
+      "operation_id": "erp.import_analytics_metric_csv",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/documents/documents.rs",
+      "function": "add_document_version",
+      "operation": "add_document_version",
+      "operation_id": "erp.add_document_version",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/expenses/expense_depth.rs",
+      "function": "create_expense_project_rebill",
+      "operation": "create_expense_project_rebill",
+      "operation_id": "erp.create_expense_project_rebill",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/fleet/fleet.rs",
+      "function": "upsert_warehouse_geo",
+      "operation": "upsert_warehouse_geo",
+      "operation_id": "erp.upsert_warehouse_geo",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/forms/mod.rs",
+      "function": "publish_form_configuration",
+      "operation": "publish_form_configuration",
+      "operation_id": "erp.publish_form_configuration",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/helpdesk/tickets.rs",
+      "function": "create_ticket",
+      "operation": "create_ticket",
+      "operation_id": "erp.create_ticket",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/hr/payroll.rs",
+      "function": "create_payroll_export_intent",
+      "operation": "create_payroll_export_intent",
+      "operation_id": "erp.create_payroll_export_intent",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/integrations/whatsapp_business.rs",
+      "function": "set_whatsapp_primary_account",
+      "operation": "set_whatsapp_primary_account",
+      "operation_id": "erp.set_whatsapp_primary_account",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/inventory/stock.rs",
+      "function": "move_stock_quant",
+      "operation": "move_stock_quant",
+      "operation_id": "erp.move_stock_quant",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/iot/registry.rs",
+      "function": "sync_hub_devices",
+      "operation": "sync_hub_devices",
+      "operation_id": "erp.sync_hub_devices",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/manufacturing/bill_of_materials.rs",
+      "function": "create_bom",
+      "operation": "create_bom",
+      "operation_id": "erp.create_bom",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/projects/tasks.rs",
+      "function": "create_task",
+      "operation": "create_task",
+      "operation_id": "erp.create_task",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/proposals/proposals.rs",
+      "function": "convert_proposal_to_sale_order",
+      "operation": "convert_proposal_to_sale_order",
+      "operation_id": "erp.convert_proposal_to_sale_order",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/purchasing/procurement_advanced.rs",
+      "function": "release_blanket_to_po",
+      "operation": "release_blanket_to_po",
+      "operation_id": "erp.release_blanket_to_po",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/sales/pos_transactions.rs",
+      "function": "create_pos_order",
+      "operation": "create_pos_order",
+      "operation_id": "erp.create_pos_order",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/sales/pos_transactions.rs",
+      "function": "hydrate_pos_order_aggregate_checked",
+      "operation": "hydrate_pos_order_aggregate",
+      "operation_id": "erp.hydrate_pos_order_aggregate",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/subscriptions/reducers.rs",
+      "function": "create_subscription_from_sale_order",
+      "operation": "create_subscription_from_sale_order",
+      "operation_id": "erp.create_subscription_from_sale_order",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/workflow/runtime.rs",
+      "function": "start_workflow_internal",
+      "operation": "start_workflow",
+      "operation_id": "erp.start_workflow",
+      "change_constructors": ["upsert_stdb_row"]
+    }
+  ]
+}

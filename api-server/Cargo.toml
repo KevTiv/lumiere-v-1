@@ -31,15 +31,19 @@ name = "workflow-worker"
 path = "src/bin/workflow-worker.rs"
 
 [[bin]]
-name = "audit-cold-drainer"
-path = "src/bin/audit-cold-drainer.rs"
+name = "projection-worker"
+path = "src/bin/projection-worker.rs"
 
 [[bin]]
-name = "pos-order-cold-drainer"
-path = "src/bin/pos-order-cold-drainer.rs"
+name = "storage-migrate"
+path = "src/bin/storage-migrate.rs"
+
+[[bin]]
+name = "reconstruct-organization"
+path = "src/bin/reconstruct-organization.rs"
 
 [dependencies]
-lumiere-contracts.workspace = true
+lumiere-contracts = { workspace = true, features = ["bindings"] }
 anyhow.workspace = true
 aes-gcm.workspace = true
 axum = { workspace = true, features = ["macros", "ws"] }

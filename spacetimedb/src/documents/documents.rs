@@ -10,20 +10,21 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::accounting::journal_entries::account_move;
 use crate::core::organization::require_company_in_organization;
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contacts::contact;
+use crate::documents::pack_locale::{
+    build_default_index_content, compute_purge_after, document_residency_region_for_company,
+    document_search_language_for_company, truncate_index_content, validate_fiscal_archive,
+};
 use crate::expenses::expenses::{expense_sheet, hr_expense};
 use crate::helpdesk::tickets::helpdesk_ticket;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::employees::hr_employee;
 use crate::inventory::product::product;
 use crate::projects::tasks::project_task;
 use crate::purchasing::purchase_orders::purchase_order;
 use crate::sales::sales_core::sale_order;
 use crate::subscriptions::tables::subscription;
-use crate::documents::pack_locale::{
-    build_default_index_content, compute_purge_after, document_residency_region_for_company,
-    document_search_language_for_company, truncate_index_content, validate_fiscal_archive,
-};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
 // TABLES
@@ -319,7 +320,9 @@ fn validate_blob_registration(
     }
     let mt = mimetype.trim().to_ascii_lowercase();
     if !ALLOWED_DOCUMENT_MIMETYPES.contains(&mt.as_str()) {
-        return Err(format!("mimetype '{mimetype}' is not an allowed document type"));
+        return Err(format!(
+            "mimetype '{mimetype}' is not an allowed document type"
+        ));
     }
     let checksum = checksum.trim();
     if checksum.is_empty() {
@@ -897,6 +900,48 @@ pub fn add_document_version(
             metadata: None,
         },
     );
+
+    let committed_document = ctx
+        .db
+        .document()
+        .id()
+        .find(&document_id)
+        .ok_or("Document disappeared before commit recording")?;
+    let mut committed_versions = Vec::new();
+    if let Some(old_version_id) = current_version_id {
+        if let Some(old_version) = ctx.db.document_version().id().find(&old_version_id) {
+            committed_versions.push(old_version);
+        }
+    }
+    committed_versions.push(
+        ctx.db
+            .document_version()
+            .id()
+            .find(&version.id)
+            .ok_or("New document version disappeared before commit recording")?,
+    );
+    committed_versions.sort_by_key(|version| version.id);
+    let mut changes = vec![RowChange::upsert_stdb_row(
+        "document",
+        serde_json::json!({"id": committed_document.id}),
+        &committed_document,
+    )?];
+    for version in &committed_versions {
+        changes.push(RowChange::upsert_stdb_row(
+            "document_version",
+            serde_json::json!({"id": version.id}),
+            version,
+        )?);
+    }
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.add_document_version".to_string(),
+            correlation_id: format!("document:{document_id}:version:{new_version_number}"),
+            changes,
+        },
+    )?;
 
     log::info!(
         "Document version added: doc={}, version={}",

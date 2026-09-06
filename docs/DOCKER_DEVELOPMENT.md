@@ -1,5 +1,9 @@
 # Docker development with OrbStack
 
+For the native fast E2E loop and CI build reuse, see the
+[build and CI guide](guides/build-and-ci-dx.md). These host-side improvements do
+not change the Docker development targets described below.
+
 The production [`docker-compose.yml`](../docker-compose.yml) remains unchanged.
 Use [`docker-compose.dev.yml`](../docker-compose.dev.yml) for local development:
 it runs the web app, Rust API, AI gateway, local SpacetimeDB, Qdrant, Redis,

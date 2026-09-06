@@ -104,7 +104,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8090/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+          "fetch('http://127.0.0.1:8090/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
         ]
       interval: 5s
       timeout: 4s
@@ -145,7 +145,7 @@ services:
       qdrant:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/health >/dev/null"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/health/ready >/dev/null"]
       interval: 10s
       timeout: 4s
       retries: 12
@@ -163,6 +163,7 @@ services:
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
       STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN in .env.docker}
       AI_GATEWAY_URL: http://ai-gateway:8080
+      AI_GATEWAY_REQUIRED: "true"
       LUMIERE_AI_GATEWAY_INTERNAL_SECRET: ${LUMIERE_AI_GATEWAY_INTERNAL_SECRET:?set LUMIERE_AI_GATEWAY_INTERNAL_SECRET in .env.docker}
       LUMIERE_REPORT_RENDERER_URL: http://chromium-worker:8090
       LUMIERE_REPORT_ARTIFACT_DIR: /var/lib/lumiere/owner-reports
@@ -257,24 +258,26 @@ services:
       retries: 12
       start_period: 20s
 
-  audit-cold-drainer:
+  projection-worker:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server --bin audit-cold-drainer'
+    command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server --bin projection-worker'
     environment:
       STDB_HOST: http://spacetimedb:3000
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
       STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN in .env.docker}
+      STDB_FINALIZATION_TOKEN: ${STDB_FINALIZATION_TOKEN:?set STDB_FINALIZATION_TOKEN in .env.docker}
       PG_HOST: postgres
       PG_PORT: 5432
       PG_DATABASE: ${PG_DATABASE:-lumiere}
       PG_USER: ${PG_USER:-lumiere}
       PG_PASSWORD: ${PG_PASSWORD:-lumiere}
       PG_TLS_MODE: disable
-      LUMIERE_AUDIT_DRAINER_POLL_SECS: ${LUMIERE_AUDIT_DRAINER_POLL_SECS:-5}
-      LUMIERE_AUDIT_DRAINER_BATCH: ${LUMIERE_AUDIT_DRAINER_BATCH:-200}
-      LUMIERE_AUDIT_DRAINER_PORT: 8094
+      LUMIERE_PROJECTION_WORKER_POLL_SECS: ${LUMIERE_PROJECTION_WORKER_POLL_SECS:-5}
+      LUMIERE_PROJECTION_WORKER_BATCH: ${LUMIERE_PROJECTION_WORKER_BATCH:-100}
+      LUMIERE_FINALIZATION_WORKER_BATCH: ${LUMIERE_FINALIZATION_WORKER_BATCH:-100}
+      LUMIERE_PROJECTION_WORKER_PORT: 8096
     volumes:
       - .:/workspace
       - cargo-target:/cargo-target
@@ -284,40 +287,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8094/health/ready >/dev/null"]
-      interval: 10s
-      timeout: 4s
-      retries: 12
-      start_period: 20s
-
-  pos-order-cold-drainer:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server --bin pos-order-cold-drainer'
-    environment:
-      STDB_HOST: http://spacetimedb:3000
-      STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
-      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN in .env.docker}
-      PG_HOST: postgres
-      PG_PORT: 5432
-      PG_DATABASE: ${PG_DATABASE:-lumiere}
-      PG_USER: ${PG_USER:-lumiere}
-      PG_PASSWORD: ${PG_PASSWORD:-lumiere}
-      PG_TLS_MODE: disable
-      LUMIERE_POS_ORDER_DRAINER_POLL_SECS: ${LUMIERE_POS_ORDER_DRAINER_POLL_SECS:-5}
-      LUMIERE_POS_ORDER_DRAINER_BATCH: ${LUMIERE_POS_ORDER_DRAINER_BATCH:-200}
-      LUMIERE_POS_ORDER_DRAINER_PORT: 8095
-    volumes:
-      - .:/workspace
-      - cargo-target:/cargo-target
-    depends_on:
-      spacetimedb:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8095/health/ready >/dev/null"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8096/health/ready >/dev/null"]
       interval: 10s
       timeout: 4s
       retries: 12

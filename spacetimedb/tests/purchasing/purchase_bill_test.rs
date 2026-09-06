@@ -8,6 +8,7 @@ use crate::accounting::journal_entries::{
     account_move, account_move_line, create_bill_from_purchase_order, AddAccountMoveLineParams,
     CreateBillFromPurchaseOrderParams,
 };
+use crate::core::organization::company;
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::inventory::product::product;
 use crate::purchasing::purchase_orders::{
@@ -22,6 +23,13 @@ pub fn test_po_confirm_to_balanced_bill(ctx: &ReducerContext) -> Result<(), Stri
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
 
     create_contact(
         ctx,
@@ -89,7 +97,7 @@ pub fn test_po_confirm_to_balanced_bill(ctx: &ReducerContext) -> Result<(), Stri
         CreatePurchaseOrderParams {
             company_id: Some(company_id),
             partner_id: vendor_id,
-            currency_id: 1,
+            currency_id,
             origin: Some("Harness PO".to_string()),
             partner_ref: Some("HARNESS-PO-001".to_string()),
             notes: None,
@@ -193,7 +201,7 @@ pub fn test_po_confirm_to_balanced_bill(ctx: &ReducerContext) -> Result<(), Stri
                 name: "Harness PO Purchase Journal".to_string(),
                 code: journal_code.clone(),
                 type_: JournalType::Purchase,
-                currency_id: Some(1),
+                currency_id: Some(currency_id),
                 default_account_id: Some(expense_id),
                 suspense_account_id: None,
                 loss_account_id: None,

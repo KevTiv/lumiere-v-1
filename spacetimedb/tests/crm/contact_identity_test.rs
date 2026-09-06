@@ -3,7 +3,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::core::audit::audit_log;
 use crate::core::organization::{company, create_company, CreateCompanyParams};
-use crate::core::users::user_profile;
+use crate::core::users::{find_user_profile_for_organization, user_profile};
 use crate::crm::contact_identities::{
     archive_contact_identity, configure_contact_identity_verification_authority,
     contact_identity_evidence_hash, contact_identity_verification_proof, contact_phone_identity,
@@ -19,6 +19,15 @@ use crate::crm::contact_roles::{
 use crate::crm::contacts::{contact, CreateContactParams};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{ContactIdentityKind, ContactVerificationState};
+
+fn company_currency_id(ctx: &ReducerContext, company_id: u64) -> Result<u64, String> {
+    ctx.db
+        .company()
+        .id()
+        .find(&company_id)
+        .map(|company| company.currency_id)
+        .ok_or_else(|| format!("Company {company_id} not found"))
+}
 
 pub fn test_phone_normalization(ctx: &ReducerContext) -> Result<(), String> {
     let _ = ctx;
@@ -286,7 +295,7 @@ pub fn test_identity_scope_and_state_forgery_rejected(ctx: &ReducerContext) -> R
         CreateCompanyParams {
             name: "Identity Isolation Company B".to_string(),
             code: format!("IDENTITY-B-{company_id}"),
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, company_id)?,
             fiscal_year_end_month: 12,
             fiscal_year_end_day: 31,
             is_parent: false,
@@ -442,10 +451,10 @@ pub fn test_identity_scope_and_state_forgery_rejected(ctx: &ReducerContext) -> R
 
 pub fn test_verify_and_archive_contact_identity(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
-    configure_contact_identity_verification_authority(ctx, ctx.sender())?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    configure_contact_identity_verification_authority(ctx, org_id, ctx.sender())?;
 
     create_contact(
         ctx,
@@ -611,30 +620,22 @@ pub fn test_verify_and_archive_contact_identity(ctx: &ReducerContext) -> Result<
         return Err("identity-mismatched verification proof should be rejected".to_string());
     }
 
-    let caller = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let caller = find_user_profile_for_organization(ctx, ctx.sender(), org_id)
         .ok_or("verification test caller profile missing")?;
     ctx.db
         .user_profile()
-        .identity()
+        .id()
         .update(crate::core::users::UserProfile {
             is_superuser: false,
             ..caller
         });
     let ordinary_writer_attempt =
         record_contact_identity_verification_proof(ctx, org_id, valid_proof.clone());
-    let ordinary_profile = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let ordinary_profile = find_user_profile_for_organization(ctx, ctx.sender(), org_id)
         .ok_or("verification test caller profile disappeared")?;
     ctx.db
         .user_profile()
-        .identity()
+        .id()
         .update(crate::core::users::UserProfile {
             is_superuser: true,
             ..ordinary_profile
@@ -905,7 +906,7 @@ pub fn test_contact_role_assignment_lifecycle(ctx: &ReducerContext) -> Result<()
         CreateCompanyParams {
             name: "Role Assignment Company B".to_string(),
             code: format!("ROLE-B-{company_id}"),
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, company_id)?,
             fiscal_year_end_month: 12,
             fiscal_year_end_day: 31,
             is_parent: false,

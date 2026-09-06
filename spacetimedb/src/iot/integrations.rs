@@ -49,7 +49,9 @@ pub fn link_device_to_workcenter(
         .find(&workcenter_id)
         .ok_or("Work center not found")?;
     if workcenter.organization_id != device.organization_id {
-        return Err("Work center does not belong to the same organization as the device".to_string());
+        return Err(
+            "Work center does not belong to the same organization as the device".to_string(),
+        );
     }
 
     ctx.db
@@ -112,7 +114,9 @@ pub fn link_device_to_location(
         .find(&location_id)
         .ok_or("Stock location not found")?;
     if location.organization_id != device.organization_id {
-        return Err("Stock location does not belong to the same organization as the device".to_string());
+        return Err(
+            "Stock location does not belong to the same organization as the device".to_string(),
+        );
     }
 
     ctx.db
@@ -175,7 +179,9 @@ pub fn link_device_to_pos(
         .find(&pos_config_id)
         .ok_or("POS configuration not found")?;
     if pos.company_id != device.company_id {
-        return Err("POS configuration does not belong to the same company as the device".to_string());
+        return Err(
+            "POS configuration does not belong to the same company as the device".to_string(),
+        );
     }
 
     ctx.db
@@ -238,7 +244,9 @@ pub fn link_device_to_quality_check(
         .find(&check_id)
         .ok_or("Quality check not found")?;
     if qc.organization_id != device.organization_id {
-        return Err("Quality check does not belong to the same organization as the device".to_string());
+        return Err(
+            "Quality check does not belong to the same organization as the device".to_string(),
+        );
     }
 
     ctx.db

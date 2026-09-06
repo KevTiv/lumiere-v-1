@@ -25,10 +25,7 @@ export const AUTH_BFF_REDUCERS = [
   "update_org_member_details",
   "update_org_member_role",
   "update_role",
-  "update_user_email",
   "update_user_organization_status",
-  "update_user_password",
-  "update_user_profile",
   "update_whatsapp_credentials",
 ] as const;
 
@@ -53,10 +50,7 @@ const AUTH_HINT_OVERRIDES: Partial<Record<AuthBffReducerKey, readonly string[]>>
   update_org_member_details: ["auth", "users"],
   update_org_member_role: ["auth", "user-roles", "users"],
   update_role: ["auth", "roles"],
-  update_user_email: ["auth"],
   update_user_organization_status: ["auth", "users"],
-  update_user_password: ["auth"],
-  update_user_profile: ["auth"],
   update_whatsapp_credentials: ["auth"],
 };
 

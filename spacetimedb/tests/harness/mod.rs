@@ -43,13 +43,15 @@ use crate::core::organization::{
     company, create_company, insert_organization_with_owner, organization, organization_settings,
     CreateCompanyParams, CreateOrganizationParams, OrganizationSettings,
 };
-use crate::crm::CRM_MULTI_COMPANY_FLAG;
 use crate::core::reference::{
-    create_currency, create_uom, create_uom_category, currency, uom, uom_cat, CreateCurrencyParams,
-    CreateUomCategoryParams, CreateUomParams,
+    create_currency, create_uom, create_uom_category, currency, seed_currency_for_organization,
+    uom, uom_cat, CreateCurrencyParams, CreateUomCategoryParams, CreateUomParams,
 };
-use crate::core::users::{user_profile, UserProfile};
+use crate::core::users::{
+    find_user_profile_for_identity, find_user_profile_for_organization, user_profile, UserProfile,
+};
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
+use crate::crm::CRM_MULTI_COMPANY_FLAG;
 use crate::inventory::product::{create_product, product, CreateProductParams};
 use crate::inventory::product_category::{
     create_product_category, product_category, CreateProductCategoryParams,
@@ -98,8 +100,6 @@ pub struct OrgFixture {
 impl OrgFixture {
     /// Seed org-scoped baseline data via domain reducers (plus one warehouse row aligned with `seed.rs`).
     pub fn seed_minimal(ctx: &ReducerContext) -> Result<Self, String> {
-        ensure_test_superuser(ctx)?;
-
         let suffix = unique_suffix(ctx);
         let org_code = format!("T{suffix}");
         let company_code = format!("C{suffix}");
@@ -125,6 +125,14 @@ impl OrgFixture {
             },
         )?;
         let organization_id = org.id;
+        // Organization creation establishes the caller's membership and
+        // organization-owned profile. Promote only after that profile exists;
+        // fresh C0 databases intentionally have no global/sentinel profile.
+        ensure_test_superuser_for_organization(ctx, organization_id)?;
+        // Canonical reference rows are tenant-owned. Seed them only after the
+        // organization exists so tests never depend on global/sentinel rows.
+        let currency_id = seed_currency_for_organization(ctx, organization_id, "USD")?.id;
+        seed_currency_for_organization(ctx, organization_id, "EUR")?;
 
         create_company(
             ctx,
@@ -132,7 +140,7 @@ impl OrgFixture {
             CreateCompanyParams {
                 name: format!("Test Company {suffix}"),
                 code: company_code.clone(),
-                currency_id: 1,
+                currency_id,
                 fiscal_year_end_month: 12,
                 fiscal_year_end_day: 31,
                 is_parent: false,
@@ -399,7 +407,7 @@ impl OrgFixture {
                 uom_po_id: uom_id,
                 standard_price: 10.0,
                 list_price: 20.0,
-                currency_id: 1,
+                currency_id,
                 default_code: Some(format!("HP-{suffix}")),
                 barcode: None,
                 description: None,
@@ -686,13 +694,12 @@ impl PurchasingIntegrityFixture {
     pub fn seed(ctx: &ReducerContext) -> Result<Self, String> {
         ensure_test_superuser(ctx)?;
 
-        let suffix = unique_suffix(ctx);
-        let currency_id = seed_distinctive_currency(ctx, suffix)?;
-
         // OrgFixture provides the fiscal and permission baseline required by the
         // accounting and inventory reducers. The purchasing scope below creates
         // a distinct legal entity rather than reusing its default company.
+        let suffix = unique_suffix(ctx);
         let primary_base = OrgFixture::seed_minimal(ctx)?;
+        let currency_id = seed_distinctive_currency(ctx, primary_base.organization_id, suffix)?;
         let primary = seed_purchasing_integrity_scope(
             ctx,
             primary_base.organization_id,
@@ -748,7 +755,11 @@ impl PurchasingIntegrityFixture {
     }
 }
 
-fn seed_distinctive_currency(ctx: &ReducerContext, suffix: u64) -> Result<u64, String> {
+fn seed_distinctive_currency(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    suffix: u64,
+) -> Result<u64, String> {
     const CURRENCY_CODE_SPACE: u64 = 26 * 26 * 26;
 
     fn currency_code(index: u64) -> String {
@@ -767,7 +778,12 @@ fn seed_distinctive_currency(ctx: &ReducerContext, suffix: u64) -> Result<u64, S
     let mut codes = Vec::with_capacity(2);
     for offset in 0..CURRENCY_CODE_SPACE {
         let code = currency_code(suffix.wrapping_add(offset));
-        if ctx.db.currency().code().find(&code).is_none() {
+        if ctx
+            .db
+            .currency()
+            .iter()
+            .all(|currency| currency.organization_id != organization_id || currency.code != code)
+        {
             codes.push(code);
             if codes.len() == 2 {
                 break;
@@ -786,6 +802,7 @@ fn seed_distinctive_currency(ctx: &ReducerContext, suffix: u64) -> Result<u64, S
     ] {
         create_currency(
             ctx,
+            organization_id,
             code.clone(),
             CreateCurrencyParams {
                 name: name.to_string(),
@@ -801,8 +818,8 @@ fn seed_distinctive_currency(ctx: &ReducerContext, suffix: u64) -> Result<u64, S
 
     ctx.db
         .currency()
-        .code()
-        .find(&codes[1])
+        .iter()
+        .find(|currency| currency.organization_id == organization_id && currency.code == codes[1])
         .map(|row| row.id)
         .ok_or("Harness: purchasing currency missing after create".into())
 }
@@ -1504,35 +1521,25 @@ fn assert_purchasing_scope_persisted(
 
 /// Elevate the caller to superuser so harness reducers pass permission checks.
 pub fn ensure_test_superuser(ctx: &ReducerContext) -> Result<(), String> {
-    if let Some(profile) = ctx.db.user_profile().identity().find(ctx.sender()) {
-        ctx.db.user_profile().identity().update(UserProfile {
+    if let Some(profile) = find_user_profile_for_identity(ctx, ctx.sender()) {
+        ctx.db.user_profile().id().update(UserProfile {
             is_superuser: true,
             ..profile
         });
-    } else {
-        ctx.db.user_profile().insert(UserProfile {
-            identity: ctx.sender(),
-            email: "harness@test.local".to_string(),
-            email_verified: false,
-            name: "Harness Tester".to_string(),
-            first_name: Some("Harness".to_string()),
-            last_name: Some("Tester".to_string()),
-            avatar_url: None,
-            phone: None,
-            mobile: None,
-            timezone: "UTC".to_string(),
-            language: "en".to_string(),
-            signature: None,
-            notification_preferences: None,
-            ui_preferences: None,
-            is_active: true,
-            is_superuser: true,
-            created_at: ctx.timestamp,
-            updated_at: ctx.timestamp,
-            last_login: Some(ctx.timestamp),
-            metadata: Some(r#"{"harness":true}"#.to_string()),
-        });
     }
+    Ok(())
+}
+
+fn ensure_test_superuser_for_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<(), String> {
+    let profile = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
+        .ok_or("Harness organization profile not found")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: true,
+        ..profile
+    });
     Ok(())
 }
 

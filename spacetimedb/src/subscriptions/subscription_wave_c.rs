@@ -11,12 +11,13 @@ use crate::accounting::relations::{require_active_currency_id, require_active_jo
 use crate::core::organization::company;
 use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::accounting::line_params::blank_journal_line;
 use crate::inventory::stock::require_product_in_org;
-use crate::subscriptions::reducers::validate_subscription_metadata;
 use crate::subscriptions::billing_helpers::{
-    blank_line, calculate_next_date, normalize_payment_mode, normalize_plan_billing_period,
+    calculate_next_date, normalize_payment_mode, normalize_plan_billing_period,
     normalize_rule_type, refresh_subscription_kpis, resolve_subscription_fx_rate,
 };
+use crate::subscriptions::reducers::validate_subscription_metadata;
 use crate::subscriptions::tables::{
     subscription, subscription_line, subscription_plan, Subscription, SubscriptionLine,
     SubscriptionPlan,
@@ -339,13 +340,13 @@ fn create_proration_adjustment_move(
 
     // OutInvoice: Dr AR / Cr income. OutRefund: Dr income / Cr AR.
     if is_credit {
-        let mut income = blank_line(income_account_id, label.to_string());
+        let mut income = blank_journal_line(income_account_id, label.to_string());
         income.debit = abs_amount;
         income.sequence = 0;
         income.partner_id = Some(subscription.partner_invoice_id);
         insert_draft_account_move_line(ctx, &move_record, income)?;
 
-        let mut receivable = blank_line(
+        let mut receivable = blank_journal_line(
             receivable_account_id,
             partner_display_name.unwrap_or_else(|| "Accounts Receivable".into()),
         );
@@ -354,13 +355,13 @@ fn create_proration_adjustment_move(
         receivable.partner_id = Some(subscription.partner_invoice_id);
         insert_draft_account_move_line(ctx, &move_record, receivable)?;
     } else {
-        let mut income = blank_line(income_account_id, label.to_string());
+        let mut income = blank_journal_line(income_account_id, label.to_string());
         income.credit = abs_amount;
         income.sequence = 0;
         income.partner_id = Some(subscription.partner_invoice_id);
         insert_draft_account_move_line(ctx, &move_record, income)?;
 
-        let mut receivable = blank_line(
+        let mut receivable = blank_journal_line(
             receivable_account_id,
             partner_display_name.unwrap_or_else(|| "Accounts Receivable".into()),
         );

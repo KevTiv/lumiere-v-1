@@ -2,8 +2,9 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::{
-    account_move, insert_draft_account_move_line, AccountMove, AddAccountMoveLineParams,
+    account_move, insert_draft_account_move_line, AccountMove,
 };
+use crate::accounting::line_params::blank_journal_line;
 use crate::accounting::relations::{
     require_active_account, require_active_journal, require_contact_in_scope,
 };
@@ -225,45 +226,6 @@ fn source_return_warehouse(
         })
         .map(|warehouse| warehouse.id)
         .ok_or_else(|| "Source receipt does not resolve to an active warehouse".to_string())
-}
-
-fn empty_move_line(account_id: u64, name: String) -> AddAccountMoveLineParams {
-    AddAccountMoveLineParams {
-        account_id,
-        name,
-        debit: 0.0,
-        credit: 0.0,
-        sequence: 0,
-        quantity: 1.0,
-        price_unit: 0.0,
-        discount: 0.0,
-        tax_ids: vec![],
-        partner_id: None,
-        product_id: None,
-        product_uom_id: None,
-        product_category_id: None,
-        analytic_account_id: None,
-        analytic_tag_ids: vec![],
-        display_type: None,
-        is_downpayment: false,
-        exclude_from_invoice_tab: false,
-        blocked: false,
-        group_tax_id: None,
-        tax_line_id: None,
-        tax_group_id: None,
-        tax_repartition_line_id: None,
-        tax_audit: None,
-        reconcile_model_id: None,
-        payment_id: None,
-        statement_line_id: None,
-        matching_number: None,
-        matching_label: None,
-        expected_pay_date: None,
-        expected_pay_date_currency_id: None,
-        expected_pay_date_amount: 0.0,
-        expected_pay_date_residual: 0.0,
-        metadata: None,
-    }
 }
 
 fn create_outgoing_return_picking(
@@ -819,7 +781,7 @@ pub fn create_vendor_credit_from_purchase_return(
             .find(&line.product_id)
             .ok_or("Product not found")?;
 
-        let mut expense = empty_move_line(params.expense_account_id, product.name.clone());
+        let mut expense = blank_journal_line(params.expense_account_id, product.name.clone());
         // Vendor credit (InRefund): credit expense, debit payable.
         expense.credit = subtotal;
         expense.debit = 0.0;
@@ -834,7 +796,7 @@ pub fn create_vendor_credit_from_purchase_return(
     }
 
     let amount_total = amount_untaxed;
-    let mut payable = empty_move_line(
+    let mut payable = blank_journal_line(
         params.payable_account_id,
         partner_display_name
             .clone()

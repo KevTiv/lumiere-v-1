@@ -227,6 +227,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "apply_organization_reconstruction_batch",
+      "exposure": "denied",
+      "reason": "trusted registered reconstruction service only; never exposed through the session BFF"
+    },
+    {
       "name": "apply_sale_order_options",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -385,6 +390,26 @@
       "name": "award_purchase_rfq_bid",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "begin_organization_reconstruction",
+      "exposure": "denied",
+      "reason": "trusted registered reconstruction service only; never exposed through the session BFF"
+    },
+    {
+      "name": "bind_password_reset_token",
+      "exposure": "denied",
+      "reason": "trusted API-server platform-control path only; never exposed through the session BFF"
+    },
+    {
+      "name": "bind_user_credential",
+      "exposure": "denied",
+      "reason": "trusted API-server platform-control path only; never exposed through the session BFF"
+    },
+    {
+      "name": "bind_user_profile",
+      "exposure": "denied",
+      "reason": "trusted API-server platform-control path only; never exposed through the session BFF"
     },
     {
       "name": "bill_timesheets",
@@ -632,6 +657,11 @@
       "name": "complete_productivity_log",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "complete_organization_reconstruction",
+      "exposure": "denied",
+      "reason": "trusted registered reconstruction service only; never exposed through the session BFF"
     },
     {
       "name": "complete_tax_deadline",
@@ -1021,8 +1051,7 @@
     {
       "name": "create_country",
       "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
+      "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
       "name": "create_credit_note_from_invoice",
@@ -1042,8 +1071,7 @@
     {
       "name": "create_currency",
       "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
+      "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
       "name": "create_currency_rate",
@@ -1390,12 +1418,6 @@
       "name": "create_partner_bank",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
-    },
-    {
-      "name": "create_password_reset_token",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
     },
     {
       "name": "create_payment",
@@ -2334,6 +2356,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "fail_organization_reconstruction",
+      "exposure": "denied",
+      "reason": "trusted registered reconstruction service only; never exposed through the session BFF"
+    },
+    {
       "name": "fail_warehouse_sync_intent",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2744,12 +2771,6 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
-      "name": "link_workos_user",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
-    },
-    {
       "name": "lock_document",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2793,6 +2814,11 @@
       "name": "mark_onboarding_done",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "mark_password_reset_token_projection_used",
+      "exposure": "denied",
+      "reason": "trusted API-server platform-control path only; never exposed through the session BFF"
     },
     {
       "name": "match_bank_line",
@@ -2963,6 +2989,11 @@
       "name": "promote_ai_skill_version",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "project_user_profile",
+      "exposure": "denied",
+      "reason": "trusted API-server platform-control projection only; organization and identity are server-derived"
     },
     {
       "name": "publish_form_configuration",
@@ -3380,6 +3411,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "run_c_0_organization_ownership_backfill",
+      "exposure": "denied",
+      "reason": "operator-only organization ownership migration; never exposed through the session BFF"
+    },
+    {
       "name": "run_cartonization",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3658,18 +3694,6 @@
       "name": "stop_timesheet_timer",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
-    },
-    {
-      "name": "store_sso_user_credential",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
-    },
-    {
-      "name": "store_user_credential",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
     },
     {
       "name": "submit_expense",
@@ -4423,9 +4447,8 @@
     },
     {
       "name": "update_user_email",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
+      "exposure": "denied",
+      "reason": "legacy direct projection mutation retired in favor of canonical platform-control profile updates"
     },
     {
       "name": "update_user_organization_status",
@@ -4434,16 +4457,9 @@
       "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
     },
     {
-      "name": "update_user_password",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
-    },
-    {
       "name": "update_user_profile",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
+      "exposure": "denied",
+      "reason": "legacy direct projection mutation retired in favor of canonical platform-control profile updates"
     },
     {
       "name": "update_vehicle_position",
@@ -4544,6 +4560,11 @@
       "name": "use_serial",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "validate_c_0_organization_ownership_backfill",
+      "exposure": "denied",
+      "reason": "operator-only organization ownership validation; never exposed through the session BFF"
     },
     {
       "name": "validate_budget",

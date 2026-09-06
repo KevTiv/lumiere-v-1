@@ -15,7 +15,7 @@ use crate::core::country_pack::{
 };
 use crate::core::organization::{company_id_from_scope, require_company_in_organization};
 use crate::core::permissions::role;
-use crate::core::users::{user_organization, user_profile};
+use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::crm::relationship_intel::mark_relationship_insight_stale;
 use crate::crm::require_single_company_crm_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
@@ -683,11 +683,7 @@ pub fn update_contact(
         changed_fields.push("is_partner".to_string());
     }
 
-    let user = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let user = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
         .ok_or("User not found")?;
     let user_org = ctx
         .db

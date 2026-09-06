@@ -12,10 +12,22 @@
 ///   - Real-time order processing
 ///   - Multiple payment support
 ///   - Loyalty point tracking
+use std::collections::BTreeSet;
+
 use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+/// Paid POS aggregates remain hot for thirty days before archive finalization.
+/// `cold_eligible_at` stores the end of this reviewed terminal window.
+pub(crate) const POS_ORDER_HOT_RETENTION: std::time::Duration =
+    std::time::Duration::from_secs(30 * 86_400);
+
+use crate::core::cold_tier::{
+    finalize_cooling, prove_durable_row, AggregateChildRef, AggregateFinalizationPlan,
+    AggregateRootRef, CoolingEligibilityFacts,
+};
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::iot::actions::queue_action_internal;
+use crate::iot::actions::{iot_action, queue_action_internal};
 use crate::iot::registry::iot_device;
 use crate::sales::pos_config::{pos_config, pos_loyalty_program, PosConfig};
 use crate::types::{CardState, PaymentStatus, PosOrderState, SessionState};
@@ -62,6 +74,22 @@ pub struct CreatePosPaymentParams {
     pub card_number: Option<String>,
     pub is_change: bool,
     pub is_tip: bool,
+}
+
+/// Server-only complete aggregate payload for rehydrating a cooled POS order.
+/// The API server obtains the rows from the placement-resolved durable
+/// projection and calls this reducer with the registered hydrator identity.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct HydratePosOrderAggregateParams {
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub placement_generation: u64,
+    pub schema_version: u32,
+    pub archive_version: u64,
+    pub payload_checksum: String,
+    pub order_json: String,
+    pub lines_json: Vec<String>,
+    pub payments_json: Vec<String>,
 }
 
 // ── Tables ────────────────────────────────────────────────────────────────────
@@ -115,6 +143,7 @@ pub struct PosSession {
     pub metadata: Option<String>,
 }
 
+#[derive(Clone)]
 #[table(
     accessor = pos_order,
     public,
@@ -196,6 +225,7 @@ pub struct PosOrder {
     pub archive_version: u64,
 }
 
+#[derive(Clone)]
 #[table(
     accessor = pos_order_line,
     public,
@@ -241,6 +271,7 @@ pub struct PosOrderLine {
     pub metadata: Option<String>,
 }
 
+#[derive(Clone)]
 #[table(
     accessor = pos_payment,
     public,
@@ -313,7 +344,7 @@ fn update_loyalty_points(
     partner_id: u64,
     points: f64,
     currency_id: u64,
-) -> Result<(), String> {
+) -> Result<Option<PosLoyaltyCard>, String> {
     let cards: Vec<_> = ctx
         .db
         .pos_loyalty_card()
@@ -330,6 +361,7 @@ fn update_loyalty_points(
     if let Some(card) = cards.into_iter().next() {
         let new_points = card.points + points;
         let new_balance = new_points * 0.01;
+        let card_id = card.id;
         ctx.db.pos_loyalty_card().id().update(PosLoyaltyCard {
             points: new_points,
             points_display: format!("{:.0} points", new_points),
@@ -338,9 +370,10 @@ fn update_loyalty_points(
             write_date: ctx.timestamp,
             ..card
         });
+        return Ok(ctx.db.pos_loyalty_card().id().find(&card_id));
     }
 
-    Ok(())
+    Ok(None)
 }
 
 // ── Reducers ──────────────────────────────────────────────────────────────────
@@ -789,7 +822,7 @@ pub fn create_pos_order(
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         metadata: None,
-        cold_eligible_at: Some(ctx.timestamp),
+        cold_eligible_at: Some(ctx.timestamp + POS_ORDER_HOT_RETENTION),
         archive_version: 1,
     });
 
@@ -822,27 +855,34 @@ pub fn create_pos_order(
         ..session
     });
 
-    if let Some(partner_id) = params.partner_id {
+    let updated_loyalty_card = if let Some(partner_id) = params.partner_id {
         if config.module_pos_loyalty {
-            let _ = update_loyalty_points(
+            update_loyalty_points(
                 ctx,
                 organization_id,
                 partner_id,
                 loyalty_points,
                 config.currency_id,
-            );
+            )?
+        } else {
+            None
         }
-    }
+    } else {
+        None
+    };
 
     // ── IoT hooks ─────────────────────────────────────────────────────────────
     // Push order total to any CustomerDisplay linked to this POS config
     // Initiate payment on any PaymentTerminal linked to this POS config
-    for device in ctx
+    let mut online_devices: Vec<_> = ctx
         .db
         .iot_device()
         .iter()
         .filter(|d| d.pos_config_id == Some(config.id) && d.status == "Online")
-    {
+        .collect();
+    online_devices.sort_by_key(|device| device.id);
+    let mut queued_iot_action_ids = Vec::new();
+    for device in online_devices {
         match device.device_type.as_str() {
             "CustomerDisplay" => {
                 let display_payload = serde_json::json!({
@@ -852,7 +892,7 @@ pub fn create_pos_order(
                     "lines": params.lines.len(),
                 })
                 .to_string();
-                queue_action_internal(
+                let action_id = queue_action_internal(
                     ctx,
                     organization_id,
                     device.company_id,
@@ -861,6 +901,7 @@ pub fn create_pos_order(
                     &display_payload,
                     "create_pos_order",
                 );
+                queued_iot_action_ids.push(action_id);
             }
             "PaymentTerminal" => {
                 // Only trigger payment terminal if payment method is card
@@ -874,7 +915,7 @@ pub fn create_pos_order(
                         "currency_id": config.currency_id,
                     })
                     .to_string();
-                    queue_action_internal(
+                    let action_id = queue_action_internal(
                         ctx,
                         organization_id,
                         device.company_id,
@@ -883,12 +924,13 @@ pub fn create_pos_order(
                         &payment_payload,
                         "create_pos_order",
                     );
+                    queued_iot_action_ids.push(action_id);
                 }
             }
             "ReceiptPrinter" => {
                 let receipt_payload =
                     serde_json::json!({ "order_id": order.id, "auto": true }).to_string();
-                queue_action_internal(
+                let action_id = queue_action_internal(
                     ctx,
                     organization_id,
                     device.company_id,
@@ -897,6 +939,7 @@ pub fn create_pos_order(
                     &receipt_payload,
                     "create_pos_order",
                 );
+                queued_iot_action_ids.push(action_id);
             }
             _ => {}
         }
@@ -917,6 +960,89 @@ pub fn create_pos_order(
         },
     );
 
+    let committed_session = ctx
+        .db
+        .pos_session()
+        .id()
+        .find(&params.session_id)
+        .ok_or("POS session disappeared before commit recording")?;
+    let committed_order = ctx
+        .db
+        .pos_order()
+        .id()
+        .find(&order.id)
+        .ok_or("POS order disappeared before commit recording")?;
+    let mut committed_lines: Vec<_> = ctx
+        .db
+        .pos_order_line()
+        .iter()
+        .filter(|line| line.organization_id == organization_id && line.order_id == order.id)
+        .collect();
+    committed_lines.sort_by_key(|line| line.id);
+    let mut committed_payments: Vec<_> = ctx
+        .db
+        .pos_payment()
+        .iter()
+        .filter(|payment| {
+            payment.organization_id == organization_id && payment.order_id == order.id
+        })
+        .collect();
+    committed_payments.sort_by_key(|payment| payment.id);
+    let mut changes = vec![RowChange::upsert_stdb_row(
+        "pos_session",
+        serde_json::json!({"id": committed_session.id}),
+        &committed_session,
+    )?];
+    changes.push(RowChange::upsert_stdb_row(
+        "pos_order",
+        serde_json::json!({"id": committed_order.id}),
+        &committed_order,
+    )?);
+    for line in &committed_lines {
+        changes.push(RowChange::upsert_stdb_row(
+            "pos_order_line",
+            serde_json::json!({"id": line.id}),
+            line,
+        )?);
+    }
+    for payment in &committed_payments {
+        changes.push(RowChange::upsert_stdb_row(
+            "pos_payment",
+            serde_json::json!({"id": payment.id}),
+            payment,
+        )?);
+    }
+    if let Some(loyalty_card) = updated_loyalty_card {
+        changes.push(RowChange::upsert_stdb_row(
+            "pos_loyalty_card",
+            serde_json::json!({"id": loyalty_card.id}),
+            &loyalty_card,
+        )?);
+    }
+    queued_iot_action_ids.sort_unstable();
+    for action_id in queued_iot_action_ids {
+        let action = ctx
+            .db
+            .iot_action()
+            .id()
+            .find(&action_id)
+            .ok_or("IoT action disappeared before commit recording")?;
+        changes.push(RowChange::upsert_stdb_row(
+            "iot_action",
+            serde_json::json!({"id": action.id}),
+            &action,
+        )?);
+    }
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.create_pos_order".to_string(),
+            correlation_id: format!("pos-session:{}:order:{}", params.session_id, order.id),
+            changes,
+        },
+    )?;
+
     Ok(())
 }
 
@@ -925,14 +1051,14 @@ pub fn create_pos_order(
 // ============================================================================
 //
 // Version-checked finalize, per the general (mutable-resource) protocol in
-// docs/plans/sliding-window-cold-tier.md §6.1 — unlike audit_log's checksum-
-// based finalize (audit_log is append-only with no archive_version/
-// cold_eligible_at concept), this is the "real" protocol every future
-// mutable archive candidate follows:
+// docs/plans/sliding-window-cold-tier.md §6.1. Audit-log cooling is disabled
+// because ordinary audit appends do not yet carry exact commit-watermark
+// evidence; this versioned protocol is the active C5 path:
 //
-//   1. worker reads (id, archive_version, cold_eligible_at, full payload);
-//   2. worker UPSERTs into PG, verifies the write;
-//   3. worker calls this reducer with the values it read in step 1;
+//   1. the C5 finalization service reads (id, archive_version,
+//      cold_eligible_at, full payload);
+//   2. it verifies the durable PG copy;
+//   3. it calls this reducer with the values it read in step 1;
 //   4. this reducer re-reads the row and deletes only if archive_version and
 //      cold_eligible_at are BOTH still exactly what the worker saw — proving
 //      no business mutation (or rehydration) happened in between.
@@ -943,24 +1069,38 @@ pub fn create_pos_order(
 // check exists anyway because a future mutator could change that, and the
 // finalize reducer must not silently stop protecting the row.
 
-/// Internal: delete a `pos_order` row once the pos-order cold drainer has
-/// durably UPSERTed and verified the exact same version in `cold_pos_order`.
+/// Internal: delete a `pos_order` row once the C5 finalization path has
+/// durably verified the exact same version.
 ///
-/// Called only by the registered pos-order drainer identity (see
-/// `core::cold_tier_identity`), never by frontend clients.
+/// Called only by the registered C5 finalization identity (see
+/// `core::cold_tier_identity`), never by frontend clients. A missing root is
+/// rejected because its organization cannot be authenticated in STDB; the
+/// worker reconciles ambiguous success from its durable transfer ledger.
 #[spacetimedb::reducer]
 pub fn finalize_pos_order_archive(
     ctx: &ReducerContext,
     id: u64,
     expected_archive_version: u64,
     expected_cold_eligible_at_micros: i64,
+    row_commit_sequence: u64,
+    durable_watermark: u64,
+    durable_change_schema_version: u32,
+    durable_contract_version: String,
 ) -> Result<(), String> {
+    let organization_id = ctx
+        .db
+        .pos_order()
+        .id()
+        .find(&id)
+        .map(|order| order.organization_id)
+        .ok_or("pos order was not found; refusing unscoped finalization")?;
     if !crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
         ctx,
-        crate::core::cold_tier_identity::POS_ORDER_COLD_DRAINER_SERVICE,
+        organization_id,
+        crate::core::cold_tier_identity::PROJECTION_WORKER_SERVICE,
     ) {
         return Err(
-            "finalize_pos_order_archive: caller is not the registered pos-order cold-drainer identity"
+            "finalize_pos_order_archive: caller is not the registered projection worker identity"
                 .to_string(),
         );
     }
@@ -970,18 +1110,25 @@ pub fn finalize_pos_order_archive(
         id,
         expected_archive_version,
         expected_cold_eligible_at_micros,
+        row_commit_sequence,
+        durable_watermark,
+        durable_change_schema_version,
+        &durable_contract_version,
     )
 }
 
 /// The version-check/deletion logic, split out so tests can exercise it
-/// directly — same reasoning as `audit::finalize_audit_log_archive_checked`:
-/// a single reducer invocation can't fake `ctx.sender()` as the registered
-/// drainer identity, so the identity gate is tested separately.
+/// directly. A single reducer invocation cannot fake `ctx.sender()` as the
+/// registered finalization identity, so the identity gate is tested separately.
 pub(crate) fn finalize_pos_order_archive_checked(
     ctx: &ReducerContext,
     id: u64,
     expected_archive_version: u64,
     expected_cold_eligible_at_micros: i64,
+    row_commit_sequence: u64,
+    durable_watermark: u64,
+    durable_change_schema_version: u32,
+    durable_contract_version: &str,
 ) -> Result<(), String> {
     let Some(row) = ctx.db.pos_order().id().find(id) else {
         // Already finalized by a prior/racing call.
@@ -1007,8 +1154,430 @@ pub(crate) fn finalize_pos_order_archive_checked(
         ));
     }
 
-    ctx.db.pos_order().id().delete(&id);
+    let root_commit = prove_durable_row(
+        ctx,
+        row.organization_id,
+        "pos_order",
+        &serde_json::json!({"id": row.id}).to_string(),
+        durable_watermark,
+    )?;
+    if root_commit.row_commit_sequence != row_commit_sequence
+        || root_commit.change_schema_version != durable_change_schema_version
+        || root_commit.contract_version != durable_contract_version
+    {
+        return Err(format!(
+            "pos_order {id}: worker durability proof disagrees with the authoritative STDB commit"
+        ));
+    }
+
+    let mut lines: Vec<_> = ctx
+        .db
+        .pos_order_line()
+        .pos_line_by_order()
+        .filter(id)
+        .collect();
+    lines.sort_by_key(|line| line.id);
+    let mut payments: Vec<_> = ctx
+        .db
+        .pos_payment()
+        .iter()
+        .filter(|payment| payment.order_id == id)
+        .collect();
+    payments.sort_by_key(|payment| payment.id);
+
+    let actual_line_ids = lines.iter().map(|line| line.id).collect::<Vec<_>>();
+    let actual_payment_ids = payments
+        .iter()
+        .map(|payment| payment.id)
+        .collect::<Vec<_>>();
+    let aggregate_membership_matches = actual_line_ids == row.lines
+        && actual_payment_ids == row.statement_ids
+        && lines
+            .iter()
+            .all(|line| line.organization_id == row.organization_id)
+        && payments.iter().all(|payment| {
+            payment.organization_id == row.organization_id && payment.company_id == row.company_id
+        });
+
+    for line in &lines {
+        prove_durable_row(
+            ctx,
+            row.organization_id,
+            "pos_order_line",
+            &serde_json::json!({"id": line.id}).to_string(),
+            durable_watermark,
+        )?;
+    }
+    for payment in &payments {
+        prove_durable_row(
+            ctx,
+            row.organization_id,
+            "pos_payment",
+            &serde_json::json!({"id": payment.id}).to_string(),
+            durable_watermark,
+        )?;
+    }
+
+    let payments_terminal = payments.iter().all(|payment| {
+        matches!(
+            payment.payment_status,
+            PaymentStatus::Done | PaymentStatus::Reversed | PaymentStatus::Cancelled
+        )
+    });
+    let terminal_state = matches!(
+        &row.state,
+        PosOrderState::Paid
+            | PosOrderState::Done
+            | PosOrderState::Invoiced
+            | PosOrderState::Cancelled
+    );
+    let is_cancelled = matches!(&row.state, PosOrderState::Cancelled);
+    let open_obligation = !is_cancelled
+        && (row.is_partially_paid
+            || row.amount_paid + 0.000_001 < row.amount_total
+            || !payments_terminal);
+    let active_workflow = row.to_invoice && row.account_move.is_none();
+    let facts = CoolingEligibilityFacts {
+        resource_policy_allows_cooling: true,
+        cold_eligible_at_micros: actual,
+        now_micros: ctx.timestamp.to_micros_since_unix_epoch(),
+        // `cold_eligible_at` is the reviewed eligibility instant, rather than
+        // the transaction creation timestamp. The worker may retain an
+        // eligible row longer, but it must never cool it before this instant.
+        minimum_age_micros: 0,
+        terminal_state,
+        open_obligation,
+        active_workflow,
+        hot_dependency: !aggregate_membership_matches,
+        projection_rebuildable: true,
+    };
+    let durable = root_commit.with_archive_version(row.archive_version, expected_archive_version);
+    let mut children = Vec::with_capacity(lines.len() + payments.len());
+    children.extend(lines.iter().map(|line| AggregateChildRef {
+        table_name: "pos_order_line".to_string(),
+        row_id: line.id,
+        parent_id: id,
+        organization_id: line.organization_id,
+    }));
+    children.extend(payments.iter().map(|payment| AggregateChildRef {
+        table_name: "pos_payment".to_string(),
+        row_id: payment.id,
+        parent_id: id,
+        organization_id: payment.organization_id,
+    }));
+    let plan = AggregateFinalizationPlan {
+        root: AggregateRootRef {
+            table_name: "pos_order".to_string(),
+            row_id: id,
+            organization_id: row.organization_id,
+        },
+        children,
+    };
+    // Deliberately do not emit organization-row-change deletes here. The
+    // durable PostgreSQL `pos_order_line` and `pos_payment` projections are
+    // the cooled aggregate members used by hydration; publishing deletes
+    // would erase those members after they leave the hot STDB working set.
+    // The root has the additional immutable `cold_pos_order` checksum/version
+    // proof written by the finalization worker.
+    finalize_cooling(&facts, &durable, &plan, |target| {
+        match target.table_name.as_str() {
+            "pos_order_line" => {
+                ctx.db.pos_order_line().id().delete(&target.row_id);
+                Ok(())
+            }
+            "pos_payment" => {
+                ctx.db.pos_payment().id().delete(&target.row_id);
+                Ok(())
+            }
+            "pos_order" => {
+                ctx.db.pos_order().id().delete(&target.row_id);
+                Ok(())
+            }
+            _ => Err("pos_order finalization plan contains an unsupported table".to_string()),
+        }
+    })
+}
+
+// ============================================================================
+// COLD-TIER HYDRATION
+// ============================================================================
+
+/// Internal reducer used by the API-server after it has fetched a complete,
+/// checksum-verified aggregate from the placement-resolved PG projection.
+///
+/// The service-identity check is essential: reducer arguments contain a
+/// durable snapshot, but a snapshot is not an authorization grant.  The
+/// reducer repeats every tenant, version, and membership check inside the
+/// transaction and inserts the aggregate atomically before normal business
+/// reducer logic is allowed to continue.
+#[spacetimedb::reducer]
+pub fn hydrate_pos_order_aggregate(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    placement_generation: u64,
+    schema_version: u32,
+    archive_version: u64,
+    payload_checksum: String,
+    order_json: String,
+    lines_json: Vec<String>,
+    payments_json: Vec<String>,
+) -> Result<(), String> {
+    if !crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
+        ctx,
+        organization_id,
+        crate::core::cold_tier_identity::POS_ORDER_HYDRATOR_SERVICE,
+    ) {
+        return Err(
+            "hydrate_pos_order_aggregate: caller is not the registered pos-order hydrator identity"
+                .to_string(),
+        );
+    }
+
+    hydrate_pos_order_aggregate_checked(
+        ctx,
+        HydratePosOrderAggregateParams {
+            organization_id,
+            company_id,
+            placement_generation,
+            schema_version,
+            archive_version,
+            payload_checksum,
+            order_json,
+            lines_json,
+            payments_json,
+        },
+    )
+}
+
+/// Transactional hydration logic split out for in-module reducer tests.
+pub(crate) fn hydrate_pos_order_aggregate_checked(
+    ctx: &ReducerContext,
+    params: HydratePosOrderAggregateParams,
+) -> Result<(), String> {
+    if params.organization_id == 0 || params.company_id == 0 {
+        return Err("hydration requires organization and company scope".to_string());
+    }
+    if params.placement_generation == 0 {
+        return Err("hydration placement generation must be non-zero".to_string());
+    }
+    if params.schema_version != 1 {
+        return Err(format!(
+            "hydration schema version {} is unsupported",
+            params.schema_version
+        ));
+    }
+    if params.archive_version == 0 {
+        return Err("hydration archive_version must be non-zero".to_string());
+    }
+    if params.payload_checksum.len() != 64
+        || !params
+            .payload_checksum
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err("hydration payload_checksum must be a sha-256 hex digest".to_string());
+    }
+
+    let spacetimedb_sats::serde::SerdeWrapper(order) =
+        serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PosOrder>>(&params.order_json)
+            .map_err(|error| format!("invalid hydration order payload: {error}"))?;
+    let lines: Vec<PosOrderLine> = params
+        .lines_json
+        .iter()
+        .map(|json| -> Result<PosOrderLine, String> {
+            let spacetimedb_sats::serde::SerdeWrapper(line) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PosOrderLine>>(json)
+                    .map_err(|error| format!("invalid hydration order-line payload: {error}"))?;
+            Ok(line)
+        })
+        .collect::<Result<_, _>>()?;
+    let payments: Vec<PosPayment> = params
+        .payments_json
+        .iter()
+        .map(|json| -> Result<PosPayment, String> {
+            let spacetimedb_sats::serde::SerdeWrapper(payment) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PosPayment>>(json)
+                    .map_err(|error| format!("invalid hydration payment payload: {error}"))?;
+            Ok(payment)
+        })
+        .collect::<Result<_, _>>()?;
+
+    if order.organization_id != params.organization_id || order.company_id != params.company_id {
+        return Err("hydration order organization/company scope mismatch".to_string());
+    }
+    if order.archive_version != params.archive_version {
+        return Err("hydration archive_version does not match order payload".to_string());
+    }
+    if order.cold_eligible_at.is_none() {
+        return Err("hydration order is not an eligible cooled row".to_string());
+    }
+
+    let line_ids = order.lines.iter().copied().collect::<BTreeSet<_>>();
+    if line_ids.len() != order.lines.len() || line_ids.len() != lines.len() {
+        return Err("hydration order-line membership is incomplete or duplicated".to_string());
+    }
+    let payment_ids = order.statement_ids.iter().copied().collect::<BTreeSet<_>>();
+    if payment_ids.len() != order.statement_ids.len() || payment_ids.len() != payments.len() {
+        return Err("hydration payment membership is incomplete or duplicated".to_string());
+    }
+    for line in &lines {
+        if !line_ids.contains(&line.id)
+            || line.organization_id != params.organization_id
+            || line.order_id != order.id
+        {
+            return Err(format!(
+                "hydration line {} has the wrong organization, parent, or membership",
+                line.id
+            ));
+        }
+    }
+    for payment in &payments {
+        if !payment_ids.contains(&payment.id)
+            || payment.organization_id != params.organization_id
+            || payment.company_id != params.company_id
+            || payment.order_id != order.id
+        {
+            return Err(format!(
+                "hydration payment {} has the wrong organization, company, parent, or membership",
+                payment.id
+            ));
+        }
+    }
+
+    // A retry after a successful transaction is a no-op only for the exact
+    // same aggregate. A same-ID, different-tenant or different-version row
+    // is a conflict and must never be overwritten by durable input.
+    if let Some(existing) = ctx.db.pos_order().id().find(&order.id) {
+        let mut existing_lines: Vec<_> = ctx
+            .db
+            .pos_order_line()
+            .pos_line_by_order()
+            .filter(&order.id)
+            .collect();
+        existing_lines.sort_by_key(|line| line.id);
+        let mut existing_payments: Vec<_> = ctx
+            .db
+            .pos_payment()
+            .iter()
+            .filter(|payment| payment.order_id == order.id)
+            .collect();
+        existing_payments.sort_by_key(|payment| payment.id);
+        let mut expected_lines = lines.clone();
+        expected_lines.sort_by_key(|line| line.id);
+        let mut expected_payments = payments.clone();
+        expected_payments.sort_by_key(|payment| payment.id);
+        let existing_line_json = existing_lines
+            .iter()
+            .map(sats_row_json)
+            .collect::<Result<Vec<_>, _>>()?;
+        let expected_line_json = expected_lines
+            .iter()
+            .map(sats_row_json)
+            .collect::<Result<Vec<_>, _>>()?;
+        let existing_payment_json = existing_payments
+            .iter()
+            .map(sats_row_json)
+            .collect::<Result<Vec<_>, _>>()?;
+        let expected_payment_json = expected_payments
+            .iter()
+            .map(sats_row_json)
+            .collect::<Result<Vec<_>, _>>()?;
+        if existing.organization_id != order.organization_id
+            || existing.company_id != order.company_id
+            || existing.archive_version != order.archive_version
+            || existing.lines != order.lines
+            || existing.statement_ids != order.statement_ids
+            || sats_row_json(&existing)? != sats_row_json(&order)?
+            || existing_lines.len() != expected_lines.len()
+            || existing_payments.len() != expected_payments.len()
+            || existing_line_json != expected_line_json
+            || existing_payment_json != expected_payment_json
+        {
+            return Err(format!(
+                "hydration target pos_order {} conflicts with an existing row",
+                order.id
+            ));
+        }
+        return Ok(());
+    }
+
+    for line in &lines {
+        if ctx.db.pos_order_line().id().find(&line.id).is_some() {
+            return Err(format!(
+                "hydration target line {} already exists without its order",
+                line.id
+            ));
+        }
+    }
+    for payment in &payments {
+        if ctx.db.pos_payment().id().find(&payment.id).is_some() {
+            return Err(format!(
+                "hydration target payment {} already exists without its order",
+                payment.id
+            ));
+        }
+    }
+
+    for line in &lines {
+        ctx.db.pos_order_line().insert(line.clone());
+    }
+    for payment in &payments {
+        ctx.db.pos_payment().insert(payment.clone());
+    }
+    ctx.db.pos_order().insert(order.clone());
+
+    let mut changes = Vec::with_capacity(1 + lines.len() + payments.len());
+    changes.push(RowChange::upsert_stdb_row(
+        "pos_order",
+        serde_json::json!({"id": order.id}),
+        &order,
+    )?);
+    changes.extend(
+        lines
+            .iter()
+            .map(|line| {
+                RowChange::upsert_stdb_row(
+                    "pos_order_line",
+                    serde_json::json!({"id": line.id}),
+                    line,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+    );
+    changes.extend(
+        payments
+            .iter()
+            .map(|payment| {
+                RowChange::upsert_stdb_row(
+                    "pos_payment",
+                    serde_json::json!({"id": payment.id}),
+                    payment,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+    );
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id: params.organization_id,
+            operation_id: "erp.hydrate_pos_order_aggregate".to_string(),
+            correlation_id: format!(
+                "pos-order-hydration:{}:{}",
+                order.id, params.archive_version
+            ),
+            changes,
+        },
+    )?;
     Ok(())
+}
+
+fn sats_row_json<T>(row: &T) -> Result<serde_json::Value, String>
+where
+    T: spacetimedb_sats::Serialize + ?Sized,
+{
+    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(row))
+        .map_err(|error| format!("serialize hydration row: {error}"))
 }
 
 #[reducer]

@@ -12,11 +12,16 @@ pub struct Config {
     pub stdb_module: String,
     /// Server/admin token for SQL fallback (same as `STDB_SERVER_TOKEN` in Next.js).
     pub stdb_server_token: Option<String>,
+    /// Dedicated projection/finalization worker token. It must be distinct from
+    /// `STDB_SERVER_TOKEN`; finalizer reducers authenticate its registered identity.
+    pub stdb_finalization_token: Option<String>,
     /// Allowed browser origins for CORS (comma-separated). Empty → common localhost dev URLs.
     pub cors_origins: Vec<String>,
     pub dev_mock_org_id: Option<u64>,
     /// AI gateway base URL (no trailing slash); proposals analyze proxies to `{url}/v1/rag`.
     pub ai_gateway_url: String,
+    /// Whether `/health/ready` must verify the AI gateway before reporting ready.
+    pub ai_gateway_required: bool,
     /// When set, password auth routes return 410 (same as Next.js + WorkOS).
     pub workos_client_id: Option<String>,
     /// AES-256 key for `stdb_token_enc` (32 bytes, 64 hex chars). Required for password auth.
@@ -81,12 +86,17 @@ impl Config {
 
         let stdb_server_token = std::env::var("STDB_SERVER_TOKEN")
             .ok()
+            .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty());
         if prod && stdb_server_token.is_none() {
             anyhow::bail!(
                 "STDB_SERVER_TOKEN must be set in production (SpacetimeDB server/admin JWT for HTTP SQL)"
             );
         }
+        let stdb_finalization_token = std::env::var("STDB_FINALIZATION_TOKEN")
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
 
         // CORS_ORIGINS: comma-separated http(s)://host:port; required for credentialed cross-origin
         // browser calls (wildcard * is invalid with credentials: include).
@@ -118,6 +128,9 @@ impl Config {
         }
         .trim_end_matches('/')
         .to_string();
+
+        let ai_gateway_required =
+            parse_ai_gateway_required(std::env::var("AI_GATEWAY_REQUIRED").ok().as_deref(), prod)?;
 
         if prod {
             let lower = ai_gateway_url.to_lowercase();
@@ -244,9 +257,11 @@ impl Config {
             stdb_host,
             stdb_module,
             stdb_server_token,
+            stdb_finalization_token,
             cors_origins,
             dev_mock_org_id,
             ai_gateway_url,
+            ai_gateway_required,
             workos_client_id,
             stdb_credential_encryption_key,
             resend_api_key,
@@ -270,5 +285,46 @@ impl Config {
             workflow_external_webhook_url,
             workflow_external_webhook_timeout_ms,
         })
+    }
+}
+
+fn parse_ai_gateway_required(raw: Option<&str>, production: bool) -> Result<bool> {
+    let default = production;
+    let Some(raw) = raw else {
+        return Ok(default);
+    };
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Ok(true),
+        "0" | "false" | "no" | "off" => Ok(false),
+        value => anyhow::bail!(
+            "AI_GATEWAY_REQUIRED must be a boolean (true/false or 1/0), got {value:?}"
+        ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_ai_gateway_required;
+
+    #[test]
+    fn ai_gateway_required_defaults_by_runtime() {
+        assert!(parse_ai_gateway_required(None, true).unwrap());
+        assert!(!parse_ai_gateway_required(None, false).unwrap());
+    }
+
+    #[test]
+    fn ai_gateway_required_accepts_explicit_boolean_values() {
+        for value in ["1", "true", "YES", "on"] {
+            assert!(parse_ai_gateway_required(Some(value), false).unwrap());
+        }
+        for value in ["0", "false", "NO", "off"] {
+            assert!(!parse_ai_gateway_required(Some(value), true).unwrap());
+        }
+    }
+
+    #[test]
+    fn ai_gateway_required_rejects_invalid_values() {
+        assert!(parse_ai_gateway_required(Some("maybe"), false).is_err());
+        assert!(parse_ai_gateway_required(Some(""), true).is_err());
     }
 }

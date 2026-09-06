@@ -4,7 +4,7 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::hr::employees::hr_employee;
+use crate::hr::relations::require_employee_in_scope;
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
@@ -111,27 +111,6 @@ pub struct CompleteOnboardingItemParams {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-fn assert_employee_scope(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    company_id: u64,
-    employee_id: u64,
-) -> Result<(), String> {
-    let emp = ctx
-        .db
-        .hr_employee()
-        .id()
-        .find(&employee_id)
-        .ok_or("Employee not found")?;
-    if emp.organization_id != organization_id {
-        return Err("Employee belongs to a different organization".to_string());
-    }
-    if emp.company_id != company_id {
-        return Err("Employee does not belong to this company".to_string());
-    }
-    Ok(())
-}
 
 pub fn find_active_onboarding_assignment(
     ctx: &ReducerContext,
@@ -272,7 +251,7 @@ pub fn assign_onboarding_template(
     params: AssignOnboardingTemplateParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_employee", "update")?;
-    assert_employee_scope(ctx, organization_id, company_id, employee_id)?;
+    require_employee_in_scope(ctx, organization_id, company_id, employee_id)?;
 
     let template = ctx
         .db
@@ -376,7 +355,7 @@ pub fn complete_onboarding_item(
     params: CompleteOnboardingItemParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_employee", "update")?;
-    assert_employee_scope(ctx, organization_id, company_id, employee_id)?;
+    require_employee_in_scope(ctx, organization_id, company_id, employee_id)?;
 
     let assignment = find_active_onboarding_assignment(ctx, employee_id)
         .ok_or("No active onboarding assignment — assign a template first".to_string())?;
@@ -442,7 +421,7 @@ pub fn mark_onboarding_done(
     employee_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_employee", "update")?;
-    assert_employee_scope(ctx, organization_id, company_id, employee_id)?;
+    require_employee_in_scope(ctx, organization_id, company_id, employee_id)?;
 
     let mut assignment = find_active_onboarding_assignment(ctx, employee_id)
         .ok_or("No active onboarding assignment — assign a template first".to_string())?;

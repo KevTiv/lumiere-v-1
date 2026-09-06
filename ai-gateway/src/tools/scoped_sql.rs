@@ -132,11 +132,7 @@ fn validate_row_scope(
     Ok(())
 }
 
-fn row_u64(row: &Value, camel: &str, snake: &str) -> Option<u64> {
-    row.get(camel)
-        .or_else(|| row.get(snake))
-        .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
-}
+use crate::wire_decode::row_u64;
 
 #[cfg(test)]
 mod tests {

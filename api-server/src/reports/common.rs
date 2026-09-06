@@ -150,7 +150,6 @@ pub struct GeneratedOwnerReportHistoryRow {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct GeneratedOwnerReportArtifactRow {
-    pub id: u64,
     pub company_id: u64,
     pub artifact_key: String,
 }

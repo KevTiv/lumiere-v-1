@@ -196,11 +196,7 @@ impl RigContext {
             .result
             .into_iter()
             .filter_map(|hit| {
-                let record = scoped_activity_record_from_payload(
-                    &hit.payload,
-                    org_id,
-                    company_id,
-                )?;
+                let record = scoped_activity_record_from_payload(&hit.payload, org_id, company_id)?;
                 Some(ContextHit {
                     score: hit.score,
                     record,
@@ -210,11 +206,17 @@ impl RigContext {
 
         Ok(hits)
     }
-
 }
 
-fn payload_string(payload: &HashMap<String, qdrant_client::qdrant::Value>, key: &str) -> Option<String> {
-    payload.get(key)?.as_str().cloned().filter(|value| !value.is_empty())
+fn payload_string(
+    payload: &HashMap<String, qdrant_client::qdrant::Value>,
+    key: &str,
+) -> Option<String> {
+    payload
+        .get(key)?
+        .as_str()
+        .cloned()
+        .filter(|value| !value.is_empty())
 }
 
 fn payload_u64(payload: &HashMap<String, qdrant_client::qdrant::Value>, key: &str) -> Option<u64> {
@@ -267,8 +269,7 @@ fn scoped_activity_record_from_payload(
     company_id: u64,
 ) -> Option<ActivityIndexRecord> {
     let record = activity_record_from_payload(payload)?;
-    (record.semantic.organization_id == organization_id
-        && record.semantic.company_id == company_id)
+    (record.semantic.organization_id == organization_id && record.semantic.company_id == company_id)
         .then_some(record)
 }
 
@@ -341,7 +342,10 @@ fn activity_scope_filter(org_id: u64, company_id: u64) -> Filter {
 mod tests {
     use super::*;
 
-    fn payload(organization_id: u64, company_id: u64) -> HashMap<String, qdrant_client::qdrant::Value> {
+    fn payload(
+        organization_id: u64,
+        company_id: u64,
+    ) -> HashMap<String, qdrant_client::qdrant::Value> {
         Payload::try_from(serde_json::json!({
             "organization_id": organization_id,
             "company_id": company_id,
@@ -379,9 +383,15 @@ mod tests {
         .expect("record");
         assert!(value.get("text").is_none());
         assert!(value.get("filename").is_none());
-        assert_eq!(value.get("organization_id").and_then(|v| v.as_u64()), Some(7));
+        assert_eq!(
+            value.get("organization_id").and_then(|v| v.as_u64()),
+            Some(7)
+        );
         assert_eq!(value.get("company_id").and_then(|v| v.as_u64()), Some(11));
-        assert_eq!(value.get("resource_id").and_then(|v| v.as_str()), Some("42"));
+        assert_eq!(
+            value.get("resource_id").and_then(|v| v.as_str()),
+            Some("42")
+        );
     }
 
     #[test]
@@ -419,12 +429,8 @@ mod tests {
         let accepted = scopes
             .into_iter()
             .filter(|(organization_id, company_id)| {
-                scoped_activity_record_from_payload(
-                    &payload(*organization_id, *company_id),
-                    7,
-                    11,
-                )
-                .is_some()
+                scoped_activity_record_from_payload(&payload(*organization_id, *company_id), 7, 11)
+                    .is_some()
             })
             .collect::<Vec<_>>();
 
@@ -433,18 +439,17 @@ mod tests {
 
     #[test]
     fn legacy_and_raw_content_payloads_fail_closed() {
-        let legacy: HashMap<String, qdrant_client::qdrant::Value> = Payload::try_from(
-            serde_json::json!({
+        let legacy: HashMap<String, qdrant_client::qdrant::Value> =
+            Payload::try_from(serde_json::json!({
                 "org_id": 7,
                 "entity_type": "sale_order",
                 "entity_id": "42",
                 "text": "secret",
                 "timestamp": 123,
                 "source": "sale_order"
-            }),
-        )
-        .expect("legacy payload")
-        .into();
+            }))
+            .expect("legacy payload")
+            .into();
         assert!(activity_record_from_payload(&legacy).is_none());
 
         let mut contaminated = payload(7, 11);

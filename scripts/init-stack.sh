@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Bootstrap the local OrbStack stack without putting a token or development
+# Bootstrap the local OrbStack stack without putting tokens or a development
 # secret in version control. The local owner token is created by the host CLI,
-# then used by the containers through .env.docker.
+# and a separate finalization identity is minted by the local server. Both are
+# passed to their intended containers through .env.docker.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -77,8 +78,22 @@ if [[ -z "$token" ]]; then
   exit 1
 fi
 
+echo "[init-stack] Minting a distinct local finalization-worker identity..."
+worker_identity_json="$(curl -fsS -X POST http://127.0.0.1:3000/v1/identity)"
+worker_token="$(WORKER_IDENTITY_JSON="$worker_identity_json" node -e '
+  const payload = JSON.parse(process.env.WORKER_IDENTITY_JSON ?? "{}");
+  if (typeof payload.token !== "string" || payload.token.length === 0) process.exit(1);
+  process.stdout.write(payload.token);
+')"
+unset worker_identity_json
+if [[ -z "$worker_token" || "$worker_token" == "$token" ]]; then
+  echo "Could not obtain a distinct local finalization-worker token" >&2
+  exit 1
+fi
+
 sed \
   -e "s|^STDB_SERVER_TOKEN=.*|STDB_SERVER_TOKEN=$token|" \
+  -e "s|^STDB_FINALIZATION_TOKEN=.*|STDB_FINALIZATION_TOKEN=$worker_token|" \
   -e "s|^STDB_TOKEN=.*|STDB_TOKEN=$token|" \
   "$env_file" >"$temp_file"
 chmod 600 "$temp_file"

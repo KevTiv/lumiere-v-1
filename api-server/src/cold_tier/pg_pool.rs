@@ -138,10 +138,9 @@ pub fn build_pool(config: &PgConfig) -> Result<Pool> {
         recycling_method: deadpool_postgres::RecyclingMethod::Fast,
     });
     deadpool_cfg.connect_timeout = Some(config.connect_timeout);
-    deadpool_cfg.pool = Some(PoolConfig {
-        max_size: config.pool_max,
-        ..Default::default()
-    });
+    let mut pool_config = PoolConfig::new(config.pool_max);
+    pool_config.timeouts.wait = Some(config.connect_timeout);
+    deadpool_cfg.pool = Some(pool_config);
 
     match config.tls_mode {
         PgTlsMode::Disable => {
@@ -188,18 +187,12 @@ fn rustls_config() -> Result<rustls::ClientConfig> {
 
 /// Process-wide cold-tier PG pool, built lazily on first use.
 ///
-/// Reads used by resource read paths (e.g. the audit-log merge in
-/// `cold_tier::audit_read`) call this instead of threading a pool through
-/// every `execute_resource_query*` call site — those call sites serve ~40
-/// resources and only one currently needs PG.
+/// Cold resource reads call this instead of threading a pool through every
+/// `execute_resource_query*` call site.
 ///
-/// If `PgConfig::from_env()`/`build_pool` fails (PG not configured, or a
-/// production TLS misconfiguration), this logs once and returns `None`
-/// forever for the life of the process — callers must treat that as "cold
-/// tier unavailable, hot-only" per the plan's failure-behavior table, not as
-/// a fatal error. This deliberately does not fail process startup: the cold
-/// tier is opt-in infrastructure that may not exist yet in a given
-/// environment (see `docs/plans/audit-log-cold-by-default.md`).
+/// The legacy optional accessor represents pool initialization, not permission
+/// to serve incomplete data. PG-dependent reads must use [`required_pool`].
+/// Configuration failures are cached until restart; readiness stays unhealthy.
 static SHARED_POOL: OnceLock<Option<Pool>> = OnceLock::new();
 
 pub fn shared_pool() -> Option<&'static Pool> {
@@ -207,11 +200,41 @@ pub fn shared_pool() -> Option<&'static Pool> {
         .get_or_init(|| match PgConfig::from_env().and_then(|cfg| build_pool(&cfg)) {
             Ok(pool) => Some(pool),
             Err(error) => {
-                tracing::warn!(%error, "cold-tier PG pool unavailable; cold reads will be hot-only");
+                tracing::error!(%error, "PostgreSQL pool unavailable; dependent requests must fail");
                 None
             }
         })
         .as_ref()
+}
+
+/// A missing durable store is an error, never an empty result set.
+pub fn required_pool() -> Result<&'static Pool> {
+    shared_pool().context("PostgreSQL pool is not configured correctly")
+}
+
+/// Bound both pool acquisition and a real database round trip for readiness.
+pub async fn check_ready() -> Result<()> {
+    bounded_readiness(Duration::from_secs(3), async {
+        let client = required_pool()?
+            .get()
+            .await
+            .context("acquire PostgreSQL readiness connection")?;
+        client
+            .simple_query("SELECT 1")
+            .await
+            .context("probe PostgreSQL readiness")?;
+        Ok(())
+    })
+    .await
+}
+
+async fn bounded_readiness(
+    timeout: Duration,
+    probe: impl std::future::Future<Output = Result<()>>,
+) -> Result<()> {
+    tokio::time::timeout(timeout, probe)
+        .await
+        .context("PostgreSQL readiness probe timed out")?
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +244,26 @@ pub fn shared_pool() -> Option<&'static Pool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn readiness_preserves_probe_failure_and_bounds_waiting() {
+        let failed = bounded_readiness(Duration::from_secs(1), async {
+            anyhow::bail!("database unavailable")
+        })
+        .await
+        .unwrap_err();
+        assert_eq!(failed.to_string(), "database unavailable");
+        let timed_out = bounded_readiness(
+            Duration::from_millis(1),
+            std::future::pending::<Result<()>>(),
+        )
+        .await
+        .unwrap_err();
+        assert!(timed_out.to_string().contains("timed out"));
+        assert!(bounded_readiness(Duration::from_secs(1), async { Ok(()) })
+            .await
+            .is_ok());
+    }
 
     #[test]
     fn parse_tls_mode() {

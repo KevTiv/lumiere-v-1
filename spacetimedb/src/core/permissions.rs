@@ -8,7 +8,7 @@
 ///          UserRoleAssignment links identities to roles within an organization.
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::users::user_organization;
+use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ============================================================================
@@ -351,13 +351,7 @@ pub(crate) fn build_policy_snapshot_row(
     organization_id: u64,
     user_identity: Identity,
 ) -> Result<PolicySnapshot, String> {
-    use crate::core::users::user_profile;
-
-    let user = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(user_identity)
+    let user = find_user_profile_for_organization(ctx, user_identity, organization_id)
         .ok_or("User not found")?;
 
     let user_org = ctx

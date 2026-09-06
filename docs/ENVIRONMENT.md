@@ -10,9 +10,11 @@ This doc summarizes how **SpacetimeDB**, **Next.js**, **api-server**, and **gate
 | `STDB_MODULE` | Same | Published database / module name (`spacetime publish <name>`). Also `NEXT_PUBLIC_STDB_MODULE`. |
 | `NEXT_PUBLIC_STDB_HOST` / `NEXT_PUBLIC_STDB_MODULE` | Browser bundle (inlined at build) | Client-side SDK connection; must match server for the same database. |
 | `STDB_SERVER_TOKEN` | Next server, api-server | JWT for HTTP SQL and admin reducer calls. |
+| `STDB_FINALIZATION_TOKEN` | projection-worker | Dedicated JWT registered as `projection_worker`; used only for finalizer reducer calls and must differ from `STDB_SERVER_TOKEN`. |
 | `LUMIERE_API_SERVER_URL` | Next `lib/api-server-forward.ts` | Internal base URL of the Rust api-server for Next routes that still perform local side effects before proxying (e.g. `http://api-server:8082`). In development, defaults to `http://127.0.0.1:8082` if unset. |
 | `LUMIERE_REDUCER_ALLOWLIST` | api-server | `strict` (production default) blocks bootstrap/test/import reducers on `POST /v1/call/{reducer}`; `off` disables filtering (local dev / e2e). |
 | `AI_GATEWAY_URL` | api-server | Internal AI gateway base URL. Required in production; must not be `localhost`. |
+| `AI_GATEWAY_REQUIRED` | api-server | Whether `/health/ready` requires the AI gateway (`true`/`false` or `1`/`0`). Defaults to `true` in production and `false` outside production. |
 | `STDB_TOKEN` | ai-gateway, iot-gateway | Service token for SpacetimeDB HTTP API (distinct from per-user tokens). |
 | `AI_CERTIFICATION_STDB_TOKEN` | ai-gateway | Dedicated SpacetimeDB token whose identity alone may claim and complete certification jobs. Required with `AI_CERTIFICATION_RUNTIME_HASH`. |
 | `AI_CERTIFICATION_RUNTIME_HASH` | ai-gateway | Immutable executor build/profile digest (`sha256:` plus 64 lowercase hex characters). Required with `AI_CERTIFICATION_STDB_TOKEN`. |
@@ -25,6 +27,7 @@ This doc summarizes how **SpacetimeDB**, **Next.js**, **api-server**, and **gate
 | `MISTRAL_API_KEY` / `GOOGLE_API_KEY` | Provider keys for LLM + embed when configured on `AiAgent` or `EMBEDDING_PROVIDER` |
 | `OLLAMA_URL` | Local Ollama for embed, vision, and chat |
 | `KONG_LLM_URL` | Optional internal Kong AI route for LLM chat (else direct provider HTTP) |
+| `KONG_LLM_READINESS_URL` | Optional exact non-generative Kong readiness endpoint; probed with `KONG_LLM_SERVICE_TOKEN` when set |
 | `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | BFF → gateway auth header |
 | `AI_CERTIFICATION_POLL_SECS` | Certification queue poll interval; defaults to `5` |
 | `AI_CERTIFICATION_BATCH_SIZE` | Maximum jobs considered per poll; defaults to `10` |
@@ -34,15 +37,39 @@ Tenant LLM provider/model selection is stored in SpacetimeDB `AiAgent` rows (Mis
 
 ## Modes
 
+### Health semantics
+
+The api-server exposes `GET /health` as liveness only; it does not contact SpacetimeDB or
+the AI gateway. `GET /health/ready` checks PostgreSQL readiness and SpacetimeDB, and checks
+the configured AI gateway when `AI_GATEWAY_REQUIRED=true`. Production defaults this
+switch to `true`; development defaults to `false` unless explicitly overridden.
+The development Compose stack explicitly enables it because that stack includes
+the AI gateway and its required stores.
+AI-gateway readiness uses Ollama's non-generative metadata endpoint and an exact
+operator-supplied `KONG_LLM_READINESS_URL` when configured. Mistral, Gemini,
+Unstructured, and Tavily are configuration-validated or runtime-observed;
+readiness never sends a billable model/search request.
+
 ### Local SpacetimeDB (`spacetime start`)
 
 - **Makefile:** `STDB_MODULE`, `STDB_CLOUD_MODULE`, `STDB_HOST` — see `make check-env`.
 - **Web:** Point `STDB_HOST` / `NEXT_PUBLIC_STDB_HOST` at `http://127.0.0.1:3000` (or your local server). Use a JWT from `spacetime login --server-issued-login local` for `STDB_SERVER_TOKEN`.
+- **Projection worker:** mint a second identity/token, register that identity as
+  `projection_worker` for each organization, and set it as
+  `STDB_FINALIZATION_TOKEN`. The worker refuses to start if it is missing or
+  equals `STDB_SERVER_TOKEN`.
 
 ### Maincloud
 
 - Set `STDB_HOST` / `NEXT_PUBLIC_STDB_HOST` to `https://maincloud.spacetimedb.com` (or `wss://` — it is normalized).
 - Set `STDB_MODULE` and `NEXT_PUBLIC_STDB_MODULE` to your published database name.
+- `make cloud-publish` builds once, publishes the CLI-optimized artifact after
+  removing non-runtime name/producer metadata, validates it, and fails locally
+  if it exceeds the guarded upload size.
+- The standalone module release profile uses size optimization, fat LTO, one
+  codegen unit, symbol stripping, and aborting panics before Binaryen runs.
+- Override `STDB_REMOTE_SERVER` with a configured standalone server nickname or
+  URL to use the same publish flow without Maincloud.
 
 ### Production (api-server)
 
@@ -83,6 +110,14 @@ Or use Makefile cloud targets with overrides:
 
 ```bash
 make publish-cloud STDB_MODULE=lumiere-staging STDB_CLOUD_MODULE=lumiere-staging
+```
+
+For a standalone remote server, supply the server explicitly:
+
+```bash
+make cloud-publish \
+  STDB_REMOTE_SERVER=https://stdb.example.com \
+  STDB_CLOUD_MODULE=lumiere-production
 ```
 
 **Data and seeding:** staging uses its own module — no production data. Seed tenants via the normal onboarding flow (`/onboarding` → `POST /api/bootstrap/tenant`). Do **not** rely on `seed_dev_data` in strict mode; use the dedicated bootstrap route (see [`PILOT_RUNBOOK.md`](PILOT_RUNBOOK.md) §2.1).

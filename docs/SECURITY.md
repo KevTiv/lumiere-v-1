@@ -13,7 +13,9 @@ Local dev has no in-process limiter yet; use Kong plugins or cloud WAF in produc
 ## Session policy
 
 - Browser sessions use `stdb_token` + `stdb_identity` cookies (30-day max-age in [api-server/src/routes/auth.rs](../api-server/src/routes/auth.rs)).
-- Rotate `STDB_SERVER_TOKEN` and `STDB_CREDENTIAL_ENCRYPTION_KEY` on compromise; force password reset for affected users.
+- Rotate `STDB_SERVER_TOKEN`, `STDB_FINALIZATION_TOKEN`, and
+  `STDB_CREDENTIAL_ENCRYPTION_KEY` on compromise; force password reset for
+  affected users.
 
 ## Session resolution (api-server)
 
@@ -24,6 +26,7 @@ User-facing `/v1/query/*` and `/v1/call/*` require an authenticated **user sessi
 | `Authorization: Bearer <jwt>` | Browser / API clients | Primary session token from sign-in |
 | `stdb_token` cookie | Browser BFF (`/api/*` → api-server) | Set by auth routes after successful sign-in |
 | `STDB_SERVER_TOKEN` | **Server-side only** | HTTP SQL, bootstrap/import routes, credential provisioning — **never** an implicit anonymous session |
+| `STDB_FINALIZATION_TOKEN` | **Projection worker only** | Registered service identity for archive-finalizer reducer calls; never grants private commit-table reads |
 | `x-stdb-identity` | Logging / hints only | **Not** trusted for access without a matching user JWT |
 | `DEV_MOCK_ORG_ID` | Local dev bypass | Ignored when `runtime_is_production()` is true ([api-server/src/config.rs](../api-server/src/config.rs)) |
 
@@ -45,8 +48,10 @@ Role-level enforcement for financial/inventory reducers (`post_account_move`, `v
 
 ## Secrets rotation checklist
 
-1. Generate new `STDB_SERVER_TOKEN` in SpacetimeDB dashboard.
-2. Update host `.env` and redeploy `web`, `api-server`, `ai-gateway`.
+1. Generate new `STDB_SERVER_TOKEN` and a distinct finalization-worker token in
+   SpacetimeDB, then register the latter identity as `projection_worker`.
+2. Update `STDB_SERVER_TOKEN` and `STDB_FINALIZATION_TOKEN` in the host secret
+   store and redeploy their consuming services.
 3. Rotate `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` across all three services simultaneously.
 4. Re-encrypt credentials if `STDB_CREDENTIAL_ENCRYPTION_KEY` changes (users must reset passwords).
 
@@ -63,8 +68,13 @@ See [api-server/src/reducer_allowlist.rs](../api-server/src/reducer_allowlist.rs
 
 ## Monitoring
 
-- Liveness: `GET /health`
-- Readiness: `GET /health/ready` (SpacetimeDB + ai-gateway)
+- api-server liveness: `GET /health`
+- api-server readiness: `GET /health/ready` (PostgreSQL, SpacetimeDB, and configured ai-gateway)
+- ai-gateway readiness: `GET /health/ready` on the gateway (SpacetimeDB, primary Qdrant, provider configuration, Ollama metadata, and any explicit Kong readiness endpoint)
+
+`/health` is liveness only. In production `AI_GATEWAY_REQUIRED` defaults to true, so
+gateway transport failures and non-success responses make readiness fail. Development
+defaults it to false unless explicitly overridden.
 - Metrics: `GET /metrics` (Prometheus text)
 
 ## Related

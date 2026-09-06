@@ -288,9 +288,10 @@ pub async fn post_rag(
     let org_id = req
         .org_id
         .ok_or_else(|| AppError::BadRequest("org_id is required for RAG generation".into()))?;
-    let company_is_in_scope = company_belongs_to_organization(state.stdb.as_ref(), org_id, req.company_id)
-        .await
-        .map_err(|error| AppError::Internal(error.to_string()))?;
+    let company_is_in_scope =
+        company_belongs_to_organization(state.stdb.as_ref(), org_id, req.company_id)
+            .await
+            .map_err(|error| AppError::Internal(error.to_string()))?;
     if !company_is_in_scope {
         return Err(AppError::Forbidden(
             "company does not belong to organization".into(),
@@ -317,17 +318,19 @@ pub async fn post_rag(
     let content_type_filter = (!include_types.is_empty()).then_some(include_types.as_slice());
     let mut retrieval_degraded = false;
     let company_result = match state.providers.embedder.embed(&req.query).await {
-        Ok(query_vector) => state
-            .vector_store
-            .search_content_types(
-                query_vector,
-                org_id,
-                req.company_id,
-                content_type_filter,
-                req.limit,
-                Some(0.65),
-            )
-            .await,
+        Ok(query_vector) => {
+            state
+                .vector_store
+                .search_content_types(
+                    query_vector,
+                    org_id,
+                    req.company_id,
+                    content_type_filter,
+                    req.limit,
+                    Some(0.65),
+                )
+                .await
+        }
         Err(error) => Err(error),
     };
     if let Err(error) = &company_result {

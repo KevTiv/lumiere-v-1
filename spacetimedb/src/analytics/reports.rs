@@ -12,6 +12,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::messaging::{mail_message, MailMessage};
 use crate::core::organization::{organization, require_company_in_organization};
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::core::queue::{enqueue_job_internal, EnqueueJobParams};
 use crate::core::users::user_organization;
 use crate::documents::documents::{document, document_version, Document, DocumentVersion};
@@ -363,9 +364,7 @@ fn validate_schedule_configuration(
             // ANL-002: when both the schedule and template carry a company scope, they must match
             if let (Some(report_company), Some(tmpl_company)) = (company_id, template.company_id) {
                 if report_company != tmpl_company {
-                    return Err(
-                        "Report template does not belong to this company".to_string(),
-                    );
+                    return Err("Report template does not belong to this company".to_string());
                 }
             }
             if params.recipients.is_empty() {
@@ -799,6 +798,52 @@ pub fn record_generated_owner_report(
             metadata: None,
         },
     );
+    let committed_document = ctx
+        .db
+        .document()
+        .id()
+        .find(&row.document_id)
+        .ok_or("Owner report document disappeared before commit recording")?;
+    let committed_version_id = committed_document
+        .current_version_id
+        .ok_or("Owner report document version missing before commit recording")?;
+    let committed_version = ctx
+        .db
+        .document_version()
+        .id()
+        .find(&committed_version_id)
+        .ok_or("Owner report version disappeared before commit recording")?;
+    let committed_report = ctx
+        .db
+        .generated_owner_report()
+        .id()
+        .find(&row.id)
+        .ok_or("Owner report disappeared before commit recording")?;
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.record_generated_owner_report".to_string(),
+            correlation_id: committed_report.correlation_id.clone(),
+            changes: vec![
+                RowChange::upsert_stdb_row(
+                    "document",
+                    serde_json::json!({"id": committed_document.id}),
+                    &committed_document,
+                )?,
+                RowChange::upsert_stdb_row(
+                    "document_version",
+                    serde_json::json!({"id": committed_version.id}),
+                    &committed_version,
+                )?,
+                RowChange::upsert_stdb_row(
+                    "generated_owner_report",
+                    serde_json::json!({"id": committed_report.id}),
+                    &committed_report,
+                )?,
+            ],
+        },
+    )?;
     Ok(())
 }
 
@@ -890,7 +935,12 @@ pub fn update_report_template(
     if let Some(tmpl_company) = tmpl.company_id {
         match company_id {
             Some(cid) if cid == tmpl_company => {}
-            _ => return Err("Company scope mismatch — provide the template's company_id to update it".to_string()),
+            _ => {
+                return Err(
+                    "Company scope mismatch — provide the template's company_id to update it"
+                        .to_string(),
+                )
+            }
         }
     }
 
@@ -1318,7 +1368,12 @@ pub fn update_metric_values(
     if let Some(metric_company) = metric.company_id {
         match company_id {
             Some(cid) if cid == metric_company => {}
-            _ => return Err("Company scope mismatch — provide the metric's company_id to update it".to_string()),
+            _ => {
+                return Err(
+                    "Company scope mismatch — provide the metric's company_id to update it"
+                        .to_string(),
+                )
+            }
         }
     }
 

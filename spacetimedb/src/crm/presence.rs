@@ -4,7 +4,7 @@
 /// currently viewing/editing a given opportunity so clients can render avatars/cursors.
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
-use crate::core::users::user_profile;
+use crate::core::users::find_user_profile_for_organization;
 use crate::crm::opportunities::opportunity;
 use crate::crm::require_single_company_crm_scope;
 use crate::helpers::check_permission;
@@ -46,11 +46,7 @@ pub fn update_opportunity_presence(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "opportunity", "read")?;
 
-    let user = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let user = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
         .ok_or("user not found")?;
 
     let opp = ctx

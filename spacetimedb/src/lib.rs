@@ -47,9 +47,10 @@
 /// 4. Add `pub mod <domain>;` below in this file
 /// 5. Use `crate::helpers::check_permission` and `crate::helpers::write_audit_log`
 ///    for multi-tenancy and auditing
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::ReducerContext;
 
 // ── Shared utilities ─────────────────────────────────────────────────────────
+mod generated_reconstruction_apply;
 pub mod helpers;
 pub mod types;
 
@@ -163,9 +164,15 @@ pub mod helpdesk_tests;
 #[path = "../tests/integrations/mod.rs"]
 pub mod integrations_tests;
 
+/// Data-operations tests — call `run_data_ops_commit_test` reducer.
+#[path = "../tests/data_ops/mod.rs"]
+pub mod data_ops_tests;
+
 use crate::core::migrations::apply_pending_global_migrations;
-use crate::core::reference::{currency, Currency};
-use crate::core::users::{user_profile, user_session, UserProfile, UserSession};
+use crate::core::users::{
+    ensure_user_profile_for_organization, find_user_profile_for_identity, user_organization,
+    user_profile, user_session, UserProfile, UserSession,
+};
 use crate::crm::presence::opportunity_presence;
 use crate::proposals::proposals::proposal_presence;
 
@@ -200,7 +207,9 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
     analytics_tests::run_all_analytics_tests(ctx).map_err(|e| format!("analytics: {e}"))?;
     iot_tests::run_all_iot_tests(ctx).map_err(|e| format!("iot: {e}"))?;
     helpdesk_tests::run_all_helpdesk_tests(ctx).map_err(|e| format!("helpdesk: {e}"))?;
-    integrations_tests::run_all_integrations_tests(ctx).map_err(|e| format!("integrations: {e}"))?;
+    integrations_tests::run_all_integrations_tests(ctx)
+        .map_err(|e| format!("integrations: {e}"))?;
+    data_ops_tests::run_data_ops_commit_test(ctx).map_err(|e| format!("data_ops: {e}"))?;
     log::info!("✅ run_all_domain_tests complete");
     Ok(())
 }
@@ -211,30 +220,6 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
 /// Use this to seed system roles, default currencies, etc.
 #[spacetimedb::reducer(init)]
 pub fn init(ctx: &ReducerContext) {
-    // Seed the onboarding catalog while leaving numeric identities to the database.
-    for (code, name, symbol, decimal_places, rounding_factor) in [
-        ("USD", "US Dollar", "$", 2, 0.01),
-        ("EUR", "Euro", "€", 2, 0.01),
-        ("GBP", "British Pound", "£", 2, 0.01),
-        ("CAD", "Canadian Dollar", "C$", 2, 0.01),
-        ("AUD", "Australian Dollar", "A$", 2, 0.01),
-        ("JPY", "Japanese Yen", "¥", 0, 1.0),
-    ] {
-        if ctx.db.currency().code().find(&code.to_string()).is_none() {
-            ctx.db.currency().insert(Currency {
-                id: 0,
-                code: code.to_string(),
-                name: name.to_string(),
-                symbol: symbol.to_string(),
-                decimal_places,
-                rounding_factor,
-                active: true,
-                position: "before".to_string(),
-                created_at: ctx.timestamp,
-                metadata: Some(r#"{"seed":"init"}"#.to_string()),
-            });
-        }
-    }
     if let Err(error) = apply_pending_global_migrations(ctx) {
         log::warn!("Global migrations skipped during init: {error}");
     }
@@ -242,38 +227,32 @@ pub fn init(ctx: &ReducerContext) {
 }
 
 /// Called every time a client connects.
-/// Creates a minimal UserProfile on first connection; updates `last_login` otherwise.
+/// Updates the organization-owned profile on connection. A newly provisioned
+/// identity has no ERP profile until it joins its first organization; this
+/// prevents a shared/sentinel global profile row from being created.
 #[spacetimedb::reducer(client_connected)]
 pub fn identity_connected(ctx: &ReducerContext) {
-    if let Some(profile) = ctx.db.user_profile().identity().find(ctx.sender()) {
-        ctx.db.user_profile().identity().update(UserProfile {
+    if let Some(profile) = find_user_profile_for_identity(ctx, ctx.sender()) {
+        ctx.db.user_profile().id().update(UserProfile {
             last_login: Some(ctx.timestamp),
             updated_at: ctx.timestamp,
             ..profile
         });
-    } else {
-        ctx.db.user_profile().insert(UserProfile {
-            identity: ctx.sender(),
-            email: String::new(),
-            email_verified: false,
-            name: String::new(),
-            first_name: None,
-            last_name: None,
-            avatar_url: None,
-            phone: None,
-            mobile: None,
-            timezone: "UTC".to_string(),
-            language: "en".to_string(),
-            signature: None,
-            notification_preferences: None,
-            ui_preferences: None,
-            is_active: true,
-            is_superuser: false,
-            created_at: ctx.timestamp,
-            updated_at: ctx.timestamp,
-            last_login: Some(ctx.timestamp),
-            metadata: None,
-        });
+    } else if let Some(membership) = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|membership| membership.is_active && membership.is_default)
+        .or_else(|| {
+            ctx.db
+                .user_organization()
+                .user_org_by_user()
+                .filter(&ctx.sender())
+                .find(|membership| membership.is_active)
+        })
+    {
+        ensure_user_profile_for_organization(ctx, ctx.sender(), membership.organization_id);
     }
 }
 

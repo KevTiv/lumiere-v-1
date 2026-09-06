@@ -2,15 +2,20 @@
 
 mod auth_password;
 pub mod cold_tier;
+mod commands;
 pub mod config;
 pub mod document_blobs;
+mod document_render;
 pub mod domain_queries;
 pub mod error;
 pub mod expense_integration_worker;
 pub mod hr_integration_worker;
+pub mod integration_worker;
 pub mod metrics;
 mod middleware;
+pub mod organization_placement;
 pub mod owner_report_worker;
+pub mod platform_control;
 pub mod project_integration_worker;
 pub mod query_exec;
 pub mod realtime;
@@ -39,14 +44,24 @@ pub async fn run_expense_integration_worker() -> anyhow::Result<()> {
     expense_integration_worker::serve().await
 }
 
-/// Run the standalone audit-log cold-tier drainer service.
-pub async fn run_audit_cold_drainer() -> anyhow::Result<()> {
-    cold_tier::audit_drainer::serve().await
+/// Run the standalone bounded SpacetimeDB-to-PostgreSQL projection worker.
+pub async fn run_projection_worker() -> anyhow::Result<()> {
+    cold_tier::projection_worker::serve().await
 }
 
-/// Run the standalone pos-order cold-tier drainer service.
-pub async fn run_pos_order_cold_drainer() -> anyhow::Result<()> {
-    cold_tier::pos_order_drainer::serve().await
+/// Apply all checksum-verified PostgreSQL storage migrations and exit.
+pub async fn run_storage_migrations() -> anyhow::Result<()> {
+    let config = cold_tier::pg_pool::PgConfig::from_env()?;
+    let pool = cold_tier::pg_pool::build_pool(&config)?;
+    cold_tier::migrate::ensure_schema(&pool).await
+}
+
+/// Run one trusted PostgreSQL-to-SpacetimeDB organization reconstruction.
+pub async fn run_organization_reconstruction(organization_id: u64) -> anyhow::Result<()> {
+    let report =
+        cold_tier::reconstruction::run_organization_reconstruction(organization_id).await?;
+    println!("{}", serde_json::to_string_pretty(&report)?);
+    Ok(())
 }
 
 /// Run the standalone project payroll/calendar/e-invoice intent worker service.

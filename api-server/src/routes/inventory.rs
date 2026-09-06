@@ -49,7 +49,7 @@ async fn pickings_post(
             json!([org_id, body])
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Stock picking created successfully" } })),

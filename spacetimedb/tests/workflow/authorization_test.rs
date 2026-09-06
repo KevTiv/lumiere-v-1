@@ -407,7 +407,7 @@ fn rejects_expired_delegation_at_decision_time(ctx: &ReducerContext) -> Result<(
 
 fn records_explicit_superuser_bypass(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = OrgFixture::seed_minimal(ctx)?;
-    let superuser = seed_profile(ctx, true);
+    let superuser = seed_profile(ctx, fixture.organization_id, true);
     let decision = authorize_workflow_decision_for_actor(
         ctx,
         superuser,
@@ -481,7 +481,7 @@ fn seed_member(
     membership_active: bool,
     superuser: bool,
 ) -> Identity {
-    let identity = seed_profile(ctx, superuser);
+    let identity = seed_profile(ctx, organization_id, superuser);
     ctx.db.user_organization().insert(UserOrganization {
         id: 0,
         user_identity: identity,
@@ -499,10 +499,13 @@ fn seed_member(
     identity
 }
 
-fn seed_profile(ctx: &ReducerContext, superuser: bool) -> Identity {
+fn seed_profile(ctx: &ReducerContext, organization_id: u64, superuser: bool) -> Identity {
     let identity = new_identity(ctx);
     ctx.db.user_profile().insert(UserProfile {
+        id: 0,
         identity,
+        platform_user_id: format!("test-{}", identity.to_hex()),
+        organization_id,
         email: format!("{}@workflow.test", identity.to_hex()),
         email_verified: true,
         name: "Workflow test user".to_string(),
@@ -547,13 +550,20 @@ fn delegation(
 }
 
 fn seed_second_company(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, String> {
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&fixture.company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
     create_company(
         ctx,
         fixture.organization_id,
         CreateCompanyParams {
             name: format!("Workflow Company {}", ctx.rng().gen::<u64>()),
             code: format!("WF{}", ctx.rng().gen::<u32>()),
-            currency_id: 1,
+            currency_id,
             fiscal_year_end_month: 12,
             fiscal_year_end_day: 31,
             is_parent: false,

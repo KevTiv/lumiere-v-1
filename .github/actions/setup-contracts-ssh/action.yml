@@ -1,0 +1,33 @@
+name: Setup contracts SSH
+description: Configure read-only SSH for the private lumiere-contracts git dependency
+
+inputs:
+  deploy-key:
+    description: SSH deploy key for lumiere-contracts repo
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Generated STDB bindings + manifests live in the private
+    # KevTiv/lumiere-contracts repo, consumed as a tag-pinned git
+    # dependency. This runner needs read-only SSH access to fetch it. The
+    # deploy key on lumiere-contracts is read-only, so a compromised
+    # secret here cannot write to that repo. github.com's SSH host key is
+    # pinned to the value GitHub publishes rather than trusted on first
+    # use. See docs/plans/contracts-extraction-execution-plan.md.
+    - name: Configure SSH for private lumiere-contracts dependency
+      shell: bash
+      env:
+        DEPLOY_KEY: ${{ inputs.deploy-key }}
+      run: |
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        echo "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+        echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
+        chmod 600 ~/.ssh/known_hosts
+        eval "$(ssh-agent -s)"
+        ssh-add ~/.ssh/id_ed25519
+        echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+        echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"

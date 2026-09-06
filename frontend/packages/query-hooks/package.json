@@ -12,6 +12,9 @@
     "./ai-ui-context": "./src/ai-ui-context.ts",
     "./action-draft-intent": "./src/action-draft-intent.ts",
     "./erp-ai-selection-context": "./src/erp-ai-selection-context.tsx",
+    "./hooks/hr": "./src/hooks/hr/index.ts",
+    "./hooks/inventory": "./src/hooks/inventory/index.ts",
+    "./hooks/accounting": "./src/hooks/accounting/index.ts",
     "./hooks/*": "./src/hooks/*.ts"
   },
   "scripts": {
@@ -20,7 +23,7 @@
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
-    "@lumiere/contracts": "github:KevTiv/lumiere-contracts#v0.3.25&path:packages/contracts",
+    "@lumiere/contracts": "github:KevTiv/lumiere-contracts#v0.3.33&path:packages/contracts",
     "@lumiere/erp-session": "workspace:*",
     "@lumiere/erp-shared": "workspace:*",
     "@lumiere/i18n": "workspace:*",

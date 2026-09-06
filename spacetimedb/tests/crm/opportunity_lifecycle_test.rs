@@ -4,6 +4,8 @@
 /// (mirrors `seed.rs`) so `convert_opportunity_to_sale_order` can find a won stage.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::organization::company;
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::core::reference::currency;
 use crate::crm::opportunities::{
     convert_opportunity_to_sale_order, create_opportunity, create_opportunity_line, opp_stage,
@@ -17,13 +19,26 @@ use crate::sales::sales_core::{sale_order, sale_order_line};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::DiscountPolicy;
 
-fn persisted_currency_id(ctx: &ReducerContext, code: &str) -> Result<u64, String> {
+fn persisted_currency_id(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    code: &str,
+) -> Result<u64, String> {
     ctx.db
         .currency()
-        .code()
-        .find(&code.to_string())
+        .iter()
+        .find(|currency| currency.organization_id == organization_id && currency.code == code)
         .map(|currency| currency.id)
         .ok_or_else(|| format!("{code} currency not found"))
+}
+
+fn company_currency_id(ctx: &ReducerContext, company_id: u64) -> Result<u64, String> {
+    ctx.db
+        .company()
+        .id()
+        .find(&company_id)
+        .map(|company| company.currency_id)
+        .ok_or_else(|| format!("Company {company_id} not found"))
 }
 
 pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<(), String> {
@@ -31,6 +46,7 @@ pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<()
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let currency_id = company_currency_id(ctx, company_id)?;
 
     let stage_qualify = ctx.db.opp_stage().insert(OpportunityStage {
         id: 0,
@@ -66,7 +82,7 @@ pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<()
         CreatePricelistParams {
             company_id: None,
             name: "Harness CRM Pricelist".to_string(),
-            currency_id: 1,
+            currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -100,7 +116,7 @@ pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<()
             user_id: None,
             team_id: None,
             company_id: Some(company_id),
-            company_currency_id: Some(1),
+            company_currency_id: Some(currency_id),
             lost_reason_id: None,
             date_open: Some(ctx.timestamp),
             date_closed: None,
@@ -189,6 +205,49 @@ pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<()
         return Err("Expected sale order linked to opportunity after convert".to_string());
     }
 
+    let order = ctx
+        .db
+        .sale_order()
+        .iter()
+        .find(|order| order.organization_id == org_id && order.opportunity_id == Some(opp.id))
+        .ok_or("Expected converted sale order row")?;
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == org_id
+                && commit.operation_id == "erp.convert_opportunity_to_sale_order"
+                && commit.correlation_id
+                    == format!("opportunity:{}:sale-order:{}", opp.id, order.id)
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 3 {
+        return Err(format!("CRM conversion commit mismatch: {}", commits.len()));
+    }
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == org_id && change.commit_sequence == commits[0].sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables != ["opportunity", "sale_order", "sale_order_line"]
+        || changes
+            .iter()
+            .any(|change| change.organization_id != org_id)
+    {
+        return Err(format!(
+            "CRM conversion row order/scope mismatch: {tables:?}"
+        ));
+    }
+
     Ok(())
 }
 
@@ -198,7 +257,7 @@ pub fn test_convert_opp_missing_currency_fail_closed(ctx: &ReducerContext) -> Re
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
-    let distinct_currency_id = persisted_currency_id(ctx, "EUR")?;
+    let distinct_currency_id = persisted_currency_id(ctx, org_id, "EUR")?;
 
     let _stage_qualify = ctx.db.opp_stage().insert(OpportunityStage {
         id: 0,
@@ -370,7 +429,7 @@ pub fn test_convert_opp_missing_uom_fail_closed(ctx: &ReducerContext) -> Result<
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
-    let distinct_currency_id = persisted_currency_id(ctx, "EUR")?;
+    let distinct_currency_id = persisted_currency_id(ctx, org_id, "EUR")?;
 
     let stage_qualify = ctx.db.opp_stage().insert(OpportunityStage {
         id: 0,
@@ -544,7 +603,7 @@ pub fn test_convert_opp_distinctive_currency_uom(ctx: &ReducerContext) -> Result
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
-    let distinct_currency_id = persisted_currency_id(ctx, "EUR")?;
+    let distinct_currency_id = persisted_currency_id(ctx, org_id, "EUR")?;
 
     let product = ctx
         .db
@@ -717,6 +776,7 @@ pub fn test_create_opportunity_line_on_unscoped_opportunity(
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let currency_id = company_currency_id(ctx, company_id)?;
 
     let stage = ctx.db.opp_stage().insert(OpportunityStage {
         id: 0,
@@ -752,7 +812,7 @@ pub fn test_create_opportunity_line_on_unscoped_opportunity(
             source_id: None,
             user_id: None,
             team_id: None,
-            company_currency_id: Some(1),
+            company_currency_id: Some(currency_id),
             company_id: None,
             date_open: Some(ctx.timestamp),
             date_closed: None,
@@ -829,6 +889,7 @@ pub fn test_opportunity_stage_transition(ctx: &ReducerContext) -> Result<(), Str
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let currency_id = company_currency_id(ctx, company_id)?;
 
     let stage_open = ctx.db.opp_stage().insert(OpportunityStage {
         id: 0,
@@ -879,7 +940,7 @@ pub fn test_opportunity_stage_transition(ctx: &ReducerContext) -> Result<(), Str
             user_id: None,
             team_id: None,
             company_id: Some(company_id),
-            company_currency_id: Some(1),
+            company_currency_id: Some(currency_id),
             lost_reason_id: None,
             date_open: Some(ctx.timestamp),
             date_closed: None,

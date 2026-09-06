@@ -15,6 +15,16 @@ Print the checklist without validating:
 scripts/check-prod-env.sh --list
 ```
 
+Apply the checksum-verified PostgreSQL catalog before starting services that
+use platform credentials or durable projections:
+
+```bash
+cargo run --locked -p api-server --bin storage-migrate
+```
+
+The command uses the same `PG_*` variables as api-server and exits non-zero if
+the existing migration history is incompatible with the release.
+
 ## Host `.env` (docker compose)
 
 These variables use `${VAR:?set VAR}` in `docker-compose.yml` — Compose fails at parse time if they are missing:
@@ -23,6 +33,7 @@ These variables use `${VAR:?set VAR}` in `docker-compose.yml` — Compose fails 
 |----------|---------|--------|
 | `STDB_MODULE` | web, api-server, ai-gateway | Published SpacetimeDB database name |
 | `STDB_SERVER_TOKEN` | web, api-server | Admin/service JWT for HTTP SQL and auth reducers |
+| `STDB_FINALIZATION_TOKEN` | projection-worker | Dedicated registered `projection_worker` identity; must differ from `STDB_SERVER_TOKEN` |
 | `STDB_TOKEN` | ai-gateway | Service token for SpacetimeDB HTTP API (not the same as `STDB_SERVER_TOKEN`) |
 | `AI_CERTIFICATION_STDB_TOKEN` | ai-gateway | Dedicated certification executor token; never reuse browser, API, or general gateway credentials |
 | `AI_CERTIFICATION_RUNTIME_HASH` | ai-gateway | Registered immutable executor digest (`sha256:` plus 64 lowercase hex characters) |
@@ -47,6 +58,7 @@ Set `NODE_ENV=production` or `LUMIERE_ENV=production`. **api-server refuses to s
 | `STDB_MODULE` or `NEXT_PUBLIC_STDB_MODULE` | yes | Database name |
 | `STDB_SERVER_TOKEN` | yes | Non-empty |
 | `AI_GATEWAY_URL` | yes | Internal ai-gateway base URL; must not contain `localhost` or `127.0.0.1` |
+| `AI_GATEWAY_REQUIRED` | optional (default true) | `/health/ready` fails unless the AI gateway responds successfully. Set false only for an intentional degraded deployment. |
 | `STDB_HOST` or `NEXT_PUBLIC_STDB_HOST` | recommended | Defaults to maincloud if unset |
 | `CORS_ORIGINS` | recommended | Comma-separated origins for credentialed browser calls |
 | `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | yes (compose) | BFF → gateway auth |
@@ -55,6 +67,49 @@ Set `NODE_ENV=production` or `LUMIERE_ENV=production`. **api-server refuses to s
 | `RESEND_API_KEY` | optional | Transactional email |
 
 In compose, `AI_GATEWAY_URL` is wired to `http://ai-gateway:8080`.
+
+The api-server endpoints have separate purposes: `/health` is liveness-only, while
+`/health/ready` checks PostgreSQL, SpacetimeDB, and the configured AI gateway. Production
+compose sets `AI_GATEWAY_REQUIRED=true`. The slim Rust images do not contain `curl`, so
+compose does not add an in-container healthcheck dependency gate. Run the host/sibling
+probe instead:
+
+```bash
+node scripts/check-compose-readiness.mjs \
+  --api http://api-server:8082/health/ready \
+  --ai http://ai-gateway:8080/health/ready \
+  --probe owner-report=http://owner-report-worker:8091/health/ready \
+  --probe workflow=http://workflow-worker:8093/health/ready \
+  --probe projection=http://projection-worker:8096/health/ready \
+  --probe chromium=http://chromium-worker:8090/health/ready
+```
+
+The projection worker is the sole SpacetimeDB-to-PostgreSQL durability and C5
+finalization service. After applying the ordered commit stream, it reads the
+pinned generated archive manifest and runs each supported candidate through
+its reviewed domain finalizer. Unknown candidate/reducer/mode combinations
+fail startup instead of being skipped. Set `LUMIERE_FINALIZATION_WORKER_BATCH`
+to a value from 1 through 200 (default 100).
+
+The current policy has one active archive root: `pos_order`; its reviewed
+`pos_order_line` and `pos_payment` children inherit the aggregate archive.
+`audit_log` is `always_hot`; its retired cold schema, read merge, drainer, and
+finalizer are not part of the deployable application.
+
+The worker uses `STDB_SERVER_TOKEN` only for private source/commit-table reads
+and uses `STDB_FINALIZATION_TOKEN` only for finalizer reducer calls. Both must
+be present and distinct; startup fails closed otherwise. Register the exact
+finalization-token identity for each organization under `projection_worker`.
+
+Before enabling cooling for an organization, register the projection worker's
+dedicated SpacetimeDB identity under the service name `projection_worker` with
+`register_cold_tier_service_identity`. The registration is a direct owner-token
+operations action and must not be exposed through the application API. The
+retired `audit_cold_drainer` and `pos_order_cold_drainer` service names are no
+longer accepted by finalization reducers.
+
+When running the probe from a sibling container, use Compose service DNS names such as
+`chromium-worker`; host-side probes should use published or externally routed hostnames.
 
 ## Service: web (Next.js)
 
@@ -87,6 +142,13 @@ Realtime WebSocket: Kong/same-origin deployments use `wss://<host>/v1/realtime/w
 | `STDB_HOST` | recommended | Defaults in gateway dev config only |
 
 Provider keys (`MISTRAL_API_KEY`, `GOOGLE_API_KEY`, etc.) depend on tenant `AiAgent` rows and `EMBEDDING_PROVIDER`.
+
+The gateway exposes `/health` for process liveness and `/health/ready` for a
+bounded, read-only SpacetimeDB and primary-Qdrant check. Readiness also validates
+configured provider credentials/endpoints and calls only safe Ollama `/api/tags`
+and the operator-supplied `KONG_LLM_READINESS_URL`. It never generates text,
+vision output, searches, or embeddings. Monitor Mistral, Gemini, Unstructured,
+and Tavily runtime errors separately because their readiness is configuration-only.
 
 Before enabling certification for an organization, an active platform
 superuser must call `register_ai_skill_certification_runtime_profile` directly

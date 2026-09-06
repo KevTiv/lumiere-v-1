@@ -7,9 +7,23 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="${1:-$ROOT/.contracts-staging/bindings}"
 MODULE_DIR="${2:-$ROOT/spacetimedb}"
 SPACETIME_BIN="${SPACETIME_BIN:-spacetime}"
+GENERATE_WASM="${STDB_GENERATE_WASM:-}"
 LOG_FILE="$(mktemp "${TMPDIR:-/tmp}/lumiere-stdb-rust-generate.XXXXXX.log")"
 trap 'rm -f "$LOG_FILE"' EXIT
 
+if [[ -z "$GENERATE_WASM" ]]; then
+  "$SPACETIME_BIN" build --module-path "$MODULE_DIR"
+  GENERATE_WASM="$MODULE_DIR/target/wasm32-unknown-unknown/release/lumiere_v1.wasm"
+fi
+if [[ ! -s "$GENERATE_WASM" ]]; then
+  echo "SpacetimeDB generation source WASM is missing: $GENERATE_WASM" >&2
+  exit 1
+fi
+
+# Bindings are a complete generated snapshot. Clean the exact output directory
+# first so reducers removed from the module cannot survive as stale APIs and so
+# the generator never pauses for an interactive deletion confirmation.
+rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
 set +e
@@ -17,7 +31,7 @@ set +e
   --include-private \
   --lang rust \
   --out-dir "$OUT_DIR" \
-  --module-path "$MODULE_DIR" 2>&1 | tee "$LOG_FILE"
+  --bin-path "$GENERATE_WASM" 2>&1 | tee "$LOG_FILE"
 generate_status="${PIPESTATUS[0]}"
 set -e
 
@@ -25,9 +39,9 @@ set -e
 # generated keyword fields. Inspect diagnostics independently of the exit code:
 # only the known keyword parse error is recoverable, and any other `error:` line
 # remains fatal even when the CLI returns zero.
-expected_keyword_errors="$({ grep '^error: expected identifier, found keyword `[^`]*`$' "$LOG_FILE" || true; } | wc -l | tr -d ' ')"
-unexpected_errors="$({ grep '^error:' "$LOG_FILE" || true; } | \
-  grep -Ev '^error: expected identifier, found keyword `[^`]+`$' || true)"
+expected_keyword_errors="$({ grep -E 'error: expected identifier, found keyword `[^`]+`' "$LOG_FILE" || true; } | wc -l | tr -d ' ')"
+unexpected_errors="$({ grep 'error:' "$LOG_FILE" || true; } | \
+  grep -Ev 'error: expected identifier, found keyword `[^`]+`' || true)"
 
 if [[ -n "$unexpected_errors" || ( "$generate_status" -ne 0 && "$expected_keyword_errors" -eq 0 ) ]]; then
   echo "SpacetimeDB Rust generation had unexpected errors:" >&2

@@ -9,9 +9,8 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::relations::{
     require_active_account, require_active_currency_id, require_active_journal,
-    require_explicit_company_id,
+    require_active_tax_ids, require_explicit_company_id,
 };
-use crate::accounting::tax_management::account_tax;
 use crate::crm::activities::activity_type;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{AccountInternalGroup, AccountTypeInternal, JournalType};
@@ -630,37 +629,6 @@ fn validate_account_journal_ids(
     Ok(())
 }
 
-/// Validate account `tax_ids` (duplicates fail). Update semantics: `None` preserve,
-/// `Some([])` clear, `Some(ids)` replace — see `relations` module docs (ACC-RI-017).
-fn validate_account_tax_ids(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    company_id: u64,
-    tax_ids: &[u64],
-) -> Result<(), String> {
-    let mut seen = HashSet::with_capacity(tax_ids.len());
-    for tax_id in tax_ids {
-        if !seen.insert(*tax_id) {
-            return Err(format!("Tax {tax_id} is duplicated"));
-        }
-        let tax = ctx
-            .db
-            .account_tax()
-            .id()
-            .find(tax_id)
-            .ok_or_else(|| format!("Tax {tax_id} not found"))?;
-        if tax.organization_id != organization_id || tax.company_id != company_id {
-            return Err(format!(
-                "Tax {tax_id} does not belong to this organization and company"
-            ));
-        }
-        if !tax.active {
-            return Err(format!("Tax {tax_id} is inactive"));
-        }
-    }
-    Ok(())
-}
-
 fn validate_journal_auxiliary_relations(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -730,7 +698,7 @@ pub fn create_account_account(
         company_id,
         &params.allowed_journal_ids,
     )?;
-    validate_account_tax_ids(ctx, organization_id, company_id, &params.tax_ids)?;
+    require_active_tax_ids(ctx, organization_id, company_id, &params.tax_ids)?;
 
     let opening_balance = params.opening_debit - params.opening_credit;
 
@@ -820,7 +788,7 @@ pub fn update_account_account(
         validate_account_journal_ids(ctx, organization_id, company_id, journal_ids)?;
     }
     if let Some(ref tax_ids) = params.tax_ids {
-        validate_account_tax_ids(ctx, organization_id, company_id, tax_ids)?;
+        require_active_tax_ids(ctx, organization_id, company_id, tax_ids)?;
     }
 
     let is_bank_account = if let Some(ref it) = params.internal_type {

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use serde_json::Value;
 use uuid::Uuid;
 
 use super::manifest::{ExecutionLimits, RiskClass, SkillVersionRef};
@@ -146,30 +146,24 @@ pub fn hash_serializable<T: Serialize>(value: &T) -> String {
 }
 
 pub fn hash_value(value: &Value) -> String {
-    let canonical = canonicalize(value);
+    let canonical = crate::wire_decode::canonicalize(value);
     let bytes = serde_json::to_vec(&canonical).unwrap_or_else(|_| b"null".to_vec());
     format!("uuid-v5:{}", Uuid::new_v5(&Uuid::NAMESPACE_OID, &bytes))
-}
-
-fn canonicalize(value: &Value) -> Value {
-    match value {
-        Value::Object(object) => {
-            let mut entries: Vec<_> = object.iter().collect();
-            entries.sort_by(|(left, _), (right, _)| left.cmp(right));
-            let mut canonical = Map::new();
-            for (key, value) in entries {
-                canonical.insert(key.clone(), canonicalize(value));
-            }
-            Value::Object(canonical)
-        }
-        Value::Array(items) => Value::Array(items.iter().map(canonicalize).collect()),
-        other => other.clone(),
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn audit_hash_preserves_oid_namespace_and_canonical_bytes() {
+        let value =
+            serde_json::json!({"z": false, "n": -7, "a": [3, 1, {"z": "é\n\"", "a": null}]});
+        assert_eq!(
+            hash_value(&value),
+            "uuid-v5:c8f367bc-151c-5782-a0c0-89184b24d5ad"
+        );
+    }
 
     #[test]
     fn hashes_are_stable_across_object_key_order() {

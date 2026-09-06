@@ -250,8 +250,9 @@ pub fn test_pack_tax_evidence_required(ctx: &ReducerContext) -> Result<(), Strin
     if ctx
         .db
         .country_pack_definition()
-        .pack_key()
-        .find(&"au".to_string())
+        .country_pack_by_pack_key()
+        .filter((&fixture.organization_id, &"au".to_string()))
+        .next()
         .is_none()
     {
         return Err("au country pack missing — run migrations".into());
@@ -749,8 +750,9 @@ pub fn test_br_pack_expense_evidence_flags(ctx: &ReducerContext) -> Result<(), S
     let br = ctx
         .db
         .country_pack_definition()
-        .pack_key()
-        .find(&"br".to_string())
+        .country_pack_by_pack_key()
+        .filter((&fixture.organization_id, &"br".to_string()))
+        .next()
         .ok_or("br country pack missing — run migrations")?;
     let meta = br.metadata.as_deref().unwrap_or("");
     if !meta.contains("expense_require_receipt") {

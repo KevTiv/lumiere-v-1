@@ -5,11 +5,13 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ── Purpose identifiers (align with permission actions where present) ─────────
 
-pub const PURPOSE_HR_SELF: &str = "hr_self";
-pub const PURPOSE_HR_MANAGER: &str = "hr_manager";
 pub const PURPOSE_HR_ADMIN: &str = "hr_admin";
-pub const PURPOSE_VIEW_COMP: &str = "view_comp";
-pub const PURPOSE_VIEW_STATUTORY_ID: &str = "view_statutory_id";
+
+// HR_EMPLOYEE_SENSITIVE, HR_EMPLOYEE_PIN, HR_CONTRACT_COMP, and HR_PAYSLIP_COMP
+// are intentionally duplicated in crates/stdb-auth/src/field_policy.rs. The two
+// build universes (root service crates and standalone spacetimedb/) cannot share
+// a crate; both copies have live consumers. See architecture rule #10 and
+// docs/plan/code-ownership-deduplication-refactor-plan.md D35.
 
 pub const HR_EMPLOYEE_SENSITIVE: &[&str] = &[
     "gender",
@@ -75,33 +77,6 @@ pub struct LogHrPiiReadParams {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-/// Resolve read purpose from subscription/query resource key.
-pub fn purpose_for_resource(resource_key: &str) -> &'static str {
-    match resource_key {
-        "my-employee" => PURPOSE_HR_SELF,
-        "direct-reports" => PURPOSE_HR_MANAGER,
-        _ => PURPOSE_HR_ADMIN,
-    }
-}
-
-/// Whether a column list includes fields that must be read-audited.
-pub fn fields_require_read_audit(resource_key: &str, fields: &[String]) -> bool {
-    let set: std::collections::HashSet<&str> = fields.iter().map(String::as_str).collect();
-    if set.contains(HR_EMPLOYEE_PIN) {
-        return true;
-    }
-    if HR_EMPLOYEE_SENSITIVE.iter().any(|c| set.contains(*c)) {
-        return true;
-    }
-    if resource_key == "contracts" && HR_CONTRACT_COMP.iter().any(|c| set.contains(*c)) {
-        return true;
-    }
-    if resource_key == "payslips" && HR_PAYSLIP_COMP.iter().any(|c| set.contains(*c)) {
-        return true;
-    }
-    false
-}
 
 /// JSON snapshot for employee mutator audits — never includes plaintext `pin`.
 pub fn employee_audit_json(emp: &super::employees::HrEmployee) -> String {

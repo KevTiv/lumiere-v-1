@@ -48,7 +48,13 @@ exit "${FAKE_EXIT_STATUS:-1}"
 FAKE
 chmod +x "$FAKE_SPACETIME"
 
-SPACETIME_BIN="$FAKE_SPACETIME" \
+# Exercise only the generator recovery path. The wrapper builds a module when
+# no source WASM is supplied, while this fake CLI intentionally implements only
+# the `generate` arguments used by the assertions below.
+FAKE_WASM="$TMP_ROOT/module.wasm"
+printf 'fake wasm' >"$FAKE_WASM"
+
+STDB_GENERATE_WASM="$FAKE_WASM" SPACETIME_BIN="$FAKE_SPACETIME" \
   bash "$ROOT/scripts/generate-spacetimedb-rust-sdk.sh" "$TMP_ROOT/out" "$TMP_ROOT/module"
 
 grep -q 'pub r#type:' "$TMP_ROOT/out/row.rs"
@@ -56,13 +62,13 @@ grep -q 'pub r#ref:' "$TMP_ROOT/out/row.rs"
 grep -q 'r#type:' "$TMP_ROOT/out/row.rs"
 grep -q 'r#ref:' "$TMP_ROOT/out/row.rs"
 
-FAKE_EXIT_STATUS=0 SPACETIME_BIN="$FAKE_SPACETIME" \
+FAKE_EXIT_STATUS=0 STDB_GENERATE_WASM="$FAKE_WASM" SPACETIME_BIN="$FAKE_SPACETIME" \
   bash "$ROOT/scripts/generate-spacetimedb-rust-sdk.sh" "$TMP_ROOT/out-zero" "$TMP_ROOT/module"
 
 grep -q 'pub r#type:' "$TMP_ROOT/out-zero/row.rs"
 grep -q 'pub r#ref:' "$TMP_ROOT/out-zero/row.rs"
 
-if FAKE_UNEXPECTED=1 FAKE_EXIT_STATUS=0 SPACETIME_BIN="$FAKE_SPACETIME" \
+if FAKE_UNEXPECTED=1 FAKE_EXIT_STATUS=0 STDB_GENERATE_WASM="$FAKE_WASM" SPACETIME_BIN="$FAKE_SPACETIME" \
   bash "$ROOT/scripts/generate-spacetimedb-rust-sdk.sh" "$TMP_ROOT/rejected" "$TMP_ROOT/module" \
   >"$TMP_ROOT/unexpected.log" 2>&1; then
   echo "generator wrapper accepted an unrelated error from a zero exit" >&2
@@ -70,7 +76,7 @@ if FAKE_UNEXPECTED=1 FAKE_EXIT_STATUS=0 SPACETIME_BIN="$FAKE_SPACETIME" \
 fi
 grep -q 'error: module compilation failed' "$TMP_ROOT/unexpected.log"
 
-if FAKE_UNEXPECTED=1 FAKE_EXIT_STATUS=1 SPACETIME_BIN="$FAKE_SPACETIME" \
+if FAKE_UNEXPECTED=1 FAKE_EXIT_STATUS=1 STDB_GENERATE_WASM="$FAKE_WASM" SPACETIME_BIN="$FAKE_SPACETIME" \
   bash "$ROOT/scripts/generate-spacetimedb-rust-sdk.sh" "$TMP_ROOT/rejected-nonzero" "$TMP_ROOT/module" \
   >"$TMP_ROOT/unexpected-nonzero.log" 2>&1; then
   echo "generator wrapper accepted an unrelated error from a nonzero exit" >&2
