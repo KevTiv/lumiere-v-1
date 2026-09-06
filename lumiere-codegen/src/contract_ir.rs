@@ -80,7 +80,11 @@ struct ResourceScopeMetadata {
     company_field: String,
 }
 
-pub fn run(paths: &Paths, registry_text: &str) -> Result<()> {
+pub fn run(
+    paths: &Paths,
+    registry_text: &str,
+    (source_commit, source_dirty): (String, bool),
+) -> Result<()> {
     let module_schema: Value = serde_json::from_str(&read_to_string(&paths.module_schema_json)?)
         .with_context(|| format!("parse {}", paths.module_schema_json.display()))?;
     let reducer_manifest: Value =
@@ -130,7 +134,6 @@ pub fn run(paths: &Paths, registry_text: &str) -> Result<()> {
         types: &base.types,
         persistence: &persistence,
     };
-    let (source_commit, source_dirty) = source_provenance()?;
     let ir = ContractIr {
         ir_version: IR_VERSION,
         source_commit,
@@ -723,7 +726,7 @@ fn prefixed_sha256(bytes: &[u8]) -> String {
     format!("sha256:{}", hex::encode(Sha256::digest(bytes)))
 }
 
-fn source_provenance() -> Result<(String, bool)> {
+pub(crate) fn source_provenance() -> Result<(String, bool)> {
     if let Ok(commit) = std::env::var("LUMIERE_SOURCE_COMMIT") {
         let commit = commit.trim();
         if !is_git_object_id(commit) {

@@ -35,6 +35,9 @@ fn main() -> Result<()> {
     if std::env::args().any(|arg| arg == "--reconstruction-apply-only") {
         return cold_tier::run_reconstruction_apply(&paths);
     }
+    // Capture provenance before any generator rewrites tracked outputs. The
+    // generated files themselves are checked for drift after this process.
+    let source_provenance = contract_ir::source_provenance()?;
     let registry_text = read_to_string(&paths.resource_registry_json)?;
 
     frontend_registry::run(&paths, &registry_text)?;
@@ -42,7 +45,7 @@ fn main() -> Result<()> {
     query_exec_audit::run(&paths, &registry_text)?;
     cold_tier::run(&paths)?;
     reducer_contract::run(&paths)?;
-    contract_ir::run(&paths, &registry_text)?;
+    contract_ir::run(&paths, &registry_text, source_provenance)?;
 
     Ok(())
 }
