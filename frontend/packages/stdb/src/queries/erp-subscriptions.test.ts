@@ -6,6 +6,7 @@ import {
   createClientSubscriptions,
   subscriptionQueriesForResource,
 } from "./erp-subscriptions"
+import { hasHrPermission } from "../field-policy"
 
 describe("ACC-RI-012: account-payment-term-lines live subscription", () => {
   it("is registered as a resolvable ERP resource key", () => {
@@ -189,6 +190,20 @@ describe("PUR-RI-017: company-scoped Purchasing subscriptions", () => {
 })
 
 describe("HR subscription SQL dialect", () => {
+  it("recognizes canonical module HR read grants for HTTP authorization", () => {
+    const fieldAccess = {
+      organizationId: 42,
+      roleId: 9,
+      roleName: "manager",
+      isSuperuser: false,
+      rolePermissions: ["module:hr:read"],
+      identityHex: "actor",
+      fieldPermissions: [],
+    }
+    assert.equal(hasHrPermission(fieldAccess, "hr_employee", "read"), true)
+    assert.equal(hasHrPermission(fieldAccess, "hr_employee", "create"), false)
+  })
+
   it("fails closed when employee authorization needs optional-field comparisons", () => {
     const context = {
       organizationId: 42,

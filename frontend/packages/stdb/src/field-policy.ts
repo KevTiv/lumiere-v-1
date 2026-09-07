@@ -85,6 +85,23 @@ function fieldResourceMatches(configured: string, resourceKey: QueryResourceKey)
   )
 }
 
+/** Module ownership is derived from the canonical generated table registry. */
+function resourceModule(resourceKey: QueryResourceKey): 'hr' | 'iot' | null {
+  const table = RESOURCE_REGISTRY[resourceKey]?.table ?? resourceKey
+  if (table.startsWith('hr_')) return 'hr'
+  if (table.startsWith('iot_')) return 'iot'
+  return null
+}
+
+function hasModulePermission(
+  fieldAccess: FieldAccessContext,
+  module: 'hr' | 'iot',
+  action: string,
+): boolean {
+  return fieldAccess.rolePermissions.includes(`module:${module}:${action}`)
+    || fieldAccess.rolePermissions.includes(`module:${module}:*`)
+}
+
 function fieldPermissionApplies(rule: FieldPermissionLike, ctx: FieldAccessContext): boolean {
   const subjectRoleId = rule.subjectRoleId ?? rule.subject_role_id
   if (subjectRoleId != null && Number(subjectRoleId) === ctx.roleId) {
@@ -168,6 +185,11 @@ export function hasHrPermission(
 ): boolean {
   if (!fieldAccess) return false
   if (fieldAccess.isSuperuser) return true
+  const module = resourceModule(resource as QueryResourceKey)
+  if (module && action === 'read' && hasModulePermission(fieldAccess, module, 'read')) {
+    return true
+  }
+  if (module && hasModulePermission(fieldAccess, module, '*')) return true
   const perm = `${resource}:${action}`
   const wildcard = `${resource}:*`
   return (

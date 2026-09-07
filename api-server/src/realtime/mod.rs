@@ -157,4 +157,23 @@ mod tests {
             vec!["auth".to_string()]
         );
     }
+
+    #[test]
+    fn realtime_authorization_keeps_module_owned_hr_and_iot_resources() {
+        let access = stdb_auth::FieldAccessContext {
+            organization_id: 7,
+            role_id: 9,
+            role_name: "manager".into(),
+            is_superuser: false,
+            role_permissions: vec!["module:hr:read".into(), "module:iot:read".into()],
+            identity_hex: "actor".into(),
+            field_permissions: Vec::new(),
+        };
+        let requested = vec!["employees".to_string(), "iot-hubs".to_string()];
+        assert_eq!(
+            authorized_resources(&requested, Some(&access))
+                .expect("module grants should authorize registered resources"),
+            requested
+        );
+    }
 }
