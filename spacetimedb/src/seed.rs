@@ -761,6 +761,91 @@ fn ensure_canonical_e2e_seed_rows(
         .find(|currency| currency.organization_id == organization_id && currency.code == "USD")
         .map(|currency| currency.id)
         .ok_or_else(|| "canonical seed requires USD currency".to_string())?;
+
+    // PR/E2E runs preserve the module for speed. Backfill the canonical
+    // same-currency snapshot when an older preserved database predates it;
+    // the guard keeps rerunning the fixture idempotent and tenant-local.
+    if !ctx.db.currency_rate().iter().any(|rate| {
+        rate.organization_id == organization_id
+            && rate.company_id == Some(company_id)
+            && rate.from_currency_id == usd_currency_id
+            && rate.to_currency_id == usd_currency_id
+    }) {
+        ctx.db.currency_rate().insert(CurrencyRate {
+            id: 0,
+            organization_id,
+            from_currency_id: usd_currency_id,
+            to_currency_id: usd_currency_id,
+            rate: 1.0,
+            inverse_rate: 1.0,
+            date: ctx.timestamp,
+            company_id: Some(company_id),
+            created_at: ctx.timestamp,
+            metadata: Some("{\"seed\":true,\"canonical\":\"finance-e2e\"}".to_string()),
+        });
+    }
+
+    if !ctx
+        .db
+        .product_pricelist()
+        .iter()
+        .any(|pricelist| pricelist.organization_id == organization_id && pricelist.is_active)
+    {
+        ctx.db.product_pricelist().insert(ProductPricelist {
+            id: 0,
+            organization_id,
+            company_id: None,
+            name: "Default Pricelist".to_string(),
+            currency_id: usd_currency_id,
+            discount_policy: DiscountPolicy::WithDiscount,
+            is_active: true,
+            created_at: ctx.timestamp,
+        });
+    }
+
+    if !ctx.db.hr_employee().iter().any(|employee| {
+        employee.organization_id == organization_id
+            && employee.company_id == company_id
+            && employee.is_active
+            && employee.deleted_at.is_none()
+    }) {
+        ctx.db.hr_employee().insert(HrEmployee {
+            id: 0,
+            organization_id,
+            company_id,
+            user_id: None,
+            resource_id: None,
+            name: "E2E Employee".to_string(),
+            employee_number: Some("E2E-001".to_string()),
+            job_title: Some("Finance and Operations".to_string()),
+            job_id: None,
+            department_id: None,
+            parent_id: None,
+            coach_id: None,
+            work_email: Some("e2e.employee@lumiere.demo".to_string()),
+            work_phone: None,
+            mobile_phone: None,
+            work_location: None,
+            work_contact_partner_id: None,
+            date_hired: Some(ctx.timestamp),
+            date_terminated: None,
+            employment_type: EmploymentType::FullTime,
+            gender: None,
+            birthday: None,
+            marital: None,
+            emergency_contact: None,
+            emergency_phone: None,
+            barcode: None,
+            pin: None,
+            image_url: None,
+            color: None,
+            is_active: true,
+            created_at: ctx.timestamp,
+            deleted_at: None,
+            metadata: Some("{\"seed\":true,\"canonical\":\"finance-e2e\"}".to_string()),
+        });
+    }
+
     let template_product = ctx
         .db
         .product()
@@ -8220,6 +8305,19 @@ Prioritize high-severity findings and cite related records."#,
         to_currency_id: eur_currency_id,
         rate: 0.92,
         inverse_rate: 1.0 / 0.92,
+        date: ctx.timestamp,
+        company_id: Some(company_id),
+        created_at: ctx.timestamp,
+        metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
+    });
+
+    ctx.db.currency_rate().insert(CurrencyRate {
+        id: 0,
+        organization_id: org_id,
+        from_currency_id: usd_currency_id,
+        to_currency_id: usd_currency_id,
+        rate: 1.0,
+        inverse_rate: 1.0,
         date: ctx.timestamp,
         company_id: Some(company_id),
         created_at: ctx.timestamp,
