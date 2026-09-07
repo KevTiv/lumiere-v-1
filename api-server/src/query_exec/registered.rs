@@ -3,6 +3,33 @@ use super::row_values::row_u64;
 use crate::error::ApiError;
 use stdb_auth::{erp_org_extra_where, select_org_scoped_sql, FieldAccessContext};
 
+/// Resources whose generated table binds `company_id` as `Option<u64>`.
+///
+/// SpacetimeDB HTTP SQL cannot compare an option-encoded column with a scalar
+/// literal. These resources are therefore organization-scoped in SQL and
+/// filtered by the caller's fail-closed Rust post-filter.
+fn nullable_company_id_resource(resource: &str) -> bool {
+    matches!(
+        resource,
+        "account-account-types"
+            | "depreciation-lines"
+            | "partner-banks"
+            | "product-categories"
+            | "stock-locations"
+            | "stock-routes"
+            | "stock-rules"
+            | "tax-deadlines"
+    )
+}
+
+fn without_nullable_company_predicate(resource: &str, extra_where: &str) -> String {
+    if nullable_company_id_resource(resource) {
+        extra_where.replace(" AND company_id = :company_id", "")
+    } else {
+        extra_where.to_owned()
+    }
+}
+
 pub(super) fn select_registered_sql(
     resource: &str,
     table: &str,
@@ -14,7 +41,9 @@ pub(super) fn select_registered_sql(
     iot_company_id: Option<u64>,
 ) -> Result<String, ApiError> {
     let extra_where_raw = erp_org_extra_where(resource).unwrap_or("");
-    let extra_where = if let Some(cid) = inventory_company_id {
+    let extra_where = if nullable_company_id_resource(resource) {
+        without_nullable_company_predicate(resource, extra_where_raw)
+    } else if let Some(cid) = inventory_company_id {
         extra_where_raw.replace(":company_id", &cid.to_string())
     } else if let Some(cid) = purchasing_company_id {
         format!("{extra_where_raw} AND company_id = {cid}")
@@ -94,5 +123,92 @@ pub(super) fn sort_registered_rows(resource: &str, rows: &mut [serde_json::Value
             )
         }),
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nullable_company_resources_never_compare_option_columns_to_scalars() {
+        let cases = [
+            (
+                "account-account-types",
+                "account_account_type",
+                None,
+                None,
+                Some(198),
+                None,
+            ),
+            (
+                "depreciation-lines",
+                "account_asset_depreciation_line",
+                None,
+                None,
+                Some(198),
+                None,
+            ),
+            (
+                "partner-banks",
+                "res_partner_bank",
+                None,
+                Some(198),
+                None,
+                None,
+            ),
+            (
+                "product-categories",
+                "product_category",
+                Some(198),
+                None,
+                None,
+                None,
+            ),
+            (
+                "stock-locations",
+                "stock_location",
+                Some(198),
+                None,
+                None,
+                None,
+            ),
+            ("stock-routes", "stock_route", Some(198), None, None, None),
+            ("stock-rules", "stock_rule", Some(198), None, None, None),
+            ("tax-deadlines", "tax_deadline", None, None, Some(198), None),
+        ];
+
+        for (resource, table, inventory, purchasing, accounting, iot) in cases {
+            let sql = select_registered_sql(
+                resource, table, 42, None, inventory, purchasing, accounting, iot,
+            )
+            .expect("registered SQL");
+            assert!(
+                !sql.contains("company_id = 198"),
+                "{resource} emitted an Option<u64> scalar predicate: {sql}"
+            );
+            assert!(
+                !sql.contains(":company_id"),
+                "{resource} left a placeholder: {sql}"
+            );
+            assert!(sql.contains("organization_id = 42"));
+        }
+    }
+
+    #[test]
+    fn required_company_resources_keep_sql_company_scope() {
+        let sql = select_registered_sql(
+            "account-accounts",
+            "account_account",
+            42,
+            None,
+            None,
+            None,
+            Some(198),
+            None,
+        )
+        .expect("registered SQL");
+        assert!(sql.contains("organization_id = 42"));
+        assert!(sql.contains("company_id = 198"));
     }
 }
