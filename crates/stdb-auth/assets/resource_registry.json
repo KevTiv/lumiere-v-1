@@ -2093,7 +2093,7 @@
       "fx_revaluation_run"
     ],
     "default_restricted": [
-      "currency_code",
+      "currency_code_snapshot",
       "as_of_date",
       "move_id",
       "journal_id",
@@ -2698,7 +2698,7 @@
       "period_start",
       "period_end",
       "total_labor_cost",
-      "currency_code",
+      "currency_code_snapshot",
       "status",
       "metadata",
       "created_at"
