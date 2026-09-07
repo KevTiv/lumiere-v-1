@@ -1,5 +1,4 @@
-use std::{fs, path::PathBuf};
-use std::{str::FromStr, sync::Arc};
+use std::{fs, str::FromStr, sync::Arc};
 
 use axum::{
     extract::{Path, Query, State},
@@ -11,18 +10,19 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sha2::{Digest, Sha256};
 use tower_cookies::Cookies;
 
 use crate::{
     error::ApiError,
     reports::{
+        artifacts::artifact_path,
         auth::{
             ensure_report_access, ensure_report_history_access, mask_report_preview, ReportAccess,
         },
         catalog::{report_catalog, ReportCatalogV1},
         common::{GeneratedOwnerReportHistoryRow, ReportKey, ReportPreviewRequest},
-        render::render_pdf,
+        execution_context::InteractiveReportContext,
+        generation::{generate_owner_report, ReportExecutionContext},
         service::{preview_report, report_artifact_key, report_history, ReportPreview},
     },
     state::AppState,
@@ -364,121 +364,23 @@ async fn pdf_post(
     let session = resolve_session(&state, &headers, &cookies)
         .await?
         .ok_or(ApiError::Unauthorized)?;
-    let organization_id = require_org(&session)?;
+    require_org(&session)?;
     let report_key = ReportKey::from_str(&report_key)
         .map_err(|_| ApiError::NotFound("Unknown report key".into()))?;
-    ensure_report_access(
-        session.field_access.as_ref(),
-        report_key,
-        ReportAccess::Export,
-    )?;
     let client = state.client_with_token(&session.stdb_token);
-    let preview = preview_report(
-        &client,
+    let context = InteractiveReportContext::from_session(session, client)?;
+    let generated = generate_owner_report(
+        &state,
+        ReportExecutionContext::interactive(context),
         report_key,
-        organization_id,
-        &session.identity_hex,
         request,
     )
     .await?;
-    let preview = mask_report_preview(preview, session.field_access.as_ref());
-    let bytes = render_pdf(&state, &preview).await?;
-    record_generated_report(&state, &client, organization_id, &preview, &bytes, None).await?;
     Ok((
         [(axum::http::header::CONTENT_TYPE, "application/pdf")],
-        bytes,
+        generated.pdf,
     )
         .into_response())
-}
-
-#[derive(Debug, serde::Deserialize)]
-pub(crate) struct RecordedOwnerReport {
-    pub id: u64,
-    pub document_id: u64,
-}
-
-pub(crate) async fn record_generated_report(
-    state: &AppState,
-    client: &stdb_client::StdbClient,
-    organization_id: u64,
-    preview: &ReportPreview,
-    pdf: &[u8],
-    correlation_suffix: Option<&str>,
-) -> Result<RecordedOwnerReport, ApiError> {
-    let value = serde_json::to_value(preview)
-        .map_err(|error| ApiError::Internal(format!("serialize generated report: {error}")))?;
-    let report_key = value["reportKey"]
-        .as_str()
-        .ok_or_else(|| ApiError::Internal("typed report did not include reportKey".into()))?;
-    let company_id = value["scope"]["companyId"]
-        .as_u64()
-        .ok_or_else(|| ApiError::Internal("typed report did not include scope.companyId".into()))?;
-    let output_hash = hex::encode(Sha256::digest(pdf));
-    let artifact_key = format!("{output_hash}.pdf");
-    let artifact_path = artifact_path(&state.config.report_artifact_dir, &artifact_key)?;
-    persist_artifact(&artifact_path, pdf)?;
-    let correlation_id = match correlation_suffix {
-        Some(suffix) => format!("owner-report:{report_key}:{suffix}"),
-        None => format!("owner-report:{report_key}:{}", &output_hash[..16]),
-    };
-    let params = json!({
-        "report_key": report_key,
-        "schema_version": value["schemaVersion"].as_u64().unwrap_or(1),
-        "parameters_json": json!({ "scope": value["scope"] }).to_string(),
-        "source_watermark_json": value["sourceWatermark"].to_string(),
-        "output_hash": format!("sha256:{output_hash}"),
-        "renderer_version": "chromium-worker-v1",
-        "artifact_key": artifact_key,
-        "artifact_size": pdf.len(),
-        "correlation_id": correlation_id,
-        "metadata": json!({ "watermark": value["watermark"] }).to_string(),
-    });
-    let result = client
-        .call_reducer(stdb_client::reducer_call!(
-            "record_generated_owner_report",
-            json!([organization_id, company_id, params]),
-        ))
-        .await
-        .map_err(|error| ApiError::Internal(format!("record generated owner report: {error}")));
-    if result.is_err() {
-        let _ = fs::remove_file(&artifact_path);
-    }
-    result?;
-    let correlation_sql = correlation_id.replace('\'', "''");
-    let rows = client
-        .query_sql(&format!(
-            "SELECT id, document_id FROM generated_owner_report WHERE organization_id = {organization_id} AND correlation_id = '{correlation_sql}' LIMIT 1"
-        ))
-        .await
-        .map_err(|error| ApiError::Internal(format!("read generated owner report: {error}")))?;
-    let row = rows
-        .into_iter()
-        .next()
-        .ok_or_else(|| ApiError::Internal("generated owner report was not persisted".into()))?;
-    serde_json::from_value(row)
-        .map_err(|error| ApiError::Internal(format!("invalid generated owner report row: {error}")))
-}
-
-fn artifact_path(root: &std::path::Path, artifact_key: &str) -> Result<PathBuf, ApiError> {
-    if !artifact_key.ends_with(".pdf") || artifact_key.contains('/') || artifact_key.contains('\\')
-    {
-        return Err(ApiError::Internal("invalid report artifact key".into()));
-    }
-    Ok(root.join(artifact_key))
-}
-
-fn persist_artifact(path: &std::path::Path, bytes: &[u8]) -> Result<(), ApiError> {
-    let directory = path
-        .parent()
-        .ok_or_else(|| ApiError::Internal("report artifact path has no parent".into()))?;
-    fs::create_dir_all(directory).map_err(|error| {
-        ApiError::Internal(format!("create report artifact directory: {error}"))
-    })?;
-    if path.exists() {
-        return Ok(());
-    }
-    fs::write(path, bytes)
-        .map_err(|error| ApiError::Internal(format!("write report artifact: {error}")))
 }
 
 pub fn router() -> Router<Arc<AppState>> {

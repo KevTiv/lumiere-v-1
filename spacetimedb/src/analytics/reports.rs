@@ -343,6 +343,9 @@ fn validate_schedule_configuration(
     company_id: Option<u64>,
     params: &CreateScheduledReportParams,
 ) -> Result<(), String> {
+    if let Some(company_id) = company_id {
+        require_company_in_organization(ctx, organization_id, company_id)?;
+    }
     if params.name.trim().is_empty() {
         return Err("scheduled report name is required".to_string());
     }
@@ -1166,15 +1169,72 @@ pub fn complete_scheduled_owner_report_run(
     if run.organization_id != organization_id {
         return Err("Scheduled report run does not belong to this organization".to_string());
     }
-    if run.generated_owner_report_id.is_some() {
-        return Ok(());
-    }
     let report = ctx
         .db
         .scheduled_report()
         .id()
         .find(&run.scheduled_report_id)
         .ok_or("Scheduled report not found")?;
+    if report.organization_id != organization_id || report.owner_report_key.is_none() {
+        return Err("Owner-report schedule does not belong to this organization".to_string());
+    }
+    let company_id = report
+        .company_id
+        .ok_or("Owner-report schedule has no company")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    let report_key = report
+        .owner_report_key
+        .as_deref()
+        .ok_or("Owner-report schedule has no report key")?;
+    let generated = ctx
+        .db
+        .generated_owner_report()
+        .id()
+        .find(&generated_owner_report_id)
+        .ok_or("Generated owner report not found")?;
+    if generated.organization_id != organization_id {
+        return Err("Generated owner report does not belong to this organization".to_string());
+    }
+    if generated.company_id != company_id {
+        return Err("Generated owner report does not belong to this company".to_string());
+    }
+    if generated.report_key != report_key {
+        return Err("Generated owner report key does not match the schedule".to_string());
+    }
+    if generated.document_id != document_id {
+        return Err("Generated owner report document does not match".to_string());
+    }
+    if generated.correlation_id != scheduled_report_correlation(report_key, run.id) {
+        return Err("Generated owner report correlation does not match the run".to_string());
+    }
+    let document = ctx
+        .db
+        .document()
+        .id()
+        .find(&document_id)
+        .ok_or("Owner report document not found")?;
+    if document.organization_id != organization_id {
+        return Err("Owner report document does not belong to this organization".to_string());
+    }
+    if document.company_id != Some(company_id) {
+        return Err("Owner report document does not belong to this company".to_string());
+    }
+    if document.res_model.as_deref() != Some("generated_owner_report")
+        || document.res_id != Some(generated_owner_report_id)
+    {
+        return Err("Owner report document linkage does not match".to_string());
+    }
+    if run.status == "completed" {
+        if run.generated_owner_report_id == Some(generated_owner_report_id)
+            && run.document_id == Some(document_id)
+        {
+            return Ok(());
+        }
+        return Err("completed scheduled report run has a different artifact".to_string());
+    }
+    if run.generated_owner_report_id.is_some() || run.document_id.is_some() {
+        return Err("scheduled report run already has an artifact".to_string());
+    }
     let notifications = create_owner_report_notifications(ctx, &report, run.id, document_id);
     ctx.db
         .scheduled_report_run()
@@ -1198,6 +1258,10 @@ pub fn complete_scheduled_owner_report_run(
     Ok(())
 }
 
+fn scheduled_report_correlation(report_key: &str, run_id: u64) -> String {
+    format!("owner-report:{report_key}:scheduled-run-{run_id}")
+}
+
 /// Retain a failed attempt on the immutable run. A later successful retry
 /// updates this same run, so retries cannot duplicate artifacts or messages.
 #[reducer]
@@ -1216,6 +1280,9 @@ pub fn fail_scheduled_owner_report_run(
         .ok_or("Scheduled report run not found")?;
     if run.organization_id != organization_id {
         return Err("Scheduled report run does not belong to this organization".to_string());
+    }
+    if run.status == "completed" {
+        return Ok(());
     }
     ctx.db
         .scheduled_report_run()
@@ -1435,6 +1502,14 @@ mod scheduled_owner_report_tests {
     #[test]
     fn cadence_rejects_unsupported_values() {
         assert!(validate_frequency("quarterly").is_err());
+    }
+
+    #[test]
+    fn scheduled_report_correlation_binds_report_key_and_run() {
+        assert_eq!(
+            scheduled_report_correlation("daily_business_summary_v1", 42),
+            "owner-report:daily_business_summary_v1:scheduled-run-42"
+        );
     }
 }
 

@@ -1,9 +1,12 @@
+pub(crate) mod artifacts;
 pub mod auth;
 pub mod catalog;
 pub mod commercial;
 pub mod common;
 pub mod daily_business_summary;
+pub(crate) mod execution_context;
 pub mod financial_position;
+pub(crate) mod generation;
 pub mod low_stock;
 pub mod open_balances;
 pub mod render;
