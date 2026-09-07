@@ -6,12 +6,14 @@ use axum::{
     extract::{Path, State},
     http::HeaderMap,
     response::IntoResponse,
-    routing::post,
+    routing::{get, post},
     Json, Router,
 };
 use serde_json::{json, Value};
 use tower_cookies::Cookies;
 
+use crate::cold_tier::projection_observability::ProjectionStatus;
+use crate::cold_tier::{pg_pool, projection_observability};
 use crate::error::ApiError;
 use crate::session::{normalize_identity_hex_for_sql, resolve_api_session};
 use crate::state::AppState;
@@ -78,6 +80,26 @@ async fn suspend_organization(
     ))
 }
 
+fn projection_status_response(
+    result: anyhow::Result<Option<ProjectionStatus>>,
+) -> Result<Json<ProjectionStatus>, ApiError> {
+    result
+        .map_err(ApiError::unavailable)?
+        .map(Json)
+        .ok_or_else(|| ApiError::NotFound("Projection status not found".into()))
+}
+
+async fn organization_projection_status(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Path(org_id): Path<u64>,
+) -> Result<Json<ProjectionStatus>, ApiError> {
+    require_superuser(&state, &headers, &cookies).await?;
+    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    projection_status_response(projection_observability::read_projection_status(pool, org_id).await)
+}
+
 async fn export_organization(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -141,6 +163,10 @@ fn chrono_now_rfc3339() -> String {
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route(
+            "/admin/organizations/:org_id/projection-status",
+            get(organization_projection_status),
+        )
+        .route(
             "/admin/organizations/:org_id/suspend",
             post(suspend_organization),
         )
@@ -148,4 +174,82 @@ pub fn router() -> Router<Arc<AppState>> {
             "/admin/organizations/:org_id/export",
             post(export_organization),
         )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::session::test_support::test_config;
+    use axum::{
+        body::{to_bytes, Body},
+        http::{Request, StatusCode},
+        response::IntoResponse,
+    };
+    use serde_json::json;
+    use tower::ServiceExt;
+
+    fn status_fixture() -> ProjectionStatus {
+        ProjectionStatus {
+            organization_id: 42,
+            stdb_head_sequence: 18,
+            durable_sequence: 15,
+            backlog_commits: 3,
+            oldest_unprojected_at: Some(1_750_000_000_000_000),
+            oldest_unprojected_age_seconds: Some(9),
+            last_error: None,
+            quarantined_sequence: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn projection_status_route_requires_authentication() {
+        let state = Arc::new(AppState::new(test_config(None)));
+        let response = router()
+            .layer(tower_cookies::CookieManagerLayer::new())
+            .with_state(state)
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/organizations/42/projection-status")
+                    .body(Body::empty())
+                    .expect("build request"),
+            )
+            .await
+            .expect("route response");
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn projection_status_response_preserves_typed_shape() {
+        let Json(status) =
+            projection_status_response(Ok(Some(status_fixture()))).expect("present status");
+        let value = serde_json::to_value(status).expect("serialize projection status");
+
+        assert_eq!(value["organizationId"], 42);
+        assert_eq!(value["stdbHeadSequence"], 18);
+        assert_eq!(value["durableSequence"], 15);
+        assert_eq!(value["backlogCommits"], 3);
+        assert!(value.get("organization_id").is_none());
+    }
+
+    #[test]
+    fn projection_status_response_reports_missing_status() {
+        let error = projection_status_response(Ok(None)).expect_err("missing status");
+        assert!(matches!(error, ApiError::NotFound(_)));
+    }
+
+    #[tokio::test]
+    async fn projection_status_response_fails_closed_when_postgres_is_unavailable() {
+        let error = projection_status_response(Err(anyhow::anyhow!("database unavailable")))
+            .expect_err("database failure");
+        let response = error.into_response();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let body = to_bytes(response.into_body(), 1024)
+            .await
+            .expect("read response body");
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&body).expect("decode response body"),
+            json!({"error": "Service temporarily unavailable"})
+        );
+    }
 }

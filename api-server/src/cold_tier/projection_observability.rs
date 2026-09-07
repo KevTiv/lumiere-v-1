@@ -8,7 +8,6 @@
 use anyhow::{Context, Result};
 use deadpool_postgres::Pool;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 /// Maximum number of UTF-8 bytes retained for a projection error message.
 pub const MAX_ERROR_MESSAGE_BYTES: usize = 4 * 1024;
@@ -132,26 +131,6 @@ pub async fn read_projection_statuses(pool: &Pool) -> Result<Vec<ProjectionStatu
         .await
         .context("read organization projection statuses")?;
     rows.iter().map(decode_status).collect()
-}
-
-/// Read one status as a JSON object, suitable for an operational endpoint.
-pub async fn read_projection_status_json(
-    pool: &Pool,
-    organization_id: u64,
-) -> Result<Option<Value>> {
-    read_projection_status(pool, organization_id)
-        .await?
-        .map(|status| serde_json::to_value(status).context("serialize projection status"))
-        .transpose()
-}
-
-/// Read all statuses as JSON objects, suitable for an operational endpoint.
-pub async fn read_projection_statuses_json(pool: &Pool) -> Result<Vec<Value>> {
-    read_projection_statuses(pool)
-        .await?
-        .into_iter()
-        .map(|status| serde_json::to_value(status).context("serialize projection status"))
-        .collect()
 }
 
 async fn upsert_status(

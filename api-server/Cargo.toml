@@ -84,6 +84,7 @@ spacetimedb-sdk = "2.0.1"
 [dev-dependencies]
 base64.workspace = true
 tokio.workspace = true
+tower.workspace = true
 
 [build-dependencies]
 serde_json = "1"

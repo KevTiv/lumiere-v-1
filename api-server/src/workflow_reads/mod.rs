@@ -401,8 +401,8 @@ fn sort_rows_by_id_desc(rows: &mut [Value]) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::candidate_scope::principal_matches_candidates;
+    use super::*;
     use serde_json::json;
     use std::collections::HashSet;
 

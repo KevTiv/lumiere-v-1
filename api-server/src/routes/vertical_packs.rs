@@ -16,7 +16,10 @@ use crate::web_session::OrgSession;
 async fn company_packs_get(
     State(state): State<Arc<AppState>>,
     Path(company_id): Path<u64>,
-    OrgSession { session, organization_id }: OrgSession,
+    OrgSession {
+        session,
+        organization_id,
+    }: OrgSession,
 ) -> Result<Json<Value>, ApiError> {
     let client = state.client_with_token(&session.stdb_token);
     let company_rows = client
