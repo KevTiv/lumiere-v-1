@@ -67,7 +67,7 @@ struct BootstrapReducerArg {
     default_company_name: String,
     default_company_code: String,
     default_company_currency_id: u64,
-    default_company_currency_code: Option<String>,
+    default_company_currency_code: Value,
     fiscal_year_end_month: u32,
     fiscal_year_end_day: u32,
     seed_form_configs: bool,
@@ -138,7 +138,7 @@ fn reducer_arg(body: &BootstrapTenantBody) -> BootstrapReducerArg {
         default_company_name: body.default_company_name.clone(),
         default_company_code: body.default_company_code.clone(),
         default_company_currency_id: body.default_company_currency_id,
-        default_company_currency_code: body.default_company_currency_code.clone(),
+        default_company_currency_code: stdb_option(body.default_company_currency_code.as_ref()),
         fiscal_year_end_month: body.fiscal_year_end_month,
         fiscal_year_end_day: body.fiscal_year_end_day,
         seed_form_configs: body.seed_form_configs,
@@ -355,7 +355,10 @@ mod tests {
 
         let value = serde_json::to_value(reducer_arg(&body)).expect("serialize reducer args");
         assert_eq!(value["default_company_code"], "MAIN");
-        assert_eq!(value["default_company_currency_code"], "USD");
+        assert_eq!(
+            value["default_company_currency_code"],
+            json!({ "some": "USD" })
+        );
         assert!(value.get("defaultCompanyCode").is_none());
         assert_eq!(value["organization"]["description"], json!({ "none": [] }));
         assert_eq!(
