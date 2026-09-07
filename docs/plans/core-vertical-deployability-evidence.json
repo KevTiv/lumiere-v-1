@@ -2,8 +2,8 @@
   "version": 1,
   "canonical_plan": "docs/plans/core-vertical-deployability-pruning-plan.md",
   "last_verified": {
-    "date": "2026-09-06",
-    "commit": "6ff9280f7"
+    "date": "2026-09-07",
+    "commit": "4856f94dc"
   },
   "relation_census": {
     "application": 458,
@@ -100,24 +100,31 @@
       "required": []
     },
     "C7": {
-      "status": "partial",
+      "status": "complete",
       "evidence": [
         "C7-R1 reconstruction and C7-R2 placement focused tests pass",
         "trusted operator-only reconstruction resolves placement configuration and the exact PostgreSQL sequence plus commit checksum without an HTTP/session route",
-        "lumiere-contracts v0.3.32 classifies 458 relations for restore and five target-local relations for recreation, including privileged service bindings",
+        "the pinned immutable lumiere-contracts v0.3.37 release classifies 458 relations for restore and five target-local relations for recreation, including privileged service bindings, and contains the corrected durable JSONB codec metadata",
         "the 2026-09-06 disposable PostgreSQL 14.20 to SpacetimeDB 2.8.2 all-module drill populated all 22 enabled modules across 202 source tables and 1710 rows, including relationship identifiers, totals, audit links, idempotency records, and an activity delete tombstone",
         "the all-module drill injected a post-commit failure, resumed the same run, repeated all 458 restored table digests with a fresh run ID, verified the exact sequence/checksum watermark, recreated five target-local relations, and retained 934 idempotent batch receipts",
         "generated restore dispatch advances all 445 auto-increment sequences while recreating exact persisted IDs, preventing post-recovery identifier collisions",
         "after reconstruction, sale order 2 continued from draft to sale and purchase order 2 continued from draft to purchase; duplicate confirmations were rejected by state guards with workflow-instance and stock-picking counts unchanged"
       ],
-      "required": [
-        "publish and pin the next immutable lumiere-contracts release containing the corrected durable JSONB codec metadata"
-      ]
+      "required": []
     },
     "C8": {
-      "status": "blocked",
-      "evidence": ["1318 operations remain semantically and idempotency unclassified with codecs unassigned"],
-      "required": ["zero unclassified operations", "generated query and subscription adoption", "handwritten bypass denial"]
+      "status": "partial",
+      "evidence": [
+        "the pinned immutable lumiere-contracts v0.3.37 application IR contains 1316 operations with zero unclassified semantic kinds, authorization scopes, idempotency policies, or unassigned codecs",
+        "all 1316 operation IDs are locked and operation-history verification passes",
+        "the generated query-row map covers 336 resources without an opaque fallback, and frontend STDB, query-hooks, UI, and web typechecks pass",
+        "the generated organization subscription compiler covers 281 structural query policies; the C8 ratchet covers 336 resources and 273 canonical subscriptions and rejects the retired handwritten ERP_ORG_SQL map",
+        "the Rust API consumer parses schema-versioned erp-org-sql.json structural descriptors, compiles reviewed predicates, and passes 20 stdb-auth tests plus 30 focused API query tests",
+        "lumiere-codegen, pinned-contract, ownership, storage-policy, operation-history, release-compatibility, and contract-drift checks pass against v0.3.37"
+      ],
+      "required": [
+        "obtain a fresh green P0 Playwright run after commit 4856f94dc; the previous run failed because the Rust API consumer still expected the retired array-shaped erp-org-sql.json artifact"
+      ]
     },
     "C9": {
       "status": "partial",
