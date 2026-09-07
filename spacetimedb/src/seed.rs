@@ -717,6 +717,109 @@ fn seed_ai_skill_certification_environment(
         });
 }
 
+/// Keep finance and HR prerequisites available for one company in the
+/// organization. Guards make this safe for fresh and preserved fixtures.
+fn ensure_finance_e2e_company_prerequisites(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+) -> Result<(), String> {
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or_else(|| format!("E2E fixture company {company_id} is missing"))?;
+    if company.organization_id != organization_id {
+        return Err(format!(
+            "E2E fixture company {company_id} belongs to another organization"
+        ));
+    }
+
+    let currency_id = company.currency_id;
+    if !ctx.db.currency_rate().iter().any(|rate| {
+        rate.organization_id == organization_id
+            && rate.company_id == Some(company_id)
+            && rate.from_currency_id == currency_id
+            && rate.to_currency_id == currency_id
+    }) {
+        ctx.db.currency_rate().insert(CurrencyRate {
+            id: 0,
+            organization_id,
+            from_currency_id: currency_id,
+            to_currency_id: currency_id,
+            rate: 1.0,
+            inverse_rate: 1.0,
+            date: ctx.timestamp,
+            company_id: Some(company_id),
+            created_at: ctx.timestamp,
+            metadata: Some("{\"seed\":true,\"canonical\":\"finance-e2e\"}".to_string()),
+        });
+    }
+
+    if !ctx.db.product_pricelist().iter().any(|pricelist| {
+        pricelist.organization_id == organization_id
+            && pricelist.is_active
+            && (pricelist.company_id.is_none() || pricelist.company_id == Some(company_id))
+    }) {
+        ctx.db.product_pricelist().insert(ProductPricelist {
+            id: 0,
+            organization_id,
+            company_id: Some(company_id),
+            name: format!("E2E Pricelist {company_id}"),
+            currency_id,
+            discount_policy: DiscountPolicy::WithDiscount,
+            is_active: true,
+            created_at: ctx.timestamp,
+        });
+    }
+
+    if !ctx.db.hr_employee().iter().any(|employee| {
+        employee.organization_id == organization_id
+            && employee.company_id == company_id
+            && employee.is_active
+            && employee.deleted_at.is_none()
+    }) {
+        ctx.db.hr_employee().insert(HrEmployee {
+            id: 0,
+            organization_id,
+            company_id,
+            user_id: None,
+            resource_id: None,
+            name: format!("E2E Employee {company_id}"),
+            employee_number: Some(format!("E2E-{company_id}")),
+            job_title: Some("Finance and Operations".to_string()),
+            job_id: None,
+            department_id: None,
+            parent_id: None,
+            coach_id: None,
+            work_email: Some(format!("e2e.employee.{company_id}@lumiere.demo")),
+            work_phone: None,
+            mobile_phone: None,
+            work_location: None,
+            work_contact_partner_id: None,
+            date_hired: Some(ctx.timestamp),
+            date_terminated: None,
+            employment_type: EmploymentType::FullTime,
+            gender: None,
+            birthday: None,
+            marital: None,
+            emergency_contact: None,
+            emergency_phone: None,
+            barcode: None,
+            pin: None,
+            image_url: None,
+            color: None,
+            is_active: true,
+            created_at: ctx.timestamp,
+            deleted_at: None,
+            metadata: Some("{\"seed\":true,\"canonical\":\"finance-e2e\"}".to_string()),
+        });
+    }
+
+    Ok(())
+}
+
 /// Repairs only the stable browser-fixture rows when a local database was
 /// seeded by an older revision. The main seed is intentionally idempotent, so
 /// this keeps rerunning the E2E setup safe without duplicating the full demo.
@@ -725,12 +828,16 @@ fn ensure_canonical_e2e_seed_rows(
     organization_id: u64,
 ) -> Result<(), String> {
     let seeder = ctx.sender();
-    let company_id = ctx
+    let company_ids = ctx
         .db
         .company()
         .iter()
-        .find(|company| company.organization_id == organization_id)
+        .filter(|company| company.organization_id == organization_id)
         .map(|company| company.id)
+        .collect::<Vec<_>>();
+    let company_id = company_ids
+        .first()
+        .copied()
         .ok_or_else(|| format!("seed organization {organization_id} has no company"))?;
 
     if !ctx
@@ -762,88 +869,8 @@ fn ensure_canonical_e2e_seed_rows(
         .map(|currency| currency.id)
         .ok_or_else(|| "canonical seed requires USD currency".to_string())?;
 
-    // PR/E2E runs preserve the module for speed. Backfill the canonical
-    // same-currency snapshot when an older preserved database predates it;
-    // the guard keeps rerunning the fixture idempotent and tenant-local.
-    if !ctx.db.currency_rate().iter().any(|rate| {
-        rate.organization_id == organization_id
-            && rate.company_id == Some(company_id)
-            && rate.from_currency_id == usd_currency_id
-            && rate.to_currency_id == usd_currency_id
-    }) {
-        ctx.db.currency_rate().insert(CurrencyRate {
-            id: 0,
-            organization_id,
-            from_currency_id: usd_currency_id,
-            to_currency_id: usd_currency_id,
-            rate: 1.0,
-            inverse_rate: 1.0,
-            date: ctx.timestamp,
-            company_id: Some(company_id),
-            created_at: ctx.timestamp,
-            metadata: Some("{\"seed\":true,\"canonical\":\"finance-e2e\"}".to_string()),
-        });
-    }
-
-    if !ctx
-        .db
-        .product_pricelist()
-        .iter()
-        .any(|pricelist| pricelist.organization_id == organization_id && pricelist.is_active)
-    {
-        ctx.db.product_pricelist().insert(ProductPricelist {
-            id: 0,
-            organization_id,
-            company_id: None,
-            name: "Default Pricelist".to_string(),
-            currency_id: usd_currency_id,
-            discount_policy: DiscountPolicy::WithDiscount,
-            is_active: true,
-            created_at: ctx.timestamp,
-        });
-    }
-
-    if !ctx.db.hr_employee().iter().any(|employee| {
-        employee.organization_id == organization_id
-            && employee.company_id == company_id
-            && employee.is_active
-            && employee.deleted_at.is_none()
-    }) {
-        ctx.db.hr_employee().insert(HrEmployee {
-            id: 0,
-            organization_id,
-            company_id,
-            user_id: None,
-            resource_id: None,
-            name: "E2E Employee".to_string(),
-            employee_number: Some("E2E-001".to_string()),
-            job_title: Some("Finance and Operations".to_string()),
-            job_id: None,
-            department_id: None,
-            parent_id: None,
-            coach_id: None,
-            work_email: Some("e2e.employee@lumiere.demo".to_string()),
-            work_phone: None,
-            mobile_phone: None,
-            work_location: None,
-            work_contact_partner_id: None,
-            date_hired: Some(ctx.timestamp),
-            date_terminated: None,
-            employment_type: EmploymentType::FullTime,
-            gender: None,
-            birthday: None,
-            marital: None,
-            emergency_contact: None,
-            emergency_phone: None,
-            barcode: None,
-            pin: None,
-            image_url: None,
-            color: None,
-            is_active: true,
-            created_at: ctx.timestamp,
-            deleted_at: None,
-            metadata: Some("{\"seed\":true,\"canonical\":\"finance-e2e\"}".to_string()),
-        });
+    for company_id in &company_ids {
+        ensure_finance_e2e_company_prerequisites(ctx, organization_id, *company_id)?;
     }
 
     let template_product = ctx
@@ -11088,6 +11115,17 @@ Prioritize high-severity findings and cite related records."#,
 
     activate_foundation_calendar_packs(ctx)?;
     activate_foundation_workflow_template_packs(ctx, org_id)?;
+
+    let seeded_company_ids = ctx
+        .db
+        .company()
+        .iter()
+        .filter(|company| company.organization_id == org_id)
+        .map(|company| company.id)
+        .collect::<Vec<_>>();
+    for seeded_company_id in seeded_company_ids {
+        ensure_finance_e2e_company_prerequisites(ctx, org_id, seeded_company_id)?;
+    }
 
     log::info!(
         "[seed] Complete. org_id={} company_id={} products=3 contacts=5 leads=5 opportunities=3 tickets=3 \
