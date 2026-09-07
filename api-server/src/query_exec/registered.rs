@@ -1,4 +1,5 @@
 use super::company_scope::optional_company_accounting_resource;
+use super::row_values::row_u64;
 use crate::error::ApiError;
 use stdb_auth::{erp_org_extra_where, select_org_scoped_sql, FieldAccessContext};
 
@@ -12,23 +13,6 @@ pub(super) fn select_registered_sql(
     accounting_company_id: Option<u64>,
     iot_company_id: Option<u64>,
 ) -> Result<String, ApiError> {
-    let order = match resource {
-        "opportunity-stages" | "activities" | "pricelist-items" => "",
-        "pos-loyalty-programs" | "sale-commissions" | "sale-commissions-pending" => {
-            " ORDER BY id DESC"
-        }
-        "landed-costs" | "landed-cost-lines" | "contact-tags" | "contact-categories"
-        | "contact-segments" | "quality-alerts" | "calendar-events" => "",
-        "mrp-bom-lines" => " ORDER BY bom_id ASC, sequence ASC",
-        "mrp-routing-workcenters" => " ORDER BY workcenter_id ASC, sequence ASC",
-        "deferred-revenue-schedules" => " ORDER BY id DESC",
-        "deferred-revenue-lines" => " ORDER BY schedule_id ASC, sequence ASC",
-        "revenue-recognition-rules" => " ORDER BY priority DESC, id DESC",
-        "workflow-activities" => " ORDER BY workflow_id ASC, sequence ASC",
-        "workflow-transitions" => " ORDER BY id ASC",
-        "workflow-workitems" => " ORDER BY instance_id ASC, id ASC",
-        _ => "",
-    };
     let extra_where_raw = erp_org_extra_where(resource).unwrap_or("");
     let extra_where = if let Some(cid) = inventory_company_id {
         extra_where_raw.replace(":company_id", &cid.to_string())
@@ -43,7 +27,7 @@ pub(super) fn select_registered_sql(
     } else {
         extra_where_raw.to_owned()
     };
-    let mut sql = select_org_scoped_sql(resource, table, organization_id, fa, &extra_where, order)
+    let mut sql = select_org_scoped_sql(resource, table, organization_id, fa, &extra_where, "")
         .map_err(ApiError::Internal)?;
     if resource == "calendar-events" {
         sql = sql
@@ -51,4 +35,64 @@ pub(super) fn select_registered_sql(
             .replace(", stop,", ", \"stop\",");
     }
     Ok(sql)
+}
+
+fn row_u64_value(row: &serde_json::Value, camel: &str, snake: &str) -> u64 {
+    row_u64(row, camel, snake)
+        .ok()
+        .flatten()
+        .unwrap_or_default()
+}
+
+pub(super) fn sort_registered_rows(resource: &str, rows: &mut [serde_json::Value]) {
+    match resource {
+        "pos-loyalty-programs"
+        | "sale-commissions"
+        | "sale-commissions-pending"
+        | "deferred-revenue-schedules" => {
+            rows.sort_by_key(|row| std::cmp::Reverse(row_u64_value(row, "id", "id")));
+        }
+        "mrp-bom-lines" => rows.sort_by_key(|row| {
+            (
+                row_u64_value(row, "bomId", "bom_id"),
+                row_u64_value(row, "sequence", "sequence"),
+                row_u64_value(row, "id", "id"),
+            )
+        }),
+        "mrp-routing-workcenters" => rows.sort_by_key(|row| {
+            (
+                row_u64_value(row, "workcenterId", "workcenter_id"),
+                row_u64_value(row, "sequence", "sequence"),
+                row_u64_value(row, "id", "id"),
+            )
+        }),
+        "deferred-revenue-lines" => rows.sort_by_key(|row| {
+            (
+                row_u64_value(row, "scheduleId", "schedule_id"),
+                row_u64_value(row, "sequence", "sequence"),
+                row_u64_value(row, "id", "id"),
+            )
+        }),
+        "revenue-recognition-rules" => rows.sort_by_key(|row| {
+            (
+                std::cmp::Reverse(row_u64_value(row, "priority", "priority")),
+                std::cmp::Reverse(row_u64_value(row, "id", "id")),
+            )
+        }),
+        "workflow-activities" => rows.sort_by_key(|row| {
+            (
+                row_u64_value(row, "workflowId", "workflow_id"),
+                row_u64_value(row, "sequence", "sequence"),
+                row_u64_value(row, "id", "id"),
+            )
+        }),
+        "workflow-transitions" => rows.sort_by_key(|row| row_u64_value(row, "id", "id")),
+        "workflow-workitems" => rows.sort_by_key(|row| {
+            (
+                row_u64_value(row, "instanceId", "instance_id"),
+                row_u64_value(row, "id", "id"),
+            )
+        }),
+        _ => {}
+    }
 }

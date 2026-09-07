@@ -58,7 +58,7 @@ pub(crate) fn authoritative_record_sql(
             company_id,
             field_access,
             &id_filter,
-            " LIMIT 1",
+            "",
         ),
         AuthoritativeResourceScope::Organization
         | AuthoritativeResourceScope::OrganizationOptionalCompany => select_org_scoped_sql(
@@ -67,7 +67,7 @@ pub(crate) fn authoritative_record_sql(
             organization_id,
             field_access,
             &id_filter,
-            " LIMIT 1",
+            "",
         ),
     }
     .map_err(ApiError::Internal)?;

@@ -448,6 +448,27 @@ pub async fn execute_resource_query_for_company(
         )));
     };
 
+    // These two published resource projections predate the immutable snapshot
+    // column rename. Translate only at the HTTP SQL boundary until the next
+    // contract release updates their registry entries.
+    if matches!(resource, "fx-revaluation-runs" | "labor-cost-snapshots") {
+        let mut columns = resolve_http_sql_columns(resource, fa).map_err(ApiError::Internal)?;
+        for column in &mut columns {
+            if column == "currency_code" {
+                *column = "currency_code_snapshot".to_owned();
+            }
+        }
+        let company_filter = accounting_company_id
+            .map(|company_id| format!(" AND company_id = {company_id}"))
+            .unwrap_or_default();
+        let sql = format!(
+            "SELECT {} FROM {} WHERE organization_id = {organization_id}{company_filter}",
+            columns.join(", "),
+            reg.table,
+        );
+        return client.query_sql(&sql).await.map_err(ApiError::internal);
+    }
+
     let sql = registered::select_registered_sql(
         resource,
         &reg.table,
@@ -499,6 +520,8 @@ pub async fn execute_resource_query_for_company(
     if resource == "contact-phone-identities" || resource == "payment-accounts" {
         filter_and_strip_archived(&mut rows);
     }
+
+    registered::sort_registered_rows(resource, &mut rows);
 
     if is_hr_pii_resource(resource) {
         let cols = resolve_http_sql_columns(resource, fa).map_err(ApiError::Internal)?;
@@ -596,7 +619,7 @@ mod tests {
         assert!(sql.contains("organization_id = 42"));
         assert!(sql.contains("company_id = 7"));
         assert!(sql.contains("id = 99"));
-        assert!(sql.ends_with("LIMIT 1"));
+        assert!(!sql.contains("LIMIT"));
     }
 
     #[test]

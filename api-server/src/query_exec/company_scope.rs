@@ -420,6 +420,7 @@ pub(crate) fn accounting_resource(resource: &str) -> bool {
             | "fiscal-years"
             | "fixed-assets"
             | "fx-revaluation-runs"
+            | "labor-cost-snapshots"
             | "partner-credit-controls"
             | "partner-credit-holds"
             | "payment-accounts"

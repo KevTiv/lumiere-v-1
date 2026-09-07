@@ -20,6 +20,52 @@ fn ai_skill_permission_allowed(field_access: Option<&FieldAccessContext>, action
     })
 }
 
+fn timestamp_value(value: Option<&Value>) -> (Option<i128>, String) {
+    let Some(value) = value else {
+        return (None, String::new());
+    };
+    if let Some(micros) = value
+        .as_object()
+        .and_then(|object| object.get("__timestamp_micros_since_unix_epoch__"))
+        .and_then(Value::as_i64)
+    {
+        return (Some(micros as i128), String::new());
+    }
+    if let Some(number) = value.as_i64() {
+        return (Some(number as i128), String::new());
+    }
+    (None, value.to_string())
+}
+
+fn row_field<'a>(row: &'a Value, field: &str) -> Option<&'a Value> {
+    row.get(field).or_else(|| match field {
+        "writeDate" => row.get("write_date"),
+        "createDate" => row.get("create_date"),
+        _ => None,
+    })
+}
+
+fn sort_rows_by_timestamp(rows: &mut [Value], field: &str, descending: bool) {
+    rows.sort_by(|a, b| {
+        let (a_number, a_text) = timestamp_value(row_field(a, field));
+        let (b_number, b_text) = timestamp_value(row_field(b, field));
+        let ordering = match (a_number, b_number) {
+            (Some(a), Some(b)) => a.cmp(&b),
+            _ => a_text.cmp(&b_text),
+        };
+        let ordering = if descending {
+            ordering.reverse()
+        } else {
+            ordering
+        };
+        ordering.then_with(|| {
+            let aid = a.get("id").and_then(Value::as_u64).unwrap_or_default();
+            let bid = b.get("id").and_then(Value::as_u64).unwrap_or_default();
+            aid.cmp(&bid)
+        })
+    });
+}
+
 pub(crate) async fn read_ai_chat_sessions(
     client: &StdbClient,
     organization_id: u64,
@@ -27,9 +73,11 @@ pub(crate) async fn read_ai_chat_sessions(
 ) -> Result<Vec<Value>, ApiError> {
     let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
     let sql = format!(
-                "SELECT id, organization_id, company_id, session_key, title, route, module, active_tab, archived, create_uid, create_date, write_uid, write_date, metadata FROM ai_chat_session WHERE organization_id = {organization_id} AND create_uid = {id} ORDER BY write_date DESC"
+                "SELECT id, organization_id, company_id, session_key, title, route, module, active_tab, archived, create_uid, create_date, write_uid, write_date, metadata FROM ai_chat_session WHERE organization_id = {organization_id} AND create_uid = {id}"
             );
-    return client.query_sql(&sql).await.map_err(ApiError::internal);
+    let mut rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
+    sort_rows_by_timestamp(&mut rows, "writeDate", true);
+    Ok(rows)
 }
 
 pub(crate) async fn read_ai_chat_messages(
@@ -39,9 +87,11 @@ pub(crate) async fn read_ai_chat_messages(
 ) -> Result<Vec<Value>, ApiError> {
     let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
     let sql = format!(
-                "SELECT id, organization_id, company_id, session_key, role, content, sources_json, ui_context_json, model, duration_ms, status, created_by, create_date, metadata FROM ai_chat_message WHERE organization_id = {organization_id} AND created_by = {id} ORDER BY create_date ASC"
+                "SELECT id, organization_id, company_id, session_key, role, content, sources_json, ui_context_json, model, duration_ms, status, created_by, create_date, metadata FROM ai_chat_message WHERE organization_id = {organization_id} AND created_by = {id}"
             );
-    return client.query_sql(&sql).await.map_err(ApiError::internal);
+    let mut rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
+    sort_rows_by_timestamp(&mut rows, "createDate", false);
+    Ok(rows)
 }
 
 pub(crate) async fn read_ai_action_drafts(
@@ -134,7 +184,7 @@ pub(super) async fn read_ai_action_drafts_inbox(
 ) -> Result<Vec<Value>, ApiError> {
     // `ai_action_draft` has `organization_id`; `company_id IN (...)` is redundant and
     // SpacetimeDB SQL does not support `IN` clauses. Scope by org only.
-    // HTTP SQL also rejects `ORDER BY id DESC` on this table — sort in Rust.
+    // HTTP SQL does not support server-side ordering on this table — sort in Rust.
     let sql = format!(
         "SELECT id, organization_id, company_id, status, reducer_name, params_json, summary, confidence, elevated, warnings_json, source_query, ui_context_json, proposed_by, reviewed_by, reviewed_at, reject_reason, executed_at, execution_error, execution_record_id, expires_at, create_date, write_date, metadata FROM ai_action_draft WHERE organization_id = {organization_id} AND status = 'pending'"
     );
@@ -157,9 +207,10 @@ pub(super) async fn read_ai_insights(
     let sql = format!("SELECT {} FROM ai_insight", col.join(", "));
     let mut rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
     rows.retain(
-        |r| match r.get("companyId").or_else(|| r.get("company_id")) {
-            None | Some(Value::Null) => true,
-            Some(v) => v.as_u64().is_some_and(|cid| company_set.contains(&cid)),
+        |r| match super::row_values::row_u64(r, "companyId", "company_id") {
+            Ok(None) => true,
+            Ok(Some(cid)) => company_set.contains(&cid),
+            Err(_) => false,
         },
     );
     return Ok(rows);
@@ -180,9 +231,10 @@ pub(super) async fn read_ai_document_processing_jobs(
     let sql = format!("SELECT {} FROM ai_document_processing_job", col.join(", "));
     let mut rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
     rows.retain(
-        |r| match r.get("companyId").or_else(|| r.get("company_id")) {
-            None | Some(Value::Null) => true,
-            Some(v) => v.as_u64().is_some_and(|cid| company_set.contains(&cid)),
+        |r| match super::row_values::row_u64(r, "companyId", "company_id") {
+            Ok(None) => true,
+            Ok(Some(cid)) => company_set.contains(&cid),
+            Err(_) => false,
         },
     );
     return Ok(rows);
