@@ -1,9 +1,10 @@
-//! Auth-hardening session tests (Phase 1–2): no anonymous admin, JWT-bound identity.
+//! Auth-hardening session tests (Phase 1–2): no anonymous admin, database-bound identity.
 
 use api_server::config::Config;
-use api_server::session::{decode_identity_hex_from_stdb_token, resolve_api_session};
+use api_server::session::resolve_api_session;
 use api_server::state::AppState;
 use base64::{engine::general_purpose::STANDARD, Engine};
+use stdb_client::normalize_spacetime_identity_header;
 
 fn test_config(server_token: Option<&str>, dev_mock_org_id: Option<u64>) -> Config {
     Config {
@@ -58,22 +59,8 @@ async fn no_bearer_or_cookie_returns_none_even_with_server_token_configured() {
     assert!(session.is_none());
 }
 
-#[tokio::test]
-async fn x_stdb_identity_header_does_not_grant_identity_without_jwt_claim() {
-    let state = AppState::new(test_config(None, None));
-    let token = fake_jwt(r#"{"iss":"spacetimedb"}"#);
-    let auth = format!("Bearer {token}");
-    let session = resolve_api_session(&state, Some(&auth), None, Some(VALID_IDENTITY_HEX))
-        .await
-        .expect("resolve should not error");
-    assert!(session.is_none());
-}
-
 #[test]
-fn decode_identity_hex_from_stdb_token_reads_hex_identity_claim() {
-    let token = fake_jwt(&format!(r#"{{"hex_identity":"{VALID_IDENTITY_HEX}"}}"#));
-    assert_eq!(
-        decode_identity_hex_from_stdb_token(&token).as_deref(),
-        Some(VALID_IDENTITY_HEX)
-    );
+fn alg_none_jwt_payload_is_not_an_authenticated_identity_header() {
+    let token = fake_jwt(&format!(r#"{{"identity":"{VALID_IDENTITY_HEX}"}}"#));
+    assert_eq!(normalize_spacetime_identity_header(&token), None);
 }

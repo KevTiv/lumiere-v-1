@@ -21,6 +21,32 @@ pub(super) struct ClientSubscribe {
     pub(super) active_company_id: Option<u64>,
 }
 
+/// A realtime client may express company intent, but the server derives the
+/// only company scope from the authenticated organization membership.  The
+/// subscription is an invalidation signal; HTTP remains authoritative for
+/// the subsequent company-scoped read.
+pub(super) fn validate_requested_company_scope(
+    requested_company_ids: &[u64],
+    active_company_id: Option<u64>,
+    allowed_company_id: u64,
+) -> Result<(), ApiError> {
+    if allowed_company_id == 0 {
+        return Err(ApiError::Forbidden(
+            "session has no valid company scope".into(),
+        ));
+    }
+    if active_company_id.is_some_and(|id| id != allowed_company_id)
+        || requested_company_ids
+            .iter()
+            .any(|id| *id != allowed_company_id)
+    {
+        return Err(ApiError::Forbidden(
+            "company scope is not permitted for this session".into(),
+        ));
+    }
+    Ok(())
+}
+
 pub(super) fn parse_tables_from_sql(sql: &str) -> HashSet<String> {
     let mut out = HashSet::new();
     let lower = sql.to_ascii_lowercase();
@@ -93,13 +119,18 @@ pub(super) fn authorized_resources(
     requested: &[String],
     field_access: Option<&FieldAccessContext>,
 ) -> Result<Vec<String>, ApiError> {
+    let Some(field_access) = field_access else {
+        return Err(ApiError::Forbidden(
+            "realtime requires an authenticated field-access context".into(),
+        ));
+    };
     validate_resources(requested)?;
     Ok(requested
         .iter()
         .map(|resource| resource.trim())
         .filter(|resource| {
             bootstrap_realtime_resource(resource)
-                || has_resource_read_permission(field_access, resource)
+                || has_resource_read_permission(Some(field_access), resource)
         })
         .map(str::to_owned)
         .collect())

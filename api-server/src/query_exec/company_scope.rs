@@ -165,29 +165,14 @@ pub async fn resolve_inventory_company_id(
     identity_hex: &str,
     requested_company_id: Option<u64>,
 ) -> Result<u64, ApiError> {
-    let identity = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
-    let sql = format!(
-        "SELECT id, organization_id, company_id, is_active FROM user_organization WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
-    );
-    let memberships = client.query_sql(&sql).await.map_err(ApiError::internal)?;
-    let membership = memberships
-        .first()
-        .ok_or_else(|| ApiError::Forbidden("No active organization membership".into()))?;
-
-    let membership_company =
-        row_u64(membership, "companyId", "company_id").map_err(ApiError::Internal)?;
-    let allowed = match membership_company {
-        Some(company_id) if company_id > 0 => company_id,
-        _ => default_company_id(client, organization_id)
-            .await?
-            .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
-    };
-
-    enforce_requested_company(
-        allowed,
+    resolve_membership_company_id(
+        client,
+        organization_id,
+        identity_hex,
         requested_company_id,
         "Cannot query another company's inventory data",
     )
+    .await
 }
 
 /// Resolve the only Purchasing company visible to the authenticated membership.
@@ -197,27 +182,14 @@ pub async fn resolve_purchasing_company_id(
     identity_hex: &str,
     requested_company_id: Option<u64>,
 ) -> Result<u64, ApiError> {
-    let identity = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
-    let sql = format!(
-        "SELECT id, organization_id, company_id, is_active FROM user_organization WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
-    );
-    let memberships = client.query_sql(&sql).await.map_err(ApiError::internal)?;
-    let membership = memberships
-        .first()
-        .ok_or_else(|| ApiError::Forbidden("No active organization membership".into()))?;
-    let membership_company =
-        row_u64(membership, "companyId", "company_id").map_err(ApiError::Internal)?;
-    let allowed = match membership_company {
-        Some(company_id) if company_id > 0 => company_id,
-        _ => default_company_id(client, organization_id)
-            .await?
-            .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
-    };
-    enforce_requested_company(
-        allowed,
+    resolve_membership_company_id(
+        client,
+        organization_id,
+        identity_hex,
         requested_company_id,
         "Cannot query another company's Purchasing data",
     )
+    .await
 }
 
 /// Resolve the only Accounting company visible to the authenticated membership.
@@ -233,27 +205,14 @@ pub async fn resolve_accounting_company_id(
     identity_hex: &str,
     requested_company_id: Option<u64>,
 ) -> Result<u64, ApiError> {
-    let identity = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
-    let sql = format!(
-        "SELECT id, organization_id, company_id, is_active FROM user_organization WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
-    );
-    let memberships = client.query_sql(&sql).await.map_err(ApiError::internal)?;
-    let membership = memberships
-        .first()
-        .ok_or_else(|| ApiError::Forbidden("No active organization membership".into()))?;
-    let membership_company =
-        row_u64(membership, "companyId", "company_id").map_err(ApiError::Internal)?;
-    let allowed = match membership_company {
-        Some(company_id) if company_id > 0 => company_id,
-        _ => default_company_id(client, organization_id)
-            .await?
-            .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
-    };
-    enforce_requested_company(
-        allowed,
+    resolve_membership_company_id(
+        client,
+        organization_id,
+        identity_hex,
         requested_company_id,
         "Cannot query another company's accounting data",
     )
+    .await
 }
 
 /// Resolve the only IoT company visible to this authenticated membership.
@@ -267,27 +226,14 @@ pub async fn resolve_iot_company_id(
     identity_hex: &str,
     requested_company_id: Option<u64>,
 ) -> Result<u64, ApiError> {
-    let identity = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
-    let sql = format!(
-        "SELECT id, organization_id, company_id, is_active FROM user_organization WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
-    );
-    let memberships = client.query_sql(&sql).await.map_err(ApiError::internal)?;
-    let membership = memberships
-        .first()
-        .ok_or_else(|| ApiError::Forbidden("No active organization membership".into()))?;
-    let membership_company =
-        row_u64(membership, "companyId", "company_id").map_err(ApiError::Internal)?;
-    let allowed = match membership_company {
-        Some(company_id) if company_id > 0 => company_id,
-        _ => default_company_id(client, organization_id)
-            .await?
-            .ok_or_else(|| ApiError::Forbidden("No company assigned".into()))?,
-    };
-    enforce_requested_company(
-        allowed,
+    resolve_membership_company_id(
+        client,
+        organization_id,
+        identity_hex,
         requested_company_id,
         "Cannot query another company's IoT data",
     )
+    .await
 }
 
 pub(crate) fn crm_resource(resource: &str) -> bool {

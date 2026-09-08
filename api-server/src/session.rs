@@ -1,6 +1,5 @@
-//! Port of `frontend/web/lib/api-session.ts` (JWT + `user_organization` + field-access context).
+//! Session resolution from an authenticated SpacetimeDB token and membership.
 
-use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::Value;
 
 use crate::error::ApiError;
@@ -12,22 +11,6 @@ use stdb_auth::{
 };
 use stdb_client::StdbClient;
 use stdb_config::runtime_is_production;
-
-const ADMIN_TOKEN_PLACEHOLDERS: &[&str] = &[
-    "",
-    "your-server-token-here",
-    "changeme",
-    "replace-me",
-    "replace_me",
-];
-
-fn is_usable_admin_token(raw: &str) -> bool {
-    let t = raw.trim();
-    !t.is_empty()
-        && !ADMIN_TOKEN_PLACEHOLDERS
-            .iter()
-            .any(|p| p.eq_ignore_ascii_case(t))
-}
 
 pub fn normalize_identity_hex_for_sql(identity: &str) -> String {
     let s = identity.trim();
@@ -54,66 +37,6 @@ pub fn parse_stdb_identity_hex(raw: &str) -> Option<String> {
         return Some(s.to_ascii_lowercase());
     }
     None
-}
-
-fn jwt_claim_as_identity_hex(s: &str) -> Option<String> {
-    parse_stdb_identity_hex(s)
-}
-
-pub fn decode_identity_hex_from_stdb_token(token: &str) -> Option<String> {
-    let parts: Vec<&str> = token.split('.').collect();
-    if parts.len() < 2 {
-        return None;
-    }
-    let mut b64 = parts[1].replace('-', "+").replace('_', "/");
-    let pad = (4 - (b64.len() % 4)) % 4;
-    b64.push_str(&"=".repeat(pad));
-    let bytes = STANDARD.decode(b64.as_bytes()).ok()?;
-    let json: Value = serde_json::from_slice(&bytes).ok()?;
-    if let Some(s) = json.get("identity").and_then(|v| v.as_str()) {
-        if let Some(h) = jwt_claim_as_identity_hex(s) {
-            return Some(h);
-        }
-    }
-    // Hybrid / WorkOS tokens: real Spacetime identity is here; `sub` may be a non-hex UUID.
-    if let Some(s) = json.get("hex_identity").and_then(|v| v.as_str()) {
-        if let Some(h) = jwt_claim_as_identity_hex(s) {
-            return Some(h);
-        }
-    }
-    if let Some(s) = json.get("sub").and_then(|v| v.as_str()) {
-        if let Some(h) = jwt_claim_as_identity_hex(s) {
-            return Some(h);
-        }
-    }
-    None
-}
-
-pub async fn query_user_organization_with_fallback(
-    client: &StdbClient,
-    identity_hex: &str,
-    admin_token: Option<&str>,
-) -> Result<Vec<Value>, String> {
-    let Some(id) = parse_stdb_identity_hex(identity_hex) else {
-        return Ok(vec![]);
-    };
-    let sql = select_user_organization_for_identity_sql(&id, None).map_err(|e| e.to_string())?;
-
-    let try_user = client.query_sql(&sql).await;
-    match try_user {
-        Ok(rows) if !rows.is_empty() => return Ok(rows),
-        Ok(_) | Err(_) => {}
-    }
-
-    let Some(admin) = admin_token.filter(|t| is_usable_admin_token(t)) else {
-        return Ok(vec![]);
-    };
-
-    let admin_client = client.with_token(admin);
-    admin_client
-        .query_sql(&sql)
-        .await
-        .map_err(|e| e.to_string())
 }
 
 pub async fn load_field_access_context(
@@ -364,19 +287,20 @@ pub async fn resolve_api_session(
         return Ok(None);
     };
 
-    // Hint from `x-stdb-identity` / `stdb_identity` cookie — not trusted without a matching JWT.
+    // Hint from `x-stdb-identity` / `stdb_identity` cookie is never an authority source.
     let _ = x_std_identity;
 
-    let Some(identity_hex) = decode_identity_hex_from_stdb_token(&stdb_token) else {
-        return Ok(None);
-    };
-
     let client = state.client_with_token(&stdb_token);
-
-    let admin = state.config.stdb_server_token.as_deref();
+    let identity_hex = client
+        .authenticated_identity()
+        .await
+        .map_err(|_| ApiError::Unauthorized)?;
 
     let mut organization_id: Option<u64> = None;
-    let rows = query_user_organization_with_fallback(&client, &identity_hex, admin)
+    let membership_sql = select_user_organization_for_identity_sql(&identity_hex, None)
+        .map_err(ApiError::Internal)?;
+    let rows = client
+        .query_sql(&membership_sql)
         .await
         .map_err(|e| ApiError::Internal(format!("user_organization query: {e}")))?;
     let org = rows.iter().find(|o| {
@@ -400,8 +324,7 @@ pub async fn resolve_api_session(
     if let Some(oid) = organization_id {
         field_access = load_field_access_context(&client, &identity_hex, oid)
             .await
-            .ok()
-            .flatten();
+            .map_err(|e| ApiError::Internal(format!("field access query: {e}")))?;
     }
 
     Ok(Some(ApiSession {
@@ -420,30 +343,6 @@ mod tests {
     use super::test_support::test_config;
     use super::*;
 
-    fn fake_jwt(payload_json: &str) -> String {
-        let header = STANDARD.encode(b"{\"alg\":\"none\"}");
-        let payload = STANDARD.encode(payload_json.as_bytes());
-        format!("{header}.{payload}.sig")
-    }
-
-    const VALID_IDENTITY_HEX: &str =
-        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-
-    #[test]
-    fn decode_identity_from_jwt_identity_claim() {
-        let token = fake_jwt(&format!(r#"{{"identity":"{VALID_IDENTITY_HEX}"}}"#));
-        assert_eq!(
-            decode_identity_hex_from_stdb_token(&token).as_deref(),
-            Some(VALID_IDENTITY_HEX)
-        );
-    }
-
-    #[test]
-    fn decode_identity_rejects_non_hex_sub() {
-        let token = fake_jwt(r#"{"sub":"00000000-0000-4000-8000-000000000000"}"#);
-        assert!(decode_identity_hex_from_stdb_token(&token).is_none());
-    }
-
     #[tokio::test]
     async fn anonymous_request_does_not_use_server_token() {
         let state = AppState::new(test_config(Some("real-admin-jwt-token-value")));
@@ -451,28 +350,5 @@ mod tests {
             .await
             .expect("resolve should not error");
         assert!(session.is_none());
-    }
-
-    #[tokio::test]
-    async fn identity_header_without_jwt_claim_is_rejected() {
-        let state = AppState::new(test_config(None));
-        let token = fake_jwt(r#"{"iss":"spacetimedb"}"#);
-        let auth = format!("Bearer {token}");
-        let session = resolve_api_session(&state, Some(&auth), None, Some(VALID_IDENTITY_HEX))
-            .await
-            .expect("resolve should not error");
-        assert!(session.is_none());
-    }
-
-    #[tokio::test]
-    async fn bearer_with_identity_claim_resolves_session() {
-        let state = AppState::new(test_config(None));
-        let token = fake_jwt(&format!(r#"{{"identity":"{VALID_IDENTITY_HEX}"}}"#));
-        let auth = format!("Bearer {token}");
-        let session = resolve_api_session(&state, Some(&auth), None, None)
-            .await
-            .expect("resolve should not error");
-        assert!(session.is_some());
-        assert_eq!(session.unwrap().identity_hex, VALID_IDENTITY_HEX);
     }
 }

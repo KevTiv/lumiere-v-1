@@ -20,10 +20,14 @@ use tower_cookies::Cookies;
 use crate::error::ApiError;
 use crate::session::resolve_api_session;
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::stdb_identity_hex_hint;
 
 #[cfg(test)]
-use self::subscription::{authorized_resources, subscription_select_all, validate_resources};
+use self::subscription::{
+    authorized_resources, subscription_select_all, validate_requested_company_scope,
+    validate_resources,
+};
 #[cfg(test)]
 use stdb_auth::{
     create_client_subscriptions, full_client_subscription_resources_vec, SubscriptionQueryContext,
@@ -61,11 +65,11 @@ pub async fn realtime_ws_upgrade(
         .await?
         .ok_or(ApiError::Unauthorized)?;
 
-    let org_id = session
-        .organization_id
-        .ok_or_else(|| ApiError::Forbidden("No organization assigned".into()))?;
+    let client = state.client_with_token(&session.stdb_token);
+    let context =
+        TrustedOperationContext::from_session(session, client, "erp.subscribe_resources")?;
 
-    Ok(ws.on_upgrade(move |socket| socket::handle_realtime_socket(socket, state, session, org_id)))
+    Ok(ws.on_upgrade(move |socket| socket::handle_realtime_socket(socket, state, context)))
 }
 
 /// POST body subscribe (for clients that cannot send WS text first); returns upgrade URL hint — optional helper.
@@ -152,10 +156,33 @@ mod tests {
     #[test]
     fn realtime_authorization_keeps_bootstrap_and_drops_ungranted_domain_resources() {
         let requested = vec!["auth".to_string(), "contacts".to_string()];
-        assert_eq!(
-            authorized_resources(&requested, None).expect("known resources should validate"),
-            vec!["auth".to_string()]
-        );
+        assert!(authorized_resources(&requested, None).is_err());
+    }
+
+    #[test]
+    fn realtime_authorization_drops_resources_without_fresh_field_access() {
+        let access = stdb_auth::FieldAccessContext {
+            organization_id: 7,
+            role_id: 9,
+            role_name: "member".into(),
+            is_superuser: false,
+            role_permissions: vec!["contact:read".into()],
+            identity_hex: "actor".into(),
+            field_permissions: Vec::new(),
+        };
+        let requested = vec!["employees".to_string(), "iot-hubs".to_string()];
+        assert!(authorized_resources(&requested, Some(&access))
+            .expect("authorization should fail closed by filtering")
+            .is_empty());
+    }
+
+    #[test]
+    fn realtime_company_scope_is_membership_derived() {
+        assert!(validate_requested_company_scope(&[], None, 11).is_ok());
+        assert!(validate_requested_company_scope(&[11], Some(11), 11).is_ok());
+        assert!(validate_requested_company_scope(&[12], None, 11).is_err());
+        assert!(validate_requested_company_scope(&[], Some(12), 11).is_err());
+        assert!(validate_requested_company_scope(&[11, 12], Some(11), 11).is_err());
     }
 
     #[test]

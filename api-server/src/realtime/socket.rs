@@ -7,23 +7,21 @@ use axum::extract::ws::{Message, WebSocket};
 use serde_json::json;
 
 use crate::error::ApiError;
-use crate::query_exec::{
-    company_ids_for_organization, crm_resource, resolve_crm_company_id, resolve_sales_company_id,
-};
-use crate::session::ApiSession;
+use crate::query_exec::{crm_resource, resolve_sales_company_id};
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
 use stdb_auth::{create_client_subscriptions, SubscriptionQueryContext};
 
 use super::bridge;
 use super::subscription::{
-    authorized_resources, parse_tables_from_sql, subscription_select_all, ClientSubscribe,
+    authorized_resources, parse_tables_from_sql, subscription_select_all,
+    validate_requested_company_scope, ClientSubscribe,
 };
 
 pub(super) async fn handle_realtime_socket(
     mut socket: WebSocket,
     state: Arc<AppState>,
-    session: ApiSession,
-    session_org: u64,
+    context: TrustedOperationContext,
 ) {
     let first = match socket.recv().await {
         Some(Ok(Message::Text(t))) => t,
@@ -62,6 +60,8 @@ pub(super) async fn handle_realtime_socket(
         }
     };
 
+    let session_org = context.organization_id();
+
     if sub.organization_id != session_org {
         let _ = socket
             .send(Message::Text(
@@ -72,7 +72,7 @@ pub(super) async fn handle_realtime_socket(
         return;
     }
 
-    let resources = match authorized_resources(&sub.resources, session.field_access.as_ref()) {
+    let resources = match authorized_resources(&sub.resources, Some(context.field_access())) {
         Ok(resources) => resources,
         Err(ApiError::BadRequest(message)) => {
             let _ = socket
@@ -82,51 +82,75 @@ pub(super) async fn handle_realtime_socket(
                 .await;
             return;
         }
-        Err(_) => unreachable!("resource authorization only returns bad requests"),
+        Err(error) => {
+            let _ = socket
+                .send(Message::Text(
+                    json!({ "type": "error", "error": error.to_string() }).to_string(),
+                ))
+                .await;
+            return;
+        }
     };
 
-    let session_client = state.client_with_token(&session.stdb_token);
-    let organization_company_ids = match company_ids_for_organization(
-        &session_client,
+    let allowed_company_id = match resolve_sales_company_id(
+        context.client(),
         session_org,
-        session.field_access.as_ref(),
+        context.actor_identity(),
+        sub.active_company_id,
     )
     .await
     {
-        Ok(ids) => ids.into_iter().collect::<HashSet<_>>(),
+        Ok(company_id) => company_id,
         Err(_) => {
             let _ = socket
                 .send(Message::Text(
-                    json!({ "type": "error", "error": "company scope validation failed" })
+                    json!({ "type": "error", "error": "activeCompanyId is not permitted for this session" })
                         .to_string(),
                 ))
                 .await;
             return;
         }
     };
-    if sub
-        .company_ids
-        .iter()
-        .any(|company_id| !organization_company_ids.contains(company_id))
-    {
+    if let Err(error) = validate_requested_company_scope(
+        &sub.company_ids,
+        sub.active_company_id,
+        allowed_company_id,
+    ) {
         let _ = socket
             .send(Message::Text(
-                json!({ "type": "error", "error": "companyId does not belong to session organization" })
-                    .to_string(),
+                json!({ "type": "error", "error": error.to_string() }).to_string(),
+            ))
+            .await;
+        return;
+    }
+    let context = match context.with_company_scope(vec![allowed_company_id]) {
+        Ok(context) => context,
+        Err(error) => {
+            let _ = socket
+                .send(Message::Text(
+                    json!({ "type": "error", "error": error.to_string() }).to_string(),
+                ))
+                .await;
+            return;
+        }
+    };
+    if let Err(error) = context.require_company_scope(&[allowed_company_id]) {
+        let _ = socket
+            .send(Message::Text(
+                json!({ "type": "error", "error": error.to_string() }).to_string(),
             ))
             .await;
         return;
     }
 
-    let identity_hex = (session.identity_hex != "unknown").then_some(session.identity_hex.as_str());
-    let legacy_company_ids = (!sub.company_ids.is_empty()).then_some(sub.company_ids.as_slice());
+    let company_ids = [allowed_company_id];
     let base_ctx = SubscriptionQueryContext {
         organization_id: Some(session_org),
-        company_ids: legacy_company_ids,
-        identity_hex,
+        company_ids: Some(&company_ids),
+        identity_hex: Some(context.actor_identity()),
         role_names: None,
         manager_employee_id: None,
-        field_access: session.field_access.as_ref(),
+        field_access: Some(context.field_access()),
     };
 
     let crm_resources: Vec<String> = resources
@@ -165,29 +189,9 @@ pub(super) async fn handle_realtime_socket(
     let queries = match create_client_subscriptions(&non_crm_resources, &base_ctx) {
         Ok(mut queries) => {
             if !crm_resources.is_empty() {
-                let allowed_company_id = match resolve_crm_company_id(
-                    &session_client,
-                    session_org,
-                    &session.identity_hex,
-                    sub.active_company_id,
-                )
-                .await
-                {
-                    Ok(company_id) => company_id,
-                    Err(_) => {
-                        let _ = socket
-                            .send(Message::Text(
-                                json!({ "type": "error", "error": "activeCompanyId is not permitted for this session" })
-                                    .to_string(),
-                            ))
-                            .await;
-                        return;
-                    }
-                };
                 resolved_crm_company_id = Some(allowed_company_id);
-                let crm_company_ids = [allowed_company_id];
                 let crm_ctx = SubscriptionQueryContext {
-                    company_ids: Some(&crm_company_ids),
+                    company_ids: Some(&company_ids),
                     ..base_ctx
                 };
                 for resource in &crm_resources {
@@ -211,25 +215,6 @@ pub(super) async fn handle_realtime_socket(
                 }
             }
             if !generated_resources.is_empty() {
-                let allowed_company_id = match resolve_sales_company_id(
-                    &session_client,
-                    session_org,
-                    &session.identity_hex,
-                    sub.active_company_id,
-                )
-                .await
-                {
-                    Ok(company_id) => company_id,
-                    Err(_) => {
-                        let _ = socket
-                            .send(Message::Text(
-                                json!({ "type": "error", "error": "activeCompanyId is not permitted for this session" })
-                                    .to_string(),
-                            ))
-                            .await;
-                        return;
-                    }
-                };
                 for resource in &generated_resources {
                     match crate::cold_tier::read_descriptor::compile_subscription_sql(
                         resource,
@@ -303,7 +288,7 @@ pub(super) async fn handle_realtime_socket(
     let (sdk_tx, mut sdk_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
 
     let token = if crm_resources.is_empty() {
-        session.stdb_token.clone()
+        context.client().token().to_owned()
     } else {
         let Some(token) = state
             .config

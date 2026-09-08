@@ -1,7 +1,8 @@
 //! Session command contracts, argument normalization, and scoped reducer calls.
 
 use crate::error::ApiError;
-use crate::state::AppState;
+use crate::query_exec::resolve_membership_company_id;
+use crate::trusted_context::TrustedOperationContext;
 use axum::Json;
 use serde_json::{json, Value};
 use stdb_client::{Exposure, ReducerCall, ReducerContract, StdbClientError};
@@ -104,33 +105,50 @@ fn snake_to_lower_camel(name: &str) -> String {
 }
 
 pub(crate) async fn execute_reducer_call(
-    state: &AppState,
-    stdb_token: &str,
+    context: &TrustedOperationContext,
     contract: &'static ReducerContract,
     args: Vec<Value>,
-    organization_id: u64,
 ) -> Result<Json<Value>, ApiError> {
+    context.ensure_contract(contract)?;
+    let organization_id = context.organization_id();
     let company_ids = validate_reducer_scope(contract, &args, organization_id)?;
+    context.require_company_scope(&company_ids)?;
+    tracing::info!(
+        operation_id = contract.contract_operation_id,
+        correlation_id = context.correlation_id(),
+        organization_id,
+        actor_identity = context.actor_identity(),
+        "dispatching trusted reducer operation"
+    );
     let call = ReducerCall::from_name(contract.name, Value::Array(args))
         .map_err(|error| ApiError::Unprocessable(error.to_string()))?;
-    let client = state.client_with_token(stdb_token);
-    for company_id in company_ids {
-        let rows = state
-            .stdb
-            .query_sql(&format!(
-                "SELECT id FROM company WHERE id = {company_id} AND organization_id = {organization_id} LIMIT 1"
-            ))
-            .await
-            .map_err(ApiError::internal)?;
-        if rows.is_empty() {
-            return Err(ApiError::Forbidden(
-                "company scope mismatch for reducer call".into(),
-            ));
-        }
-    }
-    client.call_reducer(call).await.map_err(map_reducer_error)?;
+    context
+        .client()
+        .call_reducer(call)
+        .await
+        .map_err(map_reducer_error)?;
 
     Ok(Json(json!({ "ok": true })))
+}
+
+/// Resolve every reducer company reference against the authenticated actor's
+/// active membership. Organization membership currently grants one company;
+/// passing multiple distinct company ids therefore fails closed.
+pub(crate) async fn authorize_reducer_company_scope(
+    context: &TrustedOperationContext,
+    company_ids: Vec<u64>,
+) -> Result<Vec<u64>, ApiError> {
+    for company_id in &company_ids {
+        resolve_membership_company_id(
+            context.client(),
+            context.organization_id(),
+            context.actor_identity(),
+            Some(*company_id),
+            "company scope mismatch for reducer call",
+        )
+        .await?;
+    }
+    Ok(company_ids)
 }
 
 /// Preserve reducer-level authorization and validation failures at the BFF
@@ -154,7 +172,7 @@ fn map_reducer_error(error: anyhow::Error) -> ApiError {
     }
 }
 
-fn validate_reducer_scope(
+pub(crate) fn validate_reducer_scope(
     contract: &'static ReducerContract,
     args: &[Value],
     session_organization_id: u64,
@@ -511,6 +529,20 @@ mod tests {
         assert!(matches!(
             named_command_args(contract, json!({}), 7),
             Err(ApiError::Unprocessable(_))
+        ));
+    }
+
+    #[test]
+    fn named_command_rejects_camel_case_forged_organization_field() {
+        let contract = stdb_client::reducer_contract("create_lead").expect("create_lead");
+        assert!(matches!(
+            named_command_args(
+                contract,
+                json!({ "organizationId": 99, "params": {} }),
+                7,
+            ),
+            Err(ApiError::Unprocessable(message))
+                if message.contains("server-owned fields")
         ));
     }
 

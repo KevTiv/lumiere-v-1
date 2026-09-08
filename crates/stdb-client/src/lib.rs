@@ -59,7 +59,7 @@ impl StdbClient {
         }
     }
 
-    /// Same connection settings, different bearer token (e.g. admin fallback).
+    /// Same connection settings with a different bearer token (for a service call).
     pub fn with_token(&self, token: impl Into<String>) -> Self {
         Self {
             http: self.http.clone(),
@@ -123,7 +123,37 @@ impl StdbClient {
         parse_sats_sql_response_canonical(&body).context("parse canonical SATS-SQL JSON")
     }
 
+    /// Run an authenticated SQL request and return the identity verified by
+    /// SpacetimeDB in its response header.
+    ///
+    /// The JWT payload is intentionally not inspected here: the response
+    /// header is the database's authenticated identity binding.
+    pub async fn authenticated_identity(&self) -> Result<String> {
+        let response = self.post_sql("SELECT 1").await?;
+        let header = response
+            .headers()
+            .get("spacetime-identity")
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_owned);
+        response
+            .text()
+            .await
+            .context("read authenticated identity SQL body")?;
+        header
+            .as_deref()
+            .and_then(normalize_spacetime_identity_header)
+            .context("missing or invalid spacetime-identity response header")
+    }
+
     async fn query_sql_body(&self, sql: &str) -> Result<String> {
+        self.post_sql(sql)
+            .await?
+            .text()
+            .await
+            .context("read SQL body")
+    }
+
+    async fn post_sql(&self, sql: &str) -> Result<reqwest::Response> {
         let url = format!("{}/v1/database/{}/sql", self.base_url, self.module);
         let resp = self
             .http
@@ -141,7 +171,7 @@ impl StdbClient {
             return Err(StdbClientError::Http(status, body).into());
         }
 
-        resp.text().await.context("read SQL body")
+        Ok(resp)
     }
 
     pub async fn query_table(&self, table: &str) -> Result<Vec<Value>> {
@@ -180,6 +210,20 @@ impl StdbClient {
             return Err(StdbClientError::Http(status, body).into());
         }
         Ok(())
+    }
+}
+
+/// Normalize the authenticated SpacetimeDB identity response header.
+pub fn normalize_spacetime_identity_header(raw: &str) -> Option<String> {
+    let value = raw.trim();
+    let value = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))
+        .unwrap_or(value);
+    if value.len() == 64 && value.chars().all(|character| character.is_ascii_hexdigit()) {
+        Some(value.to_ascii_lowercase())
+    } else {
+        None
     }
 }
 
@@ -583,8 +627,8 @@ fn encode_canonical_sats(
 #[cfg(test)]
 mod tests {
     use super::{
-        encode_reducer_wire_args, parse_sats_sql_response, parse_sats_sql_response_canonical,
-        reducer_contract,
+        encode_reducer_wire_args, normalize_spacetime_identity_header, parse_sats_sql_response,
+        parse_sats_sql_response_canonical, reducer_contract,
     };
     use serde_json::json;
 
@@ -604,6 +648,23 @@ mod tests {
             vec![json!(7), json!(null), json!({ "metadata": { "none": [] } })],
         );
         assert_eq!(args[1], json!({ "none": [] }));
+    }
+
+    #[test]
+    fn normalizes_verified_identity_header() {
+        let identity = "AB".repeat(32);
+        assert_eq!(
+            normalize_spacetime_identity_header(&format!("  0x{identity}  ")),
+            Some(identity.to_ascii_lowercase())
+        );
+    }
+
+    #[test]
+    fn rejects_missing_or_invalid_identity_header_values() {
+        assert_eq!(normalize_spacetime_identity_header(""), None);
+        assert_eq!(normalize_spacetime_identity_header("not-a-jwt"), None);
+        assert_eq!(normalize_spacetime_identity_header(&"ab".repeat(31)), None);
+        assert_eq!(normalize_spacetime_identity_header(&"zz".repeat(32)), None);
     }
 
     #[test]

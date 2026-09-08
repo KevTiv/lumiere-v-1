@@ -41,8 +41,8 @@ use authoritative::{authoritative_record_sql, AuthoritativeResourceScope};
 #[cfg(test)]
 pub(crate) use company_scope::enforce_requested_company;
 pub(crate) use company_scope::{
-    accounting_resource, company_ids_for_organization, crm_resource, inventory_resource,
-    iot_resource, optional_company_accounting_resource, purchasing_resource,
+    accounting_resource, crm_resource, inventory_resource, iot_resource,
+    optional_company_accounting_resource, purchasing_resource, resolve_membership_company_id,
 };
 pub use company_scope::{
     default_company_id, resolve_accounting_company_id, resolve_crm_company_id,
@@ -607,6 +607,24 @@ mod tests {
         assert!(authoritative_record_sql("sale-orders", 42, 7, 99, Some(&access)).is_err());
         assert!(authoritative_record_sql("sale-orders", 42, 7, 99, None).is_err());
         assert!(authoritative_record_sql("unknown", 42, 7, 99, Some(&access)).is_err());
+    }
+
+    #[test]
+    fn authoritative_read_rejects_zero_or_forged_scope_ids() {
+        let access = authoritative_access("sale_order:read");
+        for (organization_id, company_id, record_id) in [(0, 7, 99), (42, 0, 99), (42, 7, 0)] {
+            assert!(
+                authoritative_record_sql(
+                    "sale-orders",
+                    organization_id,
+                    company_id,
+                    record_id,
+                    Some(&access),
+                )
+                .is_err(),
+                "invalid scope tuple must fail closed: {organization_id}/{company_id}/{record_id}"
+            );
+        }
     }
 
     #[test]

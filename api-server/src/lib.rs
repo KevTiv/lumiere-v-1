@@ -23,6 +23,7 @@ pub mod reports;
 pub mod routes;
 pub mod session;
 pub mod state;
+pub(crate) mod trusted_context;
 pub mod web_session;
 pub mod workflow_reads;
 pub mod workflow_worker;

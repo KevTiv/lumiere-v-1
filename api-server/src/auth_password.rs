@@ -13,8 +13,9 @@ use stdb_client::StdbClient;
 use crate::cold_tier::pg_pool;
 use crate::error::ApiError;
 use crate::platform_control::{self, PlatformId};
-use crate::session::{normalize_identity_hex_for_sql, query_user_organization_with_fallback};
+use crate::session::normalize_identity_hex_for_sql;
 use crate::state::AppState;
+use stdb_auth::select_user_organization_for_identity_sql;
 
 const ADMIN_TOKEN_PLACEHOLDERS: &[&str] = &[
     "",
@@ -316,13 +317,10 @@ pub async fn get_role_name_in_organization(
 pub async fn user_has_organization_rows(state: &AppState, identity_hex: &str, token: &str) -> bool {
     let client = state.client_with_token(token);
     let id = normalize_identity_hex_for_sql(identity_hex);
-    match query_user_organization_with_fallback(
-        &client,
-        &id,
-        state.config.stdb_server_token.as_deref(),
-    )
-    .await
-    {
+    let Ok(sql) = select_user_organization_for_identity_sql(&id, None) else {
+        return false;
+    };
+    match client.query_sql(&sql).await {
         Ok(rows) => !rows.is_empty(),
         Err(_) => false,
     }
