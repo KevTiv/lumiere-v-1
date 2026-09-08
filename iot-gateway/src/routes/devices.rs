@@ -2,17 +2,21 @@
 ///
 /// IoT hubs that cannot run an MQTT client can POST telemetry and heartbeats
 /// directly over HTTP instead.
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::State,
+    http::{HeaderMap, StatusCode},
+    Json,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use super::auth::{authorize_target, AuthError, TargetTable};
 use crate::state::AppState;
 
 // ── Request/response types ─────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
 pub struct HeartbeatRequest {
-    pub organization_id: u64,
     pub hub_id: u64,
     pub ip_address: Option<String>,
     pub firmware_version: Option<String>,
@@ -49,14 +53,12 @@ pub struct DeviceSyncEntry {
 /// POST /v1/devices/sync body — hub reports its full detected device list.
 #[derive(Debug, Deserialize)]
 pub struct SyncRequest {
-    pub organization_id: u64,
     pub hub_id: u64,
     pub devices: Vec<DeviceSyncEntry>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct TelemetryRequest {
-    pub organization_id: u64,
     pub device_id: u64,
     pub sensor_type: String,
     pub value: f64,
@@ -67,7 +69,6 @@ pub struct TelemetryRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct StatusRequest {
-    pub organization_id: u64,
     pub device_id: u64,
     pub status: String, // "Online" | "Offline" | "Error" | "Pairing"
 }
@@ -83,10 +84,12 @@ pub struct ApiResponse {
 /// POST /v1/devices/heartbeat — hub reports it is alive
 pub async fn heartbeat(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<HeartbeatRequest>,
-) -> Result<Json<ApiResponse>, (StatusCode, Json<ApiResponse>)> {
+) -> Result<Json<ApiResponse>, AuthError> {
+    let scope = authorize_target(&state, &headers, TargetTable::Hub, req.hub_id).await?;
     let args = json!([
-        req.organization_id,
+        scope.organization_id(),
         req.hub_id,
         req.ip_address,
         req.firmware_version,
@@ -98,13 +101,7 @@ pub async fn heartbeat(
         .await
         .map_err(|e| {
             tracing::error!("Heartbeat reducer failed: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse {
-                    success: false,
-                    message: e.to_string(),
-                }),
-            )
+            AuthError::internal(e.to_string())
         })?;
 
     Ok(Json(ApiResponse {
@@ -116,10 +113,12 @@ pub async fn heartbeat(
 /// POST /v1/devices/telemetry — device submits a sensor reading
 pub async fn telemetry(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<TelemetryRequest>,
-) -> Result<Json<ApiResponse>, (StatusCode, Json<ApiResponse>)> {
+) -> Result<Json<ApiResponse>, AuthError> {
+    let scope = authorize_target(&state, &headers, TargetTable::Device, req.device_id).await?;
     let args = json!([
-        req.organization_id,
+        scope.organization_id(),
         req.device_id,
         {
             "sensor_type": req.sensor_type,
@@ -135,13 +134,7 @@ pub async fn telemetry(
         .await
         .map_err(|e| {
             tracing::error!("record_telemetry reducer failed: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse {
-                    success: false,
-                    message: e.to_string(),
-                }),
-            )
+            AuthError::internal(e.to_string())
         })?;
 
     Ok(Json(ApiResponse {
@@ -198,22 +191,18 @@ pub async fn pair(
 /// `IoTDevice` rows: new identifiers are created, absent ones are marked Offline.
 pub async fn sync_devices(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<SyncRequest>,
-) -> Result<Json<ApiResponse>, (StatusCode, Json<ApiResponse>)> {
-    let args = json!([req.organization_id, req.hub_id, req.devices]);
+) -> Result<Json<ApiResponse>, AuthError> {
+    let scope = authorize_target(&state, &headers, TargetTable::Hub, req.hub_id).await?;
+    let args = json!([scope.organization_id(), req.hub_id, req.devices]);
 
     state
         .call_reducer(stdb_client::reducer_call!("sync_hub_devices", args))
         .await
         .map_err(|e| {
             tracing::error!("sync_hub_devices failed: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse {
-                    success: false,
-                    message: e.to_string(),
-                }),
-            )
+            AuthError::internal(e.to_string())
         })?;
 
     Ok(Json(ApiResponse {
@@ -225,22 +214,18 @@ pub async fn sync_devices(
 /// POST /v1/devices/status — device reports online/offline change
 pub async fn device_status(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<StatusRequest>,
-) -> Result<Json<ApiResponse>, (StatusCode, Json<ApiResponse>)> {
-    let args = json!([req.organization_id, req.device_id, req.status]);
+) -> Result<Json<ApiResponse>, AuthError> {
+    let scope = authorize_target(&state, &headers, TargetTable::Device, req.device_id).await?;
+    let args = json!([scope.organization_id(), req.device_id, req.status]);
 
     state
         .call_reducer(stdb_client::reducer_call!("update_device_status", args))
         .await
         .map_err(|e| {
             tracing::error!("update_device_status reducer failed: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse {
-                    success: false,
-                    message: e.to_string(),
-                }),
-            )
+            AuthError::internal(e.to_string())
         })?;
 
     Ok(Json(ApiResponse {

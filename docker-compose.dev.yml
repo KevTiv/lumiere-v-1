@@ -356,7 +356,6 @@ services:
       STDB_TOKEN: ${STDB_TOKEN:?set STDB_TOKEN in .env.docker}
       MQTT_HOST: mqtt
       MQTT_PORT: 1883
-      DEFAULT_ORG_ID: ${DEV_MOCK_ORG_ID:-1}
     ports:
       - "8081:8081"
     volumes:

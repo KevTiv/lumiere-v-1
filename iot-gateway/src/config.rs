@@ -16,8 +16,6 @@ pub struct Config {
     pub mqtt_password: Option<String>,
     /// How often to poll SpacetimeDB for pending IoTActions (seconds)
     pub action_poll_secs: u64,
-    /// Default organization_id used when calling reducers from the gateway
-    pub default_org_id: u64,
 }
 
 impl Config {
@@ -47,10 +45,6 @@ impl Config {
                 .unwrap_or_else(|_| "5".to_string())
                 .parse()
                 .context("ACTION_POLL_SECS must be a valid number")?,
-            default_org_id: std::env::var("DEFAULT_ORG_ID")
-                .unwrap_or_else(|_| "1".to_string())
-                .parse()
-                .context("DEFAULT_ORG_ID must be a valid number")?,
         })
     }
 }

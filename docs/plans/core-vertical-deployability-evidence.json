@@ -128,8 +128,21 @@
     },
     "C9": {
       "status": "partial",
-      "evidence": ["resource-specific tenant checks and C7-R2 placement tests exist"],
-      "required": ["single trusted operation context", "Org A/B and Company A1/A2 proof across every data path"]
+      "evidence": [
+        "api-server session resolution now obtains actor identity from SpacetimeDB's authenticated response header, never from an unverified JWT payload or a client identity hint, and membership plus field-policy reads use the authenticated user token without an owner-token fallback",
+        "TrustedOperationContext owns the authenticated client, actor identity, organization, mandatory field-access policy, operation identity, server-generated correlation id, and membership-derived company scope for typed/compat commands, generated query routes, authoritative reads, and realtime subscriptions",
+        "command, query, and realtime boundaries reject client-owned organization fields, foreign requested companies, missing field policy, and resources without current read permission before owner-token reads or reducer dispatch",
+        "the IoT gateway removed DEFAULT_ORG_ID and client organization fields; HTTP and WebSocket target scope is derived from persisted hub/device/action rows and checked against a SpacetimeDB-authenticated active membership, while MQTT derives organization from the persisted device",
+        "hydration can only be constructed from a server-resolved placement in production and rejects forged root scope, wrong-parent children, and cross-company payments; reconstruction rejects a fence for another organization before restore",
+        "the persisted STDB adversarial reducer matrix covers Org A/B in both directions, a valid Company A2 relationship, cross-organization parent rejection without mutation, inactive membership, and audit identity equality with ctx.sender()",
+        "cargo check -p api-server --all-targets, 13 stdb-client tests, 2 session-auth tests, 2 iot-gateway tests, the native SpacetimeDB library check, and 348 passing API library tests validate the local code paths; the full API library run has one pre-existing release-manifest checksum drift outside C9 after the new hydration assertion was corrected"
+      ],
+      "required": [
+        "finish migrating remaining handwritten domain routes and scheduled service operations onto the trusted context after C8 generated-adoption convergence",
+        "provide a post-pair device credential contract for IoT hubs instead of requiring an interactive user token on hub endpoints",
+        "run the complete Org A/B and Company A1/A2 matrix against disposable STDB and PostgreSQL through commands, reads, live subscriptions, projection, cold reads, hydration, and post-reconstruction fresh sessions",
+        "prove deployment-side least-privilege PostgreSQL grants and replace the shared owner token used by owner-report, workflow, and integration workers with dedicated service identities"
+      ]
     },
     "C10": {
       "status": "blocked",
