@@ -64,23 +64,47 @@ pub struct Config {
 }
 
 impl Config {
-    /// Privileged standalone workers must never silently fall back to the
-    /// development placeholder token. The API process may use that fallback
-    /// for local mocks, but queue/integration workers call private reducers.
-    pub(crate) fn require_privileged_worker_token(&self, worker: &str) -> Result<&str> {
-        let token = self
-            .stdb_server_token
-            .as_deref()
-            .map(str::trim)
-            .filter(|token| !token.is_empty())
-            .with_context(|| format!("{worker} requires STDB_SERVER_TOKEN"))?;
-        if token == "local-dev-token" {
-            anyhow::bail!("{worker} refuses the local development STDB token")
-        }
+    /// Load the dedicated bearer credential for a privileged worker.
+    ///
+    /// Worker clients must not silently inherit the interactive/server-owner
+    /// token or another service credential. The deployment remains responsible
+    /// for granting this identity only the reducers and reads that worker
+    /// needs.
+    pub(crate) fn require_dedicated_worker_token(&self, env_name: &str) -> Result<String> {
+        let token = std::env::var(env_name)
+            .ok()
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty())
+            .with_context(|| format!("{env_name} is required for its privileged worker"))?;
+        let configured_service_tokens = DEDICATED_SERVICE_TOKEN_ENVS
+            .iter()
+            .filter(|name| **name != env_name)
+            .filter_map(|name| {
+                std::env::var(name)
+                    .ok()
+                    .map(|value| ((*name).to_owned(), value.trim().to_owned()))
+            })
+            .collect::<Vec<_>>();
+        validate_dedicated_worker_token(
+            env_name,
+            &token,
+            self.stdb_server_token.as_deref(),
+            &configured_service_tokens,
+        )?;
         Ok(token)
     }
 
     pub fn from_env() -> Result<Self> {
+        Self::from_env_inner(true)
+    }
+
+    /// Standalone workers use dedicated identities and must not require the
+    /// interactive API owner credential merely to parse shared settings.
+    pub(crate) fn from_worker_env() -> Result<Self> {
+        Self::from_env_inner(false)
+    }
+
+    fn from_env_inner(require_server_token: bool) -> Result<Self> {
         let port: u16 = std::env::var("PORT")
             .ok()
             .and_then(|s| s.parse().ok())
@@ -104,7 +128,7 @@ impl Config {
             .ok()
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty());
-        if prod && stdb_server_token.is_none() {
+        if prod && require_server_token && stdb_server_token.is_none() {
             anyhow::bail!(
                 "STDB_SERVER_TOKEN must be set in production (SpacetimeDB server/admin JWT for HTTP SQL)"
             );
@@ -304,6 +328,38 @@ impl Config {
     }
 }
 
+const DEDICATED_SERVICE_TOKEN_ENVS: &[&str] = &[
+    "STDB_OWNER_REPORT_WORKER_TOKEN",
+    "STDB_WORKFLOW_WORKER_TOKEN",
+    "STDB_EXPENSE_WORKER_TOKEN",
+    "STDB_HR_WORKER_TOKEN",
+    "STDB_PROJECT_WORKER_TOKEN",
+    "STDB_FINALIZATION_TOKEN",
+    "STDB_RECONSTRUCTION_TOKEN",
+    "STDB_RECONSTRUCTION_READ_TOKEN",
+];
+
+fn validate_dedicated_worker_token(
+    env_name: &str,
+    token: &str,
+    server_token: Option<&str>,
+    configured_service_tokens: &[(String, String)],
+) -> Result<()> {
+    if token.is_empty() || token == "local-dev-token" {
+        anyhow::bail!("{env_name} must contain a real dedicated STDB token");
+    }
+    if server_token.map(str::trim) == Some(token) {
+        anyhow::bail!("{env_name} must be distinct from STDB_SERVER_TOKEN");
+    }
+    if let Some((other_name, _)) = configured_service_tokens
+        .iter()
+        .find(|(_, other_token)| !other_token.is_empty() && other_token.as_str() == token)
+    {
+        anyhow::bail!("{env_name} must be distinct from {other_name}");
+    }
+    Ok(())
+}
+
 fn parse_ai_gateway_required(raw: Option<&str>, production: bool) -> Result<bool> {
     let default = production;
     let Some(raw) = raw else {
@@ -320,7 +376,7 @@ fn parse_ai_gateway_required(raw: Option<&str>, production: bool) -> Result<bool
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_ai_gateway_required, Config};
+    use super::{parse_ai_gateway_required, validate_dedicated_worker_token};
 
     #[test]
     fn ai_gateway_required_defaults_by_runtime() {
@@ -345,60 +401,45 @@ mod tests {
     }
 
     #[test]
-    fn privileged_workers_fail_closed_without_a_real_server_token() {
-        let mut config = Config {
-            stdb_server_token: None,
-            ..test_config()
-        };
-        assert!(config
-            .require_privileged_worker_token("owner-report worker")
-            .is_err());
-        config.stdb_server_token = Some("local-dev-token".into());
-        assert!(config
-            .require_privileged_worker_token("workflow worker")
-            .is_err());
-        config.stdb_server_token = Some("server-token".into());
-        assert_eq!(
-            config
-                .require_privileged_worker_token("integration worker")
-                .unwrap(),
-            "server-token"
-        );
-    }
-
-    fn test_config() -> Config {
-        Config {
-            port: 8082,
-            stdb_host: "http://127.0.0.1:3000".into(),
-            stdb_module: "test-module".into(),
-            stdb_server_token: None,
-            stdb_finalization_token: None,
-            cors_origins: Vec::new(),
-            dev_mock_org_id: None,
-            ai_gateway_url: "http://127.0.0.1:3001".into(),
-            ai_gateway_required: false,
-            workos_client_id: None,
-            stdb_credential_encryption_key: None,
-            resend_api_key: None,
-            resend_from_email: "test@example.com".into(),
-            app_url: "http://localhost:3000".into(),
-            cookie_secure: false,
-            report_renderer_url: None,
-            report_artifact_dir: std::env::temp_dir(),
-            document_blob_dir: std::env::temp_dir(),
-            owner_report_worker_poll_secs: 15,
-            owner_report_worker_name: "owner-report-worker".into(),
-            owner_report_worker_port: 8091,
-            workflow_worker_poll_secs: 15,
-            workflow_worker_name: "workflow-worker".into(),
-            workflow_worker_port: 8093,
-            workflow_worker_org_ids: Vec::new(),
-            workflow_worker_lease_ttl_secs: 60,
-            workflow_external_dispatch_enabled: false,
-            workflow_external_dispatch_company_ids: Vec::new(),
-            workflow_external_dispatch_action_keys: Vec::new(),
-            workflow_external_webhook_url: None,
-            workflow_external_webhook_timeout_ms: 10_000,
-        }
+    fn dedicated_worker_tokens_are_explicit_and_distinct() {
+        let peers = vec![
+            ("STDB_WORKFLOW_WORKER_TOKEN".into(), "workflow".into()),
+            ("STDB_FINALIZATION_TOKEN".into(), "finalizer".into()),
+        ];
+        assert!(validate_dedicated_worker_token(
+            "STDB_OWNER_REPORT_WORKER_TOKEN",
+            "",
+            Some("server"),
+            &peers
+        )
+        .is_err());
+        assert!(validate_dedicated_worker_token(
+            "STDB_OWNER_REPORT_WORKER_TOKEN",
+            "local-dev-token",
+            Some("server"),
+            &peers
+        )
+        .is_err());
+        assert!(validate_dedicated_worker_token(
+            "STDB_OWNER_REPORT_WORKER_TOKEN",
+            "server",
+            Some("server"),
+            &peers
+        )
+        .is_err());
+        assert!(validate_dedicated_worker_token(
+            "STDB_OWNER_REPORT_WORKER_TOKEN",
+            "workflow",
+            Some("server"),
+            &peers
+        )
+        .is_err());
+        assert!(validate_dedicated_worker_token(
+            "STDB_OWNER_REPORT_WORKER_TOKEN",
+            "owner-report",
+            Some("server"),
+            &peers
+        )
+        .is_ok());
     }
 }

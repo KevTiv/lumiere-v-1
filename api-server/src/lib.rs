@@ -21,6 +21,7 @@ pub mod query_exec;
 pub mod realtime;
 pub mod reports;
 pub mod routes;
+pub mod service_identity;
 pub mod session;
 pub mod state;
 pub(crate) mod trusted_context;

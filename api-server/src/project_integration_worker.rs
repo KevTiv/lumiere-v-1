@@ -14,6 +14,7 @@ pub async fn serve() -> anyhow::Result<()> {
         env_prefix: "PROJECT",
         default_port: 8093,
         reducer_name: "apply_pending_project_integration_intents",
+        service_name: crate::service_identity::PROJECT_WORKER_SERVICE,
         log_label: "project integration worker",
     })
     .await

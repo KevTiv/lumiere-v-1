@@ -28,14 +28,17 @@ pub struct IntegrationWorkerSpec {
     pub default_port: u16,
     /// Canonical reducer name, e.g. `"apply_pending_expense_integration_intents"`.
     pub reducer_name: &'static str,
+    /// Organization-scoped service binding required by this worker token.
+    pub service_name: &'static str,
     /// Human-readable label used in tracing output.
     pub log_label: &'static str,
 }
 
 /// Start a bounded polling worker and its internal health endpoint.
 pub async fn serve(spec: IntegrationWorkerSpec) -> anyhow::Result<()> {
-    let config = Config::from_env()?;
-    config.require_privileged_worker_token(spec.log_label)?;
+    let config = Config::from_worker_env()?;
+    let token_env = format!("STDB_{}_WORKER_TOKEN", spec.env_prefix);
+    let worker_token = config.require_dedicated_worker_token(&token_env)?;
     let port = std::env::var(format!("LUMIERE_{}_WORKER_PORT", spec.env_prefix))
         .ok()
         .and_then(|v| v.parse().ok())
@@ -54,7 +57,9 @@ pub async fn serve(spec: IntegrationWorkerSpec) -> anyhow::Result<()> {
         .filter_map(|s| s.trim().parse::<u64>().ok())
         .collect::<Vec<_>>();
 
-    let state = Arc::new(AppState::new(config));
+    let mut app_state = AppState::new(config);
+    app_state.stdb = app_state.stdb.with_token(worker_token);
+    let state = Arc::new(app_state);
     // Configuration alone does not prove that the SpacetimeDB dependency and
     // reducer are reachable. Readiness becomes true only after one successful
     // batch, matching the other API-server workers.
@@ -63,6 +68,7 @@ pub async fn serve(spec: IntegrationWorkerSpec) -> anyhow::Result<()> {
     let worker_ready = ready.clone();
     let orgs = org_ids.clone();
     let reducer_name = spec.reducer_name;
+    let service_name = spec.service_name;
     let log_label = spec.log_label;
     let env_prefix = spec.env_prefix;
     tokio::spawn(async move {
@@ -71,7 +77,7 @@ pub async fn serve(spec: IntegrationWorkerSpec) -> anyhow::Result<()> {
             return;
         }
         loop {
-            match process_batch(&worker_state, &orgs, batch, reducer_name).await {
+            match process_batch(&worker_state, &orgs, batch, reducer_name, service_name).await {
                 Ok(_) => worker_ready.store(true, Ordering::Relaxed),
                 Err(error) => {
                     worker_ready.store(false, Ordering::Relaxed);
@@ -110,8 +116,15 @@ async fn process_batch(
     org_ids: &[u64],
     batch: u32,
     reducer_name: &str,
+    service_name: &str,
 ) -> anyhow::Result<()> {
     for organization_id in org_ids {
+        crate::service_identity::verify_registered_service_identity(
+            &state.stdb,
+            *organization_id,
+            service_name,
+        )
+        .await?;
         state
             .stdb
             .call_reducer(stdb_client::ReducerCall::from_name(

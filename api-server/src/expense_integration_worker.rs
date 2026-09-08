@@ -36,6 +36,7 @@ pub async fn serve() -> anyhow::Result<()> {
         env_prefix: "EXPENSE",
         default_port: 8092,
         reducer_name: "apply_pending_expense_integration_intents",
+        service_name: crate::service_identity::EXPENSE_WORKER_SERVICE,
         log_label: "expense integration worker",
     })
     .await

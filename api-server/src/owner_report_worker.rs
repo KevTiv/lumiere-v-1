@@ -1,8 +1,9 @@
 //! Scheduled typed owner-report queue worker.
 //!
-//! The worker only uses the server token. It claims work through the shared
-//! queue reducers, renders via the trusted Chromium service, and records the
-//! same immutable artifact provenance used by interactive PDF exports.
+//! The worker uses its dedicated STDB worker token. It claims work through the
+//! shared queue reducers, renders via the trusted Chromium service, and
+//! records the same immutable artifact provenance used by interactive PDF
+//! exports.
 
 use std::{
     collections::{HashMap, HashSet},
@@ -138,10 +139,12 @@ struct DocumentRow {
 
 /// Start a bounded polling worker and its internal health endpoint.
 pub async fn serve() -> anyhow::Result<()> {
-    let config = Config::from_env()?;
-    config.require_privileged_worker_token("owner-report worker")?;
+    let config = Config::from_worker_env()?;
+    let worker_token = config.require_dedicated_worker_token("STDB_OWNER_REPORT_WORKER_TOKEN")?;
     let port = config.owner_report_worker_port;
-    let state = Arc::new(AppState::new(config));
+    let mut app_state = AppState::new(config);
+    app_state.stdb = app_state.stdb.with_token(worker_token);
+    let state = Arc::new(app_state);
     let ready = Arc::new(AtomicBool::new(false));
     let worker_state = state.clone();
     let worker_ready = ready.clone();
@@ -186,6 +189,12 @@ async fn process_batch(state: &AppState) -> anyhow::Result<usize> {
     let mut worker_ids = HashMap::new();
     let organizations = due_schedule_organizations(state).await?;
     for organization_id in organizations {
+        crate::service_identity::verify_registered_service_identity(
+            &state.stdb,
+            organization_id,
+            crate::service_identity::OWNER_REPORT_WORKER_SERVICE,
+        )
+        .await?;
         let worker_id = ensure_worker_registration(state, organization_id).await?;
         worker_ids.insert(organization_id, worker_id);
         state

@@ -17,6 +17,7 @@ pub async fn serve() -> anyhow::Result<()> {
         env_prefix: "HR",
         default_port: 8094,
         reducer_name: "apply_pending_hr_integration_intents",
+        service_name: crate::service_identity::HR_WORKER_SERVICE,
         log_label: "hr integration worker",
     })
     .await

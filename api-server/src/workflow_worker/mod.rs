@@ -38,10 +38,12 @@ struct WorkerRow {
 
 /// Start the polling worker and its internal health endpoint.
 pub async fn serve() -> anyhow::Result<()> {
-    let config = Config::from_env()?;
-    config.require_privileged_worker_token("workflow worker")?;
+    let config = Config::from_worker_env()?;
+    let worker_token = config.require_dedicated_worker_token("STDB_WORKFLOW_WORKER_TOKEN")?;
     let port = config.workflow_worker_port;
-    let state = Arc::new(AppState::new(config));
+    let mut app_state = AppState::new(config);
+    app_state.stdb = app_state.stdb.with_token(worker_token);
+    let state = Arc::new(app_state);
     let ready = Arc::new(AtomicBool::new(false));
     let shutting_down = Arc::new(AtomicBool::new(false));
     let worker_state = state.clone();
@@ -105,6 +107,12 @@ async fn process_cycle(state: &AppState, shutting_down: &AtomicBool) -> anyhow::
         if shutting_down.load(Ordering::Relaxed) {
             break;
         }
+        crate::service_identity::verify_registered_service_identity(
+            &state.stdb,
+            organization_id,
+            crate::service_identity::WORKFLOW_WORKER_SERVICE,
+        )
+        .await?;
         let worker_id = ensure_worker_registration(state, organization_id).await?;
         fire_due_timers(state, organization_id).await?;
         if state.config.workflow_external_dispatch_enabled {
