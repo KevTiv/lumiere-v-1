@@ -35,6 +35,7 @@ pub struct IntegrationWorkerSpec {
 /// Start a bounded polling worker and its internal health endpoint.
 pub async fn serve(spec: IntegrationWorkerSpec) -> anyhow::Result<()> {
     let config = Config::from_env()?;
+    config.require_privileged_worker_token(spec.log_label)?;
     let port = std::env::var(format!("LUMIERE_{}_WORKER_PORT", spec.env_prefix))
         .ok()
         .and_then(|v| v.parse().ok())

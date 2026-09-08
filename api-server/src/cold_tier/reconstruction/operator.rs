@@ -133,12 +133,10 @@ impl ReconstructionSettings {
             .context("STDB_MODULE or NEXT_PUBLIC_STDB_MODULE is required")?;
         let token = required_env(RECONSTRUCTION_TOKEN_ENV)?;
         let read_token = required_env(RECONSTRUCTION_READ_TOKEN_ENV)?;
-        if token == read_token {
-            bail!("STDB_RECONSTRUCTION_READ_TOKEN must be distinct from the reconstructor token");
-        }
-        if std::env::var("STDB_SERVER_TOKEN").ok().as_deref() == Some(token.as_str()) {
-            bail!("STDB_RECONSTRUCTION_TOKEN must be distinct from STDB_SERVER_TOKEN");
-        }
+        let server_token = std::env::var("STDB_SERVER_TOKEN")
+            .ok()
+            .map(|value| value.trim().to_owned());
+        validate_reconstruction_tokens(&token, &read_token, server_token.as_deref())?;
         let generation = required_env(PLACEMENT_GENERATION_ENV)?
             .parse::<u64>()
             .context("parse RECONSTRUCTION_PLACEMENT_GENERATION")?;
@@ -163,6 +161,23 @@ impl ReconstructionSettings {
         )
         .map_err(Into::into)
     }
+}
+
+fn validate_reconstruction_tokens(
+    token: &str,
+    read_token: &str,
+    server_token: Option<&str>,
+) -> Result<()> {
+    if token == "local-dev-token" || read_token == "local-dev-token" {
+        bail!("reconstruction refuses the local development STDB token");
+    }
+    if token == read_token {
+        bail!("STDB_RECONSTRUCTION_READ_TOKEN must be distinct from the reconstructor token");
+    }
+    if server_token == Some(token) {
+        bail!("STDB_RECONSTRUCTION_TOKEN must be distinct from STDB_SERVER_TOKEN");
+    }
+    Ok(())
 }
 
 fn required_env(name: &str) -> Result<String> {
@@ -230,5 +245,14 @@ mod tests {
             identity_from_json(&json!({ "__identity__": format!("0x{identity}") })).unwrap(),
             identity
         );
+    }
+
+    #[test]
+    fn reconstruction_tokens_are_explicit_and_distinct() {
+        assert!(validate_reconstruction_tokens("local-dev-token", "read", None).is_err());
+        assert!(validate_reconstruction_tokens("write", "local-dev-token", None).is_err());
+        assert!(validate_reconstruction_tokens("same", "same", None).is_err());
+        assert!(validate_reconstruction_tokens("write", "read", Some("write")).is_err());
+        assert!(validate_reconstruction_tokens("write", "read", Some("owner")).is_ok());
     }
 }

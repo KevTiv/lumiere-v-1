@@ -16,9 +16,7 @@ use tokio_postgres::types::ToSql;
 
 use super::{conventions, pg_codec, pg_pool};
 use crate::error::ApiError;
-use crate::organization_placement::{
-    OrganizationPlacement, OrganizationPlacementResolver, PlacementGeneration,
-};
+use crate::organization_placement::{OrganizationPlacement, OrganizationPlacementResolver};
 
 const TABLE: &str = "pos_order";
 const COLD_TABLE: &str = "cold_pos_order";
@@ -41,17 +39,6 @@ pub struct HydrationContext {
 }
 
 impl HydrationContext {
-    /// Resolve the current bootstrap placement. The first production topology
-    /// has one server-owned execution cell/store generation; callers supply
-    /// only authenticated tenant scope, never the generation itself.
-    pub fn current(organization_id: u64, company_id: u64) -> Self {
-        Self {
-            organization_id,
-            company_id,
-            placement_generation: PlacementGeneration::INITIAL.get(),
-        }
-    }
-
     /// Build hydration context from the server-resolved organization
     /// placement.  Callers provide only company scope; the generation is
     /// copied from the trusted placement record and cannot be selected by an
@@ -455,6 +442,7 @@ fn is_sha256_hex(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::organization_placement::PlacementGeneration;
 
     #[test]
     fn generated_projection_codec_covers_complete_pos_aggregate() {
@@ -477,7 +465,11 @@ mod tests {
     }
 
     fn context() -> HydrationContext {
-        HydrationContext::current(7, 8)
+        HydrationContext {
+            organization_id: 7,
+            company_id: 8,
+            placement_generation: PlacementGeneration::INITIAL.get(),
+        }
     }
 
     #[test]
@@ -507,6 +499,70 @@ mod tests {
         )
         .expect_err("cross-tenant child must fail");
         assert!(err.to_string().contains("wrong organization"));
+    }
+
+    #[test]
+    fn rejects_forged_root_tenant_fields() {
+        let mut forged_org = root();
+        forged_org["organizationId"] = json!(99);
+        let err = build_pos_order_plan(
+            context(),
+            forged_org,
+            vec![json!({"id":11,"organizationId":7,"orderId":10})],
+            vec![json!({"id":12,"organizationId":7,"companyId":8,"orderId":10})],
+            "a".repeat(64),
+            2,
+            1,
+        )
+        .expect_err("forged root organization must fail closed");
+        assert!(err
+            .to_string()
+            .contains("organization/company scope mismatch"));
+
+        let mut forged_company = root();
+        forged_company["companyId"] = json!(99);
+        let err = build_pos_order_plan(
+            context(),
+            forged_company,
+            vec![json!({"id":11,"organizationId":7,"orderId":10})],
+            vec![json!({"id":12,"organizationId":7,"companyId":8,"orderId":10})],
+            "a".repeat(64),
+            2,
+            1,
+        )
+        .expect_err("forged root company must fail closed");
+        assert!(err
+            .to_string()
+            .contains("organization/company scope mismatch"));
+    }
+
+    #[test]
+    fn rejects_cross_company_payment_and_wrong_parent_line() {
+        let err = build_pos_order_plan(
+            context(),
+            root(),
+            vec![json!({"id":11,"organizationId":7,"orderId":99})],
+            vec![json!({"id":12,"organizationId":7,"companyId":8,"orderId":10})],
+            "a".repeat(64),
+            2,
+            1,
+        )
+        .expect_err("wrong line parent must fail closed");
+        assert!(err.to_string().contains("wrong organization or parent"));
+
+        let err = build_pos_order_plan(
+            context(),
+            root(),
+            vec![json!({"id":11,"organizationId":7,"orderId":10})],
+            vec![json!({"id":12,"organizationId":7,"companyId":99,"orderId":10})],
+            "a".repeat(64),
+            2,
+            1,
+        )
+        .expect_err("cross-company payment must fail closed");
+        assert!(err
+            .to_string()
+            .contains("wrong organization, company, or parent"));
     }
 
     #[test]

@@ -122,6 +122,8 @@ pub fn run_forms_custom_field_invalid_model_test(ctx: &ReducerContext) -> Result
 pub fn run_tenant_isolation_tests(ctx: &ReducerContext) -> Result<(), String> {
     tenant_isolation_test::test_cross_tenant_company_scope_blocked(ctx)
         .map_err(|e| format!("cross_tenant_scope: {e}"))?;
+    tenant_isolation_test::test_adversarial_tenant_command_matrix(ctx)
+        .map_err(|e| format!("adversarial_command_matrix: {e}"))?;
     tenant_isolation_test::test_audit_log_append_only(ctx)
         .map_err(|e| format!("audit_append_only: {e}"))?;
     tenant_isolation_test::test_platform_bindings_and_reference_isolation(ctx)

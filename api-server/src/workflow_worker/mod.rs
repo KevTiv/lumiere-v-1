@@ -39,6 +39,7 @@ struct WorkerRow {
 /// Start the polling worker and its internal health endpoint.
 pub async fn serve() -> anyhow::Result<()> {
     let config = Config::from_env()?;
+    config.require_privileged_worker_token("workflow worker")?;
     let port = config.workflow_worker_port;
     let state = Arc::new(AppState::new(config));
     let ready = Arc::new(AtomicBool::new(false));

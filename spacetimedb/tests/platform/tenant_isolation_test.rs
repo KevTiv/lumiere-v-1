@@ -20,13 +20,14 @@ use crate::core::reference::{
     CreateCountryParams, CreateCurrencyParams,
 };
 use crate::core::users::{
-    ensure_user_profile_for_organization, user_organization, user_profile, UserOrganization,
+    ensure_user_profile_for_organization, remove_user_from_organization, user_organization,
+    user_profile, UserOrganization,
 };
 use crate::crm::contact_identities::{
     configure_contact_identity_verification_authority, contact_identity_verification_authority,
 };
 use crate::hr::country_pack_hr::hr_country_pack_leave_default;
-use crate::test_harness::ensure_test_superuser;
+use crate::test_harness::{ensure_test_superuser, OrgFixture};
 
 pub fn test_cross_tenant_company_scope_blocked(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
@@ -143,6 +144,214 @@ pub fn test_cross_tenant_company_scope_blocked(ctx: &ReducerContext) -> Result<(
         .count();
     if org_a_count != 1 || org_b_count != 1 {
         return Err("Organization rows corrupted after blocked mutation".to_string());
+    }
+
+    Ok(())
+}
+
+/// C9: exercise the stable organization/company command boundaries in both
+/// directions, including a cross-company parent reference and an inactive
+/// caller membership. The native in-module harness has one caller identity,
+/// so the inactive-membership case deliberately runs last after all successful
+/// evidence has been collected.
+pub fn test_adversarial_tenant_command_matrix(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+
+    let primary = OrgFixture::seed_minimal(ctx)?;
+    let foreign = OrgFixture::seed_minimal(ctx)?;
+    let org_a = primary.organization_id;
+    let company_a = primary.company_id;
+    let org_b = foreign.organization_id;
+    let company_b = foreign.company_id;
+    let currency_a = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_a)
+        .ok_or("C9 primary company missing")?
+        .currency_id;
+    let currency_b = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_b)
+        .ok_or("C9 foreign company missing")?
+        .currency_id;
+    let cross_company_code = format!("C9CROSS{company_a}");
+    create_company(
+        ctx,
+        org_a,
+        CreateCompanyParams {
+            name: "C9 same-org second company".to_string(),
+            code: cross_company_code.clone(),
+            currency_id: currency_a,
+            fiscal_year_end_month: 12,
+            fiscal_year_end_day: 31,
+            is_parent: false,
+            parent_id: None,
+            tax_id: None,
+            company_registry: None,
+            address_street: None,
+            address_city: None,
+            address_zip: None,
+            address_country_code: None,
+            metadata: Some(r#"{"c9_fixture":"same_org_second_company"}"#.to_string()),
+        },
+    )?;
+    let cross_company = ctx
+        .db
+        .company()
+        .company_by_org()
+        .filter(&org_a)
+        .find(|company| company.code == cross_company_code)
+        .ok_or("C9 same-org second company missing")?
+        .id;
+
+    let fiscal_year_params = || CreateFiscalYearParams {
+        name: format!("C9 FY {company_a}"),
+        date_from: ctx.timestamp + Duration::from_secs(365 * 86_400),
+        date_to: ctx.timestamp + Duration::from_secs(366 * 86_400),
+        type_: "standard".to_string(),
+        is_adjustment: false,
+        notes: None,
+        metadata: None,
+    };
+
+    // Forged organization: Org B cannot submit a fiscal-year mutation for an
+    // Org A company, even though the caller is a superuser in both fixtures.
+    let forged_organization = create_fiscal_year(ctx, org_b, company_a, fiscal_year_params());
+    if !matches!(
+        &forged_organization,
+        Err(ref message) if message.contains("does not belong")
+    ) {
+        return Err(format!(
+            "Expected forged organization rejection, got: {forged_organization:?}"
+        ));
+    }
+
+    // Foreign company: the inverse direction must be rejected as well.
+    let foreign_company = create_fiscal_year(ctx, org_a, company_b, fiscal_year_params());
+    if !matches!(&foreign_company, Err(ref message) if message.contains("does not belong")) {
+        return Err(format!(
+            "Expected foreign company rejection, got: {foreign_company:?}"
+        ));
+    }
+
+    // The fixture's second company is a valid same-organization reference;
+    // keep one positive command beside the negative cross-tenant cases.
+    create_fiscal_year(ctx, org_a, cross_company, fiscal_year_params())?;
+
+    // Company hierarchy is another stable reference boundary. A parent from
+    // Org B may not be attached while creating a company in Org A.
+    let before_companies = ctx.db.company().company_by_org().filter(&org_a).count();
+    let cross_company_parent = create_company(
+        ctx,
+        org_a,
+        CreateCompanyParams {
+            name: "C9 invalid cross-company child".to_string(),
+            code: format!("C9INVALID{company_a}"),
+            currency_id: currency_a,
+            fiscal_year_end_month: 12,
+            fiscal_year_end_day: 31,
+            is_parent: false,
+            parent_id: Some(company_b),
+            tax_id: None,
+            company_registry: None,
+            address_street: None,
+            address_city: None,
+            address_zip: None,
+            address_country_code: None,
+            metadata: None,
+        },
+    );
+    if !matches!(
+        &cross_company_parent,
+        Err(ref message) if message.contains("does not belong")
+    ) {
+        return Err(format!(
+            "Expected cross-company parent rejection, got: {cross_company_parent:?}"
+        ));
+    }
+    if ctx.db.company().company_by_org().filter(&org_a).count() != before_companies {
+        return Err("Cross-company parent rejection changed Org A companies".to_string());
+    }
+
+    // Successful same-org child creation supplies a distinctive audit row and
+    // proves that the identity is system-derived from ctx.sender().
+    let child_code = format!("C9CHILD{company_a}");
+    create_company(
+        ctx,
+        org_a,
+        CreateCompanyParams {
+            name: "C9 same-org child".to_string(),
+            code: child_code.clone(),
+            currency_id: currency_a,
+            fiscal_year_end_month: 12,
+            fiscal_year_end_day: 31,
+            is_parent: false,
+            parent_id: Some(company_a),
+            tax_id: None,
+            company_registry: None,
+            address_street: None,
+            address_city: None,
+            address_zip: None,
+            address_country_code: None,
+            metadata: Some(r#"{"c9_fixture":"c9_child"}"#.to_string()),
+        },
+    )?;
+    let child = ctx
+        .db
+        .company()
+        .company_by_org()
+        .filter(&org_a)
+        .find(|company| company.code == child_code)
+        .ok_or("C9 same-org child company not found")?;
+    if child.parent_id != Some(company_a) {
+        return Err("C9 same-org parent relationship was not persisted".to_string());
+    }
+    let audit = ctx
+        .db
+        .audit_log()
+        .iter()
+        .find(|entry| {
+            entry.organization_id == org_a
+                && entry.company_id == Some(child.id)
+                && entry.table_name == "company"
+                && entry.action == "CREATE"
+        })
+        .ok_or("C9 successful company create did not produce an audit row")?;
+    if audit.user_identity != ctx.sender() {
+        return Err("C9 audit identity did not match ctx.sender()".to_string());
+    }
+
+    // This is intentionally last: the native harness cannot invoke a reducer
+    // as a different Identity, but it can prove the same actor loses access
+    // immediately after its membership is deactivated.
+    remove_user_from_organization(ctx, ctx.sender(), org_b)?;
+    let inactive_actor = create_company(
+        ctx,
+        org_b,
+        CreateCompanyParams {
+            name: "C9 inactive actor".to_string(),
+            code: format!("C9INACTIVE{company_b}"),
+            currency_id: currency_b,
+            fiscal_year_end_month: 12,
+            fiscal_year_end_day: 31,
+            is_parent: false,
+            parent_id: None,
+            tax_id: None,
+            company_registry: None,
+            address_street: None,
+            address_city: None,
+            address_zip: None,
+            address_country_code: None,
+            metadata: None,
+        },
+    );
+    if !matches!(&inactive_actor, Err(ref message) if message.contains("Not a member")) {
+        return Err(format!(
+            "Expected inactive membership rejection, got: {inactive_actor:?}"
+        ));
     }
 
     Ok(())

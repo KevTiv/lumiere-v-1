@@ -96,6 +96,9 @@ fn require_split_stdb_tokens(
         .map(str::trim)
         .filter(|token| !token.is_empty())
         .context("projection worker requires STDB_FINALIZATION_TOKEN for finalizer reducers")?;
+    if source_token == "local-dev-token" || finalization_token == "local-dev-token" {
+        bail!("projection worker refuses the local development STDB token");
+    }
     if source_token == finalization_token {
         bail!(
             "STDB_FINALIZATION_TOKEN must be distinct from STDB_SERVER_TOKEN; source reads and finalizer reducers require separate identities"
@@ -302,6 +305,8 @@ mod tests {
     fn split_stdb_tokens_fail_closed_when_missing_or_equal() {
         assert!(require_split_stdb_tokens(None, Some("worker")).is_err());
         assert!(require_split_stdb_tokens(Some("source"), None).is_err());
+        assert!(require_split_stdb_tokens(Some("local-dev-token"), Some("worker")).is_err());
+        assert!(require_split_stdb_tokens(Some("source"), Some("local-dev-token")).is_err());
         assert!(require_split_stdb_tokens(Some("same"), Some("same")).is_err());
         assert!(
             require_split_stdb_tokens(Some(" source "), Some(" worker "))

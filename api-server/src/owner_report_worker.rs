@@ -139,6 +139,7 @@ struct DocumentRow {
 /// Start a bounded polling worker and its internal health endpoint.
 pub async fn serve() -> anyhow::Result<()> {
     let config = Config::from_env()?;
+    config.require_privileged_worker_token("owner-report worker")?;
     let port = config.owner_report_worker_port;
     let state = Arc::new(AppState::new(config));
     let ready = Arc::new(AtomicBool::new(false));

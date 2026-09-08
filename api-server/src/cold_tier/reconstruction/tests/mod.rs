@@ -82,6 +82,7 @@ impl ReconstructionSource for Source {
 struct Sink {
     events: Mutex<Vec<String>>,
     mismatch: bool,
+    wrong_fence_organization: bool,
 }
 
 impl ReconstructionSink for Sink {
@@ -93,7 +94,11 @@ impl ReconstructionSink for Sink {
         self.events.lock().unwrap().push("fence".into());
         Ok(ReconstructionFence {
             token: "attempt".into(),
-            organization_id,
+            organization_id: if self.wrong_fence_organization {
+                organization_id + 1
+            } else {
+                organization_id
+            },
             placement_generation: 1,
             watermark: watermark.clone(),
         })
@@ -209,6 +214,27 @@ async fn mismatch_or_cross_tenant_row_retains_fence() {
     .to_string()
     .contains("different organization"));
     assert_eq!(*cross_tenant.events.lock().unwrap(), ["fence"]);
+}
+
+#[tokio::test]
+async fn wrong_fence_organization_is_rejected_before_restore() {
+    let catalog = RestoreCatalog::from_manifest(MANIFEST).unwrap();
+    let sink = Sink {
+        wrong_fence_organization: true,
+        ..Default::default()
+    };
+    let err = reconstruct_organization(
+        &Source { wrong_org: false },
+        &sink,
+        &catalog,
+        7,
+        watermark(),
+        10,
+    )
+    .await
+    .expect_err("wrong placement organization must fail closed");
+    assert!(err.to_string().contains("invalid writer fence"));
+    assert_eq!(*sink.events.lock().unwrap(), ["fence"]);
 }
 
 /// Disposable-cell recovery drill. This intentionally exercises the

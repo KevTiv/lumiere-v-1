@@ -64,6 +64,22 @@ pub struct Config {
 }
 
 impl Config {
+    /// Privileged standalone workers must never silently fall back to the
+    /// development placeholder token. The API process may use that fallback
+    /// for local mocks, but queue/integration workers call private reducers.
+    pub(crate) fn require_privileged_worker_token(&self, worker: &str) -> Result<&str> {
+        let token = self
+            .stdb_server_token
+            .as_deref()
+            .map(str::trim)
+            .filter(|token| !token.is_empty())
+            .with_context(|| format!("{worker} requires STDB_SERVER_TOKEN"))?;
+        if token == "local-dev-token" {
+            anyhow::bail!("{worker} refuses the local development STDB token")
+        }
+        Ok(token)
+    }
+
     pub fn from_env() -> Result<Self> {
         let port: u16 = std::env::var("PORT")
             .ok()
@@ -304,7 +320,7 @@ fn parse_ai_gateway_required(raw: Option<&str>, production: bool) -> Result<bool
 
 #[cfg(test)]
 mod tests {
-    use super::parse_ai_gateway_required;
+    use super::{parse_ai_gateway_required, Config};
 
     #[test]
     fn ai_gateway_required_defaults_by_runtime() {
@@ -326,5 +342,63 @@ mod tests {
     fn ai_gateway_required_rejects_invalid_values() {
         assert!(parse_ai_gateway_required(Some("maybe"), false).is_err());
         assert!(parse_ai_gateway_required(Some(""), true).is_err());
+    }
+
+    #[test]
+    fn privileged_workers_fail_closed_without_a_real_server_token() {
+        let mut config = Config {
+            stdb_server_token: None,
+            ..test_config()
+        };
+        assert!(config
+            .require_privileged_worker_token("owner-report worker")
+            .is_err());
+        config.stdb_server_token = Some("local-dev-token".into());
+        assert!(config
+            .require_privileged_worker_token("workflow worker")
+            .is_err());
+        config.stdb_server_token = Some("server-token".into());
+        assert_eq!(
+            config
+                .require_privileged_worker_token("integration worker")
+                .unwrap(),
+            "server-token"
+        );
+    }
+
+    fn test_config() -> Config {
+        Config {
+            port: 8082,
+            stdb_host: "http://127.0.0.1:3000".into(),
+            stdb_module: "test-module".into(),
+            stdb_server_token: None,
+            stdb_finalization_token: None,
+            cors_origins: Vec::new(),
+            dev_mock_org_id: None,
+            ai_gateway_url: "http://127.0.0.1:3001".into(),
+            ai_gateway_required: false,
+            workos_client_id: None,
+            stdb_credential_encryption_key: None,
+            resend_api_key: None,
+            resend_from_email: "test@example.com".into(),
+            app_url: "http://localhost:3000".into(),
+            cookie_secure: false,
+            report_renderer_url: None,
+            report_artifact_dir: std::env::temp_dir(),
+            document_blob_dir: std::env::temp_dir(),
+            owner_report_worker_poll_secs: 15,
+            owner_report_worker_name: "owner-report-worker".into(),
+            owner_report_worker_port: 8091,
+            workflow_worker_poll_secs: 15,
+            workflow_worker_name: "workflow-worker".into(),
+            workflow_worker_port: 8093,
+            workflow_worker_org_ids: Vec::new(),
+            workflow_worker_lease_ttl_secs: 60,
+            workflow_external_dispatch_enabled: false,
+            workflow_external_dispatch_company_ids: Vec::new(),
+            workflow_external_dispatch_action_keys: Vec::new(),
+            workflow_external_webhook_url: None,
+            workflow_external_webhook_timeout_ms: 10_000,
+        }
     }
 }
