@@ -12,9 +12,9 @@
 ///   - Audit logging for all mutations
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::fx_metadata::merge_exchange_rate_metadata;
 use crate::core::organization::company;
 use crate::core::organization::company_id_from_scope;
-use crate::accounting::fx_metadata::merge_exchange_rate_metadata;
 use crate::core::reference::{
     require_active_currency_by_id, require_currency_by_id, resolve_currency_rate_as_of,
 };

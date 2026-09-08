@@ -4,7 +4,6 @@
 ///
 /// Tables for managing taxes, tax groups, jurisdictions, tax schedules, and tax deadlines.
 /// Includes a scheduled reducer for automatic deadline status updates.
-
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::relations::require_active_account;

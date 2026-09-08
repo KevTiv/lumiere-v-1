@@ -8,8 +8,8 @@
 /// | **PurchaseRequisition** | Internal purchase requests/RFQs |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::relations::require_analytic_account;
 use crate::accounting::payment_terms::account_payment_term;
+use crate::accounting::relations::require_analytic_account;
 use crate::accounting::tax_management::account_tax;
 use crate::core::organization::{company_id_from_scope, require_company_in_organization};
 use crate::core::reference::require_active_currency_by_id;
@@ -1818,12 +1818,7 @@ pub fn update_purchase_order_line(
     let account_analytic_id = params.account_analytic_id.or(line.account_analytic_id);
     let lot_id = params.lot_id.or(line.lot_id);
     require_product_variant_for_product(ctx, organization_id, product_id, product_variant_id)?;
-    require_analytic_account(
-        ctx,
-        organization_id,
-        order.company_id,
-        account_analytic_id,
-    )?;
+    require_analytic_account(ctx, organization_id, order.company_id, account_analytic_id)?;
     require_lot_for_product_and_company(
         ctx,
         organization_id,

@@ -7,11 +7,11 @@ use crate::accounting::journal_entries::{
     account_move, create_credit_note_from_invoice, insert_draft_account_move_line, AccountMove,
     CreateCreditNoteParams,
 };
+use crate::accounting::line_params::blank_journal_line;
 use crate::accounting::relations::{require_active_currency_id, require_active_journal};
 use crate::core::organization::company;
 use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::accounting::line_params::blank_journal_line;
 use crate::inventory::stock::require_product_in_org;
 use crate::subscriptions::billing_helpers::{
     calculate_next_date, normalize_payment_mode, normalize_plan_billing_period,

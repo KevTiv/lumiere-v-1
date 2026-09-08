@@ -392,7 +392,9 @@ pub fn migrate_workflow_instance(
     let input_hash = migrate_input_hash(organization_id, &params, &plan);
     let scope_key = format!("{organization_id}:migration:{}", params.idempotency_key);
 
-    if let Some(receipt) = crate::workflow::receipts::replay_command_receipt(ctx, &scope_key, &input_hash)? {
+    if let Some(receipt) =
+        crate::workflow::receipts::replay_command_receipt(ctx, &scope_key, &input_hash)?
+    {
         let _ = receipt;
         return Ok(());
     }

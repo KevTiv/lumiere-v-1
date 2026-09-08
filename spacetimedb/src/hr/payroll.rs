@@ -6,12 +6,12 @@
 /// `account_move_id`.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::chart_of_accounts::{account_journal};
+use crate::accounting::chart_of_accounts::account_journal;
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
-use crate::accounting::line_params::{journal_line_params, validate_company_account};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line, AccountMove,
 };
+use crate::accounting::line_params::{journal_line_params, validate_company_account};
 use crate::core::country_pack::company_enabled_pack_keys;
 use crate::core::organization::{company, company_id_from_scope};
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};

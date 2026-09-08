@@ -1,12 +1,12 @@
 //! Wave C — mileage/per diem rates, split allocations, project rebill.
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::chart_of_accounts::{account_journal};
-use crate::accounting::line_params::{journal_line_params, validate_company_account};
+use crate::accounting::chart_of_accounts::account_journal;
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line, AccountMove,
 };
+use crate::accounting::line_params::{journal_line_params, validate_company_account};
 use crate::accounting::tax_management::{account_tax, account_tax_group};
 use crate::core::country_pack::company_enabled_pack_keys;
 use crate::core::organization::company_id_from_scope;

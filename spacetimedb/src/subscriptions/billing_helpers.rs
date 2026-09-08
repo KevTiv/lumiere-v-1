@@ -3,12 +3,12 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
-use crate::accounting::line_params::blank_journal_line;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, add_account_move_line, create_account_move,
     insert_draft_account_move_line, post_invoice, AccountMove, AccountMoveLine,
     CreateAccountMoveParams,
 };
+use crate::accounting::line_params::blank_journal_line;
 use crate::accounting::payments::{
     account_payment, create_payment, post_payment_impl, register_payment_on_invoice,
     AccountPayment, CreatePaymentParams,

@@ -1,9 +1,7 @@
 /// FX revaluation — post unrealized currency adjustments (A10).
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::chart_of_accounts::{
-    account_journal, AccountAccount, AccountJournal,
-};
+use crate::accounting::chart_of_accounts::{account_journal, AccountAccount, AccountJournal};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::journal_entries::{
@@ -170,11 +168,13 @@ fn load_fx_scope(
         return Err("journal currency is incompatible with this revaluation".to_string());
     }
 
-    let gain_account = require_active_account(ctx, organization_id, company_id, gain_account_id, "gain")?;
+    let gain_account =
+        require_active_account(ctx, organization_id, company_id, gain_account_id, "gain")?;
     if gain_account.internal_group != Some(AccountInternalGroup::Income) {
         return Err("gain account must be an income account".to_string());
     }
-    let loss_account = require_active_account(ctx, organization_id, company_id, loss_account_id, "loss")?;
+    let loss_account =
+        require_active_account(ctx, organization_id, company_id, loss_account_id, "loss")?;
     if loss_account.internal_group != Some(AccountInternalGroup::Expense) {
         return Err("loss account must be an expense account".to_string());
     }
