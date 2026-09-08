@@ -261,12 +261,12 @@
       "semantic_kind": "operator"
     },
     "claim_hub_with_token": {
-      "client_facing": true,
+      "client_facing": false,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/iot/registry.rs:192 reducer body shows current-state or membership guard; session-exposed.",
+      "evidence": "spacetimedb/src/iot/registry.rs: post-pair gateway operation requires the registered iot_gateway identity and is denied to interactive sessions.",
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },

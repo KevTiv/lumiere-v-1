@@ -343,6 +343,26 @@ mod tests {
     use super::test_support::test_config;
     use super::*;
 
+    #[test]
+    fn identity_parser_accepts_only_canonical_stdb_identities() {
+        let identity = "ab".repeat(32);
+
+        assert_eq!(
+            parse_stdb_identity_hex(&format!("0x{identity}")),
+            Some(identity.clone())
+        );
+        assert_eq!(
+            parse_stdb_identity_hex(&format!("0X{}", identity.to_ascii_uppercase())),
+            Some(identity)
+        );
+        assert_eq!(parse_stdb_identity_hex("user@example.com"), None);
+        assert_eq!(
+            parse_stdb_identity_hex("550e8400-e29b-41d4-a716-446655440000"),
+            None
+        );
+        assert_eq!(parse_stdb_identity_hex("0x1234"), None);
+    }
+
     #[tokio::test]
     async fn anonymous_request_does_not_use_server_token() {
         let state = AppState::new(test_config(Some("real-admin-jwt-token-value")));

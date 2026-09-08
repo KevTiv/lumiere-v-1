@@ -15,7 +15,8 @@ This doc summarizes how **SpacetimeDB**, **Next.js**, **api-server**, and **gate
 | `LUMIERE_REDUCER_ALLOWLIST` | api-server | `strict` (production default) blocks bootstrap/test/import reducers on `POST /v1/call/{reducer}`; `off` disables filtering (local dev / e2e). |
 | `AI_GATEWAY_URL` | api-server | Internal AI gateway base URL. Required in production; must not be `localhost`. |
 | `AI_GATEWAY_REQUIRED` | api-server | Whether `/health/ready` requires the AI gateway (`true`/`false` or `1`/`0`). Defaults to `true` in production and `false` outside production. |
-| `STDB_TOKEN` | ai-gateway, iot-gateway | Service token for SpacetimeDB HTTP API (distinct from per-user tokens). |
+| `STDB_TOKEN` | ai-gateway | AI service token for the SpacetimeDB HTTP API. |
+| `STDB_IOT_GATEWAY_TOKEN` | iot-gateway | Dedicated identity registered as `iot_gateway` for every organization served; must not reuse the owner or another worker token. |
 | `AI_CERTIFICATION_STDB_TOKEN` | ai-gateway | Dedicated SpacetimeDB token whose identity alone may claim and complete certification jobs. Required with `AI_CERTIFICATION_RUNTIME_HASH`. |
 | `AI_CERTIFICATION_RUNTIME_HASH` | ai-gateway | Immutable executor build/profile digest (`sha256:` plus 64 lowercase hex characters). Required with `AI_CERTIFICATION_STDB_TOKEN`. |
 

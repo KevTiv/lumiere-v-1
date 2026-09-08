@@ -10,6 +10,9 @@ use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{QueueAttemptOutcome, QueueCompletionOutcome, QueueJobStatus};
 
+const OWNER_REPORT_QUEUE: &str = "owner_report";
+const WORKFLOW_EXTERNAL_QUEUE: &str = "workflow-external";
+
 const BASE_BACKOFF_SECS: u64 = 1;
 const MAX_BACKOFF_SECS: u64 = 60 * 60;
 const MAX_JITTER_MICROS: u64 = 60 * 1_000_000;
@@ -219,6 +222,53 @@ pub struct QueueWorker {
 fn timestamp_from_micros(value: u64, field: &str) -> Result<Timestamp, String> {
     let micros = i64::try_from(value).map_err(|_| format!("{field} is out of range"))?;
     Ok(Timestamp::from_micros_since_unix_epoch(micros))
+}
+
+fn queue_service_name(queue_name: &str) -> Option<&'static str> {
+    match queue_name {
+        OWNER_REPORT_QUEUE => Some(crate::core::cold_tier_identity::OWNER_REPORT_WORKER_SERVICE),
+        WORKFLOW_EXTERNAL_QUEUE => Some(crate::core::cold_tier_identity::WORKFLOW_WORKER_SERVICE),
+        _ => None,
+    }
+}
+
+fn require_queue_job_worker_authority(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    queue_name: &str,
+) -> Result<(), String> {
+    if queue_service_name(queue_name).is_some_and(|service_name| {
+        crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
+            ctx,
+            organization_id,
+            service_name,
+        )
+    }) {
+        Ok(())
+    } else {
+        check_permission(ctx, organization_id, "queue_job", "write")
+    }
+}
+
+fn require_queue_worker_authority(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    queues: &[String],
+    action: &str,
+) -> Result<(), String> {
+    let service_authorized = queues.len() == 1
+        && queue_service_name(&queues[0]).is_some_and(|service_name| {
+            crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
+                ctx,
+                organization_id,
+                service_name,
+            )
+        });
+    if service_authorized {
+        Ok(())
+    } else {
+        check_permission(ctx, organization_id, "queue_worker", action)
+    }
 }
 
 fn validate_nonempty(value: &str, field: &str) -> Result<(), String> {
@@ -472,7 +522,6 @@ pub fn claim_queue_job(
     job_id: u64,
     params: ClaimQueueJobParams,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "queue_job", "write")?;
     validate_nonempty(&params.lease_token, "lease_token")?;
     let mut job = ctx
         .db
@@ -481,6 +530,7 @@ pub fn claim_queue_job(
         .find(&job_id)
         .ok_or("queue job not found")?;
     require_job_scope(&job, organization_id)?;
+    require_queue_job_worker_authority(ctx, organization_id, &job.queue_name)?;
     require_revision(&job, params.expected_revision)?;
     require_worker(ctx, &job, params.worker_id)?;
 
@@ -567,7 +617,6 @@ pub fn renew_queue_job_lease(
     job_id: u64,
     params: RenewQueueLeaseParams,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "queue_job", "write")?;
     let job = ctx
         .db
         .queue_job()
@@ -575,6 +624,7 @@ pub fn renew_queue_job_lease(
         .find(&job_id)
         .ok_or("queue job not found")?;
     require_job_scope(&job, organization_id)?;
+    require_queue_job_worker_authority(ctx, organization_id, &job.queue_name)?;
     require_revision(&job, params.expected_revision)?;
     require_worker(ctx, &job, params.worker_id)?;
     require_active_lease(ctx, &job, params.worker_id, &params.lease_token)?;
@@ -613,7 +663,6 @@ pub fn complete_queue_job(
     job_id: u64,
     params: CompleteQueueJobParams,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "queue_job", "write")?;
     let job = ctx
         .db
         .queue_job()
@@ -621,6 +670,7 @@ pub fn complete_queue_job(
         .find(&job_id)
         .ok_or("queue job not found")?;
     require_job_scope(&job, organization_id)?;
+    require_queue_job_worker_authority(ctx, organization_id, &job.queue_name)?;
 
     if job.status == QueueJobStatus::Completed {
         let scope_key = receipt_scope_key(job.organization_id, job.company_id, &job.semantic_key);
@@ -906,7 +956,6 @@ pub fn register_queue_worker(
     organization_id: u64,
     params: RegisterQueueWorkerParams,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "queue_worker", "create")?;
     if let Some(company_id) = params.company_id {
         require_company_in_organization(ctx, organization_id, company_id)?;
     }
@@ -914,6 +963,7 @@ pub fn register_queue_worker(
     if params.queues.is_empty() || params.queues.iter().any(|queue| queue.trim().is_empty()) {
         return Err("worker must register at least one non-empty queue".to_string());
     }
+    require_queue_worker_authority(ctx, organization_id, &params.queues, "create")?;
     ctx.db.queue_worker().insert(QueueWorker {
         id: 0,
         organization_id,
@@ -934,7 +984,6 @@ pub fn worker_heartbeat(
     organization_id: u64,
     worker_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "queue_worker", "write")?;
     let worker = ctx
         .db
         .queue_worker()
@@ -944,9 +993,30 @@ pub fn worker_heartbeat(
     if worker.organization_id != organization_id {
         return Err("queue worker does not belong to this organization".to_string());
     }
+    require_queue_worker_authority(ctx, organization_id, &worker.queues, "write")?;
     ctx.db.queue_worker().id().update(QueueWorker {
         last_heartbeat: ctx.timestamp,
         ..worker
     });
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::queue_service_name;
+    use crate::core::cold_tier_identity::{OWNER_REPORT_WORKER_SERVICE, WORKFLOW_WORKER_SERVICE};
+
+    #[test]
+    fn service_authority_is_limited_to_owned_queue_names() {
+        assert_eq!(
+            queue_service_name("owner_report"),
+            Some(OWNER_REPORT_WORKER_SERVICE)
+        );
+        assert_eq!(
+            queue_service_name("workflow-external"),
+            Some(WORKFLOW_WORKER_SERVICE)
+        );
+        assert_eq!(queue_service_name("email"), None);
+        assert_eq!(queue_service_name(""), None);
+    }
 }

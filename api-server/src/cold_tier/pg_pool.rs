@@ -41,6 +41,32 @@ pub enum PgTlsMode {
     Require,
 }
 
+/// Runtime role used to separate durable-store responsibilities.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PgRole {
+    Projection,
+    Finalization,
+    Reconstruction,
+}
+
+impl PgRole {
+    fn credential_env(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Projection => ("PG_PROJECTION_USER", "PG_PROJECTION_PASSWORD"),
+            Self::Finalization => ("PG_FINALIZATION_USER", "PG_FINALIZATION_PASSWORD"),
+            Self::Reconstruction => ("PG_RECONSTRUCTION_USER", "PG_RECONSTRUCTION_PASSWORD"),
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Projection => "projection",
+            Self::Finalization => "finalization",
+            Self::Reconstruction => "reconstruction",
+        }
+    }
+}
+
 impl PgTlsMode {
     /// Parse from an environment-variable string.
     pub fn parse(s: &str) -> Result<Self> {
@@ -68,6 +94,20 @@ pub struct PgConfig {
 }
 
 impl PgConfig {
+    /// Resolve a dedicated least-privilege role without changing the base
+    /// configuration used by API/schema administration.
+    pub fn for_role(&self, role: PgRole) -> Result<Self> {
+        let (user_env, password_env) = role.credential_env();
+        let user = required_role_env(user_env)?;
+        let password = required_role_env(password_env)?;
+        validate_role_credentials(role, &self.user, &user, &password)?;
+        Ok(Self {
+            user,
+            password,
+            ..self.clone()
+        })
+    }
+
     /// Read PG config from the environment.
     ///
     /// In production, fails if `PG_TLS_MODE` is not `require` or if required
@@ -122,6 +162,117 @@ impl PgConfig {
             connect_timeout: Duration::from_secs(connect_timeout_secs),
         })
     }
+}
+
+fn required_role_env(name: &str) -> Result<String> {
+    std::env::var(name)
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+        .with_context(|| format!("{name} is required for its PostgreSQL role"))
+}
+
+fn validate_role_credentials(
+    role: PgRole,
+    base_user: &str,
+    role_user: &str,
+    role_password: &str,
+) -> Result<()> {
+    if role_user.is_empty() || role_password.is_empty() {
+        anyhow::bail!(
+            "{} PostgreSQL role credentials must not be blank",
+            role.label()
+        );
+    }
+    if role_user == base_user {
+        anyhow::bail!(
+            "{} PostgreSQL role user must be distinct from PG_USER",
+            role.label()
+        );
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_distinct_role_users(roles: &[(&str, &str)]) -> Result<()> {
+    for (index, (name, user)) in roles.iter().enumerate() {
+        for (other_name, other_user) in roles.iter().skip(index + 1) {
+            if user == other_user {
+                anyhow::bail!(
+                    "{} PostgreSQL role user must be distinct from {}",
+                    name,
+                    other_name
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Apply runtime grants after the generated durable schema exists. Role
+/// creation and passwords remain deployment-owned; this function only grants
+/// the capabilities required by each application worker.
+pub(crate) async fn ensure_runtime_role_grants(
+    pool: &Pool,
+    projection_user: &str,
+    finalization_user: &str,
+    reconstruction_user: &str,
+    finalization_tables: &[String],
+) -> Result<()> {
+    let sql = runtime_role_grants_sql(
+        projection_user,
+        finalization_user,
+        reconstruction_user,
+        finalization_tables,
+    )?;
+    pool.get()
+        .await
+        .context("get PostgreSQL admin client for runtime grants")?
+        .batch_execute(&sql)
+        .await
+        .context("apply least-privilege PostgreSQL runtime grants")
+}
+
+fn runtime_role_grants_sql(
+    projection_user: &str,
+    finalization_user: &str,
+    reconstruction_user: &str,
+    finalization_tables: &[String],
+) -> Result<String> {
+    let projection = quote_identifier(projection_user)?;
+    let finalization = quote_identifier(finalization_user)?;
+    let reconstruction = quote_identifier(reconstruction_user)?;
+    let mut finalization_relations = vec!["organization_projection_watermark".to_string()];
+    finalization_relations.extend(finalization_tables.iter().cloned());
+    finalization_relations.sort();
+    finalization_relations.dedup();
+    let finalization_relations = finalization_relations
+        .iter()
+        .map(|table| quote_identifier(table))
+        .collect::<Result<Vec<_>>>()?
+        .join(", ");
+
+    Ok(format!(
+        "REVOKE CREATE ON SCHEMA public FROM {projection}, {finalization}, {reconstruction};\n\
+         GRANT USAGE ON SCHEMA public TO {projection}, {finalization}, {reconstruction};\n\
+         GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {projection};\n\
+         GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO {projection};\n\
+         GRANT SELECT ON ALL TABLES IN SCHEMA public TO {reconstruction};\n\
+         GRANT SELECT ON TABLE {finalization_relations} TO {finalization};\n\
+         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {projection};\n\
+         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO {projection};\n\
+         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {reconstruction};"
+    ))
+}
+
+fn quote_identifier(value: &str) -> Result<String> {
+    if value.is_empty()
+        || !value.bytes().enumerate().all(|(index, byte)| {
+            byte == b'_' || byte.is_ascii_alphanumeric() && (index > 0 || !byte.is_ascii_digit())
+        })
+    {
+        anyhow::bail!("PostgreSQL role or relation name is not a safe identifier");
+    }
+    Ok(format!("\"{value}\""))
 }
 
 /// Build a `deadpool_postgres::Pool` from [`PgConfig`].
@@ -273,5 +424,69 @@ mod tests {
         assert_eq!(PgTlsMode::parse("REQUIRE").unwrap(), PgTlsMode::Require);
         assert_eq!(PgTlsMode::parse("tls").unwrap(), PgTlsMode::Require);
         assert!(PgTlsMode::parse("invalid").is_err());
+    }
+
+    #[test]
+    fn role_credentials_require_separate_users_and_passwords() {
+        assert!(
+            validate_role_credentials(PgRole::Projection, "lumiere", "projection", "secret")
+                .is_ok()
+        );
+        assert!(
+            validate_role_credentials(PgRole::Projection, "lumiere", "lumiere", "secret").is_err()
+        );
+        assert!(
+            validate_role_credentials(PgRole::Projection, "lumiere", "projection", "").is_err()
+        );
+    }
+
+    #[test]
+    fn runtime_roles_use_dedicated_credential_variables() {
+        assert_eq!(
+            PgRole::Projection.credential_env(),
+            ("PG_PROJECTION_USER", "PG_PROJECTION_PASSWORD")
+        );
+        assert_eq!(
+            PgRole::Finalization.credential_env(),
+            ("PG_FINALIZATION_USER", "PG_FINALIZATION_PASSWORD")
+        );
+        assert_eq!(
+            PgRole::Reconstruction.credential_env(),
+            ("PG_RECONSTRUCTION_USER", "PG_RECONSTRUCTION_PASSWORD")
+        );
+    }
+
+    #[test]
+    fn runtime_role_users_must_be_pairwise_distinct() {
+        assert!(validate_distinct_role_users(&[
+            ("projection", "projection"),
+            ("finalization", "finalization"),
+            ("reconstruction", "reconstruction"),
+        ])
+        .is_ok());
+        assert!(validate_distinct_role_users(&[
+            ("projection", "shared"),
+            ("finalization", "shared"),
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn grants_keep_finalization_and_reconstruction_read_only() {
+        let sql = runtime_role_grants_sql(
+            "projection_worker",
+            "finalization_worker",
+            "reconstruction_worker",
+            &["cold_pos_order".to_string()],
+        )
+        .expect("grant SQL");
+        assert!(sql.contains(
+            "GRANT SELECT ON TABLE \"cold_pos_order\", \"organization_projection_watermark\" TO \"finalization_worker\""
+        ));
+        assert!(sql
+            .contains("GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"reconstruction_worker\""));
+        assert!(!sql.contains("DELETE ON ALL TABLES IN SCHEMA public TO \"finalization_worker\""));
+        assert!(!sql.contains("DELETE ON ALL TABLES IN SCHEMA public TO \"reconstruction_worker\""));
+        assert!(runtime_role_grants_sql("bad-role", "finalizer", "reader", &[]).is_err());
     }
 }

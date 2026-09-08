@@ -137,14 +137,17 @@
         "the persisted STDB adversarial reducer matrix covers Org A/B in both directions, a valid Company A2 relationship, cross-organization parent rejection without mutation, inactive membership, and audit identity equality with ctx.sender()",
         "owner-report, workflow, expense, HR, and project workers require distinct non-owner SpacetimeDB tokens; API workers verify the authenticated token identity against the one active organization-scoped cold_tier_service_identity binding before processing an organization",
         "expense, HR, and project batch integration reducers now enforce the registered service identity at the reducer boundary while preserving human permissions on single-intent reducers; the expense batch operation is denied to sessions and its former UI/client call path is removed",
-        "cargo check -p api-server --all-targets, the native SpacetimeDB library check, the 1,316-operation history and C8 contract ratchet, and all nine frontend TypeScript workspaces validate the local service-identity slice"
+        "owner-report and workflow service identities now receive queue authority only for owner_report and workflow-external respectively; unrelated service identities are rejected from queue registration and heartbeat",
+        "the IoT gateway now requires a distinct registered iot_gateway identity, returns a random post-pair hub credential once, persists only its SHA-256 hash, derives organization/company/hub scope from stored rows, and removes the retired interactive claim operation from frontend exposure",
+        "PostgreSQL projection, finalization, and reconstruction use pairwise-distinct credentials; a real local PostgreSQL 16 matrix proved projection mutation, finalization access only to reviewed cooling relations, and reconstruction read-only access",
+        "a disposable locally owned SpacetimeDB module passed the existing Org A/B and Company A1/A2 adversarial reducer matrix plus live wrong-identity rejection and positive execution for distinct owner-report, workflow, expense, HR, project, and IoT gateway identities",
+        "cargo check -p api-server --all-targets, focused API/SpacetimeDB/IoT tests, the 1,316-operation history and C8 contract ratchet, and all nine frontend TypeScript workspaces validate the local C9 slice"
       ],
       "required": [
         "finish migrating remaining handwritten domain routes and scheduled service operations onto the trusted context after C8 generated-adoption convergence",
-        "provide a post-pair device credential contract for IoT hubs instead of requiring an interactive user token on hub endpoints",
         "run the complete Org A/B and Company A1/A2 matrix against disposable STDB and PostgreSQL through commands, reads, live subscriptions, projection, cold reads, hydration, and post-reconstruction fresh sessions",
-        "prove positive disposable-STDB execution under separately registered owner-report, workflow, expense, HR, and project worker identities",
-        "separate the shared PostgreSQL pool into least-privilege projection, finalization, and reconstruction roles and prove deployment-side grants"
+        "resolve the current server-owned placement generation into the trusted operation context instead of leaving placement authority only in cold-tier-specific contexts",
+        "publish and pin the changed immutable generated contracts after the release gate is approved"
       ]
     },
     "C10": {

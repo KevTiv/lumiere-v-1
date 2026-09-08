@@ -2,8 +2,9 @@
 /**
  * Local e2e-smoke: obtain the SpacetimeDB **database owner** token for HTTP SQL.
  *
- * Private tables (e.g. user_credential) reject SQL from anonymous POST /v1/identity
- * tokens. The owner token comes from `spacetime login --server-issued-login local`
+ * Private protocol tables (e.g. organization_commit_cursor) reject SQL from
+ * anonymous POST /v1/identity tokens. The owner token comes from
+ * `spacetime login --server-issued-login local`
  * and lives in ~/.config/spacetime/cli.toml.
  *
  * Usage:
@@ -77,7 +78,7 @@ async function verifyPrivateAuthSql(token, moduleName) {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'text/plain',
     },
-    body: 'SELECT identity FROM user_credential LIMIT 1',
+    body: 'SELECT organization_id FROM organization_commit_cursor LIMIT 1',
   })
 
   if (!res.ok) {

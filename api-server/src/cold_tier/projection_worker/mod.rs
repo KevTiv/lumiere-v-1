@@ -164,12 +164,51 @@ pub async fn serve() -> Result<()> {
         .unwrap_or(8096u16);
     let state = Arc::new(AppState::new(config));
     let finalization_stdb = state.stdb.with_token(&finalization_token);
-    let pg_config = pg_pool::PgConfig::from_env().context("PG config for projection worker")?;
-    let pool = pg_pool::build_pool(&pg_config).context("build PG pool for projection worker")?;
-    migrate::ensure_schema(&pool)
-        .await
-        .context("apply projection infrastructure schema")?;
-    ensure_projection_relations(&pool, PROJECTION_CODEC_MANIFEST_JSON).await?;
+    let base_pg_config =
+        pg_pool::PgConfig::from_env().context("PG config for projection worker")?;
+    let projection_pg_config = base_pg_config
+        .for_role(pg_pool::PgRole::Projection)
+        .context("resolve projection PostgreSQL role")?;
+    let finalization_pg_config = base_pg_config
+        .for_role(pg_pool::PgRole::Finalization)
+        .context("resolve finalization PostgreSQL role")?;
+    let reconstruction_pg_config = base_pg_config
+        .for_role(pg_pool::PgRole::Reconstruction)
+        .context("resolve reconstruction PostgreSQL role")?;
+    pg_pool::validate_distinct_role_users(&[
+        ("projection", projection_pg_config.user.as_str()),
+        ("finalization", finalization_pg_config.user.as_str()),
+        ("reconstruction", reconstruction_pg_config.user.as_str()),
+    ])?;
+
+    // Schema and relation DDL remain on the explicitly configured base role;
+    // runtime workers use separate least-privilege pools below.
+    {
+        let admin_pool = pg_pool::build_pool(&base_pg_config)
+            .context("build PG admin pool for projection schema")?;
+        migrate::ensure_schema(&admin_pool)
+            .await
+            .context("apply projection infrastructure schema")?;
+        ensure_projection_relations(&admin_pool, PROJECTION_CODEC_MANIFEST_JSON).await?;
+        let finalization_tables = finalization_worker::parse_archive_manifest(
+            finalization_worker::ARCHIVE_MANIFEST_JSON,
+        )?
+        .into_iter()
+        .map(|candidate| candidate.cold_table)
+        .collect::<Vec<_>>();
+        pg_pool::ensure_runtime_role_grants(
+            &admin_pool,
+            &projection_pg_config.user,
+            &finalization_pg_config.user,
+            &reconstruction_pg_config.user,
+            &finalization_tables,
+        )
+        .await?;
+    }
+    let projection_pool = pg_pool::build_pool(&projection_pg_config)
+        .context("build PG pool for projection worker")?;
+    let finalization_pool = pg_pool::build_pool(&finalization_pg_config)
+        .context("build PG pool for finalization worker")?;
     finalization_worker::parse_archive_manifest(finalization_worker::ARCHIVE_MANIFEST_JSON)
         .context("validate generated C5 archive manifest")?;
 
@@ -177,7 +216,7 @@ pub async fn serve() -> Result<()> {
     let finalization_ready = Arc::new(AtomicBool::new(false));
     let worker_ready = projection_ready.clone();
     let worker_state = state.clone();
-    let worker_pool = pool.clone();
+    let worker_pool = projection_pool.clone();
     tokio::spawn(async move {
         loop {
             let backlog_remaining = match drain_batch_with_budget(
@@ -227,7 +266,7 @@ pub async fn serve() -> Result<()> {
     });
     let finalizer_ready = finalization_ready.clone();
     let finalizer_state = state;
-    let finalizer_pool = pool.clone();
+    let finalizer_pool = finalization_pool.clone();
     tokio::spawn(async move {
         loop {
             match finalization_worker::drain_batch(
@@ -257,7 +296,7 @@ pub async fn serve() -> Result<()> {
         .route(
             "/status",
             get(move || {
-                let status_pool = pool.clone();
+                let status_pool = projection_pool.clone();
                 async move {
                     match projection_observability::read_projection_statuses(&status_pool).await {
                         Ok(statuses) => (StatusCode::OK, Json(statuses)).into_response(),

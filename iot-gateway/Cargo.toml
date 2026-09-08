@@ -21,3 +21,6 @@ tracing-subscriber.workspace = true
 anyhow.workspace = true
 stdb-config.workspace = true
 dashmap.workspace = true
+hex.workspace = true
+rand.workspace = true
+sha2.workspace = true

@@ -95,6 +95,7 @@ workflow_worker_token="$(mint_worker_token)"
 expense_worker_token="$(mint_worker_token)"
 hr_worker_token="$(mint_worker_token)"
 project_worker_token="$(mint_worker_token)"
+iot_gateway_token="$(mint_worker_token)"
 worker_tokens=(
   "$worker_token"
   "$owner_report_worker_token"
@@ -102,6 +103,7 @@ worker_tokens=(
   "$expense_worker_token"
   "$hr_worker_token"
   "$project_worker_token"
+  "$iot_gateway_token"
 )
 for worker_candidate in "${worker_tokens[@]}"; do
   if [[ -z "$worker_candidate" || "$worker_candidate" == "$token" ]]; then
@@ -122,6 +124,7 @@ sed \
   -e "s|^STDB_EXPENSE_WORKER_TOKEN=.*|STDB_EXPENSE_WORKER_TOKEN=$expense_worker_token|" \
   -e "s|^STDB_HR_WORKER_TOKEN=.*|STDB_HR_WORKER_TOKEN=$hr_worker_token|" \
   -e "s|^STDB_PROJECT_WORKER_TOKEN=.*|STDB_PROJECT_WORKER_TOKEN=$project_worker_token|" \
+  -e "s|^STDB_IOT_GATEWAY_TOKEN=.*|STDB_IOT_GATEWAY_TOKEN=$iot_gateway_token|" \
   -e "s|^STDB_TOKEN=.*|STDB_TOKEN=$token|" \
   "$env_file" >"$temp_file"
 chmod 600 "$temp_file"

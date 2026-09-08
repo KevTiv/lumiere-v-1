@@ -30,3 +30,25 @@ pub mod alerts;
 pub mod integrations;
 pub mod registry;
 pub mod telemetry;
+
+use spacetimedb::ReducerContext;
+
+/// Authorize an interactive ERP caller or the one registered IoT gateway
+/// identity for this organization. Target ownership is still checked by each
+/// reducer after this boundary.
+pub(crate) fn require_gateway_or_permission(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    model: &str,
+    action: &str,
+) -> Result<(), String> {
+    if crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
+        ctx,
+        organization_id,
+        crate::core::cold_tier_identity::IOT_GATEWAY_SERVICE,
+    ) {
+        Ok(())
+    } else {
+        crate::helpers::check_permission(ctx, organization_id, model, action)
+    }
+}

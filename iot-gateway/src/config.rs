@@ -31,7 +31,8 @@ impl Config {
             ),
             stdb_module: std::env::var("STDB_MODULE")
                 .context("STDB_MODULE is required (e.g. lumiere-v1)")?,
-            stdb_token: std::env::var("STDB_TOKEN").context("STDB_TOKEN is required")?,
+            stdb_token: std::env::var("STDB_IOT_GATEWAY_TOKEN")
+                .context("STDB_IOT_GATEWAY_TOKEN is required")?,
             mqtt_host: std::env::var("MQTT_HOST").unwrap_or_else(|_| "localhost".to_string()),
             mqtt_port: std::env::var("MQTT_PORT")
                 .unwrap_or_else(|_| "1883".to_string())

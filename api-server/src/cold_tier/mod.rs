@@ -84,6 +84,17 @@ mod tests {
     }
 
     #[test]
+    fn cold_read_plan_requires_nonzero_org_and_company_scope() {
+        let mut plan = pos_order_plan();
+        plan.organization_id = 0;
+        assert!(validate_resource_read_plan(&plan).is_err());
+
+        let mut plan = pos_order_plan();
+        plan.company_id = None;
+        assert!(validate_resource_read_plan(&plan).is_err());
+    }
+
+    #[test]
     fn pg_sql_contains_org_scope() {
         let plan = pos_order_plan();
         let (sql, binds) = compile_pg_sql(&plan).unwrap();

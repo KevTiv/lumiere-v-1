@@ -6,7 +6,6 @@ import type { ReducerCommandContractMeta } from "./types";
  */
 export const IOT_BFF_REDUCERS = [
   "acknowledge_iot_action",
-  "claim_hub_with_token",
   "create_iot_action",
   "create_iot_alert",
   "delete_iot_device",

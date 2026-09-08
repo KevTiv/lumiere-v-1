@@ -542,12 +542,6 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
-      "name": "claim_hub_with_token",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site",
-      "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
-    },
-    {
       "name": "claim_workflow_human_task",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"

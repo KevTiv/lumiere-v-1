@@ -4,7 +4,7 @@ use super::{
     reconstruct_organization_once, PgReconstructionSource, ReconstructionReport,
     ReconstructionSource,
 };
-use crate::cold_tier::pg_pool::{build_pool, PgConfig};
+use crate::cold_tier::pg_pool::{build_pool, PgConfig, PgRole};
 use crate::organization_placement::{
     CellId, DurableStoreId, OrganizationPlacement, PlacementGeneration,
 };
@@ -30,7 +30,9 @@ pub async fn run_organization_reconstruction(organization_id: u64) -> Result<Rec
         bail!("organization id must be non-zero");
     }
     let settings = ReconstructionSettings::from_env()?;
-    let pg_config = PgConfig::from_env()?;
+    let pg_config = PgConfig::from_env()?
+        .for_role(PgRole::Reconstruction)
+        .context("resolve reconstruction PostgreSQL role")?;
     let pool = build_pool(&pg_config)?;
     let source = PgReconstructionSource::new(pool.clone());
     let watermark = source

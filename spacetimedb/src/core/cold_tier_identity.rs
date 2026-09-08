@@ -32,6 +32,11 @@ pub(crate) const ORGANIZATION_RECONSTRUCTOR_SERVICE: &str = "organization_recons
 pub(crate) const EXPENSE_INTEGRATION_WORKER_SERVICE: &str = "expense_integration_worker";
 pub(crate) const HR_INTEGRATION_WORKER_SERVICE: &str = "hr_integration_worker";
 pub(crate) const PROJECT_INTEGRATION_WORKER_SERVICE: &str = "project_integration_worker";
+pub(crate) const OWNER_REPORT_WORKER_SERVICE: &str = "owner_report_worker";
+pub(crate) const WORKFLOW_WORKER_SERVICE: &str = "workflow_worker";
+/// Dedicated identity used by the IoT gateway after a hub proves its opaque
+/// post-pair credential.
+pub(crate) const IOT_GATEWAY_SERVICE: &str = "iot_gateway";
 
 #[derive(Clone)]
 #[spacetimedb::table(

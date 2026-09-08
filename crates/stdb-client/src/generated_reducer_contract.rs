@@ -674,6 +674,7 @@ const PARAMS_136: &[ReducerParam] = &[
     ReducerParam { name: "name", kind: ScalarKind::String, ref_target: None },
     ReducerParam { name: "ip_address", kind: ScalarKind::OptionalString, ref_target: None },
     ReducerParam { name: "firmware_version", kind: ScalarKind::OptionalString, ref_target: None },
+    ReducerParam { name: "credential_hash", kind: ScalarKind::String, ref_target: None },
 ];
 const PARAMS_137: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -5911,7 +5912,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "cancel_workflow_timer", contract_operation_id: "erp.cancel_workflow_timer", params: PARAMS_133, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "check_mo_availability", contract_operation_id: "erp.check_mo_availability", params: PARAMS_134, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "claim_ai_skill_certification", contract_operation_id: "erp.claim_ai_skill_certification", params: PARAMS_135, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "claim_hub_with_token", contract_operation_id: "erp.claim_hub_with_token", params: PARAMS_136, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: None, unscoped_reason: Some("the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative") },
+    ReducerContract { name: "claim_hub_with_token", contract_operation_id: "erp.claim_hub_with_token", params: PARAMS_136, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "claim_queue_job", contract_operation_id: "erp.claim_queue_job", params: PARAMS_137, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "claim_workflow_human_task", contract_operation_id: "erp.claim_workflow_human_task", params: PARAMS_138, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "cleanup_stale_proposal_presence", contract_operation_id: "erp.cleanup_stale_proposal_presence", params: PARAMS_139, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },

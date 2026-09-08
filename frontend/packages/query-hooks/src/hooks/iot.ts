@@ -163,34 +163,6 @@ export function useGenerateHubPairingToken(
   });
 }
 
-/**
- * Simulates hub pairing from the ERP (normally the IoT gateway calls this unauthenticated).
- * Use only for local/dev validation.
- */
-export function useClaimHubWithToken(organizationId: bigint) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (args: {
-      token: string;
-      serial: string;
-      name: string;
-      ipAddress?: string | null;
-      firmwareVersion?: string | null;
-    }) => {
-      const { urlPath, init } = stdbBffCommandPost('claim_hub_with_token', {
-        token: args.token,
-        serial: args.serial,
-        name: args.name,
-        ipAddress: args.ipAddress ?? null,
-        firmwareVersion: args.firmwareVersion ?? null,
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error(await parseCallError(r));
-    },
-    onSuccess: () => invalidateIotQueries(qc, organizationId),
-  });
-}
-
 export function useRegisterIotHub(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient();
   return useMutation<void, Error, Record<string, unknown>>({

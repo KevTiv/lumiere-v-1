@@ -1,4 +1,4 @@
-//! Authenticated HTTP scope for gateway user/device management requests.
+//! Post-pair hub credential scope for gateway device traffic.
 
 use axum::{
     http::{header::AUTHORIZATION, HeaderMap, StatusCode},
@@ -6,6 +6,7 @@ use axum::{
     Json,
 };
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 
 use crate::state::AppState;
 
@@ -64,6 +65,7 @@ impl IntoResponse for AuthError {
 pub(crate) struct AuthorizedTarget {
     organization_id: u64,
     company_id: u64,
+    hub_id: u64,
 }
 
 impl AuthorizedTarget {
@@ -72,8 +74,8 @@ impl AuthorizedTarget {
     }
 }
 
-/// Verify the bearer token at SpacetimeDB, then authorize the target row's
-/// organization and company through the actor's active membership.
+/// Verify the opaque bearer credential against the hash stored on the target
+/// hub, then return only server-derived organization/company scope.
 pub(crate) async fn authorize_target(
     state: &AppState,
     headers: &HeaderMap,
@@ -83,35 +85,17 @@ pub(crate) async fn authorize_target(
     if target_id == 0 {
         return Err(AuthError::forbidden("target id must be greater than zero"));
     }
-    let token = bearer_token(headers)?;
-    let actor_client = state.stdb.with_token(token);
-    let identity = actor_client
-        .authenticated_identity()
-        .await
-        .map_err(|_| AuthError::unauthorized("invalid or unauthenticated SpacetimeDB token"))?;
-
-    let (organization_id, company_id) = load_target_scope(state, table, target_id).await?;
-    let membership_sql = format!(
-        "SELECT organization_id, company_id, is_active FROM user_organization WHERE organization_id = {organization_id} AND user_identity = 0x{identity} AND is_active = true"
-    );
-    let membership = actor_client
-        .query_sql(&membership_sql)
-        .await
-        .map_err(|error| AuthError::internal(error.to_string()))?
-        .into_iter()
-        .next()
-        .ok_or_else(|| AuthError::forbidden("active organization membership required"))?;
-    let membership_company = row_u64(&membership, "companyId", "company_id")
-        .ok_or_else(|| AuthError::forbidden("active membership has no company scope"))?;
-    if membership_company == 0 || membership_company != company_id {
-        return Err(AuthError::forbidden(
-            "actor is not a member of the target company",
-        ));
+    let credential = bearer_token(headers)?;
+    let target = load_target_scope(state, table, target_id).await?;
+    let presented_hash = credential_hash(credential);
+    if !constant_time_eq(target.credential_hash.as_bytes(), presented_hash.as_bytes()) {
+        return Err(AuthError::unauthorized("invalid hub credential"));
     }
 
     Ok(AuthorizedTarget {
-        organization_id,
-        company_id,
+        organization_id: target.organization_id,
+        company_id: target.company_id,
+        hub_id: target.hub_id,
     })
 }
 
@@ -121,8 +105,11 @@ pub(crate) async fn enforce_target_scope(
     target_id: u64,
     expected: AuthorizedTarget,
 ) -> Result<(), AuthError> {
-    let (organization_id, company_id) = load_target_scope(state, table, target_id).await?;
-    if organization_id != expected.organization_id || company_id != expected.company_id {
+    let target = load_target_scope(state, table, target_id).await?;
+    if target.organization_id != expected.organization_id
+        || target.company_id != expected.company_id
+        || target.hub_id != expected.hub_id
+    {
         return Err(AuthError::forbidden(
             "target is outside the authenticated company scope",
         ));
@@ -134,7 +121,7 @@ async fn load_target_scope(
     state: &AppState,
     table: TargetTable,
     target_id: u64,
-) -> Result<(u64, u64), AuthError> {
+) -> Result<TargetScope, AuthError> {
     let target = state
         .stdb
         .query_sql(&table.select_sql(target_id))
@@ -147,10 +134,70 @@ async fn load_target_scope(
         .ok_or_else(|| AuthError::internal("target has no organization scope"))?;
     let company_id = row_u64(&target, "companyId", "company_id")
         .ok_or_else(|| AuthError::internal("target has no company scope"))?;
-    if organization_id == 0 || company_id == 0 {
+    let hub_id = match table {
+        TargetTable::Hub => target_id,
+        TargetTable::Device => row_u64(&target, "hubId", "hub_id")
+            .ok_or_else(|| AuthError::internal("device has no hub scope"))?,
+        TargetTable::Action => {
+            let device_id = row_u64(&target, "deviceId", "device_id")
+                .ok_or_else(|| AuthError::internal("action has no device scope"))?;
+            let device = state
+                .stdb
+                .query_sql(&TargetTable::Device.select_sql(device_id))
+                .await
+                .map_err(|error| AuthError::internal(error.to_string()))?
+                .into_iter()
+                .next()
+                .ok_or_else(|| AuthError::not_found("action device not found"))?;
+            let device_org = row_u64(&device, "organizationId", "organization_id")
+                .ok_or_else(|| AuthError::internal("action device has no organization scope"))?;
+            let device_company = row_u64(&device, "companyId", "company_id")
+                .ok_or_else(|| AuthError::internal("action device has no company scope"))?;
+            if device_org != organization_id || device_company != company_id {
+                return Err(AuthError::forbidden(
+                    "action and device tenant scope do not match",
+                ));
+            }
+            row_u64(&device, "hubId", "hub_id")
+                .ok_or_else(|| AuthError::internal("action device has no hub scope"))?
+        }
+    };
+    if organization_id == 0 || company_id == 0 || hub_id == 0 {
         return Err(AuthError::forbidden("target has invalid tenant scope"));
     }
-    Ok((organization_id, company_id))
+    let hub = state
+        .stdb
+        .query_sql(&TargetTable::Hub.select_sql(hub_id))
+        .await
+        .map_err(|error| AuthError::internal(error.to_string()))?
+        .into_iter()
+        .next()
+        .ok_or_else(|| AuthError::not_found("target hub not found"))?;
+    let hub_org = row_u64(&hub, "organizationId", "organization_id")
+        .ok_or_else(|| AuthError::internal("hub has no organization scope"))?;
+    let hub_company = row_u64(&hub, "companyId", "company_id")
+        .ok_or_else(|| AuthError::internal("hub has no company scope"))?;
+    if hub_org != organization_id || hub_company != company_id {
+        return Err(AuthError::forbidden(
+            "target and hub tenant scope do not match",
+        ));
+    }
+    let credential_hash = row_string(&hub, "credentialHash", "credential_hash")
+        .ok_or_else(|| AuthError::unauthorized("hub has no active credential"))?;
+    Ok(TargetScope {
+        organization_id,
+        company_id,
+        hub_id,
+        credential_hash,
+    })
+}
+
+#[derive(Debug)]
+struct TargetScope {
+    organization_id: u64,
+    company_id: u64,
+    hub_id: u64,
+    credential_hash: String,
 }
 
 fn bearer_token(headers: &HeaderMap) -> Result<&str, AuthError> {
@@ -173,6 +220,29 @@ fn row_u64(row: &Value, camel: &str, snake: &str) -> Option<u64> {
         .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
 }
 
+fn row_string(row: &Value, camel: &str, snake: &str) -> Option<String> {
+    row.get(camel)
+        .or_else(|| row.get(snake))
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+}
+
+pub(crate) fn credential_hash(credential: &str) -> String {
+    hex::encode(Sha256::digest(credential.as_bytes()))
+}
+
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    left.iter()
+        .zip(right)
+        .fold(0_u8, |difference, (left, right)| {
+            difference | (left ^ right)
+        })
+        == 0
+}
+
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum TargetTable {
     Hub,
@@ -187,13 +257,18 @@ impl TargetTable {
             Self::Device => "iot_device",
             Self::Action => "iot_action",
         };
-        format!("SELECT organization_id, company_id FROM {table} WHERE id = {id}")
+        let extra = match self {
+            Self::Hub => ", credential_hash",
+            Self::Device => ", hub_id",
+            Self::Action => ", device_id",
+        };
+        format!("SELECT organization_id, company_id{extra} FROM {table} WHERE id = {id}")
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{bearer_token, row_u64};
+    use super::{bearer_token, constant_time_eq, credential_hash, row_u64};
     use axum::http::{header::AUTHORIZATION, HeaderMap, HeaderValue};
     use serde_json::json;
 
@@ -210,5 +285,16 @@ mod tests {
         let row = json!({"organization_id": 4, "companyId": "9"});
         assert_eq!(row_u64(&row, "organizationId", "organization_id"), Some(4));
         assert_eq!(row_u64(&row, "companyId", "company_id"), Some(9));
+    }
+
+    #[test]
+    fn opaque_credentials_hash_and_compare_without_plaintext_storage() {
+        let hash = credential_hash("hub-secret");
+        assert_eq!(hash.len(), 64);
+        assert!(constant_time_eq(hash.as_bytes(), hash.as_bytes()));
+        assert!(!constant_time_eq(
+            hash.as_bytes(),
+            credential_hash("other-secret").as_bytes()
+        ));
     }
 }
