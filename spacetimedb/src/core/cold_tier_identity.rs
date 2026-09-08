@@ -27,6 +27,12 @@ pub(crate) const POS_ORDER_HYDRATOR_SERVICE: &str = "pos_order_hydrator";
 /// `service_name` used by the trusted per-organization reconstruction command.
 pub(crate) const ORGANIZATION_RECONSTRUCTOR_SERVICE: &str = "organization_reconstructor";
 
+/// Dedicated scheduled integration workers. These identities may process
+/// existing intents but are not interactive user authorities.
+pub(crate) const EXPENSE_INTEGRATION_WORKER_SERVICE: &str = "expense_integration_worker";
+pub(crate) const HR_INTEGRATION_WORKER_SERVICE: &str = "hr_integration_worker";
+pub(crate) const PROJECT_INTEGRATION_WORKER_SERVICE: &str = "project_integration_worker";
+
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = cold_tier_service_identity,
@@ -193,6 +199,23 @@ pub(crate) fn is_active_cold_tier_service_identity(
         .filter((&organization_id, &service_name))
         .any(|row| row.is_active && row.identity == ctx.sender());
     is_active
+}
+
+/// Require the caller to be the one active organization-scoped identity for
+/// the named service. This is the reducer-side authority boundary; API-side
+/// token configuration is defense in depth, not a replacement for it.
+pub(crate) fn require_active_service_identity(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    service_name: &str,
+) -> Result<(), String> {
+    if is_active_cold_tier_service_identity(ctx, organization_id, service_name) {
+        Ok(())
+    } else {
+        Err(format!(
+            "caller is not the active {service_name} identity for this organization"
+        ))
+    }
 }
 
 fn validate_platform_id(platform_id: &str) -> Result<String, String> {

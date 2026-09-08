@@ -5,14 +5,14 @@
 /// (Dr expense / Cr employee payable) with optional reimbursement clearing.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::chart_of_accounts::{account_journal};
-use crate::accounting::line_params::{journal_line_params, validate_company_account};
+use crate::accounting::chart_of_accounts::account_journal;
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line, AccountMove,
 };
-use crate::accounting::tax_management::{account_tax, account_tax_group};
+use crate::accounting::line_params::{journal_line_params, validate_company_account};
 use crate::accounting::relations::require_analytic_account;
+use crate::accounting::tax_management::{account_tax, account_tax_group};
 use crate::core::country_pack::pack_expense_evidence_rules;
 use crate::core::organization::{company, company_id_from_scope};
 use crate::core::reference::{
@@ -702,7 +702,19 @@ pub fn create_expense(
     params: CreateExpenseParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense", "create")?;
+    create_expense_inner(ctx, organization_id, params)
+}
 
+/// Create an expense after the caller's authority has been established.
+///
+/// Interactive callers enter through [`create_expense`]. The registered
+/// expense integration worker uses this path only from its service-authorized
+/// batch reducer.
+pub(super) fn create_expense_inner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateExpenseParams,
+) -> Result<(), String> {
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     require_active_currency_by_id(ctx, params.currency_id)?;
     // EXP-002: Validate employee_id FK.

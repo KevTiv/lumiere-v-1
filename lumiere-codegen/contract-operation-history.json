@@ -5286,7 +5286,14 @@
     "erp.test_finalize_rejects_unregistered_caller",
     "erp.update_user_password"
   ],
-  "compatibility_exceptions": [],
+  "compatibility_exceptions": [
+    {
+      "operation_id": "erp.apply_pending_expense_integration_intents",
+      "previous_fingerprint": "sha256:bec1fe26b7ba51433a96f53cdfe1c2dec3b22b07a5200e4ccfe872817c4b0c6c",
+      "current_fingerprint": "sha256:5848172f6f16be9f6e2a6ffa9904b40426c3977bfd5f3ab41b7a1e8c35cfd51b",
+      "reason": "restrict the batch drain to the registered expense integration worker and retire session exposure"
+    }
+  ],
   "revisions": [
     {
       "previous_release": "v0.3.33",

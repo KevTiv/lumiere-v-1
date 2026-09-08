@@ -1,12 +1,12 @@
 //! Wave D — integration intents, advances, policy exceptions, fraud helpers.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::chart_of_accounts::{account_journal};
-use crate::accounting::line_params::{journal_line_params, validate_company_account};
+use crate::accounting::chart_of_accounts::account_journal;
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line, AccountMove,
 };
+use crate::accounting::line_params::{journal_line_params, validate_company_account};
 use crate::core::organization::{company, company_id_from_scope};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::hr::employees::hr_employee;
@@ -17,8 +17,8 @@ use crate::types::{
 use serde_json::Value;
 
 use super::expenses::{
-    create_expense, expense_sheet, hr_expense, hr_expense_receipt, insert_expense_receipt,
-    CreateExpenseParams, CreateExpenseReceiptParams, HrExpense,
+    expense_sheet, hr_expense, hr_expense_receipt, insert_expense_receipt, CreateExpenseParams,
+    CreateExpenseReceiptParams, HrExpense,
 };
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -387,7 +387,7 @@ fn apply_create_expense_payload(
         }
     }
 
-    create_expense(
+    super::expenses::create_expense_inner(
         ctx,
         organization_id,
         CreateExpenseParams {
@@ -563,6 +563,19 @@ pub fn apply_expense_integration_intent(
     intent_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense", "create")?;
+    apply_expense_integration_intent_inner(ctx, organization_id, intent_id)
+}
+
+/// Apply one integration intent after the caller has authenticated its authority.
+///
+/// The interactive reducer performs the human permission check above, while the
+/// registered integration worker uses this helper after service-identity
+/// validation at its batch reducer boundary.
+pub(super) fn apply_expense_integration_intent_inner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    intent_id: u64,
+) -> Result<(), String> {
     let intent = ctx
         .db
         .expense_integration_intent()

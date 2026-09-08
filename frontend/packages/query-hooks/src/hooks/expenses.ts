@@ -777,19 +777,6 @@ export function useUnmatchExpenseCardStatementLine(organizationId: bigint) {
   })
 }
 
-export function useApplyPendingExpenseIntegrationIntents(organizationId: bigint) {
-  const qc = useQueryClient()
-  return useMutation<void, Error, number | undefined>({
-    mutationFn: async (limit = 20) => {
-      const { urlPath, init } = stdbBffCommandPost("apply_pending_expense_integration_intents", { limit: limit })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to apply pending intents'))
-    },
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
-  })
-}
-
 // ── CSV imports (organization_id, csv_data) ───────────────────────────────────
 
 import { responseErrorMessage as parseCallErrorExpenses } from "@lumiere/api-client/response-error"

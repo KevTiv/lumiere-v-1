@@ -207,11 +207,6 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
-      "name": "apply_pending_expense_integration_intents",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site"
-    },
-    {
       "name": "apply_proposal_analysis",
       "exposure": "session",
       "reason": "reviewed proposal reducer: requires proposal write permission and validates organization/company scope before every write"

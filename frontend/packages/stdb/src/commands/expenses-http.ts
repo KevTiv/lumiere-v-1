@@ -8,7 +8,6 @@ import type { ReducerCommandContractMeta } from "./types";
 export const EXPENSES_BFF_REDUCERS = [
   "apply_expense_advance_to_sheet",
   "apply_expense_integration_intent",
-  "apply_pending_expense_integration_intents",
   "approve_expense_policy_exception",
   "approve_expense_sheet",
   "create_expense",
@@ -46,7 +45,6 @@ const EXPENSES_HINT_OVERRIDES: Partial<
 > = {
   apply_expense_advance_to_sheet: ["expense-sheets", "expenses", "expense-advances"],
   apply_expense_integration_intent: ["expenses"],
-  apply_pending_expense_integration_intents: ["expenses"],
   approve_expense_policy_exception: ["expenses", "expense-policy-exceptions"],
   approve_expense_sheet: [
     "expense-sheets",

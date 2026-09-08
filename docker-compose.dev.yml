@@ -205,7 +205,7 @@ services:
     environment:
       STDB_HOST: http://spacetimedb:3000
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
-      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN in .env.docker}
+      STDB_OWNER_REPORT_WORKER_TOKEN: ${STDB_OWNER_REPORT_WORKER_TOKEN:?set STDB_OWNER_REPORT_WORKER_TOKEN in .env.docker}
       AI_GATEWAY_URL: http://ai-gateway:8080
       LUMIERE_REPORT_RENDERER_URL: http://chromium-worker:8090
       LUMIERE_REPORT_ARTIFACT_DIR: /var/lib/lumiere/owner-reports
@@ -236,7 +236,7 @@ services:
     environment:
       STDB_HOST: http://spacetimedb:3000
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
-      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN in .env.docker}
+      STDB_WORKFLOW_WORKER_TOKEN: ${STDB_WORKFLOW_WORKER_TOKEN:?set STDB_WORKFLOW_WORKER_TOKEN in .env.docker}
       LUMIERE_WORKFLOW_WORKER_POLL_SECS: ${LUMIERE_WORKFLOW_WORKER_POLL_SECS:-5}
       LUMIERE_WORKFLOW_WORKER_NAME: ${LUMIERE_WORKFLOW_WORKER_NAME:-workflow-worker-dev}
       LUMIERE_WORKFLOW_WORKER_PORT: 8093

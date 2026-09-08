@@ -135,13 +135,16 @@
         "the IoT gateway removed DEFAULT_ORG_ID and client organization fields; HTTP and WebSocket target scope is derived from persisted hub/device/action rows and checked against a SpacetimeDB-authenticated active membership, while MQTT derives organization from the persisted device",
         "hydration can only be constructed from a server-resolved placement in production and rejects forged root scope, wrong-parent children, and cross-company payments; reconstruction rejects a fence for another organization before restore",
         "the persisted STDB adversarial reducer matrix covers Org A/B in both directions, a valid Company A2 relationship, cross-organization parent rejection without mutation, inactive membership, and audit identity equality with ctx.sender()",
-        "cargo check -p api-server --all-targets, 13 stdb-client tests, 2 session-auth tests, 2 iot-gateway tests, the native SpacetimeDB library check, and 348 passing API library tests validate the local code paths; the full API library run has one pre-existing release-manifest checksum drift outside C9 after the new hydration assertion was corrected"
+        "owner-report, workflow, expense, HR, and project workers require distinct non-owner SpacetimeDB tokens; API workers verify the authenticated token identity against the one active organization-scoped cold_tier_service_identity binding before processing an organization",
+        "expense, HR, and project batch integration reducers now enforce the registered service identity at the reducer boundary while preserving human permissions on single-intent reducers; the expense batch operation is denied to sessions and its former UI/client call path is removed",
+        "cargo check -p api-server --all-targets, the native SpacetimeDB library check, the 1,316-operation history and C8 contract ratchet, and all nine frontend TypeScript workspaces validate the local service-identity slice"
       ],
       "required": [
         "finish migrating remaining handwritten domain routes and scheduled service operations onto the trusted context after C8 generated-adoption convergence",
         "provide a post-pair device credential contract for IoT hubs instead of requiring an interactive user token on hub endpoints",
         "run the complete Org A/B and Company A1/A2 matrix against disposable STDB and PostgreSQL through commands, reads, live subscriptions, projection, cold reads, hydration, and post-reconstruction fresh sessions",
-        "prove deployment-side least-privilege PostgreSQL grants and replace the shared owner token used by owner-report, workflow, and integration workers with dedicated service identities"
+        "prove positive disposable-STDB execution under separately registered owner-report, workflow, expense, HR, and project worker identities",
+        "separate the shared PostgreSQL pool into least-privilege projection, finalization, and reconstruction roles and prove deployment-side grants"
       ]
     },
     "C10": {

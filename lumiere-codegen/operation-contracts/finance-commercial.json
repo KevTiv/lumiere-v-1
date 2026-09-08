@@ -283,7 +283,7 @@
     },
     "apply_pending_expense_integration_intents": {
       "semantic_kind": "operator",
-      "client_facing": true,
+      "client_facing": false,
       "idempotency": "state_guarded",
       "codec": {
         "id": "spacetimedb-sats-json",
