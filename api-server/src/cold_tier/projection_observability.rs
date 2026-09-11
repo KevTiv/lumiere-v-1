@@ -31,6 +31,20 @@ pub struct ProjectionStatus {
     pub quarantined_sequence: Option<u64>,
 }
 
+impl ProjectionStatus {
+    /// Return whether this organization's unprojected commit age is within
+    /// the configured active-service budget.
+    ///
+    /// A non-zero backlog without a timestamp is deliberately unhealthy: the
+    /// worker must not treat missing observability as proof of freshness.
+    pub fn within_lag_budget(&self, budget_secs: u64) -> bool {
+        self.backlog_commits == 0
+            || self
+                .oldest_unprojected_age_seconds
+                .is_some_and(|age| age <= budget_secs)
+    }
+}
+
 /// Bound a value by UTF-8 bytes without splitting a code point.
 fn bounded(value: &str, max_bytes: usize) -> String {
     if value.len() <= max_bytes {
@@ -410,5 +424,27 @@ mod tests {
         assert_eq!(json["quarantinedSequence"], 10);
         assert_eq!(json["oldestUnprojectedAt"], 123);
         assert_eq!(json["oldestUnprojectedAgeSeconds"], 1);
+    }
+
+    #[test]
+    fn projection_lag_budget_requires_observable_freshness() {
+        let mut status = ProjectionStatus {
+            organization_id: 42,
+            stdb_head_sequence: 10,
+            durable_sequence: 10,
+            backlog_commits: 0,
+            oldest_unprojected_at: None,
+            oldest_unprojected_age_seconds: None,
+            last_error: None,
+            quarantined_sequence: None,
+        };
+        assert!(status.within_lag_budget(60));
+
+        status.backlog_commits = 1;
+        assert!(!status.within_lag_budget(60));
+        status.oldest_unprojected_age_seconds = Some(60);
+        assert!(status.within_lag_budget(60));
+        status.oldest_unprojected_age_seconds = Some(61);
+        assert!(!status.within_lag_budget(60));
     }
 }

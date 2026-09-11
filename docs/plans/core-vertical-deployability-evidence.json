@@ -165,9 +165,19 @@
       "required": []
     },
     "C10": {
-      "status": "blocked",
-      "evidence": ["current main P0 Playwright workflow is failing"],
-      "required": ["green lead-to-cash and procure-to-pay", "degraded-mode and failure-path coverage"]
+      "status": "complete",
+      "evidence": [
+        "the production-built lead-to-cash Playwright workflow passes persisted refresh checks for opportunity, sale-order relationship labels, invoice, payment, dashboard, and audit outcomes; focused negative cases pass for missing required sales configuration, insufficient stock with the order remaining Draft, and an invalid transition from Cancelled",
+        "the production-built procure-to-pay Playwright workflow passes PO creation and confirmation, receipt, vendor bill creation and posting, outbound supplier payment, bill reconciliation, and persisted supplier/payment labels after refresh",
+        "an exact replay of the vendor-bill request is rejected and the originally persisted bill remains authoritative; partial-receipt match state passes and an over-billed invoice cannot be posted",
+        "Accounting now uses a payment-partner lookup containing both customers and suppliers; the previous customer-only filtering made the supplier payment UI path unreachable, and its focused unit test plus frontend typecheck pass",
+        "readiness against a disposable local topology returns 200 with X-Lumiere-Degraded: postgres during a configured five-second PostgreSQL grace, returns 503 after the budget, and recovers to 200 after PostgreSQL login is restored",
+        "projection readiness treats missing or over-budget backlog age as unhealthy, and finalization refuses to cool while projection is unhealthy; focused projection and finalizer tests pass",
+        "with SpacetimeDB pointed at an unavailable local endpoint, readiness, an authenticated hot read, and an authenticated write all fail closed without PostgreSQL fallback",
+        "with the AI gateway pointed at an unavailable endpoint, readiness and both ordinary ERP golden workflows remain available because AI status is informational rather than a readiness dependency",
+        "the local C10 topology uses a disposable locally owned SpacetimeDB database and real PostgreSQL migrations; the core reducer suite and every enabled domain reducer test pass before the browser workflows"
+      ],
+      "required": []
     },
     "C11": {
       "status": "partial",

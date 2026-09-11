@@ -131,10 +131,10 @@ publish contracts, or mutate a database. Further batches require reassignment.
   enabled: this is not live database evidence.
 - Final API all-target check passed without warnings using populated pinned
   contract bindings. `git diff --check` passed. No commit or push performed.
-- AI readiness follow-up: api-server now has explicit `AI_GATEWAY_REQUIRED`
-  policy (production default true, development default false), calls the gateway
-  readiness endpoint with a two-second request timeout, and fails on transport,
-  timeout or non-success responses. The AI gateway separates static liveness
+- Historical AI readiness follow-up: api-server introduced an explicit required-AI
+  policy and failed readiness on gateway transport, timeout, or non-success responses.
+  C10 later retired that policy because AI availability must not gate ordinary ERP.
+  The AI gateway still separates static liveness
   from a three-second, read-only readiness probe of SpacetimeDB and the primary
   Qdrant collection. Provider readiness validates selected configuration and
   uses non-generative Ollama metadata plus an optional exact operator-configured

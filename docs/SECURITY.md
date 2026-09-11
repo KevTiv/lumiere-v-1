@@ -69,12 +69,11 @@ See [api-server/src/reducer_allowlist.rs](../api-server/src/reducer_allowlist.rs
 ## Monitoring
 
 - api-server liveness: `GET /health`
-- api-server readiness: `GET /health/ready` (PostgreSQL, SpacetimeDB, and configured ai-gateway)
+- api-server readiness: `GET /health/ready` (PostgreSQL and SpacetimeDB; AI is informational)
 - ai-gateway readiness: `GET /health/ready` on the gateway (SpacetimeDB, primary Qdrant, provider configuration, Ollama metadata, and any explicit Kong readiness endpoint)
 
-`/health` is liveness only. In production `AI_GATEWAY_REQUIRED` defaults to true, so
-gateway transport failures and non-success responses make readiness fail. Development
-defaults it to false unless explicitly overridden.
+`/health` is liveness only. AI gateway failures never gate ordinary ERP readiness;
+AI health is reported independently from the core STDB and PostgreSQL readiness path.
 - Metrics: `GET /metrics` (Prometheus text)
 
 ## Related

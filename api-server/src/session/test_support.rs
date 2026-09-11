@@ -20,7 +20,7 @@ pub(crate) fn test_config(server_token: Option<&str>) -> Config {
         cors_origins: vec![],
         dev_mock_org_id: None,
         ai_gateway_url: "http://127.0.0.1:3001".into(),
-        ai_gateway_required: false,
+        projection_lag_budget_secs: 300,
         workos_client_id: None,
         stdb_credential_encryption_key: None,
         resend_api_key: None,

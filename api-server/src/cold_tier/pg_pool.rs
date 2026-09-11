@@ -24,8 +24,8 @@
 //! | `PG_POOL_MAX` | `10` | no |
 //! | `PG_CONNECT_TIMEOUT_SECS` | `10` | no |
 
-use std::sync::OnceLock;
-use std::time::Duration;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use deadpool_postgres::{Config as DeadpoolConfig, ManagerConfig, Pool, PoolConfig, Runtime};
@@ -345,6 +345,7 @@ fn rustls_config() -> Result<rustls::ClientConfig> {
 /// to serve incomplete data. PG-dependent reads must use [`required_pool`].
 /// Configuration failures are cached until restart; readiness stays unhealthy.
 static SHARED_POOL: OnceLock<Option<Pool>> = OnceLock::new();
+static PG_LAST_HEALTHY: OnceLock<Mutex<Option<Instant>>> = OnceLock::new();
 
 pub fn shared_pool() -> Option<&'static Pool> {
     SHARED_POOL
@@ -377,6 +378,62 @@ pub async fn check_ready() -> Result<()> {
         Ok(())
     })
     .await
+}
+
+/// Probe PostgreSQL while allowing a bounded outage for active ERP traffic.
+///
+/// The returned flag is `true` when the probe failed but the process remains
+/// inside the configured grace window. Callers must surface that degraded
+/// state and must not use it as permission to write business data to PG.
+pub async fn check_ready_with_grace(grace: Duration) -> Result<bool> {
+    match bounded_readiness(Duration::from_secs(3), async {
+        let client = required_pool()?
+            .get()
+            .await
+            .context("acquire PostgreSQL readiness connection")?;
+        client
+            .simple_query("SELECT 1")
+            .await
+            .context("probe PostgreSQL readiness")?;
+        Ok::<(), anyhow::Error>(())
+    })
+    .await
+    {
+        Ok(()) => {
+            let healthy = PG_LAST_HEALTHY.get_or_init(|| Mutex::new(None));
+            *healthy
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(Instant::now());
+            Ok(false)
+        }
+        Err(error) => {
+            let healthy = PG_LAST_HEALTHY.get_or_init(|| Mutex::new(None));
+            let last_healthy = *healthy
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let Some(last_healthy) = last_healthy else {
+                return Err(error.context(
+                    "PostgreSQL has not established a healthy baseline for degraded mode",
+                ));
+            };
+            let outage_for = last_healthy.elapsed();
+            if can_continue_degraded(Some(outage_for), grace) {
+                tracing::warn!(
+                    outage_seconds = outage_for.as_secs(),
+                    budget_seconds = grace.as_secs(),
+                    error = %error,
+                    "PostgreSQL unavailable; continuing in bounded degraded mode"
+                );
+                Ok(true)
+            } else {
+                Err(error.context("PostgreSQL outage exceeded degraded-mode grace"))
+            }
+        }
+    }
+}
+
+fn can_continue_degraded(last_healthy_elapsed: Option<Duration>, grace: Duration) -> bool {
+    last_healthy_elapsed.is_some_and(|elapsed| elapsed <= grace)
 }
 
 async fn bounded_readiness(
@@ -414,6 +471,19 @@ mod tests {
         assert!(bounded_readiness(Duration::from_secs(1), async { Ok(()) })
             .await
             .is_ok());
+    }
+
+    #[test]
+    fn postgres_degraded_grace_is_bounded() {
+        assert!(can_continue_degraded(
+            Some(Duration::from_secs(5)),
+            Duration::from_secs(5)
+        ));
+        assert!(!can_continue_degraded(
+            Some(Duration::from_secs(6)),
+            Duration::from_secs(5)
+        ));
+        assert!(!can_continue_degraded(None, Duration::from_secs(5)));
     }
 
     #[test]

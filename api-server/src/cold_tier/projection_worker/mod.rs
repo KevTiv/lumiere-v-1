@@ -228,22 +228,38 @@ pub async fn serve() -> Result<()> {
             .await
             {
                 Ok(stats) => {
-                    let persisted_quarantine =
+                    let (lag_unhealthy, persisted_quarantine) =
                         match projection_observability::read_projection_statuses(&worker_pool).await
                         {
-                            Ok(statuses) => statuses.iter().any(|status| {
-                                status.last_error.is_some() || status.quarantined_sequence.is_some()
-                            }),
+                            Ok(statuses) => {
+                                let lag_unhealthy = statuses.iter().any(|status| {
+                                    !status.within_lag_budget(
+                                        worker_state.config.projection_lag_budget_secs,
+                                    )
+                                });
+                                if lag_unhealthy {
+                                    tracing::warn!(
+                                        budget_secs =
+                                            worker_state.config.projection_lag_budget_secs,
+                                        "projection lag exceeds configured active-service budget"
+                                    );
+                                }
+                                let persisted_quarantine = statuses.iter().any(|status| {
+                                    status.last_error.is_some()
+                                        || status.quarantined_sequence.is_some()
+                                });
+                                (lag_unhealthy, persisted_quarantine)
+                            }
                             Err(error) => {
                                 tracing::error!(
                                     %error,
                                     "read persisted projection readiness status failed"
                                 );
-                                true
+                                (true, true)
                             }
                         };
                     worker_ready.store(
-                        stats.failed == 0 && !persisted_quarantine,
+                        stats.failed == 0 && !persisted_quarantine && !lag_unhealthy,
                         Ordering::Relaxed,
                     );
                     if stats.commits > 0 || stats.already_applied > 0 {
@@ -265,10 +281,19 @@ pub async fn serve() -> Result<()> {
         }
     });
     let finalizer_ready = finalization_ready.clone();
+    let finalizer_projection_ready = projection_ready.clone();
     let finalizer_state = state;
     let finalizer_pool = finalization_pool.clone();
     tokio::spawn(async move {
         loop {
+            // Cooling must not race a failed or over-budget projection pass.
+            // The finalizer consumes the same durable store, so this gate also
+            // keeps PG loss and stale durability from triggering a hand-off.
+            if !finalizer_projection_ready.load(Ordering::Relaxed) {
+                finalizer_ready.store(false, Ordering::Relaxed);
+                tokio::time::sleep(Duration::from_secs(finalization_poll_secs)).await;
+                continue;
+            }
             match finalization_worker::drain_batch(
                 &finalizer_state.stdb,
                 &finalization_stdb,

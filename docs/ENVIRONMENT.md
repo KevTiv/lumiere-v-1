@@ -14,7 +14,7 @@ This doc summarizes how **SpacetimeDB**, **Next.js**, **api-server**, and **gate
 | `LUMIERE_API_SERVER_URL` | Next `lib/api-server-forward.ts` | Internal base URL of the Rust api-server for Next routes that still perform local side effects before proxying (e.g. `http://api-server:8082`). In development, defaults to `http://127.0.0.1:8082` if unset. |
 | `LUMIERE_REDUCER_ALLOWLIST` | api-server | `strict` (production default) blocks bootstrap/test/import reducers on `POST /v1/call/{reducer}`; `off` disables filtering (local dev / e2e). |
 | `AI_GATEWAY_URL` | api-server | Internal AI gateway base URL. Required in production; must not be `localhost`. |
-| `AI_GATEWAY_REQUIRED` | api-server | Whether `/health/ready` requires the AI gateway (`true`/`false` or `1`/`0`). Defaults to `true` in production and `false` outside production. |
+| `LUMIERE_PROJECTION_LAG_BUDGET_SECS` | api-server, projection-worker | Maximum tolerated age/outage interval before projection becomes unhealthy and active ERP readiness fails; defaults to 300 seconds. |
 | `STDB_TOKEN` | ai-gateway | AI service token for the SpacetimeDB HTTP API. |
 | `STDB_IOT_GATEWAY_TOKEN` | iot-gateway | Dedicated identity registered as `iot_gateway` for every organization served; must not reuse the owner or another worker token. |
 | `AI_CERTIFICATION_STDB_TOKEN` | ai-gateway | Dedicated SpacetimeDB token whose identity alone may claim and complete certification jobs. Required with `AI_CERTIFICATION_RUNTIME_HASH`. |
@@ -41,11 +41,10 @@ Tenant LLM provider/model selection is stored in SpacetimeDB `AiAgent` rows (Mis
 ### Health semantics
 
 The api-server exposes `GET /health` as liveness only; it does not contact SpacetimeDB or
-the AI gateway. `GET /health/ready` checks PostgreSQL readiness and SpacetimeDB, and checks
-the configured AI gateway when `AI_GATEWAY_REQUIRED=true`. Production defaults this
-switch to `true`; development defaults to `false` unless explicitly overridden.
-The development Compose stack explicitly enables it because that stack includes
-the AI gateway and its required stores.
+the AI gateway. `GET /health/ready` fails closed when SpacetimeDB is unavailable. After a
+proven healthy PostgreSQL probe, it may remain ready during a bounded PostgreSQL outage and
+marks that response with `X-Lumiere-Degraded: postgres`; it fails after the configured lag
+budget. AI availability never gates ordinary ERP readiness.
 AI-gateway readiness uses Ollama's non-generative metadata endpoint and an exact
 operator-supplied `KONG_LLM_READINESS_URL` when configured. Mistral, Gemini,
 Unstructured, and Tavily are configuration-validated or runtime-observed;

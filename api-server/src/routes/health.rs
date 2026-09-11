@@ -2,12 +2,14 @@
 
 use crate::metrics;
 use crate::state::AppState;
-use axum::{extract::State, http::StatusCode};
+use axum::{
+    extract::State,
+    http::{HeaderMap, HeaderValue, StatusCode},
+};
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
-const AI_GATEWAY_READINESS_TIMEOUT: Duration = Duration::from_secs(2);
 const STDB_READINESS_TIMEOUT: Duration = Duration::from_secs(3);
 
 pub(crate) async fn health() -> StatusCode {
@@ -16,7 +18,7 @@ pub(crate) async fn health() -> StatusCode {
 
 pub(crate) async fn health_ready(
     State(state): State<Arc<AppState>>,
-) -> Result<StatusCode, StatusCode> {
+) -> Result<(StatusCode, HeaderMap), StatusCode> {
     let token = state
         .config
         .stdb_server_token
@@ -24,63 +26,51 @@ pub(crate) async fn health_ready(
         .filter(|t| !t.is_empty())
         .unwrap_or("");
     let client = state.client_with_token(token);
-    let postgres = async {
-        crate::cold_tier::pg_pool::check_ready()
-            .await
-            .map_err(|error| anyhow::anyhow!("PostgreSQL readiness failed: {error}"))
-    };
     let spacetime = check_stdb_ready(&client, STDB_READINESS_TIMEOUT);
-    let ai_gateway = async {
-        if state.config.ai_gateway_required {
-            check_ai_gateway_ready(
-                &state.http,
-                &state.config.ai_gateway_url,
-                AI_GATEWAY_READINESS_TIMEOUT,
-            )
-            .await?;
-        }
-        Ok::<(), anyhow::Error>(())
+    // AI is an optional capability. Its outage must not remove ordinary ERP
+    // traffic from service; AI diagnostics belong on a separate probe.
+    let postgres = async {
+        crate::cold_tier::pg_pool::check_ready_with_grace(Duration::from_secs(
+            state.config.projection_lag_budget_secs,
+        ))
+        .await
+        .map(|degraded| {
+            if degraded {
+                tracing::warn!("api-server readiness is degraded by PostgreSQL outage");
+            }
+            degraded
+        })
+        .map_err(|error| anyhow::anyhow!("PostgreSQL readiness failed: {error}"))
     };
-
-    if let Err(error) = tokio::try_join!(postgres, spacetime, ai_gateway) {
+    let (postgres_degraded, _) = tokio::try_join!(postgres, spacetime).map_err(|error| {
         tracing::warn!(%error, "api-server readiness probe failed");
-        return Err(StatusCode::SERVICE_UNAVAILABLE);
-    }
-    Ok(StatusCode::OK)
+        StatusCode::SERVICE_UNAVAILABLE
+    })?;
+    Ok((StatusCode::OK, readiness_headers(postgres_degraded)))
 }
 
-fn ai_gateway_readiness_url(base_url: &str) -> String {
-    format!("{}/health/ready", base_url.trim_end_matches('/'))
+fn readiness_headers(postgres_degraded: bool) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    if postgres_degraded {
+        headers.insert("x-lumiere-degraded", HeaderValue::from_static("postgres"));
+    }
+    headers
 }
 
 async fn check_stdb_ready(
     client: &stdb_client::StdbClient,
     timeout: Duration,
 ) -> anyhow::Result<()> {
-    bounded_probe(timeout, client.query_sql("SELECT 1"))
-        .await
-        .map_err(|_| anyhow::anyhow!("SpacetimeDB readiness probe timed out"))??;
-    Ok(())
-}
-
-async fn check_ai_gateway_ready(
-    client: &reqwest::Client,
-    base_url: &str,
-    timeout: Duration,
-) -> anyhow::Result<()> {
-    let response = bounded_probe(
+    // SpacetimeDB 2.8 does not support scalar projection expressions such as
+    // `SELECT 1`. Probe the published module through a bounded primary-key
+    // miss instead; this validates module SQL without materializing rows.
+    bounded_probe(
         timeout,
-        client.get(ai_gateway_readiness_url(base_url)).send(),
+        client.query_sql("SELECT * FROM organization WHERE id = 0"),
     )
     .await
-    .map_err(|_| anyhow::anyhow!("AI gateway readiness probe timed out"))??;
-    ensure_success_status(response.status())
-        .map_err(|status| anyhow::anyhow!("AI gateway readiness returned {status}"))?;
+    .map_err(|_| anyhow::anyhow!("SpacetimeDB readiness probe timed out"))??;
     Ok(())
-}
-
-fn ensure_success_status(status: reqwest::StatusCode) -> Result<(), reqwest::StatusCode> {
-    status.is_success().then_some(()).ok_or(status)
 }
 
 async fn bounded_probe<T>(
@@ -96,25 +86,9 @@ pub(crate) async fn metrics_handler() -> (StatusCode, String) {
 
 #[cfg(test)]
 mod tests {
-    use super::{ai_gateway_readiness_url, bounded_probe, ensure_success_status};
+    use super::{bounded_probe, check_stdb_ready, readiness_headers};
+    use axum::http::header::HeaderName;
     use std::time::Duration;
-
-    #[test]
-    fn readiness_probe_uses_gateway_ready_endpoint() {
-        assert_eq!(
-            ai_gateway_readiness_url("http://gateway///"),
-            "http://gateway/health/ready"
-        );
-    }
-
-    #[test]
-    fn readiness_probe_rejects_non_success_status() {
-        assert!(ensure_success_status(reqwest::StatusCode::OK).is_ok());
-        assert_eq!(
-            ensure_success_status(reqwest::StatusCode::SERVICE_UNAVAILABLE),
-            Err(reqwest::StatusCode::SERVICE_UNAVAILABLE)
-        );
-    }
 
     #[tokio::test]
     async fn readiness_probe_is_bounded() {
@@ -122,5 +96,27 @@ mod tests {
             .await
             .unwrap_err();
         let _: tokio::time::error::Elapsed = error;
+    }
+
+    #[tokio::test]
+    async fn stdb_unavailable_readiness_fails_closed() {
+        let client = stdb_client::StdbClient::new(
+            "not-a-url".into(),
+            "missing-module".into(),
+            "token".into(),
+        );
+        assert!(check_stdb_ready(&client, Duration::from_millis(100))
+            .await
+            .is_err());
+    }
+
+    #[test]
+    fn readiness_exposes_bounded_postgres_degradation() {
+        let headers = readiness_headers(true);
+        assert_eq!(
+            headers.get(HeaderName::from_static("x-lumiere-degraded")),
+            Some(&axum::http::HeaderValue::from_static("postgres"))
+        );
+        assert!(readiness_headers(false).is_empty());
     }
 }

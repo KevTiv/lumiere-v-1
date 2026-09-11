@@ -80,6 +80,19 @@ export function contactRowsToPartnerSelectOptions(
   })
 }
 
+/** CRM contacts usable by accounting, where a payment partner may be a customer or supplier. */
+export function contactRowsToAccountingPartnerSelectOptions(
+  rows: Record<string, unknown>[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => {
+    const id = row.id
+    const display = String(row.displayName ?? row.name ?? "")
+    const email = row.email != null ? String(row.email) : ""
+    const label = email ? `${display} (${email})` : display || String(id)
+    return { value: String(id), label }
+  })
+}
+
 export function pricelistRowsToSelectOptions(
   rows: Record<string, unknown>[],
 ): Array<{ value: string; label: string }> {

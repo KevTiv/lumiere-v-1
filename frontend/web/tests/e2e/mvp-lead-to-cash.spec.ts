@@ -1,22 +1,28 @@
-import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
+import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
+
+import { matchesOperationResponse } from "./operation-response"
 
 import {
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   chooseSelectOptionByValue,
   assertMoveLinesBalanced,
+  callReducerBffResult,
   expectNoAppError,
   expectOverviewDashboardLive,
   expectSeededText,
   fetchAccountSelectLabelByInternalType,
   fetchDraftInvoiceMoveIdByPartner,
+  fetchDefaultCompanyId,
   fetchInvoiceMoveDetails,
   fetchLatestPaymentIdByPartner,
   fetchSalesInvoiceJournalLabel,
   fetchLeadIdByName,
+  fetchSessionOrganizationId,
   fetchOpportunityIdByName,
   fetchSaleOrderIdByOpportunityId,
+  scalarQueryString,
   waitForOpportunityLineExists,
   fetchFulfillmentPickingIdBySaleOrderId,
   fillField,
@@ -43,16 +49,78 @@ import {
 } from "./helpers"
 
 const SEEDED_CUSTOMER_NAME = "Acme Corporation"
+type SaleOrderQueryRow = QueryRowFor<"sale-orders">
 
-function queryString(value: unknown): string {
-  if (value == null) return ""
-  if (typeof value === "string") return value
-  if (typeof value === "object" && !Array.isArray(value)) {
-    const obj = value as Record<string, unknown>
-    if ("some" in obj) return queryString(obj.some)
-    if ("tag" in obj && typeof obj.tag === "string") return obj.tag
-  }
-  return String(value)
+async function createDraftSaleOrder(page: Parameters<typeof gotoModule>[0], clientRef: string): Promise<number> {
+  await gotoModule(page, "/sales", "sales")
+  await page.getByTestId("module-tab-sales-orders").click()
+  await waitForBffQueryMinRows(page, "/api/query/contacts")
+  await waitForBffQueryMinRows(page, "/api/query/pricelists")
+  await waitForBffQueryMinRows(page, "/api/query/warehouses")
+  await page.getByTestId("module-create-sales-orders").click()
+  await expect(page.getByTestId("form-modal-new-sale-order")).toBeVisible()
+  await chooseSelectOptionByLabel(page, "partnerId", SEEDED_CUSTOMER_NAME)
+  await chooseFirstEnabledOption(page, "pricelistId")
+  await chooseFirstEnabledOption(page, "warehouseId")
+  await fillField(page, "clientOrderRef", clientRef)
+  await Promise.all([
+    page.waitForResponse(
+      (res) => matchesOperationResponse(res, "create_sale_order") && res.ok(),
+      { timeout: 30_000 },
+    ),
+    submitForm(page, "new-sale-order"),
+  ])
+
+  let orderId = 0
+  await expect
+    .poll(
+      async () => {
+        const res = await page.request.get("/api/query/sale-orders")
+        if (!res.ok()) return 0
+        const json = (await res.json()) as { data?: SaleOrderQueryRow[] }
+        const row = (json.data ?? []).find(
+          (candidate) => candidate.clientOrderRef === clientRef,
+        )
+        orderId = Number(row?.id ?? 0)
+        return orderId
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0)
+  return orderId
+}
+
+async function addLaptopLine(
+  page: Parameters<typeof gotoModule>[0],
+  orderId: number,
+  quantity: string,
+): Promise<void> {
+  await openEntityCreate(page, "/sales", "sales", "order-lines", "add-sale-order-line")
+  await chooseSelectOptionByLabel(page, "orderId", await fetchSaleOrderSelectLabel(page, orderId))
+  await page.getByTestId("form-field-productId").click()
+  await page.getByRole("option", { name: "Lumiere Dev Laptop" }).click()
+  await chooseFirstEnabledOption(page, "uomId")
+  await fillField(page, "quantity", quantity)
+  await fillField(page, "priceUnit", "1200")
+  await Promise.all([
+    page.waitForResponse(
+      (res) => matchesOperationResponse(res, "create_sale_order_line") && res.ok(),
+      { timeout: 30_000 },
+    ),
+    submitForm(page, "add-sale-order-line"),
+  ])
+  await waitForSaleOrderLineExists(page, orderId)
+}
+
+async function saleOrderStateByClientRef(
+  page: Parameters<typeof gotoModule>[0],
+  clientRef: string,
+): Promise<string> {
+  const res = await page.request.get("/api/query/sale-orders")
+  if (!res.ok()) return ""
+  const json = (await res.json()) as { data?: SaleOrderQueryRow[] }
+  const row = (json.data ?? []).find((candidate) => candidate.clientOrderRef === clientRef)
+  return scalarQueryString(row?.state)
 }
 
 /**
@@ -122,6 +190,12 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await page.getByTestId("module-tab-crm-opportunities").click()
     await expectSeededText(page, opportunityName, "/api/query/opportunities")
     const opportunityId = await fetchOpportunityIdByName(page, opportunityName)
+    // The conversion must survive a browser refresh and keep its persisted label.
+    await page.reload({ waitUntil: "domcontentloaded" })
+    await gotoModule(page, "/crm", "crm")
+    await page.getByTestId("module-tab-crm-opportunities").click()
+    await expectSeededText(page, opportunityName, "/api/query/opportunities")
+    await expect(page.getByText(opportunityName, { exact: true })).toBeVisible()
 
     // Step 5a — add opportunity line (UI; copied to SO on convert)
     await openEntityCreate(page, "/crm", "crm", "opportunity-lines", "add-opportunity-line")
@@ -162,6 +236,15 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     const orderId = await fetchSaleOrderIdByOpportunityId(page, opportunityId)
     await waitForSaleOrderDraftInQuery(page, orderId)
     await waitForSaleOrderLineExists(page, orderId)
+
+    // A fresh Sales load must render the persisted SO label and its related line.
+    await page.reload({ waitUntil: "domcontentloaded" })
+    await gotoModule(page, "/sales", "sales")
+    await page.getByTestId("module-tab-sales-orders").click()
+    const persistedOrderLabel = await fetchSaleOrderSelectLabel(page, orderId)
+    await expect(page.getByText(persistedOrderLabel, { exact: true })).toBeVisible()
+    await page.getByTestId("module-tab-sales-order-lines").click()
+    await expect(page.getByText("Lumiere Dev Laptop", { exact: true }).first()).toBeVisible()
 
     // Step 7 — confirm sale order (UI; rows show SO reference, not partner name)
     await gotoModule(page, "/sales", "sales")
@@ -261,6 +344,10 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await gotoModule(page, "/accounting", "accounting")
     await page.getByTestId("module-tab-accounting-invoices").click()
     await expectSeededText(page, leadName, "/api/query/account-moves")
+    await page.reload({ waitUntil: "domcontentloaded" })
+    await gotoModule(page, "/accounting", "accounting")
+    await page.getByTestId("module-tab-accounting-invoices").click()
+    await expectSeededText(page, leadName, "/api/query/account-moves")
 
     // Step 11 — create payment → post → register on invoice (UI)
     const { partnerId, amountTotal, currencyId } = await fetchInvoiceMoveDetails(page, moveId)
@@ -327,6 +414,83 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     expect(leadId).toBeGreaterThan(0)
   })
 
+  test("blocks a Sales order when required configuration is missing", async ({ page }) => {
+    await gotoModule(page, "/sales", "sales")
+    await page.getByTestId("module-tab-sales-orders").click()
+    await page.getByTestId("module-create-sales-orders").click()
+    await expect(page.getByTestId("form-modal-new-sale-order")).toBeVisible()
+
+    // Partner, pricelist, and warehouse are the Sales-owned create prerequisites.
+    await page.getByTestId("form-submit-new-sale-order").click()
+    await expect(page.locator('[aria-invalid="true"]')).toHaveCount(3)
+    await expect(page.getByTestId("form-modal-new-sale-order")).toBeVisible()
+    await expectNoAppError(page)
+  })
+
+  test("keeps a draft order after insufficient stock", async ({ page }) => {
+    test.setTimeout(120_000)
+    const clientRef = smokeName("so-insufficient-stock")
+    const orderId = await createDraftSaleOrder(page, clientRef)
+    await addLaptopLine(page, orderId, "1000000")
+
+    await gotoModule(page, "/sales", "sales")
+    await page.getByTestId("module-tab-sales-orders").click()
+    await selectEntityRowById(page, orderId)
+    await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
+    const alertMessages: string[] = []
+    const onDialog = async (dialog: import("@playwright/test").Dialog) => {
+      alertMessages.push(dialog.message())
+      await dialog.accept()
+    }
+    page.once("dialog", onDialog)
+    const confirmResponse = page.waitForResponse(
+      (res) => matchesOperationResponse(res, "confirm_sales_order"),
+      { timeout: 30_000 },
+    )
+    await page.getByTestId("entity-action-confirm-orders").click()
+    const response = await confirmResponse
+    expect(response.ok()).toBe(false)
+    await expect.poll(() => alertMessages.length, { timeout: 10_000 }).toBe(1)
+    expect(alertMessages[0]).toMatch(/insufficient|available quantity|stock/i)
+
+    await page.reload({ waitUntil: "domcontentloaded" })
+    await expect
+      .poll(() => saleOrderStateByClientRef(page, clientRef), { timeout: 30_000 })
+      .toMatch(/Draft/i)
+  })
+
+  test("rejects an invalid Sales lifecycle transition", async ({ page }) => {
+    test.setTimeout(120_000)
+    const companyId = await fetchDefaultCompanyId(page)
+    const cancelledRef = smokeName("so-invalid-transition")
+    const cancelledOrderId = await createDraftSaleOrder(page, cancelledRef)
+    await gotoModule(page, "/sales", "sales")
+    await page.getByTestId("module-tab-sales-orders").click()
+    await selectEntityRowById(page, cancelledOrderId)
+    await waitForEntityActionEnabled(page, "entity-action-cancel-orders")
+    await Promise.all([
+      page.waitForResponse(
+        (res) => matchesOperationResponse(res, "cancel_sale_order") && res.ok(),
+        { timeout: 30_000 },
+      ),
+      page.getByTestId("entity-action-cancel-orders").click(),
+    ])
+    await expect
+      .poll(() => saleOrderStateByClientRef(page, cancelledRef), { timeout: 30_000 })
+      .toMatch(/Cancel/i)
+
+    // The generated command path has no caller-supplied idempotency key for
+    // this reducer, so duplicate-request replay remains a contract gap rather
+    // than being conflated with this lifecycle assertion.
+    const invalidTransition = await callReducerBffResult(page, "confirm_sales_order", [
+      await fetchSessionOrganizationId(page),
+      companyId,
+      cancelledOrderId,
+    ])
+    expect(invalidTransition.ok).toBe(false)
+    expect(invalidTransition.error ?? "").toMatch(/must be in Draft, Sent, or ToApprove|state/i)
+  })
+
   test("adds sale order line via Order Lines tab (step 7)", async ({ page }) => {
     test.setTimeout(240_000)
 
@@ -360,17 +524,8 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
         async () => {
           const res = await page.request.get("/api/query/sale-orders")
           if (!res.ok()) return 0
-          const json = (await res.json()) as {
-            data?: Array<{
-              id?: unknown
-              clientOrderRef?: unknown
-              client_order_ref?: unknown
-            }>
-          }
-          const row = (json.data ?? []).find((order) => {
-            const ref = queryString(order.clientOrderRef ?? order.client_order_ref)
-            return ref === clientRef
-          })
+          const json = (await res.json()) as { data?: SaleOrderQueryRow[] }
+          const row = (json.data ?? []).find((order) => order.clientOrderRef === clientRef)
           if (!row) return 0
           orderId = Number(row.id)
           return orderId

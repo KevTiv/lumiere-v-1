@@ -27,8 +27,8 @@ pub struct Config {
     pub dev_mock_org_id: Option<u64>,
     /// AI gateway base URL (no trailing slash); proposals analyze proxies to `{url}/v1/rag`.
     pub ai_gateway_url: String,
-    /// Whether `/health/ready` must verify the AI gateway before reporting ready.
-    pub ai_gateway_required: bool,
+    /// Maximum age of an unprojected commit before projection is unhealthy.
+    pub projection_lag_budget_secs: u64,
     /// When set, password auth routes return 410 (same as Next.js + WorkOS).
     pub workos_client_id: Option<String>,
     /// AES-256 key for `stdb_token_enc` (32 bytes, 64 hex chars). Required for password auth.
@@ -212,8 +212,11 @@ impl Config {
         .trim_end_matches('/')
         .to_string();
 
-        let ai_gateway_required =
-            parse_ai_gateway_required(std::env::var("AI_GATEWAY_REQUIRED").ok().as_deref(), prod)?;
+        let projection_lag_budget_secs = parse_projection_lag_budget(
+            std::env::var("LUMIERE_PROJECTION_LAG_BUDGET_SECS")
+                .ok()
+                .as_deref(),
+        )?;
 
         if prod {
             let lower = ai_gateway_url.to_lowercase();
@@ -345,7 +348,7 @@ impl Config {
             cors_origins,
             dev_mock_org_id,
             ai_gateway_url,
-            ai_gateway_required,
+            projection_lag_budget_secs,
             workos_client_id,
             stdb_credential_encryption_key,
             resend_api_key,
@@ -371,6 +374,8 @@ impl Config {
         })
     }
 }
+
+const DEFAULT_PROJECTION_LAG_BUDGET_SECS: u64 = 300;
 
 const DEDICATED_SERVICE_TOKEN_ENVS: &[&str] = &[
     "STDB_OWNER_REPORT_WORKER_TOKEN",
@@ -404,44 +409,30 @@ fn validate_dedicated_worker_token(
     Ok(())
 }
 
-fn parse_ai_gateway_required(raw: Option<&str>, production: bool) -> Result<bool> {
-    let default = production;
+fn parse_projection_lag_budget(raw: Option<&str>) -> Result<u64> {
     let Some(raw) = raw else {
-        return Ok(default);
+        return Ok(DEFAULT_PROJECTION_LAG_BUDGET_SECS);
     };
-    match raw.trim().to_ascii_lowercase().as_str() {
-        "1" | "true" | "yes" | "on" => Ok(true),
-        "0" | "false" | "no" | "off" => Ok(false),
-        value => anyhow::bail!(
-            "AI_GATEWAY_REQUIRED must be a boolean (true/false or 1/0), got {value:?}"
-        ),
+    let value = raw
+        .trim()
+        .parse::<u64>()
+        .context("LUMIERE_PROJECTION_LAG_BUDGET_SECS must be a positive integer")?;
+    if value == 0 {
+        anyhow::bail!("LUMIERE_PROJECTION_LAG_BUDGET_SECS must be greater than zero");
     }
+    Ok(value)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_ai_gateway_required, validate_dedicated_worker_token};
+    use super::{parse_projection_lag_budget, validate_dedicated_worker_token};
 
     #[test]
-    fn ai_gateway_required_defaults_by_runtime() {
-        assert!(parse_ai_gateway_required(None, true).unwrap());
-        assert!(!parse_ai_gateway_required(None, false).unwrap());
-    }
-
-    #[test]
-    fn ai_gateway_required_accepts_explicit_boolean_values() {
-        for value in ["1", "true", "YES", "on"] {
-            assert!(parse_ai_gateway_required(Some(value), false).unwrap());
-        }
-        for value in ["0", "false", "NO", "off"] {
-            assert!(!parse_ai_gateway_required(Some(value), true).unwrap());
-        }
-    }
-
-    #[test]
-    fn ai_gateway_required_rejects_invalid_values() {
-        assert!(parse_ai_gateway_required(Some("maybe"), false).is_err());
-        assert!(parse_ai_gateway_required(Some(""), true).is_err());
+    fn projection_lag_budget_defaults_and_rejects_zero_or_invalid_values() {
+        assert_eq!(parse_projection_lag_budget(None).unwrap(), 300);
+        assert_eq!(parse_projection_lag_budget(Some(" 45 ")).unwrap(), 45);
+        assert!(parse_projection_lag_budget(Some("0")).is_err());
+        assert!(parse_projection_lag_budget(Some("not-a-number")).is_err());
     }
 
     #[test]

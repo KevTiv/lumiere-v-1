@@ -345,7 +345,7 @@ e2e-smoke-setup:
 		else \
 			rm -f "$$STDB_HASH_FILE"; \
 			echo "[e2e] Publishing local database $(E2E_DB) (--no-config)..."; \
-			spacetime build --module-path "$(MODULE)"; \
+			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime build --module-path "$(MODULE)"; \
 			wasm-tools validate "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm"; \
 			if [ "$${E2E_CLEAR_DB:-0}" = "1" ]; then \
 				echo "[e2e] E2E_CLEAR_DB=1: clearing module data (--clear-database)"; \
@@ -794,7 +794,7 @@ e2e-smoke:
 		echo "[e2e] Logging in to local SpacetimeDB (database owner for private-table SQL)..."; \
 		E2E_STDB_HOST="$$E2E_STDB_HOST" node "$$ROOT/scripts/e2e-local-stdb-token.mjs" --login-only; \
 		echo "[e2e] Publishing local database $(E2E_DB) (--no-config)..."; \
-		spacetime build --module-path "$(MODULE)"; \
+		LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime build --module-path "$(MODULE)"; \
 		wasm-tools validate "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm"; \
 		if [ "$${E2E_CLEAR_DB:-0}" = "1" ]; then \
 			echo "[e2e] E2E_CLEAR_DB=1: clearing module data (--clear-database)"; \

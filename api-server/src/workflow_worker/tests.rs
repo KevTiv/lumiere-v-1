@@ -137,7 +137,7 @@ fn dispatch_allowlist_fail_closed_with_webhook() {
         cors_origins: vec![],
         dev_mock_org_id: None,
         ai_gateway_url: String::new(),
-        ai_gateway_required: false,
+        projection_lag_budget_secs: 300,
         workos_client_id: None,
         stdb_credential_encryption_key: None,
         resend_api_key: None,

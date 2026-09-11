@@ -58,7 +58,7 @@ Set `NODE_ENV=production` or `LUMIERE_ENV=production`. **api-server refuses to s
 | `STDB_MODULE` or `NEXT_PUBLIC_STDB_MODULE` | yes | Database name |
 | `STDB_SERVER_TOKEN` | yes | Non-empty |
 | `AI_GATEWAY_URL` | yes | Internal ai-gateway base URL; must not contain `localhost` or `127.0.0.1` |
-| `AI_GATEWAY_REQUIRED` | optional (default true) | `/health/ready` fails unless the AI gateway responds successfully. Set false only for an intentional degraded deployment. |
+| `LUMIERE_PROJECTION_LAG_BUDGET_SECS` | optional (default 300) | Maximum duration PostgreSQL may remain unavailable after a proven healthy probe while active ERP readiness remains degraded but available. |
 | `STDB_HOST` or `NEXT_PUBLIC_STDB_HOST` | recommended | Defaults to maincloud if unset |
 | `CORS_ORIGINS` | recommended | Comma-separated origins for credentialed browser calls |
 | `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | yes (compose) | BFF → gateway auth |
@@ -69,8 +69,9 @@ Set `NODE_ENV=production` or `LUMIERE_ENV=production`. **api-server refuses to s
 In compose, `AI_GATEWAY_URL` is wired to `http://ai-gateway:8080`.
 
 The api-server endpoints have separate purposes: `/health` is liveness-only, while
-`/health/ready` checks PostgreSQL, SpacetimeDB, and the configured AI gateway. Production
-compose sets `AI_GATEWAY_REQUIRED=true`. The slim Rust images do not contain `curl`, so
+`/health/ready` checks SpacetimeDB and PostgreSQL. A PostgreSQL outage is reported through
+`X-Lumiere-Degraded: postgres` only within the configured, last-known-healthy lag budget;
+AI availability never gates ordinary ERP readiness. The slim Rust images do not contain `curl`, so
 compose does not add an in-container healthcheck dependency gate. Run the host/sibling
 probe instead:
 

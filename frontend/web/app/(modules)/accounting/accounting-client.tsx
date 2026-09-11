@@ -314,7 +314,7 @@ import {
   paymentJournalRowsToSelectOptions,
   accountMoveRowsToSelectOptions,
   saleOrderRowsToSelectOptions,
-  contactRowsToPartnerSelectOptions,
+  contactRowsToAccountingPartnerSelectOptions,
   companyRowsToSelectOptions,
   consolidationJournalRowsToSelectOptions,
   consolidationAccountRowsToSelectOptions,
@@ -974,7 +974,7 @@ function AccountingClientReady({
   )
 
   const partnerSelectOptions = useMemo(() => {
-    const fromApi = contactRowsToPartnerSelectOptions(contacts as Record<string, unknown>[])
+    const fromApi = contactRowsToAccountingPartnerSelectOptions(contacts as Record<string, unknown>[])
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noPartners"), disabled: true }]
   }, [contacts, t])
