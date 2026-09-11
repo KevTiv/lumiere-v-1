@@ -7,9 +7,11 @@ use serde_json::{json, Value};
 use tower_cookies::Cookies;
 
 use crate::auth_password::send_resend_email;
+use crate::commands::dispatch_session_reducer;
 use crate::error::ApiError;
 use crate::query_exec::execute_resource_query;
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session};
 
 pub fn router() -> Router<Arc<AppState>> {
@@ -46,7 +48,8 @@ async fn dispatch_queued_mail(
         ));
     }
 
-    let client = state.client_with_token(&session.stdb_token);
+    let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let client = trusted.client();
     let rows = execute_resource_query(
         &client,
         "queued-mail-messages",
@@ -107,12 +110,13 @@ async fn dispatch_queued_mail(
         match send_resend_email(&state.http, &resend_key, &from, to, subject, text).await {
             Ok(()) => {
                 let mark_args = json!([org_id, message_id, null]);
-                if let Err(e) = client
-                    .call_reducer(stdb_client::reducer_call!(
-                        "mark_mail_message_delivered",
-                        mark_args
-                    ))
-                    .await
+                if let Err(e) = dispatch_session_reducer(
+                    &state,
+                    &session,
+                    "mark_mail_message_delivered",
+                    mark_args,
+                )
+                .await
                 {
                     errors.push(format!("message {message_id} sent but mark failed: {e}"));
                 } else {

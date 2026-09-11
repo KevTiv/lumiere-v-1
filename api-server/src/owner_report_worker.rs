@@ -25,6 +25,7 @@ use serde_json::{json, Value};
 
 use crate::{
     config::Config,
+    integration_worker::ScheduledService,
     reports::{
         artifacts::artifact_path,
         common::{ReportKey, ReportPreviewRequest},
@@ -187,23 +188,21 @@ pub async fn serve() -> anyhow::Result<()> {
 
 async fn process_batch(state: &AppState) -> anyhow::Result<usize> {
     let mut worker_ids = HashMap::new();
+    let mut services = HashMap::new();
     let organizations = due_schedule_organizations(state).await?;
     for organization_id in organizations {
-        crate::service_identity::verify_registered_service_identity(
-            &state.stdb,
+        let service = ScheduledService::authorize(
+            state,
             organization_id,
             crate::service_identity::OWNER_REPORT_WORKER_SERVICE,
         )
         .await?;
-        let worker_id = ensure_worker_registration(state, organization_id).await?;
+        let worker_id = ensure_worker_registration(state, &service).await?;
         worker_ids.insert(organization_id, worker_id);
-        state
-            .stdb
-            .call_reducer(stdb_client::reducer_call!(
-                "dispatch_due_owner_reports",
-                json!([organization_id])
-            ))
+        service
+            .call("dispatch_due_owner_reports", json!([organization_id]))
             .await?;
+        services.insert(organization_id, service);
     }
 
     let pending_rows = state
@@ -235,9 +234,28 @@ async fn process_batch(state: &AppState) -> anyhow::Result<usize> {
     jobs.extend(select_expired_leased(recovery_jobs, now_micros()));
 
     for job in &jobs {
+        let service = match services.get(&job.organization_id).cloned() {
+            Some(service) => service,
+            None => match ScheduledService::authorize(
+                state,
+                job.organization_id,
+                crate::service_identity::OWNER_REPORT_WORKER_SERVICE,
+            )
+            .await
+            {
+                Ok(service) => {
+                    services.insert(job.organization_id, service.clone());
+                    service
+                }
+                Err(error) => {
+                    tracing::error!(job_id = job.id, %error, "owner-report service authorization failed");
+                    continue;
+                }
+            },
+        };
         let worker_id = match worker_ids.get(&job.organization_id).copied() {
             Some(worker_id) => worker_id,
-            None => match ensure_worker_registration(state, job.organization_id).await {
+            None => match ensure_worker_registration(state, &service).await {
                 Ok(worker_id) => {
                     worker_ids.insert(job.organization_id, worker_id);
                     worker_id
@@ -255,9 +273,8 @@ async fn process_batch(state: &AppState) -> anyhow::Result<usize> {
             .revision
             .checked_add(1)
             .ok_or_else(|| anyhow::anyhow!("owner-report queue revision overflow"))?;
-        if let Err(error) = state
-            .stdb
-            .call_reducer(stdb_client::reducer_call!(
+        if let Err(error) = service
+            .call(
                 "claim_queue_job",
                 json!([
                     job.organization_id,
@@ -268,8 +285,8 @@ async fn process_batch(state: &AppState) -> anyhow::Result<usize> {
                         &lease_token,
                         lease_expires_at_micros,
                     )
-                ])
-            ))
+                ]),
+            )
             .await
         {
             tracing::debug!(job_id = job.id, %error, "owner-report job was claimed elsewhere");
@@ -277,6 +294,7 @@ async fn process_batch(state: &AppState) -> anyhow::Result<usize> {
         }
         match process_job(
             state,
+            &service,
             job,
             worker_id,
             &lease_token,
@@ -286,9 +304,8 @@ async fn process_batch(state: &AppState) -> anyhow::Result<usize> {
         .await
         {
             Ok(response_fingerprint) => {
-                if let Err(error) = state
-                    .stdb
-                    .call_reducer(stdb_client::reducer_call!(
+                if let Err(error) = service
+                    .call(
                         "complete_queue_job",
                         json!([
                             job.organization_id,
@@ -302,7 +319,7 @@ async fn process_batch(state: &AppState) -> anyhow::Result<usize> {
                                 Some(&response_fingerprint),
                             )
                         ]),
-                    ))
+                    )
                     .await
                 {
                     tracing::error!(
@@ -318,6 +335,7 @@ async fn process_batch(state: &AppState) -> anyhow::Result<usize> {
                 if let Ok(payload) = serde_json::from_str::<OwnerReportJob>(&job.payload) {
                     let can_fail_run = validate_failure_binding(
                         state,
+                        &service,
                         job,
                         &payload,
                         worker_id,
@@ -328,22 +346,20 @@ async fn process_batch(state: &AppState) -> anyhow::Result<usize> {
                     .await
                     .unwrap_or(false);
                     if can_fail_run {
-                        let _ = state
-                            .stdb
-                            .call_reducer(stdb_client::reducer_call!(
+                        let _ = service
+                            .call(
                                 "fail_scheduled_owner_report_run",
                                 json!([
                                     job.organization_id,
                                     payload.scheduled_report_run_id,
                                     error_message
                                 ]),
-                            ))
+                            )
                             .await;
                     }
                 }
-                let _ = state
-                    .stdb
-                    .call_reducer(stdb_client::reducer_call!(
+                let _ = service
+                    .call(
                         "complete_queue_job",
                         json!([
                             job.organization_id,
@@ -357,7 +373,7 @@ async fn process_batch(state: &AppState) -> anyhow::Result<usize> {
                                 None,
                             )
                         ]),
-                    ))
+                    )
                     .await;
             }
         }
@@ -386,10 +402,14 @@ async fn due_schedule_organizations(state: &AppState) -> anyhow::Result<Vec<u64>
     Ok(organizations.into_iter().collect())
 }
 
-async fn ensure_worker_registration(state: &AppState, organization_id: u64) -> anyhow::Result<u64> {
+async fn ensure_worker_registration(
+    state: &AppState,
+    service: &ScheduledService,
+) -> anyhow::Result<u64> {
+    let organization_id = service.organization_id();
     let name = state.config.owner_report_worker_name.replace('\'', "''");
-    let rows = state
-        .stdb
+    let rows = service
+        .client()
         .query_sql(&format!(
             "SELECT id, organization_id, name, queues, is_active FROM queue_worker WHERE organization_id = {organization_id} \
              AND name = '{name}' AND is_active = true LIMIT 1"
@@ -402,17 +422,12 @@ async fn ensure_worker_registration(state: &AppState, organization_id: u64) -> a
             organization_id,
             &state.config.owner_report_worker_name,
         )?;
-        state
-            .stdb
-            .call_reducer(stdb_client::reducer_call!(
-                "worker_heartbeat",
-                json!([organization_id, worker.id])
-            ))
+        service
+            .call("worker_heartbeat", json!([organization_id, worker.id]))
             .await?;
     } else {
-        state
-            .stdb
-            .call_reducer(stdb_client::reducer_call!("register_queue_worker", json!([
+        service
+            .call("register_queue_worker", json!([
                     organization_id,
                     {
                         "companyId": null,
@@ -420,12 +435,12 @@ async fn ensure_worker_registration(state: &AppState, organization_id: u64) -> a
                         "queues": ["owner_report"],
                         "metadata": serde_json::json!({ "service": "owner-report-worker" }).to_string(),
                     }
-                ]),))
+                ]))
             .await?;
     }
 
-    let rows = state
-        .stdb
+    let rows = service
+        .client()
         .query_sql(&format!(
             "SELECT id, organization_id, name, queues, is_active FROM queue_worker WHERE organization_id = {organization_id} \
              AND name = '{name}' AND is_active = true LIMIT 1"
@@ -463,6 +478,7 @@ fn verify_worker(
 
 async fn process_job(
     state: &AppState,
+    service: &ScheduledService,
     job: &QueueRow,
     worker_id: u64,
     lease_token: &str,
@@ -471,14 +487,15 @@ async fn process_job(
 ) -> anyhow::Result<String> {
     let payload: OwnerReportJob = serde_json::from_str(&job.payload)?;
     validate_payload_bindings(job, &payload)?;
-    let run_row = reload_run(state, payload.scheduled_report_run_id).await?;
-    let schedule = reload_schedule_facts(state, payload.scheduled_report_id).await?;
+    let run_row = reload_run(service.client(), payload.scheduled_report_run_id).await?;
+    let schedule = reload_schedule_facts(service.client(), payload.scheduled_report_id).await?;
     if run_row.status == "completed" {
-        return recover_completed_job(state, job, &payload, &run_row, &schedule).await;
+        return recover_completed_job(state, service, job, &payload, &run_row, &schedule).await;
     }
     let run = run_facts(&run_row)?;
     let context = claimed_context(
         state,
+        service,
         job,
         &payload,
         run,
@@ -503,9 +520,8 @@ async fn process_job(
     )
     .await
     .map_err(|error| anyhow::anyhow!("generate owner report: {error:?}"))?;
-    state
-        .stdb
-        .call_reducer(stdb_client::reducer_call!(
+    service
+        .call(
             "complete_scheduled_owner_report_run",
             json!([
                 job.organization_id,
@@ -513,14 +529,16 @@ async fn process_job(
                 generated.artifact.id,
                 generated.artifact.document_id,
             ]),
-        ))
+        )
         .await?;
     Ok(generated.artifact.output_hash)
 }
 
-async fn reload_run(state: &AppState, run_id: u64) -> anyhow::Result<ScheduledReportRunRow> {
-    let rows = state
-        .stdb
+async fn reload_run(
+    client: &stdb_client::StdbClient,
+    run_id: u64,
+) -> anyhow::Result<ScheduledReportRunRow> {
+    let rows = client
         .query_sql(&format!(
             "SELECT id, organization_id, scheduled_report_id, queue_job_id, status, \
              generated_owner_report_id, document_id \
@@ -546,6 +564,7 @@ fn run_facts(row: &ScheduledReportRunRow) -> anyhow::Result<ScheduledReportRunFa
 
 fn claimed_context(
     state: &AppState,
+    service: &ScheduledService,
     job: &QueueRow,
     payload: &OwnerReportJob,
     run: ScheduledReportRunFacts,
@@ -569,7 +588,7 @@ fn claimed_context(
         payload.timezone.clone(),
         &state.config.owner_report_worker_name,
     )?;
-    ScheduledReportContext::from_claimed_job(state.stdb.clone(), claimed, run, schedule)
+    ScheduledReportContext::from_claimed_job(service.client().clone(), claimed, run, schedule)
         .map_err(|error| anyhow::anyhow!(error.to_string()))
 }
 
@@ -578,6 +597,7 @@ fn claimed_context(
 /// eligible for the failure reducer.
 async fn validate_failure_binding(
     state: &AppState,
+    service: &ScheduledService,
     job: &QueueRow,
     payload: &OwnerReportJob,
     worker_id: u64,
@@ -588,17 +608,18 @@ async fn validate_failure_binding(
     if validate_payload_bindings(job, payload).is_err() {
         return Ok(false);
     }
-    let run = reload_run(state, payload.scheduled_report_run_id).await?;
+    let run = reload_run(service.client(), payload.scheduled_report_run_id).await?;
     if run.status == "completed"
         || run.generated_owner_report_id.is_some()
         || run.document_id.is_some()
     {
         return Ok(false);
     }
-    let schedule = reload_schedule_facts(state, payload.scheduled_report_id).await?;
+    let schedule = reload_schedule_facts(service.client(), payload.scheduled_report_id).await?;
     let run_facts = run_facts(&run)?;
     claimed_context(
         state,
+        service,
         job,
         payload,
         run_facts,
@@ -613,6 +634,7 @@ async fn validate_failure_binding(
 
 async fn recover_completed_job(
     state: &AppState,
+    service: &ScheduledService,
     job: &QueueRow,
     payload: &OwnerReportJob,
     run: &ScheduledReportRunRow,
@@ -622,8 +644,8 @@ async fn recover_completed_job(
     let generated_owner_report_id = run
         .generated_owner_report_id
         .ok_or_else(|| anyhow::anyhow!("completed owner-report run has no generated artifact"))?;
-    let artifact_rows = state
-        .stdb
+    let artifact_rows = service
+        .client()
         .query_sql(&format!(
             "SELECT id, organization_id, company_id, report_key, output_hash, artifact_key, \
              document_id, correlation_id FROM generated_owner_report \
@@ -638,8 +660,8 @@ async fn recover_completed_job(
         .and_then(|row| serde_json::from_value(row).map_err(anyhow::Error::from))?;
     validate_generated_artifact(job, payload, run, &artifact)?;
 
-    let document_rows = state
-        .stdb
+    let document_rows = service
+        .client()
         .query_sql(&format!(
             "SELECT id, organization_id, company_id FROM document WHERE id = {} LIMIT 1",
             artifact.document_id
@@ -753,11 +775,10 @@ fn timestamp_micros(value: &Value) -> Option<u64> {
 }
 
 async fn reload_schedule_facts(
-    state: &AppState,
+    client: &stdb_client::StdbClient,
     schedule_id: u64,
 ) -> anyhow::Result<ScheduledOwnerReportFacts> {
-    let rows = state
-        .stdb
+    let rows = client
         .query_sql(&format!(
             "SELECT id, organization_id, company_id, owner_report_key, timezone \
              FROM scheduled_report WHERE id = {schedule_id} LIMIT 1"

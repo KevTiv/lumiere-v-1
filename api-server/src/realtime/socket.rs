@@ -62,6 +62,15 @@ pub(super) async fn handle_realtime_socket(
 
     let session_org = context.organization_id();
 
+    if let Err(error) = context.require_current_placement(&state.organization_placements) {
+        let _ = socket
+            .send(Message::Text(
+                json!({ "type": "error", "error": error.to_string() }).to_string(),
+            ))
+            .await;
+        return;
+    }
+
     if sub.organization_id != session_org {
         let _ = socket
             .send(Message::Text(

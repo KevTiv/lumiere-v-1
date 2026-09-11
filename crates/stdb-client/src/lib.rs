@@ -13,6 +13,11 @@ pub use contract::{
     ReducerContractError, ReducerName, ReducerParam, ScalarKind,
 };
 
+// SpacetimeDB SQL does not accept a constant-only `SELECT 1`. Use a stable
+// Lumiere table for the authenticated request whose response header proves the
+// caller identity. The row itself is deliberately ignored.
+const AUTHENTICATED_IDENTITY_PROBE_SQL: &str = "SELECT id FROM organization LIMIT 1";
+
 #[derive(Debug, thiserror::Error)]
 pub enum StdbClientError {
     #[error("SpacetimeDB HTTP {0}: {1}")]
@@ -129,7 +134,7 @@ impl StdbClient {
     /// The JWT payload is intentionally not inspected here: the response
     /// header is the database's authenticated identity binding.
     pub async fn authenticated_identity(&self) -> Result<String> {
-        let response = self.post_sql("SELECT 1").await?;
+        let response = self.post_sql(AUTHENTICATED_IDENTITY_PROBE_SQL).await?;
         let header = response
             .headers()
             .get("spacetime-identity")
@@ -628,7 +633,7 @@ fn encode_canonical_sats(
 mod tests {
     use super::{
         encode_reducer_wire_args, normalize_spacetime_identity_header, parse_sats_sql_response,
-        parse_sats_sql_response_canonical, reducer_contract,
+        parse_sats_sql_response_canonical, reducer_contract, AUTHENTICATED_IDENTITY_PROBE_SQL,
     };
     use serde_json::json;
 
@@ -665,6 +670,14 @@ mod tests {
         assert_eq!(normalize_spacetime_identity_header("not-a-jwt"), None);
         assert_eq!(normalize_spacetime_identity_header(&"ab".repeat(31)), None);
         assert_eq!(normalize_spacetime_identity_header(&"zz".repeat(32)), None);
+    }
+
+    #[test]
+    fn authenticated_identity_uses_valid_spacetimedb_table_sql() {
+        assert_eq!(
+            AUTHENTICATED_IDENTITY_PROBE_SQL,
+            "SELECT id FROM organization LIMIT 1"
+        );
     }
 
     #[test]

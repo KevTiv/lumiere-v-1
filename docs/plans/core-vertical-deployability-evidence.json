@@ -2,8 +2,8 @@
   "version": 1,
   "canonical_plan": "docs/plans/core-vertical-deployability-pruning-plan.md",
   "last_verified": {
-    "date": "2026-09-07",
-    "commit": "4856f94dc"
+    "date": "2026-09-11",
+    "commit": "working-tree"
   },
   "relation_census": {
     "application": 458,
@@ -69,7 +69,7 @@
       "required": []
     },
     "C5": {
-      "status": "partial",
+      "status": "complete",
       "evidence": [
         "lumiere-codegen/storage-policy-manifest.json contains 463 unique reviewed policy entries; the Rust validator enforces exact 463-table coverage, aggregate/archive coherence, semantic eligibility fields, and reviewed fixture coverage",
         "29 reviewed fixtures cover every module/storage-class pair currently used by the 22 modules",
@@ -104,7 +104,7 @@
       "evidence": [
         "C7-R1 reconstruction and C7-R2 placement focused tests pass",
         "trusted operator-only reconstruction resolves placement configuration and the exact PostgreSQL sequence plus commit checksum without an HTTP/session route",
-        "the pinned immutable lumiere-contracts v0.3.38 release classifies 458 relations for restore and five target-local relations for recreation, including privileged service bindings, and contains the corrected durable JSONB codec metadata",
+        "the pinned immutable lumiere-contracts v0.3.39 release classifies 458 relations for restore and five target-local relations for recreation, including privileged service bindings, and contains the corrected durable JSONB codec metadata",
         "the 2026-09-06 disposable PostgreSQL 14.20 to SpacetimeDB 2.8.2 all-module drill populated all 22 enabled modules across 202 source tables and 1710 rows, including relationship identifiers, totals, audit links, idempotency records, and an activity delete tombstone",
         "the all-module drill injected a post-commit failure, resumed the same run, repeated all 458 restored table digests with a fresh run ID, verified the exact sequence/checksum watermark, recreated five target-local relations, and retained 934 idempotent batch receipts",
         "generated restore dispatch advances all 445 auto-increment sequences while recreating exact persisted IDs, preventing post-recovery identifier collisions",
@@ -115,21 +115,21 @@
     "C8": {
       "status": "partial",
       "evidence": [
-        "the pinned immutable lumiere-contracts v0.3.38 application IR contains 1316 operations with zero unclassified semantic kinds, authorization scopes, idempotency policies, or unassigned codecs",
+        "the pinned immutable lumiere-contracts v0.3.39 application IR contains 1316 operations with zero unclassified semantic kinds, authorization scopes, idempotency policies, or unassigned codecs",
         "all 1316 operation IDs are locked and operation-history verification passes",
         "the generated query-row map covers 336 resources without an opaque fallback, and frontend STDB, query-hooks, UI, and web typechecks pass",
         "the generated organization subscription compiler covers 281 structural query policies; the C8 ratchet covers 336 resources and 273 canonical subscriptions and rejects the retired handwritten ERP_ORG_SQL map",
         "the Rust API consumer parses schema-versioned erp-org-sql.json structural descriptors, compiles reviewed predicates, and passes 20 stdb-auth tests plus 30 focused API query tests",
-        "lumiere-codegen, pinned-contract, ownership, storage-policy, operation-history, release-compatibility, and contract-drift checks pass against v0.3.38"
+        "lumiere-codegen, pinned-contract, ownership, storage-policy, operation-history, release-compatibility, and contract-drift checks pass against v0.3.39"
       ],
       "required": [
         "obtain a fresh green P0 Playwright run after commit 4856f94dc; the previous run failed because the Rust API consumer still expected the retired array-shaped erp-org-sql.json artifact"
       ]
     },
     "C9": {
-      "status": "partial",
+      "status": "complete",
       "evidence": [
-        "api-server session resolution now obtains actor identity from SpacetimeDB's authenticated response header, never from an unverified JWT payload or a client identity hint, and membership plus field-policy reads use the authenticated user token without an owner-token fallback",
+        "api-server session resolution now obtains actor identity from SpacetimeDB's authenticated response header, never from an unverified JWT payload or a client identity hint; after that proof, private membership and field-policy authority state is read with the configured server credential and constrained to the verified identity plus organization",
         "TrustedOperationContext owns the authenticated client, actor identity, organization, mandatory field-access policy, operation identity, server-generated correlation id, and membership-derived company scope for typed/compat commands, generated query routes, authoritative reads, and realtime subscriptions",
         "command, query, and realtime boundaries reject client-owned organization fields, foreign requested companies, missing field policy, and resources without current read permission before owner-token reads or reducer dispatch",
         "the IoT gateway removed DEFAULT_ORG_ID and client organization fields; HTTP and WebSocket target scope is derived from persisted hub/device/action rows and checked against a SpacetimeDB-authenticated active membership, while MQTT derives organization from the persisted device",
@@ -141,14 +141,28 @@
         "the IoT gateway now requires a distinct registered iot_gateway identity, returns a random post-pair hub credential once, persists only its SHA-256 hash, derives organization/company/hub scope from stored rows, and removes the retired interactive claim operation from frontend exposure",
         "PostgreSQL projection, finalization, and reconstruction use pairwise-distinct credentials; a real local PostgreSQL 16 matrix proved projection mutation, finalization access only to reviewed cooling relations, and reconstruction read-only access",
         "a disposable locally owned SpacetimeDB module passed the existing Org A/B and Company A1/A2 adversarial reducer matrix plus live wrong-identity rejection and positive execution for distinct owner-report, workflow, expense, HR, project, and IoT gateway identities",
-        "cargo check -p api-server --all-targets, focused API/SpacetimeDB/IoT tests, the 1,316-operation history and C8 contract ratchet, and all nine frontend TypeScript workspaces validate the local C9 slice"
+        "all handwritten API domain reducers now dispatch through generated contracts and typed session, internal, superuser, or pre-membership authorities; route reads construct TrustedOperationContext instead of passing raw session tokens, and invitation creation no longer trusts the identity cookie or a caller-supplied organization",
+        "the trusted-route boundary ratchet rejects direct route reducer calls, raw token-bearing route helpers, and handwritten SQL routes without trusted read authority",
+        "owner-report, workflow, expense, HR, and project scheduled operations now use an authorized ScheduledService context with service-specific reducer allowlists, generated operation scope validation, registered identity verification, and a placement-generation fence before dispatch",
+        "interactive command, query, and realtime contexts resolve placement generation exclusively from server configuration and recheck lifecycle plus generation immediately before placement-sensitive work; production configuration fails closed when the cell, durable-store, or generation setting is absent",
+        "the C9 isolation matrix defines eight commands/read/subscription/projection/cold-read/hydration/reconstruction/fresh-session lanes and forty required post-reconstruction assertions; static and replay modes cannot claim a live pass, and live mode requires every injected probe to execute",
+        "the pinned immutable lumiere-contracts v0.3.39 release contains the generated C9 service-boundary contract changes",
+        "cargo check -p api-server --all-targets, 366 passing API library tests with three explicit ignored drills, the pinned codegen/ownership/storage/operation-history/release gates, the 1,316-operation history and C8 contract ratchet validate the local C9 route slice",
+        "a fresh disposable local STDB module passed the production-built CRM isolation spec: authenticated bootstrap, 31-resource registry alignment, persisted Org A/B and Company A1/A2 read isolation, private SQL and direct-subscription denial, authorized invalidation-only realtime, cross-organization and cross-company rejection, refresh, and reconnect (3/3 Playwright tests)",
+        "the real PostgreSQL manifest matrix passed against local PostgreSQL 16 for all enabled modules, including ordered create/update/delete, duplicate delivery, process restart, exact watermark persistence, injected sequence-gap rejection, and poison-commit quarantine visibility",
+        "the live finalization worker drill passed against the disposable C9 STDB module with a distinct registered worker identity and a drill-created disposable PostgreSQL database, covering projection, finalization, cold read, hydration, checksum/version guards, and cleanup",
+        "the runtime placement resolver can now read an external persistent platform-control snapshot on every resolution, observes generation and lifecycle changes without process restart, and fails closed for unavailable, malformed, missing, or duplicate organization records; focused placement tests pass 13/13",
+        "the 2026-09-11 current-tree PostgreSQL-to-fresh-STDB drill covered all 22 modules and resumed after an injected committed failure; both the resumed run and a fresh run ID verified 458/458 restored tables, 3,429 rows, five recreated protocol tables, the exact sequence-2 SHA-256 watermark, delete history, and idempotent batch receipts",
+        "after that reconstruction completed, the production-built CRM isolation suite passed 3/3 against the same target, covering persisted Org A/B and Company A1/A2 reads, private SQL/subscription denial, cross-organization and cross-company rejection, refresh, and reconnect",
+        "after reconstruction, the same target passed the live projection/finalization/hydration drill through a distinct registered worker identity, including durable PostgreSQL projection, child-first hot deletion, a checksum-bound cold row, and a finalized transfer ledger",
+        "the current API library suite passes 371 tests with three explicit ignored live/performance drills; persisted post-reconstruction audit rows retain the server-derived owner identity and the reconstruction fence records the fresh repeat run as complete with no failure",
+        "the reconstruction operator now resolves organization placement exclusively from the persistent platform-control snapshot and treats expected generation, cell, and durable store as assertions rather than selectors; live probes rejected a foreign store and stale generation before reconstruction work",
+        "a newly published empty local target completed the authoritative reconstruction path for all 458 relations and 3,429 rows at the exact sequence-2 checksum; the target fence records the completed run at placement generation 2",
+        "the post-reconstruction browser suite passed 2/2 on the fresh target, including a live WebSocket race which captured generation 2, observed an atomic server-owned advance, and rejected the first subscription as stale",
+        "the fresh target then passed the live projection, child-first finalization, complete hot+cold read, Company A1/A2 hydration, cross-company child rejection, forged-scope rejection, and stale post-I/O placement fencing drill",
+        "the live C9 evidence gate passed all eight lanes and forty executed assertions, binding hashed browser, projection, cold-read, hydration, reconstruction, fence, and target artifacts to the completed reconstruction run"
       ],
-      "required": [
-        "finish migrating remaining handwritten domain routes and scheduled service operations onto the trusted context after C8 generated-adoption convergence",
-        "run the complete Org A/B and Company A1/A2 matrix against disposable STDB and PostgreSQL through commands, reads, live subscriptions, projection, cold reads, hydration, and post-reconstruction fresh sessions",
-        "resolve the current server-owned placement generation into the trusted operation context instead of leaving placement authority only in cold-tier-specific contexts",
-        "publish and pin the changed immutable generated contracts after the release gate is approved"
-      ]
+      "required": []
     },
     "C10": {
       "status": "blocked",

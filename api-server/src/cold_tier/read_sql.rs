@@ -17,7 +17,7 @@ use super::{
 pub fn compile_stdb_sql(
     plan: &ResourceReadPlan,
 ) -> Result<(String, Vec<ScalarValue>), cursor::CursorError> {
-    compile_sql(plan, QuotingStyle::StdbBacktick)
+    compile_sql(plan, QuotingStyle::StdbPlain)
 }
 
 /// Compile a [`ResourceReadPlan`] into a Postgres SQL fragment.
@@ -70,8 +70,8 @@ fn stdb_literal(value: &ScalarValue) -> String {
 
 #[derive(Clone, Copy)]
 enum QuotingStyle {
-    /// SpacetimeDB uses backtick-quoted identifiers.
-    StdbBacktick,
+    /// SpacetimeDB 2.8 accepts validated bare identifiers, not backticks.
+    StdbPlain,
     /// Postgres uses double-quoted identifiers and `$N` placeholders.
     PgDollar,
 }
@@ -81,7 +81,7 @@ enum QuotingStyle {
 /// context and inject SQL — matching the safety `QuotingStyle` documents.
 fn quote_ident(name: &str, style: QuotingStyle) -> String {
     match style {
-        QuotingStyle::StdbBacktick => format!("`{}`", name.replace('`', "``")),
+        QuotingStyle::StdbPlain => name.to_owned(),
         QuotingStyle::PgDollar => format!("\"{}\"", name.replace('"', "\"\"")),
     }
 }
@@ -98,22 +98,25 @@ fn compile_sql(
     // A projection entry may carry a `column::CAST` suffix (e.g. `"id::TEXT"`)
     // — needed on the PG side to read NUMERIC/JSONB columns back without a
     // bignum crate (tokio-postgres has no native NUMERIC decoder). Applied
-    // only for PgDollar; stripped for StdbBacktick, since STDB returns
+    // only for PgDollar; stripped for StdbPlain, since STDB returns
     // natively typed JSON and has no use for a PG cast hint.
-    let cols = plan
-        .projection
-        .iter()
-        .map(|c| match c.split_once("::") {
-            Some((name, cast)) => match style {
-                QuotingStyle::PgDollar => format!("{}::{cast}", quote_ident(name, style)),
-                QuotingStyle::StdbBacktick => quote_ident(name, style),
-            },
-            None => quote_ident(c, style),
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
+    // STDB 2.8 HTTP SQL supports scoped `SELECT *` reads but rejects column
+    // projections. The validated descriptor still controls the returned API
+    // shape after decoding; PostgreSQL retains its generated projection.
+    let cols = match style {
+        QuotingStyle::StdbPlain => "*".to_owned(),
+        QuotingStyle::PgDollar => plan
+            .projection
+            .iter()
+            .map(|c| match c.split_once("::") {
+                Some((name, cast)) => format!("{}::{cast}", quote_ident(name, style)),
+                None => quote_ident(c, style),
+            })
+            .collect::<Vec<_>>()
+            .join(", "),
+    };
     let table = match style {
-        QuotingStyle::StdbBacktick => &descriptor.hot_table,
+        QuotingStyle::StdbPlain => &descriptor.hot_table,
         QuotingStyle::PgDollar => &descriptor.cold_table,
     };
     let mut sql = format!(
@@ -151,7 +154,7 @@ fn compile_sql(
             &plan.order,
             &cursor_values,
             |i| match style {
-                QuotingStyle::StdbBacktick => "?".to_string(),
+                QuotingStyle::StdbPlain => "?".to_string(),
                 QuotingStyle::PgDollar => {
                     format!("${}{}", base + i, pg_cast_suffix(&cursor_values[i - 1]))
                 }
@@ -173,7 +176,7 @@ fn compile_sql(
     }
 
     // ORDER BY
-    if !plan.order.is_empty() {
+    if matches!(style, QuotingStyle::PgDollar) && !plan.order.is_empty() {
         let order_clause = plan
             .order
             .iter()
@@ -191,7 +194,9 @@ fn compile_sql(
     }
 
     // LIMIT
-    sql.push_str(&format!(" LIMIT {}", plan.page.limit));
+    if matches!(style, QuotingStyle::PgDollar) {
+        sql.push_str(&format!(" LIMIT {}", plan.page.limit));
+    }
 
     Ok((sql, binds))
 }
@@ -243,7 +248,7 @@ fn push_bind(binds: &mut Vec<ScalarValue>, value: ScalarValue, style: QuotingSty
     let cast = pg_cast_suffix(&value);
     binds.push(value);
     match style {
-        QuotingStyle::StdbBacktick => "?".to_string(),
+        QuotingStyle::StdbPlain => "?".to_string(),
         QuotingStyle::PgDollar => format!("${}{cast}", binds.len()),
     }
 }
@@ -257,7 +262,7 @@ fn push_bind(binds: &mut Vec<ScalarValue>, value: ScalarValue, style: QuotingSty
 /// variant already binds as its natively-matching PG type.
 fn pg_cast_suffix(value: &ScalarValue) -> &'static str {
     match value {
-        ScalarValue::U64(_) => "::NUMERIC",
+        ScalarValue::U64(_) => "::TEXT::NUMERIC",
         ScalarValue::I64(_) | ScalarValue::Text(_) | ScalarValue::Bool(_) => "",
     }
 }

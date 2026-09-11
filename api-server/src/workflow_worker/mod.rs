@@ -15,7 +15,7 @@ mod tests;
 mod timers;
 
 use self::{outbox::dispatch_external_jobs, timers::fire_due_timers};
-use crate::{config::Config, state::AppState};
+use crate::{config::Config, integration_worker::ScheduledService, state::AppState};
 use axum::{http::StatusCode, routing::get, Router};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -107,16 +107,16 @@ async fn process_cycle(state: &AppState, shutting_down: &AtomicBool) -> anyhow::
         if shutting_down.load(Ordering::Relaxed) {
             break;
         }
-        crate::service_identity::verify_registered_service_identity(
-            &state.stdb,
+        let service = ScheduledService::authorize(
+            state,
             organization_id,
             crate::service_identity::WORKFLOW_WORKER_SERVICE,
         )
         .await?;
-        let worker_id = ensure_worker_registration(state, organization_id).await?;
-        fire_due_timers(state, organization_id).await?;
+        let worker_id = ensure_worker_registration(state, &service).await?;
+        fire_due_timers(&service).await?;
         if state.config.workflow_external_dispatch_enabled {
-            dispatch_external_jobs(state, organization_id, worker_id, shutting_down).await?;
+            dispatch_external_jobs(state, &service, worker_id, shutting_down).await?;
         }
     }
     Ok(())
@@ -144,10 +144,14 @@ async fn resolve_org_ids(state: &AppState) -> anyhow::Result<Vec<u64>> {
     Ok(ids)
 }
 
-async fn ensure_worker_registration(state: &AppState, organization_id: u64) -> anyhow::Result<u64> {
+async fn ensure_worker_registration(
+    state: &AppState,
+    service: &ScheduledService,
+) -> anyhow::Result<u64> {
+    let organization_id = service.organization_id();
     let name = state.config.workflow_worker_name.replace('\'', "''");
-    let rows = state
-        .stdb
+    let rows = service
+        .client()
         .query_sql(&format!(
             "SELECT id FROM queue_worker WHERE organization_id = {organization_id} \
              AND name = '{name}' AND is_active = true LIMIT 1"
@@ -155,18 +159,13 @@ async fn ensure_worker_registration(state: &AppState, organization_id: u64) -> a
         .await?;
     if let Some(row) = rows.into_iter().next() {
         let worker: WorkerRow = serde_json::from_value(row)?;
-        let _ = state
-            .stdb
-            .call_reducer(stdb_client::reducer_call!(
-                "worker_heartbeat",
-                json!([organization_id, worker.id])
-            ))
+        let _ = service
+            .call("worker_heartbeat", json!([organization_id, worker.id]))
             .await;
         return Ok(worker.id);
     }
-    state
-        .stdb
-        .call_reducer(stdb_client::reducer_call!(
+    service
+        .call(
             "register_queue_worker",
             json!([
                 organization_id,
@@ -177,10 +176,10 @@ async fn ensure_worker_registration(state: &AppState, organization_id: u64) -> a
                     "metadata": serde_json::json!({ "service": "workflow-worker" }).to_string(),
                 }
             ]),
-        ))
+        )
         .await?;
-    let rows = state
-        .stdb
+    let rows = service
+        .client()
         .query_sql(&format!(
             "SELECT id FROM queue_worker WHERE organization_id = {organization_id} \
              AND name = '{name}' AND is_active = true LIMIT 1"

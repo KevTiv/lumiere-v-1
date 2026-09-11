@@ -233,6 +233,11 @@ pub fn init(ctx: &ReducerContext) {
 #[spacetimedb::reducer(client_connected)]
 pub fn identity_connected(ctx: &ReducerContext) {
     if let Some(profile) = find_user_profile_for_identity(ctx, ctx.sender()) {
+        if crate::core::reconstruction::require_writes_unfenced(ctx, profile.organization_id)
+            .is_err()
+        {
+            return;
+        }
         ctx.db.user_profile().id().update(UserProfile {
             last_login: Some(ctx.timestamp),
             updated_at: ctx.timestamp,
@@ -252,6 +257,11 @@ pub fn identity_connected(ctx: &ReducerContext) {
                 .find(|membership| membership.is_active)
         })
     {
+        if crate::core::reconstruction::require_writes_unfenced(ctx, membership.organization_id)
+            .is_err()
+        {
+            return;
+        }
         ensure_user_profile_for_organization(ctx, ctx.sender(), membership.organization_id);
     }
 }

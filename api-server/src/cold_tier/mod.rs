@@ -99,10 +99,13 @@ mod tests {
         let plan = pos_order_plan();
         let (sql, binds) = compile_pg_sql(&plan).unwrap();
         assert!(
-            sql.contains("\"organization_id\" = $1::NUMERIC"),
+            sql.contains("\"organization_id\" = $1::TEXT::NUMERIC"),
             "SQL: {sql}"
         );
-        assert!(sql.contains("\"company_id\" = $2::NUMERIC"), "SQL: {sql}");
+        assert!(
+            sql.contains("\"company_id\" = $2::TEXT::NUMERIC"),
+            "SQL: {sql}"
+        );
         assert!(matches!(binds[0], ScalarValue::U64(42)));
         assert!(matches!(binds[1], ScalarValue::U64(7)));
     }
@@ -120,7 +123,7 @@ mod tests {
     fn stdb_sql_uses_question_mark_placeholders() {
         let plan = pos_order_plan();
         let (sql, _) = compile_stdb_sql(&plan).unwrap();
-        assert!(sql.contains("`organization_id` = ?"), "SQL: {sql}");
+        assert!(sql.contains("organization_id = ?"), "SQL: {sql}");
     }
 
     #[test]
@@ -159,7 +162,7 @@ mod tests {
         let cursor = cursor::encode_cursor(&plan.order, &[ScalarValue::U64(100)]).unwrap();
         plan.page.cursor = Some(cursor);
         let (sql, binds) = compile_pg_sql(&plan).unwrap();
-        assert!(sql.contains("\"id\" < $3::NUMERIC"), "SQL: {sql}");
+        assert!(sql.contains("\"id\" < $3::TEXT::NUMERIC"), "SQL: {sql}");
         assert!(matches!(binds[2], ScalarValue::U64(100)));
     }
 
@@ -184,7 +187,7 @@ mod tests {
         assert!(pg_sql.contains("\"id\"::TEXT"), "SQL: {pg_sql}");
 
         let (stdb_sql, _) = compile_stdb_sql(&plan).unwrap();
-        assert!(stdb_sql.contains("`id`"), "SQL: {stdb_sql}");
+        assert!(stdb_sql.contains("id"), "SQL: {stdb_sql}");
         assert!(!stdb_sql.contains("::TEXT"), "SQL: {stdb_sql}");
     }
 

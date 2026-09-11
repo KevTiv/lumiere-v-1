@@ -14,16 +14,31 @@ use tower_cookies::Cookies;
 
 use crate::cold_tier::projection_observability::ProjectionStatus;
 use crate::cold_tier::{pg_pool, projection_observability};
+use crate::commands::dispatch_superuser_reducer;
 use crate::error::ApiError;
 use crate::session::{normalize_identity_hex_for_sql, resolve_api_session};
 use crate::state::AppState;
 use crate::web_session::stdb_identity_hex_hint;
 
+struct SuperuserSession {
+    session: crate::session::ApiSession,
+}
+
+impl SuperuserSession {
+    fn client(&self, state: &AppState) -> stdb_client::StdbClient {
+        state.client_with_token(&self.session.stdb_token)
+    }
+
+    fn session(&self) -> &crate::session::ApiSession {
+        &self.session
+    }
+}
+
 async fn require_superuser(
     state: &AppState,
     headers: &HeaderMap,
     cookies: &Cookies,
-) -> Result<crate::session::ApiSession, ApiError> {
+) -> Result<SuperuserSession, ApiError> {
     let auth = headers
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok());
@@ -45,7 +60,7 @@ async fn require_superuser(
     if !is_superuser {
         return Err(ApiError::Forbidden("Superuser required".into()));
     }
-    Ok(session)
+    Ok(SuperuserSession { session })
 }
 
 async fn suspend_organization(
@@ -54,8 +69,8 @@ async fn suspend_organization(
     cookies: Cookies,
     Path(org_id): Path<u64>,
 ) -> Result<Json<Value>, ApiError> {
-    let session = require_superuser(&state, &headers, &cookies).await?;
-    let client = state.client_with_token(&session.stdb_token);
+    let authority = require_superuser(&state, &headers, &cookies).await?;
+    let client = authority.client(&state);
 
     let billing_sql = format!("SELECT id FROM billing_account WHERE organization_id = {org_id}");
     let rows = client
@@ -67,13 +82,14 @@ async fn suspend_organization(
         .and_then(|row| row.get("id").and_then(|v| v.as_u64()))
         .ok_or_else(|| ApiError::NotFound("Billing account not found".into()))?;
 
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "set_billing_status",
-            json!([org_id, billing_id, "suspended"]),
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_superuser_reducer(
+        &state,
+        authority.session(),
+        org_id,
+        "set_billing_status",
+        json!([org_id, billing_id, "suspended"]),
+    )
+    .await?;
 
     Ok(Json(
         json!({ "ok": true, "organizationId": org_id, "status": "suspended" }),
@@ -106,8 +122,8 @@ async fn export_organization(
     cookies: Cookies,
     Path(org_id): Path<u64>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let session = require_superuser(&state, &headers, &cookies).await?;
-    let client = state.client_with_token(&session.stdb_token);
+    let authority = require_superuser(&state, &headers, &cookies).await?;
+    let client = authority.client(&state);
 
     // Best-effort pilot DR subset — not full module export (see docs/PILOT_RUNBOOK.md §3.4).
     const EXPORT_TABLES: &[&str] = &[

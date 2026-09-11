@@ -11,9 +11,11 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use tower_cookies::Cookies;
 
+use crate::commands::dispatch_session_reducer;
 use crate::error::ApiError;
 use crate::query_exec::execute_resource_query;
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session};
 
 use super::{list_meta, paginate_limit_offset, value_as_str, value_as_u64};
@@ -92,13 +94,14 @@ pub(super) async fn contacts_get(
     let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
 
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
     let client = state.stdb.clone();
     let mut rows = execute_resource_query(
         &client,
         "contacts",
         org_id,
-        &session.identity_hex,
-        session.field_access.as_ref(),
+        context.actor_identity(),
+        Some(context.field_access()),
     )
     .await?;
 
@@ -167,14 +170,7 @@ pub(super) async fn contacts_post(
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
     let params = contact_create_params(&body)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "create_contact",
-            json!([org_id, params])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(&state, &session, "create_contact", json!([org_id, params])).await?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Contact created successfully" } })),

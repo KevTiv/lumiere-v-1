@@ -508,17 +508,6 @@ pub fn bootstrap_new_tenant(
         metadata: None,
     });
 
-    let uo = ctx
-        .db
-        .user_organization()
-        .iter()
-        .find(|uo| uo.user_identity == ctx.sender() && uo.organization_id == org.id)
-        .ok_or("Membership row missing after bootstrap")?;
-    ctx.db.user_organization().id().update(UserOrganization {
-        company_id: Some(company.id),
-        ..uo
-    });
-
     ctx.db.user_role_assignment().insert(UserRoleAssignment {
         id: 0,
         user_identity: ctx.sender(),

@@ -12,9 +12,11 @@ use axum::{
 use serde_json::{json, Value};
 use tower_cookies::Cookies;
 
+use crate::commands::dispatch_session_reducer;
 use crate::error::ApiError;
 use crate::query_exec::{default_company_id, execute_resource_query};
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session};
 
 fn value_as_u64(v: &Value) -> Option<u64> {
@@ -42,7 +44,8 @@ async fn sale_order_get(
         .parse()
         .map_err(|_| ApiError::BadRequest("Invalid order ID".into()))?;
 
-    let client = state.client_with_token(&session.stdb_token);
+    let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let client = trusted.client();
     let orders = execute_resource_query(
         &client,
         "sale-orders",
@@ -71,25 +74,26 @@ async fn sale_order_put(
         .parse()
         .map_err(|_| ApiError::BadRequest("Invalid order ID".into()))?;
 
-    let client = state.client_with_token(&session.stdb_token);
+    let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let client = trusted.client();
     let company_id = default_company_id(&client, org_id)
         .await?
         .ok_or_else(|| ApiError::Unprocessable("No company found for organization".into()))?;
 
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "update_sale_order",
-            json!([org_id, company_id, order_id, params]),
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    let context = dispatch_session_reducer(
+        &state,
+        &session,
+        "update_sale_order",
+        json!([org_id, company_id, order_id, params]),
+    )
+    .await?;
 
     let orders = execute_resource_query(
-        &client,
+        context.client(),
         "sale-orders",
         org_id,
-        &session.identity_hex,
-        session.field_access.as_ref(),
+        context.actor_identity(),
+        Some(context.field_access()),
     )
     .await?;
     let updated = find_order_by_id(&orders, order_id);
@@ -121,14 +125,13 @@ async fn sale_order_delete(
         })
     };
 
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "cancel_sale_order",
-            json!([org_id, order_id, reason])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "cancel_sale_order",
+        json!([org_id, order_id, reason]),
+    )
+    .await?;
 
     Ok(Json(
         json!({ "data": { "message": "Sale order cancelled successfully" } }),

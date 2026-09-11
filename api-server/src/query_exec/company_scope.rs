@@ -89,8 +89,8 @@ pub async fn default_company_id(client: &StdbClient, org_id: u64) -> Result<Opti
 ///
 /// A company-bound membership is restricted to that company. An organization-level
 /// membership deliberately falls back to the default company; it does not imply an
-/// all-companies grant. A requested browser company is treated as intent and must
-/// equal the server-derived scope.
+/// all-companies read grant. A requested browser company is treated as intent and
+/// must equal the server-derived read scope.
 pub async fn resolve_crm_company_id(
     client: &StdbClient,
     organization_id: u64,
@@ -133,17 +133,7 @@ pub(crate) async fn resolve_membership_company_id(
     requested_company_id: Option<u64>,
     denied_message: &str,
 ) -> Result<u64, ApiError> {
-    let identity = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
-    let sql = format!(
-        "SELECT id, organization_id, company_id, is_active FROM user_organization WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
-    );
-    let memberships = client.query_sql(&sql).await.map_err(ApiError::internal)?;
-    let membership = memberships
-        .first()
-        .ok_or_else(|| ApiError::Forbidden("No active organization membership".into()))?;
-
-    let membership_company =
-        row_u64(membership, "companyId", "company_id").map_err(ApiError::Internal)?;
+    let membership_company = membership_company_id(client, organization_id, identity_hex).await?;
     let allowed = match membership_company {
         Some(company_id) if company_id > 0 => company_id,
         _ => default_company_id(client, organization_id)
@@ -154,11 +144,58 @@ pub(crate) async fn resolve_membership_company_id(
     enforce_requested_company(allowed, requested_company_id, denied_message)
 }
 
+async fn membership_company_id(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+) -> Result<Option<u64>, ApiError> {
+    let identity = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+    let sql = format!(
+        "SELECT id, organization_id, company_id, is_active FROM user_organization WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
+    );
+    let memberships = client.query_sql(&sql).await.map_err(ApiError::internal)?;
+    let membership = memberships
+        .first()
+        .ok_or_else(|| ApiError::Forbidden("No active organization membership".into()))?;
+
+    row_u64(membership, "companyId", "company_id").map_err(ApiError::Internal)
+}
+
+pub(crate) async fn authorize_membership_company_ids(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+    requested_company_ids: &[u64],
+    denied_message: &str,
+) -> Result<(), ApiError> {
+    if requested_company_ids.is_empty() {
+        return Ok(());
+    }
+    if let Some(company_id) = membership_company_id(client, organization_id, identity_hex).await? {
+        if requested_company_ids
+            .iter()
+            .all(|requested| *requested == company_id)
+        {
+            return Ok(());
+        }
+        return Err(ApiError::Forbidden(denied_message.into()));
+    }
+    let organization_company_ids =
+        company_ids_for_organization(client, organization_id, None).await?;
+    if requested_company_ids
+        .iter()
+        .all(|requested| organization_company_ids.contains(requested))
+    {
+        Ok(())
+    } else {
+        Err(ApiError::Forbidden(denied_message.into()))
+    }
+}
+
 /// Resolve the inventory company for the authenticated membership.
 ///
 /// Company-bound memberships are restricted to that company. Organization-level
-/// memberships fall back to the default company. A requested browser company
-/// must equal the server-derived scope.
+/// memberships fall back to the default company for reads.
 pub async fn resolve_inventory_company_id(
     client: &StdbClient,
     organization_id: u64,
@@ -195,8 +232,7 @@ pub async fn resolve_purchasing_company_id(
 /// Resolve the only Accounting company visible to the authenticated membership.
 ///
 /// Company-bound memberships are restricted to that company. Organization-level
-/// memberships fall back to the default company. A requested browser company
-/// must equal the server-derived scope. Mirrors `resolve_purchasing_company_id`;
+/// memberships fall back to the default company. Mirrors `resolve_purchasing_company_id`;
 /// every accounting table this covers carries a required (non-nullable)
 /// `company_id`, so there is no org-shared row concept here to fall back to.
 pub async fn resolve_accounting_company_id(

@@ -6,7 +6,7 @@ use crate::error::ApiError;
 use crate::state::AppState;
 use stdb_auth::{
     select_field_permissions_for_org_sql, select_roles_active_sql,
-    select_user_organization_for_identity_sql, select_user_profile_by_identity_sql,
+    select_user_organization_for_identity_sql, select_user_profile_for_organization_sql,
     FieldAccessContext, FieldPermissionLike,
 };
 use stdb_client::StdbClient;
@@ -51,8 +51,8 @@ pub async fn load_field_access_context(
         return Ok(None);
     }
 
-    let sql_profile =
-        select_user_profile_by_identity_sql(identity_hex, None).map_err(|e| e.to_string())?;
+    let sql_profile = select_user_profile_for_organization_sql(identity_hex, organization_id, None)
+        .map_err(|e| e.to_string())?;
     let profiles = client
         .query_sql(&sql_profile)
         .await
@@ -290,16 +290,20 @@ pub async fn resolve_api_session(
     // Hint from `x-stdb-identity` / `stdb_identity` cookie is never an authority source.
     let _ = x_std_identity;
 
-    let client = state.client_with_token(&stdb_token);
-    let identity_hex = client
+    let session_client = state.client_with_token(&stdb_token);
+    let identity_hex = session_client
         .authenticated_identity()
         .await
         .map_err(|_| ApiError::Unauthorized)?;
 
+    // The session token proves the actor identity above. Membership and policy
+    // tables are private authority state, so resolve them with the configured
+    // server credential and always constrain them to that verified identity.
+    let authority_client = &state.stdb;
     let mut organization_id: Option<u64> = None;
     let membership_sql = select_user_organization_for_identity_sql(&identity_hex, None)
         .map_err(ApiError::Internal)?;
-    let rows = client
+    let rows = authority_client
         .query_sql(&membership_sql)
         .await
         .map_err(|e| ApiError::Internal(format!("user_organization query: {e}")))?;
@@ -322,7 +326,7 @@ pub async fn resolve_api_session(
 
     let mut field_access: Option<FieldAccessContext> = None;
     if let Some(oid) = organization_id {
-        field_access = load_field_access_context(&client, &identity_hex, oid)
+        field_access = load_field_access_context(authority_client, &identity_hex, oid)
             .await
             .map_err(|e| ApiError::Internal(format!("field access query: {e}")))?;
     }

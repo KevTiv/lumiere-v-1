@@ -22,7 +22,9 @@ pub use coordinator::{reconstruct_organization, reconstruct_organization_once};
 pub use coverage::{capture_coverage_snapshot, ReconstructionCoverageReport};
 pub(crate) use integrity::{identity_text, OrderedDigest};
 pub use operator::run_organization_reconstruction;
-pub(crate) use stdb_sink::{normalize_stdb_digest_row, stdb_sql_field_name};
+pub(crate) use stdb_sink::{
+    canonical_stdb_row_json, normalize_stdb_digest_row, stdb_sql_field_name,
+};
 #[cfg(test)]
 #[path = "tests/mod.rs"]
 mod tests;

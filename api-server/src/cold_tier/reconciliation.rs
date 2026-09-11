@@ -13,6 +13,7 @@ use deadpool_postgres::Pool;
 use serde_json::Value;
 #[cfg(test)]
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use stdb_client::StdbClient;
 
 use super::pg_codec::{self, ColumnCodec};
@@ -101,8 +102,14 @@ pub async fn reconcile_organization(
     let mut tables = Vec::with_capacity(relations.len());
 
     for relation in relations {
-        let postgres = pg_relation_digest(&client, &relation, &organization_text).await?;
-        let stdb_digest = stdb_relation_digest(stdb, &relation, organization_id).await?;
+        let (postgres, stdb_digest) = relation_digests(
+            &client,
+            stdb,
+            &relation,
+            &organization_text,
+            organization_id,
+        )
+        .await?;
         if postgres.format_version != stdb_digest.format_version {
             bail!(
                 "reconciliation digest format mismatch for '{}'",
@@ -130,12 +137,14 @@ pub async fn reconcile_organization(
     })
 }
 
-async fn pg_relation_digest(
+async fn relation_digests(
     client: &tokio_postgres::Client,
+    stdb: &StdbClient,
     relation: &ReconciliationRelation,
-    organization_id: &str,
-) -> Result<TableDigest> {
-    let projection = relation
+    organization_text: &str,
+    organization_id: u64,
+) -> Result<(TableDigest, TableDigest)> {
+    let pg_projection = relation
         .columns
         .iter()
         .map(|column| {
@@ -147,13 +156,20 @@ async fn pg_relation_digest(
         })
         .collect::<Vec<_>>()
         .join(", ");
+    let stdb_projection = relation
+        .columns
+        .iter()
+        .map(|column| quote_identifier(stdb_sql_field_name(&column.name)))
+        .collect::<Vec<_>>()
+        .join(", ");
     let primary = relation
         .columns
         .iter()
         .find(|column| column.name == relation.primary_key)
         .context("reconciliation relation lacks primary-key codec")?;
     let mut after: Option<Value> = None;
-    let mut digest = OrderedDigest::new(&relation.primary_key);
+    let mut postgres_digest = OrderedDigest::new(&relation.primary_key);
+    let mut stdb_digest = OrderedDigest::new(&relation.primary_key);
     loop {
         let after_text = after
             .as_ref()
@@ -171,18 +187,22 @@ async fn pg_relation_digest(
             (Some(_), other) => bail!("unsupported reconciliation primary key type '{other}'"),
         };
         let sql = format!(
-            "SELECT {projection} FROM {table} WHERE {organization_column} = $1::TEXT::NUMERIC{comparison} ORDER BY {primary_key} ASC LIMIT {RECONCILIATION_PAGE_SIZE}",
+            "SELECT {pg_projection} FROM {table} WHERE {organization_column} = $1::TEXT::NUMERIC{comparison} ORDER BY {primary_key} ASC LIMIT {RECONCILIATION_PAGE_SIZE}",
             table = quote_identifier(&relation.table),
             organization_column = quote_identifier(&relation.organization_column),
             primary_key = quote_identifier(&relation.primary_key),
         );
         let rows = if let Some(after) = after_text.as_ref() {
-            client.query(&sql, &[&organization_id, after]).await
+            client.query(&sql, &[&organization_text, after]).await
         } else {
-            client.query(&sql, &[&organization_id]).await
+            client.query(&sql, &[&organization_text]).await
         }
         .with_context(|| format!("read PG reconciliation relation '{}'", relation.table))?;
         let is_last = rows.len() < RECONCILIATION_PAGE_SIZE as usize;
+        if rows.is_empty() {
+            break;
+        }
+        let mut expected = Vec::with_capacity(rows.len());
         for row in &rows {
             let value = pg_codec::row_to_hot_json(&relation.columns, row)?;
             let primary_key = pg_codec::snake_to_camel(&relation.primary_key);
@@ -191,63 +211,26 @@ async fn pg_relation_digest(
                 .cloned()
                 .context("PG reconciliation row lacks primary key")?;
             let identity = serde_json::json!({relation.primary_key.clone(): primary_value});
-            digest.push(&identity, &value)?;
-            after = Some(identity);
+            postgres_digest.push(&identity, &value)?;
+            expected.push((identity, value));
         }
-        if is_last {
-            break;
-        }
-    }
-    Ok(digest.finish())
-}
-
-async fn stdb_relation_digest(
-    stdb: &StdbClient,
-    relation: &ReconciliationRelation,
-    organization_id: u64,
-) -> Result<TableDigest> {
-    let projection = relation
-        .columns
-        .iter()
-        .map(|column| quote_identifier(stdb_sql_field_name(&column.name)))
-        .collect::<Vec<_>>()
-        .join(", ");
-    let primary = relation
-        .columns
-        .iter()
-        .find(|column| column.name == relation.primary_key)
-        .context("reconciliation relation lacks primary-key codec")?;
-    let mut after: Option<Value> = None;
-    let mut digest = OrderedDigest::new(&relation.primary_key);
-    loop {
-        let comparison = after
-            .as_ref()
-            .map(|identity| {
-                let value = identity_text(identity, &relation.primary_key)?;
-                let literal = match primary.pg_type.as_str() {
-                    "NUMERIC(20,0)" => value,
-                    "TEXT" => format!("'{}'", value.replace('\'', "''")),
-                    other => bail!("unsupported reconciliation primary key type '{other}'"),
-                };
-                Ok(format!(
-                    " AND {} > {literal}",
-                    quote_identifier(&relation.primary_key)
-                ))
-            })
-            .transpose()?
-            .unwrap_or_default();
-        let sql = format!(
-            "SELECT {projection} FROM {table} WHERE {organization_column} = {organization_id}{comparison} ORDER BY {primary_key} ASC LIMIT {RECONCILIATION_PAGE_SIZE}",
+        let identities = expected
+            .iter()
+            .map(|(identity, _)| stdb_identity_equality(identity, relation, &primary.pg_type))
+            .collect::<Result<Vec<_>>>()?
+            .join(" OR ");
+        let stdb_sql = format!(
+            "SELECT {stdb_projection} FROM {table} WHERE {organization_column} = {organization_id} AND ({identities}) LIMIT {limit}",
             table = quote_identifier(&relation.table),
             organization_column = quote_identifier(&relation.organization_column),
-            primary_key = quote_identifier(&relation.primary_key),
+            limit = expected.len(),
         );
-        let rows = stdb
-            .query_sql_sats(&sql)
+        let stdb_rows = stdb
+            .query_sql_sats(&stdb_sql)
             .await
             .with_context(|| format!("read STDB reconciliation relation '{}'", relation.table))?;
-        let is_last = rows.len() < RECONCILIATION_PAGE_SIZE as usize;
-        for row in rows {
+        let mut actual_by_identity = BTreeMap::new();
+        for row in stdb_rows {
             let value = normalize_stdb_digest_row(&relation.columns, row)?;
             let primary_key = pg_codec::snake_to_camel(&relation.primary_key);
             let primary_value = value
@@ -255,17 +238,48 @@ async fn stdb_relation_digest(
                 .cloned()
                 .context("STDB reconciliation row lacks primary key")?;
             let identity = serde_json::json!({relation.primary_key.clone(): primary_value});
-            digest.push(&identity, &value)?;
-            after = Some(identity);
+            let key = identity_text(&identity, &relation.primary_key)?;
+            if actual_by_identity.insert(key, value).is_some() {
+                bail!("STDB reconciliation returned a duplicate primary key");
+            }
         }
+        for (identity, _) in &expected {
+            let key = identity_text(identity, &relation.primary_key)?;
+            if let Some(actual) = actual_by_identity.remove(&key) {
+                stdb_digest.push(identity, &actual)?;
+            }
+        }
+        if !actual_by_identity.is_empty() {
+            bail!("STDB reconciliation returned an unexpected primary key");
+        }
+        after = expected.last().map(|(identity, _)| identity.clone());
         if is_last {
             break;
         }
     }
-    Ok(digest.finish())
+    let postgres = postgres_digest.finish();
+    let mut stdb_result = stdb_digest.finish();
+    let count_sql = format!(
+        "SELECT COUNT(*) AS row_count FROM {table} WHERE {organization_column} = {organization_id}",
+        table = quote_identifier(&relation.table),
+        organization_column = quote_identifier(&relation.organization_column),
+    );
+    let count_rows = stdb
+        .query_sql_sats(&count_sql)
+        .await
+        .with_context(|| format!("count STDB reconciliation relation '{}'", relation.table))?;
+    stdb_result.row_count = count_rows
+        .first()
+        .and_then(|row| row.get("row_count"))
+        .and_then(Value::as_u64)
+        .context("STDB reconciliation row count is malformed")?;
+    if count_rows.len() != 1 {
+        bail!("STDB reconciliation row count returned multiple rows");
+    }
+    Ok((postgres, stdb_result))
 }
 
-async fn verify_declared_watermark(
+pub(crate) async fn verify_declared_watermark(
     stdb: &StdbClient,
     pool: &Pool,
     organization_id: u64,
@@ -314,6 +328,23 @@ async fn verify_declared_watermark(
         );
     }
     Ok(())
+}
+
+fn stdb_identity_equality(
+    identity: &Value,
+    relation: &ReconciliationRelation,
+    pg_type: &str,
+) -> Result<String> {
+    let value = identity_text(identity, &relation.primary_key)?;
+    let literal = match pg_type {
+        "NUMERIC(20,0)" => value,
+        "TEXT" => format!("'{}'", value.replace('\'', "''")),
+        other => bail!("unsupported reconciliation primary key type '{other}'"),
+    };
+    Ok(format!(
+        "{} = {literal}",
+        quote_identifier(&relation.primary_key)
+    ))
 }
 
 fn load_relations(

@@ -5,6 +5,10 @@ use stdb_config::{
     runtime_is_production, DEFAULT_STDB_MODULE_DEV,
 };
 
+use crate::organization_placement::{
+    ConfiguredPlacementResolver, INITIAL_CELL_ID, INITIAL_DURABLE_STORE_ID,
+};
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub port: u16,
@@ -15,6 +19,9 @@ pub struct Config {
     /// Dedicated projection/finalization worker token. It must be distinct from
     /// `STDB_SERVER_TOKEN`; finalizer reducers authenticate its registered identity.
     pub stdb_finalization_token: Option<String>,
+    /// Server-owned placement used to bind every trusted operation to the
+    /// current deployment generation. Production must configure it explicitly.
+    pub organization_placement: ConfiguredPlacementResolver,
     /// Allowed browser origins for CORS (comma-separated). Empty → common localhost dev URLs.
     pub cors_origins: Vec<String>,
     pub dev_mock_org_id: Option<u64>,
@@ -137,6 +144,42 @@ impl Config {
             .ok()
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty());
+
+        let placement_generation = match std::env::var("LUMIERE_PLACEMENT_GENERATION") {
+            Ok(value) => value
+                .trim()
+                .parse::<u64>()
+                .context("LUMIERE_PLACEMENT_GENERATION must be a positive integer")?,
+            Err(_) if prod => {
+                anyhow::bail!("LUMIERE_PLACEMENT_GENERATION must be set in production")
+            }
+            Err(_) => 1,
+        };
+        let placement_cell_id = match std::env::var("LUMIERE_CELL_ID") {
+            Ok(value) if !value.trim().is_empty() => value,
+            _ if prod => anyhow::bail!("LUMIERE_CELL_ID must be set in production"),
+            _ => INITIAL_CELL_ID.to_owned(),
+        };
+        let placement_durable_store = match std::env::var("LUMIERE_DURABLE_STORE_ID") {
+            Ok(value) if !value.trim().is_empty() => value,
+            _ if prod => anyhow::bail!("LUMIERE_DURABLE_STORE_ID must be set in production"),
+            _ => INITIAL_DURABLE_STORE_ID.to_owned(),
+        };
+        let mut organization_placement = ConfiguredPlacementResolver::new(
+            placement_cell_id.trim(),
+            placement_generation,
+            placement_durable_store.trim(),
+        )
+        .context("validate server-owned organization placement")?;
+        if let Some(path) = std::env::var("LUMIERE_PLACEMENT_CONTROL_PATH")
+            .ok()
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty())
+        {
+            organization_placement = organization_placement
+                .with_persistent_control_store(path)
+                .context("configure persistent organization placement control store")?;
+        }
 
         // CORS_ORIGINS: comma-separated http(s)://host:port; required for credentialed cross-origin
         // browser calls (wildcard * is invalid with credentials: include).
@@ -298,6 +341,7 @@ impl Config {
             stdb_module,
             stdb_server_token,
             stdb_finalization_token,
+            organization_placement,
             cors_origins,
             dev_mock_org_id,
             ai_gateway_url,

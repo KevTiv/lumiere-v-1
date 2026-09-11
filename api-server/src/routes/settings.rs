@@ -16,6 +16,7 @@ use crate::domain_queries::query_org_users;
 use crate::error::ApiError;
 use crate::query_exec::execute_resource_query;
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session};
 
 #[derive(Debug, Deserialize)]
@@ -63,7 +64,8 @@ async fn users_get(
     let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
 
-    let client = state.client_with_token(&session.stdb_token);
+    let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let client = trusted.client();
     let mut users = query_org_users(&client, org_id, session.field_access.as_ref()).await?;
 
     if let Some(ref search) = q.search {
@@ -103,7 +105,8 @@ async fn roles_get(
     let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
 
-    let client = state.client_with_token(&session.stdb_token);
+    let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let client = trusted.client();
     let roles = execute_resource_query(
         &client,
         "roles",

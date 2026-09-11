@@ -1,11 +1,47 @@
 //! Session command contracts, argument normalization, and scoped reducer calls.
 
 use crate::error::ApiError;
-use crate::query_exec::resolve_membership_company_id;
-use crate::trusted_context::TrustedOperationContext;
+use crate::organization_placement::{OrganizationPlacementResolver, PlacementGeneration};
+use crate::query_exec::authorize_membership_company_ids;
+use crate::session::{normalize_identity_hex_for_sql, ApiSession};
+use crate::state::AppState;
+use crate::trusted_context::{opaque_correlation_id, TrustedOperationContext};
 use axum::Json;
 use serde_json::{json, Value};
 use stdb_client::{Exposure, ReducerCall, ReducerContract, StdbClientError};
+
+/// Narrow server-owned authorities for routes that cannot run as an ordinary
+/// organization session. Each variant has an explicit reducer allowlist.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum InternalRouteAuthority {
+    InvitationAcceptance,
+    PasswordRecovery,
+    PlatformProfileProjection,
+    ProviderWebhook,
+}
+
+impl InternalRouteAuthority {
+    fn permits(self, reducer: &str) -> bool {
+        match self {
+            Self::InvitationAcceptance => matches!(
+                reducer,
+                "add_org_member"
+                    | "bind_user_credential"
+                    | "bind_user_profile"
+                    | "mark_invite_accepted"
+            ),
+            Self::PasswordRecovery => matches!(
+                reducer,
+                "bind_password_reset_token" | "mark_password_reset_token_projection_used"
+            ),
+            Self::PlatformProfileProjection => reducer == "project_user_profile",
+            Self::ProviderWebhook => matches!(
+                reducer,
+                "receive_crm_provider_message" | "record_crm_provider_delivery"
+            ),
+        }
+    }
+}
 
 pub(crate) fn session_reducer_contract(
     reducer: &str,
@@ -131,6 +167,231 @@ pub(crate) async fn execute_reducer_call(
     Ok(Json(json!({ "ok": true })))
 }
 
+/// Resolve a handwritten session route through the same generated reducer
+/// contract, tenant-scope checks, and trusted context used by `/operations`.
+///
+/// The returned context lets a route perform a follow-up read without
+/// reconstructing authority or retaining a raw session token.
+pub(crate) async fn dispatch_session_reducer(
+    state: &AppState,
+    session: &ApiSession,
+    reducer: &str,
+    args: Value,
+) -> Result<TrustedOperationContext, ApiError> {
+    let args = args.as_array().cloned().ok_or_else(|| {
+        ApiError::Internal("trusted route reducer arguments must be an array".into())
+    })?;
+    let contract = session_reducer_contract(reducer)?;
+    let client = state.client_with_token(&session.stdb_token);
+    let context = TrustedOperationContext::from_session_with_placement(
+        session,
+        client,
+        contract.contract_operation_id,
+        &state.organization_placements,
+    )?;
+    let company_scope = validate_reducer_scope(contract, &args, context.organization_id())?;
+    let company_scope = authorize_reducer_company_scope(&context, company_scope).await?;
+    let context = context.with_company_scope(company_scope)?;
+    context.require_current_placement(&state.organization_placements)?;
+    let _ = execute_reducer_call(&context, contract, args).await?;
+    Ok(context)
+}
+
+/// Dispatch a deny-by-default reducer from the configured server identity.
+/// The caller must choose a narrow authority variant and provide any resolved
+/// organization scope separately from the reducer payload.
+pub(crate) async fn dispatch_internal_reducer(
+    state: &AppState,
+    authority: InternalRouteAuthority,
+    organization_id: Option<u64>,
+    reducer: &str,
+    args: Value,
+) -> Result<(), ApiError> {
+    if !authority.permits(reducer) {
+        return Err(ApiError::Forbidden(format!(
+            "internal authority {authority:?} cannot invoke reducer '{reducer}'"
+        )));
+    }
+    let contract = stdb_client::reducer_contract(reducer).ok_or_else(|| {
+        ApiError::Forbidden(format!("Reducer '{reducer}' is absent from the contract"))
+    })?;
+    let invitation_membership = authority == InternalRouteAuthority::InvitationAcceptance
+        && reducer == "add_org_member"
+        && contract.exposure == Exposure::Session;
+    if contract.exposure != Exposure::Denied && !invitation_membership {
+        return Err(ApiError::Forbidden(format!(
+            "internal reducer '{reducer}' must be denied to sessions"
+        )));
+    }
+    let args = args.as_array().cloned().ok_or_else(|| {
+        ApiError::Internal("trusted internal reducer arguments must be an array".into())
+    })?;
+    validate_internal_organization_scope(contract, &args, organization_id)?;
+    let placement_generation = organization_id
+        .map(|organization_id| require_active_placement(state, organization_id))
+        .transpose()?;
+
+    let token = state
+        .config
+        .stdb_server_token
+        .as_deref()
+        .filter(|token| crate::auth_password::is_usable_admin_token(token))
+        .ok_or_else(|| ApiError::Internal("STDB_SERVER_TOKEN is not configured".into()))?;
+    let correlation_id = opaque_correlation_id();
+    tracing::info!(
+        operation_id = contract.contract_operation_id,
+        correlation_id,
+        authority = ?authority,
+        organization_id,
+        placement_generation = placement_generation.map(PlacementGeneration::get),
+        "dispatching trusted internal reducer operation"
+    );
+    state
+        .client_with_token(token)
+        .call_reducer(
+            ReducerCall::from_name(contract.name, Value::Array(args))
+                .map_err(|error| ApiError::Internal(error.to_string()))?,
+        )
+        .await
+        .map_err(map_reducer_error)
+}
+
+/// Dispatch the one operator-only reducer that intentionally preserves the
+/// authenticated superuser as the SpacetimeDB audit identity.
+pub(crate) async fn dispatch_superuser_reducer(
+    state: &AppState,
+    session: &ApiSession,
+    organization_id: u64,
+    reducer: &str,
+    args: Value,
+) -> Result<(), ApiError> {
+    if reducer != "set_billing_status"
+        || !session
+            .field_access
+            .as_ref()
+            .is_some_and(|access| access.is_superuser)
+    {
+        return Err(ApiError::Forbidden(
+            "trusted superuser authority is required".into(),
+        ));
+    }
+    let contract = stdb_client::reducer_contract(reducer).ok_or_else(|| {
+        ApiError::Forbidden(format!("Reducer '{reducer}' is absent from the contract"))
+    })?;
+    if contract.exposure != Exposure::Denied {
+        return Err(ApiError::Forbidden(
+            "superuser reducer must be denied to ordinary sessions".into(),
+        ));
+    }
+    let args = args.as_array().cloned().ok_or_else(|| {
+        ApiError::Internal("trusted superuser reducer arguments must be an array".into())
+    })?;
+    validate_internal_organization_scope(contract, &args, Some(organization_id))?;
+    let placement_generation = require_active_placement(state, organization_id)?;
+    let correlation_id = opaque_correlation_id();
+    tracing::info!(
+        operation_id = contract.contract_operation_id,
+        correlation_id,
+        actor_identity = session.identity_hex,
+        organization_id,
+        placement_generation = placement_generation.get(),
+        "dispatching trusted superuser reducer operation"
+    );
+    state
+        .client_with_token(&session.stdb_token)
+        .call_reducer(
+            ReducerCall::from_name(contract.name, Value::Array(args))
+                .map_err(|error| ApiError::Internal(error.to_string()))?,
+        )
+        .await
+        .map_err(map_reducer_error)
+}
+
+/// Bootstrap is the sole authenticated pre-membership route. It deliberately
+/// cannot invoke any other reducer and retains the authenticated user's token.
+pub(crate) async fn dispatch_tenant_bootstrap(
+    state: &AppState,
+    session: &ApiSession,
+    args: Value,
+) -> Result<(), ApiError> {
+    let contract = stdb_client::reducer_contract("bootstrap_new_tenant").ok_or_else(|| {
+        ApiError::Forbidden("bootstrap reducer is absent from the contract".into())
+    })?;
+    if contract.exposure != Exposure::Denied {
+        return Err(ApiError::Forbidden(
+            "bootstrap reducer must be denied to generic sessions".into(),
+        ));
+    }
+    let identity = normalize_identity_hex_for_sql(&session.identity_hex);
+    if identity.is_empty() || session.stdb_token.trim().is_empty() {
+        return Err(ApiError::Unauthorized);
+    }
+    let correlation_id = opaque_correlation_id();
+    tracing::info!(
+        operation_id = contract.contract_operation_id,
+        correlation_id,
+        actor_identity = identity,
+        "dispatching trusted tenant bootstrap"
+    );
+    state
+        .client_with_token(&session.stdb_token)
+        .call_reducer(
+            ReducerCall::from_name(contract.name, args)
+                .map_err(|error| ApiError::Internal(error.to_string()))?,
+        )
+        .await
+        .map_err(map_reducer_error)
+}
+
+fn validate_internal_organization_scope(
+    contract: &'static ReducerContract,
+    args: &[Value],
+    organization_id: Option<u64>,
+) -> Result<(), ApiError> {
+    let Some(position) = contract.organization_position else {
+        return Ok(());
+    };
+    let expected = organization_id.ok_or_else(|| {
+        ApiError::Forbidden(format!(
+            "internal reducer '{}' requires resolved organization scope",
+            contract.name
+        ))
+    })?;
+    let actual = args.get(position).and_then(Value::as_u64).ok_or_else(|| {
+        ApiError::Unprocessable(format!(
+            "internal reducer '{}' has an invalid organization argument",
+            contract.name
+        ))
+    })?;
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(ApiError::Forbidden(
+            "internal reducer organization scope mismatch".into(),
+        ))
+    }
+}
+
+fn require_active_placement(
+    state: &AppState,
+    organization_id: u64,
+) -> Result<PlacementGeneration, ApiError> {
+    let placement = state
+        .organization_placements
+        .resolve(organization_id)
+        .map_err(|error| {
+            ApiError::Internal(format!(
+                "resolve authoritative organization placement: {error}"
+            ))
+        })?;
+    if !placement.lifecycle().permits_business_execution() {
+        return Err(ApiError::Conflict(
+            "organization placement is fenced for trusted operation".into(),
+        ));
+    }
+    Ok(placement.generation())
+}
+
 /// Resolve every reducer company reference against the authenticated actor's
 /// active membership. Organization membership currently grants one company;
 /// passing multiple distinct company ids therefore fails closed.
@@ -138,16 +399,14 @@ pub(crate) async fn authorize_reducer_company_scope(
     context: &TrustedOperationContext,
     company_ids: Vec<u64>,
 ) -> Result<Vec<u64>, ApiError> {
-    for company_id in &company_ids {
-        resolve_membership_company_id(
-            context.client(),
-            context.organization_id(),
-            context.actor_identity(),
-            Some(*company_id),
-            "company scope mismatch for reducer call",
-        )
-        .await?;
-    }
+    authorize_membership_company_ids(
+        context.client(),
+        context.organization_id(),
+        context.actor_identity(),
+        &company_ids,
+        "company scope mismatch for reducer call",
+    )
+    .await?;
     Ok(company_ids)
 }
 
@@ -462,6 +721,32 @@ mod tests {
             let contract = stdb_client::reducer_contract(reducer).expect(reducer);
             assert_eq!(contract.exposure, Exposure::Denied, "{reducer}");
         }
+    }
+
+    #[test]
+    fn internal_route_authorities_are_narrow_and_non_interchangeable() {
+        assert!(InternalRouteAuthority::PasswordRecovery.permits("bind_password_reset_token"));
+        assert!(!InternalRouteAuthority::PasswordRecovery.permits("project_user_profile"));
+        assert!(InternalRouteAuthority::ProviderWebhook.permits("receive_crm_provider_message"));
+        assert!(!InternalRouteAuthority::ProviderWebhook.permits("add_org_member"));
+        assert!(InternalRouteAuthority::InvitationAcceptance.permits("bind_user_profile"));
+        assert!(!InternalRouteAuthority::InvitationAcceptance.permits("set_billing_status"));
+    }
+
+    #[test]
+    fn internal_route_scope_rejects_missing_or_foreign_organization() {
+        let contract = stdb_client::reducer_contract("record_crm_provider_delivery")
+            .expect("provider delivery contract");
+        let args = [json!(42), json!({})];
+        assert!(validate_internal_organization_scope(contract, &args, Some(42)).is_ok());
+        assert!(matches!(
+            validate_internal_organization_scope(contract, &args, Some(43)),
+            Err(ApiError::Forbidden(_))
+        ));
+        assert!(matches!(
+            validate_internal_organization_scope(contract, &args, None),
+            Err(ApiError::Forbidden(_))
+        ));
     }
 
     #[test]

@@ -30,7 +30,17 @@ pub(super) fn set_stdb_session_cookies(
     cookies.add(i);
 }
 
-pub(super) fn clear_stdb_session_cookies(cookies: &Cookies) {
-    cookies.remove(Cookie::new("stdb_token", ""));
-    cookies.remove(Cookie::new("stdb_identity", ""));
+pub(super) fn clear_stdb_session_cookies(config: &crate::config::Config, cookies: &Cookies) {
+    // Cookie deletion must repeat the original path (and secure policy).
+    // A pathless removal does not replace a `Path=/` session cookie in all
+    // clients, which previously left the browser authenticated after signout.
+    for name in ["stdb_token", "stdb_identity"] {
+        let mut cookie = Cookie::build((name, ""))
+            .path("/")
+            .http_only(true)
+            .same_site(SameSite::Lax)
+            .build();
+        cookie.set_secure(config.cookie_secure);
+        cookies.remove(cookie);
+    }
 }

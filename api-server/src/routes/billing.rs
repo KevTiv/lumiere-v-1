@@ -7,9 +7,11 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use tower_cookies::Cookies;
 
+use crate::commands::dispatch_session_reducer;
 use crate::error::ApiError;
 use crate::session::resolve_api_session;
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::stdb_identity_hex_hint;
 
 #[derive(Debug, Deserialize)]
@@ -45,7 +47,8 @@ async fn get_billing_account(
     cookies: Cookies,
 ) -> Result<Json<Value>, ApiError> {
     let (session, org_id) = require_org_session(&state, &headers, &cookies).await?;
-    let client = state.client_with_token(&session.stdb_token);
+    let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let client = trusted.client();
     let sql = format!(
         "SELECT id, organization_id, plan_tier, seat_count, status, trial_ends_at, metadata FROM billing_account WHERE organization_id = {org_id}"
     );
@@ -60,7 +63,8 @@ async fn patch_billing_account(
     Json(body): Json<PatchBillingBody>,
 ) -> Result<Json<Value>, ApiError> {
     let (session, org_id) = require_org_session(&state, &headers, &cookies).await?;
-    let client = state.client_with_token(&session.stdb_token);
+    let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let client = trusted.client();
     let sql = format!("SELECT id FROM billing_account WHERE organization_id = {org_id}");
     let rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
     let Some(row) = rows.first() else {
@@ -78,13 +82,13 @@ async fn patch_billing_account(
         "trialEndsAt": null,
         "metadata": null,
     });
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "update_billing_account",
-            json!([org_id, billing_id, params]),
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "update_billing_account",
+        json!([org_id, billing_id, params]),
+    )
+    .await?;
     Ok(Json(json!({ "ok": true })))
 }
 

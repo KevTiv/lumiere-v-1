@@ -1,8 +1,8 @@
 //! Validated authority contexts for interactive and scheduled owner reports.
 //!
 //! The constructors in this module are the trust boundary for shared report
-//! generation.  HTTP callers must bring a resolved [`ApiSession`] and the
-//! client created from that session token.  Scheduled callers must bring a
+//! generation. HTTP callers bring a resolved [`ApiSession`]; this module
+//! derives the matching client internally. Scheduled callers must bring a
 //! claimed queue job together with facts reloaded from its run and schedule;
 //! payload strings alone are not sufficient to create scheduled authority.
 
@@ -15,6 +15,7 @@ use crate::{
     error::ApiError,
     reports::{common::ReportKey, timezone::parse_timezone},
     session::ApiSession,
+    state::AppState,
 };
 
 /// Queue evidence after a worker has claimed an owner-report job.
@@ -226,14 +227,19 @@ pub(crate) struct InteractiveReportContext {
 }
 
 impl InteractiveReportContext {
-    /// Construct only from a resolved session and the client carrying its token.
-    pub(crate) fn from_session(session: ApiSession, client: StdbClient) -> Result<Self, ApiError> {
+    /// Construct only from a resolved session; client authority is derived
+    /// internally so HTTP routes cannot inject a different token.
+    pub(crate) fn from_session(state: &AppState, session: &ApiSession) -> Result<Self, ApiError> {
+        Self::from_parts(session, state.client_with_token(&session.stdb_token))
+    }
+
+    fn from_parts(session: &ApiSession, client: StdbClient) -> Result<Self, ApiError> {
         let organization_id = session
             .organization_id
             .ok_or_else(|| ApiError::Forbidden("report session has no organization".into()))?;
         require_nonzero(organization_id, "session organization id")?;
-        let actor_identity = require_nonempty(session.identity_hex, "actor identity")?;
-        let session_token = require_nonempty(session.stdb_token, "session token")?;
+        let actor_identity = require_nonempty(session.identity_hex.clone(), "actor identity")?;
+        let session_token = require_nonempty(session.stdb_token.clone(), "session token")?;
         if client.token() != session_token {
             return Err(invalid_context(
                 "interactive client token does not match the resolved session",
@@ -260,7 +266,7 @@ impl InteractiveReportContext {
             client,
             organization_id,
             actor_identity,
-            field_access: session.field_access,
+            field_access: session.field_access.clone(),
         })
     }
 
@@ -497,11 +503,9 @@ mod tests {
 
     #[test]
     fn interactive_context_requires_session_org_and_matching_token() {
-        let context = InteractiveReportContext::from_session(
-            session(Some(7), TOKEN, IDENTITY),
-            client(TOKEN),
-        )
-        .expect("valid interactive context");
+        let context =
+            InteractiveReportContext::from_parts(&session(Some(7), TOKEN, IDENTITY), client(TOKEN))
+                .expect("valid interactive context");
         assert_eq!(context.organization_id(), 7);
         assert_eq!(context.actor_identity(), IDENTITY);
         assert!(context.field_access().is_none());
@@ -514,7 +518,7 @@ mod tests {
             (session(Some(7), TOKEN, IDENTITY), client("other-token")),
         ] {
             assert!(
-                InteractiveReportContext::from_session(session, context_client).is_err(),
+                InteractiveReportContext::from_parts(&session, context_client).is_err(),
                 "invalid interactive authority must be rejected"
             );
         }

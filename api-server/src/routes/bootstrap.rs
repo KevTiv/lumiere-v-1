@@ -12,9 +12,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tower_cookies::Cookies;
 
+use crate::commands::dispatch_tenant_bootstrap;
 use crate::error::ApiError;
 use crate::session::resolve_api_session;
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::stdb_identity_hex_hint;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -237,17 +239,8 @@ async fn bootstrap_tenant_post(
     let arg = reducer_arg(&body);
 
     let payload = serde_json::to_value(&arg).map_err(ApiError::internal)?;
-    let client = state.client_with_token(&session.stdb_token);
-    match client
-        .call_reducer(stdb_client::reducer_call!(
-            "bootstrap_new_tenant",
-            json!([payload])
-        ))
-        .await
-    {
-        Ok(()) => Ok(Json(json!({ "ok": true }))),
-        Err(e) => Err(ApiError::internal(e)),
-    }
+    dispatch_tenant_bootstrap(&state, &session, json!([payload])).await?;
+    Ok(Json(json!({ "ok": true })))
 }
 
 async fn bootstrap_currencies_get(
@@ -270,8 +263,9 @@ async fn bootstrap_currencies_get(
     }
 
     if let Some(organization_id) = session.organization_id {
-        let client = state.client_with_token(&session.stdb_token);
-        let mut currencies = client
+        let context = TrustedOperationContext::for_resource_read(&state, &session)?;
+        let mut currencies = context
+            .client()
             .query_sql(&tenant_currency_sql(organization_id))
             .await
             .map_err(ApiError::internal)?;

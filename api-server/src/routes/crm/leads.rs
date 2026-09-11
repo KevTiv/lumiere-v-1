@@ -11,10 +11,12 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use tower_cookies::Cookies;
 
+use crate::commands::dispatch_session_reducer;
 use crate::domain_queries::query_lead_by_id;
 use crate::error::ApiError;
 use crate::query_exec::execute_resource_query;
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session};
 
 use super::{list_meta, paginate_limit_offset, value_as_str, value_as_u64};
@@ -43,13 +45,14 @@ pub(super) async fn leads_get(
     let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
 
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
     let client = state.stdb.clone();
     let mut rows = execute_resource_query(
         &client,
         "leads",
         org_id,
-        &session.identity_hex,
-        session.field_access.as_ref(),
+        context.actor_identity(),
+        Some(context.field_access()),
     )
     .await?;
 
@@ -122,14 +125,7 @@ pub(super) async fn leads_post(
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
     let params = lead_create_params(&body)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "create_lead",
-            json!([org_id, params])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(&state, &session, "create_lead", json!([org_id, params])).await?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Lead created successfully" } })),
@@ -149,8 +145,9 @@ pub(super) async fn lead_get(
     let lead_id: u64 = id
         .parse()
         .map_err(|_| ApiError::BadRequest("Invalid lead ID".into()))?;
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
     let client = state.stdb.clone();
-    let lead = query_lead_by_id(&client, lead_id, org_id, session.field_access.as_ref())
+    let lead = query_lead_by_id(&client, lead_id, org_id, Some(context.field_access()))
         .await?
         .ok_or_else(|| ApiError::NotFound("Lead not found".into()))?;
     Ok(Json(json!({ "data": lead })))
@@ -203,14 +200,13 @@ pub(super) async fn lead_put(
         return Err(ApiError::BadRequest("No valid fields to update".into()));
     }
 
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "update_lead",
-            json!([org_id, lead_id, Value::Object(params)]),
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "update_lead",
+        json!([org_id, lead_id, Value::Object(params)]),
+    )
+    .await?;
 
     Ok(Json(
         json!({ "data": { "message": "Lead updated successfully" } }),
@@ -230,14 +226,7 @@ pub(super) async fn lead_delete(
     let lead_id: u64 = id
         .parse()
         .map_err(|_| ApiError::BadRequest("Invalid lead ID".into()))?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "delete_lead",
-            json!([org_id, lead_id])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(&state, &session, "delete_lead", json!([org_id, lead_id])).await?;
     Ok(Json(
         json!({ "data": { "message": "Lead deleted successfully" } }),
     ))

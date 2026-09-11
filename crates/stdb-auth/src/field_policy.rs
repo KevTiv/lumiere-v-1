@@ -615,6 +615,19 @@ pub fn select_user_profile_by_identity_sql(
     ))
 }
 
+pub fn select_user_profile_for_organization_sql(
+    identity_hex: &str,
+    organization_id: u64,
+    field_access: Option<&FieldAccessContext>,
+) -> Result<String, String> {
+    let cols = resolve_http_sql_columns("user-profile", field_access)?;
+    let col_part = cols.join(", ");
+    let id = identity_sql_literal(identity_hex)?;
+    Ok(format!(
+        "SELECT {col_part} FROM user_profile WHERE identity = {id} AND organization_id = {organization_id} LIMIT 1"
+    ))
+}
+
 pub fn select_user_role_assignments_for_identity_sql(
     identity_hex: &str,
     field_access: Option<&FieldAccessContext>,
@@ -699,6 +712,17 @@ mod tests {
             identity_hex: "actor".into(),
             field_permissions: Vec::new(),
         }
+    }
+
+    #[test]
+    fn user_profile_authority_query_is_scoped_to_identity_and_organization() {
+        let identity = "ab".repeat(32);
+        let sql = select_user_profile_for_organization_sql(&identity, 42, None)
+            .expect("organization-scoped profile SQL");
+
+        assert!(sql.contains(&format!("identity = 0x{identity}")));
+        assert!(sql.contains("organization_id = 42"));
+        assert!(sql.ends_with("LIMIT 1"));
     }
 
     #[test]

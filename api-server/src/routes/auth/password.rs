@@ -182,7 +182,7 @@ pub(super) async fn signout(
     State(state): State<Arc<AppState>>,
     cookies: Cookies,
 ) -> impl IntoResponse {
-    clear_stdb_session_cookies(&cookies);
-    let _ = state; // WorkOS: clear STDB cookies only; AuthKit session end stays client-side if needed.
+    clear_stdb_session_cookies(&state.config, &cookies);
+    // WorkOS: clear STDB cookies only; AuthKit session end stays client-side if needed.
     Json(json!({ "redirectTo": "/sign-in" }))
 }

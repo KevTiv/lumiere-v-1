@@ -6,7 +6,8 @@ use super::{
 };
 use crate::cold_tier::pg_pool::{build_pool, PgConfig, PgRole};
 use crate::organization_placement::{
-    CellId, DurableStoreId, OrganizationPlacement, PlacementGeneration,
+    CellId, ConfiguredPlacementResolver, DurableStoreId, OrganizationPlacement,
+    OrganizationPlacementResolver, PlacementGeneration,
 };
 use anyhow::{bail, Context, Result};
 use rand::RngCore;
@@ -19,9 +20,10 @@ use stdb_config::{
 const RECONSTRUCTION_TOKEN_ENV: &str = "STDB_RECONSTRUCTION_TOKEN";
 const RECONSTRUCTION_READ_TOKEN_ENV: &str = "STDB_RECONSTRUCTION_READ_TOKEN";
 const RECONSTRUCTION_IDENTITY_ENV: &str = "STDB_RECONSTRUCTION_IDENTITY";
-const PLACEMENT_GENERATION_ENV: &str = "RECONSTRUCTION_PLACEMENT_GENERATION";
-const CELL_ID_ENV: &str = "RECONSTRUCTION_CELL_ID";
-const DURABLE_STORE_ID_ENV: &str = "RECONSTRUCTION_DURABLE_STORE_ID";
+const PLACEMENT_CONTROL_PATH_ENV: &str = "LUMIERE_PLACEMENT_CONTROL_PATH";
+const EXPECTED_GENERATION_ENV: &str = "RECONSTRUCTION_EXPECTED_PLACEMENT_GENERATION";
+const EXPECTED_CELL_ID_ENV: &str = "RECONSTRUCTION_EXPECTED_CELL_ID";
+const EXPECTED_DURABLE_STORE_ID_ENV: &str = "RECONSTRUCTION_EXPECTED_DURABLE_STORE_ID";
 
 /// Reconstruct one operator-selected organization using only server-resolved
 /// placement configuration and the exact durable PostgreSQL watermark.
@@ -34,17 +36,17 @@ pub async fn run_organization_reconstruction(organization_id: u64) -> Result<Rec
         .for_role(PgRole::Reconstruction)
         .context("resolve reconstruction PostgreSQL role")?;
     let pool = build_pool(&pg_config)?;
-    let source = PgReconstructionSource::new(pool.clone());
-    let watermark = source
-        .declared_watermark(organization_id)
-        .await
-        .context("resolve exact durable reconstruction watermark")?;
     let target = settings.target(organization_id)?;
     let stdb = StdbClient::new(settings.stdb_host, settings.stdb_module, settings.token);
     let read_stdb = stdb.with_token(settings.read_token);
     let run_id = configured_run_id(organization_id)?;
     eprintln!("starting C7 reconstruction run {run_id}");
     ensure_reconstructor_binding(&stdb, organization_id, &settings.identity).await?;
+    let source = PgReconstructionSource::new(pool.clone());
+    let watermark = source
+        .declared_watermark(organization_id)
+        .await
+        .context("resolve exact durable reconstruction watermark")?;
     reconstruct_organization_once(&stdb, &read_stdb, &pool, &target, watermark, run_id).await
 }
 
@@ -121,6 +123,11 @@ struct ReconstructionSettings {
     token: String,
     read_token: String,
     identity: String,
+    placement_resolver: ConfiguredPlacementResolver,
+    expected_placement: ExpectedPlacement,
+}
+
+struct ExpectedPlacement {
     cell_id: CellId,
     durable_store: DurableStoreId,
     generation: PlacementGeneration,
@@ -139,30 +146,62 @@ impl ReconstructionSettings {
             .ok()
             .map(|value| value.trim().to_owned());
         validate_reconstruction_tokens(&token, &read_token, server_token.as_deref())?;
-        let generation = required_env(PLACEMENT_GENERATION_ENV)?
+        let generation = required_env(EXPECTED_GENERATION_ENV)?
             .parse::<u64>()
-            .context("parse RECONSTRUCTION_PLACEMENT_GENERATION")?;
+            .context("parse RECONSTRUCTION_EXPECTED_PLACEMENT_GENERATION")?;
         Ok(Self {
             stdb_host,
             stdb_module,
             token,
             read_token,
             identity: normalize_identity(&required_env(RECONSTRUCTION_IDENTITY_ENV)?)?,
-            cell_id: CellId::new(required_env(CELL_ID_ENV)?)?,
-            durable_store: DurableStoreId::new(required_env(DURABLE_STORE_ID_ENV)?)?,
-            generation: PlacementGeneration::new(generation)?,
+            placement_resolver: ConfiguredPlacementResolver::from_persistent_control_store(
+                required_env(PLACEMENT_CONTROL_PATH_ENV)?,
+            )?,
+            expected_placement: ExpectedPlacement {
+                cell_id: CellId::new(required_env(EXPECTED_CELL_ID_ENV)?)?,
+                durable_store: DurableStoreId::new(required_env(EXPECTED_DURABLE_STORE_ID_ENV)?)?,
+                generation: PlacementGeneration::new(generation)?,
+            },
         })
     }
 
     fn target(&self, organization_id: u64) -> Result<OrganizationPlacement> {
-        OrganizationPlacement::reconstruction_target(
-            organization_id,
-            self.cell_id.clone(),
-            self.generation,
-            self.durable_store.clone(),
-        )
-        .map_err(Into::into)
+        let target = self
+            .placement_resolver
+            .resolve(organization_id)
+            .context("resolve authoritative reconstruction placement")?;
+        validate_expected_placement(&target, &self.expected_placement)?;
+        Ok(target)
     }
+}
+
+fn validate_expected_placement(
+    target: &OrganizationPlacement,
+    expected: &ExpectedPlacement,
+) -> Result<()> {
+    if target.generation() != expected.generation {
+        bail!(
+            "stale reconstruction placement generation: expected {}, authoritative {}",
+            expected.generation.get(),
+            target.generation().get()
+        );
+    }
+    if target.cell_id() != &expected.cell_id {
+        bail!(
+            "reconstruction cell mismatch: expected {}, authoritative {}",
+            expected.cell_id,
+            target.cell_id()
+        );
+    }
+    if target.durable_store() != &expected.durable_store {
+        bail!(
+            "reconstruction durable store mismatch: expected {}, authoritative {}",
+            expected.durable_store,
+            target.durable_store()
+        );
+    }
+    Ok(())
 }
 
 fn validate_reconstruction_tokens(
@@ -256,5 +295,51 @@ mod tests {
         assert!(validate_reconstruction_tokens("same", "same", None).is_err());
         assert!(validate_reconstruction_tokens("write", "read", Some("write")).is_err());
         assert!(validate_reconstruction_tokens("write", "read", Some("owner")).is_ok());
+    }
+
+    #[test]
+    fn reconstruction_expectations_fence_generation_cell_and_store() {
+        let target = OrganizationPlacement::reconstruction_target(
+            42,
+            CellId::new("cell-a").unwrap(),
+            PlacementGeneration::new(2).unwrap(),
+            DurableStoreId::new("store-a").unwrap(),
+        )
+        .unwrap();
+        let matching = ExpectedPlacement {
+            cell_id: CellId::new("cell-a").unwrap(),
+            generation: PlacementGeneration::new(2).unwrap(),
+            durable_store: DurableStoreId::new("store-a").unwrap(),
+        };
+        assert!(validate_expected_placement(&target, &matching).is_ok());
+
+        let stale = ExpectedPlacement {
+            generation: PlacementGeneration::new(1).unwrap(),
+            ..matching
+        };
+        assert!(validate_expected_placement(&target, &stale)
+            .unwrap_err()
+            .to_string()
+            .contains("stale reconstruction placement generation"));
+
+        let wrong_cell = ExpectedPlacement {
+            cell_id: CellId::new("cell-b").unwrap(),
+            generation: PlacementGeneration::new(2).unwrap(),
+            durable_store: DurableStoreId::new("store-a").unwrap(),
+        };
+        assert!(validate_expected_placement(&target, &wrong_cell)
+            .unwrap_err()
+            .to_string()
+            .contains("reconstruction cell mismatch"));
+
+        let wrong_store = ExpectedPlacement {
+            cell_id: CellId::new("cell-a").unwrap(),
+            generation: PlacementGeneration::new(2).unwrap(),
+            durable_store: DurableStoreId::new("store-b").unwrap(),
+        };
+        assert!(validate_expected_placement(&target, &wrong_store)
+            .unwrap_err()
+            .to_string()
+            .contains("reconstruction durable store mismatch"));
     }
 }

@@ -2,10 +2,10 @@
 use super::cookies::set_stdb_session_cookies;
 use crate::auth_password::{
     decrypt_token, find_credential_by_email, find_credential_by_platform_id,
-    find_reset_token_by_hash, generate_secure_token, is_usable_admin_token, micros_to_secs,
-    now_micros, send_resend_email,
+    find_reset_token_by_hash, generate_secure_token, micros_to_secs, now_micros, send_resend_email,
 };
 use crate::cold_tier::pg_pool;
+use crate::commands::{dispatch_internal_reducer, InternalRouteAuthority};
 use crate::error::ApiError;
 use crate::platform_control::{self, PlatformId};
 use crate::session::{identity_json_for_reducer_call, normalize_identity_hex_for_sql};
@@ -64,25 +64,19 @@ pub(super) async fn forgot_password(
         )
         .await
         .map_err(ApiError::internal)?;
-        let admin = state
-            .config
-            .stdb_server_token
-            .as_deref()
-            .filter(|t| is_usable_admin_token(t))
-            .ok_or_else(|| ApiError::Internal("STDB_SERVER_TOKEN is not configured".into()))?;
-        state
-            .client_with_token(admin)
-            .call_reducer(stdb_client::reducer_call!(
-                "bind_password_reset_token",
-                json!([
-                    platform_id.as_str(),
-                    platform_reset_token_id.as_str(),
-                    identity_json_for_reducer_call(&cred.identity_hex),
-                    expires_at_micros.to_string(),
-                ]),
-            ))
-            .await
-            .map_err(ApiError::internal)?;
+        dispatch_internal_reducer(
+            &state,
+            InternalRouteAuthority::PasswordRecovery,
+            None,
+            "bind_password_reset_token",
+            json!([
+                platform_id.as_str(),
+                platform_reset_token_id.as_str(),
+                identity_json_for_reducer_call(&cred.identity_hex),
+                expires_at_micros.to_string(),
+            ]),
+        )
+        .await?;
 
         if let Some(ref api_key) = state.config.resend_api_key {
             let from = state.config.resend_from_email.clone();
@@ -186,20 +180,14 @@ pub(super) async fn reset_password(
     }
 
     if let Some(cred) = find_credential_by_platform_id(&state, platform_id.as_str()).await? {
-        let admin = state
-            .config
-            .stdb_server_token
-            .as_deref()
-            .filter(|t| is_usable_admin_token(t))
-            .ok_or_else(|| ApiError::Internal("STDB_SERVER_TOKEN is not configured".into()))?;
-        state
-            .client_with_token(admin)
-            .call_reducer(stdb_client::reducer_call!(
-                "mark_password_reset_token_projection_used",
-                json!([reset_token.platform_reset_token_id]),
-            ))
-            .await
-            .map_err(ApiError::internal)?;
+        dispatch_internal_reducer(
+            &state,
+            InternalRouteAuthority::PasswordRecovery,
+            None,
+            "mark_password_reset_token_projection_used",
+            json!([reset_token.platform_reset_token_id]),
+        )
+        .await?;
         let raw = decrypt_token(key, &cred.stdb_token_enc)?;
         let id_hex = normalize_identity_hex_for_sql(&cred.identity_hex);
         set_stdb_session_cookies(&state.config, &cookies, &raw, &id_hex);

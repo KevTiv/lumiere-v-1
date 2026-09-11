@@ -66,8 +66,12 @@ pub async fn realtime_ws_upgrade(
         .ok_or(ApiError::Unauthorized)?;
 
     let client = state.client_with_token(&session.stdb_token);
-    let context =
-        TrustedOperationContext::from_session(session, client, "erp.subscribe_resources")?;
+    let context = TrustedOperationContext::from_session_with_placement(
+        &session,
+        client,
+        "erp.subscribe_resources",
+        &state.organization_placements,
+    )?;
 
     Ok(ws.on_upgrade(move |socket| socket::handle_realtime_socket(socket, state, context)))
 }
@@ -182,7 +186,8 @@ mod tests {
         assert!(validate_requested_company_scope(&[11], Some(11), 11).is_ok());
         assert!(validate_requested_company_scope(&[12], None, 11).is_err());
         assert!(validate_requested_company_scope(&[], Some(12), 11).is_err());
-        assert!(validate_requested_company_scope(&[11, 12], Some(11), 11).is_err());
+        assert!(validate_requested_company_scope(&[11, 12], Some(11), 11).is_ok());
+        assert!(validate_requested_company_scope(&[0, 11], Some(11), 11).is_err());
     }
 
     #[test]

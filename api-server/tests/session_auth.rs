@@ -1,6 +1,9 @@
 //! Auth-hardening session tests (Phase 1–2): no anonymous admin, database-bound identity.
 
 use api_server::config::Config;
+use api_server::organization_placement::{
+    ConfiguredPlacementResolver, INITIAL_CELL_ID, INITIAL_DURABLE_STORE_ID,
+};
 use api_server::session::resolve_api_session;
 use api_server::state::AppState;
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -13,6 +16,12 @@ fn test_config(server_token: Option<&str>, dev_mock_org_id: Option<u64>) -> Conf
         stdb_module: "test-module".into(),
         stdb_server_token: server_token.map(str::to_string),
         stdb_finalization_token: None,
+        organization_placement: ConfiguredPlacementResolver::new(
+            INITIAL_CELL_ID,
+            1,
+            INITIAL_DURABLE_STORE_ID,
+        )
+        .expect("valid test placement"),
         cors_origins: vec![],
         dev_mock_org_id,
         ai_gateway_url: "http://127.0.0.1:3001".into(),

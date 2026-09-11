@@ -13,6 +13,7 @@ use serde_json::Value;
 use stdb_client::StdbClient;
 
 use crate::error::ApiError;
+use crate::organization_placement::{OrganizationPlacement, OrganizationPlacementResolver};
 
 use super::{
     cursor, pg_codec, pg_pool, scalar_binds_to_pg, OrderDirection, PageSpec, ResourceReadPlan,
@@ -22,6 +23,7 @@ use super::{
 const TABLE: &str = "pos_order";
 const CODEC_MANIFEST_JSON: &str = lumiere_contracts::manifests::CODEC_MANIFEST;
 
+#[derive(Debug)]
 pub struct Page {
     pub rows: Vec<Value>,
     pub next_cursor: Option<String>,
@@ -31,13 +33,45 @@ pub struct Page {
 ///
 /// Cold-store failure rejects the request: returning the hot tail could omit
 /// orders and incorrectly terminate pagination.
-pub async fn merged_page(
+pub async fn merged_page<R: OrganizationPlacementResolver>(
     stdb: &StdbClient,
+    placements: &R,
     organization_id: u64,
     company_id: Option<u64>,
     cursor_str: Option<String>,
     limit: Option<u32>,
 ) -> Result<Page, ApiError> {
+    let pool = pg_pool::required_pool()
+        .map_err(|error| ApiError::unavailable(error.context("load complete POS order page")))?;
+    merged_page_from_pool(
+        stdb,
+        placements,
+        pool,
+        organization_id,
+        company_id,
+        cursor_str,
+        limit,
+    )
+    .await
+}
+
+/// Pool-injected form used by the live isolation drill. The placement is
+/// resolved before storage I/O and re-resolved before any rows are returned.
+pub(crate) async fn merged_page_from_pool<R: OrganizationPlacementResolver>(
+    stdb: &StdbClient,
+    placements: &R,
+    pool: &deadpool_postgres::Pool,
+    organization_id: u64,
+    company_id: Option<u64>,
+    cursor_str: Option<String>,
+    limit: Option<u32>,
+) -> Result<Page, ApiError> {
+    let placement = placements.resolve(organization_id).map_err(|error| {
+        ApiError::Internal(format!(
+            "resolve authoritative organization placement for cold read: {error}"
+        ))
+    })?;
+    require_current_read_placement(&placement, &placement)?;
     let columns = pg_codec::load_columns(CODEC_MANIFEST_JSON, TABLE)
         .map_err(|e| ApiError::Internal(format!("load pos_order codec columns: {e}")))?;
     let plan = super::read_descriptor::compile_query_plan(
@@ -60,8 +94,36 @@ pub async fn merged_page(
     };
 
     let (hot_result, cold_result) =
-        tokio::join!(query_hot(stdb, &plan), query_cold(&columns, &plan));
-    merge_page_results(hot_result, cold_result, &plan, limit)
+        tokio::join!(query_hot(stdb, &plan), query_cold(pool, &columns, &plan));
+    let page = merge_page_results(hot_result, cold_result, &plan, limit)?;
+    let current = placements.resolve(organization_id).map_err(|error| {
+        ApiError::Internal(format!(
+            "re-resolve authoritative organization placement after cold read: {error}"
+        ))
+    })?;
+    require_current_read_placement(&placement, &current)?;
+    Ok(page)
+}
+
+fn require_current_read_placement(
+    expected: &OrganizationPlacement,
+    current: &OrganizationPlacement,
+) -> Result<(), ApiError> {
+    if current.organization_id() != expected.organization_id()
+        || current.generation() != expected.generation()
+        || current.cell_id() != expected.cell_id()
+        || current.durable_store() != expected.durable_store()
+    {
+        return Err(ApiError::Conflict(
+            "organization placement changed during cold read".into(),
+        ));
+    }
+    if !current.lifecycle().permits_business_execution() {
+        return Err(ApiError::Conflict(
+            "organization placement is fenced for cold read".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// Complete a page only when both storage tiers answered successfully.
@@ -126,11 +188,10 @@ async fn query_hot(stdb: &StdbClient, plan: &ResourceReadPlan) -> Result<Vec<Val
 }
 
 async fn query_cold(
+    pool: &deadpool_postgres::Pool,
     columns: &[pg_codec::ColumnCodec],
     plan: &ResourceReadPlan,
 ) -> anyhow::Result<Vec<Value>> {
-    let pool = pg_pool::required_pool()?;
-
     let (sql, binds) = super::compile_pg_sql(plan)?;
     let owned_binds = scalar_binds_to_pg(&binds);
     let params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> =
@@ -327,8 +388,14 @@ mod tests {
 
         let (stdb_sql, stdb_binds) = super::super::compile_stdb_sql(&plan).unwrap();
         let (pg_sql, pg_binds) = super::super::compile_pg_sql(&plan).unwrap();
-        assert!(stdb_sql.contains("`id` < ?"), "SQL: {stdb_sql}");
-        assert!(pg_sql.contains("\"id\" < $3::NUMERIC"), "SQL: {pg_sql}");
+        assert!(stdb_sql.contains("id < ?"), "SQL: {stdb_sql}");
+        assert!(stdb_sql.starts_with("SELECT * FROM pos_order"));
+        assert!(!stdb_sql.contains("ORDER BY"));
+        assert!(!stdb_sql.contains("LIMIT"));
+        assert!(
+            pg_sql.contains("\"id\" < $3::TEXT::NUMERIC"),
+            "SQL: {pg_sql}"
+        );
         assert!(matches!(stdb_binds.last(), Some(ScalarValue::U64(8))));
         assert!(matches!(pg_binds.last(), Some(ScalarValue::U64(8))));
     }

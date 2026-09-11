@@ -7,13 +7,14 @@ use super::integrity::{
     OrderedDigest,
 };
 use super::protocol::{
-    ApplyDisposition, DurableWatermark, ReconstructionFence, ReconstructionSink, RestoreRow,
-    TableDigest,
+    ApplyDisposition, DurableWatermark, ReconstructionFence, ReconstructionSink,
+    ReconstructionSource, RestoreRow, TableDigest,
 };
-use super::MAX_BATCH_SIZE;
+use super::{PgReconstructionSource, MAX_BATCH_SIZE};
 use anyhow::{bail, Context, Result};
 use deadpool_postgres::Pool;
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use stdb_client::{ReducerCall, StdbClient};
 
@@ -173,26 +174,41 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
             .iter()
             .find(|column| column.name == table.primary_key)
             .context("generated codec lacks reconstruction primary key")?;
+        let source = PgReconstructionSource::new(self.pool.clone());
         let mut after = None;
         let mut digest = OrderedDigest::new(&table.primary_key);
+        let mut expected_count = 0_u64;
         loop {
-            let comparison = after
-                .as_ref()
-                .map(|identity| stdb_identity_comparison(identity, table, &primary.pg_type))
-                .transpose()?
-                .unwrap_or_default();
+            let expected = source
+                .load_batch(
+                    fence.organization_id,
+                    &fence.watermark,
+                    table,
+                    after.as_ref(),
+                    MAX_BATCH_SIZE,
+                )
+                .await?;
+            if expected.is_empty() {
+                break;
+            }
+            let identities = expected
+                .iter()
+                .map(|row| {
+                    stdb_identity_equality(&row.identity, &table.primary_key, &primary.pg_type)
+                })
+                .collect::<Result<Vec<_>>>()?
+                .join(" OR ");
             let sql = format!(
-                "SELECT {projection} FROM {table_name} WHERE {organization_column} = {organization_id}{comparison} ORDER BY {primary_key} ASC LIMIT {limit}",
+                "SELECT {projection} FROM {table_name} WHERE {organization_column} = {organization_id} AND ({identities}) LIMIT {limit}",
                 table_name = quote_identifier(&table.table),
                 organization_column = quote_identifier(&table.organization_column),
                 organization_id = fence.organization_id,
-                primary_key = quote_identifier(&table.primary_key),
-                limit = MAX_BATCH_SIZE,
+                limit = expected.len(),
             );
             let rows = self.read_stdb.query_sql_sats(&sql).await.with_context(|| {
                 format!("read STDB reconstruction digest relation '{}'", table.table)
             })?;
-            let is_last = rows.len() < MAX_BATCH_SIZE as usize;
+            let mut actual_by_identity = BTreeMap::new();
             for row in rows {
                 let row = normalize_stdb_digest_row(&columns, row)?;
                 let primary_key = pg_codec::snake_to_camel(&table.primary_key);
@@ -201,12 +217,58 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
                     .cloned()
                     .context("normalized reconstruction row lacks primary key")?;
                 let identity = json!({table.primary_key.clone(): primary_value});
-                digest.push(&identity, &row)?;
-                after = Some(identity);
+                let key = identity_text(&identity, &table.primary_key)?;
+                if actual_by_identity.insert(key, row).is_some() {
+                    bail!("STDB reconstruction digest returned a duplicate primary key");
+                }
             }
-            if is_last {
+            for expected_row in &expected {
+                let key = identity_text(&expected_row.identity, &table.primary_key)?;
+                let actual = actual_by_identity.remove(&key).with_context(|| {
+                    format!(
+                        "STDB reconstruction digest is missing primary key for '{}'",
+                        table.table
+                    )
+                })?;
+                digest.push(&expected_row.identity, &actual)?;
+            }
+            if !actual_by_identity.is_empty() {
+                bail!("STDB reconstruction digest returned an unexpected primary key");
+            }
+            expected_count = expected_count
+                .checked_add(expected.len() as u64)
+                .context("STDB reconstruction digest row count overflow")?;
+            after = expected.last().map(|row| row.identity.clone());
+            if expected.len() < MAX_BATCH_SIZE as usize {
                 break;
             }
+        }
+        let count_sql = format!(
+            "SELECT COUNT(*) AS row_count FROM {table_name} WHERE {organization_column} = {organization_id}",
+            table_name = quote_identifier(&table.table),
+            organization_column = quote_identifier(&table.organization_column),
+            organization_id = fence.organization_id,
+        );
+        let count_rows = self
+            .read_stdb
+            .query_sql_sats(&count_sql)
+            .await
+            .with_context(|| {
+                format!(
+                    "count STDB reconstruction digest relation '{}'",
+                    table.table
+                )
+            })?;
+        let actual_count = count_rows
+            .first()
+            .and_then(|row| row.get("row_count"))
+            .and_then(Value::as_u64)
+            .context("STDB reconstruction digest count is malformed")?;
+        if count_rows.len() != 1 || actual_count != expected_count {
+            bail!(
+                "STDB reconstruction digest row count mismatch for '{}': expected {expected_count}, actual {actual_count}",
+                table.table
+            );
         }
         Ok(digest.finish())
     }
@@ -230,24 +292,18 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
     }
 
     async fn verify_before_release(&self, fence: &ReconstructionFence) -> Result<()> {
-        let report = reconciliation::reconcile_organization(
+        // The coordinator has already compared every generated table digest
+        // while this writer fence is held. Revalidate the exact durable and
+        // hot-store heads immediately before release; rescanning every table
+        // here would duplicate that bounded checksum pass.
+        reconciliation::verify_declared_watermark(
             self.read_stdb,
             self.pool,
             fence.organization_id,
             fence.watermark.sequence,
         )
         .await
-        .context("reconcile reconstructed organization before releasing fence")?;
-        if !report.matches() {
-            let mismatches = report
-                .mismatches()
-                .into_iter()
-                .map(|table| table.table.as_str())
-                .collect::<Vec<_>>()
-                .join(", ");
-            bail!("reconstruction reconciliation mismatch: {mismatches}");
-        }
-        Ok(())
+        .context("revalidate reconstruction watermark before releasing fence")
     }
 
     async fn release_fence(&self, fence: &ReconstructionFence) -> Result<()> {
@@ -265,24 +321,20 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
     }
 }
 
-fn stdb_identity_comparison(
-    identity: &Value,
-    table: &RestoreTable,
-    pg_type: &str,
-) -> Result<String> {
-    let value = identity_text(identity, &table.primary_key)?;
+fn stdb_identity_equality(identity: &Value, primary_key: &str, pg_type: &str) -> Result<String> {
+    let value = identity_text(identity, primary_key)?;
     let literal = match pg_type {
         "NUMERIC(20,0)" => value,
         "TEXT" => format!("'{}'", value.replace('\'', "''")),
         other => bail!("unsupported reconstruction primary key type '{other}'"),
     };
-    Ok(format!(
-        " AND {} > {literal}",
-        quote_identifier(&table.primary_key)
-    ))
+    Ok(format!("{} = {literal}", quote_identifier(primary_key)))
 }
 
-fn canonical_stdb_row_json(columns: &[pg_codec::ColumnCodec], row: &Value) -> Result<String> {
+pub(crate) fn canonical_stdb_row_json(
+    columns: &[pg_codec::ColumnCodec],
+    row: &Value,
+) -> Result<String> {
     let source = row
         .as_object()
         .context("reconstruction row payload must be an object")?;
@@ -480,7 +532,8 @@ fn failure_injection_enabled(
 mod tests {
     use super::{
         canonical_sats_to_durable, canonical_stdb_row_json, durable_value_to_sats,
-        failure_injection_enabled, normalize_stdb_digest_row, rust_field_name, stdb_sql_field_name,
+        failure_injection_enabled, normalize_stdb_digest_row, rust_field_name,
+        stdb_identity_equality, stdb_sql_field_name,
     };
     use crate::cold_tier::pg_codec;
     use serde_json::{json, Value};
@@ -585,6 +638,18 @@ mod tests {
             assert_eq!(rust_field_name(generated), stdb);
             assert_eq!(stdb_sql_field_name(generated), stdb);
         }
+    }
+
+    #[test]
+    fn reconstruction_digest_identity_predicates_are_exact_and_escaped() {
+        assert_eq!(
+            stdb_identity_equality(&json!({"id": "42"}), "id", "NUMERIC(20,0)").unwrap(),
+            "\"id\" = 42"
+        );
+        assert_eq!(
+            stdb_identity_equality(&json!({"token": "a'b"}), "token", "TEXT").unwrap(),
+            "\"token\" = 'a''b'"
+        );
     }
 
     #[test]

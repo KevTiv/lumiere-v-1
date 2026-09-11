@@ -4,7 +4,7 @@ use super::adapter::{
 };
 use super::timers::instance_revision;
 use super::{now_micros, u64_field, BATCH_SIZE, JOB_TYPE, QUEUE_NAME};
-use crate::state::AppState;
+use crate::{integration_worker::ScheduledService, state::AppState};
 use serde::Deserialize;
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -19,12 +19,13 @@ struct QueueJobRow {
 
 pub(super) async fn dispatch_external_jobs(
     state: &AppState,
-    organization_id: u64,
+    service: &ScheduledService,
     worker_id: u64,
     shutting_down: &AtomicBool,
 ) -> anyhow::Result<()> {
-    let rows = state
-        .stdb
+    let organization_id = service.organization_id();
+    let rows = service
+        .client()
         .query_sql(&format!(
             "SELECT id, organization_id, revision, payload FROM queue_job \
              WHERE organization_id = {organization_id} \
@@ -70,9 +71,8 @@ pub(super) async fn dispatch_external_jobs(
                 .config
                 .workflow_worker_lease_ttl_secs
                 .saturating_mul(1_000_000);
-        if let Err(error) = state
-            .stdb
-            .call_reducer(stdb_client::reducer_call!(
+        if let Err(error) = service
+            .call(
                 "claim_queue_job",
                 json!([
                     organization_id,
@@ -84,7 +84,7 @@ pub(super) async fn dispatch_external_jobs(
                         "leaseExpiresAtMicros": lease_expires,
                     }
                 ]),
-            ))
+            )
             .await
         {
             tracing::debug!(job_id = job.id, %error, "claim_queue_job skipped");
@@ -92,13 +92,13 @@ pub(super) async fn dispatch_external_jobs(
         }
 
         let mut payload = preview;
-        let outbox_id = match resolve_outbox_id(state, &payload, job.id).await {
+        let outbox_id = match resolve_outbox_id(service.client(), &payload, job.id).await {
             Ok(id) => id,
             Err(error) => {
                 tracing::error!(job_id = job.id, %error, "outbox id unresolved");
                 let _ = complete_failed(
-                    state,
                     organization_id,
+                    service,
                     job.id,
                     worker_id,
                     &lease_token,
@@ -117,13 +117,12 @@ pub(super) async fn dispatch_external_jobs(
             Err(error) => ("RetryableFailure", None, Some(error.to_string()), "Failed"),
         };
 
-        let instance_revision = instance_revision_for_outbox(state, outbox_id)
+        let instance_revision = instance_revision_for_outbox(service.client(), outbox_id)
             .await
             .unwrap_or(1);
         let record_key = outbox_record_idempotency_key(&payload);
-        if let Err(error) = state
-            .stdb
-            .call_reducer(stdb_client::reducer_call!(
+        if let Err(error) = service
+            .call(
                 "record_workflow_outbox_result",
                 json!([
                     organization_id,
@@ -143,15 +142,14 @@ pub(super) async fn dispatch_external_jobs(
                         "causationId": format!("queue-job:{}", job.id),
                     }
                 ]),
-            ))
+            )
             .await
         {
             tracing::error!(job_id = job.id, %error, "record_workflow_outbox_result failed");
         }
 
-        let _ = state
-            .stdb
-            .call_reducer(stdb_client::reducer_call!(
+        let _ = service
+            .call(
                 "complete_queue_job",
                 json!([
                     organization_id,
@@ -166,24 +164,23 @@ pub(super) async fn dispatch_external_jobs(
                         "retryJitterMicros": 0,
                     }
                 ]),
-            ))
+            )
             .await;
     }
     Ok(())
 }
 
 async fn complete_failed(
-    state: &AppState,
     organization_id: u64,
+    service: &ScheduledService,
     job_id: u64,
     worker_id: u64,
     lease_token: &str,
     expected_revision: u64,
     summary: &str,
 ) -> anyhow::Result<()> {
-    state
-        .stdb
-        .call_reducer(stdb_client::reducer_call!(
+    service
+        .call(
             "complete_queue_job",
             json!([
                 organization_id,
@@ -198,14 +195,16 @@ async fn complete_failed(
                     "retryJitterMicros": 0,
                 }
             ]),
-        ))
+        )
         .await?;
     Ok(())
 }
 
-async fn instance_revision_for_outbox(state: &AppState, outbox_id: u64) -> anyhow::Result<u64> {
-    let rows = state
-        .stdb
+async fn instance_revision_for_outbox(
+    client: &stdb_client::StdbClient,
+    outbox_id: u64,
+) -> anyhow::Result<u64> {
+    let rows = client
         .query_sql(&format!(
             "SELECT workflow_instance_id FROM workflow_outbox WHERE id = {outbox_id} LIMIT 1"
         ))
@@ -215,19 +214,18 @@ async fn instance_revision_for_outbox(state: &AppState, outbox_id: u64) -> anyho
         .next()
         .and_then(|row| u64_field(&row, "workflowInstanceId", "workflow_instance_id"))
         .ok_or_else(|| anyhow::anyhow!("outbox {outbox_id} missing"))?;
-    instance_revision(state, instance_id).await
+    instance_revision(client, instance_id).await
 }
 
 async fn resolve_outbox_id(
-    state: &AppState,
+    client: &stdb_client::StdbClient,
     payload: &OutboxPayload,
     queue_job_id: u64,
 ) -> anyhow::Result<u64> {
     if let Some(id) = payload.outbox_id {
         return Ok(id);
     }
-    let rows = state
-        .stdb
+    let rows = client
         .query_sql(&format!(
             "SELECT id FROM workflow_outbox WHERE queue_job_id = {queue_job_id} LIMIT 1"
         ))

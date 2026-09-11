@@ -11,9 +11,11 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use tower_cookies::Cookies;
 
+use crate::commands::dispatch_session_reducer;
 use crate::error::ApiError;
 use crate::query_exec::execute_resource_query;
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session};
 
 use super::paginate_limit_offset;
@@ -95,13 +97,14 @@ pub(super) async fn contact_identities_get(
     let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
 
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
     let client = state.stdb.clone();
     let rows = execute_resource_query(
         &client,
         "contact-phone-identities",
         org_id,
-        &session.identity_hex,
-        session.field_access.as_ref(),
+        context.actor_identity(),
+        Some(context.field_access()),
     )
     .await?;
 
@@ -123,14 +126,13 @@ pub(super) async fn contact_identities_post(
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
     let params = contact_identity_create_params(&body)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "create_contact_identity",
-            json!([org_id, params])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "create_contact_identity",
+        json!([org_id, params]),
+    )
+    .await?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Contact identity created successfully" } })),
@@ -149,14 +151,13 @@ pub(super) async fn contact_identity_put(
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
     let params = contact_identity_update_params(&body)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "update_contact_identity",
-            json!([org_id, id, params])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "update_contact_identity",
+        json!([org_id, id, params]),
+    )
+    .await?;
     Ok(Json(
         json!({ "data": { "message": "Contact identity updated successfully" } }),
     ))
@@ -176,14 +177,13 @@ pub(super) async fn contact_identity_verify(
     let state_value = body
         .get("state")
         .ok_or_else(|| ApiError::BadRequest("missing state".into()))?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "verify_contact_identity",
-            json!([org_id, id, to_unit_enum(state_value)?]),
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "verify_contact_identity",
+        json!([org_id, id, to_unit_enum(state_value)?]),
+    )
+    .await?;
     Ok(Json(
         json!({ "data": { "message": "Contact identity verified successfully" } }),
     ))
@@ -199,14 +199,13 @@ pub(super) async fn contact_identity_archive(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "archive_contact_identity",
-            json!([org_id, id])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "archive_contact_identity",
+        json!([org_id, id]),
+    )
+    .await?;
     Ok(Json(
         json!({ "data": { "message": "Contact identity archived successfully" } }),
     ))

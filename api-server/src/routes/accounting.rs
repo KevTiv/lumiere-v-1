@@ -12,9 +12,11 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use tower_cookies::Cookies;
 
+use crate::commands::dispatch_session_reducer;
 use crate::error::ApiError;
 use crate::query_exec::execute_resource_query;
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session};
 
 #[derive(Debug, Deserialize)]
@@ -54,7 +56,8 @@ async fn accounts_get(
     let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
 
-    let client = state.client_with_token(&session.stdb_token);
+    let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let client = trusted.client();
     let mut rows = execute_resource_query(
         &client,
         "account-accounts",
@@ -126,14 +129,13 @@ async fn accounts_post(
         .filter(|s| !s.is_empty())
         .ok_or_else(|| ApiError::BadRequest("Name is required".into()))?;
 
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "create_account_account",
-            json!([org_id, body])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "create_account_account",
+        json!([org_id, body]),
+    )
+    .await?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Account created successfully" } })),
@@ -203,7 +205,8 @@ async fn payment_accounts_get(
     let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
 
-    let client = state.client_with_token(&session.stdb_token);
+    let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let client = trusted.client();
     let rows = execute_resource_query(
         &client,
         "payment-accounts",
@@ -231,14 +234,13 @@ async fn payment_accounts_post(
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
     let params = payment_account_create_params(&body)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "create_payment_account",
-            json!([org_id, params])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "create_payment_account",
+        json!([org_id, params]),
+    )
+    .await?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Payment account created successfully" } })),
@@ -256,14 +258,13 @@ async fn payment_account_put(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "update_payment_account",
-            json!([org_id, id, body])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "update_payment_account",
+        json!([org_id, id, body]),
+    )
+    .await?;
     Ok(Json(
         json!({ "data": { "message": "Payment account updated successfully" } }),
     ))
@@ -279,14 +280,13 @@ async fn payment_account_archive(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "archive_payment_account",
-            json!([org_id, id])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "archive_payment_account",
+        json!([org_id, id]),
+    )
+    .await?;
     Ok(Json(
         json!({ "data": { "message": "Payment account archived successfully" } }),
     ))
@@ -342,7 +342,8 @@ async fn payment_transactions_get(
     let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
 
-    let client = state.client_with_token(&session.stdb_token);
+    let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let client = trusted.client();
     let rows = execute_resource_query(
         &client,
         "payment-transactions",
@@ -370,14 +371,13 @@ async fn payment_transactions_post(
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
     let params = payment_transaction_create_params(&body)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "create_payment_transaction",
-            json!([org_id, params])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "create_payment_transaction",
+        json!([org_id, params]),
+    )
+    .await?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Payment transaction created successfully" } })),
@@ -395,14 +395,13 @@ async fn payment_transaction_put(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "update_payment_transaction",
-            json!([org_id, id, body])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "update_payment_transaction",
+        json!([org_id, id, body]),
+    )
+    .await?;
     Ok(Json(
         json!({ "data": { "message": "Payment transaction updated successfully" } }),
     ))
@@ -418,14 +417,13 @@ async fn payment_transaction_post(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "post_payment_transaction",
-            json!([org_id, id])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "post_payment_transaction",
+        json!([org_id, id]),
+    )
+    .await?;
     Ok(Json(
         json!({ "data": { "message": "Payment transaction posted successfully" } }),
     ))
@@ -441,14 +439,13 @@ async fn payment_transaction_void(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "void_payment_transaction",
-            json!([org_id, id])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "void_payment_transaction",
+        json!([org_id, id]),
+    )
+    .await?;
     Ok(Json(
         json!({ "data": { "message": "Payment transaction voided successfully" } }),
     ))
@@ -484,14 +481,13 @@ async fn payment_transaction_fee_post(
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
     let params = payment_fee_create_params(&body)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "create_payment_fee",
-            json!([org_id, params])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "create_payment_fee",
+        json!([org_id, params]),
+    )
+    .await?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Payment fee added successfully" } })),
@@ -509,14 +505,13 @@ async fn payment_transaction_allocate_post(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "allocate_payment_transaction",
-            json!([org_id, body])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "allocate_payment_transaction",
+        json!([org_id, body]),
+    )
+    .await?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Payment allocated successfully" } })),
@@ -534,14 +529,13 @@ async fn payment_transaction_reverse_post(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "reverse_payment_transaction",
-            json!([org_id, id, body])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "reverse_payment_transaction",
+        json!([org_id, id, body]),
+    )
+    .await?;
     Ok(Json(
         json!({ "data": { "message": "Payment transaction reversed successfully" } }),
     ))
@@ -559,7 +553,8 @@ async fn payment_reconciliations_get(
     let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
 
-    let client = state.client_with_token(&session.stdb_token);
+    let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let client = trusted.client();
     let rows = execute_resource_query(
         &client,
         "payment-reconciliations",
@@ -588,7 +583,8 @@ async fn payment_reversals_get(
     let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
 
-    let client = state.client_with_token(&session.stdb_token);
+    let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let client = trusted.client();
     let rows = execute_resource_query(
         &client,
         "payment-reversals",

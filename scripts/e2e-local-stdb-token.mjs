@@ -26,6 +26,8 @@ const host = (process.env.E2E_STDB_HOST ?? process.env.STDB_HOST ?? 'http://127.
   /\/$/,
   '',
 )
+const cliConfigPath =
+  process.env.E2E_STDB_CLI_CONFIG?.trim() || join(homedir(), '.config', 'spacetime', 'cli.toml')
 
 function isLocalHost(hostUrl) {
   try {
@@ -38,9 +40,8 @@ function isLocalHost(hostUrl) {
 }
 
 function readCliToken() {
-  const p = join(homedir(), '.config', 'spacetime', 'cli.toml')
-  if (!existsSync(p)) return null
-  const text = readFileSync(p, 'utf8')
+  if (!existsSync(cliConfigPath)) return null
+  const text = readFileSync(cliConfigPath, 'utf8')
   const m = text.match(/spacetimedb_token\s*=\s*"([^"]+)"/)
   return m ? m[1].trim() : null
 }
@@ -50,14 +51,17 @@ function moduleNameFromEnv() {
 }
 
 function loginLocal({ forceLogout = false } = {}) {
+  const cliArgs = cliConfigPath ? ['--config-path', cliConfigPath] : []
   if (forceLogout) {
-    spawnSync('spacetime', ['logout'], { stdio: 'ignore' })
+    spawnSync('spacetime', [...cliArgs, 'logout'], { stdio: 'ignore' })
   }
 
   const serverArg = isLocalHost(host) ? 'local' : host
-  const result = spawnSync('spacetime', ['login', '--server-issued-login', serverArg, '--no-browser'], {
-    encoding: 'utf8',
-  })
+  const result = spawnSync(
+    'spacetime',
+    [...cliArgs, 'login', '--server-issued-login', serverArg, '--no-browser'],
+    { encoding: 'utf8' },
+  )
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`
   if (result.status !== 0 && !output.toLowerCase().includes('already logged in')) {
     console.error(output.trim() || 'spacetime login --server-issued-login failed')
@@ -123,7 +127,7 @@ async function main() {
   }
   if (!token) {
     console.error(
-      '[e2e-stdb-token] No spacetimedb_token in ~/.config/spacetime/cli.toml. ' +
+      `[e2e-stdb-token] No spacetimedb_token in ${cliConfigPath}. ` +
         'Run with --login-only before publish, or: spacetime login --server-issued-login local',
     )
     process.exit(1)

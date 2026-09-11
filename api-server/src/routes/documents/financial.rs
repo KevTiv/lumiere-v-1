@@ -20,6 +20,7 @@ use crate::error::ApiError;
 use crate::query_exec::execute_resource_query;
 use crate::session::ApiSession;
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session};
 
 use super::attachment_response;
@@ -30,7 +31,8 @@ async fn load_financial_report(
     report_id: u64,
 ) -> Result<(Value, Vec<Value>), ApiError> {
     let org_id = require_org(session)?;
-    let client = state.client_with_token(&session.stdb_token);
+    let trusted = TrustedOperationContext::for_resource_read(state, session)?;
+    let client = trusted.client();
     let reports = execute_resource_query(
         &client,
         "financial-reports",

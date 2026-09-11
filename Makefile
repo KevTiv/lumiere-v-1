@@ -104,7 +104,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running \
 	init-stack docker-dev docker-dev-iot \
-	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift \
+	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift check-c9-isolation-matrix lint-trusted-route-boundaries \
 	clean-contracts-live-staging lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
@@ -337,7 +337,7 @@ e2e-smoke-setup:
 		STDB_HASH_FILE="$$LOG_DIR/stdb.hash"; \
 		CUR_STDB_HASH="$$(E2E_BUILD_MODULE="$(E2E_DB)" E2E_BUILD_HOST="$$E2E_STDB_HOST" "$$ROOT/scripts/e2e-dx.sh" stdb-fingerprint)"; \
 		STDB_FAST_PATH=0; \
-		if [ "$${E2E_CLEAR_DB:-0}" != "1" ] && [ "$${E2E_FORCE_REBUILD:-0}" != "1" ] && [ -f "$$STDB_HASH_FILE" ] && [ "$$(cat "$$STDB_HASH_FILE")" = "$$CUR_STDB_HASH" ] && spacetime describe "$(E2E_DB)" --server local --no-config >/dev/null 2>&1; then \
+		if [ "$${E2E_CLEAR_DB:-0}" != "1" ] && [ "$${E2E_FORCE_REBUILD:-0}" != "1" ] && [ -f "$$STDB_HASH_FILE" ] && [ "$$(cat "$$STDB_HASH_FILE")" = "$$CUR_STDB_HASH" ] && spacetime describe "$(E2E_DB)" --json --server local --no-config >/dev/null 2>&1; then \
 			STDB_FAST_PATH=1; \
 		fi; \
 		if [ "$$STDB_FAST_PATH" = "1" ]; then \
@@ -345,12 +345,14 @@ e2e-smoke-setup:
 		else \
 			rm -f "$$STDB_HASH_FILE"; \
 			echo "[e2e] Publishing local database $(E2E_DB) (--no-config)..."; \
+			spacetime build --module-path "$(MODULE)"; \
+			wasm-tools validate "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm"; \
 			if [ "$${E2E_CLEAR_DB:-0}" = "1" ]; then \
 				echo "[e2e] E2E_CLEAR_DB=1: clearing module data (--clear-database)"; \
-				LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --module-path "$(MODULE)" --server local --clear-database -y --no-config; \
+				LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --bin-path "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm" --server local --clear-database -y --no-config; \
 			else \
 				echo "[e2e] Preserving existing DB (set E2E_CLEAR_DB=1 to wipe + full re-seed)."; \
-				LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --module-path "$(MODULE)" --server local -y --no-config; \
+				LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --bin-path "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm" --server local -y --no-config; \
 			fi; \
 			if spacetime call "$(E2E_DB)" run_all_core_tests --server local --no-config; then \
 				echo "[e2e] Core reducer tests passed."; \
@@ -792,12 +794,14 @@ e2e-smoke:
 		echo "[e2e] Logging in to local SpacetimeDB (database owner for private-table SQL)..."; \
 		E2E_STDB_HOST="$$E2E_STDB_HOST" node "$$ROOT/scripts/e2e-local-stdb-token.mjs" --login-only; \
 		echo "[e2e] Publishing local database $(E2E_DB) (--no-config)..."; \
+		spacetime build --module-path "$(MODULE)"; \
+		wasm-tools validate "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm"; \
 		if [ "$${E2E_CLEAR_DB:-0}" = "1" ]; then \
 			echo "[e2e] E2E_CLEAR_DB=1: clearing module data (--clear-database)"; \
-			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --module-path "$(MODULE)" --server local --clear-database -y --no-config; \
+			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --bin-path "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm" --server local --clear-database -y --no-config; \
 		else \
 			echo "[e2e] Preserving existing DB (set E2E_CLEAR_DB=1 to wipe + full re-seed)."; \
-			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --module-path "$(MODULE)" --server local -y --no-config; \
+			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --bin-path "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm" --server local -y --no-config; \
 		fi; \
 		if spacetime call "$(E2E_DB)" run_all_core_tests --server local --no-config; then \
 			echo "[e2e] Core reducer tests passed."; \
@@ -967,7 +971,7 @@ check-c2-commit-coverage:
 	python3 scripts/verify-c2-commit-coverage.py
 	python3 lumiere-codegen/tests/test_c2_commit_coverage.py
 
-check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-policy check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals
+check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-policy check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals lint-trusted-route-boundaries
 	@git add -N \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		frontend/packages/stdb/src/query-row-map.ts \
@@ -988,7 +992,7 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 # CI-safe validation for a previously published immutable contract. Source-to-
 # contract regeneration belongs to check-contracts-source-drift; this target
 # must not couple ordinary Rust checks to whichever module is currently deployed.
-check-codegen-pinned: check-operation-history check-release-compatibility check-tenant-ownership check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals
+check-codegen-pinned: check-operation-history check-release-compatibility check-tenant-ownership check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals lint-trusted-route-boundaries
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean
 	python3 lumiere-codegen/tests/test_contract_ir_pin.py
 	node scripts/bootstrap-storage-policies.mjs --check
@@ -1112,6 +1116,13 @@ lint-no-magic-fk-zero:
 
 lint-reducer-call-literals:
 	bash scripts/lint-reducer-call-literals.sh
+
+lint-trusted-route-boundaries:
+	bash scripts/lint-trusted-route-boundaries.sh
+
+check-c9-isolation-matrix:
+	node scripts/tests/test_c9_isolation_matrix.mjs
+	node scripts/c9-isolation-matrix.mjs --static
 
 # ACC-RI-018: retained accounting double assertions require an adjacent rationale.
 lint-accounting-as-unknown-as:

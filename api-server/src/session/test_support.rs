@@ -1,5 +1,8 @@
 //! Shared test-only session configuration; never loaded by production.
 use crate::config::Config;
+use crate::organization_placement::{
+    ConfiguredPlacementResolver, INITIAL_CELL_ID, INITIAL_DURABLE_STORE_ID,
+};
 
 pub(crate) fn test_config(server_token: Option<&str>) -> Config {
     Config {
@@ -8,6 +11,12 @@ pub(crate) fn test_config(server_token: Option<&str>) -> Config {
         stdb_module: "test-module".into(),
         stdb_server_token: server_token.map(str::to_string),
         stdb_finalization_token: None,
+        organization_placement: ConfiguredPlacementResolver::new(
+            INITIAL_CELL_ID,
+            1,
+            INITIAL_DURABLE_STORE_ID,
+        )
+        .expect("valid test placement"),
         cors_origins: vec![],
         dev_mock_org_id: None,
         ai_gateway_url: "http://127.0.0.1:3001".into(),

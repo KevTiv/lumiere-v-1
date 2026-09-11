@@ -52,8 +52,12 @@ async fn post_operation_inner(
         .ok_or(ApiError::Unauthorized)?;
     let contract = session_operation_contract(&operation)?;
     let client = state.client_with_token(&session.stdb_token);
-    let context =
-        TrustedOperationContext::from_session(session, client, contract.contract_operation_id)?;
+    let context = TrustedOperationContext::from_session_with_placement(
+        &session,
+        client,
+        contract.contract_operation_id,
+        &state.organization_placements,
+    )?;
     if !body.is_object() {
         return Err(ApiError::Unprocessable(
             "Operation body must be a named object".into(),
@@ -64,6 +68,7 @@ async fn post_operation_inner(
     let company_scope = validate_reducer_scope(contract, &args, organization_id)?;
     let company_scope = authorize_reducer_company_scope(&context, company_scope).await?;
     let context = context.with_company_scope(company_scope)?;
+    context.require_current_placement(&state.organization_placements)?;
     execute_reducer_call(&context, contract, args).await
 }
 
@@ -82,8 +87,12 @@ pub(crate) async fn post_compat_reducer(
         .ok_or(ApiError::Unauthorized)?;
     let contract = session_reducer_contract(&reducer)?;
     let client = state.client_with_token(&session.stdb_token);
-    let context =
-        TrustedOperationContext::from_session(session, client, contract.contract_operation_id)?;
+    let context = TrustedOperationContext::from_session_with_placement(
+        &session,
+        client,
+        contract.contract_operation_id,
+        &state.organization_placements,
+    )?;
     let args = body.as_array().cloned().ok_or_else(|| {
         ApiError::Unprocessable(
             "Compatibility reducer body must be a positional argument array".into(),
@@ -93,5 +102,6 @@ pub(crate) async fn post_compat_reducer(
     let company_scope = validate_reducer_scope(contract, &args, organization_id)?;
     let company_scope = authorize_reducer_company_scope(&context, company_scope).await?;
     let context = context.with_company_scope(company_scope)?;
+    context.require_current_placement(&state.organization_placements)?;
     execute_reducer_call(&context, contract, args).await
 }

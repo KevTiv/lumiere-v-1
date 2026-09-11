@@ -21,10 +21,11 @@ pub(super) struct ClientSubscribe {
     pub(super) active_company_id: Option<u64>,
 }
 
-/// A realtime client may express company intent, but the server derives the
-/// only company scope from the authenticated organization membership.  The
-/// subscription is an invalidation signal; HTTP remains authoritative for
-/// the subsequent company-scoped read.
+/// A realtime client may send its known workspace company inventory, but the
+/// server derives the one active subscription scope from the authenticated
+/// membership. The inventory must include that active company when present;
+/// sibling ids are never compiled into subscription SQL. HTTP remains
+/// authoritative for subsequent company-scoped reads.
 pub(super) fn validate_requested_company_scope(
     requested_company_ids: &[u64],
     active_company_id: Option<u64>,
@@ -36,9 +37,9 @@ pub(super) fn validate_requested_company_scope(
         ));
     }
     if active_company_id.is_some_and(|id| id != allowed_company_id)
-        || requested_company_ids
-            .iter()
-            .any(|id| *id != allowed_company_id)
+        || requested_company_ids.iter().any(|id| *id == 0)
+        || (!requested_company_ids.is_empty()
+            && !requested_company_ids.contains(&allowed_company_id))
     {
         return Err(ApiError::Forbidden(
             "company scope is not permitted for this session".into(),

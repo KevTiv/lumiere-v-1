@@ -1,6 +1,6 @@
 //! Due-timer selection and revision-checked firing.
 use super::{now_micros, BATCH_SIZE};
-use crate::state::AppState;
+use crate::integration_worker::ScheduledService;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -19,9 +19,10 @@ struct InstanceRow {
     revision: u64,
 }
 
-pub(super) async fn fire_due_timers(state: &AppState, organization_id: u64) -> anyhow::Result<()> {
-    let rows = state
-        .stdb
+pub(super) async fn fire_due_timers(service: &ScheduledService) -> anyhow::Result<()> {
+    let organization_id = service.organization_id();
+    let rows = service
+        .client()
         .query_sql(&format!(
             "SELECT id, organization_id, company_id, revision, workflow_instance_id, due_at \
              FROM workflow_timer WHERE organization_id = {organization_id} \
@@ -41,13 +42,12 @@ pub(super) async fn fire_due_timers(state: &AppState, organization_id: u64) -> a
                 continue;
             }
         };
-        let instance_revision = instance_revision(state, timer.workflow_instance_id)
+        let instance_revision = instance_revision(service.client(), timer.workflow_instance_id)
             .await
             .unwrap_or(0);
         let idem = timer_fire_idempotency_key(timer.id, timer.revision);
-        if let Err(error) = state
-            .stdb
-            .call_reducer(stdb_client::reducer_call!(
+        if let Err(error) = service
+            .call(
                 "fire_workflow_timer",
                 json!([
                     organization_id,
@@ -61,7 +61,7 @@ pub(super) async fn fire_due_timers(state: &AppState, organization_id: u64) -> a
                         "causationId": format!("workflow-timer:{}", timer.id),
                     }
                 ]),
-            ))
+            )
             .await
         {
             tracing::debug!(timer_id = timer.id, %error, "fire_workflow_timer skipped");
@@ -70,9 +70,11 @@ pub(super) async fn fire_due_timers(state: &AppState, organization_id: u64) -> a
     Ok(())
 }
 
-pub(super) async fn instance_revision(state: &AppState, instance_id: u64) -> anyhow::Result<u64> {
-    let rows = state
-        .stdb
+pub(super) async fn instance_revision(
+    client: &stdb_client::StdbClient,
+    instance_id: u64,
+) -> anyhow::Result<u64> {
+    let rows = client
         .query_sql(&format!(
             "SELECT revision FROM workflow_instance WHERE id = {instance_id} LIMIT 1"
         ))

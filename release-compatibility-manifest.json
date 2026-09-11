@@ -36,7 +36,7 @@
     "checksum": "sha256:6921db14205cfc44a5c7cf178b4a3482d6cab3f06d9e02c03cd8e36c7cb17fac",
     "application_catalog_path": "api-server/src/cold_tier/migrate.rs",
     "application_catalog_version": 9,
-    "application_catalog_checksum": "sha256:98d9dfdd683ab44b37238faf7d03c52ac6740af2bbca974c3ca6f16fa96bfd5d"
+    "application_catalog_checksum": "sha256:f85d7832fe58d17ca968cfb3502ef6c847bdca2bfcec29b8917d18cf24f989b5"
   },
   "services": {
     "api_server": {
@@ -58,7 +58,7 @@
     "config_sources": [
       {
         "path": ".env.docker.example",
-        "sha256": "782f027381333e1a9a67adf00c916f0bc3153d11fe01d62c62f234aee1dbdb74"
+        "sha256": "6fe4592fbeb325741b5987a4e70663fff5924680d9a960da95d39ceea0416f10"
       },
       {
         "path": "frontend/web/.env.example",

@@ -14,8 +14,9 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::path::{Path, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// The initial logical execution cell.
 pub const INITIAL_CELL_ID: &str = "cell-primary-eu";
@@ -159,7 +160,129 @@ pub struct OrganizationPlacement {
 /// organization but cannot provide a replacement cell, store, or generation.
 pub trait OrganizationPlacementResolver {
     /// Resolve the current authoritative placement for an organization.
-    fn resolve(&self, organization_id: u64) -> Result<&OrganizationPlacement, PlacementError>;
+    fn resolve(&self, organization_id: u64) -> Result<OrganizationPlacement, PlacementError>;
+}
+
+/// Immutable placement selected by this server process's trusted deployment
+/// configuration. This is the initial runtime implementation until the
+/// platform control plane supplies a persistent multi-cell resolver.
+#[derive(Clone, Debug)]
+pub struct ConfiguredPlacementResolver {
+    cell_id: CellId,
+    generation: PlacementGeneration,
+    durable_store: DurableStoreId,
+    control_store: Option<PathBuf>,
+}
+
+#[derive(Deserialize)]
+struct PlacementControlStore {
+    placements: Vec<PlacementControlRecord>,
+}
+
+#[derive(Deserialize)]
+struct PlacementControlRecord {
+    organization_id: u64,
+    cell_id: String,
+    generation: u64,
+    lifecycle: String,
+    durable_store_id: String,
+}
+
+impl ConfiguredPlacementResolver {
+    /// Validate server-owned placement settings once during process startup.
+    pub fn new(
+        cell_id: impl Into<String>,
+        generation: u64,
+        durable_store: impl Into<String>,
+    ) -> Result<Self, PlacementError> {
+        Ok(Self {
+            cell_id: CellId::new(cell_id)?,
+            generation: PlacementGeneration::new(generation)?,
+            durable_store: DurableStoreId::new(durable_store)?,
+            control_store: None,
+        })
+    }
+
+    /// Resolve every organization exclusively from the persistent platform
+    /// control snapshot. The fallback fields are never used while this store
+    /// is configured.
+    pub fn from_persistent_control_store(path: impl Into<PathBuf>) -> Result<Self, PlacementError> {
+        Self::new(
+            INITIAL_CELL_ID,
+            PlacementGeneration::INITIAL.get(),
+            INITIAL_DURABLE_STORE_ID,
+        )?
+        .with_persistent_control_store(path)
+    }
+
+    /// Resolve placements from an external, persistent platform-control file.
+    ///
+    /// The file is read for every resolution so an atomically replaced control
+    /// snapshot takes effect without restarting this process. Missing,
+    /// duplicate, or malformed organization records fail closed.
+    pub fn with_persistent_control_store(
+        mut self,
+        path: impl Into<PathBuf>,
+    ) -> Result<Self, PlacementError> {
+        let path = path.into();
+        if path.as_os_str().is_empty() {
+            return Err(PlacementError::InvalidControlStorePath);
+        }
+        self.control_store = Some(path);
+        Ok(self)
+    }
+
+    fn resolve_persistent(
+        path: &Path,
+        organization_id: u64,
+    ) -> Result<OrganizationPlacement, PlacementError> {
+        let contents =
+            std::fs::read_to_string(path).map_err(|_| PlacementError::ControlStoreUnavailable)?;
+        let store: PlacementControlStore =
+            serde_json::from_str(&contents).map_err(|_| PlacementError::InvalidControlStore)?;
+        let mut matches = store
+            .placements
+            .into_iter()
+            .filter(|record| record.organization_id == organization_id);
+        let record = matches.next().ok_or(PlacementError::OrganizationNotFound)?;
+        if matches.next().is_some() {
+            return Err(PlacementError::InvalidControlStore);
+        }
+        let lifecycle = match record.lifecycle.as_str() {
+            "provisioning" => OrganizationLifecycle::Provisioning,
+            "active" => OrganizationLifecycle::Active,
+            "grace_period" => OrganizationLifecycle::GracePeriod,
+            "suspended" => OrganizationLifecycle::Suspended,
+            "archived" => OrganizationLifecycle::Archived,
+            "reactivating" => OrganizationLifecycle::Reactivating,
+            _ => return Err(PlacementError::InvalidControlStore),
+        };
+        Ok(OrganizationPlacement {
+            organization_id,
+            cell_id: CellId::new(record.cell_id)?,
+            generation: PlacementGeneration::new(record.generation)?,
+            lifecycle,
+            durable_store: DurableStoreId::new(record.durable_store_id)?,
+        })
+    }
+}
+
+impl OrganizationPlacementResolver for ConfiguredPlacementResolver {
+    fn resolve(&self, organization_id: u64) -> Result<OrganizationPlacement, PlacementError> {
+        if organization_id == 0 {
+            return Err(PlacementError::InvalidOrganization);
+        }
+        if let Some(path) = &self.control_store {
+            return Self::resolve_persistent(path, organization_id);
+        }
+        Ok(OrganizationPlacement {
+            organization_id,
+            cell_id: self.cell_id.clone(),
+            generation: self.generation,
+            lifecycle: OrganizationLifecycle::Active,
+            durable_store: self.durable_store.clone(),
+        })
+    }
 }
 
 impl OrganizationPlacement {
@@ -181,6 +304,7 @@ impl OrganizationPlacement {
     ///
     /// This is crate-visible so HTTP and client input types cannot construct a
     /// placement or choose a fencing generation.
+    #[cfg(test)]
     pub(crate) fn reconstruction_target(
         organization_id: u64,
         cell_id: CellId,
@@ -300,6 +424,9 @@ pub enum PlacementError {
     GenerationExhausted,
     OrganizationAlreadyExists,
     OrganizationNotFound,
+    InvalidControlStorePath,
+    ControlStoreUnavailable,
+    InvalidControlStore,
     DestinationUnavailable,
     LifecycleTransition {
         from: OrganizationLifecycle,
@@ -323,6 +450,11 @@ impl fmt::Display for PlacementError {
             Self::GenerationExhausted => f.write_str("placement generation is exhausted"),
             Self::OrganizationAlreadyExists => f.write_str("organization placement already exists"),
             Self::OrganizationNotFound => f.write_str("organization placement was not found"),
+            Self::InvalidControlStorePath => {
+                f.write_str("placement control-store path must not be empty")
+            }
+            Self::ControlStoreUnavailable => f.write_str("placement control store is unavailable"),
+            Self::InvalidControlStore => f.write_str("placement control store is invalid"),
             Self::DestinationUnavailable => {
                 f.write_str("no compatible placement destination is available")
             }
@@ -561,8 +693,8 @@ impl PlacementController {
 }
 
 impl OrganizationPlacementResolver for PlacementController {
-    fn resolve(&self, organization_id: u64) -> Result<&OrganizationPlacement, PlacementError> {
-        self.resolve(organization_id)
+    fn resolve(&self, organization_id: u64) -> Result<OrganizationPlacement, PlacementError> {
+        PlacementController::resolve(self, organization_id).cloned()
     }
 }
 
@@ -879,6 +1011,82 @@ mod tests {
         assert!(CellId::new("cell/other").is_err());
         assert!(DurableStoreId::new("").is_err());
         assert!(PlacementGeneration::new(0).is_err());
+    }
+
+    #[test]
+    fn configured_resolver_derives_active_tenant_placement_server_side() {
+        let resolver = ConfiguredPlacementResolver::new("cell-primary-eu", 9, "pg-primary")
+            .expect("valid configured placement");
+        let placement =
+            OrganizationPlacementResolver::resolve(&resolver, 42).expect("organization placement");
+        assert_eq!(placement.organization_id(), 42);
+        assert_eq!(placement.generation().get(), 9);
+        assert_eq!(placement.cell_id().as_str(), "cell-primary-eu");
+        assert_eq!(placement.durable_store().as_str(), "pg-primary");
+        assert!(placement.lifecycle().permits_business_execution());
+        assert!(OrganizationPlacementResolver::resolve(&resolver, 0).is_err());
+    }
+
+    #[test]
+    fn persistent_resolver_observes_generation_changes_without_restart() {
+        let path = std::env::temp_dir().join(format!(
+            "lumiere-placement-control-{}-{}.json",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("test")
+        ));
+        let write_generation = |generation: u64, lifecycle: &str| {
+            std::fs::write(
+                &path,
+                format!(
+                    r#"{{"placements":[{{"organization_id":42,"cell_id":"cell-primary-eu","generation":{generation},"lifecycle":"{lifecycle}","durable_store_id":"pg-primary"}}]}}"#
+                ),
+            )
+            .expect("write placement control snapshot");
+        };
+        write_generation(9, "active");
+        let resolver = ConfiguredPlacementResolver::new("unused-cell", 1, "unused-store")
+            .expect("valid fallback")
+            .with_persistent_control_store(&path)
+            .expect("valid control path");
+
+        let first = resolver.resolve(42).expect("initial persistent placement");
+        assert_eq!(first.generation().get(), 9);
+        write_generation(10, "reactivating");
+        let moved = resolver.resolve(42).expect("updated persistent placement");
+        assert_eq!(moved.generation().get(), 10);
+        assert_eq!(moved.lifecycle(), OrganizationLifecycle::Reactivating);
+        assert!(!moved.lifecycle().permits_business_execution());
+
+        std::fs::remove_file(path).expect("remove placement control snapshot");
+    }
+
+    #[test]
+    fn persistent_resolver_fails_closed_for_missing_or_duplicate_records() {
+        let path = std::env::temp_dir().join(format!(
+            "lumiere-placement-control-invalid-{}.json",
+            std::process::id()
+        ));
+        std::fs::write(&path, r#"{"placements":[]}"#).expect("write empty control snapshot");
+        let resolver = ConfiguredPlacementResolver::new("unused-cell", 1, "unused-store")
+            .expect("valid fallback")
+            .with_persistent_control_store(&path)
+            .expect("valid control path");
+        assert_eq!(
+            resolver.resolve(42),
+            Err(PlacementError::OrganizationNotFound)
+        );
+
+        std::fs::write(
+            &path,
+            r#"{"placements":[{"organization_id":42,"cell_id":"cell-a","generation":1,"lifecycle":"active","durable_store_id":"store-a"},{"organization_id":42,"cell_id":"cell-b","generation":2,"lifecycle":"active","durable_store_id":"store-b"}]}"#,
+        )
+        .expect("write duplicate control snapshot");
+        assert_eq!(
+            resolver.resolve(42),
+            Err(PlacementError::InvalidControlStore)
+        );
+
+        std::fs::remove_file(path).expect("remove placement control snapshot");
     }
 
     #[test]

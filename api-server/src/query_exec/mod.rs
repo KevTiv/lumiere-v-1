@@ -41,8 +41,9 @@ use authoritative::{authoritative_record_sql, AuthoritativeResourceScope};
 #[cfg(test)]
 pub(crate) use company_scope::enforce_requested_company;
 pub(crate) use company_scope::{
-    accounting_resource, crm_resource, inventory_resource, iot_resource,
-    optional_company_accounting_resource, purchasing_resource, resolve_membership_company_id,
+    accounting_resource, authorize_membership_company_ids, crm_resource, inventory_resource,
+    iot_resource, optional_company_accounting_resource, purchasing_resource,
+    resolve_membership_company_id,
 };
 pub use company_scope::{
     default_company_id, resolve_accounting_company_id, resolve_crm_company_id,

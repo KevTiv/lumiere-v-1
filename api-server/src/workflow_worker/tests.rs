@@ -128,6 +128,12 @@ fn dispatch_allowlist_fail_closed_with_webhook() {
         stdb_module: String::new(),
         stdb_server_token: None,
         stdb_finalization_token: None,
+        organization_placement: crate::organization_placement::ConfiguredPlacementResolver::new(
+            crate::organization_placement::INITIAL_CELL_ID,
+            1,
+            crate::organization_placement::INITIAL_DURABLE_STORE_ID,
+        )
+        .expect("valid test placement"),
         cors_origins: vec![],
         dev_mock_org_id: None,
         ai_gateway_url: String::new(),

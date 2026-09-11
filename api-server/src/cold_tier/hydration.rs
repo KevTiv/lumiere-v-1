@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 use stdb_client::StdbClient;
 use tokio_postgres::types::ToSql;
 
-use super::{conventions, pg_codec, pg_pool};
+use super::{conventions, pg_codec, pg_pool, reconstruction};
 use crate::error::ApiError;
 use crate::organization_placement::{OrganizationPlacement, OrganizationPlacementResolver};
 
@@ -153,7 +153,8 @@ pub async fn load_pos_order_plan(
     let root_select = select_columns(&root_columns);
     let root_sql = format!(
         "SELECT {root_select}, payload_checksum FROM {COLD_TABLE} \
-         WHERE organization_id = $1::NUMERIC AND company_id = $2::NUMERIC AND id = $3::NUMERIC"
+         WHERE organization_id = $1::TEXT::NUMERIC \
+           AND company_id = $2::TEXT::NUMERIC AND id = $3::TEXT::NUMERIC"
     );
     let root_params: [&(dyn ToSql + Sync); 3] = [&org, &company, &id];
     let root_row = client
@@ -179,7 +180,8 @@ pub async fn load_pos_order_plan(
     let line_select = select_columns(&line_columns);
     let line_sql = format!(
         "SELECT {line_select} FROM {LINE_TABLE} \
-         WHERE organization_id = $1::NUMERIC AND order_id = $2::NUMERIC ORDER BY id ASC"
+         WHERE organization_id = $1::TEXT::NUMERIC \
+           AND order_id = $2::TEXT::NUMERIC ORDER BY id ASC"
     );
     let line_params: [&(dyn ToSql + Sync); 2] = [&org, &id];
     let lines = client
@@ -193,8 +195,9 @@ pub async fn load_pos_order_plan(
     let payment_select = select_columns(&payment_columns);
     let payment_sql = format!(
         "SELECT {payment_select} FROM {PAYMENT_TABLE} \
-         WHERE organization_id = $1::NUMERIC AND company_id = $2::NUMERIC \
-           AND order_id = $3::NUMERIC ORDER BY id ASC"
+         WHERE organization_id = $1::TEXT::NUMERIC \
+           AND company_id = $2::TEXT::NUMERIC \
+           AND order_id = $3::TEXT::NUMERIC ORDER BY id ASC"
     );
     let payment_params: [&(dyn ToSql + Sync); 3] = [&org, &company, &id];
     let payments = client
@@ -228,7 +231,7 @@ pub async fn hydrate_pos_order_if_absent(
 ) -> Result<bool, ApiError> {
     let id = order_id(&plan.order).map_err(ApiError::internal)?;
     let sql = format!(
-        "SELECT id, organization_id, company_id FROM `{TABLE}` \
+        "SELECT id, organization_id, company_id FROM {TABLE} \
          WHERE organization_id = {} AND id = {} LIMIT 1",
         plan.context.organization_id, id
     );
@@ -247,6 +250,20 @@ pub async fn hydrate_pos_order_if_absent(
         return Ok(false);
     }
 
+    let order_json =
+        canonical_hydration_row_json(TABLE, &plan.order).map_err(ApiError::internal)?;
+    let lines_json = plan
+        .lines
+        .iter()
+        .map(|row| canonical_hydration_row_json(LINE_TABLE, row))
+        .collect::<Result<Vec<_>>>()
+        .map_err(ApiError::internal)?;
+    let payments_json = plan
+        .payments
+        .iter()
+        .map(|row| canonical_hydration_row_json(PAYMENT_TABLE, row))
+        .collect::<Result<Vec<_>>>()
+        .map_err(ApiError::internal)?;
     let args = json!([
         plan.context.organization_id,
         plan.context.company_id,
@@ -254,17 +271,9 @@ pub async fn hydrate_pos_order_if_absent(
         plan.schema_version,
         plan.archive_version,
         plan.root_checksum,
-        serde_json::to_string(&plan.order).map_err(ApiError::internal)?,
-        plan.lines
-            .iter()
-            .map(|row| serde_json::to_string(row))
-            .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(ApiError::internal)?,
-        plan.payments
-            .iter()
-            .map(|row| serde_json::to_string(row))
-            .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(ApiError::internal)?,
+        order_json,
+        lines_json,
+        payments_json,
     ]);
     stdb.call_reducer(stdb_client::reducer_call!(
         "hydrate_pos_order_aggregate",
@@ -273,6 +282,13 @@ pub async fn hydrate_pos_order_if_absent(
     .await
     .map_err(|e| ApiError::Internal(format!("hydrate pos_order aggregate: {e}")))?;
     Ok(true)
+}
+
+fn canonical_hydration_row_json(table: &str, row: &Value) -> Result<String> {
+    let columns = pg_codec::load_columns(PROJECTION_CODEC_MANIFEST_JSON, table)
+        .with_context(|| format!("load {table} hydration payload codec"))?;
+    reconstruction::canonical_stdb_row_json(&columns, row)
+        .with_context(|| format!("encode canonical {table} hydration payload"))
 }
 
 /// Resolve the server-owned durable placement, load the exact aggregate, and
@@ -287,6 +303,31 @@ pub async fn hydrate_pos_order_if_absent(
 pub async fn rehydrate_pos_order_from_durable<R: OrganizationPlacementResolver>(
     stdb: &StdbClient,
     placements: &R,
+    organization_id: u64,
+    company_id: u64,
+    order_id: u64,
+) -> Result<bool, ApiError> {
+    let pool = pg_pool::shared_pool().ok_or_else(|| {
+        ApiError::Internal("durable placement is unavailable for POS hydration".into())
+    })?;
+    rehydrate_pos_order_from_pool(
+        stdb,
+        placements,
+        pool,
+        organization_id,
+        company_id,
+        order_id,
+    )
+    .await
+}
+
+/// Pool-injected form used by the live durability drill. Production callers
+/// use [`rehydrate_pos_order_from_durable`], which supplies the shared
+/// placement-selected pool.
+pub(crate) async fn rehydrate_pos_order_from_pool<R: OrganizationPlacementResolver>(
+    stdb: &StdbClient,
+    placements: &R,
+    pool: &Pool,
     organization_id: u64,
     company_id: u64,
     order_id: u64,
@@ -306,19 +347,47 @@ pub async fn rehydrate_pos_order_from_durable<R: OrganizationPlacementResolver>(
             "hydration requires positive company and order IDs".into(),
         ));
     }
-    let pool = pg_pool::shared_pool().ok_or_else(|| {
-        ApiError::Internal("durable placement is unavailable for POS hydration".into())
-    })?;
     let plan = load_pos_order_plan(
         pool,
-        HydrationContext::from_placement(placement, company_id).map_err(|error| {
+        HydrationContext::from_placement(&placement, company_id).map_err(|error| {
             ApiError::Internal(format!("resolve POS hydration context: {error}"))
         })?,
         order_id,
     )
     .await
     .map_err(|error| ApiError::Internal(format!("load durable POS aggregate: {error}")))?;
+    require_current_hydration_placement(placements, &placement)?;
     hydrate_pos_order_if_absent(stdb, &plan).await
+}
+
+/// Re-resolve placement immediately before the mutation so a move or fence
+/// raised while PostgreSQL was being read cannot hydrate into the stale cell.
+fn require_current_hydration_placement<R: OrganizationPlacementResolver>(
+    placements: &R,
+    expected: &OrganizationPlacement,
+) -> Result<(), ApiError> {
+    let current = placements
+        .resolve(expected.organization_id())
+        .map_err(|error| {
+            ApiError::Internal(format!(
+                "re-resolve authoritative organization placement before hydration: {error}"
+            ))
+        })?;
+    if current.organization_id() != expected.organization_id()
+        || current.generation() != expected.generation()
+        || current.cell_id() != expected.cell_id()
+        || current.durable_store() != expected.durable_store()
+    {
+        return Err(ApiError::Conflict(
+            "organization placement changed during hydration".into(),
+        ));
+    }
+    if !current.lifecycle().permits_business_execution() {
+        return Err(ApiError::Conflict(
+            "organization placement is fenced for hydration".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn pos_order_contract() -> Result<ManifestContract> {
@@ -442,6 +511,15 @@ fn is_sha256_hex(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::organization_placement::{ConfiguredPlacementResolver, PlacementError};
+
+    struct StaticPlacementResolver(OrganizationPlacement);
+
+    impl OrganizationPlacementResolver for StaticPlacementResolver {
+        fn resolve(&self, _organization_id: u64) -> Result<OrganizationPlacement, PlacementError> {
+            Ok(self.0.clone())
+        }
+    }
     use crate::organization_placement::PlacementGeneration;
 
     #[test]
@@ -470,6 +548,49 @@ mod tests {
             company_id: 8,
             placement_generation: PlacementGeneration::INITIAL.get(),
         }
+    }
+
+    fn placement(cell_id: &str, generation: u64, durable_store: &str) -> OrganizationPlacement {
+        ConfiguredPlacementResolver::new(cell_id, generation, durable_store)
+            .expect("valid configured placement")
+            .resolve(7)
+            .expect("configured organization placement")
+    }
+
+    #[test]
+    fn revalidates_placement_immediately_before_hydration() {
+        let expected = placement("cell-a", 1, "store-a");
+        let current = ConfiguredPlacementResolver::new("cell-a", 1, "store-a")
+            .expect("valid current placement");
+        assert!(require_current_hydration_placement(&current, &expected).is_ok());
+
+        for stale in [
+            ConfiguredPlacementResolver::new("cell-a", 2, "store-a")
+                .expect("valid generation change"),
+            ConfiguredPlacementResolver::new("cell-b", 1, "store-a").expect("valid cell change"),
+            ConfiguredPlacementResolver::new("cell-a", 1, "store-b").expect("valid store change"),
+        ] {
+            let error = require_current_hydration_placement(&stale, &expected)
+                .expect_err("changed placement must fail closed");
+            assert!(error
+                .to_string()
+                .contains("placement changed during hydration"));
+        }
+
+        let foreign = StaticPlacementResolver(
+            ConfiguredPlacementResolver::new("cell-a", 1, "store-a")
+                .expect("valid foreign placement")
+                .resolve(8)
+                .expect("configured foreign organization"),
+        );
+        assert!(require_current_hydration_placement(&foreign, &expected).is_err());
+
+        let fenced = StaticPlacementResolver(
+            OrganizationPlacement::initial(7).expect("valid provisioning placement"),
+        );
+        let error = require_current_hydration_placement(&fenced, &fenced.0)
+            .expect_err("fenced lifecycle must reject hydration");
+        assert!(error.to_string().contains("fenced for hydration"));
     }
 
     #[test]

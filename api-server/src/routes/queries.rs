@@ -7,7 +7,7 @@ use crate::query_exec::{
 };
 use crate::session::resolve_api_session;
 use crate::state::AppState;
-use crate::trusted_context::TrustedOperationContext;
+use crate::trusted_context::{TrustedOperationContext, RESOURCE_QUERY_OPERATION_ID};
 use crate::web_session::stdb_identity_hex_hint;
 use axum::{
     extract::{Path, Query, State},
@@ -18,8 +18,6 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::sync::Arc;
 use stdb_auth::{has_resource_read_permission, registry_get};
-
-const QUERY_OPERATION_ID: &str = "erp.query_resource";
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct OrgQuery {
@@ -104,8 +102,12 @@ pub(crate) async fn get_query(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let session_client = state.client_with_token(&session.stdb_token);
-    let context =
-        TrustedOperationContext::from_session(session, session_client, QUERY_OPERATION_ID)?;
+    let context = TrustedOperationContext::from_session_with_placement(
+        &session,
+        session_client,
+        RESOURCE_QUERY_OPERATION_ID,
+        &state.organization_placements,
+    )?;
 
     let org_id = context.organization_id();
     if let Some(override_org) = q.organization_id {
@@ -115,6 +117,7 @@ pub(crate) async fn get_query(
             ));
         }
     }
+    context.require_current_placement(&state.organization_placements)?;
 
     // Private workflow tables are not readable with the user JWT; use the module
     // owner token and enforce identity/company filters in `workflow_reads`.
@@ -143,6 +146,7 @@ pub(crate) async fn get_query(
         scoped_context.require_company_scope(&[company_id])?;
         let page = crate::cold_tier::pos_order_read::merged_page(
             &client,
+            &state.organization_placements,
             org_id,
             Some(company_id),
             q.cursor.clone(),
@@ -190,9 +194,14 @@ pub(crate) async fn get_authoritative_resource(
     .await?
     .ok_or(ApiError::Unauthorized)?;
     let session_client = state.client_with_token(&session.stdb_token);
-    let context =
-        TrustedOperationContext::from_session(session, session_client, QUERY_OPERATION_ID)?;
+    let context = TrustedOperationContext::from_session_with_placement(
+        &session,
+        session_client,
+        RESOURCE_QUERY_OPERATION_ID,
+        &state.organization_placements,
+    )?;
     let organization_id = context.organization_id();
+    context.require_current_placement(&state.organization_placements)?;
 
     let owner_read = crate::query_exec::crm_resource(&resource);
     if owner_read {

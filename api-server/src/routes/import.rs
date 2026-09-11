@@ -13,10 +13,12 @@ use serde_json::{json, Value};
 use tower_cookies::Cookies;
 use tracing::warn;
 
+use crate::commands::dispatch_session_reducer;
 use crate::error::ApiError;
 use crate::query_exec::default_company_id;
 use crate::session::resolve_api_session;
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::stdb_identity_hex_hint;
 
 const MAX_CSV_BYTES: usize = 512_000;
@@ -395,15 +397,6 @@ fn validate_csv(csv: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
-fn reducer_error_message(err: &str) -> ApiError {
-    // SpacetimeDB HTTP errors often embed the reducer `Err(String)` in the body.
-    if err.contains("permission") || err.contains("Permission") {
-        ApiError::Forbidden(err.to_string())
-    } else {
-        ApiError::Unprocessable(err.to_string())
-    }
-}
-
 struct LatestImportJob {
     job_id: u64,
     imported_rows: u32,
@@ -478,7 +471,8 @@ async fn import_entity_post(
 
     validate_csv(&body.csv)?;
 
-    let client = state.client_with_token(&session.stdb_token);
+    let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let client = trusted.client();
     let params = body.params.unwrap_or(ImportParams {
         company_id: None,
         currency_id: None,
@@ -504,12 +498,9 @@ async fn import_entity_post(
         }
     };
 
-    client
-        .call_reducer(stdb_client::ReducerCall::from_name(spec.reducer, args))
-        .await
-        .map_err(|e| reducer_error_message(&e.to_string()))?;
+    let context = dispatch_session_reducer(&state, &session, spec.reducer, args).await?;
 
-    let latest_job = latest_import_job(&client, org_id, spec.table_name).await;
+    let latest_job = latest_import_job(context.client(), org_id, spec.table_name).await;
 
     let mut resp = json!({
         "ok": true,

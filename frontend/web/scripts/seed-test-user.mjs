@@ -264,6 +264,40 @@ async function ensureAdminRoleAssignment(host, moduleName, adminToken, identityF
   }
 }
 
+async function ensureCredentialBinding(
+  host,
+  moduleName,
+  adminToken,
+  credential,
+  identityForReducer,
+  orgId,
+) {
+  try {
+    await callStdbReducer(host, moduleName, adminToken, 'bind_user_credential', [
+      credential.platformUserId,
+      identityForReducer,
+      TEST_EMAIL,
+    ])
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (!message.includes('Identity already has a credential binding')) throw error
+    const rows = await queryStdb(
+      host,
+      moduleName,
+      adminToken,
+      `SELECT platform_user_id, email FROM user_credential WHERE organization_id = ${orgId} AND email = '${TEST_EMAIL}'`,
+    )
+    if (
+      rows.length !== 1 ||
+      rows[0]?.platformUserId !== credential.platformUserId ||
+      rows[0]?.email !== TEST_EMAIL
+    ) {
+      throw new Error('Existing organization credential binding does not match the platform user')
+    }
+    console.log('[seed-test-user] Credential binding already matches; continuing.')
+  }
+}
+
 async function main() {
   loadEnvLocal()
 
@@ -310,11 +344,14 @@ async function main() {
     }
   }
 
-  await callStdbReducer(host, moduleName, adminToken, 'bind_user_credential', [
-    credential.platformUserId,
+  await ensureCredentialBinding(
+    host,
+    moduleName,
+    adminToken,
+    credential,
     identityForReducer,
-    TEST_EMAIL,
-  ])
+    orgId,
+  )
   await callStdbReducer(host, moduleName, adminToken, 'bind_user_profile', [
     credential.platformUserId,
     identityForReducer,

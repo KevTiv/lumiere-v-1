@@ -2,15 +2,20 @@
 use super::cookies::set_stdb_session_cookies;
 use crate::auth_password::{
     decrypt_token, encrypt_token, find_credential_by_email, find_invite_by_token_hash,
-    generate_secure_token, get_role_name_in_organization, is_usable_admin_token, now_micros,
-    send_resend_email,
+    generate_secure_token, get_role_name_in_organization, now_micros, send_resend_email,
 };
 use crate::cold_tier::pg_pool;
+use crate::commands::{
+    dispatch_internal_reducer, dispatch_session_reducer, InternalRouteAuthority,
+};
 use crate::error::ApiError;
 use crate::platform_control::{self, PlatformId};
 use crate::session::{identity_json_for_reducer_call, normalize_identity_hex_for_sql};
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
+use crate::web_session::{require_org, resolve_session};
 use axum::extract::State;
+use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 use axum::Json;
 use serde::Deserialize;
@@ -30,25 +35,27 @@ pub(super) struct InviteBody {
 
 pub(super) async fn invite(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     cookies: Cookies,
     Json(body): Json<InviteBody>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let identity_hex = cookies
-        .get("stdb_identity")
-        .map(|c| c.value().to_string())
+    let session = resolve_session(&state, &headers, &cookies)
+        .await?
         .ok_or(ApiError::Unauthorized)?;
+    let session_organization_id = require_org(&session)?;
+    if body.organization_id != session_organization_id {
+        return Err(ApiError::Forbidden(
+            "invitation organization does not match the authenticated session".into(),
+        ));
+    }
+    let identity_hex = session.identity_hex.clone();
 
     let hex = identity_hex
         .trim()
         .trim_start_matches("0x")
         .trim_start_matches("0X");
-    let admin = state
-        .config
-        .stdb_server_token
-        .as_deref()
-        .filter(|t| is_usable_admin_token(t))
-        .ok_or_else(|| ApiError::Internal("STDB_SERVER_TOKEN is not configured".into()))?;
-    let client = state.client_with_token(admin);
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let client = context.client();
 
     let sql = format!(
         "SELECT role_id, organization_id, is_active FROM user_role_assignment WHERE identity = 0x{hex} AND organization_id = {} AND is_active = true",
@@ -116,20 +123,20 @@ pub(super) async fn invite(
     let (token, token_hash) = generate_secure_token();
     let expires_at = now_micros() + (7_i128 * 24 * 60 * 60 * 1_000_000);
 
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "create_user_invite",
-            json!([
-                body.organization_id,
-                body.role_id,
-                body.email.trim(),
-                token_hash,
-                identity_json_for_reducer_call(&identity_hex),
-                expires_at.to_string()
-            ]),
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "create_user_invite",
+        json!([
+            body.organization_id,
+            body.role_id,
+            body.email.trim(),
+            token_hash,
+            identity_json_for_reducer_call(&identity_hex),
+            expires_at.to_string()
+        ]),
+    )
+    .await?;
 
     let org_sql = format!(
         "SELECT name FROM organization WHERE id = {}",
@@ -230,14 +237,6 @@ pub(super) async fn accept_invite(
         ));
     }
 
-    let admin = state
-        .config
-        .stdb_server_token
-        .as_deref()
-        .filter(|t| is_usable_admin_token(t))
-        .ok_or_else(|| ApiError::Internal("STDB_SERVER_TOKEN is not configured".into()))?;
-    let client = state.client_with_token(admin);
-
     let email = body.email.trim().to_lowercase();
     let role_name = get_role_name_in_organization(&state, invite.role_id, invite.organization_id)
         .await?
@@ -270,10 +269,12 @@ pub(super) async fn accept_invite(
 
     // Establish the validated organization membership before materializing the
     // organization-owned credential/profile rows.
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "add_org_member",
-            json!([
+    dispatch_internal_reducer(
+        &state,
+        InternalRouteAuthority::InvitationAcceptance,
+        Some(invite.organization_id),
+        "add_org_member",
+        json!([
                 identity_json_for_reducer_call(&member_identity),
                 invite.organization_id,
                 {
@@ -286,10 +287,9 @@ pub(super) async fn accept_invite(
                     "is_default": true,
                     "metadata": Value::Null,
                 }
-            ]),
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+        ]),
+    )
+    .await?;
 
     if let Some((password_hash, token_enc)) = new_credential {
         let pool = pg_pool::shared_pool().ok_or_else(|| {
@@ -332,35 +332,38 @@ pub(super) async fn accept_invite(
 
     // The membership reducer derives organization ownership. Only after it
     // succeeds may this opaque platform binding be projected into ERP.
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "bind_user_credential",
-            json!([
-                platform_user_id.as_str(),
-                identity_json_for_reducer_call(&member_identity),
-                email.clone(),
-            ]),
-        ))
-        .await
-        .map_err(ApiError::internal)?;
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "bind_user_profile",
-            json!([
-                platform_user_id.as_str(),
-                identity_json_for_reducer_call(&member_identity),
-            ]),
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_internal_reducer(
+        &state,
+        InternalRouteAuthority::InvitationAcceptance,
+        Some(invite.organization_id),
+        "bind_user_credential",
+        json!([
+            platform_user_id.as_str(),
+            identity_json_for_reducer_call(&member_identity),
+            email.clone(),
+        ]),
+    )
+    .await?;
+    dispatch_internal_reducer(
+        &state,
+        InternalRouteAuthority::InvitationAcceptance,
+        Some(invite.organization_id),
+        "bind_user_profile",
+        json!([
+            platform_user_id.as_str(),
+            identity_json_for_reducer_call(&member_identity),
+        ]),
+    )
+    .await?;
 
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "mark_invite_accepted",
-            json!([invite.id])
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_internal_reducer(
+        &state,
+        InternalRouteAuthority::InvitationAcceptance,
+        Some(invite.organization_id),
+        "mark_invite_accepted",
+        json!([invite.id]),
+    )
+    .await?;
 
     let id_hex = normalize_identity_hex_for_sql(&member_identity);
     set_stdb_session_cookies(&state.config, &cookies, &stdb_token, &id_hex);

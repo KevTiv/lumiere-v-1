@@ -57,8 +57,10 @@ Required configuration:
 - `STDB_RECONSTRUCTION_TOKEN` is the dedicated reconstructor JWT and must differ from
   `STDB_SERVER_TOKEN`. `STDB_RECONSTRUCTION_IDENTITY` is its server-issued 64-hex SpacetimeDB
   identity; it is explicit because an OIDC JWT subject is not a SpacetimeDB identity.
-- `RECONSTRUCTION_PLACEMENT_GENERATION`, `RECONSTRUCTION_CELL_ID`, and
-  `RECONSTRUCTION_DURABLE_STORE_ID` are trusted placement configuration.
+- `LUMIERE_PLACEMENT_CONTROL_PATH` identifies the persistent, server-owned placement snapshot.
+  `RECONSTRUCTION_EXPECTED_PLACEMENT_GENERATION`, `RECONSTRUCTION_EXPECTED_CELL_ID`, and
+  `RECONSTRUCTION_EXPECTED_DURABLE_STORE_ID` are operator assertions which must exactly match
+  that authoritative record; they cannot select or override the reconstruction target.
 - `RECONSTRUCTION_RUN_ID` is optional for a new run and required to resume the exact failed run.
 
 Build a disposable destination with the reconstructor identity allowlisted, publish it, then run:

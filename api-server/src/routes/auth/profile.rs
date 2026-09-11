@@ -1,6 +1,6 @@
 //! Authenticated PostgreSQL profile reads and updates.
-use crate::auth_password::is_usable_admin_token;
 use crate::cold_tier::pg_pool;
+use crate::commands::{dispatch_internal_reducer, InternalRouteAuthority};
 use crate::error::ApiError;
 use crate::platform_control::{self, PlatformId};
 use crate::session::identity_json_for_reducer_call;
@@ -109,29 +109,23 @@ pub(super) async fn profile_update(
         .await
         .map_err(ApiError::internal)?
         .ok_or(ApiError::NotFound("User profile not found".into()))?;
-    let admin = state
-        .config
-        .stdb_server_token
-        .as_deref()
-        .filter(|token| is_usable_admin_token(token))
-        .ok_or_else(|| ApiError::Internal("STDB_SERVER_TOKEN is not configured".into()))?;
-    state
-        .client_with_token(admin)
-        .call_reducer(stdb_client::reducer_call!(
-            "project_user_profile",
-            json!([
-                identity_json_for_reducer_call(&session.identity_hex),
-                organization_id,
-                projected.get::<_, String>("email"),
-                projected.get::<_, bool>("email_verified"),
-                projected.get::<_, String>("name"),
-                projected.get::<_, Option<String>>("first_name"),
-                projected.get::<_, Option<String>>("last_name"),
-                projected.get::<_, String>("timezone"),
-                projected.get::<_, String>("language"),
-            ]),
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    dispatch_internal_reducer(
+        &state,
+        InternalRouteAuthority::PlatformProfileProjection,
+        Some(organization_id),
+        "project_user_profile",
+        json!([
+            identity_json_for_reducer_call(&session.identity_hex),
+            organization_id,
+            projected.get::<_, String>("email"),
+            projected.get::<_, bool>("email_verified"),
+            projected.get::<_, String>("name"),
+            projected.get::<_, Option<String>>("first_name"),
+            projected.get::<_, Option<String>>("last_name"),
+            projected.get::<_, String>("timezone"),
+            projected.get::<_, String>("language"),
+        ]),
+    )
+    .await?;
     Ok(Json(json!({ "success": true })))
 }
