@@ -26,6 +26,17 @@
 //! ```
 
 use std::collections::HashMap;
+mod presentation;
+
+/// Persisted presentation draft revision and tenant-isolation acceptance gate.
+#[spacetimedb::reducer]
+pub fn run_presentation_draft_tests(ctx: &spacetimedb::ReducerContext) -> Result<(), String> {
+    presentation::test_presentation_module_revision_round_trip(ctx)?;
+    presentation::test_presentation_module_rejects_invalid_payload(ctx)?;
+    presentation::test_presentation_module_owner_scope_isolated(ctx)?;
+    presentation::test_presentation_module_rejects_inactive_cross_org_actor(ctx)?;
+    Ok(())
+}
 use std::time::Duration;
 
 use spacetimedb::{ReducerContext, Table};

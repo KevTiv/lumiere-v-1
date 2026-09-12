@@ -1118,6 +1118,7 @@ pub(crate) fn source_provenance() -> Result<(String, bool)> {
         "--untracked-files=normal",
         "--",
         "spacetimedb",
+        "crates/presentation-core",
         "lumiere-codegen",
         "crates/stdb-auth/assets/resource_registry.json",
     ])?;

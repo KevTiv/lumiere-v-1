@@ -56,8 +56,19 @@ IR_VERSION="${IR_METADATA[1]}"
 SCHEMA_HASH="${IR_METADATA[2]}"
 IR_SHA256="${IR_METADATA[3]}"
 
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+# A prepare directory retains a fully checked local candidate for review.
+# No remote branch or immutable tag is changed in this mode.
+if [[ -n "${LUMIERE_CONTRACTS_PREPARE_DIR:-}" ]]; then
+  WORK="$LUMIERE_CONTRACTS_PREPARE_DIR"
+  if [[ -e "$WORK" ]]; then
+    echo "error: prepare directory already exists: $WORK" >&2
+    exit 1
+  fi
+  mkdir -p "$WORK"
+else
+  WORK="$(mktemp -d)"
+  trap 'rm -rf "$WORK"' EXIT
+fi
 
 git clone --quiet "$CONTRACTS_REPO" "$WORK/repo"
 cd "$WORK/repo"
@@ -114,6 +125,32 @@ rm -f manifests/application-operations.json manifests/resource-registry.json
 echo "$VERSION" > CONTRACT_VERSION
 
 # Restore contracts-owned manifests before the Rust crate enumerates them.
+# Preserve reviewed capability entries while binding them to the new source.
+# The companion generator below validates every retained descriptor against
+# the new canonical IR and fails if any entry no longer matches. This does
+# not admit new capabilities, including newly added operations.
+python3 - <<'PY'
+import hashlib
+import json
+from pathlib import Path
+
+path = Path("ir/agent-capability-registry-v1.json")
+checksum = path.with_suffix(path.suffix + ".sha256")
+raw = path.read_bytes()
+if checksum.read_text().split() != [hashlib.sha256(raw).hexdigest(), path.name]:
+    raise SystemExit("existing agent capability checksum mismatch")
+artifact = json.loads(raw)
+pin = json.loads(Path("ir/PIN.json").read_text())
+artifact["source_ir"] = {
+    "ir_version": pin["ir_version"],
+    "source_commit": pin["source_commit"],
+    "source_dirty": False,
+    "schema_hash": pin["schema_hash"],
+}
+raw = (json.dumps(artifact, indent=2) + "\n").encode()
+path.write_bytes(raw)
+checksum.write_text(f"{hashlib.sha256(raw).hexdigest()}  {path.name}\n")
+PY
 python3 scripts/generate-from-ir.py
 
 # lib.rs re-exports the generated bindings module tree and exposes each
@@ -156,11 +193,20 @@ rm -f crates/lumiere-contracts/Cargo.toml.bak
 # surface on every release so a drifted companion main branch cannot silently
 # drop the bindings/v2 API required by pinned consumers.
 python3 - <<'PY'
+import re
 from pathlib import Path
 
 path = Path("crates/lumiere-contracts/Cargo.toml")
-package = path.read_text(encoding="utf-8").split("[features]", 1)[0]
-package = package.split("[dependencies]", 1)[0].rstrip()
+manifest = path.read_text(encoding="utf-8")
+# Retain companion-owned test/build/target sections while reasserting the
+# generated feature/dependency surface. New fixture dependencies must survive.
+sections = re.split(r"(?=^\[)", manifest, flags=re.MULTILINE)
+retained = "".join(
+    section for section in sections
+    if section.startswith("[")
+    and section.splitlines()[0] not in {"[package]", "[features]", "[dependencies]"}
+)
+package = next(section for section in sections if section.startswith("[package]\n")).rstrip()
 path.write_text(
     package
     + f'''\n\n[features]
@@ -171,7 +217,7 @@ v2 = []
 [dependencies]
 spacetimedb-sdk = {{ version = "=2.8.2", optional = true }}
 serde_json = "1.0"
-''',
+''' + ("\n" + retained if retained else ""),
     encoding="utf-8",
 )
 PY
@@ -226,6 +272,13 @@ if git diff --cached --quiet; then
 fi
 git -c user.name="lumiere-codegen" -c user.email="codegen@lumiere.local" \
   commit --quiet -m "chore: publish generated contracts v$VERSION"
+if [[ -n "${LUMIERE_CONTRACTS_PREPARE_DIR:-}" ]]; then
+  echo "Prepared contracts v$VERSION at $WORK/repo"
+  echo "Candidate commit: $(git rev-parse HEAD)"
+  echo "Remote destination: $CONTRACTS_REPO (main and v$VERSION)"
+  echo "No remote commit or tag was published."
+  exit 0
+fi
 git push --quiet origin main
 git tag -a "v$VERSION" -m "Generated contracts release v$VERSION"
 git push --quiet origin "v$VERSION"

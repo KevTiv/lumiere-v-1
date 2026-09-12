@@ -12,6 +12,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
+lumiere-presentation-core = { path = "../crates/presentation-core" }
 spacetimedb = { version = "=2.8.2" }
 spacetimedb-sats = { version = "=2.8.2", features = ["serde"] }
 log = "0.4"

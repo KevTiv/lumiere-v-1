@@ -35,6 +35,7 @@ const PLATFORM_GLOBAL_REASONS = {};
 // matching a prefix remain in the explicit map below so adding a table cannot
 // silently lose its module owner.
 const MODULE_PREFIXES = [
+  ["presentation_", "presentation"],
   ["subscription_", "subscriptions"],
   ["workflow_", "workflow"],
   ["project_", "projects"],
@@ -177,6 +178,7 @@ const APPEND_HISTORY_TABLES = new Set([
 // parent primary-key column are present in the current schema manifest. All
 // other tables remain explicit roots until a domain-owned FK graph exists.
 const PARENT_OVERRIDES = {
+  presentation_module_version: ["presentation_module", "module_id", "id"],
   account_period: ["account_fiscal_year", "fiscal_year_id", "id"],
   account_asset_depreciation_line: ["account_asset", "asset_id", "id"],
   account_bank_statement_line: ["account_bank_statement", "statement_id", "id"],
@@ -579,8 +581,8 @@ function validateParentOverrides(tables) {
 }
 
 function validate(schema, policyDocument, resourceRegistry) {
-  if (!Array.isArray(schema.tables) || schema.tables.length !== 463) {
-    throw new Error(`expected schema manifest with 463 tables, found ${schema.tables?.length ?? "none"}`);
+  if (!Array.isArray(schema.tables) || schema.tables.length !== 465) {
+    throw new Error(`expected schema manifest with 465 tables, found ${schema.tables?.length ?? "none"}`);
   }
   if (policyDocument.version !== 1 || !Array.isArray(policyDocument.policies)) {
     throw new Error("storage policy source must have version 1 and a policies array");
@@ -592,9 +594,9 @@ function validate(schema, policyDocument, resourceRegistry) {
   const schemaNames = new Set(schema.tables.map((table) => table.sql_name));
   if (schemaNames.size !== schema.tables.length) throw new Error("schema manifest contains duplicate table names");
   if (schema.ownership_summary?.verified !== true
-      || schema.ownership_summary.erp_owned_count !== 463
+      || schema.ownership_summary.erp_owned_count !== 465
       || schema.ownership_summary.platform_global_count !== 0) {
-    throw new Error("schema manifest must carry verified C0 ownership totals (463 organization + 0 platform)");
+    throw new Error("schema manifest must carry verified C0 ownership totals (465 organization + 0 platform)");
   }
   const policyNames = new Set();
   const resources = new Map(Object.entries(resourceRegistry));
@@ -706,8 +708,8 @@ function validate(schema, policyDocument, resourceRegistry) {
 
   const platform = policyDocument.policies.filter((entry) => entry.organization_ownership === "platform_global");
   const organization = policyDocument.policies.filter((entry) => entry.organization_ownership === "direct");
-  if (platform.length !== PLATFORM_GLOBAL_TABLES.size || organization.length !== 463) {
-    throw new Error(`C0 ownership split must be 463 organization + 0 platform, got ${organization.length} + ${platform.length}`);
+  if (platform.length !== PLATFORM_GLOBAL_TABLES.size || organization.length !== 465) {
+    throw new Error(`C0 ownership split must be 465 organization + 0 platform, got ${organization.length} + ${platform.length}`);
   }
   const wrongPlatform = platform.filter((entry) => !PLATFORM_GLOBAL_TABLES.has(entry.table));
   if (wrongPlatform.length) throw new Error(`unapproved platform-global policy: ${wrongPlatform.map((entry) => entry.table).join(", ")}`);
@@ -784,9 +786,9 @@ if (checkOnly) {
   if (JSON.stringify(refreshed) !== JSON.stringify(policyDocument)) {
     throw new Error("storage policy source is not reproducible; run the bootstrap without --check");
   }
-  console.log(`C1 storage policy check passed: ${policyDocument.policies.length}/463 tables`);
+  console.log(`C1 storage policy check passed: ${policyDocument.policies.length}/465 tables`);
 } else {
   fs.writeFileSync(policyPath, `${JSON.stringify(policyDocument, null, 2)}\n`);
   console.log(`Wrote ${policyPath}`);
-  console.log(`C1 storage policy bootstrap passed: ${policyDocument.policies.length}/463 tables`);
+  console.log(`C1 storage policy bootstrap passed: ${policyDocument.policies.length}/465 tables`);
 }
