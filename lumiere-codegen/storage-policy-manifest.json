@@ -8976,7 +8976,7 @@
       "cooling_eligibility_source": "reviewed:presentation/drafts/always-hot",
       "dependency_behavior": "follow_parent",
       "hydration_policy": "not_applicable",
-      "delete_behavior": "tombstone",
+      "delete_behavior": "append_only",
       "postgres_access_path": "organization_index"
     },
     {
