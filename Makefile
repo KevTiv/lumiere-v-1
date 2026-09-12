@@ -152,6 +152,8 @@ help-legacy:
 	@echo "  codegen                 Extract canonical contract IR plus local runtime/audit artifacts"
 	@echo "  check-codegen           Fail if generated artifacts drift from sources (CI). Requires .contracts-staging/ (see contracts-staging-from-pinned)"
 	@echo "  check-contract-ir       Validate the versioned IR envelope and both SHA-256 hashes"
+	@echo "  check-agent-capabilities Validate the live-generated agent capability artifact and checksum"
+	@echo "  check-agent-capabilities-pinned Validate capabilities against pinned IR (CI-safe; no live schema)"
 	@echo "  check-operation-history Fail on reused operation IDs or unapproved contract-shape changes"
 	@echo "  check-release-compatibility Validate pinned IR, contracts, PG migration, services, and deployment generation"
 	@echo "  check-tenant-ownership  Validate C0 direct organization ownership (required by check-codegen)"
@@ -942,7 +944,22 @@ docker-dev-iot:
 codegen: schema-snapshot
 	cargo run -p lumiere-codegen
 
-check-contract-ir: codegen
+check-agent-capabilities: codegen
+	python3 scripts/verify-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts/test_verify_agent_capability_artifact.py
+
+# CI-safe capability validation for the immutable contracts release. This is
+# deliberately separate from `check-agent-capabilities`: the live source gate
+# must continue to regenerate every artifact, while this target stages one
+# coherent pinned release and emits only the capability artifact from its
+# already-pinned canonical IR. Keeping the staging prerequisite here avoids
+# mixing live schema output with pinned bindings/manifests/IR.
+check-agent-capabilities-pinned: contracts-staging-from-pinned
+	cargo run -p lumiere-codegen -- --agent-capabilities-only
+	python3 scripts/verify-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts/test_verify_agent_capability_artifact.py
+
+check-contract-ir: codegen check-agent-capabilities
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json
 	python3 lumiere-codegen/tests/test_contract_ir_pin.py
 	python3 scripts/verify-operation-history.py
@@ -996,7 +1013,7 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 # CI-safe validation for a previously published immutable contract. Source-to-
 # contract regeneration belongs to check-contracts-source-drift; this target
 # must not couple ordinary Rust checks to whichever module is currently deployed.
-check-codegen-pinned: check-operation-history-pinned check-release-compatibility check-tenant-ownership check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals lint-trusted-route-boundaries
+check-codegen-pinned: check-agent-capabilities-pinned check-operation-history-pinned check-release-compatibility check-tenant-ownership check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals lint-trusted-route-boundaries
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean
 	python3 lumiere-codegen/tests/test_contract_ir_pin.py
 	node scripts/bootstrap-storage-policies.mjs --check
