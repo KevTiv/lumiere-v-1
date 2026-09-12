@@ -1316,6 +1316,8 @@
     "verify_contact_identity": "erp.verify_contact_identity",
     "void_payment_transaction": "erp.void_payment_transaction",
     "waive_tax_deadline": "erp.waive_tax_deadline",
-    "worker_heartbeat": "erp.worker_heartbeat"
+    "worker_heartbeat": "erp.worker_heartbeat",
+    "save_presentation_module": "erp.save_presentation_module",
+    "run_presentation_draft_tests": "erp.run_presentation_draft_tests"
   }
 }

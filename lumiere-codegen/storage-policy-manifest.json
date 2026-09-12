@@ -169,6 +169,12 @@
       "module": "workflow",
       "storage_class": "always_hot",
       "reviewed": true
+    },
+    {
+      "table": "presentation_module",
+      "module": "presentation",
+      "storage_class": "always_hot",
+      "reviewed": true
     }
   ],
   "policies": [
@@ -8907,6 +8913,68 @@
       "cooling_eligibility": "never",
       "cooling_eligibility_source": "reviewed:c5/finance-commercial/always-hot/missing-semantic-safety-contract",
       "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "presentation_module",
+      "module": "presentation",
+      "rationale": "Personal module draft head and immutable snapshots; access requires organization and actor ownership.",
+      "authoritative_resources": [],
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "none",
+      "company_column_path": [],
+      "company_column_nullable": null,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "updated_at"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:presentation/drafts/always-hot",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "presentation_module_version",
+      "module": "presentation",
+      "rationale": "Personal module draft head and immutable snapshots; access requires organization and actor ownership.",
+      "authoritative_resources": [],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "none",
+      "company_column_path": [],
+      "company_column_nullable": null,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "presentation_module",
+          "child_column": "module_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "revision"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:presentation/drafts/always-hot",
+      "dependency_behavior": "follow_parent",
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",
       "postgres_access_path": "organization_index"

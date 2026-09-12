@@ -56,8 +56,19 @@ IR_VERSION="${IR_METADATA[1]}"
 SCHEMA_HASH="${IR_METADATA[2]}"
 IR_SHA256="${IR_METADATA[3]}"
 
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+# A prepare directory retains a fully checked local candidate for review.
+# No remote branch or immutable tag is changed in this mode.
+if [[ -n "${LUMIERE_CONTRACTS_PREPARE_DIR:-}" ]]; then
+  WORK="$LUMIERE_CONTRACTS_PREPARE_DIR"
+  if [[ -e "$WORK" ]]; then
+    echo "error: prepare directory already exists: $WORK" >&2
+    exit 1
+  fi
+  mkdir -p "$WORK"
+else
+  WORK="$(mktemp -d)"
+  trap 'rm -rf "$WORK"' EXIT
+fi
 
 git clone --quiet "$CONTRACTS_REPO" "$WORK/repo"
 cd "$WORK/repo"
@@ -226,6 +237,13 @@ if git diff --cached --quiet; then
 fi
 git -c user.name="lumiere-codegen" -c user.email="codegen@lumiere.local" \
   commit --quiet -m "chore: publish generated contracts v$VERSION"
+if [[ -n "${LUMIERE_CONTRACTS_PREPARE_DIR:-}" ]]; then
+  echo "Prepared contracts v$VERSION at $WORK/repo"
+  echo "Candidate commit: $(git rev-parse HEAD)"
+  echo "Remote destination: $CONTRACTS_REPO (main and v$VERSION)"
+  echo "No remote commit or tag was published."
+  exit 0
+fi
 git push --quiet origin main
 git tag -a "v$VERSION" -m "Generated contracts release v$VERSION"
 git push --quiet origin "v$VERSION"

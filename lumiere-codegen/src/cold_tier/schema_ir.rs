@@ -110,9 +110,9 @@ impl LumiereSchemaManifest {
 
     /// Enforce the C0 organization-ownership invariant for every manifest relation.
     pub fn validate_tenant_ownership(&self) -> Result<()> {
-        if self.tables.len() != 463 {
+        if self.tables.len() != 465 {
             bail!(
-                "C0 requires 463 organization-owned relations (458 application + 5 protocol), found {}",
+                "C0 requires 465 organization-owned relations (460 application + 5 protocol), found {}",
                 self.tables.len()
             );
         }
@@ -322,10 +322,10 @@ mod tests {
     }
 
     #[test]
-    fn c0_validation_requires_463_direct_relations() {
+    fn c0_validation_requires_465_direct_relations() {
         let complete = LumiereSchemaManifest {
             version: 1,
-            tables: vec![table("orders", Some((GeneratedType::U64, false)), true); 463],
+            tables: vec![table("orders", Some((GeneratedType::U64, false)), true); 465],
             enum_types: vec![],
         };
         complete.validate_tenant_ownership().unwrap();

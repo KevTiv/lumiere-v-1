@@ -72,6 +72,7 @@ pub mod inventory; // Phase 3–4 — Products & Inventory
 pub mod iot; // Phase 20 — IoT Integration (devices, telemetry, actions)
 pub mod manufacturing; // Phase 10 — BOM, Work Orders
 pub mod projects; // Phase 11 — Projects, Tasks, Timesheets
+pub mod presentation;
 pub mod proposals; // Phase 21 — Sales Proposals & Tenders
 pub mod purchasing; // Phase 6 — Purchase Orders & Supply Chain
 pub mod sales; // Phase 5 — Quotations, POS, Delivery
