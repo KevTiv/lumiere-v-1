@@ -166,7 +166,9 @@ move residuals, clearing residual) rather than operational rows alone.
 `RECONCILIATION_EPSILON = 1e-6`. The native model (`money.rs`) shows exact agreement with integer
 minor units for 0-, 2- and 3-decimal currencies up to 1e8 major units, and demonstrates that from
 ~1e10 major units the epsilon is below f64 resolution so admission becomes exact float comparison
-(`MONEY-PRECISION`). Not changed in this PR. Pre-tenant position: acceptable for the SME pilot
+(`MONEY-PRECISION`). The in-module PAY-09 case (a 12,345,678,901.23 payment settled by two
+allocations) passes on `main`, so the divergence is proven for the admission rule in isolation, not yet
+reproduced end-to-end through the ledger. Not changed in this PR. Pre-tenant position: acceptable for the SME pilot
 envelope only if tenant limits stay below 1e9 major units per payment; otherwise a blocker requiring
 integer minor units/decimal.
 
@@ -272,11 +274,11 @@ Registered in `KNOWN_DEFECTS` / `expectKnownDefect()`; runtime confirmation reco
 | `COMM-11` | A batch creator can approve their own batch; no independent-approval rule. |
 | `COMM-13` | `create_message_batch` does not scope candidate contacts/identities to the calling organization. |
 | `COMM-14` | A number change under the same identity id silently redirects an approved recipient. |
-| `COMM-15` | Batch approval retry by the same approver returns an error instead of an idempotent success. |
+| `COMM-15` | (Playwright-only; not yet executed against a running stack) Batch approval retry by the same approver returns an error instead of an idempotent success. |
 | `PAY-03` | `post_payment_transaction` retry after commit returns an error instead of idempotent success. |
 | `PAY-05` | `reverse_payment_transaction` retry after commit returns an error instead of idempotent success. |
 | `PAY-11B` | `stage_bank_statement_import` silently accepts a replayed idempotency key with a different payload. |
-| `AG-IDEMP-01` | AI draft approval retry after commit returns an error instead of idempotent success. |
+| `AG-IDEMP-01` | (Playwright-only; not yet executed against a running stack) AI draft approval retry after commit returns an error instead of idempotent success. |
 
 Additional documented findings (not executed as tests): `MONEY-PRECISION`, `CSV-01..04`, `REC-01`.
 
@@ -360,4 +362,17 @@ cd frontend/web && pnpm exec playwright test --list --grep @pretenant
 
 ## Validation log
 
-See the PR description for the exact commands and results of the run that accompanies this branch.
+Run on 2026-09-12 against `main` @ `06c9c82a0` plus this branch.
+
+| Command | Result |
+|---------|--------|
+| `cd spacetimedb && cargo check --locked --tests` | pass |
+| `cd spacetimedb && cargo test --locked --lib pretenant_cert` | 6 passed |
+| `spacetime build` + `spacetime publish lumiere-pretenant-cert --server local --clear-database` | pass |
+| `spacetime call lumiere-pretenant-cert run_core_operational_messaging_test` | pass: COMM-01/02/03/04/08/10/12 and SM-01 pass; COMM-05/06/07/09/11/13/14 confirmed known defects |
+| `spacetime call lumiere-pretenant-cert run_accounting_payment_management_test` | pass: PAY-01/02/04/06/07/08/09/10/11A and SM-02 pass; PAY-03/05/11B confirmed known defects |
+| `cd frontend/web && pnpm exec playwright test --list` | 216 tests in 69 files (44 `@pretenant`) |
+| `tsc --noEmit` (web, excluding stale local `.next/dev` types) | pass |
+
+Not executed: the `@pretenant` Playwright suite (needs a running seeded stack, `make e2e-pretenant`). Its
+browser-only defects (`COMM-15`, `AG-IDEMP-01`) and behavioural assertions are unverified at runtime.

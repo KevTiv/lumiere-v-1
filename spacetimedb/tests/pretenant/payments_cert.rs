@@ -21,10 +21,10 @@ use crate::accounting::payment_management::{
     CreatePaymentAccountParams, CreatePaymentTransactionParams, ReversePaymentTransactionParams,
 };
 use crate::accounting::payments::account_payment;
-use crate::accounting_tests::helpers::{create_balanced_customer_invoice, seed_bank_journal};
+use crate::accounting_tests::helpers::{create_balanced_customer_invoice_on_account, seed_bank_journal};
 use crate::core::audit::audit_log;
 use crate::core::organization::company;
-use crate::test_harness::{ensure_test_superuser, OrgFixture};
+use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{PartnerType, PaymentDirection, PaymentProviderCode, PaymentTransactionStatus};
 
 const CENTS: u32 = 2;
@@ -156,7 +156,27 @@ pub(super) fn posted_receipt(
 
 /// Posted customer invoice and its receivable line.
 pub(super) fn invoice(ctx: &ReducerContext, w: &Wallet, amount: f64) -> Result<(u64, u64), String> {
-    let invoice_id = create_balanced_customer_invoice(ctx, &w.fixture, amount, true)?;
+    // The shared helper derives its idempotency key from the ref label, so each certification
+    // invoice needs a distinct label or later invoices replay the first one.
+    let ar_id = *w
+        .fixture
+        .chart_account_ids
+        .get(chart_keys::AR)
+        .ok_or("harness missing AR account")?;
+    let sequence = ctx
+        .db
+        .account_move()
+        .iter()
+        .filter(|m| m.organization_id == w.org())
+        .count();
+    let invoice_id = create_balanced_customer_invoice_on_account(
+        ctx,
+        &w.fixture,
+        amount,
+        ar_id,
+        &format!("pretenant invoice {sequence}"),
+        true,
+    )?;
     let line_id = ctx
         .db
         .account_move_line()
