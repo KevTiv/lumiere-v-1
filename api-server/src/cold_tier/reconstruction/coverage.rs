@@ -84,6 +84,7 @@ pub async fn capture_coverage_snapshot(
     let catalog = RestoreCatalog::generated()?;
     let expected_modules = enabled_modules()?;
     let rows = load_source_rows(&source, organization_id, &catalog).await?;
+    validate_presentation_rows(&rows)?;
     let module_row_counts = count_module_rows(&rows);
     let covered_modules = module_row_counts.keys().cloned().collect::<BTreeSet<_>>();
     let missing = expected_modules
@@ -378,6 +379,74 @@ fn count_module_rows(rows: &[SnapshotRow]) -> BTreeMap<String, usize> {
     counts
 }
 
+fn validate_presentation_rows(rows: &[SnapshotRow]) -> Result<()> {
+    let heads = rows
+        .iter()
+        .filter(|row| row.table == "presentation_module")
+        .collect::<Vec<_>>();
+    let versions = rows
+        .iter()
+        .filter(|row| row.table == "presentation_module_version")
+        .collect::<Vec<_>>();
+    if heads.is_empty() || versions.is_empty() {
+        bail!(
+            "seeded source lacks presentation_module head and version rows (heads={}, versions={})",
+            heads.len(),
+            versions.len()
+        );
+    }
+
+    let head_revisions = heads
+        .iter()
+        .map(|row| {
+            let id =
+                value_u64(&row.row, "id").context("presentation module head lacks numeric id")?;
+            let revision = value_u64(&row.row, "current_revision")
+                .context("presentation module head lacks numeric current_revision")?;
+            if revision == 0 {
+                bail!("presentation module head current_revision must be positive");
+            }
+            Ok((id, revision))
+        })
+        .collect::<Result<BTreeMap<_, _>>>()?;
+    let head_ids = head_revisions.keys().copied().collect::<BTreeSet<_>>();
+    let mut version_revisions = BTreeSet::new();
+    for version in versions {
+        let module_id = value_u64(&version.row, "module_id")
+            .context("presentation module version lacks numeric module_id")?;
+        if !head_ids.contains(&module_id) {
+            bail!(
+                "presentation module version references missing head {}",
+                module_id
+            );
+        }
+        let revision = value_u64(&version.row, "revision")
+            .context("presentation module version lacks numeric revision")?;
+        if revision == 0 {
+            bail!("presentation module version revision must be positive");
+        }
+        version_revisions.insert((module_id, revision));
+    }
+    for (module_id, revision) in head_revisions {
+        if !version_revisions.contains(&(module_id, revision)) {
+            bail!(
+                "presentation module head {} current_revision {} lacks a matching version",
+                module_id,
+                revision
+            );
+        }
+    }
+    Ok(())
+}
+
+fn value_u64(row: &Value, field: &str) -> Option<u64> {
+    row.get(field).and_then(|value| {
+        value
+            .as_u64()
+            .or_else(|| value.as_str().and_then(|text| text.parse().ok()))
+    })
+}
+
 fn count_named_values(rows: &[SnapshotRow], predicate: impl Fn(&str) -> bool) -> usize {
     rows.iter()
         .filter_map(|row| row.row.as_object())
@@ -407,14 +476,16 @@ fn require_disposable_source() -> Result<()> {
     let module = required_env(SOURCE_MODULE_ENV)?;
     if !is_disposable_source_module(&module) {
         bail!(
-            "{SOURCE_MODULE_ENV} must use the disposable 'lumiere-c7-source-' prefix or local E2E suffix"
+            "{SOURCE_MODULE_ENV} must use a recognized disposable C7 source name or local E2E suffix"
         );
     }
     Ok(())
 }
 
 fn is_disposable_source_module(module: &str) -> bool {
-    module.starts_with("lumiere-c7-source-") || module.ends_with("-local-e2e")
+    module.starts_with("lumiere-c7-source-")
+        || module == "lumiere-c7-presentation-source"
+        || module.ends_with("-local-e2e")
 }
 
 fn required_env(name: &str) -> Result<String> {
@@ -440,16 +511,61 @@ mod tests {
     #[test]
     fn enabled_module_census_is_complete() {
         let modules = enabled_modules().unwrap();
-        assert_eq!(modules.len(), 22);
+        assert_eq!(modules.len(), 23);
         assert!(modules.contains("core"));
+        assert!(modules.contains("presentation"));
         assert!(modules.contains("workflow"));
     }
 
     #[test]
     fn source_module_scope_accepts_only_explicit_local_test_names() {
         assert!(is_disposable_source_module("lumiere-c7-source-final"));
+        assert!(is_disposable_source_module(
+            "lumiere-c7-presentation-source"
+        ));
         assert!(is_disposable_source_module("lumiere-v1-local-e2e"));
         assert!(!is_disposable_source_module("lumiere-production"));
+    }
+
+    fn presentation_row(table: &str, row: Value) -> SnapshotRow {
+        SnapshotRow {
+            table: table.to_owned(),
+            module: "presentation".to_owned(),
+            identity: json!({"id": 1}),
+            row,
+        }
+    }
+
+    #[test]
+    fn presentation_rows_require_matching_current_revision() {
+        let rows = vec![
+            presentation_row(
+                "presentation_module",
+                json!({"id": 7, "current_revision": 2}),
+            ),
+            presentation_row(
+                "presentation_module_version",
+                json!({"id": 9, "module_id": 7, "revision": 1}),
+            ),
+        ];
+        let error = validate_presentation_rows(&rows).unwrap_err().to_string();
+        assert!(error.contains("current_revision 2"));
+    }
+
+    #[test]
+    fn presentation_rows_reject_missing_head_reference() {
+        let rows = vec![
+            presentation_row(
+                "presentation_module",
+                json!({"id": 7, "current_revision": 1}),
+            ),
+            presentation_row(
+                "presentation_module_version",
+                json!({"id": 9, "module_id": 8, "revision": 1}),
+            ),
+        ];
+        let error = validate_presentation_rows(&rows).unwrap_err().to_string();
+        assert!(error.contains("references missing head 8"));
     }
 
     #[test]

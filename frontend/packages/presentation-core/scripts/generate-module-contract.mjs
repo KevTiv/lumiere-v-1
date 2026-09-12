@@ -7,7 +7,7 @@ const root = new URL('../../../../', import.meta.url);
 const packageRoot = new URL('../', import.meta.url);
 const check = process.argv.includes('--check');
 const schemaOnlyInput = process.argv.includes('--from-schema');
-for (const [name, title, args] of [['module-draft', 'ModuleDraft', []], ['preview-contract', 'PreviewContract', ['preview']]]) {
+for (const [name, title, args] of [['module-draft', 'ModuleDraft', []], ['preview-contract', 'PreviewContract', ['preview']], ['saved-draft-contract', 'SavedDraftContract', ['saved']]]) {
   const schemaPath = new URL(`schema/${name}.schema.json`, packageRoot);
   const schemaText = schemaOnlyInput
     ? await readFile(schemaPath, 'utf8')
