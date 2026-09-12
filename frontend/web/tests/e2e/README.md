@@ -39,6 +39,7 @@ These Playwright tests exercise the current high-value ERP web flows:
 | `parity-phase5-chatter-mutations.spec.ts` | Post note on seeded sale order + mail_message assert (`@parity-phase-5`) |
 | `crm-duplicate-merge.spec.ts` | Duplicate contact detection + merge via CRM Duplicates tab (`@phase-4`) |
 | `import-rollback.spec.ts` | CRM contact import assistant + rollback import job (`@phase-4`) |
+| `pretenant-*.spec.ts` | Pre-tenant adversarial certification (`@pretenant @adversarial`): two-session approvals, concurrency, lost responses, latency/offline, responsive reachability, capability-gated IR/agent cases. Optional/nightly: `make e2e-pretenant`. See `docs/plans/pre-tenant-adversarial-certification.md` |
 | `manufacturing-mutations.spec.ts` | Work center, BOM, and MO create mutations (`@phase-4`) |
 | `expenses-wave-lifecycle.spec.ts` | Expenses capture/ops panels, allocations form, conflict outbox, card statement create (`@expenses` `@p0`) |
 | `phase-5-workforce-smoke.spec.ts` | HR/Projects/Expenses/Calendar shell smoke (`@phase-5`) |

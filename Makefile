@@ -103,6 +103,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running \
+	e2e-pretenant pretenant-cert-stdb pretenant-cert-native \
 	init-stack docker-dev docker-dev-iot \
 	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift check-c9-isolation-matrix lint-trusted-route-boundaries \
 	clean-contracts-live-staging lint-reducer-call-literals api-server-run \
@@ -710,6 +711,20 @@ e2e-web-dev: e2e-smoke-setup
 		NEXT_PUBLIC_STDB_HOST="$$E2E_STDB_HOST" NEXT_PUBLIC_API_GATEWAY_URL="" \
 		pnpm exec next dev --hostname 127.0.0.1 --port $(E2E_WEB_PORT); \
 	'
+
+# Pre-tenant adversarial certification (docs/plans/pre-tenant-adversarial-certification.md).
+# Browser suite is optional/nightly/manual and needs a running stack (e2e-smoke-setup or e2e-web-dev).
+e2e-pretenant:
+	@$(MAKE) --no-print-directory e2e-playwright-only E2E_GREP="@pretenant" E2E_ONLY_SPEC="$(E2E_ONLY_SPEC)"
+
+# In-module certification runs inside existing domain test reducers (no new reducers/contracts).
+pretenant-cert-stdb:
+	spacetime call "$(E2E_DB)" run_core_operational_messaging_test --server local --no-config
+	spacetime call "$(E2E_DB)" run_accounting_payment_management_test --server local --no-config
+
+# Native money-representation model and known-defect registry consistency.
+pretenant-cert-native:
+	cd spacetimedb && python3 ../scripts/run-required-cargo-tests.py --locked --lib pretenant_cert
 
 e2e-playwright-only:
 	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_ONLY_SPEC="$(E2E_ONLY_SPEC)" E2E_GREP="$(E2E_GREP)" E2E_WORKERS="$(E2E_WORKERS)" /bin/bash -c 'set -euo pipefail; \
