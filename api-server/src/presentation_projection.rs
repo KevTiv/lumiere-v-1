@@ -140,7 +140,7 @@ pub fn project_account_move_row(row: &Value, fields: &[String]) -> Result<Previe
     for field in fields {
         let column = columns
             .iter()
-            .find(|column| column.sql_name == field)
+            .find(|column| column.sql_name == *field)
             .ok_or_else(|| {
                 ApiError::Unprocessable(format!(
                     "field '{field}' is not generated for account_move"
