@@ -168,6 +168,10 @@ pub mod integrations_tests;
 #[path = "../tests/data_ops/mod.rs"]
 pub mod data_ops_tests;
 
+/// Pre-tenant adversarial certification cases — invoked from existing domain test reducers.
+#[path = "../tests/pretenant/mod.rs"]
+pub mod pretenant_cert;
+
 use crate::core::migrations::apply_pending_global_migrations;
 use crate::core::users::{
     ensure_user_profile_for_organization, find_user_profile_for_identity, user_organization,
