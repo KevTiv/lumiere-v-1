@@ -134,6 +134,22 @@ pub async fn apply_commit(
         apply_change(&transaction, change, &mut statements).await?;
     }
 
+    let next_sequence = commit
+        .sequence
+        .checked_add(1)
+        .context("advance durable organization commit cursor")?
+        .to_string();
+    transaction
+        .execute(
+            "INSERT INTO organization_commit_cursor (organization_id, next_sequence) \
+             VALUES ($1::TEXT::NUMERIC, $2::TEXT::NUMERIC) \
+             ON CONFLICT (organization_id) DO UPDATE SET \
+                next_sequence = EXCLUDED.next_sequence",
+            &[&organization_id_text, &next_sequence],
+        )
+        .await
+        .context("advance durable organization commit cursor")?;
+
     transaction
         .execute(
             "INSERT INTO organization_projection_watermark \

@@ -24,6 +24,7 @@ pub(super) fn projection_plan(change_kinds: &[&str]) -> Vec<String> {
     .map(str::to_string)
     .collect::<Vec<_>>();
     plan.extend((0..change_kinds.len()).map(|ordinal| format!("apply_change:{ordinal}")));
+    plan.push("advance_commit_cursor".to_string());
     plan.push("advance_watermark".to_string());
     plan.push("commit".to_string());
     plan

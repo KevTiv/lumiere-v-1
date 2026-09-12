@@ -59,7 +59,7 @@ async function assertDocumentsTab(page: Page, tabId: string) {
       await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "document-insights":
-      await expect(page.getByTestId("entity-action-generate-insights")).toBeVisible()
+      await expect(page.getByTestId("entity-action-ask-ai")).toBeVisible()
       await expect(activeTabEntityTable(page)).toBeVisible()
       break
     default:

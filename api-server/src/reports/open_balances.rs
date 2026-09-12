@@ -16,6 +16,7 @@ const BUCKET_ORDER: [(&str, &str); 5] = [
 ];
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OpenMoveSourceRow {
     pub id: u64,
     pub partner_id: Option<u64>,
@@ -27,12 +28,14 @@ pub struct OpenMoveSourceRow {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MoveLineMoveIdRow {
     pub id: u64,
     pub move_id: u64,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MoveAllocationSourceRow {
     pub allocated_move_line_id: u64,
     pub allocated_amount: f64,

@@ -14,6 +14,7 @@ use super::{PgReconstructionSource, MAX_BATCH_SIZE};
 use anyhow::{bail, Context, Result};
 use deadpool_postgres::Pool;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use stdb_client::{ReducerCall, StdbClient};
@@ -175,6 +176,9 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
             .find(|column| column.name == table.primary_key)
             .context("generated codec lacks reconstruction primary key")?;
         let source = PgReconstructionSource::new(self.pool.clone());
+        let receipt_digest = self
+            .verify_batch_receipts(fence, table, &columns, &source)
+            .await?;
         let mut after = None;
         let mut digest = OrderedDigest::new(&table.primary_key);
         let mut expected_count = 0_u64;
@@ -205,9 +209,15 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
                 organization_id = fence.organization_id,
                 limit = expected.len(),
             );
-            let rows = self.read_stdb.query_sql_sats(&sql).await.with_context(|| {
-                format!("read STDB reconstruction digest relation '{}'", table.table)
-            })?;
+            let rows = match self.read_stdb.query_sql_sats(&sql).await {
+                Ok(rows) => rows,
+                Err(error) if is_private_relation_error(&error) => return Ok(receipt_digest),
+                Err(error) => {
+                    return Err(error).with_context(|| {
+                        format!("read STDB reconstruction digest relation '{}'", table.table)
+                    });
+                }
+            };
             let mut actual_by_identity = BTreeMap::new();
             for row in rows {
                 let row = normalize_stdb_digest_row(&columns, row)?;
@@ -249,16 +259,18 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
             organization_column = quote_identifier(&table.organization_column),
             organization_id = fence.organization_id,
         );
-        let count_rows = self
-            .read_stdb
-            .query_sql_sats(&count_sql)
-            .await
-            .with_context(|| {
-                format!(
-                    "count STDB reconstruction digest relation '{}'",
-                    table.table
-                )
-            })?;
+        let count_rows = match self.read_stdb.query_sql_sats(&count_sql).await {
+            Ok(rows) => rows,
+            Err(error) if is_private_relation_error(&error) => return Ok(receipt_digest),
+            Err(error) => {
+                return Err(error).with_context(|| {
+                    format!(
+                        "count STDB reconstruction digest relation '{}'",
+                        table.table
+                    )
+                });
+            }
+        };
         let actual_count = count_rows
             .first()
             .and_then(|row| row.get("row_count"))
@@ -270,7 +282,14 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
                 table.table
             );
         }
-        Ok(digest.finish())
+        let direct_digest = digest.finish();
+        if direct_digest != receipt_digest {
+            bail!(
+                "STDB reconstruction row and receipt digests disagree for '{}'",
+                table.table
+            );
+        }
+        Ok(direct_digest)
     }
 
     async fn prepare_recreated_state(
@@ -296,8 +315,10 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
         // while this writer fence is held. Revalidate the exact durable and
         // hot-store heads immediately before release; rescanning every table
         // here would duplicate that bounded checksum pass.
-        reconciliation::verify_declared_watermark(
-            self.read_stdb,
+        // The operator verifies the durable head here. The trusted completion
+        // reducer verifies the restored private commit cursor before it can
+        // release the writer fence.
+        reconciliation::verify_postgres_watermark(
             self.pool,
             fence.organization_id,
             fence.watermark.sequence,
@@ -319,6 +340,111 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
         )
         .await
     }
+}
+
+impl StdbReconstructionSink<'_> {
+    async fn verify_batch_receipts(
+        &self,
+        fence: &ReconstructionFence,
+        table: &RestoreTable,
+        columns: &[pg_codec::ColumnCodec],
+        source: &PgReconstructionSource,
+    ) -> Result<TableDigest> {
+        let mut after = None;
+        let mut batch_ordinal = 0_u64;
+        let mut digest = OrderedDigest::new(&table.primary_key);
+        loop {
+            let rows = source
+                .load_batch(
+                    fence.organization_id,
+                    &fence.watermark,
+                    table,
+                    after.as_ref(),
+                    MAX_BATCH_SIZE,
+                )
+                .await?;
+            let is_last_batch = rows.len() < MAX_BATCH_SIZE as usize;
+            let rows_json = rows
+                .iter()
+                .map(|row| canonical_stdb_row_json(columns, &row.row))
+                .collect::<Result<Vec<_>>>()?;
+            let expected_checksum = reconstruction_batch_checksum(
+                &table.table,
+                table.restore_order,
+                batch_ordinal,
+                is_last_batch,
+                &rows_json,
+            );
+            let receipt_key = format!(
+                "{}:{}:{}:{}",
+                fence.organization_id, fence.token, table.restore_order, batch_ordinal
+            );
+            let receipt_sql = format!(
+                "SELECT restore_order, batch_ordinal, is_last_batch, row_count, batch_checksum \
+                 FROM organization_reconstruction_batch_receipt \
+                 WHERE receipt_key = '{}' AND organization_id = {}",
+                receipt_key.replace('\'', "''"),
+                fence.organization_id,
+            );
+            let receipts = self
+                .read_stdb
+                .query_sql_sats(&receipt_sql)
+                .await
+                .with_context(|| format!("read reconstruction receipt for '{}'", table.table))?;
+            let receipt = receipts
+                .first()
+                .filter(|_| receipts.len() == 1)
+                .context("reconstruction batch receipt is missing or duplicated")?;
+            if receipt.get("restore_order").and_then(Value::as_u64)
+                != Some(u64::from(table.restore_order))
+                || receipt.get("batch_ordinal").and_then(Value::as_u64) != Some(batch_ordinal)
+                || receipt.get("is_last_batch").and_then(Value::as_bool) != Some(is_last_batch)
+                || receipt.get("row_count").and_then(Value::as_u64) != Some(rows.len() as u64)
+                || receipt.get("batch_checksum").and_then(Value::as_str)
+                    != Some(expected_checksum.as_str())
+            {
+                bail!(
+                    "reconstruction batch receipt mismatch for '{}'",
+                    table.table
+                );
+            }
+            for row in &rows {
+                digest.push(&row.identity, &row.row)?;
+            }
+            if is_last_batch {
+                break;
+            }
+            after = rows.last().map(|row| row.identity.clone());
+            batch_ordinal = batch_ordinal
+                .checked_add(1)
+                .context("reconstruction receipt batch ordinal overflow")?;
+        }
+        Ok(digest.finish())
+    }
+}
+
+fn reconstruction_batch_checksum(
+    table_name: &str,
+    restore_order: u32,
+    batch_ordinal: u64,
+    is_last_batch: bool,
+    rows_json: &[String],
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(table_name.as_bytes());
+    hasher.update(restore_order.to_le_bytes());
+    hasher.update(batch_ordinal.to_le_bytes());
+    hasher.update([u8::from(is_last_batch)]);
+    for row in rows_json {
+        hasher.update((row.len() as u64).to_le_bytes());
+        hasher.update(row.as_bytes());
+    }
+    format!("sha256:{:x}", hasher.finalize())
+}
+
+fn is_private_relation_error(error: &anyhow::Error) -> bool {
+    let message = format!("{error:#}");
+    message.contains("no such table:") && message.contains("may be marked private")
 }
 
 fn stdb_identity_equality(identity: &Value, primary_key: &str, pg_type: &str) -> Result<String> {
@@ -532,8 +658,9 @@ fn failure_injection_enabled(
 mod tests {
     use super::{
         canonical_sats_to_durable, canonical_stdb_row_json, durable_value_to_sats,
-        failure_injection_enabled, normalize_stdb_digest_row, rust_field_name,
-        stdb_identity_equality, stdb_sql_field_name,
+        failure_injection_enabled, is_private_relation_error, normalize_stdb_digest_row,
+        reconstruction_batch_checksum, rust_field_name, stdb_identity_equality,
+        stdb_sql_field_name,
     };
     use crate::cold_tier::pg_codec;
     use serde_json::{json, Value};
@@ -701,5 +828,30 @@ mod tests {
             normalize_stdb_digest_row(&columns, json!({"user_ids": identities.clone()})).unwrap(),
             json!({"userIds": identities})
         );
+    }
+
+    #[test]
+    fn reconstruction_receipt_checksum_matches_module_protocol() {
+        assert_eq!(
+            reconstruction_batch_checksum(
+                "accounting_operation_receipt",
+                20,
+                0,
+                true,
+                &[r#"{"id":"receipt-1"}"#.to_owned()],
+            ),
+            "sha256:5a1b5885b4f6d1fc93d628cffd2f1ec78bc7a003b38afb66f5dae65cc342093e"
+        );
+    }
+
+    #[test]
+    fn private_relation_fallback_is_narrow() {
+        let private = anyhow::anyhow!(
+            "SpacetimeDB HTTP 400 Bad Request: no such table: `receipt`. If the table exists, it may be marked private."
+        );
+        assert!(is_private_relation_error(&private));
+        assert!(!is_private_relation_error(&anyhow::anyhow!(
+            "connection refused"
+        )));
     }
 }

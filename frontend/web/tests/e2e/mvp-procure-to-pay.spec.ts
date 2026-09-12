@@ -27,6 +27,7 @@ import {
   postDraftBillViaUi,
   scalarQueryString,
   selectEntityRowById,
+  selectModuleTab,
   smokeName,
   submitForm,
   waitForEntityActionEnabled,
@@ -67,7 +68,7 @@ async function createConfirmedPoWithLine(
   quantity: string,
 ) {
   await gotoModule(page, "/purchasing", "purchasing")
-  await page.getByTestId("module-tab-purchasing-orders").click()
+  await selectModuleTab(page, "purchasing", "orders")
   await page.getByTestId("module-create-purchasing-orders").click()
   await expect(page.getByTestId("form-modal-new-purchase-order")).toBeVisible()
   await chooseSelectOptionByLabel(page, "partnerId", VENDOR_NAME)
@@ -82,10 +83,10 @@ async function createConfirmedPoWithLine(
   ])
   expect(createPoRes.ok()).toBe(true)
 
-  const orderId = await fetchLatestPurchaseOrderIdByPartner(page, vendorPartnerId)
+  const orderId = await fetchLatestPurchaseOrderIdByPartner(page, vendorPartnerId, origin)
   const orderLabel = await fetchPurchaseOrderSelectLabel(page, orderId)
 
-  await page.getByTestId("module-tab-purchasing-lines").click()
+  await selectModuleTab(page, "purchasing", "lines")
   await page.getByTestId("entity-action-pol-add-form").click()
   await expect(page.getByTestId("form-modal-add-purchase-order-line")).toBeVisible()
   await chooseSelectOptionByLabel(page, "orderId", orderLabel)
@@ -102,7 +103,7 @@ async function createConfirmedPoWithLine(
   ])
   expect(lineRes.ok()).toBe(true)
 
-  await page.getByTestId("module-tab-purchasing-orders").click()
+  await selectModuleTab(page, "purchasing", "orders")
   await selectEntityRowById(page, orderId)
   await clickEntityActionAndWaitForReducer(page, "entity-action-po-confirm", "confirm_purchase_order")
   await waitForPurchaseOrderState(page, orderId, "Purchase")
@@ -117,7 +118,7 @@ async function receivePoLineQty(
   qty: string,
 ) {
   const receiveLabel = await fetchPurchaseOrderLineReceiveLabel(page, orderId, lineId)
-  await page.getByTestId("module-tab-purchasing-lines").click()
+  await selectModuleTab(page, "purchasing", "lines")
   await page.getByTestId("entity-action-pol-receive-form").click()
   await expect(page.getByTestId("form-modal-receive-purchase-order-line")).toBeVisible()
   await chooseSelectOptionByLabel(page, "lineId", receiveLabel)
@@ -133,7 +134,7 @@ async function receivePoLineQty(
 }
 
 async function createBillFromPo(page: import("@playwright/test").Page, orderId: number) {
-  await page.getByTestId("module-tab-purchasing-orders").click()
+  await selectModuleTab(page, "purchasing", "orders")
   const journalLabel = await fetchVendorBillJournalLabel(page)
   const expenseLabel = await fetchAccountSelectLabelByInternalType(page, "expense")
   const payableLabel = await fetchAccountSelectLabelByInternalType(page, "payable")
@@ -271,7 +272,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
 
     await page.reload()
     await gotoModule(page, "/purchasing", "purchasing")
-    await page.getByTestId("module-tab-purchasing-lines").click()
+    await selectModuleTab(page, "purchasing", "lines")
     await expect(page.getByTestId(`entity-row-${lineId}`)).toContainText("Matched", {
       timeout: 30_000,
     })
@@ -301,7 +302,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
 
     await page.reload()
     await gotoModule(page, "/purchasing", "purchasing")
-    await page.getByTestId("module-tab-purchasing-lines").click()
+    await selectModuleTab(page, "purchasing", "lines")
     await expect(page.getByTestId(`entity-row-${lineId}`)).toContainText("Over-billed", {
       timeout: 30_000,
     })

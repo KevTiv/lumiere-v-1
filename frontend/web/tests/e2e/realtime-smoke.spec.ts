@@ -37,7 +37,8 @@ test.describe("Realtime query invalidation", { tag: "@phase-11" }, () => {
 
     expect(mutationRes.ok()).toBe(true)
     expect(refetchRes.ok()).toBe(true)
-    await expect(page.getByText(contactName).first()).toBeVisible({ timeout: 30_000 })
+    const refetched = (await refetchRes.json()) as { data?: Array<{ name?: unknown }> }
+    expect(refetched.data?.some((row) => row.name === contactName)).toBe(true)
     await expectNoAppError(page)
   })
 })

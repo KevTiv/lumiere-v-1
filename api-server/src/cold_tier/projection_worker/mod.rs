@@ -64,6 +64,33 @@ pub struct ProjectionDrainBudget {
     pub max_concurrent_organizations: usize,
 }
 
+#[derive(Debug, Clone)]
+struct RetryBackoff {
+    base: Duration,
+    max: Duration,
+    failures: u32,
+}
+
+impl RetryBackoff {
+    fn new(base: Duration, max: Duration) -> Self {
+        Self {
+            base,
+            max: max.max(base),
+            failures: 0,
+        }
+    }
+
+    fn failure_delay(&mut self) -> Duration {
+        let multiplier = 1u32 << self.failures.min(16);
+        self.failures = self.failures.saturating_add(1);
+        self.base.saturating_mul(multiplier).min(self.max)
+    }
+
+    fn reset(&mut self) {
+        self.failures = 0;
+    }
+}
+
 impl Default for ProjectionDrainBudget {
     fn default() -> Self {
         Self {
@@ -119,6 +146,11 @@ pub async fn serve() -> Result<()> {
         .and_then(|value| value.parse().ok())
         .filter(|value| *value > 0)
         .unwrap_or(5u64);
+    let projection_retry_max_secs = std::env::var("LUMIERE_PROJECTION_RETRY_MAX_SECS")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(60u64);
     let batch = std::env::var("LUMIERE_PROJECTION_WORKER_BATCH")
         .ok()
         .and_then(|value| value.parse().ok())
@@ -158,6 +190,11 @@ pub async fn serve() -> Result<()> {
         .and_then(|value| value.parse().ok())
         .filter(|value| *value > 0)
         .unwrap_or(5u64);
+    let finalization_retry_max_secs = std::env::var("LUMIERE_FINALIZATION_RETRY_MAX_SECS")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(60u64);
     let port = std::env::var("LUMIERE_PROJECTION_WORKER_PORT")
         .ok()
         .and_then(|value| value.parse().ok())
@@ -218,8 +255,12 @@ pub async fn serve() -> Result<()> {
     let worker_state = state.clone();
     let worker_pool = projection_pool.clone();
     tokio::spawn(async move {
+        let mut retry_backoff = RetryBackoff::new(
+            Duration::from_secs(idle_poll_secs),
+            Duration::from_secs(projection_retry_max_secs),
+        );
         loop {
-            let backlog_remaining = match drain_batch_with_budget(
+            let (backlog_remaining, failed) = match drain_batch_with_budget(
                 &worker_state.stdb,
                 &worker_pool,
                 batch,
@@ -265,17 +306,23 @@ pub async fn serve() -> Result<()> {
                     if stats.commits > 0 || stats.already_applied > 0 {
                         tracing::info!(?stats, "projection worker batch complete");
                     }
-                    stats.backlog_remaining
+                    (stats.backlog_remaining, stats.failed > 0)
                 }
                 Err(error) => {
                     worker_ready.store(false, Ordering::Relaxed);
                     tracing::error!(%error, "projection worker batch failed");
-                    false
+                    (false, true)
                 }
             };
-            if backlog_remaining {
+            if failed {
+                let delay = retry_backoff.failure_delay();
+                tracing::warn!(delay_ms = delay.as_millis(), "projection retry backoff");
+                tokio::time::sleep(delay).await;
+            } else if backlog_remaining {
+                retry_backoff.reset();
                 tokio::task::yield_now().await;
             } else {
+                retry_backoff.reset();
                 tokio::time::sleep(Duration::from_secs(idle_poll_secs)).await;
             }
         }
@@ -285,6 +332,10 @@ pub async fn serve() -> Result<()> {
     let finalizer_state = state;
     let finalizer_pool = finalization_pool.clone();
     tokio::spawn(async move {
+        let mut retry_backoff = RetryBackoff::new(
+            Duration::from_secs(finalization_poll_secs),
+            Duration::from_secs(finalization_retry_max_secs),
+        );
         loop {
             // Cooling must not race a failed or over-budget projection pass.
             // The finalizer consumes the same durable store, so this gate also
@@ -307,10 +358,21 @@ pub async fn serve() -> Result<()> {
                     if stats.read > 0 {
                         tracing::info!(?stats, "C5 finalization batch complete");
                     }
+                    if stats.failed > 0 {
+                        let delay = retry_backoff.failure_delay();
+                        tracing::warn!(delay_ms = delay.as_millis(), "finalization retry backoff");
+                        tokio::time::sleep(delay).await;
+                        continue;
+                    }
+                    retry_backoff.reset();
                 }
                 Err(error) => {
                     finalizer_ready.store(false, Ordering::Relaxed);
                     tracing::error!(%error, "manifest-driven C5 finalization batch failed");
+                    let delay = retry_backoff.failure_delay();
+                    tracing::warn!(delay_ms = delay.as_millis(), "finalization retry backoff");
+                    tokio::time::sleep(delay).await;
+                    continue;
                 }
             }
             tokio::time::sleep(Duration::from_secs(finalization_poll_secs)).await;
@@ -360,10 +422,23 @@ pub async fn serve() -> Result<()> {
 mod tests {
     use super::decode::parse_commit;
     use super::relations::{parse_relations, render_relation_ddl};
-    use super::require_split_stdb_tokens;
     use super::status::{classify_apply_error, projection_heads, ProjectionFailureKind};
+    use super::{require_split_stdb_tokens, RetryBackoff};
     use anyhow::anyhow;
     use serde_json::{json, Value};
+    use std::time::Duration;
+
+    #[test]
+    fn retry_backoff_is_bounded_and_resets_after_success() {
+        let mut backoff = RetryBackoff::new(Duration::from_secs(2), Duration::from_secs(10));
+        assert_eq!(backoff.failure_delay(), Duration::from_secs(2));
+        assert_eq!(backoff.failure_delay(), Duration::from_secs(4));
+        assert_eq!(backoff.failure_delay(), Duration::from_secs(8));
+        assert_eq!(backoff.failure_delay(), Duration::from_secs(10));
+        assert_eq!(backoff.failure_delay(), Duration::from_secs(10));
+        backoff.reset();
+        assert_eq!(backoff.failure_delay(), Duration::from_secs(2));
+    }
 
     #[test]
     fn split_stdb_tokens_fail_closed_when_missing_or_equal() {

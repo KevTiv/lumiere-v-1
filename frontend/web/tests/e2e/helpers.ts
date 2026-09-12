@@ -62,8 +62,20 @@ export async function gotoModule(page: Page, route: string, moduleId?: string) {
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
   await expectAuthenticatedShell(page)
   if (moduleId) {
-    await expect(page.getByTestId(`module-view-${moduleId}`)).toBeVisible()
+    const moduleView = page.getByTestId(`module-view-${moduleId}`)
+    await expect(moduleView).toBeVisible()
+    await expect(moduleView).toHaveAttribute("data-hydrated", "true")
   }
+}
+
+/** Select a module tab and wait until its panel is the active interaction surface. */
+export async function selectModuleTab(page: Page, moduleId: string, tabId: string) {
+  const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
+  await tab.click()
+  await expect(tab).toHaveAttribute("aria-selected", "true")
+  // Base UI may regenerate the tab/tabpanel ids during the state transition.
+  // The selected tab and the single visible panel are the stable behavior.
+  await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1)
 }
 
 /** Open an entity tab’s create modal and wait for the form dialog. */
@@ -75,7 +87,7 @@ export async function openEntityCreate(
   formId: string,
 ) {
   await gotoModule(page, route, moduleId)
-  await page.getByTestId(`module-tab-${moduleId}-${tabId}`).click()
+  await selectModuleTab(page, moduleId, tabId)
   const createBtn = page.getByTestId(`module-create-${moduleId}-${tabId}`)
   await createBtn.scrollIntoViewIfNeeded()
   await createBtn.click()
@@ -480,16 +492,24 @@ function isCustomerInvoiceMoveType(value: unknown): boolean {
 export async function fetchLatestPurchaseOrderIdByPartner(
   page: Page,
   partnerId: number,
+  origin?: string,
 ): Promise<number> {
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
     const res = await page.request.get("/api/query/purchase-orders")
     if (res.ok()) {
       const json = (await res.json()) as {
-        data?: Array<{ id?: unknown; partnerId?: unknown; partner_id?: unknown }>
+        data?: Array<{
+          id?: unknown
+          partnerId?: unknown
+          partner_id?: unknown
+          origin?: unknown
+        }>
       }
       const matches = (json.data ?? []).filter(
-        (row) => scalarQueryId(row.partnerId ?? row.partner_id) === partnerId,
+        (row) =>
+          scalarQueryId(row.partnerId ?? row.partner_id) === partnerId &&
+          (origin === undefined || scalarQueryString(row.origin) === origin),
       )
       const newest = [...matches].sort(
         (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
@@ -499,7 +519,9 @@ export async function fetchLatestPurchaseOrderIdByPartner(
     }
     await page.waitForTimeout(250)
   }
-  throw new Error(`purchase order not found for partner id ${partnerId}`)
+  throw new Error(
+    `purchase order not found for partner id ${partnerId}${origin === undefined ? "" : ` and origin ${origin}`}`,
+  )
 }
 
 export async function waitForPurchaseOrderState(
@@ -700,6 +722,7 @@ export async function installPostHogResetProbe(page: Page) {
 
 /** Click the entity table row whose text includes `text`. Enables selection actions. */
 export async function selectEntityRowByText(page: Page, text: string | RegExp) {
+  await dismissBlockingDialogs(page)
   const row = activeTabEntityTable(page).locator("tbody tr").filter({ hasText: text }).first()
   await expect(row).toBeVisible({ timeout: 30_000 })
   if ((await row.getAttribute("data-state")) !== "selected") {
@@ -710,6 +733,7 @@ export async function selectEntityRowByText(page: Page, text: string | RegExp) {
 
 /** Click an entity table row by its `data-testid="entity-row-{id}"` key. */
 export async function selectEntityRowById(page: Page, id: number | string) {
+  await dismissBlockingDialogs(page)
   const table = activeTabEntityTable(page)
   const row = table.getByTestId(`entity-row-${id}`)
   await expect(row).toBeVisible({ timeout: 30_000 })
@@ -761,9 +785,14 @@ export async function fetchSessionOrganizationId(page: Page): Promise<number> {
     throw new Error(`user-organization query failed: ${res.status()}`)
   }
   const json = (await res.json()) as {
-    data?: Array<{ organizationId?: number | string; organization_id?: number | string }>
+    data?: Array<{
+      organizationId?: number | string
+      organization_id?: number | string
+      isDefault?: boolean
+      is_default?: boolean
+    }>
   }
-  const row = json.data?.[0]
+  const row = json.data?.find((membership) => membership.isDefault ?? membership.is_default) ?? json.data?.[0]
   const id = row?.organizationId ?? row?.organization_id
   if (id == null) throw new Error("no organization in session")
   return Number(id)
@@ -2077,15 +2106,6 @@ export async function gotoApprovals(page: Page) {
   await expect(page.getByTestId("module-view-approvals")).toBeVisible()
 }
 
-export async function createApprovalRuleViaUi(
-  _page: Page,
-  _options: { name: string; threshold: string },
-) {
-  throw new Error(
-    "createApprovalRuleViaUi removed: approval rules are published workflow versions — use /workflows",
-  )
-}
-
 export async function waitForPendingApprovalRequest(
   page: Page,
   model: string,
@@ -2459,6 +2479,16 @@ export async function openRecordChatterByRowText(page: Page, text: string | RegE
   await expect(row).toBeVisible({ timeout: 30_000 })
   await row.click()
   await expect(page.getByTestId("record-chatter-dialog")).toBeVisible({ timeout: 15_000 })
+
+  // Some entity tabs also open their record sheet from the same row action.
+  // Close only that top sheet so the independently requested chatter dialog
+  // remains interactive; never force-click through its modal overlay.
+  const sheet = page.locator('[data-slot="sheet-content"]:visible')
+  if ((await sheet.count()) > 0) {
+    await sheet.locator('[data-slot="sheet-close"]').click()
+    await expect(sheet).toBeHidden()
+    await expect(page.getByTestId("record-chatter-dialog")).toBeVisible()
+  }
 }
 
 export async function postChatterNote(page: Page, body: string) {
@@ -2892,6 +2922,116 @@ export async function seedPublishableWorkflowDraft(
     workflowId,
     versionId,
     draftRevision: rev,
+  }
+}
+
+/** Publish a company-scoped approval workflow for the guarded PO confirm action. */
+export async function seedPurchaseOrderApprovalWorkflow(
+  page: Page,
+  options: { workflowKey: string; name: string },
+): Promise<{ organizationId: number; versionId: number; revision: number }> {
+  const seeded = await seedPublishableWorkflowDraft(page, {
+    ...options,
+    model: "purchase_order",
+  })
+  const candidateRoleId = await fetchAdminRoleId(page)
+  let revision = seeded.draftRevision
+
+  for (const node of [
+    {
+      nodeKey: "approval",
+      name: "Approve purchase order",
+      kind: { tag: "HumanTask" },
+      sequence: 2,
+      action: WORKFLOW_NONE,
+      taskPolicy: { some: {
+        kind: { tag: "ApproveReject" },
+        assignment: { tag: "AnyCandidate" },
+        candidateRoleIds: [candidateRoleId],
+        candidateGroupIds: [],
+        candidateUnitIds: [],
+        requireCommentOnReject: true,
+      } },
+    },
+    {
+      nodeKey: "confirm",
+      name: "Confirm purchase order",
+      kind: { tag: "Action" },
+      sequence: 3,
+      action: { some: {
+        actionKey: "confirm_purchase_order",
+        inputSchemaVersion: 1,
+        input: [],
+      } },
+      taskPolicy: WORKFLOW_NONE,
+    },
+  ]) {
+    await callReducerOwner("upsert_workflow_node", [
+      seeded.organizationId,
+      seeded.versionId,
+      revision,
+      {
+        ...node,
+        splitKind: { tag: "None" },
+        joinKind: { tag: "None" },
+        timerPolicy: WORKFLOW_NONE,
+        retryPolicy: WORKFLOW_NONE,
+        subflow: WORKFLOW_NONE,
+        metadata: WORKFLOW_NONE,
+      },
+    ])
+    revision += 1
+  }
+
+  for (const edge of [
+    {
+      edgeKey: "e_start_end",
+      fromNodeKey: "start",
+      toNodeKey: "approval",
+      sequence: 1,
+      signalKey: WORKFLOW_NONE,
+    },
+    {
+      edgeKey: "e_approval_confirm",
+      fromNodeKey: "approval",
+      toNodeKey: "confirm",
+      sequence: 2,
+      signalKey: { some: "approved" },
+    },
+    {
+      edgeKey: "e_approval_reject",
+      fromNodeKey: "approval",
+      toNodeKey: "end",
+      sequence: 3,
+      signalKey: { some: "rejected" },
+    },
+    {
+      edgeKey: "e_confirm_end",
+      fromNodeKey: "confirm",
+      toNodeKey: "end",
+      sequence: 4,
+      signalKey: WORKFLOW_NONE,
+    },
+  ]) {
+    await callReducerOwner("upsert_workflow_edge", [
+      seeded.organizationId,
+      seeded.versionId,
+      revision,
+      { ...edge, condition: WORKFLOW_NONE, metadata: WORKFLOW_NONE },
+    ])
+    revision += 1
+  }
+
+  await callReducerBff(page, "publish_workflow_version", [
+    seeded.organizationId,
+    seeded.versionId,
+    revision,
+  ])
+  await waitForWorkflowVersionStatus(page, seeded.versionId, "Published")
+  return {
+    organizationId: seeded.organizationId,
+    versionId: seeded.versionId,
+    revision,
   }
 }
 

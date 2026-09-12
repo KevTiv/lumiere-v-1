@@ -85,6 +85,7 @@ export function ModuleView({
   const useRuntimeCreate = runtimeForms != null && runtimeForms.organizationId > 0
   const defaultTab = config.defaultTab ?? config.tabs[0]?.id ?? ""
   const [internalTab, setInternalTab] = useState(defaultTab)
+  const [isHydrated, setIsHydrated] = useState(false)
   const activeTab = activeTabProp ?? internalTab
   const prevActiveTabRef = useRef<string | null>(null)
   const setActiveTab = (v: string) => {
@@ -101,6 +102,10 @@ export function ModuleView({
   }, [config.title])
 
   useEffect(() => {
+    setIsHydrated(true)
+  }, [])
+
+  useEffect(() => {
     if (prevActiveTabRef.current === activeTab) return
     prevActiveTabRef.current = activeTab
     aiReporter?.setActiveTab(activeTab)
@@ -113,7 +118,11 @@ export function ModuleView({
   const showDashboardExport = activeTabConfig?.type === "dashboard"
 
   return (
-    <div className="flex flex-col min-h-full gap-2" data-testid={`module-view-${config.id}`}>
+    <div
+      className="flex flex-col min-h-full gap-2"
+      data-testid={`module-view-${config.id}`}
+      data-hydrated={isHydrated ? "true" : "false"}
+    >
       <DashboardHeader
         title={config.title}
         description={config.description}

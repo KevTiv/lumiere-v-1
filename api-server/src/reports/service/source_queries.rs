@@ -3,10 +3,33 @@ use super::{CompanyRow, ValidatedPreviewRequest};
 use crate::error::ApiError;
 use crate::reports::common::{ReportPreviewRequest, ReportScope, SourceRowCount, SourceWatermark};
 use crate::reports::timezone::{parse_timezone, ReportDayWindow};
-use chrono::NaiveDate;
-use serde::de::DeserializeOwned;
+use chrono::{DateTime, NaiveDate, SecondsFormat, Utc};
+use serde::{de::DeserializeOwned, Deserialize};
 use stdb_client::StdbClient;
 const MAX_ROWS_PER_SOURCE: usize = 1_000;
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct StdbTimestamp {
+    micros_since_unix_epoch: i64,
+}
+
+impl StdbTimestamp {
+    pub(super) fn is_between(self, start: DateTime<Utc>, end: DateTime<Utc>) -> bool {
+        let micros = self.micros_since_unix_epoch;
+        start.timestamp_micros() <= micros && micros < end.timestamp_micros()
+    }
+
+    pub(super) fn is_before(self, end: DateTime<Utc>) -> bool {
+        self.micros_since_unix_epoch < end.timestamp_micros()
+    }
+
+    pub(super) fn to_rfc3339(self) -> Result<String, ApiError> {
+        DateTime::from_timestamp_micros(self.micros_since_unix_epoch)
+            .map(|timestamp| timestamp.to_rfc3339_opts(SecondsFormat::Micros, true))
+            .ok_or_else(|| ApiError::Internal("report source timestamp is out of range".into()))
+    }
+}
 
 pub(super) fn source_watermark(
     window: &ReportDayWindow,

@@ -15,6 +15,8 @@ This doc summarizes how **SpacetimeDB**, **Next.js**, **api-server**, and **gate
 | `LUMIERE_REDUCER_ALLOWLIST` | api-server | `strict` (production default) blocks bootstrap/test/import reducers on `POST /v1/call/{reducer}`; `off` disables filtering (local dev / e2e). |
 | `AI_GATEWAY_URL` | api-server | Internal AI gateway base URL. Required in production; must not be `localhost`. |
 | `LUMIERE_PROJECTION_LAG_BUDGET_SECS` | api-server, projection-worker | Maximum tolerated age/outage interval before projection becomes unhealthy and active ERP readiness fails; defaults to 300 seconds. |
+| `LUMIERE_PROJECTION_RETRY_MAX_SECS` | projection-worker | Maximum exponential retry delay after projection transport/application failures; defaults to 60 seconds. |
+| `LUMIERE_FINALIZATION_RETRY_MAX_SECS` | projection-worker finalizer | Maximum exponential retry delay after finalization failures; defaults to 60 seconds. |
 | `STDB_TOKEN` | ai-gateway | AI service token for the SpacetimeDB HTTP API. |
 | `STDB_IOT_GATEWAY_TOKEN` | iot-gateway | Dedicated identity registered as `iot_gateway` for every organization served; must not reuse the owner or another worker token. |
 | `AI_CERTIFICATION_STDB_TOKEN` | ai-gateway | Dedicated SpacetimeDB token whose identity alone may claim and complete certification jobs. Required with `AI_CERTIFICATION_RUNTIME_HASH`. |
@@ -40,8 +42,9 @@ Tenant LLM provider/model selection is stored in SpacetimeDB `AiAgent` rows (Mis
 
 ### Health semantics
 
-The api-server exposes `GET /health` as liveness only; it does not contact SpacetimeDB or
-the AI gateway. `GET /health/ready` fails closed when SpacetimeDB is unavailable. After a
+The api-server exposes `GET /live` as process liveness (`GET /health` remains a compatibility
+alias); it does not contact SpacetimeDB or the AI gateway. `GET /ready` returns structured
+dependency diagnostics (`GET /health/ready` remains an alias) and fails closed when SpacetimeDB is unavailable. After a
 proven healthy PostgreSQL probe, it may remain ready during a bounded PostgreSQL outage and
 marks that response with `X-Lumiere-Degraded: postgres`; it fails after the configured lag
 budget. AI availability never gates ordinary ERP readiness.

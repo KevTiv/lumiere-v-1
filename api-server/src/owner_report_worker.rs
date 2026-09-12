@@ -111,6 +111,16 @@ struct ScheduledReportRow {
 }
 
 #[derive(Debug, Deserialize)]
+struct DueScheduledReportRow {
+    #[serde(alias = "organizationId")]
+    organization_id: u64,
+    #[serde(alias = "isActive")]
+    is_active: bool,
+    #[serde(alias = "ownerReportKey")]
+    owner_report_key: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 struct GeneratedOwnerReportRow {
     #[serde(alias = "organizationId")]
     organization_id: u64,
@@ -384,19 +394,13 @@ async fn process_batch(state: &AppState) -> anyhow::Result<usize> {
 async fn due_schedule_organizations(state: &AppState) -> anyhow::Result<Vec<u64>> {
     let rows = state
         .stdb
-        .query_sql(
-            "SELECT organization_id FROM scheduled_report \
-             WHERE is_active = true AND owner_report_key IS NOT NULL",
-        )
+        .query_sql("SELECT organization_id, is_active, owner_report_key FROM scheduled_report")
         .await?;
     let mut organizations = HashSet::new();
     for row in rows {
-        if let Some(id) = row
-            .get("organizationId")
-            .or_else(|| row.get("organization_id"))
-            .and_then(|value| value.as_u64())
-        {
-            organizations.insert(id);
+        let row: DueScheduledReportRow = serde_json::from_value(row)?;
+        if row.is_active && row.owner_report_key.is_some() {
+            organizations.insert(row.organization_id);
         }
     }
     Ok(organizations.into_iter().collect())

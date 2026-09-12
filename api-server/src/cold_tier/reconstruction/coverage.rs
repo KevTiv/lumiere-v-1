@@ -12,7 +12,7 @@ use serde::Serialize;
 use serde_json::{json, Map, Value};
 use stdb_client::StdbClient;
 
-use super::RestoreCatalog;
+use super::{DurableWatermark, RestoreCatalog};
 use crate::cold_tier::{
     commit_projection::{
         apply_commit, canonical_json, change_checksum, commit_checksum_from_changes,
@@ -40,6 +40,7 @@ const STORAGE_POLICY_MANIFEST_JSON: &str =
 #[derive(Debug, Serialize)]
 pub struct ReconstructionCoverageReport {
     pub organization_id: u64,
+    pub watermark: DurableWatermark,
     pub modules: Vec<String>,
     pub module_row_counts: BTreeMap<String, usize>,
     pub source_tables_with_rows: usize,
@@ -147,7 +148,7 @@ pub async fn capture_coverage_snapshot(
     )?];
     delete_changes.push(cursor_change(organization_id, sequence, 1, sequence + 1)?);
     projected_row_changes += delete_changes.len();
-    apply_snapshot_commit(
+    let watermark_checksum = apply_snapshot_commit(
         &pool,
         organization_id,
         sequence,
@@ -164,6 +165,10 @@ pub async fn capture_coverage_snapshot(
     let source_rows = rows.len();
     Ok(ReconstructionCoverageReport {
         organization_id,
+        watermark: DurableWatermark {
+            sequence,
+            commit_checksum: watermark_checksum,
+        },
         modules: expected_modules.into_iter().collect(),
         module_row_counts,
         source_tables_with_rows,
@@ -309,7 +314,7 @@ async fn apply_snapshot_commit(
     sequence: u64,
     actor_identity: &str,
     changes: &[OrganizationRowChangeInput],
-) -> Result<()> {
+) -> Result<String> {
     let mut commit = OrganizationCommitEnvelope {
         id: format!("{organization_id}:{sequence}"),
         organization_id,
@@ -338,7 +343,7 @@ async fn apply_snapshot_commit(
     {
         bail!("C7 coverage snapshot commit was already applied; use an empty disposable database");
     }
-    Ok(())
+    Ok(commit.checksum)
 }
 
 fn select_delete_proof(rows: &[SnapshotRow]) -> Result<&SnapshotRow> {
@@ -400,10 +405,16 @@ fn require_disposable_source() -> Result<()> {
         bail!("STDB_HOST must be loopback");
     }
     let module = required_env(SOURCE_MODULE_ENV)?;
-    if !module.starts_with("lumiere-c7-source-") {
-        bail!("{SOURCE_MODULE_ENV} must use the disposable 'lumiere-c7-source-' prefix");
+    if !is_disposable_source_module(&module) {
+        bail!(
+            "{SOURCE_MODULE_ENV} must use the disposable 'lumiere-c7-source-' prefix or local E2E suffix"
+        );
     }
     Ok(())
+}
+
+fn is_disposable_source_module(module: &str) -> bool {
+    module.starts_with("lumiere-c7-source-") || module.ends_with("-local-e2e")
 }
 
 fn required_env(name: &str) -> Result<String> {
@@ -432,6 +443,13 @@ mod tests {
         assert_eq!(modules.len(), 22);
         assert!(modules.contains("core"));
         assert!(modules.contains("workflow"));
+    }
+
+    #[test]
+    fn source_module_scope_accepts_only_explicit_local_test_names() {
+        assert!(is_disposable_source_module("lumiere-c7-source-final"));
+        assert!(is_disposable_source_module("lumiere-v1-local-e2e"));
+        assert!(!is_disposable_source_module("lumiere-production"));
     }
 
     #[test]

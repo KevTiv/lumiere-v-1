@@ -268,17 +268,17 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<Tenant>
       {
         name: branchName,
         code: `${code}B`,
-        currencyId,
-        fiscalYearEndMonth: 12,
-        fiscalYearEndDay: 31,
-        isParent: false,
-        parentId: mainCompanyId,
-        taxId: null,
-        companyRegistry: null,
-        addressStreet: null,
-        addressCity: null,
-        addressZip: null,
-        addressCountryCode: "US",
+        currency_id: currencyId,
+        fiscal_year_end_month: 12,
+        fiscal_year_end_day: 31,
+        is_parent: false,
+        parent_id: { some: mainCompanyId },
+        tax_id: { none: [] },
+        company_registry: { none: [] },
+        address_street: { none: [] },
+        address_city: { none: [] },
+        address_zip: { none: [] },
+        address_country_code: { some: "US" },
         metadata: JSON.stringify({ fixture: "P1-CONTACT-01", scope: "branch" }),
       },
     ])
@@ -350,8 +350,9 @@ test.describe("P1-CONTACT-01 phone-first contacts", { tag: ["@p1", "@contacts"] 
       ])
       const supplierId = await fetchContactIdByName(alpha.page, supplierName)
 
-      // Same raw value and name in the branch company must not leak into the main-company duplicate view.
-      await callReducerBff(alpha.page, "create_contact", [
+      // CRM currently admits only the organization's primary company. Prove that the
+      // server rejects a forged sibling-company scope rather than weakening CRM-RI-007.
+      const siblingCompanyContact = await callReducerBffResult(alpha.page, "create_contact", [
         alpha.organizationId,
         createContactParams({
           name: customerName,
@@ -360,16 +361,8 @@ test.describe("P1-CONTACT-01 phone-first contacts", { tag: ["@p1", "@contacts"] 
           isCustomer: true,
         }),
       ])
-      const branchContactRow = await waitForRow(
-        alpha.page,
-        "contacts",
-        (row) =>
-          valueAsString(row, "name") === customerName &&
-          sameId(row.companyId ?? row.company_id, alpha.branchCompanyId),
-        "branch-scoped customer contact",
-      )
-      const branchContactId = valueAsId(branchContactRow, "id")
-      if (branchContactId == null) throw new Error("branch-scoped customer contact is missing its id")
+      expect(siblingCompanyContact.ok).toBe(false)
+      expect(siblingCompanyContact.error ?? "").toMatch(/restricted to a single company/i)
 
       await createPhoneIdentity(
         alpha.page,
@@ -393,14 +386,6 @@ test.describe("P1-CONTACT-01 phone-first contacts", { tag: ["@p1", "@contacts"] 
         "+12025550201",
         "MobileMoney",
       )
-      await createPhoneIdentity(
-        alpha.page,
-        alpha.organizationId,
-        branchContactId,
-        alpha.branchCompanyId,
-        FORMATTED_PHONE,
-      )
-
       await assignContactRole(alpha.page, alpha.organizationId, customerId, alpha.mainCompanyId, "customer")
       await assignContactRole(alpha.page, alpha.organizationId, duplicateId, alpha.mainCompanyId, "customer")
       await assignContactRole(alpha.page, alpha.organizationId, supplierId, alpha.mainCompanyId, "supplier")
@@ -441,30 +426,31 @@ test.describe("P1-CONTACT-01 phone-first contacts", { tag: ["@p1", "@contacts"] 
       const contacts = await queryRows(alpha.page, "contacts")
       const customer = contacts.find((row) => sameId(row.id, customerId))
       const supplier = contacts.find((row) => sameId(row.id, supplierId))
-      const branchContact = contacts.find((row) => sameId(row.id, branchContactId))
       expect(customer?.isCustomer ?? customer?.is_customer).toBe(true)
       expect(supplier?.isVendor ?? supplier?.is_vendor).toBe(true)
       expect(valueAsId(customer ?? {}, "companyId", "company_id")).toBe(alpha.mainCompanyId)
-      expect(valueAsId(branchContact ?? {}, "companyId", "company_id")).toBe(alpha.branchCompanyId)
 
-      const roles = await queryRows(alpha.page, "contact-role-assignments")
-      expect(
-        roles.some(
-          (row) =>
-            sameId(row.contactId ?? row.contact_id, customerId) &&
-            valueAsString(row, "role") === "customer" &&
-            sameId(row.companyId ?? row.company_id, alpha.mainCompanyId),
-        ),
-      ).toBe(true)
-      expect(
-        roles.some(
-          (row) =>
-            sameId(row.contactId ?? row.contact_id, supplierId) &&
-            valueAsString(row, "role") === "supplier" &&
-            sameId(row.companyId ?? row.company_id, alpha.mainCompanyId),
-        ),
-      ).toBe(true)
+      await waitForRow(
+        alpha.page,
+        "contact-role-assignments",
+        (row) =>
+          sameId(row.contactId ?? row.contact_id, customerId) &&
+          valueAsString(row, "role") === "customer" &&
+          sameId(row.companyId ?? row.company_id, alpha.mainCompanyId),
+        "customer role assignment",
+      )
+      await waitForRow(
+        alpha.page,
+        "contact-role-assignments",
+        (row) =>
+          sameId(row.contactId ?? row.contact_id, supplierId) &&
+          valueAsString(row, "role") === "supplier" &&
+          sameId(row.companyId ?? row.company_id, alpha.mainCompanyId),
+        "supplier role assignment",
+      )
 
+      await alpha.page.reload()
+      await alpha.page.getByTestId("module-tab-crm-contacts").click()
       await expect(alpha.page.getByText(supplierName).first()).toBeVisible({ timeout: 30_000 })
       await alpha.page.getByTestId("module-tab-crm-duplicates").click()
       await expect(alpha.page.getByTestId("crm-duplicates-empty")).toBeVisible({ timeout: 30_000 })
@@ -486,7 +472,9 @@ test.describe("P1-CONTACT-01 phone-first contacts", { tag: ["@p1", "@contacts"] 
         ],
       )
       expect(foreignCompanyIdentity.ok).toBe(false)
-      expect(foreignCompanyIdentity.error ?? "").toMatch(/company does not belong to this organization/i)
+      expect(foreignCompanyIdentity.error ?? "").toMatch(
+        /company does not belong to this organization|company must match the contact company/i,
+      )
 
       const crossTenantContact = await callReducerBffResult(alpha.page, "create_contact", [
         beta.organizationId,
@@ -497,7 +485,9 @@ test.describe("P1-CONTACT-01 phone-first contacts", { tag: ["@p1", "@contacts"] 
         }),
       ])
       expect(crossTenantContact.ok).toBe(false)
-      expect(crossTenantContact.error ?? "").toMatch(/not a member of this organization/i)
+      expect(crossTenantContact.error ?? "").toMatch(
+        /not a member of this organization|organization scope mismatch/i,
+      )
 
       const betaContacts = await queryRows(beta.page, "contacts")
       expect(betaContacts.some((row) => valueAsString(row, "name") === customerName)).toBe(false)

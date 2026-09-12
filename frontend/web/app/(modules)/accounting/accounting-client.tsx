@@ -3172,13 +3172,14 @@ function AccountingClientReady({
                     chartStructureContent={chartStructurePanel}
                     onImportAccountsCsv={() => setCsvKind("account")}
                     onAccountClick={(account) => setGlDrilldownAccount(account)}
-                    onCreate={async (data) => {
+                    onCreate={accountTypes.length > 0 ? async (data) => {
                       const p = toCreateAccountAccountParams(data as Record<string, unknown>, {
                         companyId: operatingCompanyId,
                         accountTypes,
                       })
-                      if (p) await createAccount.mutateAsync(p)
-                    }}
+                      if (!p) throw new Error("Account type configuration is unavailable")
+                      await createAccount.mutateAsync(p)
+                    } : undefined}
                   />
                 ),
               }

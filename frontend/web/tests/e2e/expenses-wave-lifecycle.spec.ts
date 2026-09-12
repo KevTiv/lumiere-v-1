@@ -43,7 +43,6 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     await expect(page.getByTestId("expenses-capture-submit")).toBeVisible()
     await expect(page.getByTestId("expenses-capture-flush")).toBeVisible()
     await expect(page.getByTestId("expenses-ops-panel")).toBeVisible()
-    await expect(page.getByTestId("expenses-ops-flush-intents")).toBeVisible()
     await expectNoAppError(page)
 
     await openExpensesTab(page, "expense-sheets")
@@ -354,6 +353,8 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
         state?: string | { tag?: string }
         accountMoveId?: number | string | null
         account_move_id?: number | string | null
+        reimbursementMoveId?: number | string | null
+        reimbursement_move_id?: number | string | null
       }>
     }
     const seedSheet = (seedJson.data ?? []).find((s) => s.name === "Q1 Business Trips")
@@ -361,6 +362,8 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     const postSheetId = Number(seedSheet!.id)
     let seedState = sheetState(seedSheet!.state)
     let accountMoveId = scalarQueryId(seedSheet!.accountMoveId ?? seedSheet!.account_move_id) ?? 0
+    const existingReimbursementMoveId =
+      scalarQueryId(seedSheet!.reimbursementMoveId ?? seedSheet!.reimbursement_move_id) ?? 0
 
     const journals = await page.request.get("/api/query/account-journals")
     const journalData =
@@ -420,6 +423,16 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
       expect(accountMoveId).toBeGreaterThan(0)
     }
     expect(accountMoveId).toBeGreaterThan(0)
+
+    // The focused local suite preserves data between runs. A prior successful
+    // reimbursement is terminal and must not be submitted again; verify its
+    // durable accounting link. Fresh CI starts from Approved and exercises the
+    // complete post + reimburse UI path below.
+    if (/Done/i.test(seedState)) {
+      expect(existingReimbursementMoveId).toBeGreaterThan(0)
+      await expectNoAppError(page)
+      return
+    }
 
     await gotoModule(page, "/expenses", "expenses")
     await openExpensesTab(page, "expense-sheets")

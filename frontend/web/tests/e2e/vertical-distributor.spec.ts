@@ -1,6 +1,61 @@
 import { expect, test, type Page } from "@playwright/test"
 
-import { callReducerBff, expectNoAppError, gotoModule } from "./helpers"
+import {
+  callReducerBff,
+  expectNoAppError,
+  gotoModule,
+  scalarQueryId,
+} from "./helpers"
+
+async function ensureLaptopIsLowStock(page: Page, companyId: number): Promise<void> {
+  const productsResponse = await page.request.get("/api/query/products")
+  if (!productsResponse.ok()) throw new Error(`products query failed: ${productsResponse.status()}`)
+  const products = (await productsResponse.json()) as {
+    data?: Array<{ id?: unknown; name?: unknown }>
+  }
+  const productId = scalarQueryId(
+    products.data?.find((row) => row.name === "Lumiere Dev Laptop")?.id,
+  )
+  if (productId == null) throw new Error("Lumiere Dev Laptop is missing from the dev fixture")
+
+  const quantsResponse = await page.request.get("/api/query/stock-quants")
+  if (!quantsResponse.ok()) {
+    throw new Error(`stock-quants query failed: ${quantsResponse.status()}`)
+  }
+  const quants = (await quantsResponse.json()) as {
+    data?: Array<{ id?: unknown; productId?: unknown; product_id?: unknown; companyId?: unknown; company_id?: unknown }>
+  }
+  const quantIds = (quants.data ?? []).flatMap((row) => {
+    const matches =
+      scalarQueryId(row.productId ?? row.product_id) === productId &&
+      scalarQueryId(row.companyId ?? row.company_id) === companyId
+    if (!matches) return []
+    const id = scalarQueryId(row.id)
+    return id == null ? [] : [id]
+  })
+  if (quantIds.length === 0) {
+    throw new Error("Lumiere Dev Laptop stock quant is missing from the dev fixture")
+  }
+
+  const organizationResponse = await page.request.get("/api/query/user-organization")
+  if (!organizationResponse.ok()) {
+    throw new Error(`user-organization query failed: ${organizationResponse.status()}`)
+  }
+  const memberships = (await organizationResponse.json()) as {
+    data?: Array<{ organizationId?: unknown; organization_id?: unknown }>
+  }
+  const organizationId = scalarQueryId(
+    memberships.data?.[0]?.organizationId ?? memberships.data?.[0]?.organization_id,
+  )
+  if (organizationId == null) throw new Error("authenticated organization is missing")
+
+  for (const quantId of quantIds) {
+    await callReducerBff(page, "update_stock_quant_quantity", [organizationId, quantId, {
+      company_id: { some: companyId },
+      quantity: 1,
+    }])
+  }
+}
 
 async function defaultCompanyId(page: Page): Promise<number> {
   const response = await page.request.get("/api/query/companies")
@@ -20,10 +75,11 @@ test.describe("Distributor / wholesaler pack", { tag: ["@phase-5", "@dev-fixture
     test.setTimeout(120_000)
 
     const companyId = await defaultCompanyId(page)
+    await ensureLaptopIsLowStock(page, companyId)
     await callReducerBff(page, "set_company_vertical_pack", [companyId, {
-      packKey: "distributor_wholesaler",
+      pack_key: "distributor_wholesaler",
       enabled: true,
-      configuration: null,
+      configuration: { none: [] },
     }])
 
     await expect.poll(async () => {
@@ -54,7 +110,7 @@ test.describe("Distributor / wholesaler pack", { tag: ["@phase-5", "@dev-fixture
     )
 
     await gotoModule(page, "/distributor")
-    await expect(page.getByRole("heading", { name: "Distributor workspace" })).toBeVisible()
+    await expect(page.getByText("Distributor workspace", { exact: true })).toBeVisible()
     await expect(page.getByText("Enabled", { exact: true })).toBeVisible()
     await expect(page.getByText("Open sales orders", { exact: true })).toBeVisible()
     await expect(page.getByText("Low-stock alerts", { exact: true })).toBeVisible()

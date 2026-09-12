@@ -366,6 +366,7 @@ fn atomic_plan_inserts_and_applies_all_changes_before_watermark() {
             "insert_changes_ordered",
             "apply_change:0",
             "apply_change:1",
+            "advance_commit_cursor",
             "advance_watermark",
             "commit"
         ]

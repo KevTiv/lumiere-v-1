@@ -5294,10 +5294,28 @@
       "reason": "restrict the batch drain to the registered expense integration worker and retire session exposure"
     },
     {
+      "operation_id": "erp.cancel_message_batch",
+      "previous_fingerprint": "sha256:93c133ece5077eff5205c8fc984aa50fc2fc05aa7d9f8e9504a2e5715a4b580d",
+      "current_fingerprint": "sha256:48abbabe91a552949c1b2d77667b6417f97f48ba337671378181b89929e998b9",
+      "reason": "expose authenticated message-batch cancellation through trusted server context"
+    },
+    {
       "operation_id": "erp.claim_hub_with_token",
       "previous_fingerprint": "sha256:5f773f34a0186ea74f2c78561aec1fac6719a505c50dec091971c9b5a2edf8d2",
       "current_fingerprint": "sha256:dd51f85d90d3a948fd786d1e2f2e77d8e53d9f0ab7b09ff025aabef6b54d5c49",
       "reason": "issue a hashed post-pair hub credential through the registered IoT gateway and retire interactive session exposure"
+    },
+    {
+      "operation_id": "erp.create_operational_message",
+      "previous_fingerprint": "sha256:cc1b717ef65873a9c0e95a410bcaeb7cc657229d5bc56b411c9e9efe328a5b83",
+      "current_fingerprint": "sha256:a4fd0512c87e6bdef2c58afcb7023c807fc4b7ea5345bd4b9e022343dde130c5",
+      "reason": "expose authenticated operational-message creation through trusted server context"
+    },
+    {
+      "operation_id": "erp.record_message_copied",
+      "previous_fingerprint": "sha256:6f43f86c3209687d2a0511de47c7c46012ad7e13801b75a23e92a9de9fc21551",
+      "current_fingerprint": "sha256:30f54d4805aa8932bc631415ba31628a1fa518b28ae4b959c1066c2d4e75be64",
+      "reason": "expose authenticated message copy acknowledgement through trusted server context"
     }
   ],
   "revisions": [

@@ -41,6 +41,7 @@ use self::inventory::{preview_low_stock, preview_stock_movement};
 pub use self::history::{report_artifact_key, report_history};
 use self::source_queries::{
     query_company, query_typed, scope_for, source_watermark, sql_id_list, validate_request,
+    StdbTimestamp,
 };
 
 #[derive(Debug, Deserialize)]

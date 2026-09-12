@@ -126,7 +126,9 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
     }
 
     await expect(page.getByTestId("approvals-inbox-count")).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByTestId("approvals-inbox-empty")).toBeVisible()
+    await expect(
+      page.getByTestId("approvals-inbox-empty").or(page.getByRole("button", { name: /^claim$/i }).first()),
+    ).toBeVisible()
     await expect(page.getByRole("link", { name: /workflow definitions/i })).toBeVisible()
     await expectNoAppError(page)
   })

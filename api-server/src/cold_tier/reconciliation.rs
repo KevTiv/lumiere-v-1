@@ -285,6 +285,36 @@ pub(crate) async fn verify_declared_watermark(
     organization_id: u64,
     watermark: u64,
 ) -> Result<()> {
+    verify_postgres_watermark(pool, organization_id, watermark).await?;
+
+    let cursor_rows = stdb
+        .query_sql(&format!(
+            "SELECT next_sequence FROM organization_commit_cursor \
+             WHERE organization_id = {organization_id} LIMIT 1"
+        ))
+        .await
+        .context("read STDB reconciliation watermark")?;
+    let next_sequence = cursor_rows
+        .first()
+        .and_then(|row| row.get("nextSequence"))
+        .and_then(Value::as_u64)
+        .ok_or_else(|| anyhow!("organization {organization_id} has no valid STDB commit cursor"))?;
+    let stdb_watermark = next_sequence.checked_sub(1).ok_or_else(|| {
+        anyhow!("organization {organization_id} has an invalid zero next sequence")
+    })?;
+    if stdb_watermark != watermark {
+        bail!(
+            "declared watermark {watermark} does not match STDB watermark {stdb_watermark}; writers must remain fenced"
+        );
+    }
+    Ok(())
+}
+
+pub(crate) async fn verify_postgres_watermark(
+    pool: &Pool,
+    organization_id: u64,
+    watermark: u64,
+) -> Result<()> {
     let client = pool
         .get()
         .await
@@ -307,26 +337,6 @@ pub(crate) async fn verify_declared_watermark(
         bail!("declared watermark {watermark} does not match PG watermark {pg_watermark}");
     }
 
-    let cursor_rows = stdb
-        .query_sql(&format!(
-            "SELECT next_sequence FROM organization_commit_cursor \
-             WHERE organization_id = {organization_id} LIMIT 1"
-        ))
-        .await
-        .context("read STDB reconciliation watermark")?;
-    let next_sequence = cursor_rows
-        .first()
-        .and_then(|row| row.get("nextSequence"))
-        .and_then(Value::as_u64)
-        .ok_or_else(|| anyhow!("organization {organization_id} has no valid STDB commit cursor"))?;
-    let stdb_watermark = next_sequence.checked_sub(1).ok_or_else(|| {
-        anyhow!("organization {organization_id} has an invalid zero next sequence")
-    })?;
-    if stdb_watermark != watermark {
-        bail!(
-            "declared watermark {watermark} does not match STDB watermark {stdb_watermark}; writers must remain fenced"
-        );
-    }
     Ok(())
 }
 

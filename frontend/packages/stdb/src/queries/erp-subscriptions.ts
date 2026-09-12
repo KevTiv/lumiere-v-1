@@ -403,7 +403,7 @@ export function subscriptionQueriesForResource(
     const org = ctx.organizationId;
     if (org === undefined || org === null || Number.isNaN(Number(org))) return null;
     const cols = resolveHttpSqlColumns("employee-documents", ctx.fieldAccess).join(", ");
-    let extra = " AND active = true";
+    let extra = " AND is_active = true";
     if (!hasHrPermission(ctx.fieldAccess, "hr_employee", "view_pii")) {
       extra += " AND purpose != 'tax_id' AND purpose != 'identity'";
     }

@@ -457,6 +457,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "cancel_message_batch",
+      "exposure": "session",
+      "reason": "invoked by the authenticated messaging command API"
+    },
+    {
       "name": "cancel_manufacturing_order",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3075,6 +3080,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "record_message_copied",
+      "exposure": "session",
+      "reason": "invoked by the authenticated messaging command API"
+    },
+    {
       "name": "record_privacy_consent",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3518,6 +3528,11 @@
       "name": "set_consolidation_company_rate",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "create_operational_message",
+      "exposure": "session",
+      "reason": "invoked by the authenticated messaging command API"
     },
     {
       "name": "set_contact_communication_preference",

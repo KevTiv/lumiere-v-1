@@ -68,8 +68,9 @@ Set `NODE_ENV=production` or `LUMIERE_ENV=production`. **api-server refuses to s
 
 In compose, `AI_GATEWAY_URL` is wired to `http://ai-gateway:8080`.
 
-The api-server endpoints have separate purposes: `/health` is liveness-only, while
-`/health/ready` checks SpacetimeDB and PostgreSQL. A PostgreSQL outage is reported through
+The api-server endpoints have separate purposes: `/live` is liveness-only (`/health` is its
+compatibility alias), while `/ready` returns structured SpacetimeDB, PostgreSQL, projection,
+contract, migration, release, and informational AI diagnostics (`/health/ready` is its alias). A PostgreSQL outage is reported through
 `X-Lumiere-Degraded: postgres` only within the configured, last-known-healthy lag budget;
 AI availability never gates ordinary ERP readiness. The slim Rust images do not contain `curl`, so
 compose does not add an in-container healthcheck dependency gate. Run the host/sibling

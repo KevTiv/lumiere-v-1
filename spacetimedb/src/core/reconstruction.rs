@@ -12,6 +12,7 @@ use spacetimedb::{ReducerContext, Table, Timestamp};
 use crate::core::cold_tier_identity::{
     is_active_cold_tier_service_identity, ORGANIZATION_RECONSTRUCTOR_SERVICE,
 };
+use crate::core::persistence::organization_commit_cursor as _;
 use crate::core::permissions::{
     build_policy_snapshot_row, policy_snapshot, upsert_policy_snapshot,
 };
@@ -367,6 +368,18 @@ pub fn complete_organization_reconstruction(
     {
         return Err("reconstruction completion does not match the active fence".to_string());
     }
+    let restored_watermark = ctx
+        .db
+        .organization_commit_cursor()
+        .organization_id()
+        .find(&organization_id)
+        .ok_or_else(|| "reconstructed organization commit cursor is missing".to_string())?
+        .next_sequence
+        .checked_sub(1)
+        .ok_or_else(|| "reconstructed organization commit cursor is invalid".to_string())?;
+    if restored_watermark != verified_watermark {
+        return Err("reconstructed organization commit cursor does not match watermark".to_string());
+    }
     rebuild_organization_recreated_state(ctx, organization_id)?;
     fence.state = COMPLETE.to_string();
     fence.updated_at = ctx.timestamp;
@@ -642,5 +655,22 @@ mod tests {
         let mut changed = params.clone();
         changed.rows_json.reverse();
         assert_ne!(batch_checksum(&params), batch_checksum(&changed));
+    }
+
+    #[test]
+    fn reconstruction_batch_checksum_matches_operator_protocol_vector() {
+        let params = ApplyOrganizationReconstructionBatchParams {
+            organization_id: 199,
+            run_id: "c11-proof".to_string(),
+            table_name: "accounting_operation_receipt".to_string(),
+            restore_order: 20,
+            batch_ordinal: 0,
+            is_last_batch: true,
+            rows_json: vec![r#"{"id":"receipt-1"}"#.to_string()],
+        };
+        assert_eq!(
+            batch_checksum(&params),
+            "sha256:5a1b5885b4f6d1fc93d628cffd2f1ec78bc7a003b38afb66f5dae65cc342093e"
+        );
     }
 }

@@ -77,6 +77,8 @@ pub mod chart_keys {
 pub struct OrgFixture {
     pub organization_id: u64,
     pub company_id: u64,
+    /// Organization-owned company currency; never substitute a historical sentinel ID.
+    pub currency_id: u64,
     pub fiscal_year_id: u64,
     pub partner_id: u64,
     pub product_id: u64,
@@ -641,6 +643,7 @@ impl OrgFixture {
         Ok(Self {
             organization_id,
             company_id,
+            currency_id,
             fiscal_year_id,
             partner_id,
             product_id,
@@ -1622,13 +1625,14 @@ mod smoke {
         let fixture = OrgFixture {
             organization_id: 1,
             company_id: 2,
-            fiscal_year_id: 3,
-            partner_id: 4,
-            product_id: 5,
-            warehouse_id: 6,
-            location_id: 7,
-            customer_location_id: 8,
-            supplier_location_id: 9,
+            currency_id: 3,
+            fiscal_year_id: 4,
+            partner_id: 5,
+            product_id: 6,
+            warehouse_id: 7,
+            location_id: 8,
+            customer_location_id: 9,
+            supplier_location_id: 10,
             chart_account_ids,
         };
 

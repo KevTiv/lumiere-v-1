@@ -427,7 +427,7 @@ export function useCreatePricelist(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreatePricelistParams>({
     mutationFn: async (params) => {
-      const json = stdbParamsToJson(params as object)
+      const json = stdbParamsToJson(params as object, "CreatePricelistParams")
       const { urlPath, init } = stdbBffCommandPost("create_pricelist", { params: json })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create pricelist')

@@ -15,7 +15,7 @@ use tower_cookies::Cookies;
 use crate::{
     commands::dispatch_session_reducer,
     error::ApiError,
-    query_exec::resolve_membership_company_id,
+    query_exec::{resolve_membership_company_id, row_u64},
     reports::{
         artifacts::artifact_path,
         auth::{
@@ -213,10 +213,25 @@ async fn owner_schedules_get(
     )
     .await?;
     let context = context.with_company_scope(vec![company_id])?;
-    let schedules = context.client().query_sql(&format!(
-        "SELECT * FROM scheduled_report WHERE organization_id = {organization_id} AND company_id = {} AND owner_report_key IS NOT NULL",
-        company_id
-    )).await.map_err(|error| ApiError::Internal(format!("list owner-report schedules: {error}")))?;
+    // SpacetimeDB SQL cannot compare an Option<u64> column to a scalar. Keep
+    // tenant restriction in SQL, then apply the authorized company scope to
+    // the decoded option value before returning any row.
+    let schedules = context
+        .client()
+        .query_sql(&format!(
+            "SELECT * FROM scheduled_report WHERE organization_id = {organization_id}"
+        ))
+        .await
+        .map_err(|error| ApiError::Internal(format!("list owner-report schedules: {error}")))?
+        .into_iter()
+        .filter(|schedule| {
+            row_u64(schedule, "companyId", "company_id").is_ok_and(|id| id == Some(company_id))
+                && schedule
+                    .get("ownerReportKey")
+                    .or_else(|| schedule.get("owner_report_key"))
+                    .is_some_and(|value| !value.is_null())
+        })
+        .collect::<Vec<_>>();
     let schedule_ids: std::collections::HashSet<u64> = schedules
         .iter()
         .filter_map(|schedule| schedule.get("id").and_then(|value| value.as_u64()))

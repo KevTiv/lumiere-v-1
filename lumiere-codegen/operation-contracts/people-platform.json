@@ -332,14 +332,14 @@
       "evidence": "spacetimedb/src/hr/contracts.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
     },
     "cancel_message_batch": {
-      "semantic_kind": "internal",
-      "client_facing": false,
+      "semantic_kind": "command",
+      "client_facing": true,
       "idempotency": "state_guarded",
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/core/operational_messaging.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+      "evidence": "api-server/src/routes/messaging.rs: authenticated messaging route dispatches the state-guarded cancellation through TrustedOperationContext"
     },
     "cancel_payslip": {
       "semantic_kind": "command",
@@ -972,14 +972,14 @@
       "evidence": "spacetimedb/src/hr/onboarding.rs: body inserts or appends a new effect without a replay guard"
     },
     "create_operational_message": {
-      "semantic_kind": "internal",
-      "client_facing": false,
+      "semantic_kind": "command",
+      "client_facing": true,
       "idempotency": "non_idempotent",
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/core/operational_messaging.rs: body inserts or appends a new effect without a replay guard"
+      "evidence": "api-server/src/routes/messaging.rs: authenticated messaging route dispatches the reducer through TrustedOperationContext; reducer renders from an approved template and validates the recipient"
     },
     "create_organization": {
       "semantic_kind": "command",
@@ -2472,14 +2472,14 @@
       "evidence": "spacetimedb/src/hr/integrations.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
     },
     "record_message_copied": {
-      "semantic_kind": "internal",
-      "client_facing": false,
+      "semantic_kind": "command",
+      "client_facing": true,
       "idempotency": "state_guarded",
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/core/operational_messaging.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+      "evidence": "api-server/src/routes/messaging.rs: authenticated messaging route dispatches the state-guarded copy acknowledgement through TrustedOperationContext"
     },
     "record_payroll_export_result": {
       "semantic_kind": "internal",

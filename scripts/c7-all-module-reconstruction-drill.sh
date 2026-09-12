@@ -44,6 +44,9 @@ else
   "${C7_COVERAGE_BIN}" "$organization_id" | tee "$coverage_report"
 fi
 jq -e '
+  .organization_id == ($organization_id | tonumber) and
+  .watermark.sequence > 0 and
+  (.watermark.commit_checksum | length) == 64 and
   (.modules | length) == 22 and
   (.module_row_counts | length) == 22 and
   .source_rows > 0 and
@@ -51,7 +54,7 @@ jq -e '
   .total_values > 0 and
   .audit_rows > 0 and
   .durable_idempotency_records > 0
-' "$coverage_report" >/dev/null
+' --arg organization_id "$organization_id" "$coverage_report" >/dev/null
 
 if [[ "${C7_REUSE_RECONSTRUCTION:-0}" == "1" ]]; then
   if [[ ! -f "$resume_report" || ! -f "$repeat_report" ]]; then
@@ -66,6 +69,10 @@ fi
 
 jq -e '.verified == true and .restored_tables == 458' \
   "$resume_report" "$repeat_report" >/dev/null
+jq -e --slurpfile coverage "$coverage_report" '
+  .organization_id == $coverage[0].organization_id and
+  .watermark == $coverage[0].watermark
+' "$resume_report" "$repeat_report" >/dev/null
 
 deleted_table="$(jq -r '.deleted_table' "$coverage_report")"
 if [[ "$deleted_table" != "activity" && "$deleted_table" != "audit_rule" ]]; then

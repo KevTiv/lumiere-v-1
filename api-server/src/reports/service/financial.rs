@@ -1,4 +1,5 @@
 use chrono::{SecondsFormat, Utc};
+use serde::Deserialize;
 use stdb_client::StdbClient;
 
 use crate::error::ApiError;
@@ -19,9 +20,118 @@ use crate::reports::{
 
 /// Financial report preview source loading.
 use super::{
-    query_company, query_typed, scope_for, source_watermark, sql_id_list, ReportPreview,
+    query_company, query_typed, scope_for, source_watermark, ReportPreview, StdbTimestamp,
     ValidatedPreviewRequest, PREVIEW_WATERMARK, QUERY_LIMIT,
 };
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PaymentAccountQueryRow {
+    id: u64,
+    name: String,
+    provider_code: String,
+    reference_masked: Option<String>,
+    currency_id: u64,
+    account_journal_id: u64,
+    active: bool,
+}
+
+impl From<PaymentAccountQueryRow> for PaymentAccountSourceRow {
+    fn from(row: PaymentAccountQueryRow) -> Self {
+        Self {
+            id: row.id,
+            name: row.name,
+            provider_code: row.provider_code,
+            reference_masked: row.reference_masked,
+            currency_id: row.currency_id,
+            account_journal_id: row.account_journal_id,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PaymentQueryRow {
+    id: u64,
+    payment_account_id: u64,
+    direction: String,
+    status: String,
+    occurred_at: StdbTimestamp,
+    settlement_amount: f64,
+    net_account_amount: f64,
+    currency_id: u64,
+    external_reference: Option<String>,
+}
+
+impl PaymentQueryRow {
+    fn posted(self) -> Option<Self> {
+        (self.status.eq_ignore_ascii_case("posted")).then_some(self)
+    }
+
+    fn as_posted_source(&self) -> PostedPaymentSourceRow {
+        PostedPaymentSourceRow {
+            id: self.id,
+            payment_account_id: self.payment_account_id,
+            direction: self.direction.clone(),
+            settlement_amount: self.settlement_amount,
+            net_account_amount: self.net_account_amount,
+            currency_id: self.currency_id,
+        }
+    }
+
+    fn into_unreconciled_source(self) -> Result<UnreconciledPaymentSourceRow, ApiError> {
+        Ok(UnreconciledPaymentSourceRow {
+            id: self.id,
+            payment_account_id: self.payment_account_id,
+            external_reference: self.external_reference,
+            occurred_at: self.occurred_at.to_rfc3339()?,
+            net_account_amount: self.net_account_amount,
+            currency_id: self.currency_id,
+        })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LiquidityMoveLineQueryRow {
+    journal_id: u64,
+    account_id: u64,
+    balance: f64,
+    parent_state: String,
+    date: StdbTimestamp,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct JournalQueryRow {
+    id: u64,
+    default_account_id: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OpenMoveQueryRow {
+    id: u64,
+    partner_id: Option<u64>,
+    invoice_partner_display_name: Option<String>,
+    invoice_date_due: Option<StdbTimestamp>,
+    amount_total: f64,
+    amount_residual: f64,
+    currency_id: u64,
+    state: String,
+    move_type: String,
+    date: StdbTimestamp,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MoveAllocationQueryRow {
+    allocated_move_line_id: u64,
+    allocated_amount: f64,
+    is_reversal: bool,
+    created_at: StdbTimestamp,
+    currency_id: u64,
+}
 
 pub(super) async fn preview_cash_mobile_money(
     client: &StdbClient,
@@ -32,24 +142,23 @@ pub(super) async fn preview_cash_mobile_money(
     let company = query_company(client, organization_id, request.company_id).await?;
     let window = day_window(request.date, &request.timezone)?;
     let accounts_sql = format!(
-        "SELECT id, name, provider_code, reference_masked, currency_id, account_journal_id FROM payment_account WHERE organization_id = {organization_id} AND company_id = {} AND active = true LIMIT {QUERY_LIMIT}",
+        "SELECT id, name, provider_code, reference_masked, currency_id, account_journal_id, active FROM payment_account WHERE organization_id = {organization_id} AND company_id = {} LIMIT {QUERY_LIMIT}",
         company.id
     );
-    let accounts =
-        query_typed::<PaymentAccountSourceRow>(client, "payment_account", accounts_sql).await?;
+    let accounts = query_typed::<PaymentAccountQueryRow>(client, "payment_account", accounts_sql)
+        .await?
+        .into_iter()
+        .filter(|row| row.active)
+        .map(PaymentAccountSourceRow::from)
+        .collect::<Vec<_>>();
     let journal_ids = accounts
         .iter()
         .map(|account| account.account_journal_id)
         .collect::<Vec<_>>();
-    let journal_id_list = sql_id_list(&journal_ids);
 
     let payments_sql = format!(
-        "SELECT id, payment_account_id, direction, settlement_amount, net_account_amount, currency_id FROM payment_transaction WHERE organization_id = {organization_id} AND company_id = {} AND status = 'Posted' AND occurred_at >= '{}' AND occurred_at < '{}' LIMIT {QUERY_LIMIT}",
-        company.id, window.start_sql, window.end_sql
-    );
-    let prior_payments_sql = format!(
-        "SELECT id, payment_account_id, direction, settlement_amount, net_account_amount, currency_id FROM payment_transaction WHERE organization_id = {organization_id} AND company_id = {} AND status = 'Posted' AND occurred_at < '{}' LIMIT {QUERY_LIMIT}",
-        company.id, window.start_sql
+        "SELECT id, payment_account_id, direction, status, occurred_at, settlement_amount, net_account_amount, currency_id, external_reference FROM payment_transaction WHERE organization_id = {organization_id} AND company_id = {} LIMIT {QUERY_LIMIT}",
+        company.id
     );
     let fees_sql = format!(
         "SELECT payment_transaction_id, amount, tax_amount, currency_id FROM payment_fee WHERE organization_id = {organization_id} AND company_id = {} AND created_at >= '{}' AND created_at < '{}' LIMIT {QUERY_LIMIT}",
@@ -63,34 +172,45 @@ pub(super) async fn preview_cash_mobile_money(
         "SELECT payment_transaction_id, is_reversal FROM payment_reconciliation WHERE organization_id = {organization_id} AND company_id = {company_id} LIMIT {QUERY_LIMIT}",
         company_id = company.id
     );
-    let unreconciled_candidates_sql = format!(
-        "SELECT id, payment_account_id, external_reference, occurred_at, net_account_amount, currency_id FROM payment_transaction WHERE organization_id = {organization_id} AND company_id = {} AND status = 'Posted' AND occurred_at < '{}' LIMIT {QUERY_LIMIT}",
-        company.id, window.end_sql
-    );
-
-    let journals_sql = if journal_id_list.is_empty() {
+    let journals_sql = if journal_ids.is_empty() {
         None
     } else {
         Some(format!(
-            "SELECT id, default_account_id FROM account_journal WHERE organization_id = {organization_id} AND company_id = {} AND id IN ({journal_id_list}) LIMIT {QUERY_LIMIT}",
+            "SELECT id, default_account_id FROM account_journal WHERE organization_id = {organization_id} AND company_id = {} LIMIT {QUERY_LIMIT}",
             company.id
         ))
     };
-    let liquidity_lines_sql = if journal_id_list.is_empty() {
+    let liquidity_lines_sql = if journal_ids.is_empty() {
         None
     } else {
         Some(format!(
-            "SELECT journal_id, account_id, balance FROM account_move_line WHERE organization_id = {organization_id} AND company_id = {} AND parent_state = 'Posted' AND date < '{}' AND currency_id = {} AND journal_id IN ({journal_id_list}) LIMIT {QUERY_LIMIT}",
-            company.id, window.start_sql, company.currency_id
+            "SELECT journal_id, account_id, balance, parent_state, date FROM account_move_line WHERE organization_id = {organization_id} AND company_id = {} AND currency_id = {} LIMIT {QUERY_LIMIT}",
+            company.id, company.currency_id
         ))
     };
 
-    let (payments, prior_payments, fees, prior_fees) = tokio::try_join!(
-        query_typed::<PostedPaymentSourceRow>(client, "payment_transaction", payments_sql),
-        query_typed::<PostedPaymentSourceRow>(client, "payment_transaction", prior_payments_sql),
+    let (payment_rows, fees, prior_fees) = tokio::try_join!(
+        query_typed::<PaymentQueryRow>(client, "payment_transaction", payments_sql),
         query_typed::<PaymentFeeSourceRow>(client, "payment_fee", fees_sql),
         query_typed::<PaymentFeeSourceRow>(client, "payment_fee", prior_fees_sql),
     )?;
+    let payment_rows = payment_rows
+        .into_iter()
+        .filter_map(PaymentQueryRow::posted)
+        .collect::<Vec<_>>();
+    let payments = payment_rows
+        .iter()
+        .filter(|row| {
+            row.occurred_at
+                .is_between(window.window_start_utc, window.window_end_utc)
+        })
+        .map(PaymentQueryRow::as_posted_source)
+        .collect::<Vec<_>>();
+    let prior_payments = payment_rows
+        .iter()
+        .filter(|row| row.occurred_at.is_before(window.window_start_utc))
+        .map(PaymentQueryRow::as_posted_source)
+        .collect::<Vec<_>>();
 
     let reconciliations = query_typed::<PaymentReconciliationSourceRow>(
         client,
@@ -99,20 +219,40 @@ pub(super) async fn preview_cash_mobile_money(
     )
     .await?;
     let reconciliation_count = reconciliations.len();
-    let unreconciled_candidates = query_typed::<UnreconciledPaymentSourceRow>(
-        client,
-        "payment_transaction",
-        unreconciled_candidates_sql,
-    )
-    .await?;
+    let unreconciled_candidates = payment_rows
+        .into_iter()
+        .filter(|row| row.occurred_at.is_before(window.window_end_utc))
+        .map(PaymentQueryRow::into_unreconciled_source)
+        .collect::<Result<Vec<_>, _>>()?;
 
     let journals = if let Some(sql) = journals_sql {
-        query_typed::<JournalDefaultAccountRow>(client, "account_journal", sql).await?
+        query_typed::<JournalQueryRow>(client, "account_journal", sql)
+            .await?
+            .into_iter()
+            .filter(|row| journal_ids.contains(&row.id))
+            .map(|row| JournalDefaultAccountRow {
+                id: row.id,
+                default_account_id: row.default_account_id,
+            })
+            .collect()
     } else {
         vec![]
     };
     let liquidity_lines = if let Some(sql) = liquidity_lines_sql {
-        query_typed::<LiquidityMoveLineRow>(client, "account_move_line", sql).await?
+        query_typed::<LiquidityMoveLineQueryRow>(client, "account_move_line", sql)
+            .await?
+            .into_iter()
+            .filter(|row| {
+                journal_ids.contains(&row.journal_id)
+                    && row.parent_state.eq_ignore_ascii_case("posted")
+                    && row.date.is_before(window.window_start_utc)
+            })
+            .map(|row| LiquidityMoveLineRow {
+                journal_id: row.journal_id,
+                account_id: row.account_id,
+                balance: row.balance,
+            })
+            .collect()
     } else {
         vec![]
     };
@@ -194,33 +334,68 @@ pub(super) async fn preview_open_balances(
     let company = query_company(client, organization_id, request.company_id).await?;
     let window = day_window(request.date, &request.timezone)?;
     let moves_sql = format!(
-        "SELECT id, partner_id, invoice_partner_display_name, invoice_date_due, amount_total, amount_residual, currency_id FROM account_move WHERE organization_id = {organization_id} AND company_id = {} AND state = 'Posted' AND move_type = '{move_type}' AND date < '{}' LIMIT {QUERY_LIMIT}",
-        company.id, window.end_sql
+        "SELECT id, partner_id, invoice_partner_display_name, invoice_date_due, amount_total, amount_residual, currency_id, state, move_type, date FROM account_move WHERE organization_id = {organization_id} AND company_id = {} LIMIT {QUERY_LIMIT}",
+        company.id
     );
-    let moves = query_typed::<OpenMoveSourceRow>(client, "account_move", moves_sql).await?;
+    let moves = query_typed::<OpenMoveQueryRow>(client, "account_move", moves_sql)
+        .await?
+        .into_iter()
+        .filter(|row| {
+            row.state.eq_ignore_ascii_case("posted")
+                && row.move_type.eq_ignore_ascii_case(move_type)
+                && row.date.is_before(window.window_end_utc)
+        })
+        .map(|row| {
+            Ok(OpenMoveSourceRow {
+                id: row.id,
+                partner_id: row.partner_id,
+                invoice_partner_display_name: row.invoice_partner_display_name,
+                invoice_date_due: row
+                    .invoice_date_due
+                    .map(StdbTimestamp::to_rfc3339)
+                    .transpose()?,
+                amount_total: row.amount_total,
+                amount_residual: row.amount_residual,
+                currency_id: row.currency_id,
+            })
+        })
+        .collect::<Result<Vec<_>, ApiError>>()?;
     let move_ids = moves.iter().map(|move_| move_.id).collect::<Vec<_>>();
-    let move_id_list = sql_id_list(&move_ids);
-
-    let lines = if move_id_list.is_empty() {
+    let lines = if move_ids.is_empty() {
         vec![]
     } else {
         let lines_sql = format!(
-            "SELECT id, move_id FROM account_move_line WHERE organization_id = {organization_id} AND company_id = {} AND move_id IN ({move_id_list}) LIMIT {QUERY_LIMIT}",
+            "SELECT id, move_id FROM account_move_line WHERE organization_id = {organization_id} AND company_id = {} LIMIT {QUERY_LIMIT}",
             company.id
         );
-        query_typed::<MoveLineMoveIdRow>(client, "account_move_line", lines_sql).await?
+        query_typed::<MoveLineMoveIdRow>(client, "account_move_line", lines_sql)
+            .await?
+            .into_iter()
+            .filter(|row| move_ids.contains(&row.move_id))
+            .collect()
     };
     let line_ids = lines.iter().map(|line| line.id).collect::<Vec<_>>();
-    let line_id_list = sql_id_list(&line_ids);
-    let allocations = if line_id_list.is_empty() {
+    let allocations = if line_ids.is_empty() {
         vec![]
     } else {
         let allocations_sql = format!(
-            "SELECT allocated_move_line_id, allocated_amount, is_reversal, created_at, currency_id FROM payment_reconciliation WHERE organization_id = {organization_id} AND company_id = {} AND allocated_move_line_id IN ({line_id_list}) LIMIT {QUERY_LIMIT}",
+            "SELECT allocated_move_line_id, allocated_amount, is_reversal, created_at, currency_id FROM payment_reconciliation WHERE organization_id = {organization_id} AND company_id = {} LIMIT {QUERY_LIMIT}",
             company.id
         );
-        query_typed::<MoveAllocationSourceRow>(client, "payment_reconciliation", allocations_sql)
+        query_typed::<MoveAllocationQueryRow>(client, "payment_reconciliation", allocations_sql)
             .await?
+            .into_iter()
+            .filter(|row| line_ids.contains(&row.allocated_move_line_id))
+            .map(|row| {
+                Ok(MoveAllocationSourceRow {
+                    allocated_move_line_id: row.allocated_move_line_id,
+                    allocated_amount: row.allocated_amount,
+                    is_reversal: row.is_reversal,
+                    created_at: row.created_at.to_rfc3339()?,
+                    currency_id: row.currency_id,
+                })
+            })
+            .collect::<Result<Vec<_>, ApiError>>()?
     };
 
     let source_rows = vec![

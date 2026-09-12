@@ -5,6 +5,7 @@ import {
   expectNoAppError,
   fillField,
   openEntityCreate,
+  selectModuleTab,
   smokeName,
   submitForm,
 } from "./helpers"
@@ -19,6 +20,20 @@ test.describe("CRM phone identities and roles", { tag: ["@p1", "@contacts", "@ui
     await fillField(page, "name", contactName)
     await fillField(page, "email", `${contactName}@example.test`)
     await submitForm(page, "new-contact")
+    await expect
+      .poll(async () => {
+        const response = await page.request.get("/api/query/contacts")
+        if (!response.ok()) return false
+        const payload = (await response.json()) as {
+          data?: Array<{ name?: unknown }>
+        }
+        return payload.data?.some((row) => row.name === contactName) ?? false
+      }, { timeout: 30_000 })
+      .toBe(true)
+
+    await page.reload({ waitUntil: "domcontentloaded" })
+    await selectModuleTab(page, "crm", "contacts")
+    await page.getByRole("textbox", { name: "Search records" }).fill(contactName)
 
     const contactRow = page.locator('[data-testid^="entity-row-"]', { hasText: contactName }).first()
     await expect(contactRow).toBeVisible({ timeout: 30_000 })
@@ -28,7 +43,7 @@ test.describe("CRM phone identities and roles", { tag: ["@p1", "@contacts", "@ui
     await expect(recordSheet).toBeVisible()
     await recordSheet.getByRole("tab", { name: "Phones & roles" }).click()
 
-    await recordSheet.getByRole("button", { name: "Add phone" }).click()
+    await recordSheet.getByRole("button", { name: "Add phone" }).first().click()
     const identityDialog = page.getByTestId("form-modal-create-contact-identity")
     await expect(identityDialog).toBeVisible()
     await identityDialog.getByTestId("form-field-rawValue").fill("+1 202 555 0101")

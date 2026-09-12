@@ -1,6 +1,11 @@
 import { expect, test, type Page } from "@playwright/test"
 
-import { expectNoAppError, gotoModule, openEntityCreate } from "./helpers"
+import {
+  expectNoAppError,
+  gotoModule,
+  openEntityCreate,
+  selectModuleTab,
+} from "./helpers"
 
 const MANUFACTURING_KEY_TAB_IDS = [
   "dashboard",
@@ -10,7 +15,7 @@ const MANUFACTURING_KEY_TAB_IDS = [
 ] as const
 
 async function openManufacturingTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-manufacturing-${tabId}`).click()
+  await selectModuleTab(page, "manufacturing", tabId)
 }
 
 async function assertManufacturingTabRenders(page: Page, tabId: string) {
@@ -24,13 +29,13 @@ async function assertManufacturingTabRenders(page: Page, tabId: string) {
       break
     case "orders":
       await expect(page.getByTestId("module-create-manufacturing-orders")).toBeVisible()
-      await expect(page.getByRole("tabpanel", { name: "Manufacturing Orders" }).getByTestId("entity-table")).toBeVisible()
+      await expect(page.locator('[role="tabpanel"]:visible').getByTestId("entity-table")).toBeVisible()
       break
     case "bom-lines":
-      await expect(page.getByRole("tabpanel", { name: "BOM Lines" }).getByTestId("entity-table")).toBeVisible()
+      await expect(page.locator('[role="tabpanel"]:visible').getByTestId("entity-table")).toBeVisible()
       break
     case "routing-operations":
-      await expect(page.getByRole("tabpanel", { name: "Routing Operations" }).getByTestId("entity-table")).toBeVisible()
+      await expect(page.locator('[role="tabpanel"]:visible').getByTestId("entity-table")).toBeVisible()
       break
     default:
       break

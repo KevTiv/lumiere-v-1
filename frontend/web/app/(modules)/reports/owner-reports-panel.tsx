@@ -398,7 +398,7 @@ function ReportCard({ entry, isPending, onPreview }: ReportCardProps) {
   const previewable = isReportPreviewAvailable(entry)
 
   return (
-    <Card>
+    <Card data-testid={`owner-report-card-${entry.key}`}>
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-base">{entry.title}</CardTitle>

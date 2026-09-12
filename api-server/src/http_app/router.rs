@@ -27,6 +27,8 @@ pub(super) fn app(state: Arc<AppState>, cors: CorsLayer) -> Router {
         .merge(routes::domain_router());
 
     Router::new()
+        .route("/live", get(health::health))
+        .route("/ready", get(health::health_ready))
         .route("/health", get(health::health))
         .route("/health/ready", get(health::health_ready))
         .route("/metrics", get(health::metrics_handler))

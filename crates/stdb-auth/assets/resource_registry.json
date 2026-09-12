@@ -1087,7 +1087,11 @@
     "default_restricted": [
       "contact_id",
       "company_id",
+      "kind",
       "normalized_e164",
+      "display_masked",
+      "is_preferred",
+      "verification_state",
       "created_by",
       "verified_at",
       "archived_at",
@@ -1148,10 +1152,10 @@
     ],
     "default_restricted": [
       "contact_id",
-      "company_id",
-      "assigned_by",
-      "ended_by",
-      "metadata"
+      "role",
+      "active_from",
+      "active_until",
+      "is_active"
     ],
     "mandatory": [
       "id",
@@ -2951,11 +2955,20 @@
     ],
     "default_restricted": [
       "company_id",
+      "template_id",
+      "channel",
+      "status",
+      "subject_model",
       "subject_query",
+      "recipient_count",
+      "excluded_count",
       "preview_sample_ids",
       "approved_by",
+      "approved_at",
       "rejected_by",
+      "rejected_at",
       "rejection_reason",
+      "created_at",
       "created_by",
       "metadata"
     ],
@@ -2972,10 +2985,18 @@
     ],
     "default_restricted": [
       "company_id",
+      "key",
+      "name",
+      "locale",
       "subject",
       "body_template",
       "allowed_variables",
       "applicable_channels",
+      "active",
+      "review_state",
+      "retention_classification",
+      "created_at",
+      "updated_at",
       "created_by",
       "updated_by",
       "metadata"
@@ -3178,11 +3199,22 @@
     ],
     "default_restricted": [
       "company_id",
+      "template_id",
       "contact_id",
       "phone_identity_id",
+      "channel",
+      "status",
+      "subject_model",
+      "subject_id",
       "rendered_subject",
       "rendered_body",
       "variable_hash",
+      "copied_at",
+      "queued_at",
+      "sent_at",
+      "failed_at",
+      "failure_reason",
+      "created_at",
       "created_by",
       "metadata"
     ],
@@ -3353,10 +3385,17 @@
     ],
     "default_restricted": [
       "company_id",
+      "provider_code",
+      "name",
+      "provider_label",
       "reference_normalized",
       "reference_masked",
+      "currency_id",
+      "account_journal_id",
       "fee_account_id",
       "clearing_account_id",
+      "active",
+      "is_primary",
       "created_by",
       "updated_by",
       "metadata"
@@ -3375,6 +3414,8 @@
     ],
     "default_restricted": [
       "company_id",
+      "bearer",
+      "amount",
       "fee_account_id",
       "tax_account_id",
       "provider_reference",
@@ -3396,6 +3437,10 @@
     "default_restricted": [
       "company_id",
       "allocated_move_line_id",
+      "allocated_amount",
+      "residual_before",
+      "residual_after",
+      "is_reversal",
       "write_off_account_id",
       "metadata"
     ],
@@ -3432,8 +3477,11 @@
     ],
     "default_restricted": [
       "company_id",
+      "direction",
+      "status",
       "external_reference",
       "reference_fingerprint",
+      "settlement_amount",
       "account_payment_id",
       "evidence_document_ids",
       "created_by",
@@ -4030,8 +4078,7 @@
     ],
     "default_restricted": [
       "name",
-      "company_id",
-      "active"
+      "company_id"
     ],
     "mandatory": [
       "id",
@@ -4497,6 +4544,7 @@
       "state",
       "partner_id",
       "company_id",
+      "origin",
       "picking_ids"
     ],
     "mandatory": [

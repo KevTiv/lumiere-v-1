@@ -929,6 +929,7 @@ mod tests {
         assert!(inventory_resource("stock-pickings"));
         assert!(inventory_resource("warehouses"));
         assert!(inventory_resource("quality-checks"));
+        assert!(!inventory_resource("quality-teams"));
         assert!(inventory_resource("replenishment-rules"));
         assert!(inventory_resource("picking-batches"));
         assert!(!inventory_resource("account-moves"));

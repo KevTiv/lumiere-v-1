@@ -131,6 +131,13 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: ORGANIZATION_COMMIT_PROTOCOL_UPGRADE_SQL,
     },
+    Migration {
+        version: 10,
+        name: "organization_commit_cursor_backfill",
+        change_set: 2,
+        phase: MigrationPhase::ProjectBackfill,
+        sql: ORGANIZATION_COMMIT_CURSOR_BACKFILL_SQL,
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.
@@ -320,6 +327,17 @@ begin
     end if;
 end
 $lumiere$;
+"#;
+
+/// Restore the protocol cursor omitted by early C3 projectors. The durable
+/// watermark is authoritative and already binds the exact commit checksum, so
+/// its successor is the only valid next source sequence.
+const ORGANIZATION_COMMIT_CURSOR_BACKFILL_SQL: &str = r#"
+insert into organization_commit_cursor (organization_id, next_sequence)
+select organization_id, applied_sequence + 1
+from organization_projection_watermark
+on conflict (organization_id) do update
+set next_sequence = excluded.next_sequence;
 "#;
 
 fn postgres_identifier(identifier: &str) -> String {
@@ -922,6 +940,42 @@ pub async fn ensure_schema(pool: &Pool) -> Result<()> {
     Ok(())
 }
 
+/// Verify that PostgreSQL has the exact migration prefix required by this
+/// application binary without applying or modifying schema state.
+pub async fn check_schema_ready(pool: &Pool) -> Result<i64> {
+    let client = pool
+        .get()
+        .await
+        .context("get PG client for migration readiness")?;
+    let rows = client
+        .query(
+            "select version, name, change_set, phase, checksum from lumiere_platform.schema_migration order by version asc",
+            &[],
+        )
+        .await
+        .context("read PostgreSQL migration history for readiness")?;
+    let applied = rows
+        .into_iter()
+        .map(|row| AppliedMigration {
+            version: row.get("version"),
+            name: row.get("name"),
+            change_set: row.get("change_set"),
+            phase: row.get("phase"),
+            checksum: row.get("checksum"),
+        })
+        .collect::<Vec<_>>();
+    let first_pending = first_pending_migration(&applied, MIGRATIONS)
+        .context("validate PostgreSQL migration readiness")?;
+    if first_pending != MIGRATIONS.len() {
+        bail!(
+            "PostgreSQL migration {} ({}) has not been applied",
+            MIGRATIONS[first_pending].version,
+            MIGRATIONS[first_pending].name
+        );
+    }
+    Ok(MIGRATIONS.last().map_or(0, |migration| migration.version))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1000,6 +1054,22 @@ mod tests {
                     .find("organization_row_change_commit_fk")
                     .expect("child foreign key")
         );
+    }
+
+    #[test]
+    fn organization_commit_cursor_backfill_is_derived_and_idempotent() {
+        let migration = MIGRATIONS
+            .iter()
+            .find(|migration| migration.name == "organization_commit_cursor_backfill")
+            .expect("cursor backfill migration is shipped");
+        assert_eq!(migration.version, 10);
+        assert_eq!(migration.change_set, 2);
+        assert_eq!(migration.phase, MigrationPhase::ProjectBackfill);
+        assert!(migration.sql.contains("applied_sequence + 1"));
+        assert!(migration
+            .sql
+            .contains("on conflict (organization_id) do update"));
+        assert!(!migration.sql.contains("delete"));
     }
 
     #[test]

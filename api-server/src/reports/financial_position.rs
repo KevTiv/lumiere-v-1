@@ -13,6 +13,7 @@ use super::daily_business_summary::MoneyAmount;
 const MAX_UNRECONCILED_LINES: usize = 50;
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PaymentAccountSourceRow {
     pub id: u64,
     pub name: String,
@@ -23,6 +24,7 @@ pub struct PaymentAccountSourceRow {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PostedPaymentSourceRow {
     pub id: u64,
     pub payment_account_id: u64,
@@ -33,6 +35,7 @@ pub struct PostedPaymentSourceRow {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PaymentFeeSourceRow {
     pub payment_transaction_id: u64,
     pub amount: f64,
@@ -41,12 +44,14 @@ pub struct PaymentFeeSourceRow {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JournalDefaultAccountRow {
     pub id: u64,
     pub default_account_id: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LiquidityMoveLineRow {
     pub journal_id: u64,
     pub account_id: u64,
@@ -54,12 +59,14 @@ pub struct LiquidityMoveLineRow {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PaymentReconciliationSourceRow {
     pub payment_transaction_id: u64,
     pub is_reversal: bool,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UnreconciledPaymentSourceRow {
     pub id: u64,
     pub payment_account_id: u64,

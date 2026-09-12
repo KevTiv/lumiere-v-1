@@ -2,7 +2,7 @@
   "version": 1,
   "canonical_plan": "docs/plans/core-vertical-deployability-pruning-plan.md",
   "last_verified": {
-    "date": "2026-09-11",
+    "date": "2026-09-12",
     "commit": "working-tree"
   },
   "relation_census": {
@@ -181,8 +181,23 @@
     },
     "C11": {
       "status": "partial",
-      "evidence": ["basic health, readiness, metrics, and projection status exist"],
-      "required": ["dependency-specific readiness", "bounded retry and poison handling", "synthetic checks and recovery runbooks"]
+      "evidence": [
+        "the api-server exposes /live and structured /ready endpoints while retaining /health and /health/ready as compatibility aliases",
+        "a live disposable-topology probe returned ready with healthy SpacetimeDB, PostgreSQL, projection-lag, ir-v2 contract, migration 10, and lumiere-contracts 0.3.39 release-compatibility components; AI was explicitly informational",
+        "every HTTP response receives a server-generated X-Correlation-Id and api-server release identifier, and typed operation logs inherit bounded operation, correlation, and release span fields",
+        "the superuser per-organization projection endpoint reports source/durable sequences, backlog age, last error, and quarantined sequence without exposing cross-organization business rows",
+        "projection and finalization transport/application failures use independently bounded exponential retry delays that reset after success, while deterministic malformed, scope-invalid, checksum-invalid, and incompatible commits retain the existing immediate durable quarantine without cursor advancement",
+        "scripts/c11-synthetic-check.sh provides readiness, workflow, isolation, watermark, and full modes by composing the existing guarded disposable-topology proofs",
+        "docs/C11_OPERATIONS_RUNBOOK.md covers projection lag, blocked sequence, PostgreSQL loss, SpacetimeDB loss, incompatible release/migration, reconstruction, and AI outage recovery without manual database-row edits",
+        "focused readiness, release metadata, migration, projection backoff, and request-identity tests pass; cargo check -p api-server --all-targets and the live readiness synthetic pass",
+        "the final all-module reconstruction drill restored all 458 application relations and 3,449 rows into a freshly published target after an injected committed mid-run failure; same-run resume and a fresh run ID both matched the exact sequence-2 checksum, recreated five protocol rows, and preserved delete and idempotency behavior",
+        "the production Next.js build passes; the 173-test Playwright run completed with 165 passes and six intentional skips, and its two isolated failures were corrected and pass focused production-build reruns (CRM phone identity and role lifecycle, and manufacturing tab synchronization)",
+        "the frontend STDB package passes 93 tests, including the EndContactRoleParams optional-string regression; operation history remains valid at 1,316 operations, release compatibility passes, ownership is 463/463 with zero globals, storage policy is 463/463, and C2/C9/trusted-route ratchets pass"
+      ],
+      "required": [
+        "publish and pin the next immutable lumiere-contracts release for the regenerated C11 contract artifacts after explicit approval",
+        "push the C11 branch and obtain a completely green PR/CI state"
+      ]
     }
   }
 }
