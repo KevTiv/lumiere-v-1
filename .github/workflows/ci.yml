@@ -259,6 +259,9 @@ jobs:
       - name: Unit tests (ui)
         run: pnpm --dir packages/ui test
 
+      - name: Unit tests (presentation core)
+        run: pnpm --dir packages/presentation-core test
+
       - name: Unit tests (web BFF helpers)
         run: pnpm --dir web test:unit
 

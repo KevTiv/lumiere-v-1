@@ -1,6 +1,7 @@
 # Frontend multi-surface workflow, presentation, and reusable-work architecture
 
 **Status:** Proposed — 2026-08-24
+**Execution update (2026-09-12):** The [Luna coordination and delivery ledger](./frontend-ir-luna-coordination-plan.md) tracks the remaining work. Its first implementation slice is the static Overview presentation boundary, a partial F0/F1 proof. The phase checklists below remain full acceptance gates; this slice does not complete admin publishing or multi-surface workflow delivery.
 **Tracks:** `frontend-architecture`, `workflow-ir`, `presentation-ir`, `work-programs`, `runtime-extensions`, `admin-ui-composition`, `nextjs`, `expo`, `gpui-readiness`, `client-resilience`
 **Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [overview-dashboard-subagent-plan.md](./overview-dashboard-subagent-plan.md) · [organization-onboarding-workflow-subagent-plan.md](./organization-onboarding-workflow-subagent-plan.md) · [work-program-ui-harness-convergence-plan.md](./work-program-ui-harness-convergence-plan.md) · [agent-control-plane-model-routing-plan.md](./agent-control-plane-model-routing-plan.md) · [traffic-resilience-admission-control-plan.md](./traffic-resilience-admission-control-plan.md)
 

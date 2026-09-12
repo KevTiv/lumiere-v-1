@@ -1,0 +1,13 @@
+{
+  "name": "@lumiere/presentation-core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/index.test.ts"
+  },
+  "devDependencies": { "@types/node": "^22.10.0", "tsx": "^4.20.5", "typescript": "^5.5.0" }
+}

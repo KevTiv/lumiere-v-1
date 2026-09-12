@@ -67,7 +67,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  transpilePackages: ["@lumiere/ui", "@lumiere/stdb"],
+  transpilePackages: ["@lumiere/ui", "@lumiere/stdb", "@lumiere/presentation-core"],
   // Force a single React instance across all workspace packages.
   // @react-three/fiber inside @lumiere/ui would otherwise resolve React from
   // packages/ui/node_modules, causing "ReactCurrentOwner" undefined errors.

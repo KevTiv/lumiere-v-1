@@ -25,6 +25,7 @@
     "@lumiere/erp-session": "workspace:*",
     "@lumiere/erp-shared": "workspace:*",
     "@lumiere/i18n": "workspace:*",
+    "@lumiere/presentation-core": "workspace:*",
     "@lumiere/query-hooks": "workspace:*",
     "@lumiere/stdb": "workspace:*",
     "@radix-ui/react-accordion": "1.2.12",
