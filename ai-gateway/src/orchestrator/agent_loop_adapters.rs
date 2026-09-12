@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use serde_json::json;
 
 use super::agent_loop::{run_loop, LoopEvent, LoopLimits, LoopOutcome, LoopRecorder, LoopTools};
+use super::invocation_policy::ReviewedInvocationPolicy;
 use crate::{
     providers::llm::{LlmCompletion, LlmRequest, ToolCallRequest},
     tools::{
@@ -18,10 +19,12 @@ use crate::{
 pub(super) async fn run_recorded_loop(
     llm: &dyn LlmCompletion,
     view: &AuthorizedToolView<'_>,
+    policy: &ReviewedInvocationPolicy,
     context: &ToolContext,
     request: LlmRequest,
     limits: LoopLimits,
 ) -> Result<LoopOutcome> {
+    policy.ensure_context(context.org_id, context.company_id, &context.skill_key)?;
     let tools = AuthorizedLoopTools { view, context };
     let recorder = StdbLoopRecorder {
         stdb: &context.stdb,
@@ -29,7 +32,16 @@ pub(super) async fn run_recorded_loop(
         company_id: context.company_id,
         run_id: context.run_id,
     };
-    run_loop(context.run_id, llm, &tools, &recorder, request, limits).await
+    run_loop(
+        context.run_id,
+        llm,
+        &tools,
+        policy,
+        &recorder,
+        request,
+        limits,
+    )
+    .await
 }
 
 /// Binds the loop's tool execution to the H3 invocation view and trusted scope.

@@ -4,6 +4,7 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 
 use crate::{
+    harness::audit::{DecisionOutcome, PolicyDecision},
     providers::llm::{LlmCompletion, LlmMessage, LlmRequest, ToolCallRequest},
     tools::types::ToolOutput,
 };
@@ -20,6 +21,9 @@ pub(super) enum LoopStop {
     CandidateFinal(String),
     MalformedCall,
     ToolDenied,
+    /// Policy requires approval; no draft is created by this loop yet.
+    PendingApproval,
+    PolicyFailed,
     ToolFailed,
     ProviderFailed,
     RoundLimit,
@@ -50,6 +54,22 @@ pub(super) trait LoopTools: Send + Sync {
     async fn execute(&self, call: &ToolCallRequest) -> Result<ToolOutput>;
 }
 
+/// Reevaluate reviewed policy for each invocation and protect its output.
+#[async_trait]
+pub(super) trait LoopPolicy: Send + Sync {
+    async fn evaluate(
+        &self,
+        call: &ToolCallRequest,
+        completed_calls: u32,
+    ) -> Result<PolicyDecision>;
+    async fn protect_output(
+        &self,
+        call: &ToolCallRequest,
+        completed_calls: u32,
+        output: ToolOutput,
+    ) -> Result<ToolOutput>;
+}
+
 #[async_trait]
 pub(super) trait LoopRecorder: Send + Sync {
     async fn record(&self, event: &LoopEvent) -> Result<()>;
@@ -59,6 +79,7 @@ pub(super) async fn run_loop(
     run_id: u64,
     llm: &dyn LlmCompletion,
     tools: &dyn LoopTools,
+    policy: &dyn LoopPolicy,
     recorder: &dyn LoopRecorder,
     request: LlmRequest,
     limits: LoopLimits,
@@ -247,10 +268,93 @@ pub(super) async fn run_loop(
         }
 
         for call in calls {
+            let decision = match policy.evaluate(&call, tool_calls_used).await {
+                Ok(decision) => decision,
+                Err(error) => {
+                    record(
+                        recorder,
+                        LoopEvent {
+                            step_no: next_step(&mut event_step),
+                            kind: "policy".into(),
+                            tool_name: Some(call.name.clone()),
+                            input: json!({"id":call.id}),
+                            summary: "policy evaluation failed".into(),
+                            error: Some(error.to_string()),
+                        },
+                    )
+                    .await?;
+                    return stop(
+                        recorder,
+                        &mut event_step,
+                        transcript,
+                        LoopStop::PolicyFailed,
+                        input_tokens,
+                        output_tokens,
+                    )
+                    .await;
+                }
+            };
+            record(
+                recorder,
+                LoopEvent {
+                    step_no: next_step(&mut event_step),
+                    kind: "policy".into(),
+                    tool_name: Some(call.name.clone()),
+                    input: json!({"id":call.id,"decision":decision}),
+                    summary: "per-call policy decision".into(),
+                    error: None,
+                },
+            )
+            .await?;
+            let policy_stop = match decision.outcome {
+                DecisionOutcome::Allow => None,
+                DecisionOutcome::Deny => Some(LoopStop::ToolDenied),
+                DecisionOutcome::DraftOnly => Some(LoopStop::PendingApproval),
+            };
+            if let Some(reason) = policy_stop {
+                return stop(
+                    recorder,
+                    &mut event_step,
+                    transcript,
+                    reason,
+                    input_tokens,
+                    output_tokens,
+                )
+                .await;
+            }
             tool_calls_used = tool_calls_used.saturating_add(1);
             let input = call.arguments.clone();
             match tools.execute(&call).await {
                 Ok(output) => {
+                    let output = match policy
+                        .protect_output(&call, tool_calls_used - 1, output)
+                        .await
+                    {
+                        Ok(output) => output,
+                        Err(error) => {
+                            record(
+                                recorder,
+                                LoopEvent {
+                                    step_no: next_step(&mut event_step),
+                                    kind: "policy".into(),
+                                    tool_name: Some(call.name.clone()),
+                                    input: json!({"id":call.id}),
+                                    summary: "tool output rejected by policy".into(),
+                                    error: Some(error.to_string()),
+                                },
+                            )
+                            .await?;
+                            return stop(
+                                recorder,
+                                &mut event_step,
+                                transcript,
+                                LoopStop::PolicyFailed,
+                                input_tokens,
+                                output_tokens,
+                            )
+                            .await;
+                        }
+                    };
                     let summary = output.summary.clone();
                     let event_input = json!({
                         "id": call.id,
@@ -435,7 +539,7 @@ async fn stop(
             }),
             summary,
             error: match &reason {
-                LoopStop::CandidateFinal(_) => None,
+                LoopStop::CandidateFinal(_) | LoopStop::PendingApproval => None,
                 ref terminal => Some(format!("{terminal:?}")),
             },
         },
