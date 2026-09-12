@@ -15,15 +15,16 @@ This is not full H5 acceptance. Production skill routing remains disabled.
 The current `record_ai_spend` reducer charges after completion using floating
 point mutable pricing and only warns about overspend. Snapshot reads and the
 gateway's process-local limiter cannot prevent concurrent budget admission.
-No durable reservation/settlement primitive exists in the inspected tree.
+H5b now adds a separate reservation/settlement contract in `ai/spend.rs`.
+It is not yet released or used by the gateway; legacy spend remains unchanged.
 
-The next contract slice must add an organization-owned spend reservation with
+The new contract defines an organization-owned spend reservation with
 company, agent, active run, provider/model, billing period, immutable price
 version, integer monetary units, bounded input/output allowance, idempotency
-key and lifecycle state. An atomic reserve reducer must validate all bindings
-and subtract both settled usage and outstanding reservations from the budget.
+key and lifecycle state. The atomic reserve reducer validates these bindings
+and subtracts both settled usage and outstanding reservations from the budget.
 Identical retries recover the same reservation; conflicting reuse is denied.
-Settlement must be idempotent and use the reservation's pricing snapshot.
+Settlement is idempotent and uses the reservation's pricing snapshot.
 
 Provider timeouts are ambiguous: a request may already have incurred charges.
 Do not refund or expire its reservation automatically. Preserve committed funds
@@ -51,6 +52,74 @@ draft. Approval must independently validate the resulting draft and scope.
 
 The policy stop can be tested now. Draft creation, budget settlement and live
 end-to-end approval remain separate persistence acceptance gates.
+
+## H5b source implementation
+
+The persistence slice adds four private, organization-owned tables. They are
+not public SQL/subscription surfaces; gateway ID recovery needs an explicitly
+authorized scoped read path (or owner-authorized service lookup) at activation:
+
+- `ai_price_snapshot`: immutable versioned input/output prices, denominated in
+  millionths of the named currency per 1,000 tokens. New reservations require
+  the latest version for the selected agent/provider/model/currency.
+- `ai_spend_budget`: one shared agent budget per UTC calendar month, across
+  companies. Currency is immutable; limit changes cannot undercut commitments.
+- `ai_spend_reservation`: exact organization/request-key binding to company,
+  agent, run, model, price, month and token allowances. Admission updates shared
+  outstanding units transactionally. Settlement stores token counts and rejects
+  conflicting retries; ambiguous outcomes retain their outstanding amount.
+- `ai_action_draft_request`: immutable organization/company/run/request mapping
+  to the exact inserted draft and its original creation-payload hash. The draft,
+  mapping and run association are written in one transaction. Existing manual
+  draft parameters and the legacy reducer API are unchanged.
+
+`create_ai_agent_run` now checks active skill/agent/team/config ownership while
+preserving valid organization-wide optional company scope. Existing step appends
+recover identical run/step payloads and reject conflicting or out-of-order writes.
+Completion is idempotent and preserves previously associated draft IDs.
+
+Spend reservation and settlement require separate `ai_spend/reserve` and
+`ai_spend/settle` grants. Provision these only to the trusted gateway/accounting
+principal: ordinary run writers must not self-report usage to release funds.
+Configuration requires `ai_agent/write`. There is no default permission grant.
+The new governed path requires an explicit model allowlist; an empty list denies.
+
+## Remaining release and activation gates
+
+1. Generate schema, Rust/TypeScript bindings, storage/projection/reconstruction
+   coverage and canonical IR for these four tables and four new reducers; review
+   ownership and reducer exposure. The currently pinned v0.3.42 is unchanged.
+2. Run the module transaction/concurrent-client tests and fresh durable replay,
+   then the complete contracts release gates. Publish a new immutable version
+   and pin its gateway consumers; do not edit generated staging by hand.
+3. Add durable provider-attempt dispatch/reconciliation state. Recovering a
+   reservation does **not** authorize dispatching the same attempt again. Bind
+   allowances to the exact provider request and account for prompt usage before
+   dispatch. Every fallback attempt needs its own reservation and an explicitly
+   allowed provider/model pair; cross-provider fallback is not implemented here.
+4. Wire gateway reserve/settle and exact draft lookup through released contracts.
+   Replace legacy latest-ID lookups only in a separately verified migration.
+5. Persist approval-wait/terminal run states and validate candidate final answers.
+   Prove permitted, denied, exhausted-budget, ambiguous-timeout and fallback
+   behavior end-to-end before enabling production skill routing.
+
+The native helper tests are not evidence of live concurrent admission or
+PostgreSQL-to-fresh-SpacetimeDB reconstruction. H5 remains partial until these
+gates pass.
+
+### H5b local validation
+
+- Final native `cargo test --offline --locked --manifest-path spacetimedb/Cargo.toml
+  --lib`: 61 passed, 0 failed. This includes arithmetic limits, outstanding
+  reservation accounting, exact settlement replay, UTC/Unicode handling,
+  draft creation-payload hashes, and step/completion payload matching.
+- Final `cargo check --offline --locked --manifest-path spacetimedb/Cargo.toml
+  --target wasm32-unknown-unknown`: passed with 9 warnings. This is a target
+  compilation check, not a deployed WASM runtime or contracts publication gate.
+- Edited Rust files pass `rustfmt --check`; `git diff --check` passes.
+  Whole-module formatting remains red on unrelated existing differences in
+  `src/core/reconstruction.rs` and `src/generated_reconstruction_apply.rs`;
+  this slice does not change those files.
 
 ## Execution and recovery boundary
 

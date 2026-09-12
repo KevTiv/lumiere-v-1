@@ -16,6 +16,7 @@ pub mod intelligence;
 pub mod reducer_allowlist;
 pub mod skill_registry;
 pub mod skills;
+pub mod spend;
 
 pub use action_drafts::*;
 pub use agents::*;
@@ -24,3 +25,4 @@ pub use intelligence::*;
 pub use reducer_allowlist::*;
 pub use skill_registry::*;
 pub use skills::*;
+pub use spend::*;

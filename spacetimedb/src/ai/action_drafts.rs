@@ -1,12 +1,14 @@
 //! AI action drafts — human-approved ERP mutations proposed by the harness.
 
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::ai::action_draft_lifecycle::{
     on_draft_approved, on_draft_created, on_draft_expired, on_draft_rejected,
 };
 use crate::ai::reducer_allowlist::is_allowed_ai_reducer;
+use crate::ai::skills::{ai_agent_run, AiAgentRun};
 use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::projects::tasks::{create_task, project_task, CreateTaskParams};
@@ -20,6 +22,7 @@ use crate::sales::sales_core::{
 use crate::types::TaskState;
 
 const DRAFT_TTL_SECS: u64 = 86_400;
+const REQUEST_KEY_MAX_LEN: usize = 160;
 const ELEVATED_GOVERNANCE_FIELDS: [&str; 8] = [
     "risk",
     "skill_key",
@@ -70,6 +73,28 @@ pub struct AiActionDraft {
     pub metadata: Option<String>,
 }
 
+/// Durable idempotency link between one H5 request and its draft.
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = ai_action_draft_request,
+    index(accessor = ai_action_draft_request_by_org, btree(columns = [organization_id])),
+    index(accessor = ai_action_draft_request_by_run, btree(columns = [run_id]))
+)]
+pub struct AiActionDraftRequest {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub run_id: u64,
+    /// Scoped request key; callers must not use this as a global identifier.
+    pub request_key: String,
+    pub draft_id: u64,
+    /// SHA-256 of the complete immutable creation payload.
+    pub creation_payload_hash: String,
+    pub create_date: Timestamp,
+}
+
 // ── Input Params ─────────────────────────────────────────────────────────────
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -101,6 +126,15 @@ pub fn create_ai_action_draft(
     company_id: u64,
     params: CreateAiActionDraftParams,
 ) -> Result<(), String> {
+    create_ai_action_draft_inner(ctx, organization_id, company_id, params).map(|_| ())
+}
+
+fn create_ai_action_draft_inner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    params: CreateAiActionDraftParams,
+) -> Result<AiActionDraft, String> {
     check_permission(ctx, organization_id, "ai_action_draft", "create")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
 
@@ -114,6 +148,9 @@ pub fn create_ai_action_draft(
     }
     if params.summary.trim().is_empty() {
         return Err("summary is required".to_string());
+    }
+    if !params.confidence.is_finite() || !(0.0..=1.0).contains(&params.confidence) {
+        return Err("confidence must be finite and between 0 and 1".to_string());
     }
     if params.elevated {
         validate_elevated_governance_metadata(params.metadata.as_deref())?;
@@ -191,6 +228,87 @@ pub fn create_ai_action_draft(
         },
     );
 
+    Ok(row)
+}
+
+/// Create a draft and its durable request link atomically.
+///
+/// A retry with the same tenant/run/request key is an exact no-op only when the
+/// immutable creation payload hash matches. The draft itself may have changed
+/// state or been edited after creation; that does not alter the retry decision.
+#[reducer]
+pub fn create_ai_run_action_draft(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    request_key: String,
+    params: CreateAiActionDraftParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_action_draft", "create")?;
+    check_permission(ctx, organization_id, "ai_agent_run", "write")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    let request_key = request_key.trim();
+    if request_key.is_empty() || request_key.len() > REQUEST_KEY_MAX_LEN {
+        return Err(format!(
+            "request_key must be 1..{REQUEST_KEY_MAX_LEN} bytes"
+        ));
+    }
+    if !params.confidence.is_finite() || !(0.0..=1.0).contains(&params.confidence) {
+        return Err("confidence must be finite and between 0 and 1".to_string());
+    }
+    let run = ctx
+        .db
+        .ai_agent_run()
+        .id()
+        .find(&run_id)
+        .ok_or("AI agent run not found")?;
+    if run.organization_id != organization_id || run.company_id != company_id {
+        return Err("AI agent run does not belong to this organization/company".to_string());
+    }
+    let payload_hash =
+        creation_payload_hash(organization_id, company_id, run_id, request_key, &params);
+    if let Some(existing) = ctx
+        .db
+        .ai_action_draft_request()
+        .ai_action_draft_request_by_run()
+        .filter(&run_id)
+        .find(|link| {
+            link.organization_id == organization_id
+                && link.company_id == company_id
+                && link.run_id == run_id
+                && link.request_key == request_key
+        })
+    {
+        if existing.creation_payload_hash == payload_hash {
+            return Ok(());
+        }
+        return Err("request key is already bound to a different draft payload".to_string());
+    }
+    if run.status != "running" && run.status != "pending" {
+        return Err("cannot create a new draft for a terminal AI agent run".to_string());
+    }
+
+    let draft = create_ai_action_draft_inner(ctx, organization_id, company_id, params)?;
+    ctx.db
+        .ai_action_draft_request()
+        .insert(AiActionDraftRequest {
+            id: 0,
+            organization_id,
+            company_id,
+            run_id,
+            request_key: request_key.to_string(),
+            draft_id: draft.id,
+            creation_payload_hash: payload_hash,
+            create_date: ctx.timestamp,
+        });
+    let mut draft_ids = run.action_draft_ids;
+    draft_ids.push(draft.id);
+    ctx.db.ai_agent_run().id().update(AiAgentRun {
+        action_draft_ids: draft_ids,
+        write_date: ctx.timestamp,
+        ..run
+    });
     Ok(())
 }
 
@@ -519,6 +637,34 @@ fn is_expired(ctx: &ReducerContext, draft: &AiActionDraft) -> bool {
     draft
         .expires_at
         .is_some_and(|expires| expires <= ctx.timestamp)
+}
+
+fn creation_payload_hash(
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    request_key: &str,
+    params: &CreateAiActionDraftParams,
+) -> String {
+    let payload = serde_json::json!({
+        "organization_id": organization_id,
+        "company_id": company_id,
+        "run_id": run_id,
+        "request_key": request_key,
+        "reducer_name": params.reducer_name.trim(),
+        "params_json": params.params_json,
+        "summary": params.summary,
+        "confidence": params.confidence,
+        "elevated": params.elevated,
+        "warnings_json": params.warnings_json,
+        "source_query": params.source_query,
+        "ui_context_json": params.ui_context_json,
+        "expires_at_micros": params.expires_at.map(|value| value.to_micros_since_unix_epoch()),
+        "metadata": params.metadata,
+    });
+    let canonical = serde_json::to_vec(&payload).expect("JSON payload is serializable");
+    let digest = Sha256::digest(canonical);
+    format!("sha256:{digest:x}")
 }
 
 fn mark_expired(ctx: &ReducerContext, draft: &AiActionDraft) {
@@ -1003,5 +1149,41 @@ mod tests {
         let err = build_create_task_params(1, &serde_json::json!({ "company_id": 1 }))
             .expect_err("name required");
         assert!(err.contains("name"));
+    }
+
+    fn hash_params() -> CreateAiActionDraftParams {
+        CreateAiActionDraftParams {
+            reducer_name: "create_task".to_string(),
+            params_json: r#"{"company_id":1}"#.to_string(),
+            summary: "create task".to_string(),
+            confidence: 0.8,
+            elevated: false,
+            warnings_json: None,
+            source_query: Some("make a task".to_string()),
+            ui_context_json: None,
+            expires_at: Some(Timestamp::from_micros_since_unix_epoch(42)),
+            metadata: Some("{}".to_string()),
+        }
+    }
+
+    #[test]
+    fn creation_payload_hash_is_deterministic_and_sensitive() {
+        let params = hash_params();
+        let first = creation_payload_hash(1, 2, 3, "request-1", &params);
+        assert_eq!(first, creation_payload_hash(1, 2, 3, "request-1", &params));
+        assert_ne!(first, creation_payload_hash(1, 2, 3, "request-2", &params));
+        let mut changed = params.clone();
+        changed.summary.push('!');
+        assert_ne!(first, creation_payload_hash(1, 2, 3, "request-1", &changed));
+    }
+
+    #[test]
+    fn creation_payload_hash_normalizes_reducer_name() {
+        let mut trimmed = hash_params();
+        trimmed.reducer_name = "  create_task  ".to_string();
+        assert_eq!(
+            creation_payload_hash(1, 2, 3, "request-1", &trimmed),
+            creation_payload_hash(1, 2, 3, "request-1", &hash_params())
+        );
     }
 }
