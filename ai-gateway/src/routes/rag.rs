@@ -465,13 +465,11 @@ pub async fn post_rag(
             provider: agent.provider.clone(),
             model: agent.model.clone(),
             system: system_prompt,
-            messages: vec![LlmMessage {
-                role: "user".to_string(),
-                content: user_content,
-            }],
+            messages: vec![LlmMessage::text("user", user_content)],
             max_tokens: agent.max_tokens,
             temperature: Some(agent.temperature),
             top_p: Some(agent.top_p),
+            tools: Vec::new(),
         })
         .await
         .map_err(|e| AppError::Internal(format!("LLM request failed: {e}")))?;
