@@ -8,6 +8,28 @@
 **Scope:** Adapter shell and authorization-view boundary only. No runtime
 capability is admitted by this document.
 
+## Implementation handoff (2026-09-12)
+
+The child branch `codex/ai-harness-h3-adapter` implements the pinned catalog
+shell and a borrowed authorization view for runtime-native tools. The view
+intersects skill names with existing action permissions before resolving a
+call. H4 must wire this handle into its future model loop; legacy deterministic
+callers continue to use their existing path.
+
+The v0.3.42 format has no provider description, name, or JSON Schema fields.
+Consequently, nonempty provider conversion returns an unsupported error.
+Synthetic fixtures test structural rejection, not an invented future contract.
+Successful nonempty conversion, provider-name collision testing, and generated
+execution remain follow-up acceptance work after a reviewed contract extension.
+The current slice must not be reported as full H3 acceptance.
+
+Validation: `cargo test --offline --locked -p ai-gateway` passed 171 tests;
+one existing Qdrant integration test requires `QDRANT_TEST_URL` and remains
+ignored. The focused tools suite passed 11 tests, including counter-based
+execution denial and tenant-query scope checks. Locked gateway compilation,
+workspace formatting, and diff checks passed. No live provider or database
+execution was required for these tests.
+
 ## Outcome
 
 Adapt the generated H2 capability catalog to the gateway's existing
