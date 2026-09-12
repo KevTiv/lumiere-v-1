@@ -184,6 +184,7 @@
       "evidence": [
         "the api-server exposes /live and structured /ready endpoints while retaining /health and /health/ready as compatibility aliases",
         "a live disposable-topology probe returned ready with healthy SpacetimeDB, PostgreSQL, projection-lag, ir-v2 contract, migration 10, and lumiere-contracts 0.3.39 release-compatibility components; AI was explicitly informational",
+        "the immutable lumiere-contracts v0.3.40 release contains the regenerated C11 contract artifacts and is pinned by the Rust and TypeScript consumers",
         "every HTTP response receives a server-generated X-Correlation-Id and api-server release identifier, and typed operation logs inherit bounded operation, correlation, and release span fields",
         "the superuser per-organization projection endpoint reports source/durable sequences, backlog age, last error, and quarantined sequence without exposing cross-organization business rows",
         "projection and finalization transport/application failures use independently bounded exponential retry delays that reset after success, while deterministic malformed, scope-invalid, checksum-invalid, and incompatible commits retain the existing immediate durable quarantine without cursor advancement",
@@ -195,7 +196,6 @@
         "the frontend STDB package passes 93 tests, including the EndContactRoleParams optional-string regression; operation history remains valid at 1,316 operations, release compatibility passes, ownership is 463/463 with zero globals, storage policy is 463/463, and C2/C9/trusted-route ratchets pass"
       ],
       "required": [
-        "publish and pin the next immutable lumiere-contracts release for the regenerated C11 contract artifacts after explicit approval",
         "push the C11 branch and obtain a completely green PR/CI state"
       ]
     }
