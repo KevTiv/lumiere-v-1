@@ -2,6 +2,7 @@
 
 **Status:** Proposed — 2026-08-24
 **Execution update (2026-09-12):** The [Luna coordination and delivery ledger](./frontend-ir-luna-coordination-plan.md) tracks the remaining work. Its first implementation slice is the static Overview presentation boundary, a partial F0/F1 proof. The phase checklists below remain full acceptance gates; this slice does not complete admin publishing or multi-surface workflow delivery.
+**Product direction (2026-09-12):** The target is a frontend that users and the harness can reshape into versioned modules and pages over existing ERP capabilities. Dashboard extraction is an enabling proof. The module/page composition contract in sections 3.8–3.11 and the revised delivery ledger govern subsequent work.
 **Tracks:** `frontend-architecture`, `workflow-ir`, `presentation-ir`, `work-programs`, `runtime-extensions`, `admin-ui-composition`, `nextjs`, `expo`, `gpui-readiness`, `client-resilience`
 **Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [overview-dashboard-subagent-plan.md](./overview-dashboard-subagent-plan.md) · [organization-onboarding-workflow-subagent-plan.md](./organization-onboarding-workflow-subagent-plan.md) · [work-program-ui-harness-convergence-plan.md](./work-program-ui-harness-convergence-plan.md) · [agent-control-plane-model-routing-plan.md](./agent-control-plane-model-routing-plan.md) · [traffic-resilience-admission-control-plan.md](./traffic-resilience-admission-control-plan.md)
 
@@ -12,6 +13,8 @@
 Make Lumiere's frontend architecture surface-independent enough to support Next.js, Expo / React Native, and a future lean native shell without reimplementing business workflows or creating dangerous transport behavior independently per surface.
 
 Extend that same architecture so successful AI-assisted work can become **normal reusable ERP UI** instead of remaining trapped in chat or a separate agent interface.
+
+The product must support a user asking for a workspace suited to their work, changing its pages and tools, and saving the result as an ordinary module. Human configuration and harness proposals use the same composition model. Existing ERP modules supply reusable capabilities and components; sandbox-crafted WorkPrograms add derived analysis, reports, and draft-producing tools where needed. The shell resolves published module definitions instead of requiring a new hand-coded route for every user need.
 
 Before implementing AI-created UI convergence, first investigate and prove an **admin-driven UI composition path** over the same presentation foundations. Organization admins should be able to configure supported UI composition such as module tools, reports, dashboard sections, entity actions, field/table visibility, ordering, and other safe presentation choices without writing code. This is the non-AI proving ground for the runtime-configurable UI model that AI-created WorkPrograms will later consume.
 
@@ -234,6 +237,8 @@ workspace tool
 
 Placement does not grant access. The server resolves current actor/org/company scope and re-authorizes execution.
 
+WorkProgram placement intents describe compatible or suggested install locations. The actual organization/user placement is owned by the published module/page revision described below, not by a second mutable copy inside the program.
+
 ### 3.6 Design foundations
 
 Create a renderer-neutral token package containing semantic tokens only:
@@ -273,6 +278,92 @@ crates/
 ```
 
 Do not force React packages into the Rust/native path.
+
+### 3.8 Module/page composition is the product contract
+
+Extend `presentation-core` around a versioned `ModuleDefinition` containing `PageDefinition`s and typed nodes. A dashboard is one supported page composition, not the root abstraction for every ERP experience. These are proposed runtime contracts; the static Overview package does not implement them yet.
+
+```text
+ModuleDefinitionVersion
+  identity, title, navigation intent, provenance
+  compatible application/component/program versions
+  pages
+    PageDefinition
+      stable node IDs and supported extension slots
+      entity list / detail / editor / workflow / dashboard / report / program run
+      typed data, selection, input, output, and action bindings
+      presentation preferences
+```
+
+Module owners expose approved components and extension slots with versioned input/output schemas. Web adapters wrap current entity views, forms, dashboards, and action bars. Keep exceptional bespoke interactions as explicit registered components; do not build a universal replacement UI before a second real consumer exists.
+
+Both the editor and harness may add a page, arrange nodes, choose approved fields/filters/actions, connect selection to a detail panel, and attach a compatible published WorkProgram. Metadata references component and capability IDs, schema-checked field paths, and semantic navigation targets. Arbitrary JSX, raw URLs/SQL, executable props, and new reducer names are outside this composition contract. Multi-step calculations belong in a WorkProgram rather than an expanding frontend expression language.
+
+The shared authenticated module host resolves module/page identities and published versions, then selects renderer adapters. Module definitions cannot replace authentication routes or override reserved core routes. Existing routes can initially mount the same host through adapters. Navigation visibility is a presentation hint; opening a page and invoking its bindings still resolves current server authority.
+
+Keep four version domains explicit: application-contract release, component/presentation schema, module/page revision, and WorkProgram/CodeArtifact version. A published module records exact dependency identities plus declared compatibility constraints; it never silently follows a newly published program or adopts changed operation semantics.
+
+### 3.9 The ERP dictionary describes available business capabilities
+
+Build on the [capability IR foundation](./agent-harness-capability-ir-foundation.md), [codegen extension](./agent-ir-codegen-extension-plan.md), and [generated tool surface](./agent-generated-erp-tool-surface-plan.md). Generate structural facts from canonical IR and join reviewed semantic annotations by stable identifiers.
+
+| Dictionary content | Authoritative source and use |
+| --- | --- |
+| Entities, fields, row/input/output types, enums, declared relationships | Schema/contract IR; property editors, binding checks, entity discovery |
+| Stable read/action IDs, exposure, context-derived inputs, result envelopes, invalidation | Application contracts and reviewed resource classifications; typed UI and harness calls |
+| Business purpose, terminology, examples, units, documented lifecycle meaning | Reviewed domain annotations with source path/revision and owner; discovery and explanation |
+| Supported filtering/projection/pagination, field sensitivity, result size policy | Reviewed read contracts and server policy metadata; bounded acquisition and rendering |
+| Effect/risk, idempotency, confirmation, compatibility | Existing authored classifications and policy references; planning, certification, fresh execution checks |
+
+Generating a reducer signature does not recover all of its business semantics. Do not infer relationships from field names or treat an LLM summary as an authoritative precondition. Unclassified outputs, units, relationships, or resource scopes stay visibly unresolved; unsupported bindings cannot be published. The current generator already emits locked operation IDs and reviewed classifications, but that is not a complete discoverable business dictionary.
+
+Maintain three linked catalogs: the ERP capability dictionary, the component/slot catalog, and the published WorkProgram catalog. The editor and harness discover the same compatible entries through server-filtered catalog APIs. Tenant labels and user descriptions may improve discovery, but cannot override canonical types, risk, scope, or reducer behavior. Discovery filtering does not replace authorization at execution.
+
+### 3.10 One validation and publication path for users and harness
+
+```text
+user editor or harness proposal
+        ↓
+ModuleDefinition draft / patch against an exact base revision
+        ↓
+server validation + dependency resolution
+        ↓
+preview + binding/interaction fixtures + author review
+        ↓
+immutable published revision + audited activation pointer
+        ↓
+shared module host + platform renderer
+```
+
+Use one typed definition schema and one server-side validator for both authoring paths. Validate node/prop schemas, slot compatibility, resource fields, output-to-input compatibility, version references, graph cycles, supported capabilities, and acquisition/compute budgets. Return structured diagnostics pointing to the offending node/binding. Client checks improve editing; the server owns publication and execution checks.
+
+The renderer consumes a resolved presentation plan. A shared data layer coalesces identical reads by capability, normalized parameters, current organization/company and projection; it never combines different permission contexts. Plan bounded subscriptions using existing authorized invalidation semantics, cancellation and cache lifecycle. A published page must not multiply resource requests per widget or start a sandbox when it renders. Program nodes display a previous output/status and provide an explicit run action.
+
+Personal layouts, active-team layouts, and organization-published modules have separate edit/publish authority. Choose deterministic precedence before persistence: system template → organization revision → one selected team/workspace revision → personal presentation preferences. Team selection must be explicit where membership is ambiguous. Preferences may hide/reorder permitted content, but cannot grant capabilities. Patches target stable node IDs and an exact base revision; concurrent edits and template upgrades produce a reviewable conflict rather than silently losing customizations.
+
+Record immutable definition versions, dependency manifests, authorship, certification evidence, and activation/revert events durably. Use the existing STDB mutation and PostgreSQL projection/reconstruction path for configuration metadata; immutable code/output artifacts use the established artifact store. Specify tables, projection coverage and activation concurrency before implementation. A revert changes the active presentation revision; it does not undo completed business operations.
+
+Module/page revisions own node structure and placements. `RuntimePresentationEntry` becomes the resolved registry/index view of those published placements, rather than an independently editable competing page model. A simple "add report" operation patches the module revision through the same publication path.
+
+Rejected drafts do not replace the last valid publication. If a dependency becomes unavailable after publication, affected nodes show an explicit unavailable state and cannot invoke it; other valid nodes remain usable. Test component/render errors separately from binding errors. The static Overview adapter currently throws on missing developer-owned bindings; it is not the runtime validator or the per-node recovery mechanism for user-authored pages.
+
+Harness proposals identify affected nodes, expected behavior, required capabilities, code/program dependencies, and evidence. Preserve the user/agent who authored the change separately from the original authors of any methodology or source material used to derive a program. Harness authoring does not bypass the same ownership, preview, publish, audit, and compatibility rules used by the human editor.
+
+### 3.11 What users can extend
+
+| Requested extension | Mechanism |
+| --- | --- |
+| Rearrange a page, change visible fields, add an approved action or report | Versioned presentation configuration over registered slots/components |
+| Create a new module grouping existing ERP work | New module/page definitions and navigation entries; no new backend schema required |
+| Add an analysis, recommendation, importer preparation, or derived report | Versioned WorkProgram/CodeArtifact, typed inputs/outputs, sandbox fixtures and evidence, then compatible UI placement |
+| Add a specialized UI component absent from the component catalog | Reviewed component/plugin implementation, versioned props/slot contract and renderer tests, then catalog registration; this alone does not require new ERP schema |
+| Introduce a genuinely new business entity, invariant, transaction, or operation absent from the catalog | Normal backend implementation and schema migration, authorization, tests, IR generation/release and consumer pin update |
+
+Sandbox code acquires authorized datasets, computes, and emits schema-validated outputs or typed action drafts. ERP mutations are executed through the authoritative capability boundary with current permissions and required approvals; the sandbox cannot create database authority. The harness can prepare a developer-reviewed backend PR for a missing capability, but a runtime module publication cannot substitute for that release.
+
+First end-to-end example: a user creates a **Collections workspace** with an existing receivables list, customer detail, an attention summary, and a sandbox-generated prioritization report. Prove each selected read is classified and available in the dictionary. First publish the page manually; then have the harness propose a patch adding the tested report. Run it explicitly, persist its output/provenance, and render that output after reopening the module. Any follow-up business action must reference an actually available capability; missing actions produce a capability-gap report.
+
+This proof is successful when a user can create and reshape that module without editing frontend source, and the harness can extend it through the identical versioned path. A serialized dashboard fixture alone does not meet that gate.
 
 ---
 
@@ -533,6 +624,10 @@ Before implementation-heavy convergence work, investigate the smallest safe admi
 - [ ] identify which current module tools/reports/entity actions/dashboard cards could become runtime placement entries without changing business semantics;
 - [ ] define minimal `workflow-core`, `presentation-core`, and `work-program-core` types;
 - [ ] define minimal `RuntimePresentationEntry` / admin placement/version contract;
+- [ ] define versioned module/page/node/slot contracts and a shared authenticated module host boundary;
+- [ ] connect an ERP capability dictionary, component catalog and WorkProgram catalog using reviewed stable references;
+- [ ] define the common editor/harness validation, preview, publication and compatibility path;
+- [ ] specify personal/team/organization ownership, base-revision patches and customization conflicts;
 - [ ] define design-token package boundary;
 - [ ] decide which admin-driven configuration belongs in STDB active state versus durable history/artifact metadata;
 - [ ] define publish/version/rollback/audit behavior before AI promotion is introduced;
@@ -544,6 +639,8 @@ Before implementation-heavy convergence work, investigate the smallest safe admi
 
 - [ ] implement a web-first admin presentation editor for a narrowly scoped proof;
 - [ ] allow an authorized admin to add/remove/reorder one safe module/report/dashboard placement from approved registry entries;
+- [ ] create one composed module/page from existing ERP components and reshape it without frontend source edits;
+- [ ] persist and reopen the chosen revision; prove concurrent-edit conflict handling and reverting to the prior revision;
 - [ ] publish immutable/versioned runtime presentation configuration;
 - [ ] render the published result through normal web renderer primitives;
 - [ ] consume the same published configuration in a renderer-neutral fixture and/or Expo proof;

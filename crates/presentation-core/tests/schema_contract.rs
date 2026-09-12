@@ -1,0 +1,19 @@
+use lumiere_presentation_core::ModuleDraft;
+use schemars::generate::SchemaSettings;
+use serde_json::Value;
+
+#[test]
+fn generated_frontend_schema_matches_canonical_rust_schema() {
+    let generated = SchemaSettings::draft07()
+        .into_generator()
+        .into_root_schema_for::<ModuleDraft>();
+    let generated = serde_json::to_value(generated).expect("Rust schema must serialize");
+    let checked_in: Value = serde_json::from_str(include_str!(
+        "../../../frontend/packages/presentation-core/schema/module-draft.schema.json"
+    ))
+    .expect("frontend schema must be JSON");
+    assert_eq!(
+        generated, checked_in,
+        "frontend schema drifted from canonical Rust schema"
+    );
+}

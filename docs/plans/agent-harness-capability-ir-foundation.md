@@ -10,6 +10,8 @@
 
 Make the generated application-contract IR usable as the single typed capability source for the AI harness, ordinary frontend clients, future content/file workflows, analytical shaping, and presentation tooling.
 
+**Dictionary and composition alignment (2026-09-12):** The generated registry also supplies the ERP dictionary for the [user/harness module-composition model](./frontend-multisurface-workflow-presentation-plan.md#39-the-erp-dictionary-describes-available-business-capabilities). Structural contract facts and reviewed semantic documentation remain distinct, linked by stable identifiers and source revisions. Unknown business semantics are not inferred from reducer signatures. Both the editor and harness resolve this catalog alongside registered component/slot contracts and published WorkPrograms; neither authoring path creates backend capabilities by inventing metadata.
+
 The AI harness must not gain a parallel API surface or a separate authorization model. It should consume generated capability descriptors for the same stable ERP operations used by web/Expo clients, with all effective permissions resolved through the existing Casbin-style server authorization boundary.
 
 The harness should also avoid treating raw ERP query responses as model context. Bulk data remains server-side and is reduced through typed deterministic analysis plans before compact results reach the model.

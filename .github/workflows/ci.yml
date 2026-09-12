@@ -95,6 +95,12 @@ jobs:
       - name: Workspace members (api-server, ai-gateway, lumiere-codegen, stdb-auth)
         run: cargo check --locked -p api-server -p ai-gateway -p lumiere-codegen -p stdb-auth
 
+      - name: Presentation contracts and draft validator
+        run: cargo test --locked -p lumiere-presentation-core
+
+      - name: Presentation discovery policy
+        run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib presentation_dictionary::tests
+
       - name: C3 PostgreSQL projection matrix
         env:
           C3_TEST_PG: "1"
@@ -261,6 +267,9 @@ jobs:
 
       - name: Unit tests (presentation core)
         run: pnpm --dir packages/presentation-core test
+
+      - name: Presentation generated TypeScript drift
+        run: pnpm --dir packages/presentation-core check:contract-types
 
       - name: Unit tests (web BFF helpers)
         run: pnpm --dir web test:unit

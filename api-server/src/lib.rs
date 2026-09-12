@@ -16,6 +16,7 @@ mod middleware;
 pub mod organization_placement;
 pub mod owner_report_worker;
 pub mod platform_control;
+mod presentation_dictionary;
 pub mod project_integration_worker;
 pub mod query_exec;
 pub mod realtime;
