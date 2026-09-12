@@ -209,6 +209,9 @@ v2 = []
 [dependencies]
 spacetimedb-sdk = {{ version = "=2.8.2", optional = true }}
 serde_json = "1.0"
+
+[dev-dependencies]
+sha2 = "0.10"
 ''',
     encoding="utf-8",
 )
