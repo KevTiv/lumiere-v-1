@@ -836,7 +836,7 @@ function ReportsClientLoaded({
             customContent: (
               <OwnerReportsPanel
                 organizationId={orgId}
-                companies={companies as unknown as Record<string, unknown>[]}
+                companies={companies}
                 defaultCompanyId={
                   operatingCompanyId != null && operatingCompanyId > 0n
                     ? Number(operatingCompanyId)

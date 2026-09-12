@@ -61,12 +61,15 @@ import {
   useUpdateOwnerReportSchedule,
 } from "@lumiere/query-hooks/hooks/owner-reports"
 import { downloadPivotTableXlsx } from "@lumiere/query-hooks/hooks/templates"
-import { companyRowsToSelectOptions } from "@/lib/form-lookup"
+import {
+  companyRowsToSelectOptions,
+  type CompanyLookupRow,
+} from "@/lib/form-lookup"
 import { useToast } from "@/hooks/use-toast"
 
 interface OwnerReportsPanelProps {
   organizationId: bigint
-  companies: Record<string, unknown>[]
+  companies: readonly CompanyLookupRow[]
   defaultCompanyId?: number
 }
 

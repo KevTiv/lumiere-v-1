@@ -974,7 +974,7 @@ function AccountingClientReady({
   )
 
   const partnerSelectOptions = useMemo(() => {
-    const fromApi = contactRowsToAccountingPartnerSelectOptions(contacts as Record<string, unknown>[])
+    const fromApi = contactRowsToAccountingPartnerSelectOptions(contacts)
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noPartners"), disabled: true }]
   }, [contacts, t])
