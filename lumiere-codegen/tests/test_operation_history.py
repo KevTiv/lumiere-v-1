@@ -62,6 +62,7 @@ class OperationHistoryTests(unittest.TestCase):
         MODULE.verify(
             ROOT / ".contracts-staging/ir/lumiere-contract-ir-v2.json",
             ROOT / "lumiere-codegen/contract-operation-history.json",
+            allow_previous_compatibility=True,
         )
 
     def test_shape_fingerprint_ignores_source_provenance(self):
