@@ -330,13 +330,11 @@ async fn draft_actions_llm(
             provider: agent.provider.clone(),
             model: agent.model.clone(),
             system,
-            messages: vec![LlmMessage {
-                role: "user".to_string(),
-                content: prompt,
-            }],
+            messages: vec![LlmMessage::text("user", prompt)],
             max_tokens: agent.max_tokens.min(ACTION_DRAFT_MAX_TOKENS),
             temperature: Some(agent.temperature),
             top_p: Some(agent.top_p),
+            tools: Vec::new(),
         })
         .await
         .map_err(|e| DraftActionsError::other(format!("LLM request failed: {e}")))?;
