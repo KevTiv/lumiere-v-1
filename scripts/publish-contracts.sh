@@ -31,9 +31,45 @@ if [[ ! -f "$STAGING/ir/lumiere-contract-ir-v2.json" \
   echo "error: canonical contract IR v2 artifact missing — run make codegen first" >&2
   exit 1
 fi
+if [[ ! -f "$STAGING/ir/agent-capability-registry-v1.json" \
+  || ! -f "$STAGING/ir/agent-capability-registry-v1.json.sha256" ]]; then
+  echo "error: agent capability artifact or checksum sidecar missing — run make codegen first" >&2
+  exit 1
+fi
 
 python3 "$ROOT/scripts/verify-contract-ir.py" \
   "$STAGING/ir/lumiere-contract-ir-v2.json" --require-clean
+python3 "$ROOT/scripts/verify-agent-capability-artifact.py" \
+  "$STAGING/ir/agent-capability-registry-v1.json"
+
+# The verifier validates the capability artifact's own shape and checksum. A
+# publisher must also prove that it is the clean output for the exact IR being
+# transferred; otherwise an old, valid artifact could be paired with a newer
+# contract release.
+python3 - "$STAGING/ir/lumiere-contract-ir-v2.json" \
+  "$STAGING/ir/agent-capability-registry-v1.json" <<'PY'
+import json
+import sys
+
+ir_path, capability_path = sys.argv[1:]
+with open(ir_path, encoding="utf-8") as source:
+    ir = json.load(source)
+with open(capability_path, encoding="utf-8") as source:
+    capability = json.load(source)
+
+if ir.get("source_dirty") is not False:
+    raise SystemExit("publish-contracts: canonical IR source is dirty")
+source_ir = capability.get("source_ir")
+if not isinstance(source_ir, dict):
+    raise SystemExit("publish-contracts: capability artifact source_ir is missing")
+for field in ("ir_version", "source_commit", "source_dirty", "schema_hash"):
+    if source_ir.get(field) != ir.get(field):
+        raise SystemExit(
+            f"publish-contracts: capability artifact source_ir.{field} does not match canonical IR"
+        )
+if source_ir.get("source_dirty") is not False:
+    raise SystemExit("publish-contracts: capability artifact source IR is dirty")
+PY
 
 SOURCE_REPO="$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)"
 if [[ -z "$SOURCE_REPO" ]]; then
@@ -68,6 +104,8 @@ mkdir -p ir
 rm -f ir/lumiere-contract-ir-v1.json ir/lumiere-contract-ir-v1.json.sha256 ir/PIN-v1.json
 cp "$STAGING/ir/lumiere-contract-ir-v2.json" ir/
 cp "$STAGING/ir/lumiere-contract-ir-v2.json.sha256" ir/
+cp "$STAGING/ir/agent-capability-registry-v1.json" ir/
+cp "$STAGING/ir/agent-capability-registry-v1.json.sha256" ir/
 
 # Keep one immutable provenance pin per IR generation. `PIN.json` is only the
 # active-generation pointer consumed by downstream emitters. The source commit
@@ -171,6 +209,9 @@ v2 = []
 [dependencies]
 spacetimedb-sdk = {{ version = "=2.8.2", optional = true }}
 serde_json = "1.0"
+
+[dev-dependencies]
+sha2 = "0.10"
 ''',
     encoding="utf-8",
 )
@@ -197,6 +238,18 @@ python3 scripts/generate-from-ir.py
 for generated in query-registry.ts operation-inputs.ts operation-descriptors.ts; do
   if [[ ! -f "packages/contracts/src/generated/$generated" ]]; then
     echo "error: contracts generator did not emit packages/contracts/src/generated/$generated" >&2
+    exit 1
+  fi
+done
+
+# H2b's companion generator owns the language-specific capability surfaces;
+# the JSON artifact above remains the immutable source handoff. Keep these
+# assertions explicit so a release cannot silently omit one consumer surface.
+for generated in \
+  crates/lumiere-contracts/src/generated/agent_capabilities.rs \
+  packages/contracts/src/generated/agent-capability-registry.ts; do
+  if [[ ! -f "$generated" ]]; then
+    echo "error: contracts generator did not emit $generated" >&2
     exit 1
   fi
 done
