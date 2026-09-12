@@ -1059,6 +1059,14 @@ contracts-staging-from-pinned:
 	python3 scripts/verify-contract-ir.py \
 		"$$CHECKOUT/ir/lumiere-contract-ir-v2.json" \
 		--require-clean --allow-legacy-v2 --expect-pin-from "$$V2_PIN"; \
+	if [ -f "$$CHECKOUT/ir/agent-capability-registry-v1.json" ] || [ -f "$$CHECKOUT/ir/agent-capability-registry-v1.json.sha256" ]; then \
+		if [ ! -f "$$CHECKOUT/ir/agent-capability-registry-v1.json" ] || [ ! -f "$$CHECKOUT/ir/agent-capability-registry-v1.json.sha256" ]; then \
+			echo "contracts-staging-from-pinned: capability artifact and checksum sidecar must be published together" >&2; \
+			exit 1; \
+		fi; \
+		python3 scripts/verify-agent-capability-artifact.py \
+			"$$CHECKOUT/ir/agent-capability-registry-v1.json"; \
+	fi; \
 	cp -R "$$CHECKOUT/packages/contracts/src/generated/." .contracts-staging/ts/generated/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" .contracts-staging/ts/; \
@@ -1085,6 +1093,7 @@ check-contracts-source-drift: clean-contracts-live-staging generate-stdb-rust-sd
 	diff -rq "$$CHECKOUT/crates/lumiere-contracts/src/bindings" .contracts-staging/bindings && \
 	diff -rq \
 		-x query-registry.ts -x operation-inputs.ts -x operation-descriptors.ts \
+		-x agent-capability-registry.ts \
 		-x operations.ts -x resources.ts -x resource-codecs.ts -x wire-codecs.ts \
 		"$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
 	echo "check-contracts-source-drift: source bindings match pinned lumiere-contracts release"
@@ -1116,9 +1125,19 @@ check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-std
 		! -name 'application-operations.json' ! -name 'resource-registry.json' | LC_ALL=C sort) && \
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean --expect-schema-hash-from "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" && \
 	python3 scripts/verify-contract-ir.py "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" --require-clean --expect-pin-from "$$V2_PIN" && \
+	if [ -f "$$CHECKOUT/ir/agent-capability-registry-v1.json" ] || [ -f "$$CHECKOUT/ir/agent-capability-registry-v1.json.sha256" ]; then \
+		test -f .contracts-staging/ir/agent-capability-registry-v1.json && \
+		test -f "$$CHECKOUT/ir/agent-capability-registry-v1.json.sha256" && \
+		test -f .contracts-staging/ir/agent-capability-registry-v1.json.sha256 && \
+		python3 scripts/verify-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json && \
+		python3 scripts/verify-agent-capability-artifact.py "$$CHECKOUT/ir/agent-capability-registry-v1.json" && \
+		diff .contracts-staging/ir/agent-capability-registry-v1.json "$$CHECKOUT/ir/agent-capability-registry-v1.json" && \
+		diff .contracts-staging/ir/agent-capability-registry-v1.json.sha256 "$$CHECKOUT/ir/agent-capability-registry-v1.json.sha256"; \
+	fi && \
 	python3 "$$CHECKOUT/scripts/generate-from-ir.py" --check && \
 	diff -rq \
 		-x query-registry.ts -x operation-inputs.ts -x operation-descriptors.ts \
+		-x agent-capability-registry.ts \
 		-x operations.ts -x resources.ts -x resource-codecs.ts -x wire-codecs.ts \
 		"$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
 	diff "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/stdb-generated-sql-columns.json && \
