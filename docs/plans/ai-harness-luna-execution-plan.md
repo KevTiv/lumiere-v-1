@@ -6,6 +6,11 @@
 **Authority:** This ledger coordinates implementation; milestone acceptance
 remains owned by `ai-harness-completion-plan.md` and immutable contract gates.
 
+The H3 implementation handoff is bounded in
+[ai-harness-h3-registry-adapter-plan.md](./ai-harness-h3-registry-adapter-plan.md).
+It starts only from the H2c consumer pin at PR #20 / `lumiere-contracts`
+`v0.3.42`.
+
 ## Operating rules
 
 1. One reviewable PR per row or smaller risk-bounded slice.
@@ -26,9 +31,9 @@ remains owned by `ai-harness-completion-plan.md` and immutable contract gates.
 | Order | Workstream | Branch / parent | Owner | Exit gate | Status |
 | --- | --- | --- | --- | --- | --- |
 | 1 | H2a capability contract source | `codex/ai-harness-capability-ir` / PR #15 | Luna IR agent; coordinator integrates | Explicit fail-closed metadata, generator/verifier tests, no pin change | Ready |
-| 2 | H2b companion generation and release | companion contracts branch / H2a | Coordinator | Rust, TypeScript, package, history and drift gates green; publish reviewed immutable version | Blocked on H2a |
-| 3 | H2c consumer pin | new child / H2b release | Coordinator | Pin/provenance updated; pinned and source-drift gates green | Blocked on release |
-| 4 | H3 registry adapter | new child / H2c | Luna registry agent | Generated descriptors convert to `ToolSpec`; allowlist and denial fixtures pass | Blocked on H2 |
+| 2 | H2b companion generation and release | companion contracts branch / H2a | Coordinator | Rust, TypeScript, package, history and drift gates green; publish reviewed immutable version | Corrected checksum release published as `v0.3.42` |
+| 3 | H2c consumer pin | `codex/ai-harness-capability-pin` / PR #20 | Coordinator | Pin/provenance updated; pinned and source-drift gates green | In review |
+| 4 | [H3 registry adapter](./ai-harness-h3-registry-adapter-plan.md) | new child / H2c PR #20 | Luna registry agent | Generated descriptors convert to `ToolSpec`; allowlist and denial fixtures pass | Coordination started; implementation blocked on H2c |
 | 5 | H4 pure agent loop | new child / H3 | Luna loop agent | Durable nonzero run; two calls plus final answer; malformed/cap stops persisted | Blocked on H3 |
 | 6 | H5 per-call policy | new child / H4 | Luna policy agent | Every call reauthorized; denial cannot reach execution; action draft stops loop | Blocked on H4 |
 | 7 | H5 budget/model routing | new child / policy slice | Luna routing agent; coordinator owns STDB integration | Atomic reservation/charge, allowed-model routing, bounded Mistral-to-Gemini fallback | Blocked on policy slice |
@@ -119,4 +124,3 @@ Every agent handoff records:
 - warnings, ignored tests and unavailable live dependencies;
 - generated/pin status;
 - next child branch and unresolved stop rules.
-
