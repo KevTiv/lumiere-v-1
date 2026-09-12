@@ -1,0 +1,369 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SavedDraftContract",
+  "description": "Export catalog for generated schemas, not an HTTP envelope.",
+  "type": "object",
+  "properties": {
+    "list": {
+      "description": "Bounded list of personal module heads.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/SavedDraftList"
+        }
+      ]
+    },
+    "request": {
+      "description": "Save input.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/SaveDraftRequest"
+        }
+      ]
+    },
+    "saved": {
+      "description": "Complete saved snapshot.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/SavedDraft"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "request",
+    "saved",
+    "list"
+  ],
+  "definitions": {
+    "ComponentReference": {
+      "description": "Versioned reference into the approved component catalog.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable catalog identifier.",
+          "type": "string"
+        },
+        "version": {
+          "description": "Exact compatible catalog version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ]
+    },
+    "ModuleDraft": {
+      "description": "A draft module definition submitted for validation or publication.",
+      "type": "object",
+      "properties": {
+        "applicationContract": {
+          "description": "Pinned application-contract release identifier.",
+          "type": "string"
+        },
+        "baseRevision": {
+          "description": "Exact base revision targeted by an update, encoded as a decimal string.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "componentCatalogVersion": {
+          "description": "Pinned component catalog revision.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "moduleId": {
+          "description": "Stable module identifier.",
+          "type": "string"
+        },
+        "pages": {
+          "description": "Ordered pages in the module.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PageDefinition"
+          }
+        },
+        "schemaVersion": {
+          "description": "Schema revision for this wire model.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "title": {
+          "description": "Human-facing module title.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "moduleId",
+        "title",
+        "applicationContract",
+        "componentCatalogVersion",
+        "pages"
+      ]
+    },
+    "PageDefinition": {
+      "description": "A composed page and its ordered presentation nodes.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable page identifier.",
+          "type": "string"
+        },
+        "nodes": {
+          "description": "Ordered nodes rendered on the page.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PageNode"
+          }
+        },
+        "title": {
+          "description": "Human-facing page title.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "nodes"
+      ]
+    },
+    "PageNode": {
+      "description": "A supported renderer-neutral page node.",
+      "oneOf": [
+        {
+          "description": "A bounded entity collection/list.",
+          "type": "object",
+          "properties": {
+            "component": {
+              "description": "Approved component implementation and version.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/ComponentReference"
+                }
+              ]
+            },
+            "fields": {
+              "description": "SQL column identifiers exposed by the actor-filtered capability dictionary.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "id": {
+              "description": "Stable node identifier.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "collection"
+            },
+            "pageSize": {
+              "description": "Requested page size; execution must separately enforce bounded acquisition.",
+              "type": "integer",
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0
+            },
+            "resource": {
+              "description": "Generated/approved read resource identifier.",
+              "type": "string"
+            },
+            "slot": {
+              "description": "Semantic host slot, independent of layout technology.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/SemanticSlot"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id",
+            "slot",
+            "component",
+            "resource",
+            "fields",
+            "pageSize"
+          ]
+        },
+        {
+          "description": "A detail view linked to a source node.",
+          "type": "object",
+          "properties": {
+            "component": {
+              "description": "Approved component implementation and version.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/ComponentReference"
+                }
+              ]
+            },
+            "fields": {
+              "description": "SQL column identifiers exposed by the source capability dictionary.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "id": {
+              "description": "Stable node identifier.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "detail"
+            },
+            "slot": {
+              "description": "Semantic host slot, independent of layout technology.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/SemanticSlot"
+                }
+              ]
+            },
+            "sourceNodeId": {
+              "description": "Stable ID of a collection node on the same page.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id",
+            "slot",
+            "component",
+            "sourceNodeId",
+            "fields"
+          ]
+        }
+      ]
+    },
+    "SaveDraftRequest": {
+      "description": "Untrusted save intent; organization and actor come from the session.",
+      "type": "object",
+      "properties": {
+        "definition": {
+          "description": "Complete definition, validated against the current actor's catalog.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ModuleDraft"
+            }
+          ]
+        },
+        "expectedRevision": {
+          "description": "Canonical positive decimal revision, or null for a new module.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "definition"
+      ]
+    },
+    "SavedDraft": {
+      "description": "Complete immutable snapshot, prepared for editing at its saved revision.",
+      "type": "object",
+      "properties": {
+        "definition": {
+          "description": "Complete definition with baseRevision set to revision for editing.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ModuleDraft"
+            }
+          ]
+        },
+        "definitionHash": {
+          "description": "Lowercase SHA-256 hex of canonical persisted JSON, before edit revision insertion.",
+          "type": "string"
+        },
+        "moduleKey": {
+          "description": "Stable module slug within the personal organization scope.",
+          "type": "string"
+        },
+        "revision": {
+          "description": "Canonical positive decimal revision.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "moduleKey",
+        "revision",
+        "definitionHash",
+        "definition"
+      ]
+    },
+    "SavedDraftList": {
+      "description": "All personal heads, bounded by the database's per-owner module limit.",
+      "type": "object",
+      "properties": {
+        "drafts": {
+          "description": "Summaries of the current actor's saved modules.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SavedDraftSummary"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "drafts"
+      ]
+    },
+    "SavedDraftSummary": {
+      "description": "Personal module head summary; never includes another actor's module.",
+      "type": "object",
+      "properties": {
+        "moduleKey": {
+          "description": "Stable module slug.",
+          "type": "string"
+        },
+        "revision": {
+          "description": "Canonical positive decimal revision.",
+          "type": "string"
+        },
+        "title": {
+          "description": "Current snapshot's title.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "moduleKey",
+        "title",
+        "revision"
+      ]
+    },
+    "SemanticSlot": {
+      "description": "Semantic placement slot understood by platform renderers.",
+      "oneOf": [
+        {
+          "description": "Main page content.",
+          "type": "string",
+          "const": "primary"
+        },
+        {
+          "description": "Supporting or detail content.",
+          "type": "string",
+          "const": "secondary"
+        }
+      ]
+    }
+  }
+}

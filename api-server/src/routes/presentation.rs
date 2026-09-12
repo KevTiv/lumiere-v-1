@@ -1,4 +1,4 @@
-//! Actor-scoped discovery and draft diagnostics; no persistence or activation.
+//! Actor-scoped discovery, preview and personal draft persistence; no activation.
 
 use std::sync::Arc;
 
@@ -19,18 +19,28 @@ use tower_cookies::Cookies;
 use crate::{
     error::ApiError,
     presentation_dictionary::{account_moves_capability, DictionaryError},
-    session::resolve_api_session,
+    session::{resolve_api_session, ApiSession},
     state::AppState,
     trusted_context::TrustedOperationContext,
     web_session::stdb_identity_hex_hint,
 };
+
+mod saved_drafts;
 
 pub(super) fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/presentation/capabilities", get(capabilities))
         .route("/presentation/validate", post(validate))
         .route("/presentation/preview", get(preview_options).post(preview))
-        .layer(DefaultBodyLimit::max(64 * 1024))
+        .route(
+            "/presentation/drafts",
+            get(saved_drafts::list_drafts).post(saved_drafts::save_draft),
+        )
+        .route(
+            "/presentation/drafts/:module_key",
+            get(saved_drafts::get_draft),
+        )
+        .layer(DefaultBodyLimit::max(96 * 1024))
 }
 
 fn dictionary_error(error: DictionaryError) -> ApiError {
@@ -45,6 +55,17 @@ async fn context(
     headers: &HeaderMap,
     cookies: &Cookies,
 ) -> Result<TrustedOperationContext, ApiError> {
+    let session = session(state, headers, cookies).await?;
+    let context = TrustedOperationContext::for_resource_read(state, &session)?;
+    context.require_current_placement(&state.organization_placements)?;
+    Ok(context)
+}
+
+async fn session(
+    state: &AppState,
+    headers: &HeaderMap,
+    cookies: &Cookies,
+) -> Result<ApiSession, ApiError> {
     let auth = headers
         .get(AUTHORIZATION)
         .and_then(|value| value.to_str().ok());
@@ -55,9 +76,7 @@ async fn context(
     let session = resolve_api_session(state, auth, token.as_deref(), hint.as_deref())
         .await?
         .ok_or(ApiError::Unauthorized)?;
-    let context = TrustedOperationContext::for_resource_read(state, &session)?;
-    context.require_current_placement(&state.organization_placements)?;
-    Ok(context)
+    Ok(session)
 }
 
 async fn capabilities(

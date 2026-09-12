@@ -1,0 +1,49 @@
+{
+  "evidence": "frontend-ir-wave3b-browser",
+  "recordedAt": "2026-09-12",
+  "runtime": {
+    "page": "http://127.0.0.1:3100/presentation-preview",
+    "authenticatedPage": true,
+    "apiServer": "http://127.0.0.1:48082",
+    "stdbHttp": "http://127.0.0.1:3917",
+    "module": "lumiere-c7-presentation-source",
+    "session": "seeded owner session; credential omitted"
+  },
+  "command": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 PRESENTATION_AUTH_STATE=tests/e2e/.auth/presentation-owner.json pnpm exec playwright test tests/e2e/presentation-preview.spec.ts --project=authenticated --no-deps",
+  "configuration": {
+    "playwrightConfig": "frontend/web/playwright.config.ts",
+    "project": "authenticated",
+    "workers": 4,
+    "httpMocks": [
+      "/api/presentation/preview",
+      "/api/presentation/drafts",
+      "/api/presentation/drafts/collections-preview"
+    ],
+    "httpMockPurpose": "Deterministic browser race scenarios; the page and authentication/session path were real."
+  },
+  "tests": [
+    {
+      "name": "preserves an edit made while a draft save is pending",
+      "result": "passed"
+    },
+    {
+      "name": "does not overwrite edits made while reopening a saved draft",
+      "result": "passed"
+    },
+    {
+      "name": "keeps local edits and offers reload after a stale save conflict",
+      "result": "passed"
+    }
+  ],
+  "result": {
+    "passed": 3,
+    "failed": 0,
+    "durationSeconds": 22.0,
+    "skipped": "live save and reopen round-trip persists title and revision (opt-in freeze-gated test)",
+    "playwrightStatusFile": "frontend/web/test-results/.last-run.json"
+  },
+  "limitations": [
+    "Draft and preview HTTP responses were mocked for deterministic UI races; this evidence does not claim browser save persistence to STDB.",
+    "Persistence and API reducer behavior require separate live HTTP/STDB proof."
+  ]
+}
