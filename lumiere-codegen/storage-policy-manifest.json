@@ -8926,7 +8926,7 @@
       "organization_ownership": "direct",
       "organization_column": "organization_id",
       "company_ownership": "none",
-      "company_column_path": [],
+      "company_column_path": null,
       "company_column_nullable": null,
       "aggregate": {
         "kind": "root",
@@ -8955,7 +8955,7 @@
       "organization_ownership": "direct",
       "organization_column": "organization_id",
       "company_ownership": "none",
-      "company_column_path": [],
+      "company_column_path": null,
       "company_column_nullable": null,
       "aggregate": {
         "kind": "child",

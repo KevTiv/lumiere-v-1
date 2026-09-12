@@ -3878,6 +3878,10 @@
       "name": "run_pos_order_finalize_test",
       "shape_fingerprint": "sha256:ecad8a210b07512d663c05f2e2a738bddd69bae257b90bd1d96b6c4581985915"
     },
+    "erp.run_presentation_draft_tests": {
+      "name": "run_presentation_draft_tests",
+      "shape_fingerprint": "sha256:72c8e5651946c336a5fa9887672cf6f7f9af9e0125d31e7a402b825c5cf744f1"
+    },
     "erp.run_projects_wave_a_test": {
       "name": "run_projects_wave_a_test",
       "shape_fingerprint": "sha256:d2b21a3daf5f20761d31539761c621ba9346add773c46884da0b07d8367552e2"
@@ -4141,6 +4145,10 @@
     "erp.save_import_mapping_template": {
       "name": "save_import_mapping_template",
       "shape_fingerprint": "sha256:392257623d593a5057b036e6a8a83ab98979c7837f04eda25252a3a5515249a6"
+    },
+    "erp.save_presentation_module": {
+      "name": "save_presentation_module",
+      "shape_fingerprint": "sha256:5d51c2a7956b6645b03791d7fd714df24887efaa20543f1acb0250dacec316d1"
     },
     "erp.save_proposal_version": {
       "name": "save_proposal_version",
@@ -5326,6 +5334,14 @@
       "current_operations_fingerprint": "sha256:1330cd2311a303e81a9ede9e4512bcfdedf1d4c32510626c576ddda31e29eceb",
       "operation_count": 1316,
       "reason": "classify every operation with explicit semantic kind, client exposure, authorization scope, idempotency, and codec metadata"
+    },
+    {
+      "previous_release": "v0.3.40",
+      "previous_ir_sha256": "sha256:05ab697d45f2974089991384698b640cfcb685cb304b811ec836d7a62a59ba48",
+      "previous_operations_fingerprint": "sha256:1330cd2311a303e81a9ede9e4512bcfdedf1d4c32510626c576ddda31e29eceb",
+      "current_operations_fingerprint": "sha256:9ba1a8001e6b36eabdd2acc98a739830537f09c33282423e3b631cac19b06531",
+      "operation_count": 1318,
+      "reason": "add denied personal presentation draft save and persisted harness identities; preserve existing operation baselines and compatibility exceptions"
     }
   ]
 }
