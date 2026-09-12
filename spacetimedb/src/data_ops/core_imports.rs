@@ -48,7 +48,12 @@ pub fn import_country_csv(
             continue;
         }
 
-        if ctx.db.country().code().find(&code).is_some() {
+        if ctx
+            .db
+            .country()
+            .iter()
+            .any(|country| country.organization_id == organization_id && country.code == code)
+        {
             // upsert: skip existing
             imported += 1;
             continue;
@@ -56,7 +61,7 @@ pub fn import_country_csv(
 
         let currency_code = opt_str(col(&headers, row, "currency_code"));
         let currency_id = match currency_code.as_deref() {
-            Some(code) => match require_currency_row(ctx, code)
+            Some(code) => match require_currency_row(ctx, organization_id, code)
                 .and_then(|currency| require_active_currency_by_id(ctx, currency.id))
             {
                 Ok(currency) => Some(currency.id),
@@ -77,7 +82,9 @@ pub fn import_country_csv(
         };
 
         ctx.db.country().insert(Country {
+            organization_code_key: format!("{organization_id}:{code}"),
             code,
+            organization_id,
             name,
             official_name: opt_str(col(&headers, row, "official_name")),
             iso3: col(&headers, row, "iso3").to_string(),
@@ -129,7 +136,12 @@ pub fn import_currency_csv(
             continue;
         }
 
-        if ctx.db.currency().code().find(&code).is_some() {
+        if ctx
+            .db
+            .currency()
+            .iter()
+            .any(|currency| currency.organization_id == organization_id && currency.code == code)
+        {
             imported += 1;
             continue;
         }
@@ -145,6 +157,8 @@ pub fn import_currency_csv(
 
         ctx.db.currency().insert(Currency {
             id: 0,
+            organization_code_key: format!("{organization_id}:{code}"),
+            organization_id,
             code: code.clone(),
             name,
             symbol: if symbol.is_empty() {
@@ -206,7 +220,7 @@ pub fn import_currency_rate_csv(
             continue;
         }
 
-        let from_currency_id = match require_currency_row(ctx, &from_currency)
+        let from_currency_id = match require_currency_row(ctx, organization_id, &from_currency)
             .and_then(|currency| require_active_currency_by_id(ctx, currency.id))
         {
             Ok(currency) => currency.id,
@@ -223,7 +237,7 @@ pub fn import_currency_rate_csv(
                 continue;
             }
         };
-        let to_currency_id = match require_currency_row(ctx, &to_currency)
+        let to_currency_id = match require_currency_row(ctx, organization_id, &to_currency)
             .and_then(|currency| require_active_currency_by_id(ctx, currency.id))
         {
             Ok(currency) => currency.id,

@@ -129,6 +129,7 @@ import { useOpenErpAiChat } from "@/lib/erp-ai-context"
 import { PivotExplorer } from "./pivot-explorer"
 import { VatReportPanel } from "./vat-report-panel"
 import { QueryBuilder } from "./query-builder"
+import { OwnerReportsPanel } from "./owner-reports-panel"
 
 export { REPORTS_UI_REDUCERS } from "@/lib/reports-ui-reducers"
 
@@ -828,6 +829,23 @@ function ReportsClientLoaded({
         }
         if (tab.id === "dashboards") return { ...tab, entityConfig: dashboardsEntityConfig }
         if (tab.id === "dashboard-widgets") return { ...tab, entityConfig: dashboardWidgetsEntityConfig }
+        if (tab.id === "owner-reports") {
+          return {
+            ...tab,
+            type: "custom" as const,
+            customContent: (
+              <OwnerReportsPanel
+                organizationId={orgId}
+                companies={companies}
+                defaultCompanyId={
+                  operatingCompanyId != null && operatingCompanyId > 0n
+                    ? Number(operatingCompanyId)
+                    : undefined
+                }
+              />
+            ),
+          }
+        }
         if (tab.id === "pivot-explorer") {
           return {
             ...tab,

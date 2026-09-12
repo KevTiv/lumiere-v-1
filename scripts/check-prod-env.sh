@@ -79,6 +79,7 @@ Production checklist (set on the host / orchestrator before docker compose up):
   docker-compose (host .env — see docker-compose.yml):
     STDB_MODULE
     STDB_SERVER_TOKEN
+    STDB_FINALIZATION_TOKEN      (dedicated projection/finalization identity, distinct from STDB_SERVER_TOKEN)
     STDB_TOKEN                    (ai-gateway service token, distinct from STDB_SERVER_TOKEN)
     AI_CERTIFICATION_STDB_TOKEN   (dedicated certification executor identity)
     AI_CERTIFICATION_RUNTIME_HASH (sha256: plus 64 lowercase hex characters)
@@ -120,6 +121,11 @@ validate() {
   # docker-compose ${VAR:?} requirements
   require_nonempty STDB_MODULE || true
   require_nonempty STDB_SERVER_TOKEN || true
+  require_nonempty STDB_FINALIZATION_TOKEN || true
+  if [[ -n "${STDB_SERVER_TOKEN:-}" && -n "${STDB_FINALIZATION_TOKEN:-}" \
+    && "${STDB_SERVER_TOKEN}" == "${STDB_FINALIZATION_TOKEN}" ]]; then
+    missing+=("STDB_FINALIZATION_TOKEN (must be distinct from STDB_SERVER_TOKEN)")
+  fi
   require_nonempty STDB_TOKEN || true
   require_nonempty AI_CERTIFICATION_STDB_TOKEN || true
   if require_nonempty AI_CERTIFICATION_RUNTIME_HASH; then

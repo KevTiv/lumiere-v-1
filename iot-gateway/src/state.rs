@@ -10,7 +10,6 @@ use stdb_client::StdbClient;
 /// Shared application state passed to all Axum route handlers.
 #[derive(Clone)]
 pub struct AppState {
-    pub config: Arc<Config>,
     pub stdb: StdbClient,
     /// MQTT client — wrapped in Mutex because AsyncClient is not Clone
     pub mqtt: Arc<Mutex<AsyncClient>>,
@@ -23,7 +22,6 @@ impl AppState {
         let host = config.stdb_host.trim_end_matches('/').to_string();
         let stdb = StdbClient::new(host, config.stdb_module.clone(), config.stdb_token.clone());
         AppState {
-            config: Arc::new(config),
             stdb,
             mqtt: Arc::new(Mutex::new(mqtt)),
             hub_connections: Arc::new(DashMap::new()),

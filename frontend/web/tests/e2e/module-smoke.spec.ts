@@ -9,6 +9,7 @@ import {
   fillField,
   gotoModule,
   openEntityCreate,
+  selectModuleTab,
   smokeName,
   submitForm,
 } from "./helpers"
@@ -52,7 +53,7 @@ test.describe("ERP module smoke", () => {
 
     await openEntityCreate(page, "/sales", "sales", "pricelists", "new-pricelist")
     await fillField(page, "name", pricelistName)
-    await fillField(page, "currencyId", "1")
+    await chooseFirstOption(page, "currencyId")
     await submitForm(page, "new-pricelist")
 
     await expect(page.getByText(pricelistName)).toBeVisible()
@@ -62,11 +63,16 @@ test.describe("ERP module smoke", () => {
     const proposalTitle = smokeName("proposal")
     const orgId = await fetchSessionOrganizationId(page)
 
-    await openEntityCreate(page, "/proposals", "proposals", "proposals", "new-proposal")
+    await gotoModule(page, "/proposals", "proposals")
+    await expect(page.getByTestId("proposal-currencies-ready")).toBeAttached()
+    await selectModuleTab(page, "proposals", "proposals")
+    await page.getByTestId("module-create-proposals-proposals").click()
+    await expect(page.getByTestId("form-modal-new-proposal")).toBeVisible()
     await fillField(page, "title", proposalTitle)
     await fillField(page, "clientName", "Smoke Client")
     await chooseFirstOption(page, "type")
     await fillField(page, "value", "5000")
+    await chooseFirstOption(page, "currencyId")
     const [createProposalRes] = await Promise.all([
       page.waitForResponse(
         (res) => matchesOperationResponse(res, "create_proposal") && res.ok(),

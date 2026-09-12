@@ -133,12 +133,20 @@ pub fn test_cancel_done_order_rejected(ctx: &ReducerContext) -> Result<(), Strin
         .id()
         .find(&order_id)
         .ok_or("Sale order missing before mutation")?;
-    ctx.db.sale_order().id().update(crate::sales::sales_core::SaleOrder {
-        state: SaleState::Done,
-        ..order
-    });
+    ctx.db
+        .sale_order()
+        .id()
+        .update(crate::sales::sales_core::SaleOrder {
+            state: SaleState::Done,
+            ..order
+        });
 
-    match cancel_sale_order(ctx, org_id, order_id, Some("attempt cancel done".to_string())) {
+    match cancel_sale_order(
+        ctx,
+        org_id,
+        order_id,
+        Some("attempt cancel done".to_string()),
+    ) {
         Ok(()) => Err("Expected cancel of a Done order to be rejected".to_string()),
         Err(e) if e.contains("Cannot cancel a done order") => {
             let after = ctx
@@ -176,10 +184,13 @@ pub fn test_cancel_invoiced_order_rejected(ctx: &ReducerContext) -> Result<(), S
         .id()
         .find(&order_id)
         .ok_or("Sale order missing before mutation")?;
-    ctx.db.sale_order().id().update(crate::sales::sales_core::SaleOrder {
-        invoice_status: InvoiceStatus::Invoiced,
-        ..order
-    });
+    ctx.db
+        .sale_order()
+        .id()
+        .update(crate::sales::sales_core::SaleOrder {
+            invoice_status: InvoiceStatus::Invoiced,
+            ..order
+        });
 
     match cancel_sale_order(
         ctx,
@@ -196,7 +207,9 @@ pub fn test_cancel_invoiced_order_rejected(ctx: &ReducerContext) -> Result<(), S
                 .find(&order_id)
                 .ok_or("Sale order missing after rejected cancel")?;
             if after.state == SaleState::Cancelled {
-                return Err("Expected state NOT to become Cancelled after rejected cancel".to_string());
+                return Err(
+                    "Expected state NOT to become Cancelled after rejected cancel".to_string(),
+                );
             }
             if after.invoice_status != InvoiceStatus::Invoiced {
                 return Err(format!(

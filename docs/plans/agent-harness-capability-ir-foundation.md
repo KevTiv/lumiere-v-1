@@ -16,6 +16,15 @@ The harness should also avoid treating raw ERP query responses as model context.
 
 The runtime may use replaceable provider/plugin seams for inference, retrieval, indexing, sandboxing, research, OCR, telemetry, or rendering, but those seams must terminate at the generated capability boundary. They never redefine authorization, STDB invariants, organization placement, durable sequencing, or ERP contract semantics.
 
+The [harness interactive execution contract](./ai-harness-completion-plan.md#8-interactive-execution-and-recovery)
+defines typed questions, diagnostics, mode restrictions and session controls.
+Runtime mode profiles cannot grant capabilities. Specialist delegation and
+lifecycle extensions require separate M8/M9 admission: child capability/budget
+subsets, pinned extension schemas/order/timeouts, and explicit failure policy.
+Extension-transformed calls are revalidated/reauthorized; no plugin can replace
+trusted actor context or bypass required validation. These runtime records refer
+to generated capabilities; they do not move tenant-authored logic into build-time IR.
+
 ```text
 Application-contract IR
         │

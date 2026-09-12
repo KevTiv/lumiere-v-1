@@ -264,7 +264,7 @@ export function ChartOfAccountsView({
                   {t("accounting.csvImport.toolbarAccounts")}
                 </Button>
               ) : null}
-              <Button onClick={() => setShowCreateModal(true)} className="gap-2">
+              <Button disabled={!onCreate} onClick={() => setShowCreateModal(true)} className="gap-2">
                 <Plus className="h-4 w-4" />
                 {t("accounting.actions.newAccount")}
               </Button>
@@ -347,7 +347,7 @@ export function ChartOfAccountsView({
           <DialogFooter>
             <Button
               variant="outline"
-              disabled={isCreating}
+              disabled={isCreating || !onCreate}
               onClick={() => setShowCreateModal(false)}
             >
               {t("common.cancel")}

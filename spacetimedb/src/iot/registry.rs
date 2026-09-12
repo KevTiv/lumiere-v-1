@@ -11,6 +11,7 @@ use spacetimedb::Identity;
 /// 4. Hub then calls `sync_hub_devices` to register all detected peripherals
 use spacetimedb::{reducer, table, ReducerContext, Table, Timestamp};
 
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
@@ -29,7 +30,11 @@ pub struct IoTHub {
     pub company_id: u64,
     pub name: String,
     /// Unique hardware identifier (MAC address or serial number)
+    #[unique]
     pub serial: String,
+    /// SHA-256 of the opaque credential returned once by the IoT gateway at
+    /// pairing time. The plaintext credential is never persisted.
+    pub credential_hash: Option<String>,
     pub ip_address: Option<String>,
     pub firmware_version: Option<String>,
     /// "Online" | "Offline" | "Error" | "Pairing" | "ConnectedNoServer"
@@ -183,6 +188,7 @@ pub fn claim_hub_with_token(
     name: String,
     ip_address: Option<String>,
     firmware_version: Option<String>,
+    credential_hash: String,
 ) -> Result<(), String> {
     let pairing = ctx
         .db
@@ -200,6 +206,18 @@ pub fn claim_hub_with_token(
     if now_us > expires_us {
         return Err("Pairing token has expired".to_string());
     }
+    crate::core::cold_tier_identity::require_active_service_identity(
+        ctx,
+        pairing.organization_id,
+        crate::core::cold_tier_identity::IOT_GATEWAY_SERVICE,
+    )?;
+    if credential_hash.len() != 64
+        || !credential_hash
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err("credential_hash must be 64 lowercase hexadecimal characters".to_string());
+    }
 
     // Consume the token
     ctx.db.iot_pairing_token().token().update(IoTPairingToken {
@@ -214,6 +232,7 @@ pub fn claim_hub_with_token(
         company_id: pairing.company_id,
         name: name.clone(),
         serial: serial.clone(),
+        credential_hash: Some(credential_hash),
         ip_address,
         firmware_version,
         status: "Online".to_string(),
@@ -269,6 +288,7 @@ pub fn register_iot_hub(
         company_id,
         name: params.name.clone(),
         serial: params.serial.clone(),
+        credential_hash: None,
         ip_address: params.ip_address,
         firmware_version: params.firmware_version,
         status: "Offline".to_string(),
@@ -313,7 +333,7 @@ pub fn update_hub_heartbeat(
     firmware_version: Option<String>,
     connectivity_quality: Option<String>,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "iot_hub", "write")?;
+    super::require_gateway_or_permission(ctx, organization_id, "iot_hub", "write")?;
 
     let hub = ctx
         .db
@@ -350,7 +370,7 @@ pub fn sync_hub_devices(
     hub_id: u64,
     detected: Vec<DeviceSyncEntry>,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "iot_device", "write")?;
+    super::require_gateway_or_permission(ctx, organization_id, "iot_device", "write")?;
 
     let hub = ctx
         .db
@@ -375,12 +395,13 @@ pub fn sync_hub_devices(
         .iot_device_by_hub()
         .filter(&hub_id)
         .collect();
+    let mut changed_devices = Vec::new();
 
     // Create or update detected devices
     for entry in &detected {
         if let Some(existing_device) = existing.iter().find(|d| d.identifier == entry.identifier) {
             // Update name/capabilities and mark online
-            ctx.db.iot_device().id().update(IoTDevice {
+            let updated = ctx.db.iot_device().id().update(IoTDevice {
                 name: entry.name.clone(),
                 device_type: entry.device_type.clone(),
                 capabilities: entry.capabilities.clone(),
@@ -390,9 +411,10 @@ pub fn sync_hub_devices(
                 write_date: ctx.timestamp,
                 ..existing_device.clone()
             });
+            changed_devices.push(updated);
         } else {
             // New device — create it
-            ctx.db.iot_device().insert(IoTDevice {
+            let inserted = ctx.db.iot_device().insert(IoTDevice {
                 id: 0,
                 hub_id,
                 organization_id,
@@ -413,6 +435,7 @@ pub fn sync_hub_devices(
                 write_date: ctx.timestamp,
                 metadata: None,
             });
+            changed_devices.push(inserted);
 
             log::info!(
                 "Auto-discovered device: type={} identifier={} hub={}",
@@ -427,13 +450,37 @@ pub fn sync_hub_devices(
     let detected_ids: Vec<&str> = detected.iter().map(|e| e.identifier.as_str()).collect();
     for device in &existing {
         if !detected_ids.contains(&device.identifier.as_str()) && device.status != "Offline" {
-            ctx.db.iot_device().id().update(IoTDevice {
+            let updated = ctx.db.iot_device().id().update(IoTDevice {
                 status: "Offline".to_string(),
                 write_uid: ctx.sender(),
                 write_date: ctx.timestamp,
                 ..device.clone()
             });
+            changed_devices.push(updated);
         }
+    }
+
+    changed_devices.sort_by_key(|device| device.id);
+    if !changed_devices.is_empty() {
+        let changes = changed_devices
+            .iter()
+            .map(|device| {
+                RowChange::upsert_stdb_row(
+                    "iot_device",
+                    serde_json::json!({"id": device.id}),
+                    device,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        record_organization_commit(
+            ctx,
+            OrganizationCommitInput {
+                organization_id,
+                operation_id: "erp.sync_hub_devices".to_string(),
+                correlation_id: format!("iot-hub:{organization_id}:{hub_id}:sync"),
+                changes,
+            },
+        )?;
     }
 
     Ok(())
@@ -524,7 +571,7 @@ pub fn update_device_status(
     device_id: u64,
     status: String,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "iot_device", "write")?;
+    super::require_gateway_or_permission(ctx, organization_id, "iot_device", "write")?;
 
     match status.as_str() {
         "Online" | "Offline" | "Error" | "Pairing" | "ConnectedNoServer" => {}

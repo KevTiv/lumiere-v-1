@@ -11,7 +11,8 @@ use crate::accounting::journal_entries::{
     account_move, account_move_line, create_invoice_from_sale_order, AddAccountMoveLineParams,
     CreateInvoiceFromSaleOrderParams,
 };
-use crate::core::organization::CompanyScopeParams;
+use crate::core::organization::{company, CompanyScopeParams};
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::inventory::product::product;
 use crate::inventory::stock::{
     assign_stock_picking, confirm_stock_picking, done_stock_move, stock_move, stock_picking,
@@ -31,11 +32,21 @@ use crate::types::{
     PricelistAppliedOn, SaleState,
 };
 
+fn company_currency_id(ctx: &ReducerContext, company_id: u64) -> Result<u64, String> {
+    ctx.db
+        .company()
+        .id()
+        .find(&company_id)
+        .map(|company| company.currency_id)
+        .ok_or_else(|| format!("Company {company_id} not found"))
+}
+
 pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let currency_id = company_currency_id(ctx, company_id)?;
 
     let product = ctx
         .db
@@ -50,7 +61,7 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
         CreatePricelistParams {
             company_id: None,
             name: "Harness Pricelist".to_string(),
-            currency_id: 1,
+            currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -72,7 +83,7 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
             partner_invoice_id: fixture.partner_id,
             partner_shipping_id: fixture.partner_id,
             pricelist_id,
-            currency_id: 1,
+            currency_id,
             warehouse_id: fixture.warehouse_id,
             order_lines: vec![CreateSaleOrderLineParams {
                 product_id: fixture.product_id,
@@ -218,7 +229,7 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
                 name: "Harness SO Sales Journal".to_string(),
                 code: journal_code.clone(),
                 type_: JournalType::Sale,
-                currency_id: Some(1),
+                currency_id: Some(currency_id),
                 default_account_id: Some(revenue_id),
                 suspense_account_id: None,
                 loss_account_id: None,
@@ -338,6 +349,48 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
         },
     )?;
 
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == org_id
+                && commit.operation_id == "erp.create_invoice_from_sale_order"
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 5 {
+        return Err(format!(
+            "invoice should emit one five-row organization commit, got {} commits / {:?}",
+            commits.len(),
+            commits.first().map(|commit| commit.row_change_count)
+        ));
+    }
+    let commit = &commits[0];
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == org_id && change.commit_sequence == commit.sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables
+        != [
+            "sale_order",
+            "account_move",
+            "account_move_line",
+            "account_move_line",
+            "sale_order_line",
+        ]
+    {
+        return Err(format!("invoice commit row order mismatch: {tables:?}"));
+    }
+
     let invoiced_order = ctx
         .db
         .sale_order()
@@ -402,6 +455,7 @@ pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> 
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let currency_id = company_currency_id(ctx, company_id)?;
 
     let product = ctx
         .db
@@ -416,7 +470,7 @@ pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> 
         CreatePricelistParams {
             company_id: None,
             name: "Harness Delivery Pricelist".to_string(),
-            currency_id: 1,
+            currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -438,7 +492,7 @@ pub fn test_order_to_delivery_state(ctx: &ReducerContext) -> Result<(), String> 
             partner_invoice_id: fixture.partner_id,
             partner_shipping_id: fixture.partner_id,
             pricelist_id,
-            currency_id: 1,
+            currency_id,
             warehouse_id: fixture.warehouse_id,
             order_lines: vec![CreateSaleOrderLineParams {
                 product_id: fixture.product_id,

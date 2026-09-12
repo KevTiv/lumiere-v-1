@@ -5,7 +5,7 @@ use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::ExpensePaymentMode;
 
-use super::expense_wave_d::{apply_expense_integration_intent, expense_integration_intent};
+use super::expense_wave_d::expense_integration_intent;
 use super::expenses::hr_expense;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -312,7 +312,11 @@ pub fn apply_pending_expense_integration_intents(
     organization_id: u64,
     limit: u32,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "hr_expense", "create")?;
+    crate::core::cold_tier_identity::require_active_service_identity(
+        ctx,
+        organization_id,
+        crate::core::cold_tier_identity::EXPENSE_INTEGRATION_WORKER_SERVICE,
+    )?;
     let cap = limit.clamp(1, 50) as usize;
     let pending: Vec<u64> = ctx
         .db
@@ -331,7 +335,11 @@ pub fn apply_pending_expense_integration_intents(
         .collect();
     for intent_id in pending {
         // Best-effort: continue on individual failures so the batch progresses.
-        let _ = apply_expense_integration_intent(ctx, organization_id, intent_id);
+        let _ = super::expense_wave_d::apply_expense_integration_intent_inner(
+            ctx,
+            organization_id,
+            intent_id,
+        );
     }
     Ok(())
 }

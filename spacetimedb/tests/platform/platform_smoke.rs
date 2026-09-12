@@ -12,10 +12,11 @@ use crate::core::country_pack::{
     country_pack_definition, set_company_country_pack, SetCompanyCountryPackParams,
 };
 use crate::documents::documents::{
-    create_document, create_document_folder, delete_document, delete_document_folder, doc_folder,
-    document, document_version, lock_document, restore_document, update_document,
-    update_document_folder, CreateDocumentFolderParams, CreateDocumentParams, Document,
-    DocumentFolder, UpdateDocumentFolderParams, UpdateDocumentParams,
+    add_document_version, create_document, create_document_folder, delete_document,
+    delete_document_folder, doc_folder, document, document_version, lock_document,
+    restore_document, update_document, update_document_folder, AddDocumentVersionParams,
+    CreateDocumentFolderParams, CreateDocumentParams, Document, DocumentFolder,
+    UpdateDocumentFolderParams, UpdateDocumentParams,
 };
 use crate::documents::drive_sync::{
     document_external_ref, set_google_drive_conflict_policy, sync_external_file_to_document,
@@ -1088,8 +1089,9 @@ pub fn test_documents_wave_c_index_retention_fiscal(ctx: &ReducerContext) -> Res
     if ctx
         .db
         .country_pack_definition()
-        .pack_key()
-        .find(&"au".to_string())
+        .country_pack_by_pack_key()
+        .filter((&org_id, &"au".to_string()))
+        .next()
         .is_none()
     {
         return Err("au country pack missing — run migrations".into());
@@ -1336,6 +1338,7 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
+    use crate::core::persistence::{organization_commit, organization_row_change};
     let checksum = "d".repeat(64);
 
     create_document(
@@ -1370,6 +1373,56 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
         .iter()
         .find(|d| d.organization_id == org_id && d.name == "Wave D Hold Doc")
         .ok_or("wave d doc missing")?;
+
+    add_document_version(
+        ctx,
+        org_id,
+        doc.id,
+        AddDocumentVersionParams {
+            file_name: "hold-v2.pdf".to_string(),
+            file_size: 96,
+            mimetype: "application/pdf".to_string(),
+            url: "/api/documents/blobs/object/1/default/hold-v2".to_string(),
+            checksum: "e".repeat(64),
+            changes_description: Some("C2 version".to_string()),
+        },
+    )?;
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == org_id
+                && commit.operation_id == "erp.add_document_version"
+                && commit.correlation_id == format!("document:{}:version:2", doc.id)
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 3 {
+        return Err(format!(
+            "document version should emit one three-row organization commit, got {} / {:?}",
+            commits.len(),
+            commits.first().map(|commit| commit.row_change_count)
+        ));
+    }
+    let commit = &commits[0];
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == org_id && change.commit_sequence == commit.sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables != ["document", "document_version", "document_version"] {
+        return Err(format!(
+            "document version commit row order mismatch: {tables:?}"
+        ));
+    }
 
     apply_document_legal_hold(
         ctx,
@@ -1805,14 +1858,70 @@ pub fn test_forms_custom_field_eav(ctx: &ReducerContext) -> Result<(), String> {
         ),
     )?;
 
+    use crate::core::persistence::{organization_commit, organization_row_change};
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == org_id
+                && commit.operation_id == "erp.publish_form_configuration"
+                && commit
+                    .correlation_id
+                    .starts_with("form:crm/new-lead:config:")
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 2 {
+        return Err(format!(
+            "form publish should emit one two-row organization commit, got {} / {:?}",
+            commits.len(),
+            commits.first().map(|commit| commit.row_change_count)
+        ));
+    }
+    let commit = &commits[0];
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == org_id && change.commit_sequence == commit.sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables != ["form_config", "form_config_field"] {
+        return Err(format!(
+            "form publish commit row order mismatch: {tables:?}"
+        ));
+    }
+
     if set_eav(ctx, org_id, company_id, lead_id, "custom:unknown", "\"x\"").is_ok() {
         return Err("unknown custom field should be rejected".to_string());
     }
-    if set_eav(ctx, org_id, company_id, lead_id, "custom:region_code", "\"\"").is_ok() {
+    if set_eav(
+        ctx,
+        org_id,
+        company_id,
+        lead_id,
+        "custom:region_code",
+        "\"\"",
+    )
+    .is_ok()
+    {
         return Err("required custom field empty value should be rejected".to_string());
     }
 
-    set_eav(ctx, org_id, company_id, lead_id, "custom:region_code", "\"APAC\"")?;
+    set_eav(
+        ctx,
+        org_id,
+        company_id,
+        lead_id,
+        "custom:region_code",
+        "\"APAC\"",
+    )?;
 
     let row = ctx
         .db
@@ -1921,71 +2030,91 @@ pub fn test_forms_custom_field_record_existence(ctx: &ReducerContext) -> Result<
         },
     )?;
 
-    let make_contact = |ctx: &ReducerContext, fixture: &OrgFixture, name: &str| -> Result<u64, String> {
-        create_contact(
-            ctx,
-            fixture.organization_id,
-            CreateContactParams {
-                name: name.to_string(),
-                type_: "contact".to_string(),
-                email: None,
-                phone: None,
-                mobile: None,
-                company_id: Some(fixture.company_id),
-                is_customer: true,
-                is_vendor: false,
-                is_employee: false,
-                is_prospect: false,
-                is_partner: false,
-                customer_rank: 0,
-                supplier_rank: 0,
-                display_name: None,
-                first_name: None,
-                last_name: None,
-                title: None,
-                email_secondary: None,
-                fax: None,
-                website: None,
-                street: None,
-                street2: None,
-                city: None,
-                state_code: None,
-                zip: None,
-                country_code: None,
-                tax_id: None,
-                company_registry: None,
-                industry: None,
-                employees_count: None,
-                annual_revenue: None,
-                description: None,
-                salesperson_id: None,
-                assigned_user_id: None,
-                parent_id: None,
-                user_id: None,
-                color: None,
-                metadata: None,
-            },
-        )?;
-        ctx.db
-            .contact()
-            .iter()
-            .find(|c| c.organization_id == fixture.organization_id && c.name == name)
-            .map(|c| c.id)
-            .ok_or_else(|| format!("contact {name} missing after create"))
-    };
+    let make_contact =
+        |ctx: &ReducerContext, fixture: &OrgFixture, name: &str| -> Result<u64, String> {
+            create_contact(
+                ctx,
+                fixture.organization_id,
+                CreateContactParams {
+                    name: name.to_string(),
+                    type_: "contact".to_string(),
+                    email: None,
+                    phone: None,
+                    mobile: None,
+                    company_id: Some(fixture.company_id),
+                    is_customer: true,
+                    is_vendor: false,
+                    is_employee: false,
+                    is_prospect: false,
+                    is_partner: false,
+                    customer_rank: 0,
+                    supplier_rank: 0,
+                    display_name: None,
+                    first_name: None,
+                    last_name: None,
+                    title: None,
+                    email_secondary: None,
+                    fax: None,
+                    website: None,
+                    street: None,
+                    street2: None,
+                    city: None,
+                    state_code: None,
+                    zip: None,
+                    country_code: None,
+                    tax_id: None,
+                    company_registry: None,
+                    industry: None,
+                    employees_count: None,
+                    annual_revenue: None,
+                    description: None,
+                    salesperson_id: None,
+                    assigned_user_id: None,
+                    parent_id: None,
+                    user_id: None,
+                    color: None,
+                    metadata: None,
+                },
+            )?;
+            ctx.db
+                .contact()
+                .iter()
+                .find(|c| c.organization_id == fixture.organization_id && c.name == name)
+                .map(|c| c.id)
+                .ok_or_else(|| format!("contact {name} missing after create"))
+        };
 
     let foreign_contact_id = make_contact(ctx, &foreign, "FRM-002 Foreign Contact")?;
     let missing_contact_id = ctx.db.contact().iter().map(|c| c.id).max().unwrap_or(0) + 1000;
 
-    if set_eav(ctx, local.organization_id, local.company_id, missing_contact_id).is_ok() {
+    if set_eav(
+        ctx,
+        local.organization_id,
+        local.company_id,
+        missing_contact_id,
+    )
+    .is_ok()
+    {
         return Err("missing contact record_id should be rejected".to_string());
     }
-    if set_eav(ctx, local.organization_id, local.company_id, foreign_contact_id).is_ok() {
+    if set_eav(
+        ctx,
+        local.organization_id,
+        local.company_id,
+        foreign_contact_id,
+    )
+    .is_ok()
+    {
         return Err("cross-org contact record_id should be rejected".to_string());
     }
 
     let local_contact_id = make_contact(ctx, &local, "FRM-002 Local Contact")?;
-    set_eav(ctx, local.organization_id, local.company_id, local_contact_id)?;
+    set_eav(
+        ctx,
+        local.organization_id,
+        local.company_id,
+        local_contact_id,
+    )?;
     if !ctx.db.record_custom_field_value().iter().any(|r| {
         r.organization_id == local.organization_id
             && r.model == "contact"
@@ -2100,7 +2229,9 @@ pub fn test_forms_custom_field_rejects_invalid_model(ctx: &ReducerContext) -> Re
     )
     .expect_err("non-whitelisted model must be rejected by delete_record_custom_field_values");
     if !delete_err.contains("not in the allowed ERP model set") {
-        return Err(format!("unexpected error for invalid model delete: {delete_err}"));
+        return Err(format!(
+            "unexpected error for invalid model delete: {delete_err}"
+        ));
     }
 
     Ok(())
@@ -2136,7 +2267,9 @@ pub fn test_documents_folder_fk_rejects_cross_org(ctx: &ReducerContext) -> Resul
         .db
         .doc_folder()
         .iter()
-        .find(|f| f.organization_id == foreign.organization_id && f.name == "DOC-006 Foreign Folder")
+        .find(|f| {
+            f.organization_id == foreign.organization_id && f.name == "DOC-006 Foreign Folder"
+        })
         .map(|f| f.id)
         .ok_or("foreign folder missing")?;
 
@@ -2211,27 +2344,28 @@ pub fn test_documents_upload_rejects_oversized_and_disallowed_mimetype(
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
 
-    let base = |name: &str, file_size: u64, mimetype: &str, checksum: String| CreateDocumentParams {
-        name: name.to_string(),
-        description: None,
-        file_name: "doc.bin".to_string(),
-        file_size,
-        mimetype: mimetype.to_string(),
-        url: "/api/documents/blobs/object/4/default/deadbeef".to_string(),
-        checksum,
-        folder_id: None,
-        res_model: None,
-        res_id: None,
-        partner_id: None,
-        tag_ids: vec![],
-        is_favorite: false,
-        index_content: None,
-        classification_id: None,
-        retention_days: None,
-        fiscal_kind: None,
-        residency_region: None,
-        metadata: None,
-    };
+    let base =
+        |name: &str, file_size: u64, mimetype: &str, checksum: String| CreateDocumentParams {
+            name: name.to_string(),
+            description: None,
+            file_name: "doc.bin".to_string(),
+            file_size,
+            mimetype: mimetype.to_string(),
+            url: "/api/documents/blobs/object/4/default/deadbeef".to_string(),
+            checksum,
+            folder_id: None,
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            tag_ids: vec![],
+            is_favorite: false,
+            index_content: None,
+            classification_id: None,
+            retention_days: None,
+            fiscal_kind: None,
+            residency_region: None,
+            metadata: None,
+        };
 
     let oversized = create_document(
         ctx,

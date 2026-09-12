@@ -6,13 +6,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    paths:
-      - "frontend/web/tests/e2e/**"
-      - "frontend/web/playwright.config.ts"
-      - "Makefile"
-      - "scripts/e2e*"
-      - "spacetimedb/**"
-      - "api-server/**"
   workflow_dispatch:
     inputs:
       suite:
@@ -39,10 +32,28 @@ env:
   # suite publishes with identical to the one contracts drift validates
   # against, and gives the cache step below a stable key.
   SPACETIME_CLI_VERSION: "2.8.2"
+  WASM_TOOLS_VERSION: "1.258.0"
+  BINARYEN_VERSION: "132"
 
 jobs:
+  scope:
+    name: Classify change scope
+    runs-on: ubuntu-latest
+    outputs:
+      valid: ${{ steps.scope.outputs.valid }}
+      run_e2e: ${{ steps.scope.outputs.run_e2e }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: scope
+        run: python3 scripts/ci-change-scope.py --github-output "$GITHUB_OUTPUT"
+      - name: Test change classifier
+        run: python3 -m unittest discover -s scripts/tests -p 'test_ci_change_scope.py'
+
   plan:
     name: Plan E2E matrix
+    needs: scope
     runs-on: ubuntu-latest
     outputs:
       configs: ${{ steps.plan.outputs.configs }}
@@ -51,8 +62,8 @@ jobs:
         run: |
           case "${{ github.event_name }}" in
             push)
-              # Every main push: run both P0 and full with a clean module DB.
-              configs='[{"suite":"p0","clear_db":"1"},{"suite":"full","clear_db":"1"}]'
+              # Main retains one complete run; PRs use the bounded P0 suite.
+              configs='[{"suite":"full","clear_db":"1"}]'
               ;;
             pull_request)
               configs='[{"suite":"p0","clear_db":"0"}]'
@@ -78,9 +89,24 @@ jobs:
 
   e2e-smoke:
     name: Playwright smoke (${{ matrix.config.suite }})
-    needs: plan
+    needs: [scope, plan]
+    if: needs.plan.result == 'success' && needs.scope.outputs.run_e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: lumiere
+          POSTGRES_USER: lumiere
+          POSTGRES_PASSWORD: lumiere
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U lumiere -d lumiere"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     concurrency:
       group: e2e-smoke-${{ github.workflow }}-${{ github.ref }}-${{ matrix.config.suite }}
       cancel-in-progress: true
@@ -103,49 +129,61 @@ jobs:
       # The install unpacks a ~150MB binary bundle; cached by exact version,
       # so this only actually downloads again when SPACETIME_CLI_VERSION
       # changes. Mirrors ci.yml's contracts-drift job.
-      - name: Cache spacetime CLI
-        id: cache-spacetime
+      - uses: ./.github/actions/setup-spacetime-cli
+        with:
+          version: ${{ env.SPACETIME_CLI_VERSION }}
+
+      - name: Cache WASM validation and optimization tools
+        id: cache-wasm-tools
         uses: actions/cache@v4
         with:
           path: |
-            ~/.local/bin/spacetime
-            ~/.local/share/spacetime/bin
-          key: spacetime-cli-${{ env.SPACETIME_CLI_VERSION }}-${{ runner.os }}
+            ~/.local/bin/wasm-tools
+            ~/.local/bin/wasm-opt
+            ~/.local/share/binaryen
+          key: wasm-tools-${{ env.WASM_TOOLS_VERSION }}-binaryen-${{ env.BINARYEN_VERSION }}-${{ runner.os }}-${{ runner.arch }}
 
-      - name: Install SpacetimeDB CLI
-        if: steps.cache-spacetime.outputs.cache-hit != 'true'
+      - name: Install pinned WASM validation and optimization tools
+        if: steps.cache-wasm-tools.outputs.cache-hit != 'true'
+        shell: bash
         run: |
-          curl -sSf https://install.spacetimedb.com | sh -s -- -y
-          "$HOME/.local/bin/spacetime" version install "$SPACETIME_CLI_VERSION"
-          "$HOME/.local/bin/spacetime" version use "$SPACETIME_CLI_VERSION"
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          mkdir -p "$HOME/.local/bin" "$HOME/.local/share"
 
-      - name: Add spacetime CLI to PATH
-        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          wasm_tools_archive="$work/wasm-tools.tar.gz"
+          curl -fsSL \
+            "https://github.com/bytecodealliance/wasm-tools/releases/download/v${WASM_TOOLS_VERSION}/wasm-tools-${WASM_TOOLS_VERSION}-x86_64-linux.tar.gz" \
+            -o "$wasm_tools_archive"
+          echo "b52d14eb74a4852cc249369bd4480c2b2fdd876145f41db51ff52269ded240ce  $wasm_tools_archive" | sha256sum --check
+          tar -xzf "$wasm_tools_archive" -C "$work"
+          install -m 0755 \
+            "$work/wasm-tools-${WASM_TOOLS_VERSION}-x86_64-linux/wasm-tools" \
+            "$HOME/.local/bin/wasm-tools"
 
-      # pnpm resolves the @lumiere/contracts git-subdirectory dependency
-      # over SSH — same read-only deploy key as ci.yml's frontend job.
-      - name: Configure SSH for private lumiere-contracts dependency
+          binaryen_archive="$work/binaryen.tar.gz"
+          curl -fsSL \
+            "https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz" \
+            -o "$binaryen_archive"
+          echo "195ddc94f9bc89f45abdabb0b9eea86023d727ba90eac8b35b80f2544fc30572  $binaryen_archive" | sha256sum --check
+          tar -xzf "$binaryen_archive" -C "$work"
+          rm -rf "$HOME/.local/share/binaryen"
+          mv "$work/binaryen-version_${BINARYEN_VERSION}" "$HOME/.local/share/binaryen"
+          ln -s "$HOME/.local/share/binaryen/bin/wasm-opt" "$HOME/.local/bin/wasm-opt"
+
+      - name: Add WASM tools to PATH
+        shell: bash
         run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_ed25519
-          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
-          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/wasm-tools" --version
+          "$HOME/.local/bin/wasm-opt" --version
 
-      - uses: pnpm/action-setup@v4
+      - uses: ./.github/actions/setup-contracts-ssh
         with:
-          version: 10.31.0
+          deploy-key: ${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+      - uses: ./.github/actions/setup-frontend
 
       - name: Install frontend dependencies
         working-directory: frontend
@@ -174,12 +212,30 @@ jobs:
         working-directory: frontend/web
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Cache Next.js intermediate output
+        uses: actions/cache@v4
+        with:
+          # Cache compiler data only, never Next's runtime fetch cache.
+          path: |
+            frontend/web/.next/cache/webpack
+            frontend/web/.next/cache/turbopack
+            frontend/web/.next/cache/swc
+          key: next-compiler-v1-${{ runner.os }}-node22-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-${{ github.sha }}
+          restore-keys: |
+            next-compiler-v1-${{ runner.os }}-node22-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-
+
       - name: Run make e2e-smoke
         env:
           E2E_SUITE: ${{ matrix.config.suite }}
           E2E_CLEAR_DB: ${{ matrix.config.clear_db }}
           NEXT_PUBLIC_STDB_MODULE: ${{ env.STDB_MODULE }}
           NEXT_PUBLIC_STDB_HOST: ${{ env.STDB_HOST }}
+          PG_HOST: 127.0.0.1
+          PG_PORT: "5432"
+          PG_DATABASE: lumiere
+          PG_USER: lumiere
+          PG_PASSWORD: lumiere
+          PG_TLS_MODE: disable
         run: |
           # Makefile defaults to a macOS dev PATH; use the runner PATH in CI.
           export E2E_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.cargo/bin:${HOME}/.local/bin:${PNPM_HOME}"
@@ -201,3 +257,19 @@ jobs:
           name: e2e-logs-${{ matrix.config.suite }}
           path: .tmp/e2e/
           retention-days: 7
+
+  gate:
+    name: E2E gate
+    if: always()
+    needs: [scope, plan, e2e-smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require scope and E2E result
+        run: |
+          test "${{ needs.scope.result }}" = success
+          test "${{ needs.scope.outputs.valid }}" = true
+          test "${{ needs.plan.result }}" = success
+          case "${{ needs.scope.outputs.run_e2e }}:${{ needs.e2e-smoke.result }}" in
+            true:success|false:skipped) ;;
+            *) exit 1 ;;
+          esac

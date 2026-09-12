@@ -379,14 +379,22 @@ Discovery filtering is never authorization proof.
 type ContextProvenance =
   | { kind: "erp_record"; authoritative: true; entity: EntityKey; version?: string }
   | { kind: "erp_dataset"; authoritative: true; datasetId: DatasetId; watermark: string }
-  | { kind: "evidence"; authoritative: true; evidenceId: EvidenceId; programId: AnalysisProgramId }
-  | { kind: "artifact"; authoritative: boolean; artifactId: ArtifactId }
+  | { kind: "evidence"; evidenceId: EvidenceId; programId: AnalysisProgramId; assessmentRef: EvidenceAssessmentRef }
+  | { kind: "artifact"; artifactId: ArtifactId; assessmentRef: EvidenceAssessmentRef }
   | { kind: "user_input"; authoritative: false }
   | { kind: "external_research"; authoritative: false; sourceRef: string }
   | { kind: "model_generated"; authoritative: false }
 ```
 
 Preserve source operation/dataset/watermark/program/correlation lineage wherever practical.
+
+`EvidenceAssessmentRef` resolves the separate source-origin, verification,
+domain-approval and applicability dimensions defined by the
+[harness evidence contract](./ai-harness-completion-plan.md#7-evidence-intellectual-provenance-and-knowledge-contract).
+An authoritative ERP record identifies business state; it does not make an
+arbitrary derived interpretation authoritative. Generated results and artifacts
+retain claim/decision/component lineage and pass the applicable harness M1–M5
+gates before final presentation, publication or reuse.
 
 ---
 

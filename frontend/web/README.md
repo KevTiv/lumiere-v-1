@@ -10,6 +10,11 @@ This repository is linked to a [v0](https://v0.app) project. You can continue de
 
 ## Getting Started
 
+For this monorepo's API/STDB-backed development and tests, use the
+[build and CI workflow](../../docs/guides/build-and-ci-dx.md). The fast path is
+`make e2e-web-dev` from the repository root, then `make e2e-single-running E2E_SPEC=auth-shell.spec.ts`
+in another terminal. CI retains production builds.
+
 First, run the development server:
 
 ```bash

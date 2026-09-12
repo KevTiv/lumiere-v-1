@@ -47,6 +47,8 @@ pub fn run_projects_wave_e_test(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("change_order_dual_baselines: {e}"))?;
     wave_e_test::test_project_revrec_isolation(ctx)
         .map_err(|e| format!("project_revrec_isolation: {e}"))?;
+    wave_e_test::test_project_integration_worker_requires_service_identity(ctx)
+        .map_err(|e| format!("project_integration_worker_auth: {e}"))?;
     wave_e_test::test_subcontractor_in_margin(ctx)
         .map_err(|e| format!("subcontractor_in_margin: {e}"))?;
     Ok(())

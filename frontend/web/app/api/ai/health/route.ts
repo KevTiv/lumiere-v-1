@@ -1,5 +1,5 @@
 /**
- * GET /api/ai/health — proxies ai-gateway `/health` for ERP Settings diagnostics.
+ * GET /api/ai/health — proxies ai-gateway readiness for ERP Settings diagnostics.
  */
 import { type NextRequest, NextResponse } from 'next/server'
 
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const gw = await fetchAiGateway('/health', { method: 'GET' })
+    const gw = await fetchAiGateway('/health/ready', { method: 'GET' })
     let payload: unknown = gw.text
     try {
       payload = gw.text ? JSON.parse(gw.text) : {}

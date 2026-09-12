@@ -65,7 +65,11 @@ fn semantic_payload(record: &SemanticIndexRecord) -> Result<HashMap<String, Valu
 }
 
 fn payload_string(payload: &HashMap<String, Value>, key: &str) -> Option<String> {
-    payload.get(key)?.as_str().cloned().filter(|value| !value.is_empty())
+    payload
+        .get(key)?
+        .as_str()
+        .cloned()
+        .filter(|value| !value.is_empty())
 }
 
 fn payload_u64(payload: &HashMap<String, Value>, key: &str) -> Option<u64> {
@@ -110,8 +114,7 @@ fn scoped_semantic_record_from_payload(
     company_id: u64,
 ) -> Option<SemanticIndexRecord> {
     let record = semantic_record_from_payload(payload)?;
-    (record.organization_id == organization_id && record.company_id == company_id)
-        .then_some(record)
+    (record.organization_id == organization_id && record.company_id == company_id).then_some(record)
 }
 
 impl VectorStore {
@@ -122,6 +125,24 @@ impl VectorStore {
         }
         let client = builder.build().context("Failed to connect to Qdrant")?;
         Ok(VectorStore { client, collection })
+    }
+
+    /// Verify Qdrant is reachable and the configured semantic collection exists.
+    /// This is a read-only readiness probe; it never creates or mutates a collection.
+    pub async fn check_ready(&self) -> Result<()> {
+        let collections = self
+            .client
+            .list_collections()
+            .await
+            .context("list Qdrant collections")?;
+        if !collections
+            .collections
+            .iter()
+            .any(|collection| collection.name == self.collection)
+        {
+            anyhow::bail!("configured Qdrant collection is unavailable");
+        }
+        Ok(())
     }
 
     /// Create the collection if it does not already exist.
@@ -280,11 +301,11 @@ impl VectorStore {
             bounded_search_limit(limit),
         )
         .filter(Filter {
-                must: conditions,
-                ..Default::default()
-            })
-            .with_payload(true)
-            .params(SearchParamsBuilder::default().exact(false).build());
+            must: conditions,
+            ..Default::default()
+        })
+        .with_payload(true)
+        .params(SearchParamsBuilder::default().exact(false).build());
 
         if let Some(threshold) = score_threshold {
             builder = builder.score_threshold(threshold);
@@ -303,11 +324,8 @@ impl VectorStore {
                 let payload = p.payload;
                 let score = p.score;
 
-                let record = scoped_semantic_record_from_payload(
-                    &payload,
-                    organization_id,
-                    company_id,
-                )?;
+                let record =
+                    scoped_semantic_record_from_payload(&payload, organization_id, company_id)?;
                 Some(SearchResult { score, record })
             })
             .collect();
@@ -400,12 +418,8 @@ mod tests {
         let accepted = scopes
             .into_iter()
             .filter(|(organization_id, company_id)| {
-                scoped_semantic_record_from_payload(
-                    &payload(*organization_id, *company_id),
-                    42,
-                    7,
-                )
-                .is_some()
+                scoped_semantic_record_from_payload(&payload(*organization_id, *company_id), 42, 7)
+                    .is_some()
             })
             .collect::<Vec<_>>();
 
@@ -422,20 +436,15 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires QDRANT_TEST_URL"]
     async fn qdrant_enforces_two_organization_company_isolation() {
-        let url = std::env::var("QDRANT_TEST_URL")
-            .unwrap_or_else(|_| "http://127.0.0.1:6334".into());
+        let url =
+            std::env::var("QDRANT_TEST_URL").unwrap_or_else(|_| "http://127.0.0.1:6334".into());
         let collection = format!("lumiere_q0_isolation_{}", uuid::Uuid::new_v4().simple());
         let store = VectorStore::new(&url, None, collection.clone())
             .await
             .expect("test vector store");
         store.ensure_collection(3).await.expect("test collection");
 
-        for (id, organization_id, company_id) in [
-            (1, 42, 7),
-            (2, 42, 8),
-            (3, 43, 7),
-            (4, 43, 8),
-        ] {
+        for (id, organization_id, company_id) in [(1, 42, 7), (2, 42, 8), (3, 43, 7), (4, 43, 8)] {
             store
                 .upsert(EmbedPoint {
                     id,
@@ -475,23 +484,16 @@ mod tests {
             .upsert_points(
                 UpsertPointsBuilder::new(
                     collection.clone(),
-                    vec![PointStruct::new(
-                        99,
-                        vec![1.0, 0.0, 0.0],
-                        contaminated,
-                    )],
+                    vec![PointStruct::new(99, vec![1.0, 0.0, 0.0], contaminated)],
                 )
                 .wait(true),
             )
             .await
             .expect("contaminated point");
 
-        for (organization_id, company_id, expected_resource_id) in [
-            (42, 7, "1"),
-            (42, 8, "2"),
-            (43, 7, "3"),
-            (43, 8, "4"),
-        ] {
+        for (organization_id, company_id, expected_resource_id) in
+            [(42, 7, "1"), (42, 8, "2"), (43, 7, "3"), (43, 8, "4")]
+        {
             let hits = store
                 .search(
                     vec![1.0, 0.0, 0.0],
@@ -515,5 +517,4 @@ mod tests {
             .await
             .expect("delete test collection");
     }
-
 }

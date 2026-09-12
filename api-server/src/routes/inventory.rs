@@ -6,9 +6,11 @@ use axum::{extract::State, http::HeaderMap, routing::get, Json, Router};
 use serde_json::{json, Value};
 use tower_cookies::Cookies;
 
+use crate::commands::dispatch_session_reducer;
 use crate::error::ApiError;
 use crate::query_exec::execute_resource_query;
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session};
 
 async fn pickings_get(
@@ -20,7 +22,8 @@ async fn pickings_get(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
-    let client = state.client_with_token(&session.stdb_token);
+    let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let client = trusted.client();
     let data = execute_resource_query(
         &client,
         "stock-pickings",
@@ -42,14 +45,13 @@ async fn pickings_post(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "create_stock_picking",
-            json!([org_id, body])
-        ))
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "create_stock_picking",
+        json!([org_id, body]),
+    )
+    .await?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Stock picking created successfully" } })),

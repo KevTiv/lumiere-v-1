@@ -7,6 +7,7 @@ import {
   optionalTrimmedString,
   unwrapSome,
 } from "./form-coercion"
+import { toCreatePosConfigParams } from "./pos-create-params"
 
 test("unwrapSome only unwraps an Option::Some wire value", () => {
   assert.equal(unwrapSome({ some: "value" }), "value")
@@ -31,4 +32,41 @@ test("formValue prefers the first present alias and preserves falsy values", () 
   assert.equal(formValue({ id: undefined, legacy_id: false }, "id", "legacy_id"), false)
   assert.equal(formValue({ id: 0, legacy_id: 2 }, "id", "legacy_id"), 0)
   assert.equal(formValue({}, "id", "legacy_id"), undefined)
+})
+
+test("POS required IDs distinguish absent defaults from supplied invalid values", () => {
+  const context = {
+    pickingTypeId: 11n,
+    journalId: 12n,
+    currencyId: 13n,
+    pricelistId: 14n,
+    warehouseId: 15n,
+    stockLocationId: 16n,
+  }
+  const absent = toCreatePosConfigParams({ name: "Till" }, context)
+  assert.equal(absent?.pickingTypeId, 11n)
+  assert.throws(
+    () => toCreatePosConfigParams({ name: "Till", pickingTypeId: "not-an-id" }, context),
+    RangeError,
+  )
+  assert.throws(
+    () => toCreatePosConfigParams({ name: "Till", pickingTypeId: {} }, context),
+    RangeError,
+  )
+  assert.throws(
+    () => toCreatePosConfigParams({ name: "Till", pickingTypeId: "-1" }, context),
+    RangeError,
+  )
+  assert.throws(
+    () => toCreatePosConfigParams({ name: "Till", pickingTypeId: "18446744073709551616" }, context),
+    RangeError,
+  )
+  assert.equal(
+    toCreatePosConfigParams({ name: "Till", pickingTypeId: { some: "42" } }, context)?.pickingTypeId,
+    42n,
+  )
+  assert.equal(
+    toCreatePosConfigParams({ name: "Till", pickingTypeId: { none: [] } }, context)?.pickingTypeId,
+    11n,
+  )
 })

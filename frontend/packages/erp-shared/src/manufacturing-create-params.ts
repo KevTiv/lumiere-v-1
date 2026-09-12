@@ -37,6 +37,7 @@ function requiredBigIntU64(v: unknown): bigint | null {
 }
 
 function num(v: unknown, fallback = 0): number {
+  if (v == null || (typeof v === "string" && v.trim() === "")) return fallback
   const n = Number(v)
   return Number.isFinite(n) ? n : fallback
 }

@@ -1,0 +1,17 @@
+{
+  "_comment": "Reviewed read contracts for archive-capable resources. Runtime scope is authenticated; this file cannot supply tenant IDs, SQL, store names, or hydration payloads.",
+  "version": 1,
+  "descriptors": [
+    {
+      "resource": "pos-orders",
+      "table": "pos_order",
+      "max_limit": 500,
+      "order_by": [
+        {
+          "column": "id",
+          "direction": "desc"
+        }
+      ]
+    }
+  ]
+}

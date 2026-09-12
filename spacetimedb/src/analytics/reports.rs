@@ -12,6 +12,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::messaging::{mail_message, MailMessage};
 use crate::core::organization::{organization, require_company_in_organization};
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::core::queue::{enqueue_job_internal, EnqueueJobParams};
 use crate::core::users::user_organization;
 use crate::documents::documents::{document, document_version, Document, DocumentVersion};
@@ -342,6 +343,9 @@ fn validate_schedule_configuration(
     company_id: Option<u64>,
     params: &CreateScheduledReportParams,
 ) -> Result<(), String> {
+    if let Some(company_id) = company_id {
+        require_company_in_organization(ctx, organization_id, company_id)?;
+    }
     if params.name.trim().is_empty() {
         return Err("scheduled report name is required".to_string());
     }
@@ -363,9 +367,7 @@ fn validate_schedule_configuration(
             // ANL-002: when both the schedule and template carry a company scope, they must match
             if let (Some(report_company), Some(tmpl_company)) = (company_id, template.company_id) {
                 if report_company != tmpl_company {
-                    return Err(
-                        "Report template does not belong to this company".to_string(),
-                    );
+                    return Err("Report template does not belong to this company".to_string());
                 }
             }
             if params.recipients.is_empty() {
@@ -799,6 +801,52 @@ pub fn record_generated_owner_report(
             metadata: None,
         },
     );
+    let committed_document = ctx
+        .db
+        .document()
+        .id()
+        .find(&row.document_id)
+        .ok_or("Owner report document disappeared before commit recording")?;
+    let committed_version_id = committed_document
+        .current_version_id
+        .ok_or("Owner report document version missing before commit recording")?;
+    let committed_version = ctx
+        .db
+        .document_version()
+        .id()
+        .find(&committed_version_id)
+        .ok_or("Owner report version disappeared before commit recording")?;
+    let committed_report = ctx
+        .db
+        .generated_owner_report()
+        .id()
+        .find(&row.id)
+        .ok_or("Owner report disappeared before commit recording")?;
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.record_generated_owner_report".to_string(),
+            correlation_id: committed_report.correlation_id.clone(),
+            changes: vec![
+                RowChange::upsert_stdb_row(
+                    "document",
+                    serde_json::json!({"id": committed_document.id}),
+                    &committed_document,
+                )?,
+                RowChange::upsert_stdb_row(
+                    "document_version",
+                    serde_json::json!({"id": committed_version.id}),
+                    &committed_version,
+                )?,
+                RowChange::upsert_stdb_row(
+                    "generated_owner_report",
+                    serde_json::json!({"id": committed_report.id}),
+                    &committed_report,
+                )?,
+            ],
+        },
+    )?;
     Ok(())
 }
 
@@ -890,7 +938,12 @@ pub fn update_report_template(
     if let Some(tmpl_company) = tmpl.company_id {
         match company_id {
             Some(cid) if cid == tmpl_company => {}
-            _ => return Err("Company scope mismatch — provide the template's company_id to update it".to_string()),
+            _ => {
+                return Err(
+                    "Company scope mismatch — provide the template's company_id to update it"
+                        .to_string(),
+                )
+            }
         }
     }
 
@@ -1116,15 +1169,72 @@ pub fn complete_scheduled_owner_report_run(
     if run.organization_id != organization_id {
         return Err("Scheduled report run does not belong to this organization".to_string());
     }
-    if run.generated_owner_report_id.is_some() {
-        return Ok(());
-    }
     let report = ctx
         .db
         .scheduled_report()
         .id()
         .find(&run.scheduled_report_id)
         .ok_or("Scheduled report not found")?;
+    if report.organization_id != organization_id || report.owner_report_key.is_none() {
+        return Err("Owner-report schedule does not belong to this organization".to_string());
+    }
+    let company_id = report
+        .company_id
+        .ok_or("Owner-report schedule has no company")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    let report_key = report
+        .owner_report_key
+        .as_deref()
+        .ok_or("Owner-report schedule has no report key")?;
+    let generated = ctx
+        .db
+        .generated_owner_report()
+        .id()
+        .find(&generated_owner_report_id)
+        .ok_or("Generated owner report not found")?;
+    if generated.organization_id != organization_id {
+        return Err("Generated owner report does not belong to this organization".to_string());
+    }
+    if generated.company_id != company_id {
+        return Err("Generated owner report does not belong to this company".to_string());
+    }
+    if generated.report_key != report_key {
+        return Err("Generated owner report key does not match the schedule".to_string());
+    }
+    if generated.document_id != document_id {
+        return Err("Generated owner report document does not match".to_string());
+    }
+    if generated.correlation_id != scheduled_report_correlation(report_key, run.id) {
+        return Err("Generated owner report correlation does not match the run".to_string());
+    }
+    let document = ctx
+        .db
+        .document()
+        .id()
+        .find(&document_id)
+        .ok_or("Owner report document not found")?;
+    if document.organization_id != organization_id {
+        return Err("Owner report document does not belong to this organization".to_string());
+    }
+    if document.company_id != Some(company_id) {
+        return Err("Owner report document does not belong to this company".to_string());
+    }
+    if document.res_model.as_deref() != Some("generated_owner_report")
+        || document.res_id != Some(generated_owner_report_id)
+    {
+        return Err("Owner report document linkage does not match".to_string());
+    }
+    if run.status == "completed" {
+        if run.generated_owner_report_id == Some(generated_owner_report_id)
+            && run.document_id == Some(document_id)
+        {
+            return Ok(());
+        }
+        return Err("completed scheduled report run has a different artifact".to_string());
+    }
+    if run.generated_owner_report_id.is_some() || run.document_id.is_some() {
+        return Err("scheduled report run already has an artifact".to_string());
+    }
     let notifications = create_owner_report_notifications(ctx, &report, run.id, document_id);
     ctx.db
         .scheduled_report_run()
@@ -1148,6 +1258,10 @@ pub fn complete_scheduled_owner_report_run(
     Ok(())
 }
 
+fn scheduled_report_correlation(report_key: &str, run_id: u64) -> String {
+    format!("owner-report:{report_key}:scheduled-run-{run_id}")
+}
+
 /// Retain a failed attempt on the immutable run. A later successful retry
 /// updates this same run, so retries cannot duplicate artifacts or messages.
 #[reducer]
@@ -1166,6 +1280,9 @@ pub fn fail_scheduled_owner_report_run(
         .ok_or("Scheduled report run not found")?;
     if run.organization_id != organization_id {
         return Err("Scheduled report run does not belong to this organization".to_string());
+    }
+    if run.status == "completed" {
+        return Ok(());
     }
     ctx.db
         .scheduled_report_run()
@@ -1318,7 +1435,12 @@ pub fn update_metric_values(
     if let Some(metric_company) = metric.company_id {
         match company_id {
             Some(cid) if cid == metric_company => {}
-            _ => return Err("Company scope mismatch — provide the metric's company_id to update it".to_string()),
+            _ => {
+                return Err(
+                    "Company scope mismatch — provide the metric's company_id to update it"
+                        .to_string(),
+                )
+            }
         }
     }
 
@@ -1380,6 +1502,14 @@ mod scheduled_owner_report_tests {
     #[test]
     fn cadence_rejects_unsupported_values() {
         assert!(validate_frequency("quarterly").is_err());
+    }
+
+    #[test]
+    fn scheduled_report_correlation_binds_report_key_and_run() {
+        assert_eq!(
+            scheduled_report_correlation("daily_business_summary_v1", 42),
+            "owner-report:daily_business_summary_v1:scheduled-run-42"
+        );
     }
 }
 

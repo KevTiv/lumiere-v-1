@@ -7,39 +7,10 @@
 use serde_json::{Map, Value};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::analytic_accounting::account_analytic_account;
+use crate::accounting::relations::require_analytic_account;
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::{BillType, PricingType};
-
-/// PRJ-003: analytic_account_id is stored but was never validated against the
-/// org/company-scoped account_analytic_account table — mirrors the equivalent
-/// helper in purchasing/purchase_orders.rs.
-fn require_project_analytic_account(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    company_id: u64,
-    analytic_account_id: Option<u64>,
-) -> Result<(), String> {
-    let Some(analytic_account_id) = analytic_account_id else {
-        return Ok(());
-    };
-    let account = ctx
-        .db
-        .account_analytic_account()
-        .id()
-        .find(&analytic_account_id)
-        .ok_or("Analytic account not found")?;
-    if account.organization_id != organization_id || account.company_id != company_id {
-        return Err(
-            "Analytic account does not belong to this organization and company".to_string(),
-        );
-    }
-    if !account.active {
-        return Err("Analytic account is inactive".to_string());
-    }
-    Ok(())
-}
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -476,7 +447,7 @@ pub fn create_project(
     check_permission(ctx, organization_id, "project_project", "create")?;
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     validate_project_name_unique(ctx, organization_id, &params.name, None)?;
-    require_project_analytic_account(ctx, organization_id, company_id, params.analytic_account_id)?;
+    require_analytic_account(ctx, organization_id, company_id, params.analytic_account_id)?;
 
     BillType::from_str(&params.bill_type)?;
     PricingType::from_str(&params.pricing_type)?;
@@ -813,7 +784,7 @@ pub fn update_project(
     }
 
     if let Some(analytic_account_id) = params.analytic_account_id {
-        require_project_analytic_account(ctx, organization_id, company_id, analytic_account_id)?;
+        require_analytic_account(ctx, organization_id, company_id, analytic_account_id)?;
         project.analytic_account_id = analytic_account_id;
         changed_fields.push("analytic_account_id".to_string());
     }

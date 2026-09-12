@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
-  useApplyPendingExpenseIntegrationIntents,
   useCreateExpenseCardStatementLine,
   useMatchExpenseCardStatementLine,
   useSeedStatutoryExpenseMileageRates,
@@ -36,7 +35,6 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
   const createStmt = useCreateExpenseCardStatementLine(orgId, companyId)
   const matchStmt = useMatchExpenseCardStatementLine(orgId)
   const unmatchStmt = useUnmatchExpenseCardStatementLine(orgId)
-  const applyPending = useApplyPendingExpenseIntegrationIntents(orgId)
   const upsertMileage = useUpsertExpenseMileageRate(orgId, companyId)
   const upsertPerDiem = useUpsertExpensePerDiemRate(orgId, companyId)
   const seedStatutoryMileage = useSeedStatutoryExpenseMileageRates(orgId, companyId)
@@ -263,21 +261,6 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
           </Button>
         </div>
       </div>
-
-      <Button
-        type="button"
-        size="sm"
-        variant="secondary"
-        disabled={busy}
-        data-testid="expenses-ops-flush-intents"
-        onClick={() =>
-          void run(async () => {
-            await applyPending.mutateAsync(20)
-          }, t("expenses.ops.flushedIntents"))
-        }
-      >
-        {t("expenses.ops.flushIntents")}
-      </Button>
 
       <FormModal
         open={rateForm !== null}

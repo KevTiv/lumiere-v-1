@@ -13,7 +13,7 @@ use crate::core::permissions::{
     org_permission, role, sod_conflict_rule, user_role_assignment, PermissionAction,
     PermissionEffect, PermissionSubject,
 };
-use crate::core::users::{user_organization, user_profile};
+use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::helpers::{write_audit_log_v2, AuditLogParams};
 
 /// One organizational workflow delegation. `role_id = None` delegates all of
@@ -114,11 +114,7 @@ pub(crate) fn require_workflow_company_access(
     company_id: u64,
     identity: Identity,
 ) -> Result<bool, String> {
-    let profile = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(identity)
+    let profile = find_user_profile_for_organization(ctx, identity, organization_id)
         .ok_or("workflow actor profile not found")?;
     if !profile.is_active {
         return Err("workflow actor account is inactive".to_string());
@@ -422,11 +418,7 @@ pub fn create_workflow_delegation(
     company_id: u64,
     params: CreateWorkflowDelegationParams,
 ) -> Result<(), String> {
-    let sender = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let sender = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
         .ok_or("workflow delegation creator profile not found")?;
     if !sender.is_active {
         return Err("workflow delegation creator is inactive".to_string());
@@ -569,11 +561,7 @@ pub fn revoke_workflow_delegation(
     if delegation.organization_id != organization_id {
         return Err("workflow delegation belongs to another organization".to_string());
     }
-    let sender = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let sender = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
         .ok_or("workflow delegation revoker profile not found")?;
     if ctx.sender() != delegation.delegator_identity
         && ctx.sender() != delegation.delegatee_identity

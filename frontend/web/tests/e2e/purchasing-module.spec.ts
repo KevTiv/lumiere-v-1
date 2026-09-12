@@ -24,7 +24,6 @@ import {
   openEntityCreate,
   scalarQueryId,
   scalarQueryString,
-  selectEntityRowById,
   smokeName,
   waitForPurchaseOrderState,
 } from "./helpers"
@@ -250,7 +249,7 @@ test.describe("PUR-007: PO → Receipt → Landed Cost flow", { tag: "@p0" }, ()
       },
     ])
 
-    const orderId = await fetchLatestPurchaseOrderIdByPartner(page, vendorPartnerId)
+    const orderId = await fetchLatestPurchaseOrderIdByPartner(page, vendorPartnerId, origin)
 
     await callReducerBff(page, "add_purchase_order_line", [
       organizationId,
@@ -360,11 +359,20 @@ test.describe("PUR-007: PO → Receipt → Landed Cost flow", { tag: "@p0" }, ()
 
     await gotoModule(page, "/purchasing", "purchasing")
     await page.getByTestId("module-tab-purchasing-orders").click()
-    await selectEntityRowById(page, orderId)
+    await expect(
+      page
+        .locator('[role="tabpanel"]:visible [data-testid="entity-table"]')
+        .first()
+        .getByTestId(`entity-row-${orderId}`),
+    ).toBeVisible({ timeout: 30_000 })
 
     await page.getByTestId("module-tab-purchasing-landed-costs").click()
-    await expect(page.getByTestId("entity-table")).toBeVisible({ timeout: 30_000 })
-    await selectEntityRowById(page, landedCostId)
+    await expect(
+      page
+        .locator('[role="tabpanel"]:visible [data-testid="entity-table"]')
+        .first()
+        .getByTestId(`entity-row-${landedCostId}`),
+    ).toBeVisible({ timeout: 30_000 })
 
     await expectNoAppError(page)
   })

@@ -1,6 +1,6 @@
 //! Country-pack helpers for document search locale, residency, and fiscal archive kinds.
 
-use spacetimedb::ReducerContext;
+use spacetimedb::{ReducerContext, Table};
 
 use crate::core::country_pack::{company_country_pack, country_pack_definition};
 
@@ -25,12 +25,9 @@ pub(crate) fn company_pack_string(
         .filter(&company_id)
         .filter(|p| p.organization_id == organization_id && p.enabled)
     {
-        let Some(def) = ctx
-            .db
-            .country_pack_definition()
-            .pack_key()
-            .find(&pack.pack_key)
-        else {
+        let Some(def) = ctx.db.country_pack_definition().iter().find(|definition| {
+            definition.organization_id == organization_id && definition.pack_key == pack.pack_key
+        }) else {
             continue;
         };
         if let Some(v) = pack_metadata_json(&def.metadata)
@@ -62,12 +59,9 @@ pub(crate) fn company_pack_string_list(
         .filter(&company_id)
         .filter(|p| p.organization_id == organization_id && p.enabled)
     {
-        let Some(def) = ctx
-            .db
-            .country_pack_definition()
-            .pack_key()
-            .find(&pack.pack_key)
-        else {
+        let Some(def) = ctx.db.country_pack_definition().iter().find(|definition| {
+            definition.organization_id == organization_id && definition.pack_key == pack.pack_key
+        }) else {
             continue;
         };
         let Some(meta) = pack_metadata_json(&def.metadata) else {

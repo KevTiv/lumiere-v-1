@@ -11,7 +11,7 @@ import {
 } from "./helpers"
 
 test.describe("STDB subscription cache", { tag: "@phase-11" }, () => {
-  test("creating a CRM contact updates the list without refetching contacts query", async ({
+  test("creating a CRM contact invalidates exactly one authorized contacts query", async ({
     page,
   }) => {
     const contactName = smokeName("sub-contact")
@@ -31,18 +31,24 @@ test.describe("STDB subscription cache", { tag: "@phase-11" }, () => {
     await expect(page.getByTestId("form-modal-new-contact")).toBeVisible()
     await fillField(page, "name", contactName)
     await fillField(page, "email", `${contactName}@example.test`)
+    contactsQueryAfterCreate = 0
 
-    const mutationRes = await Promise.all([
+    const [mutationRes, refetchRes] = await Promise.all([
       page.waitForResponse(
         (res) => matchesOperationResponse(res, "create_contact") && res.ok(),
         { timeout: 30_000 },
       ),
+      page.waitForResponse(
+        (res) => res.url().includes("/api/query/contacts") && res.ok(),
+        { timeout: 30_000 },
+      ),
       submitForm(page, "new-contact"),
-    ]).then(([res]) => res)
+    ])
 
     expect(mutationRes.ok()).toBe(true)
-    await expect(page.getByText(contactName).first()).toBeVisible({ timeout: 30_000 })
-    expect(contactsQueryAfterCreate).toBe(0)
+    const refetched = (await refetchRes.json()) as { data?: Array<{ name?: unknown }> }
+    expect(refetched.data?.some((row) => row.name === contactName)).toBe(true)
+    expect(contactsQueryAfterCreate).toBe(1)
     await expectNoAppError(page)
   })
 })

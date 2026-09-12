@@ -8,6 +8,7 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 
 import { encodeOptionalU64, stdbParamsToJson } from "@lumiere/stdb/stdb-params-json"
+import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
@@ -26,10 +27,6 @@ import type {
   ProposalTemplate,
   ProposalVersion,
 } from "@lumiere/stdb/types"
-
-function toScalarU64(v: bigint | number | string): bigint {
-  return typeof v === "bigint" ? v : BigInt(String(v))
-}
 
 /** Coerce optional id fields; empty string → null. */
 function optionalScalarU64(

@@ -70,8 +70,9 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
     let profile = ctx
         .db
         .user_profile()
-        .identity()
-        .find(ctx.sender())
+        .user_profile_by_identity()
+        .filter(&ctx.sender())
+        .min_by_key(|profile| profile.id)
         .ok_or("User profile not found after update")?;
 
     if profile.name != "Test User" {
@@ -79,6 +80,24 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
             "Profile name mismatch: expected 'Test User', got '{}'",
             profile.name
         ));
+    }
+    if profile.organization_id != org.id {
+        return Err(format!(
+            "Profile organization mismatch: expected {}, got {}",
+            org.id, profile.organization_id
+        ));
+    }
+    let scoped_profiles: Vec<_> = ctx
+        .db
+        .user_profile()
+        .user_profile_by_organization()
+        .filter(&org.id)
+        .collect();
+    if !scoped_profiles
+        .iter()
+        .any(|candidate| candidate.identity == ctx.sender())
+    {
+        return Err("Organization-leading profile index omitted the caller".to_string());
     }
 
     if profile.first_name != Some("Test".to_string()) {
@@ -137,8 +156,9 @@ pub fn test_user_management(ctx: &ReducerContext) -> Result<(), String> {
     let updated_profile = ctx
         .db
         .user_profile()
-        .identity()
-        .find(ctx.sender())
+        .user_profile_by_identity()
+        .filter(&ctx.sender())
+        .min_by_key(|profile| profile.id)
         .ok_or("Profile not found after partial update")?;
 
     if updated_profile.name != "Updated Test User" {
@@ -321,8 +341,9 @@ pub fn test_user_organization_membership(ctx: &ReducerContext) -> Result<(), Str
     let _profile = ctx
         .db
         .user_profile()
-        .identity()
-        .find(ctx.sender())
+        .user_profile_by_identity()
+        .filter(&ctx.sender())
+        .min_by_key(|profile| profile.id)
         .ok_or("User profile should exist")?;
 
     log::info!("✓ User profile exists");
@@ -566,8 +587,9 @@ pub fn test_user_profile_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
     let profile = ctx
         .db
         .user_profile()
-        .identity()
-        .find(ctx.sender())
+        .user_profile_by_identity()
+        .filter(&ctx.sender())
+        .min_by_key(|profile| profile.id)
         .ok_or("Profile not found")?;
 
     if profile.name != "Valid Name" {
@@ -600,8 +622,9 @@ pub fn test_user_profile_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
     let profile = ctx
         .db
         .user_profile()
-        .identity()
-        .find(ctx.sender())
+        .user_profile_by_identity()
+        .filter(&ctx.sender())
+        .min_by_key(|profile| profile.id)
         .ok_or("Profile not found")?;
 
     if profile.notification_preferences.is_none() {
@@ -634,8 +657,9 @@ pub fn test_user_profile_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
     let profile = ctx
         .db
         .user_profile()
-        .identity()
-        .find(ctx.sender())
+        .user_profile_by_identity()
+        .filter(&ctx.sender())
+        .min_by_key(|profile| profile.id)
         .ok_or("Profile not found")?;
 
     if profile.ui_preferences.is_none() {
@@ -646,7 +670,12 @@ pub fn test_user_profile_edge_cases(ctx: &ReducerContext) -> Result<(), String> 
 
     // Test 4: Profile lookup by identity
     log::info!("TEST: Profile lookup by identity...");
-    let found_profile = ctx.db.user_profile().identity().find(ctx.sender());
+    let found_profile = ctx
+        .db
+        .user_profile()
+        .user_profile_by_identity()
+        .filter(&ctx.sender())
+        .min_by_key(|profile| profile.id);
 
     if found_profile.is_none() {
         return Err("Should find profile by identity".to_string());

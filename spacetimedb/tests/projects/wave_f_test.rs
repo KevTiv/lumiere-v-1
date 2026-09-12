@@ -5,6 +5,7 @@ use spacetimedb::{ReducerContext, Table};
 use crate::accounting::analytic_accounting::{
     account_analytic_account, create_analytic_account, CreateAnalyticAccountParams,
 };
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::projects::milestones::{
     create_project_milestone, project_milestone, CreateProjectMilestoneParams,
 };
@@ -72,7 +73,11 @@ pub fn test_project_analytic_account_fk(ctx: &ReducerContext) -> Result<(), Stri
     let cross_org = create_project(
         ctx,
         fixture.organization_id,
-        project_params(&fixture, "PRJ-003 Cross Org Account", Some(foreign_account_id)),
+        project_params(
+            &fixture,
+            "PRJ-003 Cross Org Account",
+            Some(foreign_account_id),
+        ),
     );
     if cross_org.is_ok() {
         return Err("cross-org analytic_account_id should reject".into());
@@ -88,9 +93,7 @@ pub fn test_project_analytic_account_fk(ctx: &ReducerContext) -> Result<(), Stri
         .db
         .project_project()
         .iter()
-        .find(|p| {
-            p.organization_id == fixture.organization_id && p.name == "PRJ-003 Valid Account"
-        })
+        .find(|p| p.organization_id == fixture.organization_id && p.name == "PRJ-003 Valid Account")
         .ok_or("valid project missing")?;
     if saved.analytic_account_id != Some(valid_account_id) {
         return Err("valid analytic_account_id was not persisted".into());
@@ -98,7 +101,11 @@ pub fn test_project_analytic_account_fk(ctx: &ReducerContext) -> Result<(), Stri
     Ok(())
 }
 
-fn project_params(fixture: &OrgFixture, name: &str, analytic_account_id: Option<u64>) -> CreateProjectParams {
+fn project_params(
+    fixture: &OrgFixture,
+    name: &str,
+    analytic_account_id: Option<u64>,
+) -> CreateProjectParams {
     CreateProjectParams {
         company_id: Some(fixture.company_id),
         name: name.to_string(),
@@ -200,6 +207,40 @@ pub fn test_task_stage_fk_project_scoped(ctx: &ReducerContext) -> Result<(), Str
         .ok_or("task A missing")?;
     if saved_task.stage_id != Some(stage_a) {
         return Err("same-project stage_id was not persisted".into());
+    }
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == fixture.organization_id
+                && commit.operation_id == "erp.create_task"
+                && commit.correlation_id == format!("project-task:{}", saved_task.id)
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 2 {
+        return Err(format!("task commit mismatch: {}", commits.len()));
+    }
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == fixture.organization_id
+                && change.commit_sequence == commits[0].sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables != ["project_project", "project_task"]
+        || changes
+            .iter()
+            .any(|change| change.organization_id != fixture.organization_id)
+    {
+        return Err(format!("task row order/scope mismatch: {tables:?}"));
     }
     Ok(())
 }
@@ -322,8 +363,12 @@ pub fn test_task_milestone_fk_cross_project_and_org_rejected(
 
     // A milestone belonging to a completely different organization must reject too.
     let foreign_project = seed_project(ctx, &other_org, "PRJ-007 Foreign Project")?;
-    let foreign_milestone =
-        seed_milestone(ctx, &other_org, foreign_project, "PRJ-007 Foreign Milestone")?;
+    let foreign_milestone = seed_milestone(
+        ctx,
+        &other_org,
+        foreign_project,
+        "PRJ-007 Foreign Milestone",
+    )?;
     let cross_org = create_task(
         ctx,
         fixture.organization_id,

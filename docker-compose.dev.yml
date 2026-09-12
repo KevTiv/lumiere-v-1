@@ -42,10 +42,17 @@ services:
       POSTGRES_DB: ${PG_DATABASE:-lumiere}
       POSTGRES_USER: ${PG_USER:-lumiere}
       POSTGRES_PASSWORD: ${PG_PASSWORD:-lumiere}
+      PG_PROJECTION_USER: ${PG_PROJECTION_USER:-lumiere_projection}
+      PG_PROJECTION_PASSWORD: ${PG_PROJECTION_PASSWORD:-lumiere_projection}
+      PG_FINALIZATION_USER: ${PG_FINALIZATION_USER:-lumiere_finalization}
+      PG_FINALIZATION_PASSWORD: ${PG_FINALIZATION_PASSWORD:-lumiere_finalization}
+      PG_RECONSTRUCTION_USER: ${PG_RECONSTRUCTION_USER:-lumiere_reconstruction}
+      PG_RECONSTRUCTION_PASSWORD: ${PG_RECONSTRUCTION_PASSWORD:-lumiere_reconstruction}
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./scripts/postgres/init-runtime-roles.sh:/docker-entrypoint-initdb.d/20-runtime-roles.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-lumiere} -d ${PG_DATABASE:-lumiere}"]
       interval: 5s
@@ -104,7 +111,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8090/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+          "fetch('http://127.0.0.1:8090/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
         ]
       interval: 5s
       timeout: 4s
@@ -145,7 +152,7 @@ services:
       qdrant:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/health >/dev/null"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/health/ready >/dev/null"]
       interval: 10s
       timeout: 4s
       retries: 12
@@ -204,7 +211,7 @@ services:
     environment:
       STDB_HOST: http://spacetimedb:3000
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
-      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN in .env.docker}
+      STDB_OWNER_REPORT_WORKER_TOKEN: ${STDB_OWNER_REPORT_WORKER_TOKEN:?set STDB_OWNER_REPORT_WORKER_TOKEN in .env.docker}
       AI_GATEWAY_URL: http://ai-gateway:8080
       LUMIERE_REPORT_RENDERER_URL: http://chromium-worker:8090
       LUMIERE_REPORT_ARTIFACT_DIR: /var/lib/lumiere/owner-reports
@@ -235,7 +242,7 @@ services:
     environment:
       STDB_HOST: http://spacetimedb:3000
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
-      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN in .env.docker}
+      STDB_WORKFLOW_WORKER_TOKEN: ${STDB_WORKFLOW_WORKER_TOKEN:?set STDB_WORKFLOW_WORKER_TOKEN in .env.docker}
       LUMIERE_WORKFLOW_WORKER_POLL_SECS: ${LUMIERE_WORKFLOW_WORKER_POLL_SECS:-5}
       LUMIERE_WORKFLOW_WORKER_NAME: ${LUMIERE_WORKFLOW_WORKER_NAME:-workflow-worker-dev}
       LUMIERE_WORKFLOW_WORKER_PORT: 8093
@@ -257,24 +264,37 @@ services:
       retries: 12
       start_period: 20s
 
-  audit-cold-drainer:
+  projection-worker:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server --bin audit-cold-drainer'
+    command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server --bin projection-worker'
     environment:
       STDB_HOST: http://spacetimedb:3000
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
       STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN in .env.docker}
+      STDB_FINALIZATION_TOKEN: ${STDB_FINALIZATION_TOKEN:?set STDB_FINALIZATION_TOKEN in .env.docker}
       PG_HOST: postgres
       PG_PORT: 5432
       PG_DATABASE: ${PG_DATABASE:-lumiere}
       PG_USER: ${PG_USER:-lumiere}
       PG_PASSWORD: ${PG_PASSWORD:-lumiere}
+      PG_PROJECTION_USER: ${PG_PROJECTION_USER:-lumiere_projection}
+      PG_PROJECTION_PASSWORD: ${PG_PROJECTION_PASSWORD:-lumiere_projection}
+      PG_FINALIZATION_USER: ${PG_FINALIZATION_USER:-lumiere_finalization}
+      PG_FINALIZATION_PASSWORD: ${PG_FINALIZATION_PASSWORD:-lumiere_finalization}
+      PG_RECONSTRUCTION_USER: ${PG_RECONSTRUCTION_USER:-lumiere_reconstruction}
+      PG_RECONSTRUCTION_PASSWORD: ${PG_RECONSTRUCTION_PASSWORD:-lumiere_reconstruction}
       PG_TLS_MODE: disable
-      LUMIERE_AUDIT_DRAINER_POLL_SECS: ${LUMIERE_AUDIT_DRAINER_POLL_SECS:-5}
-      LUMIERE_AUDIT_DRAINER_BATCH: ${LUMIERE_AUDIT_DRAINER_BATCH:-200}
-      LUMIERE_AUDIT_DRAINER_PORT: 8094
+      LUMIERE_PROJECTION_WORKER_POLL_SECS: ${LUMIERE_PROJECTION_WORKER_POLL_SECS:-5}
+      LUMIERE_PROJECTION_WORKER_BATCH: ${LUMIERE_PROJECTION_WORKER_BATCH:-100}
+      LUMIERE_PROJECTION_MAX_COMMITS_PER_ORG: ${LUMIERE_PROJECTION_MAX_COMMITS_PER_ORG:-100}
+      LUMIERE_PROJECTION_MAX_BYTES_PER_ORG: ${LUMIERE_PROJECTION_MAX_BYTES_PER_ORG:-16777216}
+      LUMIERE_PROJECTION_MAX_MILLIS_PER_ORG: ${LUMIERE_PROJECTION_MAX_MILLIS_PER_ORG:-500}
+      LUMIERE_PROJECTION_ORG_CONCURRENCY: ${LUMIERE_PROJECTION_ORG_CONCURRENCY:-8}
+      LUMIERE_FINALIZATION_WORKER_BATCH: ${LUMIERE_FINALIZATION_WORKER_BATCH:-100}
+      LUMIERE_FINALIZATION_WORKER_POLL_SECS: ${LUMIERE_FINALIZATION_WORKER_POLL_SECS:-5}
+      LUMIERE_PROJECTION_WORKER_PORT: 8096
     volumes:
       - .:/workspace
       - cargo-target:/cargo-target
@@ -284,40 +304,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8094/health/ready >/dev/null"]
-      interval: 10s
-      timeout: 4s
-      retries: 12
-      start_period: 20s
-
-  pos-order-cold-drainer:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server --bin pos-order-cold-drainer'
-    environment:
-      STDB_HOST: http://spacetimedb:3000
-      STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
-      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN in .env.docker}
-      PG_HOST: postgres
-      PG_PORT: 5432
-      PG_DATABASE: ${PG_DATABASE:-lumiere}
-      PG_USER: ${PG_USER:-lumiere}
-      PG_PASSWORD: ${PG_PASSWORD:-lumiere}
-      PG_TLS_MODE: disable
-      LUMIERE_POS_ORDER_DRAINER_POLL_SECS: ${LUMIERE_POS_ORDER_DRAINER_POLL_SECS:-5}
-      LUMIERE_POS_ORDER_DRAINER_BATCH: ${LUMIERE_POS_ORDER_DRAINER_BATCH:-200}
-      LUMIERE_POS_ORDER_DRAINER_PORT: 8095
-    volumes:
-      - .:/workspace
-      - cargo-target:/cargo-target
-    depends_on:
-      spacetimedb:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8095/health/ready >/dev/null"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8096/health/ready >/dev/null"]
       interval: 10s
       timeout: 4s
       retries: 12
@@ -378,10 +365,9 @@ services:
       RUST_LOG: ${RUST_LOG:-iot_gateway=debug,tower_http=info}
       STDB_HOST: http://spacetimedb:3000
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
-      STDB_TOKEN: ${STDB_TOKEN:?set STDB_TOKEN in .env.docker}
+      STDB_IOT_GATEWAY_TOKEN: ${STDB_IOT_GATEWAY_TOKEN:?set STDB_IOT_GATEWAY_TOKEN in .env.docker}
       MQTT_HOST: mqtt
       MQTT_PORT: 1883
-      DEFAULT_ORG_ID: ${DEV_MOCK_ORG_ID:-1}
     ports:
       - "8081:8081"
     volumes:

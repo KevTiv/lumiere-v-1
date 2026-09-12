@@ -1,5 +1,5 @@
 //! Core domain test suite — invoke via `run_all_core_tests` reducer.
-pub mod audit_finalize_test;
+pub mod bootstrap_commit_test;
 pub mod operational_messaging_test;
 pub mod permissions_tests;
 pub mod queue_tests;
@@ -13,23 +13,8 @@ pub fn run_all_core_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_core_sod_test(ctx)?;
     run_core_permissions_test(ctx)?;
     run_queue_foundation_tests(ctx)?;
-    run_core_audit_finalize_test(ctx)?;
     log::info!("✅ run_all_core_tests complete");
     Ok(())
-}
-
-#[spacetimedb::reducer]
-pub fn run_core_audit_finalize_test(ctx: &ReducerContext) -> Result<(), String> {
-    audit_finalize_test::test_finalize_deletes_on_checksum_match(ctx)
-        .map_err(|e| format!("finalize_checksum_match: {e}"))?;
-    audit_finalize_test::test_finalize_refuses_on_checksum_mismatch(ctx)
-        .map_err(|e| format!("finalize_checksum_mismatch: {e}"))?;
-    audit_finalize_test::test_finalize_is_idempotent_when_already_gone(ctx)
-        .map_err(|e| format!("finalize_idempotent: {e}"))?;
-    audit_finalize_test::test_finalize_rejects_checksum_from_a_different_row(ctx)
-        .map_err(|e| format!("finalize_cross_row_checksum: {e}"))?;
-    audit_finalize_test::test_finalize_rejects_unregistered_caller(ctx)
-        .map_err(|e| format!("finalize_unregistered_caller: {e}"))
 }
 
 #[spacetimedb::reducer]

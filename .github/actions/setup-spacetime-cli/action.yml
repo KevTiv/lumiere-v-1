@@ -1,0 +1,31 @@
+name: Setup SpacetimeDB CLI
+description: Cache and install the pinned SpacetimeDB CLI, add it to PATH
+
+inputs:
+  version:
+    description: SpacetimeDB CLI version to install
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Cache spacetime CLI
+      id: cache-spacetime
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.local/bin/spacetime
+          ~/.local/share/spacetime/bin
+        key: spacetime-cli-${{ inputs.version }}-${{ runner.os }}
+
+    - name: Install spacetime CLI
+      if: steps.cache-spacetime.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        curl -sSf https://install.spacetimedb.com | sh -s -- -y
+        "$HOME/.local/bin/spacetime" version install "${{ inputs.version }}"
+        "$HOME/.local/bin/spacetime" version use "${{ inputs.version }}"
+
+    - name: Add spacetime CLI to PATH
+      shell: bash
+      run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"

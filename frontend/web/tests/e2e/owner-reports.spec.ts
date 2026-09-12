@@ -93,12 +93,12 @@ test.describe("Owner reports e2e", { tag: "@dev-fixture" }, () => {
       report: {
         accounts: Array<{ name: string }>
         unreconciled: { count: number }
-        receipts: { receiptTotal: { minorUnits: number } }
+        receipts: { minorUnits: number }
       }
     }
     expect(preview.report.accounts.some((account) => account.name.includes("MTN"))).toBe(true)
     expect(preview.report.unreconciled.count).toBeGreaterThanOrEqual(1)
-    expect(preview.report.receipts.receiptTotal.minorUnits).toBeGreaterThan(0)
+    expect(preview.report.receipts.minorUnits).toBeGreaterThan(0)
   })
 
   test("stock movement preview returns completed-movement totals", async ({ page }) => {
@@ -133,12 +133,17 @@ test.describe("Owner reports e2e", { tag: "@dev-fixture" }, () => {
     await gotoModule(page, "/reports", "reports")
     await page.getByTestId("module-tab-reports-owner-reports").click()
 
-    await expect(page.getByText("Daily Business Summary")).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByText("Cash & Mobile Money Report")).toBeVisible()
-    await expect(page.getByText("Unpaid Customer Balances")).toBeVisible()
-    await expect(page.getByText("Stock Movement Report")).toBeVisible()
-
-    const dailyCard = page.locator('[class*="card"]').filter({ hasText: "Daily Business Summary" })
+    const dailyCard = page.getByTestId("owner-report-card-daily_business_summary_v1")
+    await expect(dailyCard).toBeVisible({ timeout: 30_000 })
+    await expect(
+      page.getByText("Cash & Mobile Money Report", { exact: true }),
+    ).toBeVisible()
+    await expect(
+      page.getByText("Unpaid Customer Balances", { exact: true }),
+    ).toBeVisible()
+    await expect(
+      page.getByText("Stock Movement Report", { exact: true }),
+    ).toBeVisible()
     await dailyCard.getByRole("button", { name: /preview/i }).click()
 
     await expect(page.getByText(/watermark|generated/i).first()).toBeVisible({ timeout: 60_000 })

@@ -18,7 +18,7 @@ use crate::accounting::fiscal_periods::{
 use crate::accounting::journal_entries::account_move;
 use crate::accounting::relations::{require_active_account, require_active_journal};
 use crate::core::organization::{company, require_company_in_organization};
-use crate::core::users::user_profile;
+use crate::core::users::find_user_profile_for_identity;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::sales::pricelists::product_pricelist;
 use crate::sales::sales_core::sale_order;
@@ -1087,12 +1087,7 @@ pub fn set_intercompany_rule_active(
 
 #[spacetimedb::reducer]
 pub fn backfill_intercompany_organization_ownership(ctx: &ReducerContext) -> Result<(), String> {
-    let user = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
-        .ok_or("user not found")?;
+    let user = find_user_profile_for_identity(ctx, ctx.sender()).ok_or("user not found")?;
     if !user.is_superuser {
         return Err("only superusers may backfill accounting ownership".to_string());
     }

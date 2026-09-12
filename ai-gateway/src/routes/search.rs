@@ -49,13 +49,10 @@ pub async fn post_search(
         return Err(AppError::BadRequest("query must not be empty".into()));
     }
 
-    let company_is_in_scope = company_belongs_to_organization(
-        state.stdb.as_ref(),
-        req.org_id,
-        req.company_id,
-    )
-    .await
-    .map_err(|error| AppError::Internal(error.to_string()))?;
+    let company_is_in_scope =
+        company_belongs_to_organization(state.stdb.as_ref(), req.org_id, req.company_id)
+            .await
+            .map_err(|error| AppError::Internal(error.to_string()))?;
     if !company_is_in_scope {
         return Err(AppError::Forbidden(
             "company does not belong to organization".into(),

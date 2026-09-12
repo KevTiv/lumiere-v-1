@@ -3,6 +3,7 @@
 //! `conflict_policy` override for Google Drive.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::integrations::google_drive::{
     create_google_drive_connection, google_drive_connection, DriveConflictPolicy, SyncDirection,
 };
@@ -148,7 +149,52 @@ pub fn test_whatsapp_primary_account_integrity(ctx: &ReducerContext) -> Result<(
         return Err("creating a new primary must unset the previous primary".to_string());
     }
 
+    let first_id = first.id;
     let second_id = second.id;
+    let before_commits = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_org()
+        .filter(&fixture.organization_id)
+        .count();
+    set_whatsapp_primary_account(ctx, fixture.organization_id, first_id)?;
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_org()
+        .filter(&fixture.organization_id)
+        .collect();
+    if commits.len() != before_commits + 1 {
+        return Err(format!(
+            "primary switch should create exactly one commit, got {} new commits",
+            commits.len().saturating_sub(before_commits)
+        ));
+    }
+    let commit = commits
+        .iter()
+        .max_by_key(|commit| commit.sequence)
+        .ok_or("primary switch commit missing")?;
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_commit()
+        .filter(&fixture.organization_id)
+        .filter(|change| change.commit_sequence == commit.sequence)
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    if commit.row_change_count != 2
+        || changes.len() != 2
+        || changes[0].ordinal != 0
+        || changes[0].row_identity_json != format!(r#"{{"id":{second_id}}}"#)
+        || changes[1].ordinal != 1
+        || changes[1].row_identity_json != format!(r#"{{"id":{first_id}}}"#)
+        || changes
+            .iter()
+            .any(|change| change.organization_id != fixture.organization_id)
+    {
+        return Err("primary switch commit did not preserve ordered org-scoped rows".to_string());
+    }
+
     delete_whatsapp_business_account(ctx, fixture.organization_id, second_id)?;
     let result = set_whatsapp_primary_account(ctx, fixture.organization_id, second_id);
     match result {
@@ -156,12 +202,12 @@ pub fn test_whatsapp_primary_account_integrity(ctx: &ReducerContext) -> Result<(
         other => return Err(format!("expected deleted-primary rejection, got {other:?}")),
     }
 
-    set_whatsapp_primary_account(ctx, fixture.organization_id, first.id)?;
+    set_whatsapp_primary_account(ctx, fixture.organization_id, first_id)?;
     let restored = ctx
         .db
         .whatsapp_business_account()
         .id()
-        .find(&first.id)
+        .find(&first_id)
         .ok_or("restored primary WhatsApp account missing")?;
     if !restored.is_primary {
         return Err("active WhatsApp account was not promoted to primary".to_string());

@@ -829,7 +829,11 @@ pub fn test_plan_update_and_deactivate(ctx: &ReducerContext) -> Result<(), Strin
     Ok(())
 }
 
-fn base_amend_params(line_id: u64, notes: &str, parent_line_id: Option<u64>) -> AmendSubscriptionParams {
+fn base_amend_params(
+    line_id: u64,
+    notes: &str,
+    parent_line_id: Option<u64>,
+) -> AmendSubscriptionParams {
     AmendSubscriptionParams {
         amendment_type: "price".into(),
         line_id,

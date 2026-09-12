@@ -12,6 +12,7 @@ use crate::accounting::tax_management::{
     account_tax, account_tax_group, create_account_tax, create_account_tax_group,
     CreateAccountTaxGroupParams, CreateAccountTaxParams,
 };
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::expenses::expense_depth::{
     create_expense_project_rebill, hr_expense_allocation, hr_expense_mileage_rate,
     hr_expense_per_diem_rate, set_expense_allocations, upsert_expense_mileage_rate,
@@ -24,6 +25,7 @@ use crate::expenses::expenses::{
     CreateExpenseSheetParams, PostExpenseSheetParams, UpdateExpenseParams,
 };
 use crate::hr::employees::{create_employee, hr_employee, CreateEmployeeParams};
+use crate::projects::project_accounting::project_margin_snapshot;
 use crate::projects::projects::{create_project, project_project, CreateProjectParams};
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{
@@ -541,6 +543,62 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
     }
     if sheet.state != ExpenseSheetState::Posted {
         // still Posted is fine
+    }
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == fixture.organization_id
+                && commit.operation_id == "erp.create_expense_project_rebill"
+                && commit.correlation_id == format!("expense-sheet:{sheet_id}:rebill:{rebill_id}")
+        })
+        .collect();
+    let margin_snapshot = ctx
+        .db
+        .project_margin_snapshot()
+        .margin_by_project()
+        .filter(&project_id)
+        .find(|snapshot| {
+            snapshot.organization_id == fixture.organization_id
+                && snapshot.company_id == fixture.company_id
+        })
+        .ok_or("project margin snapshot after rebill")?;
+    if commits.len() != 1 || commits[0].row_change_count != 5 {
+        return Err(format!("rebill commit mismatch: {}", commits.len()));
+    }
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == fixture.organization_id
+                && change.commit_sequence == commits[0].sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables
+        != [
+            "hr_expense_sheet",
+            "account_move",
+            "account_move_line",
+            "account_move_line",
+            "project_margin_snapshot",
+        ]
+        || changes
+            .iter()
+            .any(|change| change.organization_id != fixture.organization_id)
+        || changes[4].row_identity_json != format!(r#"{{"id":{}}}"#, margin_snapshot.id)
+        || changes
+            .iter()
+            .enumerate()
+            .any(|(ordinal, change)| change.ordinal as usize != ordinal)
+    {
+        return Err(format!("rebill row order/scope mismatch: {tables:?}"));
     }
     Ok(())
 }

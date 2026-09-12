@@ -484,11 +484,7 @@ fn read_limits() -> ExecutionLimits {
     }
 }
 
-fn row_u64(row: &Value, camel: &str, snake: &str) -> Option<u64> {
-    row.get(camel)
-        .or_else(|| row.get(snake))
-        .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
-}
+use crate::wire_decode::{row_u64, snake_to_camel};
 fn row_f64(row: &Value, field: &str) -> Option<f64> {
     row.get(&snake_to_camel(field))
         .or_else(|| row.get(field))
@@ -499,21 +495,6 @@ fn row_string(row: &Value, camel: &str, snake: &str) -> Option<String> {
         .or_else(|| row.get(snake))
         .and_then(Value::as_str)
         .map(str::to_string)
-}
-fn snake_to_camel(value: &str) -> String {
-    let mut out = String::new();
-    let mut uppercase = false;
-    for character in value.chars() {
-        if character == '_' {
-            uppercase = true;
-        } else if uppercase {
-            out.extend(character.to_uppercase());
-            uppercase = false;
-        } else {
-            out.push(character);
-        }
-    }
-    out
 }
 
 #[cfg(test)]

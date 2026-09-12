@@ -2,6 +2,8 @@
 
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::organization::company;
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::purchasing::purchase_orders::{
     create_purchase_order, purchase_order, CreatePurchaseOrderParams,
@@ -49,6 +51,49 @@ fn test_start_replay_mismatch_singleton_and_scope(ctx: &ReducerContext) -> Resul
 
     start_workflow(ctx, fixture.organization_id, params.clone())?;
     let instance = latest_instance(ctx, fixture.organization_id, workflow_id)?;
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_org()
+        .filter(&fixture.organization_id)
+        .collect();
+    let commit = commits
+        .iter()
+        .max_by_key(|commit| commit.sequence)
+        .ok_or("workflow start commit missing")?;
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_commit()
+        .filter(&fixture.organization_id)
+        .filter(|change| change.commit_sequence == commit.sequence)
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let token_id = ctx
+        .db
+        .workflow_token()
+        .workflow_token_by_instance()
+        .filter(&instance.id)
+        .next()
+        .map(|token| token.id)
+        .ok_or("workflow start token missing")?;
+    if commit.operation_id != "erp.start_workflow"
+        || commit.row_change_count != 2
+        || changes.len() != 2
+        || changes[0].table_name != "workflow_instance"
+        || changes[1].table_name != "workflow_token"
+        || changes[0].row_identity_json != format!(r#"{{"id":{}}}"#, instance.id)
+        || changes[1].row_identity_json != format!(r#"{{"id":{token_id}}}"#)
+        || changes[0].ordinal != 0
+        || changes[1].ordinal != 1
+        || changes
+            .iter()
+            .any(|change| change.organization_id != fixture.organization_id)
+    {
+        return Err(
+            "workflow start commit did not preserve parent-before-child org rows".to_string(),
+        );
+    }
     let counts = runtime_counts(ctx, instance.id);
     start_workflow(ctx, fixture.organization_id, params.clone())?;
     if runtime_counts(ctx, instance.id) != counts {
@@ -129,7 +174,14 @@ fn test_signal_replay_stale_and_terminal(ctx: &ReducerContext) -> Result<(), Str
     start_workflow(
         ctx,
         fixture.organization_id,
-        start_params(&fixture, workflow_id, version_id, subject_id, "start-201", None),
+        start_params(
+            &fixture,
+            workflow_id,
+            version_id,
+            subject_id,
+            "start-201",
+            None,
+        ),
     )?;
     let instance = latest_instance(ctx, fixture.organization_id, workflow_id)?;
     let next = signal_params(&fixture, instance.id, subject_id, 1, "next", "signal-next");
@@ -159,7 +211,14 @@ fn test_signal_replay_stale_and_terminal(ctx: &ReducerContext) -> Result<(), Str
         return Err(format!("signal key mismatch was not atomic: {error}"));
     }
 
-    let stale = signal_params(&fixture, instance.id, subject_id, 1, "finish", "signal-stale");
+    let stale = signal_params(
+        &fixture,
+        instance.id,
+        subject_id,
+        1,
+        "finish",
+        "signal-stale",
+    );
     let error = signal_workflow(ctx, fixture.organization_id, stale)
         .err()
         .ok_or("stale signal revision advanced")?;
@@ -169,7 +228,14 @@ fn test_signal_replay_stale_and_terminal(ctx: &ReducerContext) -> Result<(), Str
         return Err(format!("stale signal was not atomic: {error}"));
     }
 
-    let finish = signal_params(&fixture, instance.id, subject_id, 2, "finish", "signal-finish");
+    let finish = signal_params(
+        &fixture,
+        instance.id,
+        subject_id,
+        2,
+        "finish",
+        "signal-finish",
+    );
     signal_workflow(ctx, fixture.organization_id, finish)?;
     let completed = require_instance(ctx, instance.id)?;
     if completed.state != WorkflowInstanceState::Completed
@@ -191,7 +257,14 @@ fn test_signal_replay_stale_and_terminal(ctx: &ReducerContext) -> Result<(), Str
     }
 
     let completed_counts = runtime_counts(ctx, instance.id);
-    let terminal = signal_params(&fixture, instance.id, subject_id, 3, "finish", "signal-terminal");
+    let terminal = signal_params(
+        &fixture,
+        instance.id,
+        subject_id,
+        3,
+        "finish",
+        "signal-terminal",
+    );
     let error = signal_workflow(ctx, fixture.organization_id, terminal)
         .err()
         .ok_or("terminal instance accepted a new signal")?;
@@ -209,7 +282,14 @@ fn test_cancel_replay_and_terminal_behavior(ctx: &ReducerContext) -> Result<(), 
     start_workflow(
         ctx,
         fixture.organization_id,
-        start_params(&fixture, workflow_id, version_id, subject_id, "start-301", None),
+        start_params(
+            &fixture,
+            workflow_id,
+            version_id,
+            subject_id,
+            "start-301",
+            None,
+        ),
     )?;
     let instance = latest_instance(ctx, fixture.organization_id, workflow_id)?;
     let cancel = CancelWorkflowParams {
@@ -312,16 +392,26 @@ fn seed_purchase_order_subject(
         .db
         .contact()
         .iter()
-        .find(|c| c.organization_id == fixture.organization_id && c.display_name == format!("Vendor {tag}"))
+        .find(|c| {
+            c.organization_id == fixture.organization_id
+                && c.display_name == format!("Vendor {tag}")
+        })
         .map(|c| c.id)
         .ok_or_else(|| format!("vendor contact {tag} missing"))?;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&fixture.company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
     create_purchase_order(
         ctx,
         fixture.organization_id,
         CreatePurchaseOrderParams {
             company_id: Some(fixture.company_id),
             partner_id: vendor_id,
-            currency_id: 1,
+            currency_id,
             origin: Some(tag.to_string()),
             partner_ref: None,
             notes: None,

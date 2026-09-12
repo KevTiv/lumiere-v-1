@@ -196,6 +196,9 @@ created
 queued
   ↓
 running
+  ├──→ waiting-input
+  │        ↓
+  │      running
   ├──→ waiting-approval
   │        ↓
   │      running
@@ -212,6 +215,13 @@ running
 
 A renderer may display progress but never owns program state.
 
+`waiting-input` is distinct from approval. Required question dependencies suspend
+their steps; unrelated ready steps can continue, and the run waits only when no
+eligible work remains. Persist question/reply versions and respondent identity;
+stale replies deny and duplicate replies are idempotent. Steering versions the
+objective/decision and invalidates affected checks/approvals. Apply the shared
+[harness interactive execution gates](./ai-harness-completion-plan.md#8-interactive-execution-and-recovery).
+
 ---
 
 ## 7. Checkpoints and resumability
@@ -226,6 +236,9 @@ interface ProgramCheckpoint {
   artifactRefs: readonly ArtifactRef[]
   evidenceRefs: readonly EvidenceRef[]
   approvalRefs: readonly ApprovalRef[]
+  questionRefs: readonly QuestionRequestRef[]
+  decisionRefs: readonly DecisionVersionRef[]
+  continuationManifestRef: ContinuationManifestRef
   datasetWatermarks: readonly DatasetWatermarkRef[]
   createdAt: string
 }
@@ -239,6 +252,16 @@ Resume semantics:
 - externally sourced results may require freshness checks;
 - model steps may be re-run only when the program policy allows it;
 - a resumed run retains one correlation lineage.
+
+The continuation manifest preserves objective/constraint versions, completed
+effect references, remaining budget and repair/non-progress state. Validate it
+after compaction and before resume against authoritative records, with fresh
+access checks; summaries cannot restore permissions or reset budgets. Event
+cursors, request versions and idempotency protect multi-client reconnect/resume.
+Interrupt stops new scheduling and cancels supported in-flight work; reconcile
+uncertain consequential outcomes before allowing further effects. Forked
+alternatives retain parent lineage but require fresh execution approval and
+admitted budgets. Reverting a candidate is not an ERP business reversal.
 
 ---
 
@@ -261,6 +284,11 @@ Rules:
 - consequential steps require the underlying capability's idempotency semantics;
 - approval steps are not retried as mutations;
 - frontend reconnect must recover state rather than replay the last step.
+- structured validator diagnostics bind to candidate/component versions; repairs
+  create a new candidate and revalidate within shared attempt/cost limits;
+- repeated unchanged results/errors trigger bounded replan/question/stop;
+  admitted polling has explicit time/attempt/backoff limits and cannot reset
+  the task budget by changing provider.
 
 ---
 

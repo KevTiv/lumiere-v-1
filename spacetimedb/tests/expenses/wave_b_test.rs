@@ -677,15 +677,19 @@ pub fn test_fx_snapshot_on_submit(ctx: &ReducerContext) -> Result<(), String> {
     let eur_currency_id = ctx
         .db
         .currency()
-        .code()
-        .find(&"EUR".to_string())
+        .iter()
+        .find(|currency| {
+            currency.organization_id == fixture.organization_id && currency.code == "EUR"
+        })
         .ok_or("EUR currency is not seeded")?
         .id;
     let usd_currency_id = ctx
         .db
         .currency()
-        .code()
-        .find(&"USD".to_string())
+        .iter()
+        .find(|currency| {
+            currency.organization_id == fixture.organization_id && currency.code == "USD"
+        })
         .ok_or("USD currency is not seeded")?
         .id;
     let _ = create_currency_rate(

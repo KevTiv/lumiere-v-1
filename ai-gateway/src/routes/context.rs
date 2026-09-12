@@ -3,9 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::{AppError, AppResult},
-    harness::{
-        fetch_authorized_live_snapshots, resolve_snapshot_candidates, ActorCredentials,
-    },
+    harness::{fetch_authorized_live_snapshots, resolve_snapshot_candidates, ActorCredentials},
     rig_agent::ContextHit,
     state::AppState,
 };
@@ -51,15 +49,10 @@ pub async fn post_search(
             AppError::Unavailable("semantic retrieval unavailable".into())
         })?;
     let candidates = resolve_snapshot_candidates(None, &[], &candidate_hits, top_k);
-    let snapshots = fetch_authorized_live_snapshots(
-        &state,
-        &actor,
-        req.org_id,
-        req.company_id,
-        &candidates,
-    )
-    .await
-    .map_err(|_| AppError::Unavailable("authoritative resolver unavailable".into()))?;
+    let snapshots =
+        fetch_authorized_live_snapshots(&state, &actor, req.org_id, req.company_id, &candidates)
+            .await
+            .map_err(|_| AppError::Unavailable("authoritative resolver unavailable".into()))?;
     let authorized = snapshots
         .iter()
         .map(|snapshot| (snapshot.entity_type.as_str(), snapshot.entity_id))
@@ -90,8 +83,7 @@ pub async fn post_search(
 
 pub async fn post_ingest() -> AppResult<StatusCode> {
     Err(AppError::Unavailable(
-        "Activity indexing is deferred until an authorized indexing projection is available"
-            .into(),
+        "Activity indexing is deferred until an authorized indexing projection is available".into(),
     ))
 }
 
@@ -109,6 +101,9 @@ mod tests {
     #[tokio::test]
     async fn activity_and_document_ingestion_are_unavailable() {
         assert!(matches!(post_ingest().await, Err(AppError::Unavailable(_))));
-        assert!(matches!(post_document().await, Err(AppError::Unavailable(_))));
+        assert!(matches!(
+            post_document().await,
+            Err(AppError::Unavailable(_))
+        ));
     }
 }

@@ -1,6 +1,7 @@
 //! Wave A / Wave C purchasing gap-fix domain tests.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::organization::company;
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::inventory::product::{create_product, product, CreateProductParams};
 use crate::inventory::stock::{resolve_warehouse_stock_location, stock_picking, stock_quant};
@@ -508,6 +509,13 @@ pub fn test_receive_po_line_lot_required(ctx: &ReducerContext) -> Result<(), Str
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
     let product_id = create_lot_tracked_product(ctx, &fixture, "LOT-RCV")?;
 
     create_contact(
@@ -576,7 +584,7 @@ pub fn test_receive_po_line_lot_required(ctx: &ReducerContext) -> Result<(), Str
         CreatePurchaseOrderParams {
             company_id: Some(company_id),
             partner_id: vendor_id,
-            currency_id: 1,
+            currency_id,
             origin: Some("Lot receive PO".to_string()),
             partner_ref: Some("LOT-RCV-PO".to_string()),
             notes: None,

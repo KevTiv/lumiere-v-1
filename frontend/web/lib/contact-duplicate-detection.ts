@@ -3,6 +3,8 @@
  * (email; name + phone) for the merge UI.
  */
 
+import { rowId, rowEmail, rowPhone, rowName } from "@lumiere/erp-shared/contact-matching"
+
 export type ContactDuplicatePair = {
   contactIdA: string
   contactIdB: string
@@ -12,30 +14,6 @@ export type ContactDuplicatePair = {
 }
 
 type QueryRow = Record<string, unknown>
-
-function norm(value: unknown): string {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase()
-}
-
-function rowId(row: QueryRow): string {
-  return String(row.id ?? "")
-}
-
-function rowEmail(row: QueryRow): string {
-  return norm(row.email ?? row.emailFrom ?? row.email_from)
-}
-
-function rowPhone(row: QueryRow): string {
-  const phone = norm(row.phone ?? row.phoneNumber ?? row.phone_number)
-  if (phone) return phone
-  return norm(row.mobile)
-}
-
-function rowName(row: QueryRow): string {
-  return norm(row.name ?? row.displayName ?? row.display_name)
-}
 
 function isActiveContact(row: QueryRow): boolean {
   const deleted = row.deletedAt ?? row.deleted_at

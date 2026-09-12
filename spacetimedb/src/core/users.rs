@@ -1,8 +1,9 @@
 /// User Management & Authentication
 ///
 /// Tables:  UserProfile · UserOrganization · UserSession
-/// Pattern: UserProfile is keyed by SpacetimeDB `Identity` (auto-created on
-///          first connect). UserOrganization links a user to an org+role.
+/// Pattern: UserProfile is an organization-owned binding keyed by a generated
+///          row id, linked to an identity and an opaque platform key.
+///          UserOrganization links a user to an org+role.
 ///          UserSession tracks active client connections.
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
@@ -84,10 +85,31 @@ pub struct CreateUserSessionParams {
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
-#[spacetimedb::table(accessor = user_profile, public)]
+#[spacetimedb::table(
+    accessor = user_profile,
+    index(accessor = user_profile_by_organization, btree(columns = [organization_id])),
+    index(accessor = user_profile_by_identity, btree(columns = [identity])),
+    index(
+        accessor = user_profile_by_identity_organization,
+        btree(columns = [identity, organization_id])
+    ),
+    index(
+        accessor = user_profile_by_organization_platform_user,
+        btree(columns = [organization_id, platform_user_id])
+    )
+)]
 pub struct UserProfile {
     #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    /// SpacetimeDB identity represented by this organization binding.
     pub identity: Identity,
+    /// Opaque key into the platform-control profile; never derived from the
+    /// organization or used as a tenant selector.
+    pub platform_user_id: String,
+    /// Organization ownership is assigned from the caller's validated
+    /// membership. It is never accepted from profile update parameters.
+    pub organization_id: u64,
     pub email: String,
     pub email_verified: bool,
     pub name: String,
@@ -115,6 +137,7 @@ pub struct UserProfile {
     index(accessor = user_org_by_user, btree(columns = [user_identity])),
     index(accessor = user_org_by_org,  btree(columns = [organization_id]))
 )]
+#[derive(Clone)]
 pub struct UserOrganization {
     #[primary_key]
     #[auto_inc]
@@ -174,6 +197,108 @@ fn audit_organization_for_identity(ctx: &ReducerContext, identity: Identity) -> 
         .unwrap_or(0)
 }
 
+/// Insert the organization-owned profile for an identity after membership has
+/// been established. Identity-connected users who have not completed tenant
+/// onboarding do not yet have an ERP profile row.
+pub(crate) fn ensure_user_profile_for_organization(
+    ctx: &ReducerContext,
+    identity: Identity,
+    organization_id: u64,
+) {
+    if find_user_profile_for_organization(ctx, identity, organization_id).is_some() {
+        return;
+    }
+    ctx.db.user_profile().insert(UserProfile {
+        id: 0,
+        identity,
+        platform_user_id: String::new(),
+        organization_id,
+        email: String::new(),
+        email_verified: false,
+        name: String::new(),
+        first_name: None,
+        last_name: None,
+        avatar_url: None,
+        phone: None,
+        mobile: None,
+        timezone: "UTC".to_string(),
+        language: "en".to_string(),
+        signature: None,
+        notification_preferences: None,
+        ui_preferences: None,
+        is_active: true,
+        is_superuser: false,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        last_login: Some(ctx.timestamp),
+        metadata: None,
+    });
+}
+
+/// Resolve the profile for an identity in a validated organization.
+///
+/// Membership is the source of truth for organization selection. The default
+/// active membership wins; otherwise the lowest-id active membership is used,
+/// making recovery deterministic even if historical data contains duplicate
+/// default flags. Profiles are then selected by the identity+organization
+/// binding, never by identity alone.
+pub(crate) fn find_user_profile_for_identity(
+    ctx: &ReducerContext,
+    identity: Identity,
+) -> Option<UserProfile> {
+    let organization_id = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&identity)
+        .filter(|membership| membership.is_active && membership.is_default)
+        .min_by_key(|membership| membership.id)
+        .or_else(|| {
+            ctx.db
+                .user_organization()
+                .user_org_by_user()
+                .filter(&identity)
+                .filter(|membership| membership.is_active)
+                .min_by_key(|membership| membership.id)
+        })
+        .map(|membership| membership.organization_id)?;
+
+    find_user_profile_for_organization(ctx, identity, organization_id)
+}
+
+/// Resolve a profile for an identity and organization using the compound
+/// binding index. The lowest row id is selected defensively if legacy data has
+/// duplicate bindings; new writes are guarded by `ensure_user_profile...`.
+pub(crate) fn find_user_profile_for_organization(
+    ctx: &ReducerContext,
+    identity: Identity,
+    organization_id: u64,
+) -> Option<UserProfile> {
+    ctx.db
+        .user_profile()
+        .user_profile_by_identity_organization()
+        .filter((&identity, &organization_id))
+        .min_by_key(|profile| profile.id)
+}
+
+/// Return whether an organization already has a different profile binding for
+/// an opaque platform user id. Empty ids are intentionally allowed while a
+/// profile is being provisioned.
+pub(crate) fn has_duplicate_platform_user_binding(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    platform_user_id: &str,
+    profile_id: u64,
+) -> bool {
+    !platform_user_id.is_empty()
+        && ctx
+            .db
+            .user_profile()
+            .user_profile_by_organization_platform_user()
+            .filter((&organization_id, &platform_user_id.to_string()))
+            .any(|profile| profile.id != profile_id)
+}
+
 /// Update the calling user's own profile fields.
 /// Clients cannot change `is_active` or `is_superuser` through this reducer.
 #[spacetimedb::reducer]
@@ -181,12 +306,19 @@ pub fn update_user_profile(
     ctx: &ReducerContext,
     params: UpdateUserProfileParams,
 ) -> Result<(), String> {
-    let profile = ctx
+    let profile =
+        find_user_profile_for_identity(ctx, ctx.sender()).ok_or("User profile not found")?;
+    if !ctx
         .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
-        .ok_or("User profile not found")?;
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .any(|membership| {
+            membership.organization_id == profile.organization_id && membership.is_active
+        })
+    {
+        return Err("User profile has no active organization membership".to_string());
+    }
 
     let updated_name = params.name.unwrap_or(profile.name.clone());
     let updated_first_name = params.first_name.or(profile.first_name.clone());
@@ -194,7 +326,7 @@ pub fn update_user_profile(
     let updated_timezone = params.timezone.unwrap_or(profile.timezone.clone());
     let updated_language = params.language.unwrap_or(profile.language.clone());
 
-    ctx.db.user_profile().identity().update(UserProfile {
+    ctx.db.user_profile().id().update(UserProfile {
         name: updated_name.clone(),
         first_name: updated_first_name.clone(),
         last_name: updated_last_name.clone(),
@@ -307,6 +439,10 @@ pub fn add_user_to_organization(
         metadata: params.metadata,
     });
 
+    // Materialize the organization-owned profile only after membership has
+    // been validated. The API server binds its opaque platform key separately.
+    ensure_user_profile_for_organization(ctx, user_identity, organization_id);
+
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -392,6 +528,9 @@ pub fn add_org_member(
         is_default: params.is_default,
         metadata: params.metadata,
     });
+
+    // Materialize the profile only after this validated membership exists.
+    ensure_user_profile_for_organization(ctx, user_identity, organization_id);
 
     write_audit_log_v2(
         ctx,
@@ -665,11 +804,7 @@ pub fn create_user_session(
     organization_id: u64,
     params: CreateUserSessionParams,
 ) -> Result<(), String> {
-    let user = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    let user = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
         .ok_or("User not found")?;
 
     if !user.is_active {

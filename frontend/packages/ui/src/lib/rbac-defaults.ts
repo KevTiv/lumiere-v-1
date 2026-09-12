@@ -117,11 +117,11 @@ export function permissionStringsToPolicyRules(
 
 /** SpacetimeDB `org_permission` row (camelCase or snake_case from BFF). */
 export interface BackendOrgPermissionRow {
-  id?: number | string
-  organizationId?: number
-  organization_id?: number
-  roleId?: number | null
-  role_id?: number | null
+  id?: bigint | number | string
+  organizationId?: bigint | number
+  organization_id?: bigint | number
+  roleId?: bigint | number | null
+  role_id?: bigint | number | null
   resource?: string
   subject?: unknown
   action?: unknown
@@ -159,7 +159,7 @@ function orgPermissionActionToUiAction(action: unknown): Action | "*" {
 
 function orgPermissionSubjectToPolicySubject(
   subject: unknown,
-  roleId: number | null | undefined,
+  roleId: bigint | number | null | undefined,
 ): string | null {
   const tag = readOrgPermissionEnumTag(subject)
   if (tag === "Role") {

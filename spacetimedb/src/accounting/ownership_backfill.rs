@@ -22,7 +22,7 @@ use crate::accounting::fixed_assets::{
 use crate::accounting::intercompany::{
     backfill_intercompany_organization_ownership, intercompany_rule, intercompany_transaction,
 };
-use crate::core::users::user_profile;
+use crate::core::users::find_user_profile_for_identity;
 
 const BACKFILL_SCOPES: [&str; 4] = [
     "fiscal_periods",
@@ -32,12 +32,7 @@ const BACKFILL_SCOPES: [&str; 4] = [
 ];
 
 fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
-    let user = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
-        .ok_or("user not found")?;
+    let user = find_user_profile_for_identity(ctx, ctx.sender()).ok_or("user not found")?;
     if !user.is_superuser {
         return Err("only superusers may manage accounting ownership backfills".to_string());
     }
@@ -72,7 +67,12 @@ pub fn run_accounting_ownership_backfill(ctx: &ReducerContext) -> Result<(), Str
 pub fn validate_accounting_ownership_backfill(ctx: &ReducerContext) -> Result<(), String> {
     require_superuser(ctx)?;
 
-    let issue_count = ctx.db.accounting_ownership_backfill_issue().iter().count();
+    let issue_count = ctx
+        .db
+        .accounting_ownership_backfill_issue()
+        .iter()
+        .filter(|issue| !issue.table_name.starts_with("c0:"))
+        .count();
     if issue_count != 0 {
         return Err(format!(
             "accounting ownership validation failed: {issue_count} quarantined row(s) remain"

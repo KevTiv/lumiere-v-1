@@ -197,14 +197,8 @@ pub fn test_submit_expense_rejects_cross_company_attach(
         employee_a,
         "Wave G Sheet A",
     )?;
-    let line_b = create_line_with_receipt_in(
-        ctx,
-        &fixture,
-        company_b,
-        employee_b,
-        "Wave G Line B",
-        55.0,
-    )?;
+    let line_b =
+        create_line_with_receipt_in(ctx, &fixture, company_b, employee_b, "Wave G Line B", 55.0)?;
 
     let cross = submit_expense(ctx, fixture.organization_id, line_b, sheet_a);
     if cross.is_ok() {
@@ -286,7 +280,9 @@ pub fn test_post_expense_sheet_is_idempotent(ctx: &ReducerContext) -> Result<(),
         .id()
         .find(&sheet_id)
         .ok_or("sheet after first post")?;
-    let move_id = after_first.account_move_id.ok_or("move id after first post")?;
+    let move_id = after_first
+        .account_move_id
+        .ok_or("move id after first post")?;
 
     // Same client_request_id — must no-op, not error, and must not touch account_move_id.
     post_expense_sheet(ctx, fixture.organization_id, sheet_id, post_params())?;
@@ -324,7 +320,9 @@ pub fn test_post_expense_sheet_is_idempotent(ctx: &ReducerContext) -> Result<(),
         },
     );
     if mismatched.is_ok() {
-        return Err("posting an already-posted sheet with a different request id should fail".into());
+        return Err(
+            "posting an already-posted sheet with a different request id should fail".into(),
+        );
     }
     Ok(())
 }
@@ -523,9 +521,7 @@ pub fn test_create_expense_analytic_account_fk(ctx: &ReducerContext) -> Result<(
         .db
         .hr_expense()
         .iter()
-        .find(|e| {
-            e.organization_id == fixture.organization_id && e.name == "EXP-014 Valid Account"
-        })
+        .find(|e| e.organization_id == fixture.organization_id && e.name == "EXP-014 Valid Account")
         .ok_or("valid expense missing")?;
     if saved.analytic_account_id != Some(valid_account_id) {
         return Err("valid analytic_account_id was not persisted".into());

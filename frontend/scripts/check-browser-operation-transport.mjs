@@ -24,11 +24,11 @@ const RETIRED_ALIAS_PATTERNS = [
     pattern: "/api/call/:path*",
   },
   {
-    file: path.join(REPOSITORY_ROOT, "api-server/src/http_app.rs"),
+    file: path.join(REPOSITORY_ROOT, "api-server/src/http_app/router.rs"),
     pattern: '.route("/call/:reducer"',
   },
   {
-    file: path.join(REPOSITORY_ROOT, "api-server/src/http_app.rs"),
+    file: path.join(REPOSITORY_ROOT, "api-server/src/routes/queries.rs"),
     pattern: 'rename = "withCompany"',
   },
 ]

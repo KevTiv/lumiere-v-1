@@ -7,18 +7,32 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="${1:-$ROOT/.contracts-staging/ts/generated}"
 MODULE_DIR="${2:-$ROOT/spacetimedb}"
 SPACETIME_BIN="${SPACETIME_BIN:-spacetime}"
+GENERATE_WASM="${STDB_GENERATE_WASM:-}"
 INDEX="$OUT_DIR/index.ts"
 BUILDER='export class DbConnectionBuilder extends __DbConnectionBuilder<DbConnection> {}'
 BUILDER_ANNOTATION="// @ts-expect-error -- generated module size exceeds TypeScript's instantiation depth"
 REDUCERS='export const reducers = __convertToAccessorMap(reducersSchema.reducersType.reducers);'
 REDUCERS_ANNOTATION="// @ts-ignore -- generated module size exceeds TypeScript's instantiation depth in consumers"
 
+if [[ -z "$GENERATE_WASM" ]]; then
+  "$SPACETIME_BIN" build --module-path "$MODULE_DIR"
+  GENERATE_WASM="$MODULE_DIR/target/wasm32-unknown-unknown/release/lumiere_v1.wasm"
+fi
+if [[ ! -s "$GENERATE_WASM" ]]; then
+  echo "SpacetimeDB generation source WASM is missing: $GENERATE_WASM" >&2
+  exit 1
+fi
+
+# Bindings are a complete generated snapshot. Clean the exact output directory
+# first so reducers removed from the module cannot survive as stale APIs and so
+# the generator never pauses for an interactive deletion confirmation.
+rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 "$SPACETIME_BIN" generate \
   --include-private \
   --lang typescript \
   --out-dir "$OUT_DIR" \
-  --module-path "$MODULE_DIR"
+  --bin-path "$GENERATE_WASM"
 
 if ! grep -Fqx "$BUILDER_ANNOTATION" "$INDEX"; then
   matches="$(grep -Fxc "$BUILDER" "$INDEX" || true)"

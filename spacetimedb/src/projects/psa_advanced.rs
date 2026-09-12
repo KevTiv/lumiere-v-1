@@ -22,6 +22,9 @@ use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, AccountMove, AccountMoveLine,
 };
+use crate::core::cold_tier_identity::{
+    require_active_service_identity, PROJECT_INTEGRATION_WORKER_SERVICE,
+};
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::projects::capacity::{resource_allocation, resource_capacity_snapshot};
@@ -32,7 +35,6 @@ use crate::projects::project_accounting::{
 };
 use crate::projects::projects::project_project;
 use crate::projects::tasks::project_task;
-use crate::projects::timesheets::project_timesheet;
 use crate::purchasing::purchase_orders::{purchase_order, purchase_order_line};
 use crate::types::{AccountMoveState, PaymentState};
 
@@ -1716,6 +1718,16 @@ pub fn apply_project_integration_intent(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "project_integration_intent", "write")?;
 
+    apply_project_integration_intent_inner(ctx, organization_id, intent_id)
+}
+
+/// Apply one project integration intent after the caller's authority has been
+/// established by either the interactive reducer or the registered worker.
+fn apply_project_integration_intent_inner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    intent_id: u64,
+) -> Result<(), String> {
     let intent = ctx
         .db
         .project_integration_intent()
@@ -1828,7 +1840,7 @@ pub fn apply_pending_project_integration_intents(
     organization_id: u64,
     limit: u32,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "project_integration_intent", "write")?;
+    require_active_service_identity(ctx, organization_id, PROJECT_INTEGRATION_WORKER_SERVICE)?;
     let cap = if limit == 0 { 20 } else { limit.min(100) };
     let pending: Vec<u64> = ctx
         .db
@@ -1840,7 +1852,7 @@ pub fn apply_pending_project_integration_intents(
         .map(|i| i.id)
         .collect();
     for intent_id in pending {
-        let _ = apply_project_integration_intent(ctx, organization_id, intent_id);
+        let _ = apply_project_integration_intent_inner(ctx, organization_id, intent_id);
     }
     Ok(())
 }

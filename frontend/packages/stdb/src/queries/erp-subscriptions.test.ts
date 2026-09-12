@@ -6,6 +6,7 @@ import {
   createClientSubscriptions,
   subscriptionQueriesForResource,
 } from "./erp-subscriptions"
+import { hasHrPermission } from "../field-policy"
 
 describe("ACC-RI-012: account-payment-term-lines live subscription", () => {
   it("is registered as a resolvable ERP resource key", () => {
@@ -31,6 +32,35 @@ describe("ACC-RI-012: account-payment-term-lines live subscription", () => {
   it("returns null without an organizationId (fails closed, matches sibling resources)", () => {
     const sql = subscriptionQueriesForResource("account-payment-term-lines", {})
     assert.equal(sql, null)
+  })
+})
+
+describe("C8 generated organization subscription compiler", () => {
+  it("compiles reviewed predicates and ordering from structural metadata", () => {
+    const sql = subscriptionQueriesForResource("proposal-templates", {
+      organizationId: 42,
+    })
+    assert.ok(sql)
+    assert.match(sql![0], /FROM proposal_template\b/)
+    assert.match(sql![0], /organization_id\s*=\s*42/)
+    assert.match(sql![0], /is_active\s*=\s*true/)
+    assert.match(sql![0], /ORDER BY name ASC/)
+  })
+
+  it("keeps workflow predicates in the generated policy", () => {
+    const sql = subscriptionQueriesForResource("timesheets-to-validate", {
+      organizationId: 42,
+    })
+    assert.ok(sql)
+    assert.match(sql![0], /FROM project_timesheet\b/)
+    assert.match(sql![0], /validation_status\s*=\s*'draft'/)
+  })
+
+  it("fails closed for unknown resources", () => {
+    assert.equal(
+      subscriptionQueriesForResource("not-a-resource", { organizationId: 42 }),
+      null,
+    )
   })
 })
 
@@ -160,6 +190,20 @@ describe("PUR-RI-017: company-scoped Purchasing subscriptions", () => {
 })
 
 describe("HR subscription SQL dialect", () => {
+  it("recognizes canonical module HR read grants for HTTP authorization", () => {
+    const fieldAccess = {
+      organizationId: 42,
+      roleId: 9,
+      roleName: "manager",
+      isSuperuser: false,
+      rolePermissions: ["module:hr:read"],
+      identityHex: "actor",
+      fieldPermissions: [],
+    }
+    assert.equal(hasHrPermission(fieldAccess, "hr_employee", "read"), true)
+    assert.equal(hasHrPermission(fieldAccess, "hr_employee", "create"), false)
+  })
+
   it("fails closed when employee authorization needs optional-field comparisons", () => {
     const context = {
       organizationId: 42,

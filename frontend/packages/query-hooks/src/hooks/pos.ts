@@ -12,13 +12,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { apiFetch, fetchQueryList, rqBigIntKey } from '../http';
 import { stdbParamsToJson } from '@lumiere/erp-shared/stdb-params-json';
+import { scalarToU64 as toScalarU64, type ScalarId } from '@lumiere/erp-shared/u64';
 import type { CreatePosConfigParams, CreatePosOrderParams, PosConfig, PosSession, PosTerminal } from '@lumiere/stdb/types';
-
-type ScalarId = bigint | number | string;
-
-function toScalarU64(v: ScalarId): bigint {
-  return typeof v === 'bigint' ? v : BigInt(String(v));
-}
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 

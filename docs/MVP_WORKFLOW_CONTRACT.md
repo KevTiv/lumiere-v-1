@@ -39,7 +39,7 @@ Generated from [reducer-coverage-matrix.md](./reducer-coverage-matrix.md) and [f
 ## Known gaps (explicit)
 
 1. ~~**Opportunity lines UI**~~ — **Done (Wave 4):** CRM **Opportunity Lines** tab + `create_opportunity_line` reducer; convert SO copies lines from `opportunity_line`.
-2. **Procure-to-pay** — complete: `mvp-procure-to-pay.spec.ts` (full UI path including receive, post bill, and three-way match guard).
+2. **Procure-to-pay** — complete: `mvp-procure-to-pay.spec.ts` (full UI path including receipt, bill posting, supplier payment, reconciliation, duplicate-command rejection, and the three-way-match guard).
 
 ## Secondary path: procure-to-pay
 
@@ -50,6 +50,8 @@ Generated from [reducer-coverage-matrix.md](./reducer-coverage-matrix.md) and [f
 | Receive goods | `receive_po_line` | `/purchasing` → Lines, receive form | `proven` — `mvp-procure-to-pay.spec.ts` |
 | Vendor bill | `create_bill_from_purchase_order` | `/purchasing` → PO `create-bill` modal | `proven` — `mvp-procure-to-pay.spec.ts` |
 | Post bill | `post_invoice` | `/accounting` → Bills → detail modal → Post | `proven` — `mvp-procure-to-pay.spec.ts` |
+| Pay supplier | `create_payment`, `post_payment`, `register_payment_on_invoice` | `/accounting` → Payments | `proven` — `mvp-procure-to-pay.spec.ts` (outbound supplier payment persists through refresh and settles the bill) |
+| Duplicate bill request | `create_bill_from_purchase_order` | authenticated operation endpoint | `proven` — exact request replay is rejected and the original bill ID remains authoritative |
 | Three-way match | `compute_line_match_state`, `post_invoice` guard | `/purchasing` → Lines (match badge) | `proven` — `mvp-procure-to-pay.spec.ts` (partial receive + over-bill blocked) |
 
 ## Exit criteria (MVP)

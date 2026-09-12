@@ -3,6 +3,7 @@ import test from "node:test"
 
 import {
   accountJournalRowsToSelectOptions,
+  contactRowsToAccountingPartnerSelectOptions,
   paymentJournalRowsToSelectOptions,
 } from "./form-lookup"
 
@@ -36,4 +37,17 @@ test("journal options tolerate omitted projection fields", () => {
     ],
   )
   assert.deepEqual(paymentJournalRowsToSelectOptions([{ id: 1n }]), [])
+})
+
+test("accounting payment partner options include customers and suppliers", () => {
+  assert.deepEqual(
+    contactRowsToAccountingPartnerSelectOptions([
+      { id: 1n, displayName: "Customer", isCustomer: true },
+      { id: 2n, displayName: "Supplier", isVendor: true },
+    ]),
+    [
+      { value: "1", label: "Customer" },
+      { value: "2", label: "Supplier" },
+    ],
+  )
 })

@@ -2,8 +2,9 @@
 
 use std::time::Duration;
 
-use spacetimedb::ReducerContext;
+use spacetimedb::{ReducerContext, Table};
 
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::inventory::product::product;
 use crate::inventory::warehouse::warehouse;
 use crate::manufacturing::bill_of_materials::{
@@ -460,6 +461,41 @@ pub fn test_consume_materials_rejects_cross_org_component(
         .next()
         .ok_or("BOM line missing after create")?;
 
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == fixture_a.organization_id
+                && commit.operation_id == "erp.create_bom"
+                && commit.correlation_id == format!("bom:{}", bom.id)
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].row_change_count != 2 {
+        return Err(format!("BOM commit mismatch: {}", commits.len()));
+    }
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == fixture_a.organization_id
+                && change.commit_sequence == commits[0].sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables != ["mrp_bom", "mrp_bom_line"]
+        || changes
+            .iter()
+            .any(|change| change.organization_id != fixture_a.organization_id)
+    {
+        return Err(format!("BOM row order/scope mismatch: {tables:?}"));
+    }
+
     // Force the stored line to reference fixture_b's (foreign-org) product,
     // bypassing create_bom's own line validation to simulate a stale row.
     ctx.db.mrp_bom_line().id().update(MrpBomLine {
@@ -506,8 +542,7 @@ pub fn test_consume_materials_rejects_cross_org_component(
 
     if consume_mo_materials(ctx, fixture_a.organization_id, fixture_a.company_id, mo.id).is_ok() {
         return Err(
-            "consume_mo_materials accepted a BOM component from a foreign organization"
-                .to_string(),
+            "consume_mo_materials accepted a BOM component from a foreign organization".to_string(),
         );
     }
 

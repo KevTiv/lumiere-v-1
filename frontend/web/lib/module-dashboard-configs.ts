@@ -2121,7 +2121,6 @@ export const iotDashboard: DashboardConfig = {
               },
               { id: "register_hub", label: "Register hub", icon: "plus", color: "green" },
               { id: "register_device", label: "Register device", icon: "package", color: "purple" },
-              { id: "claim_hub_dev", label: "Claim hub (dev)", icon: "settings", color: "orange" },
               { id: "sync_devices_dev", label: "Sync devices (dev)", icon: "template", color: "teal" },
             ],
           },

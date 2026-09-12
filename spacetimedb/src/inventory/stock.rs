@@ -8,6 +8,7 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company_id_from_scope, CompanyScopeParams};
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::core::reference::{convert_uom_quantity, currency};
 use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
@@ -2365,6 +2366,76 @@ pub fn move_stock_quant(
             metadata: None,
         },
     );
+
+    // Capture the exact quant outcomes after the move. The source tombstone
+    // is retained when the move empties it; all upserts use the generated SATS
+    // serializer so the projection cannot drift to a partial row payload.
+    let mut changed_quants: Vec<(u64, RowChange)> = Vec::new();
+    if let Some(source_after) = ctx.db.stock_quant().id().find(&quant_id) {
+        changed_quants.push((
+            source_after.id,
+            RowChange::upsert_stdb_row(
+                "stock_quant",
+                serde_json::json!({"id": source_after.id}),
+                &source_after,
+            )?,
+        ));
+    } else {
+        changed_quants.push((
+            quant_id,
+            RowChange::delete("stock_quant", serde_json::json!({"id": quant_id})),
+        ));
+    }
+    if let Some(destination_id) = dest_id {
+        if let Some(destination_after) = ctx.db.stock_quant().id().find(&destination_id) {
+            changed_quants.push((
+                destination_after.id,
+                RowChange::upsert_stdb_row(
+                    "stock_quant",
+                    serde_json::json!({"id": destination_after.id}),
+                    &destination_after,
+                )?,
+            ));
+        }
+    } else if !is_emptying_src {
+        let destination_after = ctx
+            .db
+            .stock_quant()
+            .iter()
+            .filter(|quant| {
+                quant.organization_id == organization_id
+                    && quant.company_id == company_id
+                    && quant.product_id == src.product_id
+                    && quant.location_id == params.dest_location_id
+                    && quant.product_variant_id == src.product_variant_id
+                    && quant.lot_id == src.lot_id
+                    && quant.package_id == src.package_id
+                    && quant.owner_id == src.owner_id
+            })
+            .max_by_key(|quant| quant.id)
+            .ok_or("Destination quant disappeared before commit recording")?;
+        changed_quants.push((
+            destination_after.id,
+            RowChange::upsert_stdb_row(
+                "stock_quant",
+                serde_json::json!({"id": destination_after.id}),
+                &destination_after,
+            )?,
+        ));
+    }
+    changed_quants.sort_by_key(|(id, _)| *id);
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.move_stock_quant".to_string(),
+            correlation_id: format!("stock-quant:{quant_id}:move-to:{}", params.dest_location_id),
+            changes: changed_quants
+                .into_iter()
+                .map(|(_, change)| change)
+                .collect(),
+        },
+    )?;
 
     Ok(())
 }

@@ -102,6 +102,13 @@ pub fn test_message_template_and_single_message(ctx: &ReducerContext) -> Result<
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("Harness company not found")?
+        .currency_id;
 
     let contact_id = seed_contact_with_phone(ctx, &fixture, "Messaging Customer")?;
 
@@ -124,7 +131,7 @@ pub fn test_message_template_and_single_message(ctx: &ReducerContext) -> Result<
         CreateCompanyParams {
             name: "Messaging Company B".to_string(),
             code: format!("MSG-B-{company_id}"),
-            currency_id: 1,
+            currency_id,
             fiscal_year_end_month: 12,
             fiscal_year_end_day: 31,
             is_parent: false,

@@ -72,25 +72,11 @@ pub struct InsightsGenerateResponse {
 }
 
 fn row_field<'a>(row: &'a Value, snake_key: &str) -> Option<&'a Value> {
-    let camel = snake_to_camel_key(snake_key);
+    let camel = snake_to_camel(snake_key);
     row.get(snake_key).or_else(|| row.get(&camel))
 }
 
-fn snake_to_camel_key(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut upper = false;
-    for c in s.chars() {
-        if c == '_' {
-            upper = true;
-        } else if upper {
-            out.push(c.to_ascii_uppercase());
-            upper = false;
-        } else {
-            out.push(c);
-        }
-    }
-    out
-}
+use crate::wire_decode::snake_to_camel;
 
 fn value_to_u64(value: &Value) -> Option<u64> {
     value

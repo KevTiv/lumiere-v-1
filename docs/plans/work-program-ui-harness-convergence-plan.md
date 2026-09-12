@@ -8,6 +8,12 @@
 
 ## 1. Objective
 
+Before runtime UI composition is activated, use the
+[module-by-module maintainability plan](../plan/module-by-module-maintainability-plan.md)
+to establish typed feature ownership and prove human composition over existing
+UI pieces. Its cleanup acceptance is separate from this plan's runtime
+validation, authorization, versioning, and activation gates.
+
 Converge Lumiere's planned renderer-neutral frontend architecture and AI harness around one reusable unit of user work:
 
 ```text
@@ -268,6 +274,24 @@ ProgramRunTrace       → progress/trace panel
 ```
 
 Platform renderers remain free to choose the UX.
+
+All answer/report and component renderers must support the shared
+[harness source/decision inspector and gates](./ai-harness-completion-plan.md#milestones-and-acceptance-criteria).
+From a material claim or workflow/formula/code component, an authorized reviewer
+must reach its exact versioned passage, original author, discussion contributor,
+interpretation/adaptation, validation and review history. Display unresolved,
+superseded and unavailable-source states; reauthorize excerpt reads and exports.
+Candidate prose is not a validated final answer until M2; trace events alone do
+not satisfy M3, and publication/reuse requires applicable M4/M5 checks.
+
+M3 also requires typed question/answer, interrupt/resume and compare/fork controls
+from the [interactive execution contract](./ai-harness-completion-plan.md#8-interactive-execution-and-recovery).
+Recover pending inputs and progress from durable events on reconnect; distinguish
+waiting for input, approval and in-flight effect reconciliation. Show candidate
+diagnostics/repair history and source/decision/component differences between
+alternatives. Selecting a mode, replying to a question or choosing a candidate
+cannot grant execution approval. Specialist/extension controls appear only after
+their separate M8/M9 admission.
 
 ---
 

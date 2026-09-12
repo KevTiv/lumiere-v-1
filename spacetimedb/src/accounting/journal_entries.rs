@@ -15,6 +15,7 @@ use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::relations::{require_active_tax, require_explicit_company_id};
 use crate::accounting::tax_management::account_tax;
 use crate::core::organization::{company, require_company_in_organization};
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contacts::contact;
 use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
@@ -2082,6 +2083,68 @@ pub fn create_invoice_from_sale_order(
             metadata: None,
         },
     );
+
+    let committed_order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&sale_order_id)
+        .ok_or("Sale order disappeared before commit recording")?;
+    let committed_move = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&move_record.id)
+        .ok_or("Invoice disappeared before commit recording")?;
+    let mut committed_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_record.id)
+        .collect();
+    committed_lines.sort_by_key(|line| line.id);
+    let mut committed_sale_lines: Vec<_> = ctx
+        .db
+        .sale_order_line()
+        .order_line_by_order()
+        .filter(&sale_order_id)
+        .collect();
+    committed_sale_lines.sort_by_key(|line| line.id);
+    let mut changes = vec![
+        RowChange::upsert_stdb_row(
+            "sale_order",
+            serde_json::json!({"id": committed_order.id}),
+            &committed_order,
+        )?,
+        RowChange::upsert_stdb_row(
+            "account_move",
+            serde_json::json!({"id": committed_move.id}),
+            &committed_move,
+        )?,
+    ];
+    for line in &committed_lines {
+        changes.push(RowChange::upsert_stdb_row(
+            "account_move_line",
+            serde_json::json!({"id": line.id}),
+            line,
+        )?);
+    }
+    for line in &committed_sale_lines {
+        changes.push(RowChange::upsert_stdb_row(
+            "sale_order_line",
+            serde_json::json!({"id": line.id}),
+            line,
+        )?);
+    }
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.create_invoice_from_sale_order".to_string(),
+            correlation_id: format!("sale-order:{sale_order_id}:invoice:{}", move_record.id),
+            changes,
+        },
+    )?;
 
     log::info!(
         "Created invoice {} for sale order {}",

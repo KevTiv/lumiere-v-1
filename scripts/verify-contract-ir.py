@@ -113,12 +113,20 @@ def main() -> None:
         operation_names.add(name)
         kind = operation.get("kind")
         source_kind = operation.get("source_kind", kind)
-        if (
+        legacy_classification = (
+            isinstance(kind, dict)
+            and kind.get("status") == "unclassified"
+            and kind.get("value") is None
+        )
+        if legacy_classification:
+            if not args.allow_legacy_v2:
+                fail(f"operation {name} must declare a classified semantic kind")
+        elif (
             not isinstance(kind, dict)
-            or kind.get("status") != "unclassified"
-            or kind.get("value") is not None
+            or kind.get("status") != "classified"
+            or kind.get("value") not in {"command", "operator", "test", "internal"}
         ):
-            fail(f"operation {name} must declare semantic kind as unclassified")
+            fail(f"operation {name} has invalid semantic kind classification")
         application = operation.get("application")
         if source_kind == "reducer" and (not isinstance(application, dict) or application.get("name") != name):
             fail(f"reducer operation {name} application contract does not match")
@@ -183,16 +191,56 @@ def main() -> None:
             ):
                 fail(f"operation {name} must declare unresolved output")
             codec = operation.get("codec")
-            if (
-                not isinstance(codec, dict)
-                or codec.get("status") != "unassigned"
-                or codec.get("id") is not None
-                or codec.get("version") is not None
-            ):
-                fail(f"operation {name} must declare codec as unassigned")
+            legacy_codec = (
+                isinstance(codec, dict)
+                and codec.get("status") == "unassigned"
+                and codec.get("id") is None
+                and codec.get("version") is None
+            )
+            if legacy_codec:
+                if not args.allow_legacy_v2:
+                    fail(f"operation {name} must declare an assigned codec")
+            elif codec != {
+                "id": "spacetimedb-sats-json",
+                "status": "assigned",
+                "version": 1,
+            }:
+                fail(f"operation {name} has invalid codec assignment")
             idempotency = operation.get("idempotency")
-            if not isinstance(idempotency, dict) or idempotency.get("status") != "unclassified":
-                fail(f"operation {name} must declare idempotency status")
+            legacy_idempotency = (
+                isinstance(idempotency, dict)
+                and idempotency.get("status") == "unclassified"
+                and idempotency.get("value") is None
+            )
+            if legacy_idempotency:
+                if not args.allow_legacy_v2:
+                    fail(f"operation {name} must declare classified idempotency")
+            elif (
+                not isinstance(idempotency, dict)
+                or idempotency.get("status") != "classified"
+                or idempotency.get("value") not in {
+                    "idempotent",
+                    "request_guarded",
+                    "state_guarded",
+                    "non_idempotent",
+                    "not_applicable",
+                }
+            ):
+                fail(f"operation {name} has invalid idempotency classification")
+            if not legacy_classification:
+                expected_client_facing = (
+                    isinstance(application, dict)
+                    and application.get("exposure") == "session"
+                )
+                if operation.get("client_facing") is not expected_client_facing:
+                    fail(f"operation {name} client_facing conflicts with exposure")
+                authorization = operation.get("authorization")
+                expected_scope = application.get("scope") if isinstance(application, dict) else None
+                if authorization != {"scope": expected_scope, "status": "classified"}:
+                    fail(f"operation {name} has invalid authorization classification")
+                evidence = operation.get("classification_evidence")
+                if not isinstance(evidence, str) or not evidence.strip():
+                    fail(f"operation {name} has no classification evidence")
         invalidates = operation.get("invalidates")
         if not isinstance(invalidates, list) or any(
             resource not in resource_names for resource in invalidates
@@ -221,31 +269,43 @@ def main() -> None:
         ):
             fail(f"resource {name} has invalid invalidated_by references")
         scope = resource.get("scope")
-        unclassified_scope = {
-            "company_field": None,
-            "kind": "unclassified",
-            "organization_field": None,
+        allowed_scope_kinds = {
+            "global",
+            "identity",
+            "organization",
+            "organization_company",
+            "organization_identity",
+            "organization_optional_company",
+            "organization_via_company",
+            "organization_via_parent",
         }
-        optional_company_scope = (
-            isinstance(scope, dict)
-            and set(scope) == {"company_field", "kind", "organization_field"}
-            and scope.get("kind") == "organization_optional_company"
-            and isinstance(scope.get("organization_field"), str)
-            and bool(scope["organization_field"])
-            and isinstance(scope.get("company_field"), str)
-            and bool(scope["company_field"])
-        )
-        if scope != unclassified_scope and not optional_company_scope:
+        if (
+            not isinstance(scope, dict)
+            or scope.get("kind") not in allowed_scope_kinds
+            or scope.get("kind") == "unclassified"
+        ):
             fail(f"resource {name} has invalid scope classification")
         query = resource.get("query")
         if (
             not isinstance(query, dict)
-            or query.get("status") != "unclassified"
+            or query.get("status") != "classified"
+            or query.get("authorization") != "server-enforced"
+            or query.get("result_type_reference") != row_ref
             or query.get("input_type_reference") is not None
             or query.get("filter_type_reference") is not None
             or query.get("cursor_type_reference") is not None
         ):
             fail(f"resource {name} must declare query classification status")
+        subscription = resource.get("subscription")
+        if (
+            not isinstance(subscription, dict)
+            or subscription.get("status") not in {"classified", "not-client-facing"}
+            or not isinstance(subscription.get("realtime"), bool)
+            or subscription.get("delivery_mode") not in {"invalidation-only", "bff-only"}
+            or subscription.get("delivery_mode") == "bff-only"
+            and subscription.get("realtime")
+        ):
+            fail(f"resource {name} has invalid subscription classification")
 
     persistence = ir.get("persistence")
     if persistence is not None:
@@ -263,28 +323,69 @@ def main() -> None:
         }
         if authority != expected_authority:
             fail("persistence authority must keep SpacetimeDB as business authority")
+        commit_stream = persistence.get("commit_stream")
+        expected_commit_stream = {
+            "contract_version": "ir-v2",
+            "envelope_table": "organization_commit",
+            "row_change_table": "organization_row_change",
+            "sequence_scope": "organization_id",
+            "sequence_order": "strictly_monotonic",
+            "transaction_boundary": "spacetimedb_reducer",
+            "row_order": "reducer_declared_dependency_safe",
+            "upsert_payload": "canonical_full_row_json",
+            "delete_payload": "durable_identity_tombstone",
+            "checksum": {
+                "algorithm": "sha256",
+                "row_preimage": "table_newline_identity_newline_kind_newline_row",
+                "commit_preimage": "length_prefixed_envelope_fields_then_row_checksums",
+            },
+            "audit_relation": "separate_schema_not_reconstruction_source",
+        }
+        if commit_stream != expected_commit_stream:
+            fail("persistence commit_stream has invalid required semantics")
         storage = persistence.get("storage")
         policies = storage.get("policies") if isinstance(storage, dict) else None
         coverage = storage.get("coverage") if isinstance(storage, dict) else None
         if not isinstance(policies, list) or not isinstance(coverage, dict):
             fail("persistence.storage must contain policies and coverage")
-        if coverage.get("classified") != 458 or coverage.get("total") != 458 or coverage.get("unclassified") != 0:
-            fail("persistence storage coverage must be 458/458 with zero unclassified")
         policy_tables = {policy.get("table") for policy in policies if isinstance(policy, dict)}
-        if policy_tables != table_names or len(policies) != len(table_names):
-            fail("persistence storage policies must exactly cover IR tables")
+        if (
+            coverage.get("classified") != len(policy_tables)
+            or coverage.get("total") != len(policy_tables)
+            or coverage.get("unclassified") != 0
+            or len(policies) != len(policy_tables)
+        ):
+            fail("persistence storage coverage must exactly cover its table census")
+        if not table_names <= policy_tables:
+            fail("persistence storage policies must cover every IR table")
         postgresql = persistence.get("postgresql")
         archive = postgresql.get("archive") if isinstance(postgresql, dict) else None
         codec = postgresql.get("codec") if isinstance(postgresql, dict) else None
+        projection = postgresql.get("projection") if isinstance(postgresql, dict) else None
         candidates = archive.get("candidates") if isinstance(archive, dict) else None
         codec_tables = codec.get("tables") if isinstance(codec, dict) else None
-        if not isinstance(candidates, list) or not isinstance(codec_tables, dict):
-            fail("persistence.postgresql must contain archive candidates and codecs")
+        projection_tables = (
+            projection.get("tables") if isinstance(projection, dict) else None
+        )
+        if (
+            not isinstance(candidates, list)
+            or not isinstance(codec_tables, dict)
+            or not isinstance(projection_tables, dict)
+        ):
+            fail("persistence.postgresql must contain archive, codec, and projection manifests")
+        if (
+            not isinstance(projection, dict)
+            or projection.get("version") != 1
+            or projection.get("checksum_algo") != "sha256"
+            or projection.get("canonical_serialization")
+            != "json_sorted_keys_no_whitespace"
+        ):
+            fail("PostgreSQL projection manifest has invalid artifact metadata")
         archive_tables = {candidate.get("table") for candidate in candidates if isinstance(candidate, dict)}
         if archive_tables != set(codec_tables):
             fail("PostgreSQL archive candidates and codec tables must match")
-        if not archive_tables <= table_names:
-            fail("PostgreSQL projection references an unknown IR table")
+        if not archive_tables <= policy_tables:
+            fail("PostgreSQL archive references a table outside the storage-policy census")
         policy_by_table = {policy["table"]: policy for policy in policies}
         candidate_by_table = {candidate["table"]: candidate for candidate in candidates}
         for table in archive_tables:
@@ -300,11 +401,18 @@ def main() -> None:
             if not isinstance(columns, list) or not columns:
                 fail(f"PostgreSQL projection table {table} has no codec columns")
             column_names = [column.get("name") for column in columns if isinstance(column, dict)]
-            if len(column_names) != len(columns) or len(column_names) != len(set(column_names)):
+            if (
+                len(column_names) != len(columns)
+                or any(not isinstance(name, str) or not name for name in column_names)
+                or len(column_names) != len(set(column_names))
+            ):
                 fail(f"PostgreSQL projection table {table} has invalid codec column names")
             for column in columns:
                 if (
-                    not isinstance(column.get("stdb_type"), str)
+                    not isinstance(column, dict)
+                    or not isinstance(column.get("name"), str)
+                    or not column["name"]
+                    or not isinstance(column.get("stdb_type"), str)
                     or not isinstance(column.get("pg_type"), str)
                     or not isinstance(column.get("nullable"), bool)
                     or not isinstance(column.get("pg_bind"), str)
@@ -312,6 +420,113 @@ def main() -> None:
                     or not isinstance(column.get("api_json"), str)
                 ):
                     fail(f"PostgreSQL projection table {table} has incomplete codec semantics")
+
+        if set(projection_tables) != policy_tables or len(projection_tables) != len(policy_tables):
+            fail("PostgreSQL projection manifest must exactly cover storage-policy tables")
+        if list(projection_tables) != sorted(projection_tables):
+            fail("PostgreSQL projection manifest tables must be sorted by name")
+        for table, projection_table in projection_tables.items():
+            if not isinstance(projection_table, dict):
+                fail(f"PostgreSQL projection table {table} must be an object")
+            unknown_fields = set(projection_table) - {
+                "projection_table",
+                "module",
+                "projection_mode",
+                "postgres_access_path",
+                "primary_key",
+                "organization_column",
+                "columns",
+                "archive_table",
+            }
+            if unknown_fields:
+                fail(
+                    f"PostgreSQL projection table {table} has unknown fields: "
+                    f"{', '.join(sorted(unknown_fields))}"
+                )
+            if projection_table.get("projection_table") != table:
+                fail(f"PostgreSQL projection table {table} has mismatched projection-table metadata")
+            if projection_table.get("module") != policy_by_table[table].get("module"):
+                fail(f"PostgreSQL projection table {table} module disagrees with storage policy")
+            if projection_table.get("projection_mode") != policy_by_table[table].get("projection_mode"):
+                fail(f"PostgreSQL projection table {table} mode disagrees with storage policy")
+            requested_access_path = policy_by_table[table].get("postgres_access_path")
+            expected_access_path = (
+                "organization_index"
+                if table in {"organization_commit", "organization_row_change"}
+                else requested_access_path
+            )
+            if expected_access_path not in {
+                "organization_index",
+                "organization_partition",
+                "snapshot_key",
+                "platform_shared",
+                "external",
+            }:
+                fail(f"PostgreSQL projection table {table} has invalid storage-policy access path")
+            if projection_table.get("postgres_access_path") != expected_access_path:
+                fail(f"PostgreSQL projection table {table} access path disagrees with storage policy")
+            organization_column = projection_table.get("organization_column")
+            if organization_column not in (None, "organization_id"):
+                fail(f"PostgreSQL projection table {table} has invalid organization-column metadata")
+            expected_organization_column = policy_by_table[table].get("organization_column")
+            if organization_column != expected_organization_column:
+                fail(f"PostgreSQL projection table {table} organization scope disagrees with storage policy")
+            primary_key = projection_table.get("primary_key")
+            if (
+                not isinstance(primary_key, dict)
+                or not isinstance(primary_key.get("name"), str)
+                or not primary_key["name"]
+                or not isinstance(primary_key.get("type"), str)
+                or not primary_key["type"]
+            ):
+                fail(f"PostgreSQL projection table {table} has invalid primary-key metadata")
+            policy_primary_key = policy_by_table[table].get("primary_key")
+            expected_primary_key = (
+                policy_primary_key.get("column")
+                if isinstance(policy_primary_key, dict)
+                else None
+            )
+            if primary_key["name"] != expected_primary_key:
+                fail(f"PostgreSQL projection table {table} primary key disagrees with storage policy")
+            columns = projection_table.get("columns")
+            if not isinstance(columns, list) or not columns:
+                fail(f"PostgreSQL projection table {table} has no codec columns")
+            column_names = [column.get("name") for column in columns if isinstance(column, dict)]
+            if (
+                len(column_names) != len(columns)
+                or any(not isinstance(name, str) or not name for name in column_names)
+                or len(column_names) != len(set(column_names))
+            ):
+                fail(f"PostgreSQL projection table {table} has invalid codec column names")
+            if primary_key["name"] not in column_names:
+                fail(f"PostgreSQL projection table {table} lacks its primary-key column")
+            if organization_column == "organization_id" and "organization_id" not in column_names:
+                fail(f"PostgreSQL projection table {table} lacks its organization column")
+            for column in columns:
+                if (
+                    not isinstance(column, dict)
+                    or not isinstance(column.get("name"), str)
+                    or not column["name"]
+                    or not isinstance(column.get("stdb_type"), str)
+                    or not isinstance(column.get("pg_type"), str)
+                    or not isinstance(column.get("nullable"), bool)
+                    or not isinstance(column.get("pg_bind"), str)
+                    or not isinstance(column.get("pg_from"), str)
+                    or not isinstance(column.get("api_json"), str)
+                ):
+                    fail(f"PostgreSQL projection table {table} has incomplete codec semantics")
+            archive_table = projection_table.get("archive_table")
+            if archive_table is not None:
+                candidate = candidate_by_table.get(table)
+                if (
+                    not isinstance(archive_table, str)
+                    or not archive_table
+                    or candidate is None
+                    or archive_table != candidate.get("cold_table")
+                ):
+                    fail(f"PostgreSQL projection table {table} has invalid archive-table metadata")
+            if table in codec_tables and projection_table["columns"] != codec_tables[table].get("columns"):
+                fail(f"PostgreSQL projection table {table} columns disagree with archive codec")
 
     semantic = {
         field: ir[field]

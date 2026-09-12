@@ -61,12 +61,15 @@ import {
   useUpdateOwnerReportSchedule,
 } from "@lumiere/query-hooks/hooks/owner-reports"
 import { downloadPivotTableXlsx } from "@lumiere/query-hooks/hooks/templates"
-import { companyRowsToSelectOptions } from "@/lib/form-lookup"
+import {
+  companyRowsToSelectOptions,
+  type CompanyLookupRow,
+} from "@/lib/form-lookup"
 import { useToast } from "@/hooks/use-toast"
 
 interface OwnerReportsPanelProps {
   organizationId: bigint
-  companies: Record<string, unknown>[]
+  companies: readonly CompanyLookupRow[]
   defaultCompanyId?: number
 }
 
@@ -398,7 +401,7 @@ function ReportCard({ entry, isPending, onPreview }: ReportCardProps) {
   const previewable = isReportPreviewAvailable(entry)
 
   return (
-    <Card>
+    <Card data-testid={`owner-report-card-${entry.key}`}>
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-base">{entry.title}</CardTitle>

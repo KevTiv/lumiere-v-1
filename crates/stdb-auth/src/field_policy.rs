@@ -214,6 +214,32 @@ fn field_resource_matches(configured: &str, resource_key: &str) -> bool {
         .any(|a| a == configured || a.replace('-', "_") == configured_norm)
 }
 
+/// Return the module that owns a registered table, when module-level RBAC is
+/// defined for that table family. Keeping this derived from the canonical
+/// registry prevents HTTP and realtime authorization from disagreeing on
+/// aliases such as `employees`/`hr_employee` and `iot-hubs`/`iot_hub`.
+fn resource_module(resource_key: &str) -> Option<&'static str> {
+    let table = registry_get(resource_key)
+        .map(|entry| entry.table.as_str())
+        .unwrap_or(resource_key);
+    if table.starts_with("hr_") {
+        Some("hr")
+    } else if table.starts_with("iot_") {
+        Some("iot")
+    } else {
+        None
+    }
+}
+
+fn has_module_permission(access: &FieldAccessContext, module: &str, action: &str) -> bool {
+    let exact = format!("module:{module}:{action}");
+    let wildcard = format!("module:{module}:*");
+    access
+        .role_permissions
+        .iter()
+        .any(|permission| permission == &exact || permission == &wildcard)
+}
+
 fn field_permission_applies(rule: &FieldPermissionLike, ctx: &FieldAccessContext) -> bool {
     if let Some(role_id) = rule.subject_role_id {
         if role_id == ctx.role_id {
@@ -247,6 +273,11 @@ pub fn has_resource_read_permission(
     let Some(resource) = registry_get(resource_key) else {
         return false;
     };
+    if resource_module(resource_key)
+        .is_some_and(|module| has_module_permission(access, module, "read"))
+    {
+        return true;
+    }
 
     access.role_permissions.iter().any(|permission| {
         let Some((configured_resource, action)) = permission.rsplit_once(':') else {
@@ -336,6 +367,14 @@ pub fn has_hr_permission(
         return false;
     };
     if fa.is_superuser {
+        return true;
+    }
+    if action == "read"
+        && resource_module(resource).is_some_and(|module| has_module_permission(fa, module, "read"))
+    {
+        return true;
+    }
+    if resource_module(resource).is_some_and(|module| has_module_permission(fa, module, "*")) {
         return true;
     }
     let perm = format!("{resource}:{action}");
@@ -576,6 +615,19 @@ pub fn select_user_profile_by_identity_sql(
     ))
 }
 
+pub fn select_user_profile_for_organization_sql(
+    identity_hex: &str,
+    organization_id: u64,
+    field_access: Option<&FieldAccessContext>,
+) -> Result<String, String> {
+    let cols = resolve_http_sql_columns("user-profile", field_access)?;
+    let col_part = cols.join(", ");
+    let id = identity_sql_literal(identity_hex)?;
+    Ok(format!(
+        "SELECT {col_part} FROM user_profile WHERE identity = {id} AND organization_id = {organization_id} LIMIT 1"
+    ))
+}
+
 pub fn select_user_role_assignments_for_identity_sql(
     identity_hex: &str,
     field_access: Option<&FieldAccessContext>,
@@ -663,6 +715,17 @@ mod tests {
     }
 
     #[test]
+    fn user_profile_authority_query_is_scoped_to_identity_and_organization() {
+        let identity = "ab".repeat(32);
+        let sql = select_user_profile_for_organization_sql(&identity, 42, None)
+            .expect("organization-scoped profile SQL");
+
+        assert!(sql.contains(&format!("identity = 0x{identity}")));
+        assert!(sql.contains("organization_id = 42"));
+        assert!(sql.ends_with("LIMIT 1"));
+    }
+
+    #[test]
     fn resource_read_permission_accepts_alias_and_wildcards() {
         assert!(has_resource_read_permission(
             Some(&field_access(&["sale_order:read"])),
@@ -676,6 +739,36 @@ mod tests {
             Some(&field_access(&["*:*"])),
             "products"
         ));
+    }
+
+    #[test]
+    fn resource_read_permission_accepts_canonical_module_grants() {
+        assert!(has_resource_read_permission(
+            Some(&field_access(&["module:iot:read"])),
+            "iot-hubs"
+        ));
+        assert!(has_resource_read_permission(
+            Some(&field_access(&["module:iot:*"])),
+            "iot-devices"
+        ));
+        assert!(has_resource_read_permission(
+            Some(&field_access(&["module:hr:read"])),
+            "employees"
+        ));
+        assert!(!has_resource_read_permission(
+            Some(&field_access(&["module:hr:read"])),
+            "iot-hubs"
+        ));
+    }
+
+    #[test]
+    fn hr_module_read_grant_is_read_only_but_wildcard_covers_hr_actions() {
+        let read = field_access(&["module:hr:read"]);
+        assert!(has_hr_permission(Some(&read), "hr_employee", "read"));
+        assert!(!has_hr_permission(Some(&read), "hr_employee", "create"));
+
+        let wildcard = field_access(&["module:hr:*"]);
+        assert!(has_hr_permission(Some(&wildcard), "hr_employee", "create"));
     }
 
     #[test]

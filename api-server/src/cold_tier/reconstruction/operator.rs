@@ -1,0 +1,345 @@
+//! Trusted operator entrypoint for one organization reconstruction.
+
+use super::{
+    reconstruct_organization_once, PgReconstructionSource, ReconstructionReport,
+    ReconstructionSource,
+};
+use crate::cold_tier::pg_pool::{build_pool, PgConfig, PgRole};
+use crate::organization_placement::{
+    CellId, ConfiguredPlacementResolver, DurableStoreId, OrganizationPlacement,
+    OrganizationPlacementResolver, PlacementGeneration,
+};
+use anyhow::{bail, Context, Result};
+use rand::RngCore;
+use serde_json::{json, Value};
+use stdb_client::StdbClient;
+use stdb_config::{
+    env_stdb_host_or_next_public, env_stdb_module_or_next_public, normalize_stdb_http_host,
+};
+
+const RECONSTRUCTION_TOKEN_ENV: &str = "STDB_RECONSTRUCTION_TOKEN";
+const RECONSTRUCTION_READ_TOKEN_ENV: &str = "STDB_RECONSTRUCTION_READ_TOKEN";
+const RECONSTRUCTION_IDENTITY_ENV: &str = "STDB_RECONSTRUCTION_IDENTITY";
+const PLACEMENT_CONTROL_PATH_ENV: &str = "LUMIERE_PLACEMENT_CONTROL_PATH";
+const EXPECTED_GENERATION_ENV: &str = "RECONSTRUCTION_EXPECTED_PLACEMENT_GENERATION";
+const EXPECTED_CELL_ID_ENV: &str = "RECONSTRUCTION_EXPECTED_CELL_ID";
+const EXPECTED_DURABLE_STORE_ID_ENV: &str = "RECONSTRUCTION_EXPECTED_DURABLE_STORE_ID";
+
+/// Reconstruct one operator-selected organization using only server-resolved
+/// placement configuration and the exact durable PostgreSQL watermark.
+pub async fn run_organization_reconstruction(organization_id: u64) -> Result<ReconstructionReport> {
+    if organization_id == 0 {
+        bail!("organization id must be non-zero");
+    }
+    let settings = ReconstructionSettings::from_env()?;
+    let pg_config = PgConfig::from_env()?
+        .for_role(PgRole::Reconstruction)
+        .context("resolve reconstruction PostgreSQL role")?;
+    let pool = build_pool(&pg_config)?;
+    let target = settings.target(organization_id)?;
+    let stdb = StdbClient::new(settings.stdb_host, settings.stdb_module, settings.token);
+    let read_stdb = stdb.with_token(settings.read_token);
+    let run_id = configured_run_id(organization_id)?;
+    eprintln!("starting C7 reconstruction run {run_id}");
+    ensure_reconstructor_binding(&stdb, organization_id, &settings.identity).await?;
+    let source = PgReconstructionSource::new(pool.clone());
+    let watermark = source
+        .declared_watermark(organization_id)
+        .await
+        .context("resolve exact durable reconstruction watermark")?;
+    reconstruct_organization_once(&stdb, &read_stdb, &pool, &target, watermark, run_id).await
+}
+
+async fn ensure_reconstructor_binding(
+    stdb: &StdbClient,
+    organization_id: u64,
+    identity: &str,
+) -> Result<()> {
+    let rows = stdb
+        .query_sql(&format!(
+            "SELECT identity, is_active FROM cold_tier_service_identity \
+             WHERE organization_id = {organization_id} \
+             AND service_name = 'organization_reconstructor'"
+        ))
+        .await
+        .context("read destination reconstruction service binding")?;
+    let active = rows
+        .iter()
+        .filter(|row| {
+            row.get("isActive")
+                .or_else(|| row.get("is_active"))
+                .and_then(Value::as_bool)
+                == Some(true)
+        })
+        .collect::<Vec<_>>();
+    if active.len() > 1 {
+        bail!("destination has multiple active organization reconstructors");
+    }
+    if let Some(row) = active.first() {
+        let bound = identity_from_json(
+            row.get("identity")
+                .context("destination reconstructor row lacks identity")?,
+        )?;
+        if !bound.eq_ignore_ascii_case(identity) {
+            bail!("destination reconstructor binding does not match STDB_RECONSTRUCTION_TOKEN");
+        }
+        return Ok(());
+    }
+    stdb.call_reducer(stdb_client::reducer_call!(
+        "register_cold_tier_service_identity",
+        json!([
+            organization_id,
+            format!("c7-reconstructor-{organization_id}-{}", random_hex::<8>()),
+            "organization_reconstructor",
+            json!({ "__identity__": format!("0x{identity}") }),
+        ]),
+    ))
+    .await
+    .context("bootstrap destination reconstruction service binding")
+}
+
+fn identity_from_json(value: &Value) -> Result<String> {
+    let identity = value
+        .as_str()
+        .or_else(|| value.get("__identity__").and_then(Value::as_str))
+        .context("decode destination reconstructor identity")?;
+    normalize_identity(identity)
+}
+
+fn normalize_identity(identity: &str) -> Result<String> {
+    let identity = identity
+        .trim()
+        .strip_prefix("0x")
+        .unwrap_or(identity.trim());
+    if identity.len() != 64 || !identity.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        bail!("SpacetimeDB identity must be 64 hexadecimal characters");
+    }
+    Ok(identity.to_ascii_lowercase())
+}
+
+struct ReconstructionSettings {
+    stdb_host: String,
+    stdb_module: String,
+    token: String,
+    read_token: String,
+    identity: String,
+    placement_resolver: ConfiguredPlacementResolver,
+    expected_placement: ExpectedPlacement,
+}
+
+struct ExpectedPlacement {
+    cell_id: CellId,
+    durable_store: DurableStoreId,
+    generation: PlacementGeneration,
+}
+
+impl ReconstructionSettings {
+    fn from_env() -> Result<Self> {
+        let stdb_host = env_stdb_host_or_next_public()
+            .map(|host| normalize_stdb_http_host(&host))
+            .context("STDB_HOST or NEXT_PUBLIC_STDB_HOST is required")?;
+        let stdb_module = env_stdb_module_or_next_public()
+            .context("STDB_MODULE or NEXT_PUBLIC_STDB_MODULE is required")?;
+        let token = required_env(RECONSTRUCTION_TOKEN_ENV)?;
+        let read_token = required_env(RECONSTRUCTION_READ_TOKEN_ENV)?;
+        let server_token = std::env::var("STDB_SERVER_TOKEN")
+            .ok()
+            .map(|value| value.trim().to_owned());
+        validate_reconstruction_tokens(&token, &read_token, server_token.as_deref())?;
+        let generation = required_env(EXPECTED_GENERATION_ENV)?
+            .parse::<u64>()
+            .context("parse RECONSTRUCTION_EXPECTED_PLACEMENT_GENERATION")?;
+        Ok(Self {
+            stdb_host,
+            stdb_module,
+            token,
+            read_token,
+            identity: normalize_identity(&required_env(RECONSTRUCTION_IDENTITY_ENV)?)?,
+            placement_resolver: ConfiguredPlacementResolver::from_persistent_control_store(
+                required_env(PLACEMENT_CONTROL_PATH_ENV)?,
+            )?,
+            expected_placement: ExpectedPlacement {
+                cell_id: CellId::new(required_env(EXPECTED_CELL_ID_ENV)?)?,
+                durable_store: DurableStoreId::new(required_env(EXPECTED_DURABLE_STORE_ID_ENV)?)?,
+                generation: PlacementGeneration::new(generation)?,
+            },
+        })
+    }
+
+    fn target(&self, organization_id: u64) -> Result<OrganizationPlacement> {
+        let target = self
+            .placement_resolver
+            .resolve(organization_id)
+            .context("resolve authoritative reconstruction placement")?;
+        validate_expected_placement(&target, &self.expected_placement)?;
+        Ok(target)
+    }
+}
+
+fn validate_expected_placement(
+    target: &OrganizationPlacement,
+    expected: &ExpectedPlacement,
+) -> Result<()> {
+    if target.generation() != expected.generation {
+        bail!(
+            "stale reconstruction placement generation: expected {}, authoritative {}",
+            expected.generation.get(),
+            target.generation().get()
+        );
+    }
+    if target.cell_id() != &expected.cell_id {
+        bail!(
+            "reconstruction cell mismatch: expected {}, authoritative {}",
+            expected.cell_id,
+            target.cell_id()
+        );
+    }
+    if target.durable_store() != &expected.durable_store {
+        bail!(
+            "reconstruction durable store mismatch: expected {}, authoritative {}",
+            expected.durable_store,
+            target.durable_store()
+        );
+    }
+    Ok(())
+}
+
+fn validate_reconstruction_tokens(
+    token: &str,
+    read_token: &str,
+    server_token: Option<&str>,
+) -> Result<()> {
+    if token == "local-dev-token" || read_token == "local-dev-token" {
+        bail!("reconstruction refuses the local development STDB token");
+    }
+    if token == read_token {
+        bail!("STDB_RECONSTRUCTION_READ_TOKEN must be distinct from the reconstructor token");
+    }
+    if server_token == Some(token) {
+        bail!("STDB_RECONSTRUCTION_TOKEN must be distinct from STDB_SERVER_TOKEN");
+    }
+    Ok(())
+}
+
+fn required_env(name: &str) -> Result<String> {
+    std::env::var(name)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .with_context(|| format!("{name} is required"))
+}
+
+fn new_run_id(organization_id: u64) -> String {
+    format!("c7-{organization_id}-{}", random_hex::<16>())
+}
+
+fn random_hex<const N: usize>() -> String {
+    let mut random = [0_u8; N];
+    rand::thread_rng().fill_bytes(&mut random);
+    hex::encode(random)
+}
+
+fn configured_run_id(organization_id: u64) -> Result<String> {
+    let run_id = std::env::var("RECONSTRUCTION_RUN_ID")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| new_run_id(organization_id));
+    if run_id.len() > 128
+        || !run_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b':'))
+    {
+        bail!("RECONSTRUCTION_RUN_ID has an invalid shape");
+    }
+    Ok(run_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn run_ids_are_bounded_unique_and_do_not_encode_placement() {
+        let first = new_run_id(42);
+        let second = new_run_id(42);
+        assert_ne!(first, second);
+        assert!(first.starts_with("c7-42-"));
+        assert!(first.len() <= 128);
+    }
+
+    #[test]
+    fn reconstruction_identity_is_explicit_and_normalized() {
+        let identity = "ab".repeat(32);
+        assert_eq!(
+            normalize_identity(&format!("0x{identity}")).unwrap(),
+            identity
+        );
+        assert!(normalize_identity("an-oidc-subject-is-not-an-identity").is_err());
+    }
+
+    #[test]
+    fn destination_identity_accepts_sats_and_plain_shapes() {
+        let identity = "cd".repeat(32);
+        assert_eq!(identity_from_json(&json!(identity)).unwrap(), identity);
+        assert_eq!(
+            identity_from_json(&json!({ "__identity__": format!("0x{identity}") })).unwrap(),
+            identity
+        );
+    }
+
+    #[test]
+    fn reconstruction_tokens_are_explicit_and_distinct() {
+        assert!(validate_reconstruction_tokens("local-dev-token", "read", None).is_err());
+        assert!(validate_reconstruction_tokens("write", "local-dev-token", None).is_err());
+        assert!(validate_reconstruction_tokens("same", "same", None).is_err());
+        assert!(validate_reconstruction_tokens("write", "read", Some("write")).is_err());
+        assert!(validate_reconstruction_tokens("write", "read", Some("owner")).is_ok());
+    }
+
+    #[test]
+    fn reconstruction_expectations_fence_generation_cell_and_store() {
+        let target = OrganizationPlacement::reconstruction_target(
+            42,
+            CellId::new("cell-a").unwrap(),
+            PlacementGeneration::new(2).unwrap(),
+            DurableStoreId::new("store-a").unwrap(),
+        )
+        .unwrap();
+        let matching = ExpectedPlacement {
+            cell_id: CellId::new("cell-a").unwrap(),
+            generation: PlacementGeneration::new(2).unwrap(),
+            durable_store: DurableStoreId::new("store-a").unwrap(),
+        };
+        assert!(validate_expected_placement(&target, &matching).is_ok());
+
+        let stale = ExpectedPlacement {
+            generation: PlacementGeneration::new(1).unwrap(),
+            ..matching
+        };
+        assert!(validate_expected_placement(&target, &stale)
+            .unwrap_err()
+            .to_string()
+            .contains("stale reconstruction placement generation"));
+
+        let wrong_cell = ExpectedPlacement {
+            cell_id: CellId::new("cell-b").unwrap(),
+            generation: PlacementGeneration::new(2).unwrap(),
+            durable_store: DurableStoreId::new("store-a").unwrap(),
+        };
+        assert!(validate_expected_placement(&target, &wrong_cell)
+            .unwrap_err()
+            .to_string()
+            .contains("reconstruction cell mismatch"));
+
+        let wrong_store = ExpectedPlacement {
+            cell_id: CellId::new("cell-a").unwrap(),
+            generation: PlacementGeneration::new(2).unwrap(),
+            durable_store: DurableStoreId::new("store-b").unwrap(),
+        };
+        assert!(validate_expected_placement(&target, &wrong_store)
+            .unwrap_err()
+            .to_string()
+            .contains("reconstruction durable store mismatch"));
+    }
+}

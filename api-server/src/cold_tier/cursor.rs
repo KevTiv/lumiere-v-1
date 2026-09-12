@@ -92,7 +92,7 @@ pub fn decode_cursor(cursor: &str, order: &[ReadOrder]) -> Result<Vec<ScalarValu
 ///
 /// `placeholder` maps a 1-based bind index to a SQL placeholder string (e.g.
 /// `$1` for PG or `?` for STDB).  `quote_col` quotes a column identifier for
-/// the target store (e.g. `"col"` for PG or `` `col` `` for STDB).  Both are
+/// the target store (for example `"col"` for PG or validated bare names for STDB). Both are
 /// injected so this stays independent of the store-specific syntax.
 pub fn cursor_predicate<F, Q>(
     order: &[ReadOrder],
@@ -151,6 +151,9 @@ where
 /// Errors that can occur while decoding a cursor.
 #[derive(Debug, thiserror::Error)]
 pub enum CursorError {
+    /// The read plan is not an allowlisted, bounded archive read.
+    #[error("invalid resource read plan: {0}")]
+    InvalidPlan(String),
     /// The `order` list is empty; a cursor requires at least one order key.
     #[error("cursor requires a non-empty order list")]
     EmptyOrder,

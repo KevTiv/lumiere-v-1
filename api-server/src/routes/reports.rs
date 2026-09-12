@@ -1,5 +1,4 @@
-use std::{fs, path::PathBuf};
-use std::{str::FromStr, sync::Arc};
+use std::{fs, str::FromStr, sync::Arc};
 
 use axum::{
     extract::{Path, Query, State},
@@ -11,21 +10,25 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sha2::{Digest, Sha256};
 use tower_cookies::Cookies;
 
 use crate::{
+    commands::dispatch_session_reducer,
     error::ApiError,
+    query_exec::{resolve_membership_company_id, row_u64},
     reports::{
+        artifacts::artifact_path,
         auth::{
             ensure_report_access, ensure_report_history_access, mask_report_preview, ReportAccess,
         },
         catalog::{report_catalog, ReportCatalogV1},
         common::{GeneratedOwnerReportHistoryRow, ReportKey, ReportPreviewRequest},
-        render::render_pdf,
+        execution_context::InteractiveReportContext,
+        generation::{generate_owner_report, ReportExecutionContext},
         service::{preview_report, report_artifact_key, report_history, ReportPreview},
     },
     state::AppState,
+    trusted_context::TrustedOperationContext,
     web_session::{require_org, resolve_session},
 };
 
@@ -84,7 +87,7 @@ async fn catalog_get(
     let session = resolve_session(&state, &headers, &cookies)
         .await?
         .ok_or(ApiError::Unauthorized)?;
-    require_org(&session)?;
+    let _context = TrustedOperationContext::for_resource_read(&state, &session)?;
 
     Ok(Json(report_catalog()))
 }
@@ -107,12 +110,22 @@ async fn preview_post(
         report_key,
         ReportAccess::Preview,
     )?;
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let company_id = resolve_membership_company_id(
+        context.client(),
+        organization_id,
+        context.actor_identity(),
+        Some(request.company_id),
+        "owner-report preview company scope mismatch",
+    )
+    .await?;
+    let context = context.with_company_scope(vec![company_id])?;
     let client = state.stdb.clone();
     let preview = preview_report(
         &client,
         report_key,
         organization_id,
-        &session.identity_hex,
+        context.actor_identity(),
         request,
     )
     .await?;
@@ -137,9 +150,19 @@ async fn history_get(
         ));
     }
     ensure_report_history_access(session.field_access.as_ref())?;
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let company_id = resolve_membership_company_id(
+        context.client(),
+        organization_id,
+        context.actor_identity(),
+        Some(query.company_id),
+        "owner-report history company scope mismatch",
+    )
+    .await?;
+    let _context = context.with_company_scope(vec![company_id])?;
     let client = state.stdb.clone();
     Ok(Json(
-        report_history(&client, organization_id, query.company_id).await?,
+        report_history(&client, organization_id, company_id).await?,
     ))
 }
 
@@ -153,8 +176,9 @@ async fn owner_schedule_recipients_get(
         .ok_or(ApiError::Unauthorized)?;
     let organization_id = require_org(&session)?;
     ensure_report_history_access(session.field_access.as_ref())?;
-    let client = state.client_with_token(&session.stdb_token);
-    let rows = client
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let rows = context
+        .client()
         .query_sql(&format!(
             "SELECT user_identity FROM user_organization WHERE organization_id = {organization_id} AND is_active = true"
         ))
@@ -179,16 +203,41 @@ async fn owner_schedules_get(
             "companyId must be greater than zero".into(),
         ));
     }
-    let client = state.client_with_token(&session.stdb_token);
-    let schedules = client.query_sql(&format!(
-        "SELECT * FROM scheduled_report WHERE organization_id = {organization_id} AND company_id = {} AND owner_report_key IS NOT NULL",
-        query.company_id
-    )).await.map_err(|error| ApiError::Internal(format!("list owner-report schedules: {error}")))?;
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let company_id = resolve_membership_company_id(
+        context.client(),
+        organization_id,
+        context.actor_identity(),
+        Some(query.company_id),
+        "owner-report schedule company scope mismatch",
+    )
+    .await?;
+    let context = context.with_company_scope(vec![company_id])?;
+    // SpacetimeDB SQL cannot compare an Option<u64> column to a scalar. Keep
+    // tenant restriction in SQL, then apply the authorized company scope to
+    // the decoded option value before returning any row.
+    let schedules = context
+        .client()
+        .query_sql(&format!(
+            "SELECT * FROM scheduled_report WHERE organization_id = {organization_id}"
+        ))
+        .await
+        .map_err(|error| ApiError::Internal(format!("list owner-report schedules: {error}")))?
+        .into_iter()
+        .filter(|schedule| {
+            row_u64(schedule, "companyId", "company_id").is_ok_and(|id| id == Some(company_id))
+                && schedule
+                    .get("ownerReportKey")
+                    .or_else(|| schedule.get("owner_report_key"))
+                    .is_some_and(|value| !value.is_null())
+        })
+        .collect::<Vec<_>>();
     let schedule_ids: std::collections::HashSet<u64> = schedules
         .iter()
         .filter_map(|schedule| schedule.get("id").and_then(|value| value.as_u64()))
         .collect();
-    let runs = client
+    let runs = context
+        .client()
         .query_sql(&format!(
         "SELECT * FROM scheduled_report_run WHERE organization_id = {organization_id} LIMIT 100"
     ))
@@ -224,11 +273,11 @@ async fn owner_schedule_create(
     )?;
     let timezone = crate::reports::timezone::parse_timezone(&input.timezone)?;
     let next_run = parse_schedule_timestamp(&input.next_run)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "create_scheduled_report",
-            json!([organization_id, input.company_id, {
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "create_scheduled_report",
+        json!([organization_id, input.company_id, {
                 "name": input.name,
                 "report_template_id": null,
                 "owner_report_key": input.report_key,
@@ -249,10 +298,9 @@ async fn owner_schedule_create(
                 "subject": null,
                 "body": null,
                 "metadata": null,
-            }]),
-        ))
-        .await
-        .map_err(|error| ApiError::BadRequest(format!("create owner-report schedule: {error}")))?;
+        }]),
+    )
+    .await?;
     Ok(StatusCode::CREATED)
 }
 
@@ -273,11 +321,11 @@ async fn owner_schedule_update(
         .as_deref()
         .map(parse_schedule_timestamp)
         .transpose()?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "update_owner_report_schedule",
-            json!([organization_id, report_id, {
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "update_owner_report_schedule",
+        json!([organization_id, report_id, {
                 "name": input.name,
                 "frequency": input.frequency,
                 "hour": input.hour,
@@ -286,10 +334,9 @@ async fn owner_schedule_update(
                 "recipient_identities": input.recipient_identities,
                 "is_active": input.is_active,
                 "next_run": next_run.map(timestamp_json),
-            }]),
-        ))
-        .await
-        .map_err(|error| ApiError::BadRequest(format!("update owner-report schedule: {error}")))?;
+        }]),
+    )
+    .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -304,14 +351,13 @@ async fn owner_schedule_run_now(
         .ok_or(ApiError::Unauthorized)?;
     let organization_id = require_org(&session)?;
     ensure_report_history_access(session.field_access.as_ref())?;
-    state
-        .client_with_token(&session.stdb_token)
-        .call_reducer(stdb_client::reducer_call!(
-            "run_owner_report_schedule",
-            json!([organization_id, report_id]),
-        ))
-        .await
-        .map_err(|error| ApiError::BadRequest(format!("run owner-report schedule: {error}")))?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "run_owner_report_schedule",
+        json!([organization_id, report_id]),
+    )
+    .await?;
     Ok(StatusCode::ACCEPTED)
 }
 
@@ -336,7 +382,8 @@ async fn artifact_get(
         .ok_or(ApiError::Unauthorized)?;
     let organization_id = require_org(&session)?;
     ensure_report_history_access(session.field_access.as_ref())?;
-    let client = state.client_with_token(&session.stdb_token);
+    let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let client = trusted.client();
     let (_company_id, artifact_key) =
         report_artifact_key(&client, organization_id, report_id).await?;
     let path = artifact_path(&state.config.report_artifact_dir, &artifact_key)?;
@@ -364,121 +411,22 @@ async fn pdf_post(
     let session = resolve_session(&state, &headers, &cookies)
         .await?
         .ok_or(ApiError::Unauthorized)?;
-    let organization_id = require_org(&session)?;
+    require_org(&session)?;
     let report_key = ReportKey::from_str(&report_key)
         .map_err(|_| ApiError::NotFound("Unknown report key".into()))?;
-    ensure_report_access(
-        session.field_access.as_ref(),
+    let context = InteractiveReportContext::from_session(&state, &session)?;
+    let generated = generate_owner_report(
+        &state,
+        ReportExecutionContext::interactive(context),
         report_key,
-        ReportAccess::Export,
-    )?;
-    let client = state.client_with_token(&session.stdb_token);
-    let preview = preview_report(
-        &client,
-        report_key,
-        organization_id,
-        &session.identity_hex,
         request,
     )
     .await?;
-    let preview = mask_report_preview(preview, session.field_access.as_ref());
-    let bytes = render_pdf(&state, &preview).await?;
-    record_generated_report(&state, &client, organization_id, &preview, &bytes, None).await?;
     Ok((
         [(axum::http::header::CONTENT_TYPE, "application/pdf")],
-        bytes,
+        generated.pdf,
     )
         .into_response())
-}
-
-#[derive(Debug, serde::Deserialize)]
-pub(crate) struct RecordedOwnerReport {
-    pub id: u64,
-    pub document_id: u64,
-}
-
-pub(crate) async fn record_generated_report(
-    state: &AppState,
-    client: &stdb_client::StdbClient,
-    organization_id: u64,
-    preview: &ReportPreview,
-    pdf: &[u8],
-    correlation_suffix: Option<&str>,
-) -> Result<RecordedOwnerReport, ApiError> {
-    let value = serde_json::to_value(preview)
-        .map_err(|error| ApiError::Internal(format!("serialize generated report: {error}")))?;
-    let report_key = value["reportKey"]
-        .as_str()
-        .ok_or_else(|| ApiError::Internal("typed report did not include reportKey".into()))?;
-    let company_id = value["scope"]["companyId"]
-        .as_u64()
-        .ok_or_else(|| ApiError::Internal("typed report did not include scope.companyId".into()))?;
-    let output_hash = hex::encode(Sha256::digest(pdf));
-    let artifact_key = format!("{output_hash}.pdf");
-    let artifact_path = artifact_path(&state.config.report_artifact_dir, &artifact_key)?;
-    persist_artifact(&artifact_path, pdf)?;
-    let correlation_id = match correlation_suffix {
-        Some(suffix) => format!("owner-report:{report_key}:{suffix}"),
-        None => format!("owner-report:{report_key}:{}", &output_hash[..16]),
-    };
-    let params = json!({
-        "report_key": report_key,
-        "schema_version": value["schemaVersion"].as_u64().unwrap_or(1),
-        "parameters_json": json!({ "scope": value["scope"] }).to_string(),
-        "source_watermark_json": value["sourceWatermark"].to_string(),
-        "output_hash": format!("sha256:{output_hash}"),
-        "renderer_version": "chromium-worker-v1",
-        "artifact_key": artifact_key,
-        "artifact_size": pdf.len(),
-        "correlation_id": correlation_id,
-        "metadata": json!({ "watermark": value["watermark"] }).to_string(),
-    });
-    let result = client
-        .call_reducer(stdb_client::reducer_call!(
-            "record_generated_owner_report",
-            json!([organization_id, company_id, params]),
-        ))
-        .await
-        .map_err(|error| ApiError::Internal(format!("record generated owner report: {error}")));
-    if result.is_err() {
-        let _ = fs::remove_file(&artifact_path);
-    }
-    result?;
-    let correlation_sql = correlation_id.replace('\'', "''");
-    let rows = client
-        .query_sql(&format!(
-            "SELECT id, document_id FROM generated_owner_report WHERE organization_id = {organization_id} AND correlation_id = '{correlation_sql}' LIMIT 1"
-        ))
-        .await
-        .map_err(|error| ApiError::Internal(format!("read generated owner report: {error}")))?;
-    let row = rows
-        .into_iter()
-        .next()
-        .ok_or_else(|| ApiError::Internal("generated owner report was not persisted".into()))?;
-    serde_json::from_value(row)
-        .map_err(|error| ApiError::Internal(format!("invalid generated owner report row: {error}")))
-}
-
-fn artifact_path(root: &std::path::Path, artifact_key: &str) -> Result<PathBuf, ApiError> {
-    if !artifact_key.ends_with(".pdf") || artifact_key.contains('/') || artifact_key.contains('\\')
-    {
-        return Err(ApiError::Internal("invalid report artifact key".into()));
-    }
-    Ok(root.join(artifact_key))
-}
-
-fn persist_artifact(path: &std::path::Path, bytes: &[u8]) -> Result<(), ApiError> {
-    let directory = path
-        .parent()
-        .ok_or_else(|| ApiError::Internal("report artifact path has no parent".into()))?;
-    fs::create_dir_all(directory).map_err(|error| {
-        ApiError::Internal(format!("create report artifact directory: {error}"))
-    })?;
-    if path.exists() {
-        return Ok(());
-    }
-    fs::write(path, bytes)
-        .map_err(|error| ApiError::Internal(format!("write report artifact: {error}")))
 }
 
 pub fn router() -> Router<Arc<AppState>> {

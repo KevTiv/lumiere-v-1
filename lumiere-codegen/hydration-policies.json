@@ -1,5 +1,12 @@
 {
-  "_comment": "Reducer hydration policies for the sliding-window cold tier. A policy declares that a reducer may target an archived row by id; the api-server hydrates the row from PG before invoking the reducer. Phase 1 (audit_log) is append-only and immutable — no reducer mutates an audit row by id — so this list is empty. Populate it in Phase 2 when mutable transactional resources gain cold_eligible_at + archive_version.",
+  "_comment": "Hydration policies for coolable mutable aggregates. Tenant/company scope, aggregate members, durable schema version/checksums, and archive columns are generated from the storage and durable-schema manifests. Placement generation is always resolved server-side. Reducer/id fields remain optional until reducer signatures expose a supported mutation target.",
   "version": 1,
-  "policies": []
+  "policies": [
+    {
+      "_comment": "pos_order is the first coolable mutable aggregate. Its children remain listed so a future aggregate hydration cannot silently omit membership.",
+      "table": "pos_order",
+      "placement_generation_source": "server_derived",
+      "aggregate_membership": ["pos_order", "pos_order_line", "pos_payment"]
+    }
+  ]
 }

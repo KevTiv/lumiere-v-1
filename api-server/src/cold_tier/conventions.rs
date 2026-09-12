@@ -4,8 +4,8 @@
 //!
 //! Every cold-tier table stores a `payload_checksum` and (for mutable
 //! transactional resources) an `archive_version`.  This module defines the
-//! canonical rules so the codegen, drainer, finalize reducer, and recovery
-//! tooling all agree.
+//! canonical rules so codegen, the generic projector, the C5 finalize reducer,
+//! and recovery tooling all agree.
 //!
 //! ## Payload checksum
 //!
@@ -22,8 +22,8 @@
 //! {"action":"CREATE","changed_fields":["name"],"company_id":null,"id":42,...}
 //! ```
 //!
-//! The checksum is computed by the drainer **before** the PG UPSERT and stored
-//! in `payload_checksum`.  The finalize reducer verifies that PG contains a row
+//! The checksum is computed before the durable PG write and stored in
+//! `payload_checksum`. The C5 finalize reducer verifies that PG contains a row
 //! with the same checksum before deleting the STDB row.
 //!
 //! ## Archive version
@@ -74,7 +74,7 @@ pub fn compute_payload_checksum_json<T: serde::Serialize>(value: &T) -> anyhow::
 /// Compute the payload checksum from a `serde_json::Value`, ensuring canonical
 /// key ordering by re-serialising through sorted keys.
 ///
-/// This is the recommended function for drainer code that receives a
+/// This is the recommended function for projection code that receives a
 /// `serde_json::Value` row representation.
 pub fn compute_payload_checksum_canonical(value: &serde_json::Value) -> String {
     let canonical = canonicalize_json(value);
@@ -83,7 +83,7 @@ pub fn compute_payload_checksum_canonical(value: &serde_json::Value) -> String {
 }
 
 /// Recursively sort object keys in a JSON value to produce canonical JSON.
-fn canonicalize_json(value: &serde_json::Value) -> serde_json::Value {
+pub(crate) fn canonicalize_json(value: &serde_json::Value) -> serde_json::Value {
     use serde_json::{Map, Value};
 
     match value {
@@ -105,6 +105,30 @@ fn canonicalize_json(value: &serde_json::Value) -> serde_json::Value {
     }
 }
 
+/// Validate a PostgreSQL identifier for use in generated projection SQL.
+///
+/// Allows lowercase ASCII letters, digits, and underscores, up to 128 bytes,
+/// non-empty. This matches the grammar of all generated manifest identifiers.
+pub(crate) fn validate_identifier(value: &str) -> anyhow::Result<()> {
+    if value.is_empty()
+        || value.len() > 128
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+    {
+        anyhow::bail!("unsafe projection identifier '{value}'");
+    }
+    Ok(())
+}
+
+/// Quote a validated PostgreSQL identifier for use in generated SQL.
+///
+/// The identifier is validated in release builds before quoting.
+pub(crate) fn quote_identifier(identifier: &str) -> anyhow::Result<String> {
+    validate_identifier(identifier)?;
+    Ok(format!("\"{identifier}\""))
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -113,6 +137,41 @@ fn canonicalize_json(value: &serde_json::Value) -> serde_json::Value {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn canonical_payload_bytes_and_checksum_match_golden_vector() {
+        let value = json!({"z": false, "n": -7, "a": [3, 1, {"z": "é\n\"", "a": null}]});
+        let bytes = serde_json::to_vec(&canonicalize_json(&value)).expect("JSON value");
+        assert_eq!(
+            bytes,
+            r#"{"a":[3,1,{"a":null,"z":"é\n\""}],"n":-7,"z":false}"#.as_bytes()
+        );
+        assert_eq!(
+            compute_payload_checksum_canonical(&value),
+            "a42c8067e7ddb3cd4e102f6b8ba61ef954aa74210de0fa10b1b10fc48a8c2c80"
+        );
+        assert_ne!(
+            compute_payload_checksum_canonical(&value),
+            compute_payload_checksum_canonical(
+                &json!({"z": false, "n": -7, "a": [1, 3, {"z": "é\n\"", "a": null}]})
+            )
+        );
+    }
+
+    #[test]
+    fn identifiers_are_validated_before_quoting() {
+        for valid in ["audit_log", "column_2", "_internal", "2"] {
+            assert_eq!(
+                quote_identifier(valid).expect("valid identifier"),
+                format!("\"{valid}\"")
+            );
+        }
+        assert!(validate_identifier(&"a".repeat(128)).is_ok());
+        assert!(validate_identifier(&"a".repeat(129)).is_err());
+        for invalid in ["", "Audit", "a.b", "a b", "a\"b", "a;b", "é", "a--b"] {
+            assert!(quote_identifier(invalid).is_err(), "accepted {invalid:?}");
+        }
+    }
 
     #[test]
     fn checksum_is_sha256_hex() {

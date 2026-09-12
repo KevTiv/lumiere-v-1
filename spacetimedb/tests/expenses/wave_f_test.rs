@@ -119,7 +119,7 @@ fn seed_accounts(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<ExpenseAc
                 name: "Wave F Misc".into(),
                 code: journal_code.clone(),
                 type_: JournalType::General,
-                currency_id: Some(1),
+                currency_id: Some(fixture.currency_id),
                 default_account_id: Some(expense_id),
                 suspense_account_id: None,
                 loss_account_id: None,
@@ -312,7 +312,7 @@ fn create_line_with_receipt(
             date: ctx.timestamp,
             unit_amount: amount,
             quantity: 1.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             product_id: None,
             description: None,
             tax_ids: vec![],
@@ -356,7 +356,7 @@ fn create_draft_sheet(
             company_id: Some(fixture.company_id),
             employee_id,
             name: name.to_string(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             notes: None,
             accounting_date: None,
         },
@@ -501,7 +501,7 @@ pub fn test_isolation_rebill_card_advance(ctx: &ReducerContext) -> Result<(), St
             date: ctx.timestamp,
             unit_amount: 40.0,
             quantity: 1.0,
-            currency_id: 1,
+            currency_id: fixture_a.currency_id,
             product_id: None,
             description: None,
             tax_ids: vec![],
@@ -541,7 +541,7 @@ pub fn test_isolation_rebill_card_advance(ctx: &ReducerContext) -> Result<(), St
             external_ref: format!("WF-ISO-STMT-{}", fixture_b.company_id),
             merchant_key: Some("iso-merchant".into()),
             amount: 40.0,
-            currency_id: 1,
+            currency_id: fixture_b.currency_id,
             transaction_date: ctx.timestamp,
             fx_fee_amount: 0.0,
             metadata: None,
@@ -580,7 +580,7 @@ pub fn test_isolation_rebill_card_advance(ctx: &ReducerContext) -> Result<(), St
             employee_id: emp_a,
             name: "WF Iso Advance".into(),
             amount: 50.0,
-            currency_id: 1,
+            currency_id: fixture_a.currency_id,
             journal_id: accounts_a.journal_id,
             cash_account_id: accounts_a.cash_id,
             advance_account_id: accounts_a.advance_id,
@@ -677,8 +677,8 @@ pub fn test_csv_draft_only(ctx: &ReducerContext) -> Result<(), String> {
     let name = format!("WF CSV Posted {}", fixture.company_id);
     let csv = format!(
         "name,company_id,employee_id,currency_id,unit_amount,quantity,total_amount,state\n\
-         {name},{},{},1,10,1,10,posted\n",
-        fixture.company_id, employee_id
+         {name},{},{},{},10,1,10,posted\n",
+        fixture.company_id, employee_id, fixture.currency_id
     );
     import_expense_csv(ctx, fixture.organization_id, csv)?;
 
@@ -719,8 +719,8 @@ pub fn test_csv_draft_only(ctx: &ReducerContext) -> Result<(), String> {
     let draft_name = format!("WF CSV Draft {}", fixture.company_id);
     let draft_csv = format!(
         "name,company_id,employee_id,currency_id,unit_amount,quantity,total_amount,state\n\
-         {draft_name},{},{},1,12,1,12,draft\n",
-        fixture.company_id, employee_id
+         {draft_name},{},{},{},12,1,12,draft\n",
+        fixture.company_id, employee_id, fixture.currency_id
     );
     import_expense_csv(ctx, fixture.organization_id, draft_csv)?;
     let draft = ctx

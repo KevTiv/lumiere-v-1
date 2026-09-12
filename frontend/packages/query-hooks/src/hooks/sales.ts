@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, coalesceQueryInitialData, rqBigIntKey } from "../http"
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
+import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   ApplyOmnichannelAllocationParams,
@@ -45,10 +46,6 @@ import type {
 } from "@lumiere/stdb/types"
 
 import { finalizeUpdateSaleOrderParams } from "./sales-params-merge"
-
-function toScalarU64(v: bigint | number | string): bigint {
-  return typeof v === "bigint" ? v : BigInt(String(v))
-}
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -430,7 +427,7 @@ export function useCreatePricelist(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreatePricelistParams>({
     mutationFn: async (params) => {
-      const json = stdbParamsToJson(params as object)
+      const json = stdbParamsToJson(params as object, "CreatePricelistParams")
       const { urlPath, init } = stdbBffCommandPost("create_pricelist", { params: json })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create pricelist')

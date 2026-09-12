@@ -16,6 +16,7 @@ const BUCKET_ORDER: [(&str, &str); 5] = [
 ];
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OpenMoveSourceRow {
     pub id: u64,
     pub partner_id: Option<u64>,
@@ -27,12 +28,14 @@ pub struct OpenMoveSourceRow {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MoveLineMoveIdRow {
     pub id: u64,
     pub move_id: u64,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MoveAllocationSourceRow {
     pub allocated_move_line_id: u64,
     pub allocated_amount: f64,
@@ -48,18 +51,6 @@ enum AgingBucketKey {
     Days31To60,
     Days61To90,
     Over90,
-}
-
-impl AgingBucketKey {
-    fn id(self) -> &'static str {
-        match self {
-            Self::Current => "current",
-            Self::Days1To30 => "1_30",
-            Self::Days31To60 => "31_60",
-            Self::Days61To90 => "61_90",
-            Self::Over90 => "over_90",
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

@@ -7,6 +7,9 @@ use super::payroll::{
     apply_partner_payslip_artifact, apply_payroll_export_result_internal, hr_payroll_export_intent,
     hr_payslip, RecordPayrollExportResultParams,
 };
+use crate::core::cold_tier_identity::{
+    require_active_service_identity, HR_INTEGRATION_WORKER_SERVICE,
+};
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
@@ -459,6 +462,18 @@ pub fn apply_hr_integration_intent(
     intent_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_payroll", "confirm")?;
+    apply_hr_integration_intent_inner(ctx, organization_id, intent_id)
+}
+
+/// Apply one intent after the caller's authority has already been established.
+///
+/// The public reducer above remains a human-permission path. The batch worker
+/// uses this inner path only after proving its registered service identity.
+fn apply_hr_integration_intent_inner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    intent_id: u64,
+) -> Result<(), String> {
     let intent = ctx
         .db
         .hr_integration_intent()
@@ -528,7 +543,7 @@ pub fn apply_pending_hr_integration_intents(
     organization_id: u64,
     limit: u32,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "hr_payroll", "confirm")?;
+    require_active_service_identity(ctx, organization_id, HR_INTEGRATION_WORKER_SERVICE)?;
     let cap = if limit == 0 { 20 } else { limit.min(100) };
     let pending: Vec<u64> = ctx
         .db
@@ -540,7 +555,7 @@ pub fn apply_pending_hr_integration_intents(
         .map(|i| i.id)
         .collect();
     for intent_id in pending {
-        let _ = apply_hr_integration_intent(ctx, organization_id, intent_id);
+        let _ = apply_hr_integration_intent_inner(ctx, organization_id, intent_id);
     }
     Ok(())
 }

@@ -12,6 +12,24 @@ type JournalLookupRow = {
   type_?: unknown
 }
 
+type ContactLookupRow = {
+  id?: unknown
+  displayName?: unknown
+  name?: unknown
+  email?: unknown
+  isCustomer?: unknown
+  is_customer?: unknown
+  isVendor?: unknown
+  is_vendor?: unknown
+  supplierRank?: unknown
+  supplier_rank?: unknown
+}
+
+export type CompanyLookupRow = {
+  id?: unknown
+  name?: unknown
+}
+
 /** Chart of accounts — code + name for GL pickers. */
 export function accountAccountRowsToSelectOptions(
   rows: Record<string, unknown>[],
@@ -64,7 +82,7 @@ function isTruthyFlag(v: unknown): boolean {
 
 /** CRM contacts — `Contact.id` is used as sale `partnerId` in this schema. */
 export function contactRowsToPartnerSelectOptions(
-  rows: Record<string, unknown>[],
+  rows: readonly ContactLookupRow[],
 ): Array<{ value: string; label: string }> {
   const customers = rows.filter((r) => {
     const isCustomer = r.isCustomer ?? r.is_customer
@@ -72,6 +90,19 @@ export function contactRowsToPartnerSelectOptions(
   })
   const list = customers.length > 0 ? customers : rows
   return list.map((row) => {
+    const id = row.id
+    const display = String(row.displayName ?? row.name ?? "")
+    const email = row.email != null ? String(row.email) : ""
+    const label = email ? `${display} (${email})` : display || String(id)
+    return { value: String(id), label }
+  })
+}
+
+/** CRM contacts usable by accounting, where a payment partner may be a customer or supplier. */
+export function contactRowsToAccountingPartnerSelectOptions(
+  rows: readonly ContactLookupRow[],
+): Array<{ value: string; label: string }> {
+  return rows.map((row) => {
     const id = row.id
     const display = String(row.displayName ?? row.name ?? "")
     const email = row.email != null ? String(row.email) : ""
@@ -618,7 +649,7 @@ export function contactSegmentRowsToSelectOptions(
 }
 
 export function companyRowsToSelectOptions(
-  rows: Record<string, unknown>[],
+  rows: readonly CompanyLookupRow[],
 ): Array<{ value: string; label: string }> {
   return rows.map((row) => ({
     value: String(row.id ?? ""),

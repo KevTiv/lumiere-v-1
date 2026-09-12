@@ -617,7 +617,10 @@ pub fn test_full_subscription_lifecycle(ctx: &ReducerContext) -> Result<(), Stri
         .chart_account_ids
         .get(chart_keys::REVENUE)
         .ok_or("revenue account")?;
-    let ar_id = *fixture.chart_account_ids.get(chart_keys::AR).ok_or("ar account")?;
+    let ar_id = *fixture
+        .chart_account_ids
+        .get(chart_keys::AR)
+        .ok_or("ar account")?;
 
     // ── Step 1: Create a plan and a draft subscription from a confirmed SO ────
 

@@ -6,14 +6,21 @@ import {
   type BrowserContext,
   type Page,
 } from "@playwright/test"
+import { readFileSync, renameSync, writeFileSync } from "node:fs"
 
 import {
   callReducerBff,
+  callReducerBffResult,
   fetchSessionOrganizationId,
   scalarQueryId,
   signIn,
   smokeName,
 } from "./helpers"
+import {
+  writeC9BrowserEvidence,
+  type C9BrowserEvidence,
+  type C9EvidenceCheck,
+} from "./c9-browser-evidence"
 import { DbConnection } from "@lumiere/stdb/generated"
 import { RESOURCE_REGISTRY as resourceRegistry } from "@lumiere/stdb/generated/query-registry"
 
@@ -28,6 +35,7 @@ type TenantFixture = {
   page: Page
   branchContext: BrowserContext
   branchPage: Page
+  ownerEmail: string
   organizationId: number
   mainCompanyId: number
   branchCompanyId: number
@@ -44,6 +52,52 @@ type RealtimeMessage = {
   row?: unknown
   data?: unknown
   payload?: unknown
+}
+
+type PlacementControlRecord = {
+  organization_id: number
+  cell_id: string
+  generation: number
+  lifecycle: "active"
+  durable_store_id: string
+}
+
+function placementControlPath() {
+  return process.env.LUMIERE_PLACEMENT_CONTROL_PATH?.trim()
+}
+
+function replacePlacementControl(contents: string) {
+  const controlPath = placementControlPath()
+  if (!controlPath) return
+  const temporaryPath = `${controlPath}.next`
+  writeFileSync(temporaryPath, contents, "utf8")
+  renameSync(temporaryPath, controlPath)
+}
+
+function writePlacementControl(organizationId: number, generation?: number) {
+  const controlPath = placementControlPath()
+  if (!controlPath) return undefined
+  const configuredGeneration = Number(process.env.LUMIERE_PLACEMENT_GENERATION ?? "1")
+  const nextGeneration = generation ?? configuredGeneration
+  if (!Number.isSafeInteger(nextGeneration) || nextGeneration <= 0) {
+    throw new Error("C9_PLACEMENT_GENERATION must be a positive safe integer")
+  }
+  const current = JSON.parse(readFileSync(controlPath, "utf8")) as {
+    placements?: PlacementControlRecord[]
+  }
+  const record: PlacementControlRecord = {
+    organization_id: organizationId,
+    cell_id: process.env.LUMIERE_CELL_ID ?? "cell-primary-eu",
+    generation: nextGeneration,
+    lifecycle: "active",
+    durable_store_id: process.env.LUMIERE_DURABLE_STORE_ID ?? "pg-primary",
+  }
+  const placements = (current.placements ?? []).filter(
+    (candidate) => candidate.organization_id !== organizationId,
+  )
+  placements.push(record)
+  replacePlacementControl(`${JSON.stringify({ placements }, null, 2)}\n`)
+  return record
 }
 
 const CRM_RESOURCES = [
@@ -181,6 +235,11 @@ function realtimeUrl() {
   return url.toString()
 }
 
+function apiServerUrl(path: string) {
+  const base = (process.env.LUMIERE_API_SERVER_URL ?? "http://127.0.0.1:8082").replace(/\/$/, "")
+  return `${base}${path}`
+}
+
 function valueAsId(row: QueryRow, ...keys: string[]): number | null {
   for (const key of keys) {
     const id = scalarQueryId(row[key])
@@ -310,8 +369,8 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
       )
     }
     const currencies = (await currenciesResponse.json()) as { data?: QueryRow[] }
-    const currencyId = valueAsId(currencies.data?.[0] ?? {}, "id")
-    if (currencyId == null) throw new Error("bootstrap currency catalog is empty")
+    const currencyCode = valueAsString(currencies.data?.[0] ?? {}, "code")
+    if (!currencyCode) throw new Error("bootstrap currency catalog is empty")
 
     const mainCompanyName = `${suffix} main`
     const bootstrap = await api.post("/api/bootstrap/tenant", {
@@ -333,7 +392,8 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
         },
         defaultCompanyName: mainCompanyName,
         defaultCompanyCode: `${organizationCode}M`,
-        defaultCompanyCurrencyId: currencyId,
+        defaultCompanyCurrencyId: 0,
+        defaultCompanyCurrencyCode: currencyCode,
         fiscalYearEndMonth: 12,
         fiscalYearEndDay: 31,
         seedFormConfigs: false,
@@ -349,6 +409,15 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
       throw new Error(`tenant bootstrap failed (${bootstrap.status()}): ${await bootstrap.text()}`)
     }
 
+    const organizations = await ownerSql(
+      `SELECT id FROM organization WHERE code = '${organizationCode}'`,
+    )
+    const persistedOrganizationId = valueAsId(organizations[0] ?? {}, "id")
+    if (persistedOrganizationId == null) {
+      throw new Error(`${label} bootstrapped organization is not persisted`)
+    }
+    writePlacementControl(persistedOrganizationId)
+
     context = await browser.newContext({
       baseURL: e2eBaseUrl(),
       storageState: await api.storageState(),
@@ -356,6 +425,7 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
     const page = await context.newPage()
     await page.goto("/")
     const organizationId = await fetchSessionOrganizationId(page)
+    expect(organizationId).toBe(persistedOrganizationId)
     const mainCompany = await waitForRow(
       page,
       "/api/query/companies",
@@ -363,7 +433,10 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
       `${label} main company`,
     )
     const mainCompanyId = valueAsId(mainCompany, "id")
-    if (mainCompanyId == null) throw new Error(`${label} main company has no id`)
+    const currencyId = valueAsId(mainCompany, "currencyId", "currency_id")
+    if (mainCompanyId == null || currencyId == null) {
+      throw new Error(`${label} main company has no id or currency`)
+    }
 
     const branchCompanyName = `${suffix} branch`
     await callReducerBff(page, "create_company", [
@@ -797,7 +870,7 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
         name: branchRoleName,
         description: some("ephemeral company-bound CRM isolation reader"),
         parent_id: none,
-        permissions: ["contact:read", "contact_identity:read"],
+        permissions: CRM_RESOURCES.map((resource) => `${resource}:read`),
         is_active: true,
         metadata: some(JSON.stringify({ fixture: "CRM-RI-007-live-isolation" })),
       },
@@ -849,6 +922,7 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
       page,
       branchContext,
       branchPage,
+      ownerEmail: `${suffix}@example.test`,
       organizationId,
       mainCompanyId,
       branchCompanyId,
@@ -885,6 +959,17 @@ function unwrapSats(value: unknown): unknown {
   return value
 }
 
+function serializedEvidenceValue(value: unknown): string {
+  if (typeof value === "string") return value.replace(/^0x/i, "")
+  if (value == null) return ""
+  if (typeof value === "object" && !Array.isArray(value)) {
+    for (const key of ["__identity__", "identity", "value", "some"]) {
+      if (key in value) return serializedEvidenceValue((value as Record<string, unknown>)[key])
+    }
+  }
+  return JSON.stringify(value)
+}
+
 async function ownerSql(sql: string): Promise<QueryRow[]> {
   const host = (process.env.E2E_STDB_HOST ?? process.env.STDB_HOST ?? "http://127.0.0.1:3000").replace(
     /\/$/,
@@ -917,6 +1002,33 @@ async function ownerSql(sql: string): Promise<QueryRow[]> {
       elements.map((element, index) => [sqlElementName(element), unwrapSats(values[index])]),
     ),
   )
+}
+
+async function serverDerivedAuditEvidence(organizationId: number) {
+  const rows = await ownerSql(
+    `SELECT actor_identity, correlation_id FROM organization_commit WHERE organization_id = ${organizationId} LIMIT 1`,
+  )
+  const row = rows.find(
+    (candidate) =>
+      serializedEvidenceValue(candidate.actor_identity).length > 0 &&
+      serializedEvidenceValue(candidate.correlation_id).length > 0,
+  )
+  if (!row) {
+    throw new Error(`${organizationId} has no persisted server-derived commit audit evidence`)
+  }
+  return {
+    server_derived: true as const,
+    actor_identity: serializedEvidenceValue(row.actor_identity),
+    correlation_id: serializedEvidenceValue(row.correlation_id),
+  }
+}
+
+function passCheck(id: string, evidence: string): C9EvidenceCheck {
+  return { id, status: "pass", after_reconstruction: true, evidence }
+}
+
+function notRunCheck(id: string, evidence: string): C9EvidenceCheck {
+  return { id, status: "not_run", after_reconstruction: false, evidence }
 }
 
 async function ordinaryTokenForPage(page: Page) {
@@ -1036,6 +1148,54 @@ async function realtimeSubscribe(page: Page, payload: Record<string, unknown>) {
       }),
     { url: realtimeUrl(), subscription: payload },
   )
+}
+
+async function realtimeSubscribeAfterPlacementChange(
+  page: Page,
+  payload: Record<string, unknown>,
+  mutatePlacement: () => void,
+) {
+  const key = `__crmIsolationDelayedSubscribe${Math.random().toString(36).slice(2)}`
+  const response = page.evaluate(
+    ({ url, subscription, stateKey }) =>
+      new Promise<RealtimeMessage>((resolve, reject) => {
+        const state = window as typeof window & Record<string, unknown>
+        const socket = new WebSocket(url)
+        const timeout = window.setTimeout(() => {
+          socket.close()
+          reject(new Error("delayed realtime subscription timed out"))
+        }, 30_000)
+        socket.onopen = () => {
+          state[`${stateKey}:send`] = () => socket.send(JSON.stringify(subscription))
+          state[`${stateKey}:ready`] = true
+        }
+        socket.onmessage = (event) => {
+          if (typeof event.data !== "string") return
+          const message = JSON.parse(event.data) as RealtimeMessage
+          if (message.type !== "subscribed" && message.type !== "error") return
+          window.clearTimeout(timeout)
+          socket.close()
+          resolve(message)
+        }
+        socket.onerror = () => {
+          window.clearTimeout(timeout)
+          reject(new Error("delayed realtime WebSocket failed"))
+        }
+      }),
+    { url: realtimeUrl(), subscription: payload, stateKey: key },
+  )
+  await page.waitForFunction(
+    (stateKey) =>
+      Boolean((window as typeof window & Record<string, unknown>)[`${stateKey}:ready`]),
+    key,
+  )
+  mutatePlacement()
+  await page.evaluate((stateKey) => {
+    const send = (window as typeof window & Record<string, unknown>)[`${stateKey}:send`]
+    if (typeof send !== "function") throw new Error("delayed realtime sender is unavailable")
+    send()
+  }, key)
+  return response
 }
 
 async function waitForRealtimeChange(
@@ -1166,6 +1326,44 @@ test.describe("CRM authenticated read isolation", { tag: ["@p0", "@crm"] }, () =
       ].filter((row) => fixtureNames.has(valueAsString(row, "name")))
       expect(persisted).toHaveLength(8)
 
+      const fixtureContactId = (name: string) =>
+        valueAsId(persisted.find((row) => valueAsString(row, "name") === name) ?? {}, "id")
+      const alphaMainContactId = fixtureContactId(alpha.mainContactName)
+      const alphaBranchContactId = fixtureContactId(alpha.branchContactName)
+      const betaMainContactId = fixtureContactId(beta.mainContactName)
+      expect(alphaMainContactId).not.toBeNull()
+      expect(alphaBranchContactId).not.toBeNull()
+      expect(betaMainContactId).not.toBeNull()
+      const alphaTagRows = await queryRows(
+        alpha.page,
+        `/api/query/contact-tags?companyId=${alpha.mainCompanyId}`,
+      )
+      const alphaTagId = valueAsId(
+        alphaTagRows.find((row) => valueAsString(row, "name") === alpha.sharedNames["contact-tags"]) ?? {},
+        "id",
+      )
+      expect(alphaTagId).not.toBeNull()
+
+      const forgedOrganizationCommand = await callReducerBffResult(
+        alpha.page,
+        "create_contact",
+        [
+          beta.organizationId,
+          contactParams(smokeName("crm-isolation-forged-org"), alpha.mainCompanyId),
+        ],
+      )
+      expect(forgedOrganizationCommand.ok).toBe(false)
+      expect(forgedOrganizationCommand.status).toBeGreaterThanOrEqual(400)
+
+      const foreignIdCommand = await callReducerBffResult(alpha.page, "assign_tag_to_contact", [
+        alpha.organizationId,
+        betaMainContactId,
+        alphaTagId,
+        some(JSON.stringify({ fixture: "CRM-RI-007-live-isolation", scope: "foreign" })),
+      ])
+      expect(foreignIdCommand.ok).toBe(false)
+      expect(foreignIdCommand.status).toBeGreaterThanOrEqual(400)
+
       const alphaOwn = await queryRows(
         alpha.page,
         `/api/query/contacts?companyId=${alpha.mainCompanyId}`,
@@ -1263,12 +1461,6 @@ test.describe("CRM authenticated read isolation", { tag: ["@p0", "@crm"] }, () =
           ),
         ).toBe(false)
       }
-      const fixtureContactId = (name: string) =>
-        valueAsId(persisted.find((row) => valueAsString(row, "name") === name) ?? {}, "id")
-      const alphaMainContactId = fixtureContactId(alpha.mainContactName)
-      const alphaBranchContactId = fixtureContactId(alpha.branchContactName)
-      expect(alphaMainContactId).not.toBeNull()
-      expect(alphaBranchContactId).not.toBeNull()
       for (const resource of ["contact-tag-assignments", "segment-members"] as const) {
         const mainFixtureRows = (alphaMainMatrix.get(resource) ?? []).filter(
           (row) => valueAsId(row, "contactId", "contact_id") === alphaMainContactId,
@@ -1349,6 +1541,22 @@ test.describe("CRM authenticated read isolation", { tag: ["@p0", "@crm"] }, () =
       expect(crossOrganizationSubscription.type).toBe("error")
       expect(crossOrganizationSubscription.error).toMatch(/organizationId does not match session/i)
 
+      const orgBOnlyContactName = smokeName("crm-isolation-org-b-only")
+      await expectNoRealtimeChange(
+        alpha.page,
+        {
+          resources: COMPANY_SCOPED_CRM_RESOURCES,
+          organizationId: alpha.organizationId,
+          companyIds: [alpha.mainCompanyId, alpha.branchCompanyId],
+          activeCompanyId: alpha.mainCompanyId,
+        },
+        () =>
+          callReducerBff(beta.page, "create_contact", [
+            beta.organizationId,
+            contactParams(orgBOnlyContactName, beta.mainCompanyId),
+          ]),
+      )
+
       const liveContactName = smokeName("crm-isolation-live-main")
       const change = await waitForRealtimeChange(
         alpha.page,
@@ -1421,6 +1629,212 @@ test.describe("CRM authenticated read isolation", { tag: ["@p0", "@crm"] }, () =
         activeCompanyId: alpha.mainCompanyId,
       })
       expect(reconnected.type).toBe("subscribed")
+
+      let freshForeignIdReadStatus = 0
+      const freshAlphaContext = await browser.newContext({ baseURL: e2eBaseUrl() })
+      const freshBetaContext = await browser.newContext({ baseURL: e2eBaseUrl() })
+      try {
+        const freshAlphaPage = await freshAlphaContext.newPage()
+        const freshBetaPage = await freshBetaContext.newPage()
+        await signIn(freshAlphaPage, alpha.ownerEmail, E2E_PASSWORD)
+        await signIn(freshBetaPage, beta.ownerEmail, E2E_PASSWORD)
+
+        const freshAlphaRows = await queryRows(
+          freshAlphaPage,
+          `/api/query/contacts?companyId=${alpha.mainCompanyId}`,
+        )
+        expect(
+          freshAlphaRows.some((row) => valueAsString(row, "name") === alpha.mainContactName),
+        ).toBe(true)
+        expect(
+          freshAlphaRows.some((row) => valueAsString(row, "name") === beta.mainContactName),
+        ).toBe(false)
+
+        const freshBetaRows = await queryRows(
+          freshBetaPage,
+          `/api/query/contacts?companyId=${beta.mainCompanyId}`,
+        )
+        expect(
+          freshBetaRows.some((row) => valueAsString(row, "name") === beta.mainContactName),
+        ).toBe(true)
+
+        const freshForeignIdRead = await freshAlphaPage.request.get(
+          apiServerUrl(
+            `/v1/authoritative/contacts/${betaMainContactId}?companyId=${alpha.mainCompanyId}`,
+          ),
+          { headers: { Authorization: `Bearer ${await ordinaryTokenForPage(freshAlphaPage)}` } },
+        )
+        freshForeignIdReadStatus = freshForeignIdRead.status()
+        expect([403, 404]).toContain(freshForeignIdReadStatus)
+      } finally {
+        await freshAlphaContext.close()
+        await freshBetaContext.close()
+      }
+
+      let staleGenerationSubscription: RealtimeMessage | undefined
+      const controlPath = placementControlPath()
+      if (controlPath) {
+        const originalControl = readFileSync(controlPath, "utf8")
+        const currentControl = JSON.parse(originalControl) as {
+          placements?: PlacementControlRecord[]
+        }
+        const currentPlacement = currentControl.placements?.find(
+          (record) => record.organization_id === alpha.organizationId,
+        )
+        if (!currentPlacement) throw new Error("Org A has no placement-control record")
+        try {
+          staleGenerationSubscription = await realtimeSubscribeAfterPlacementChange(
+            alpha.page,
+            {
+              resources: CRM_RESOURCES,
+              organizationId: alpha.organizationId,
+              companyIds: [alpha.mainCompanyId],
+              activeCompanyId: alpha.mainCompanyId,
+            },
+            () => writePlacementControl(alpha.organizationId, currentPlacement.generation + 1),
+          )
+          expect(staleGenerationSubscription.type).toBe("error")
+          expect(staleGenerationSubscription.error).toMatch(/placement.*generation|stale/i)
+        } finally {
+          replacePlacementControl(originalControl)
+        }
+      }
+
+      const audit = await serverDerivedAuditEvidence(alpha.organizationId)
+      const staleSignout = await alpha.page.request.post("/api/auth/signout")
+      expect(staleSignout.ok()).toBe(true)
+      const staleSessionRead = await alpha.page.request.get(
+        `/api/query/contacts?companyId=${alpha.mainCompanyId}`,
+      )
+      expect(staleSessionRead.status()).toBe(401)
+      const staleSessionCommand = await callReducerBffResult(alpha.page, "create_contact", [
+        alpha.organizationId,
+        contactParams(smokeName("crm-isolation-stale-session"), alpha.mainCompanyId),
+      ])
+      expect(staleSessionCommand.ok).toBe(false)
+      expect(staleSessionCommand.status).toBe(401)
+
+      const evidence: C9BrowserEvidence = {
+        schema_version: 1,
+        generated_at: new Date().toISOString(),
+        source: "crm-read-isolation.spec.ts",
+        phase: "post-reconstruction",
+        post_reconstruction: true,
+        fixtures: {
+          org_a: alpha.organizationId,
+          org_b: beta.organizationId,
+          company_a1: alpha.mainCompanyId,
+          company_a2: alpha.branchCompanyId,
+          company_a1_org: alpha.organizationId,
+          company_a2_org: alpha.organizationId,
+        },
+        audit,
+        lanes: {
+          commands: {
+            fresh_session: false,
+            checks: [
+              passCheck(
+                "org_a_positive_create",
+                "Org A authenticated reducer calls created persisted CRM fixtures",
+              ),
+              passCheck(
+                "org_b_foreign_id_rejected",
+                `Org A assign_tag_to_contact with Org B contact ${betaMainContactId} returned HTTP ${foreignIdCommand.status}`,
+              ),
+              passCheck(
+                "forged_organization_rejected",
+                `Org A create_contact with forged organization ${beta.organizationId} returned HTTP ${forgedOrganizationCommand.status}`,
+              ),
+              passCheck(
+                "stale_session_rejected",
+                "After authenticated sign-out, browser query and reducer calls returned HTTP 401",
+              ),
+              passCheck(
+                "audit_identity_server_derived",
+                "Organization commit audit identity and correlation were read from the server-owned ledger",
+              ),
+            ],
+          },
+          reads: {
+            fresh_session: false,
+            checks: [
+              passCheck(
+                "org_a_read_excludes_org_b",
+                "Org A list reads excluded Org B rows",
+              ),
+              passCheck(
+                "company_a1_read_excludes_a2",
+                "Company A1 list reads excluded Company A2 rows",
+              ),
+              passCheck(
+                "foreign_id_read_fail_closed",
+                `Fresh Org A session reading known Org B contact ${betaMainContactId} returned HTTP ${freshForeignIdReadStatus}`,
+              ),
+              passCheck(
+                "forged_company_rejected",
+                `Cross-company Org A read returned HTTP ${crossCompanyQuery.status()}`,
+              ),
+              passCheck(
+                "fresh_read_after_reconstruction",
+                "Fresh browser contexts read their own reconstructed fixtures and excluded the other organization",
+              ),
+            ],
+          },
+          subscriptions: {
+            fresh_session: false,
+            checks: [
+              passCheck(
+                "org_a_subscription_excludes_org_b",
+                "Org A subscription remained quiet while an Org B contact was created",
+              ),
+              passCheck(
+                "company_a1_subscription_excludes_a2",
+                "Company A2 subscription remained quiet while a Company A1 contact was created",
+              ),
+              passCheck(
+                "foreign_subscription_rejected",
+                "Cross-company and cross-organization realtime subscriptions returned authorization errors",
+              ),
+              staleGenerationSubscription
+                ? passCheck(
+                    "stale_generation_subscription_rejected",
+                    `The live WebSocket captured the current server-owned generation; after that snapshot advanced, its first subscription was rejected: ${staleGenerationSubscription.error}`,
+                  )
+                : notRunCheck(
+                    "stale_generation_subscription_rejected",
+                    "Set C9_PLACEMENT_CONTROL_PATH to execute the live placement-generation race",
+                  ),
+            ],
+          },
+          fresh_sessions: {
+            fresh_session: true,
+            checks: [
+              passCheck(
+                "org_a_fresh_session_read_present",
+                "A new browser context read Org A's own contact after sign-in",
+              ),
+              passCheck(
+                "org_a_fresh_session_excludes_org_b",
+                "A new Org A browser context excluded Org B's contact",
+              ),
+              passCheck(
+                "org_b_fresh_session_read_present",
+                "A new Org B browser context read Org B's own contact after sign-in",
+              ),
+              passCheck(
+                "foreign_ids_fail_closed",
+                `Fresh Org A browser context was denied known foreign contact ${betaMainContactId} with HTTP ${freshForeignIdReadStatus}`,
+              ),
+              passCheck(
+                "audit_identity_preserved",
+                "Fresh-session evidence retained the server-derived audit identity and correlation",
+              ),
+            ],
+          },
+        },
+      }
+      const evidencePath = writeC9BrowserEvidence(evidence)
+      if (evidencePath) console.log(`[c9-browser] evidence=${evidencePath}`)
     } finally {
       await alpha.branchContext.close()
       await alpha.context.close()

@@ -10,10 +10,12 @@ import { expect, test, type Page } from "@playwright/test"
 
 import {
   chooseFirstOption,
+  callReducerBff,
   expectNoAppError,
   expectSeededText,
   fillField,
   gotoModule,
+  fetchSessionOrganizationId,
   smokeName,
   submitForm,
 } from "./helpers"
@@ -134,6 +136,14 @@ test.describe("Inventory module e2e", { tag: "@dev-fixture" }, () => {
 
   test("creates quality alert with minimal fields", async ({ page }) => {
     const title = smokeName("quality-alert")
+    const organizationId = await fetchSessionOrganizationId(page)
+    await callReducerBff(page, "create_quality_team", [organizationId, {
+      name: smokeName("quality-team"),
+      description: null,
+      email: null,
+      phone: null,
+      metadata: null,
+    }])
     await gotoModule(page, "/inventory", "inventory")
     await openInventoryTab(page, "quality")
 

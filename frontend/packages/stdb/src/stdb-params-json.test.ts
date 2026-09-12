@@ -55,6 +55,14 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(out.phone, { none: [] })
   })
 
+  it("wraps an end-contact-role reason as an optional string", () => {
+    const out = stdbParamsToJson(
+      { reason: "test correction" },
+      "EndContactRoleParams",
+    )
+    assert.deepEqual(out.reason, { some: "test correction" })
+  })
+
   it("encodeReducerCallArgs SATS-encodes the trailing params object", () => {
     const encoded = encodeReducerCallArgs("create_lead", [
       1,
@@ -122,6 +130,29 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(params.proposal_id, { none: [] })
     assert.deepEqual(params.order_lines, [])
     assert.equal("companyId" in params, false)
+  })
+
+  it("encodeReducerCallArgs encodes contact identity fields and optional values", () => {
+    assert.deepEqual(
+      encodeReducerCallArgs("create_contact_identity", [1, {
+        contactId: 2,
+        companyId: 3,
+        kind: { tag: "Primary" },
+        rawValue: "+12025550101",
+        isPreferred: true,
+        verificationState: null,
+        metadata: null,
+      }]),
+      [1, {
+      contact_id: 2,
+      company_id: { some: 3 },
+      kind: { primary: [] },
+      raw_value: "+12025550101",
+      is_preferred: true,
+      verification_state: { none: [] },
+      metadata: { none: [] },
+      }],
+    )
   })
 
   it("encodeReducerCallArgs SATS-encodes nested return order line Option fields", () => {
@@ -260,6 +291,25 @@ describe("stdbParamsToJson", () => {
         },
       },
     )
+  })
+
+  it("encodes payment transaction timestamps through compatibility reducer calls", () => {
+    const encoded = encodeReducerCallArgs("create_payment_transaction", [
+      42,
+      {
+        companyId: 7,
+        occurredAt: {
+          some: { microsSinceUnixEpoch: 1_700_000_000_000_000n },
+        },
+      },
+    ])
+    const params = encoded[1] as Record<string, unknown>
+    assert.equal(params.company_id, 7)
+    assert.deepEqual(params.occurred_at, {
+      some: {
+        __timestamp_micros_since_unix_epoch__: 1_700_000_000_000_000,
+      },
+    })
   })
 
   it("encodeReducerCallArgs SATS-encodes update_sale_order params", () => {

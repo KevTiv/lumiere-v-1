@@ -3,6 +3,9 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { fetchAiGateway, resolveAiGatewayBaseUrl } from '@/lib/ai-gateway-server'
 import { resolveApiSession, type ApiSession } from '@/lib/api-session'
 import { companyIdBelongsToOrganization } from '@/lib/company-scope-server'
+import { positiveInteger } from './positive-integer'
+
+export { positiveInteger } from './positive-integer'
 
 export type JsonObject = Record<string, unknown>
 
@@ -55,15 +58,6 @@ export async function parseJsonBody(request: NextRequest): Promise<
   } catch {
     return { ok: false, response: NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }) }
   }
-}
-
-export function positiveInteger(raw: unknown): number {
-  if (typeof raw === 'number' && Number.isFinite(raw)) return Math.floor(raw)
-  if (typeof raw === 'string' && raw.trim() !== '') {
-    const parsed = Number.parseInt(raw, 10)
-    if (Number.isFinite(parsed)) return parsed
-  }
-  return NaN
 }
 
 export function optionalPositiveInteger(raw: unknown): number | undefined {

@@ -1,33 +1,16 @@
-//! Port of `frontend/web/lib/api-session.ts` (JWT + `user_organization` + field-access context).
+//! Session resolution from an authenticated SpacetimeDB token and membership.
 
-use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::Value;
 
 use crate::error::ApiError;
 use crate::state::AppState;
 use stdb_auth::{
     select_field_permissions_for_org_sql, select_roles_active_sql,
-    select_user_organization_for_identity_sql, select_user_profile_by_identity_sql,
+    select_user_organization_for_identity_sql, select_user_profile_for_organization_sql,
     FieldAccessContext, FieldPermissionLike,
 };
 use stdb_client::StdbClient;
 use stdb_config::runtime_is_production;
-
-const ADMIN_TOKEN_PLACEHOLDERS: &[&str] = &[
-    "",
-    "your-server-token-here",
-    "changeme",
-    "replace-me",
-    "replace_me",
-];
-
-fn is_usable_admin_token(raw: &str) -> bool {
-    let t = raw.trim();
-    !t.is_empty()
-        && !ADMIN_TOKEN_PLACEHOLDERS
-            .iter()
-            .any(|p| p.eq_ignore_ascii_case(t))
-}
 
 pub fn normalize_identity_hex_for_sql(identity: &str) -> String {
     let s = identity.trim();
@@ -56,66 +39,6 @@ pub fn parse_stdb_identity_hex(raw: &str) -> Option<String> {
     None
 }
 
-fn jwt_claim_as_identity_hex(s: &str) -> Option<String> {
-    parse_stdb_identity_hex(s)
-}
-
-pub fn decode_identity_hex_from_stdb_token(token: &str) -> Option<String> {
-    let parts: Vec<&str> = token.split('.').collect();
-    if parts.len() < 2 {
-        return None;
-    }
-    let mut b64 = parts[1].replace('-', "+").replace('_', "/");
-    let pad = (4 - (b64.len() % 4)) % 4;
-    b64.push_str(&"=".repeat(pad));
-    let bytes = STANDARD.decode(b64.as_bytes()).ok()?;
-    let json: Value = serde_json::from_slice(&bytes).ok()?;
-    if let Some(s) = json.get("identity").and_then(|v| v.as_str()) {
-        if let Some(h) = jwt_claim_as_identity_hex(s) {
-            return Some(h);
-        }
-    }
-    // Hybrid / WorkOS tokens: real Spacetime identity is here; `sub` may be a non-hex UUID.
-    if let Some(s) = json.get("hex_identity").and_then(|v| v.as_str()) {
-        if let Some(h) = jwt_claim_as_identity_hex(s) {
-            return Some(h);
-        }
-    }
-    if let Some(s) = json.get("sub").and_then(|v| v.as_str()) {
-        if let Some(h) = jwt_claim_as_identity_hex(s) {
-            return Some(h);
-        }
-    }
-    None
-}
-
-pub async fn query_user_organization_with_fallback(
-    client: &StdbClient,
-    identity_hex: &str,
-    admin_token: Option<&str>,
-) -> Result<Vec<Value>, String> {
-    let Some(id) = parse_stdb_identity_hex(identity_hex) else {
-        return Ok(vec![]);
-    };
-    let sql = select_user_organization_for_identity_sql(&id, None).map_err(|e| e.to_string())?;
-
-    let try_user = client.query_sql(&sql).await;
-    match try_user {
-        Ok(rows) if !rows.is_empty() => return Ok(rows),
-        Ok(_) | Err(_) => {}
-    }
-
-    let Some(admin) = admin_token.filter(|t| is_usable_admin_token(t)) else {
-        return Ok(vec![]);
-    };
-
-    let admin_client = client.with_token(admin);
-    admin_client
-        .query_sql(&sql)
-        .await
-        .map_err(|e| e.to_string())
-}
-
 pub async fn load_field_access_context(
     client: &StdbClient,
     identity_hex: &str,
@@ -128,8 +51,8 @@ pub async fn load_field_access_context(
         return Ok(None);
     }
 
-    let sql_profile =
-        select_user_profile_by_identity_sql(identity_hex, None).map_err(|e| e.to_string())?;
+    let sql_profile = select_user_profile_for_organization_sql(identity_hex, organization_id, None)
+        .map_err(|e| e.to_string())?;
     let profiles = client
         .query_sql(&sql_profile)
         .await
@@ -364,19 +287,24 @@ pub async fn resolve_api_session(
         return Ok(None);
     };
 
-    // Hint from `x-stdb-identity` / `stdb_identity` cookie — not trusted without a matching JWT.
+    // Hint from `x-stdb-identity` / `stdb_identity` cookie is never an authority source.
     let _ = x_std_identity;
 
-    let Some(identity_hex) = decode_identity_hex_from_stdb_token(&stdb_token) else {
-        return Ok(None);
-    };
+    let session_client = state.client_with_token(&stdb_token);
+    let identity_hex = session_client
+        .authenticated_identity()
+        .await
+        .map_err(|_| ApiError::Unauthorized)?;
 
-    let client = state.client_with_token(&stdb_token);
-
-    let admin = state.config.stdb_server_token.as_deref();
-
+    // The session token proves the actor identity above. Membership and policy
+    // tables are private authority state, so resolve them with the configured
+    // server credential and always constrain them to that verified identity.
+    let authority_client = &state.stdb;
     let mut organization_id: Option<u64> = None;
-    let rows = query_user_organization_with_fallback(&client, &identity_hex, admin)
+    let membership_sql = select_user_organization_for_identity_sql(&identity_hex, None)
+        .map_err(ApiError::Internal)?;
+    let rows = authority_client
+        .query_sql(&membership_sql)
         .await
         .map_err(|e| ApiError::Internal(format!("user_organization query: {e}")))?;
     let org = rows.iter().find(|o| {
@@ -398,10 +326,9 @@ pub async fn resolve_api_session(
 
     let mut field_access: Option<FieldAccessContext> = None;
     if let Some(oid) = organization_id {
-        field_access = load_field_access_context(&client, &identity_hex, oid)
+        field_access = load_field_access_context(authority_client, &identity_hex, oid)
             .await
-            .ok()
-            .flatten();
+            .map_err(|e| ApiError::Internal(format!("field access query: {e}")))?;
     }
 
     Ok(Some(ApiSession {
@@ -413,66 +340,31 @@ pub async fn resolve_api_session(
 }
 
 #[cfg(test)]
+pub(crate) mod test_support;
+
+#[cfg(test)]
 mod tests {
+    use super::test_support::test_config;
     use super::*;
-    use crate::config::Config;
-
-    fn test_config(server_token: Option<&str>) -> Config {
-        Config {
-            port: 8082,
-            stdb_host: "http://127.0.0.1:3000".into(),
-            stdb_module: "test-module".into(),
-            stdb_server_token: server_token.map(str::to_string),
-            cors_origins: vec![],
-            dev_mock_org_id: None,
-            ai_gateway_url: "http://127.0.0.1:3001".into(),
-            workos_client_id: None,
-            stdb_credential_encryption_key: None,
-            resend_api_key: None,
-            resend_from_email: "test@example.com".into(),
-            app_url: "http://localhost:3000".into(),
-            cookie_secure: false,
-            report_renderer_url: None,
-            report_artifact_dir: std::env::temp_dir().join("lumiere-owner-reports-test"),
-            document_blob_dir: std::env::temp_dir().join("lumiere-document-blobs-test"),
-            owner_report_worker_poll_secs: 15,
-            owner_report_worker_name: "test-owner-report-worker".to_string(),
-            owner_report_worker_port: 8091,
-            workflow_worker_poll_secs: 15,
-            workflow_worker_name: "test-workflow-worker".to_string(),
-            workflow_worker_port: 8093,
-            workflow_worker_org_ids: vec![],
-            workflow_worker_lease_ttl_secs: 60,
-            workflow_external_dispatch_enabled: false,
-            workflow_external_dispatch_company_ids: vec![],
-            workflow_external_dispatch_action_keys: vec![],
-            workflow_external_webhook_url: None,
-            workflow_external_webhook_timeout_ms: 10_000,
-        }
-    }
-
-    fn fake_jwt(payload_json: &str) -> String {
-        let header = STANDARD.encode(b"{\"alg\":\"none\"}");
-        let payload = STANDARD.encode(payload_json.as_bytes());
-        format!("{header}.{payload}.sig")
-    }
-
-    const VALID_IDENTITY_HEX: &str =
-        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
     #[test]
-    fn decode_identity_from_jwt_identity_claim() {
-        let token = fake_jwt(&format!(r#"{{"identity":"{VALID_IDENTITY_HEX}"}}"#));
+    fn identity_parser_accepts_only_canonical_stdb_identities() {
+        let identity = "ab".repeat(32);
+
         assert_eq!(
-            decode_identity_hex_from_stdb_token(&token).as_deref(),
-            Some(VALID_IDENTITY_HEX)
+            parse_stdb_identity_hex(&format!("0x{identity}")),
+            Some(identity.clone())
         );
-    }
-
-    #[test]
-    fn decode_identity_rejects_non_hex_sub() {
-        let token = fake_jwt(r#"{"sub":"00000000-0000-4000-8000-000000000000"}"#);
-        assert!(decode_identity_hex_from_stdb_token(&token).is_none());
+        assert_eq!(
+            parse_stdb_identity_hex(&format!("0X{}", identity.to_ascii_uppercase())),
+            Some(identity)
+        );
+        assert_eq!(parse_stdb_identity_hex("user@example.com"), None);
+        assert_eq!(
+            parse_stdb_identity_hex("550e8400-e29b-41d4-a716-446655440000"),
+            None
+        );
+        assert_eq!(parse_stdb_identity_hex("0x1234"), None);
     }
 
     #[tokio::test]
@@ -482,28 +374,5 @@ mod tests {
             .await
             .expect("resolve should not error");
         assert!(session.is_none());
-    }
-
-    #[tokio::test]
-    async fn identity_header_without_jwt_claim_is_rejected() {
-        let state = AppState::new(test_config(None));
-        let token = fake_jwt(r#"{"iss":"spacetimedb"}"#);
-        let auth = format!("Bearer {token}");
-        let session = resolve_api_session(&state, Some(&auth), None, Some(VALID_IDENTITY_HEX))
-            .await
-            .expect("resolve should not error");
-        assert!(session.is_none());
-    }
-
-    #[tokio::test]
-    async fn bearer_with_identity_claim_resolves_session() {
-        let state = AppState::new(test_config(None));
-        let token = fake_jwt(&format!(r#"{{"identity":"{VALID_IDENTITY_HEX}"}}"#));
-        let auth = format!("Bearer {token}");
-        let session = resolve_api_session(&state, Some(&auth), None, None)
-            .await
-            .expect("resolve should not error");
-        assert!(session.is_some());
-        assert_eq!(session.unwrap().identity_hex, VALID_IDENTITY_HEX);
     }
 }

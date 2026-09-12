@@ -475,7 +475,7 @@ export const crmForms: FormRegistryEntry[] = [
           name: "email",
           label: "Email",
           fieldType: "Email",
-          validation: { required: true },
+          validation: { required: false },
           aiSuggestions: [],
           order: 3,
           isSystem: true,

@@ -25,6 +25,7 @@ import {
   encodeOptionalU64,
   stdbParamsToJson,
 } from "@lumiere/erp-shared/stdb-params-json"
+import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
 import { invalidateStdbQueryResources } from "./stdb"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import type {
@@ -48,12 +49,6 @@ import type {
   UpdateLandedCostParams,
   AddLandedCostLineParams,
 } from "@lumiere/stdb/types"
-
-type ScalarId = bigint | number | string
-
-function toScalarU64(v: ScalarId): bigint {
-  return typeof v === "bigint" ? v : BigInt(String(v))
-}
 
 /** Shallow merge for reducer JSON: `overrides` entries with value `undefined` are skipped. */
 function mergeReducerParams(

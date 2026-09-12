@@ -5,6 +5,20 @@
       "dependsOn": ["^build"],
       "outputs": [".output/**", "dist/**"]
     },
+    "my-project#build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "env": [
+        "NEXT_PUBLIC_*",
+        "LUMIERE_*",
+        "STDB_*",
+        "WORKOS_*",
+        "POSTHOG_*",
+        "DEV_MOCK_ORG_ID",
+        "NODE_ENV"
+      ]
+    },
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },

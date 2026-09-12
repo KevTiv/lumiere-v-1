@@ -8,6 +8,7 @@ use crate::support::read_to_string;
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use std::collections::BTreeSet;
+use syn::{Expr, ExprPath, File, Item, Lit, Pat, Stmt};
 
 pub fn run(paths: &Paths, registry_text: &str) -> Result<()> {
     let allowlist_json = read_to_string(&paths.query_exec_non_registry_json)?;
@@ -36,64 +37,78 @@ pub fn registry_key_set(registry_json: &str) -> Result<BTreeSet<String>> {
     Ok(obj.keys().cloned().collect())
 }
 
-/// Parse early-return `match resource` arms (before `_ => {}`) from `query_exec.rs`.
+/// Parse early-return `match resource` arms (before the top-level fallback) from the
+/// intended query dispatcher in `query_exec.rs`.
 pub fn parse_early_special_resources(query_exec_rs: &str) -> Result<BTreeSet<String>> {
-    let fn_start = query_exec_rs
-        .find("pub async fn execute_resource_query")
-        .context("execute_resource_query not found in query_exec.rs")?;
-    let match_start = query_exec_rs[fn_start..]
-        .find("match resource {")
-        .context("match resource block not found")?
-        + fn_start;
+    let file: File = syn::parse_file(query_exec_rs).context("parse query_exec.rs")?;
+    let dispatcher_names = [
+        "execute_resource_query_for_company",
+        "execute_resource_query",
+    ];
+    let dispatcher = dispatcher_names
+        .iter()
+        .find_map(|name| {
+            file.items.iter().find_map(|item| match item {
+                Item::Fn(function) if function.sig.ident == *name => Some(function),
+                _ => None,
+            })
+        })
+        .context("intended execute_resource_query dispatcher not found in query_exec.rs")?;
+
+    let resource_match = dispatcher
+        .block
+        .stmts
+        .iter()
+        .find_map(|statement| match statement {
+            Stmt::Expr(Expr::Match(expression), _) if is_resource_expr(&expression.expr) => {
+                Some(expression)
+            }
+            _ => None,
+        })
+        .context("top-level match resource block not found in intended dispatcher")?;
 
     let mut resources = BTreeSet::new();
-    let mut pattern_buf = String::new();
-
-    for line in query_exec_rs[match_start..].lines().skip(1) {
-        if line.trim() == "_ => {}" {
-            break;
+    let mut found_fallback = false;
+    for arm in &resource_match.arms {
+        if matches!(&arm.pat, Pat::Wild(_)) && arm.guard.is_none() {
+            found_fallback = true;
         }
-        // Arm patterns are indented with 8 spaces; bodies use 12+.
-        if !(line.starts_with("        ") && !line.starts_with("            ")) {
-            continue;
-        }
-        let trimmed = line.trim();
-        if !(trimmed.starts_with('"') || trimmed.starts_with('|')) {
-            continue;
-        }
-
-        pattern_buf.push(' ');
-        pattern_buf.push_str(trimmed);
-        if trimmed.contains("=>") {
-            for key in extract_quoted_keys(pattern_buf.split("=>").next().unwrap_or("")) {
-                resources.insert(key);
-            }
-            pattern_buf.clear();
+        for literal in pattern_resource_literals(&arm.pat)? {
+            resources.insert(literal);
         }
     }
-
-    if !pattern_buf.is_empty() {
-        bail!("unfinished match arm pattern near end of early match block");
+    if !found_fallback {
+        bail!("match resource block has no top-level wildcard fallback");
     }
-
     Ok(resources)
 }
 
-fn extract_quoted_keys(fragment: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut rest = fragment;
-    while let Some(start) = rest.find('"') {
-        rest = &rest[start + 1..];
-        let Some(end) = rest.find('"') else {
-            break;
-        };
-        let key = &rest[..end];
-        if !key.is_empty() && key.chars().all(|c| c.is_ascii_lowercase() || c == '-') {
-            out.push(key.to_string());
+fn is_resource_expr(expression: &Expr) -> bool {
+    let Expr::Path(ExprPath {
+        qself: None, path, ..
+    }) = expression
+    else {
+        return false;
+    };
+    path.segments.len() == 1 && path.segments[0].ident == "resource"
+}
+
+fn pattern_resource_literals(pattern: &Pat) -> Result<Vec<String>> {
+    Ok(match pattern {
+        Pat::Lit(literal) => match &literal.lit {
+            Lit::Str(value) => vec![value.value()],
+            _ => bail!("resource dispatcher patterns must be string literals"),
+        },
+        Pat::Or(or) => {
+            let mut resources = Vec::new();
+            for case in &or.cases {
+                resources.extend(pattern_resource_literals(case)?);
+            }
+            resources
         }
-        rest = &rest[end + 1..];
-    }
-    out
+        Pat::Wild(_) => Vec::new(),
+        _ => bail!("unsupported resource dispatcher pattern; audit cannot prove coverage"),
+    })
 }
 
 pub fn audit_query_exec_special_cases(
@@ -159,15 +174,100 @@ mod tests {
 
     #[test]
     fn parse_early_arms_finds_known_virtual_resource() {
-        let sample = r#"
+        let sample = r##"
+fn authoritative_resource_scope(resource: &str) -> Option<()> {
+    match resource {
+        "not-an-early-arm" => Some(()),
+        _ => None,
+    }
+}
+
+pub async fn execute_resource_query_with_options() {
+    match resource {
+        "wrong-dispatcher" => { return Ok(vec![]); }
+        _ => {}
+    }
+}
+
 pub async fn execute_resource_query() {
     match resource {
+        "nested-parent" => {
+            /* braces in comments must not change match depth: { } */
+            let _sql = r#"{"brace": true}"#;
+            let _ = match resource {
+                "nested-child" => true,
+                _ => false,
+            };
+            return Ok(vec![]);
+        }
+        "import-jobs" | "policy-snapshots" => { return Ok(vec![]); }
+        _ => {}
+    }
+}
+"##;
+        let keys = parse_early_special_resources(sample).unwrap();
+        assert_eq!(
+            keys,
+            ["import-jobs", "nested-parent", "policy-snapshots"]
+                .into_iter()
+                .map(str::to_string)
+                .collect()
+        );
+    }
+
+    #[test]
+    fn parse_actual_query_exec_selects_current_dispatcher() {
+        let paths = Paths::resolve(&manifest_dir());
+        let source = read_to_string(&paths.query_exec_rs).unwrap();
+        let keys = parse_early_special_resources(&source).unwrap();
+        assert!(keys.contains("roles"));
+        assert!(!keys.contains("products"));
+    }
+
+    #[test]
+    fn parse_early_arms_requires_fallback_sentinel() {
+        let sample = r#"
+pub async fn execute_resource_query_for_company() {
+    match resource {
         "import-jobs" => { return Ok(vec![]); }
+    }
+}
+"#;
+        let error = parse_early_special_resources(sample).unwrap_err();
+        assert!(error.to_string().contains("wildcard fallback"));
+    }
+
+    #[test]
+    fn audit_rejects_unknown_and_stale_allowlist_entries() {
+        let source = r#"
+pub async fn execute_resource_query_for_company() {
+    match resource {
+        "user_2" => { return Ok(vec![]); }
         _ => {}
     }
 }
 "#;
-        let keys = parse_early_special_resources(sample).unwrap();
-        assert!(keys.contains("import-jobs"));
+        let unknown = audit_query_exec_special_cases(source, r#"{"known": {}}"#, "[]").unwrap_err();
+        assert!(unknown.to_string().contains("user_2"));
+
+        let stale =
+            audit_query_exec_special_cases(source, r#"{"user_2": {}}"#, r#"["stale-resource"]"#)
+                .unwrap_err();
+        assert!(stale.to_string().contains("stale-resource"));
+    }
+
+    #[test]
+    fn audit_fails_closed_for_uninspectable_patterns_and_guarded_fallback() {
+        for arms in [
+            "RESOURCE_CONSTANT => {}, _ => {}",
+            "name => {}",
+            "42 => {}, _ => {}",
+            "\"known\" => {}, _ if allowed => {}",
+        ] {
+            let source = format!(
+                "async fn execute_resource_query_for_company() {{ match resource {{ {arms} }} }}"
+            );
+            assert!(parse_early_special_resources(&source).is_err(), "{arms}");
+        }
     }
 }

@@ -20,7 +20,7 @@ use crate::accounting::fiscal_periods::{
 };
 use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::core::organization::{company, require_company_in_organization};
-use crate::core::users::user_profile;
+use crate::core::users::find_user_profile_for_identity;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::ConsolidationState;
 
@@ -1110,12 +1110,7 @@ pub fn unmatch_elimination_entry(
 
 #[spacetimedb::reducer]
 pub fn backfill_consolidation_organization_ownership(ctx: &ReducerContext) -> Result<(), String> {
-    let user = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
-        .ok_or("user not found")?;
+    let user = find_user_profile_for_identity(ctx, ctx.sender()).ok_or("user not found")?;
     if !user.is_superuser {
         return Err("only superusers may backfill accounting ownership".to_string());
     }

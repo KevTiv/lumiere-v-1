@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::config::Config;
+use crate::organization_placement::ConfiguredPlacementResolver;
 use stdb_client::StdbClient;
 
 #[derive(Clone)]
@@ -8,10 +9,12 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub stdb: StdbClient,
     pub http: reqwest::Client,
+    pub organization_placements: ConfiguredPlacementResolver,
 }
 
 impl AppState {
     pub fn new(config: Config) -> Self {
+        let organization_placements = config.organization_placement.clone();
         let stdb = StdbClient::new(
             config.stdb_host.clone(),
             config.stdb_module.clone(),
@@ -24,6 +27,7 @@ impl AppState {
             config: Arc::new(config),
             stdb,
             http: reqwest::Client::new(),
+            organization_placements,
         }
     }
 

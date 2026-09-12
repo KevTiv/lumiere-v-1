@@ -268,7 +268,11 @@ fn find_tax_id(
         .ok_or_else(|| "probe tax not found after create".to_string())
 }
 
-fn tax_probe_line_params(account_id: u64, partner_id: u64, tax_ids: Vec<u64>) -> AddAccountMoveLineParams {
+fn tax_probe_line_params(
+    account_id: u64,
+    partner_id: u64,
+    tax_ids: Vec<u64>,
+) -> AddAccountMoveLineParams {
     AddAccountMoveLineParams {
         account_id,
         name: "ACC-004 tax probe".to_string(),
@@ -370,11 +374,7 @@ pub fn test_add_account_move_line_rejects_invalid_and_cross_org_tax_id(
     );
     match nonexistent_result {
         Err(error) if error.contains("not found") => {}
-        Err(error) => {
-            return Err(format!(
-                "unexpected error for nonexistent tax_id: {error}"
-            ))
-        }
+        Err(error) => return Err(format!("unexpected error for nonexistent tax_id: {error}")),
         Ok(()) => return Err("add_account_move_line accepted a nonexistent tax_id".to_string()),
     }
 
@@ -393,9 +393,7 @@ pub fn test_add_account_move_line_rejects_invalid_and_cross_org_tax_id(
             ))
         }
         Ok(()) => {
-            return Err(
-                "add_account_move_line accepted a cross-organization tax_id".to_string(),
-            )
+            return Err("add_account_move_line accepted a cross-organization tax_id".to_string())
         }
     }
 

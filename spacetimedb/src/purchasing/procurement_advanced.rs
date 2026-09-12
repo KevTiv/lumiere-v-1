@@ -6,14 +6,15 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::accounting::relations::{require_active_currency_id, require_contact_in_scope};
 use crate::core::organization::require_company_in_organization;
-use crate::core::users::{user_organization, user_profile};
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
+use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::{require_product_in_org, require_warehouse_in_org_and_company};
 use crate::manufacturing::relations::{require_uom_compatible, require_uom_in_org};
 use crate::purchasing::purchase_orders::{
-    add_purchase_order_line, create_purchase_order, purchase_order, AddPurchaseOrderLineParams,
-    CreatePurchaseOrderParams,
+    add_purchase_order_line, create_purchase_order, purchase_order, purchase_order_line,
+    AddPurchaseOrderLineParams, CreatePurchaseOrderParams,
 };
 use crate::purchasing::require_purchasing_ri_phase0_unsafe_actions_enabled;
 use crate::types::PoState;
@@ -401,11 +402,7 @@ fn require_organization_identity(
     identity: Identity,
     role: &str,
 ) -> Result<(), String> {
-    let profile = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(&identity)
+    let profile = find_user_profile_for_organization(ctx, identity, organization_id)
         .ok_or_else(|| format!("{role} user profile not found"))?;
     if !profile.is_active {
         return Err(format!("{role} user is inactive"));
@@ -773,7 +770,8 @@ pub fn release_blanket_to_po(
             });
     }
 
-    ctx.db
+    let committed_release = ctx
+        .db
         .purchase_blanket_release()
         .insert(PurchaseBlanketRelease {
             id: 0,
@@ -823,6 +821,71 @@ pub fn release_blanket_to_po(
             metadata: None,
         },
     );
+
+    let committed_blanket = ctx
+        .db
+        .purchase_blanket_order()
+        .id()
+        .find(&blanket_order_id)
+        .ok_or("Blanket order disappeared before commit recording")?;
+    let mut committed_blanket_lines: Vec<_> = ctx
+        .db
+        .purchase_blanket_order_line()
+        .purchase_blanket_line_by_blanket()
+        .filter(&blanket_order_id)
+        .collect();
+    committed_blanket_lines.sort_by_key(|line| line.id);
+    let committed_po = ctx
+        .db
+        .purchase_order()
+        .id()
+        .find(&po.id)
+        .ok_or("Purchase order disappeared before commit recording")?;
+    let mut committed_po_lines: Vec<_> = ctx
+        .db
+        .purchase_order_line()
+        .purchase_order_line_by_order()
+        .filter(&po.id)
+        .collect();
+    committed_po_lines.sort_by_key(|line| line.id);
+    let mut changes = vec![RowChange::upsert_stdb_row(
+        "purchase_blanket_order",
+        serde_json::json!({"id": committed_blanket.id}),
+        &committed_blanket,
+    )?];
+    for line in &committed_blanket_lines {
+        changes.push(RowChange::upsert_stdb_row(
+            "purchase_blanket_order_line",
+            serde_json::json!({"id": line.id}),
+            line,
+        )?);
+    }
+    changes.push(RowChange::upsert_stdb_row(
+        "purchase_order",
+        serde_json::json!({"id": committed_po.id}),
+        &committed_po,
+    )?);
+    for line in &committed_po_lines {
+        changes.push(RowChange::upsert_stdb_row(
+            "purchase_order_line",
+            serde_json::json!({"id": line.id}),
+            line,
+        )?);
+    }
+    changes.push(RowChange::upsert_stdb_row(
+        "purchase_blanket_release",
+        serde_json::json!({"id": committed_release.id}),
+        &committed_release,
+    )?);
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.release_blanket_to_po".to_string(),
+            correlation_id: format!("blanket-order:{blanket_order_id}:release:{idempotency_key}"),
+            changes,
+        },
+    )?;
     Ok(())
 }
 

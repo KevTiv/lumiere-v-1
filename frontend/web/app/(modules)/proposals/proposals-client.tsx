@@ -314,6 +314,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         if (tab.id === "proposals" && tab.entityConfig) {
           return {
             ...tab,
+            createForm: proposalCreateForm,
             entityConfig: proposalsTableConfig(t, {
               formatProposalDisplayName: proposalPrimaryLabel,
               actions: proposalRowActions,
@@ -323,7 +324,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         return tab
       }),
     }),
-    [liveSections, moduleConfig, proposalRowActions, t],
+    [liveSections, moduleConfig, proposalCreateForm, proposalRowActions, t],
   )
 
   const data = useMemo(
@@ -403,6 +404,11 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
 
   return (
     <>
+      {currencyOptions.length > 0 ? (
+        <span className="sr-only" data-testid="proposal-currencies-ready">
+          Currency options ready
+        </span>
+      ) : null}
       <ModuleView
         config={config}
         data={data}

@@ -16,7 +16,9 @@
 //! “preserve from another source”; that collides with explicit clear.
 
 use spacetimedb::ReducerContext;
+use std::collections::HashSet;
 
+use crate::accounting::analytic_accounting::account_analytic_account;
 use crate::accounting::chart_of_accounts::{
     account_account, account_journal, AccountAccount, AccountJournal,
 };
@@ -147,4 +149,66 @@ pub(crate) fn require_contact_in_scope(
         return Err(format!("{role} contact is inactive"));
     }
     Ok(contact)
+}
+
+/// Validate a list of tax IDs: duplicates fail, each must be active and
+/// belong to the given organization and company.
+///
+/// Error text and order match the former per-module validators exactly.
+pub(crate) fn require_active_tax_ids(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    tax_ids: &[u64],
+) -> Result<(), String> {
+    let mut seen = HashSet::with_capacity(tax_ids.len());
+    for tax_id in tax_ids {
+        if !seen.insert(*tax_id) {
+            return Err(format!("Tax {tax_id} is duplicated"));
+        }
+        let tax = ctx
+            .db
+            .account_tax()
+            .id()
+            .find(tax_id)
+            .ok_or_else(|| format!("Tax {tax_id} not found"))?;
+        if tax.organization_id != organization_id || tax.company_id != company_id {
+            return Err(format!(
+                "Tax {tax_id} does not belong to this organization and company"
+            ));
+        }
+        if !tax.active {
+            return Err(format!("Tax {tax_id} is inactive"));
+        }
+    }
+    Ok(())
+}
+
+/// Validate an optional analytic account ID. `None` is a no-op (the field
+/// is optional). When `Some`, the account must be active and belong to the
+/// given organization and company.
+pub(crate) fn require_analytic_account(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    analytic_account_id: Option<u64>,
+) -> Result<(), String> {
+    let Some(analytic_account_id) = analytic_account_id else {
+        return Ok(());
+    };
+    let account = ctx
+        .db
+        .account_analytic_account()
+        .id()
+        .find(&analytic_account_id)
+        .ok_or("Analytic account not found")?;
+    if account.organization_id != organization_id || account.company_id != company_id {
+        return Err(
+            "Analytic account does not belong to this organization and company".to_string(),
+        );
+    }
+    if !account.active {
+        return Err("Analytic account is inactive".to_string());
+    }
+    Ok(())
 }

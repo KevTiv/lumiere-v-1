@@ -4,20 +4,25 @@ import { matchesOperationResponse } from "./operation-response"
  *
  * Seeded records: vendor partner `Globex Corp`, product `Lumiere Dev Laptop`.
  */
-import { expect, test } from "@playwright/test"
+import { expect, request as playwrightRequest, test, type Browser, type Page } from "@playwright/test"
 
 import {
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
-  createApprovalRuleViaUi,
+  callReducerBff,
   expectNoAppError,
+  fetchAdminRoleId,
+  fetchDefaultCompanyId,
   fetchLatestPurchaseOrderIdByPartner,
   fetchPurchaseOrderSelectLabel,
+  fetchSessionOrganizationId,
   fetchVendorPartnerIdByName,
   fillField,
   gotoModule,
   rejectApprovalRequestViaUi,
+  seedPurchaseOrderApprovalWorkflow,
   selectEntityRowById,
+  signIn,
   smokeName,
   submitForm,
   waitForEntityActionEnabled,
@@ -26,6 +31,57 @@ import {
 } from "./helpers"
 
 const VENDOR_NAME = "Globex Corp"
+const APPROVER_PASSWORD = "Password123$"
+
+async function provisionIndependentApprover(page: Page, browser: Browser) {
+  const email = `${smokeName("approval-reviewer")}@example.test`
+  const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3100"
+  const signup = await playwrightRequest.newContext({ baseURL })
+  let identity: string
+  try {
+    const response = await signup.post("/api/auth/signup", {
+      data: { email, password: APPROVER_PASSWORD },
+    })
+    if (!response.ok()) {
+      throw new Error(`approver signup failed (${response.status()}): ${await response.text()}`)
+    }
+    const state = await signup.storageState()
+    const rawIdentity = state.cookies.find((cookie) => cookie.name === "stdb_identity")?.value
+    if (!rawIdentity) throw new Error("approver signup did not set stdb_identity")
+    identity = rawIdentity.replace(/^0x/i, "")
+  } finally {
+    await signup.dispose()
+  }
+
+  const organizationId = await fetchSessionOrganizationId(page)
+  const companyId = await fetchDefaultCompanyId(page)
+  const adminRoleId = await fetchAdminRoleId(page)
+  await callReducerBff(page, "add_org_member", [
+    identity,
+    organizationId,
+    {
+      role_name: "admin",
+      company_id: companyId,
+      job_title: null,
+      department_id: null,
+      employee_id: null,
+      is_active: true,
+      is_default: true,
+      metadata: null,
+    },
+  ])
+  await callReducerBff(page, "assign_role", [
+    identity,
+    adminRoleId,
+    organizationId,
+    { expires_at_micros: null, metadata: null },
+  ])
+
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+  const approverPage = await context.newPage()
+  await signIn(approverPage, email, APPROVER_PASSWORD)
+  return { context, page: approverPage }
+}
 
 test.describe(
   "Parity phase 3 — approvals and documents mutations",
@@ -33,6 +89,7 @@ test.describe(
   () => {
     test("blocks PO confirm behind approval rule then rejects the pending request", async ({
       page,
+      browser,
     }) => {
       test.setTimeout(240_000)
 
@@ -40,9 +97,13 @@ test.describe(
       const origin = smokeName("approval-po")
       const vendorPartnerId = await fetchVendorPartnerIdByName(page, VENDOR_NAME)
 
-      await createApprovalRuleViaUi(page, { name: ruleName, threshold: "100" })
+      const approvalWorkflow = await seedPurchaseOrderApprovalWorkflow(page, {
+        workflowKey: ruleName.toLowerCase().replace(/-/g, "_"),
+        name: ruleName,
+      })
 
-      await gotoModule(page, "/purchasing", "purchasing")
+      try {
+        await gotoModule(page, "/purchasing", "purchasing")
       await page.getByTestId("module-tab-purchasing-orders").click()
       await page.getByTestId("module-create-purchasing-orders").click()
       await expect(page.getByTestId("form-modal-new-purchase-order")).toBeVisible()
@@ -58,7 +119,7 @@ test.describe(
       ])
       expect(createPoRes.ok()).toBe(true)
 
-      const orderId = await fetchLatestPurchaseOrderIdByPartner(page, vendorPartnerId)
+      const orderId = await fetchLatestPurchaseOrderIdByPartner(page, vendorPartnerId, origin)
       const orderLabel = await fetchPurchaseOrderSelectLabel(page, orderId)
 
       await page.getByTestId("module-tab-purchasing-lines").click()
@@ -83,11 +144,23 @@ test.describe(
       await waitForEntityActionEnabled(page, "entity-action-po-confirm")
       await page.getByTestId("entity-action-po-confirm").click()
 
-      await waitForPurchaseOrderState(page, orderId, "ToApprove")
       const requestId = await waitForPendingApprovalRequest(page, "purchase_order", orderId)
-      await rejectApprovalRequestViaUi(page, requestId, "E2E approval reject")
+      await waitForPurchaseOrderState(page, orderId, "Draft")
+        const approver = await provisionIndependentApprover(page, browser)
+        try {
+          await rejectApprovalRequestViaUi(approver.page, requestId, "E2E approval reject")
+        } finally {
+          await approver.context.close()
+        }
 
-      await expectNoAppError(page)
+        await expectNoAppError(page)
+      } finally {
+        await callReducerBff(page, "retire_workflow_version", [
+          approvalWorkflow.organizationId,
+          approvalWorkflow.versionId,
+          approvalWorkflow.revision,
+        ])
+      }
     })
   },
 )

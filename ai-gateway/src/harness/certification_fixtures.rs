@@ -206,27 +206,11 @@ fn required_u64(value: Option<&Value>) -> Option<u64> {
 }
 
 pub fn hash_value(value: &Value) -> String {
-    let canonical = canonicalize(value);
+    let canonical = crate::wire_decode::canonicalize(value);
     let encoded = serde_json::to_vec(&canonical).unwrap_or_else(|_| b"null".to_vec());
     let mut hasher = Sha256::new();
     hasher.update(encoded);
     format!("sha256:{:x}", hasher.finalize())
-}
-
-fn canonicalize(value: &Value) -> Value {
-    match value {
-        Value::Object(object) => {
-            let mut entries = object.iter().collect::<Vec<_>>();
-            entries.sort_by(|(left, _), (right, _)| left.cmp(right));
-            let mut canonical = serde_json::Map::new();
-            for (key, value) in entries {
-                canonical.insert(key.clone(), canonicalize(value));
-            }
-            Value::Object(canonical)
-        }
-        Value::Array(values) => Value::Array(values.iter().map(canonicalize).collect()),
-        other => other.clone(),
-    }
 }
 
 #[cfg(test)]

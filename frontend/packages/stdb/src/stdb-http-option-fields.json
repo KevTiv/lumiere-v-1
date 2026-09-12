@@ -492,6 +492,12 @@
   "ApplyExpenseAdvanceParams": [
     "metadata"
   ],
+  "AssignContactRoleParams": [
+    "company_id",
+    "active_from",
+    "active_until",
+    "metadata"
+  ],
   "AssignRoleParams": [
     "expires_at_micros",
     "metadata"
@@ -758,6 +764,8 @@
   "CreateAccountAccountParams": [
     "company_id",
     "currency_id",
+    "internal_type",
+    "internal_group",
     "group_id",
     "note",
     "metadata"
@@ -1072,6 +1080,11 @@
     "color",
     "metadata"
   ],
+  "CreateContactIdentityParams": [
+    "company_id",
+    "verification_state",
+    "metadata"
+  ],
   "CreateContactSegmentParams": [
     "description",
     "domain",
@@ -1282,8 +1295,6 @@
     "metadata"
   ],
   "CreateFiscalYearParams": [
-    "closing_move_id",
-    "opening_move_id",
     "notes",
     "metadata"
   ],
@@ -1487,6 +1498,34 @@
     "cash_journal_id",
     "use_payment_terminal",
     "image"
+  ],
+  "CreatePaymentAccountParams": [
+    "provider_label",
+    "reference_raw",
+    "fee_account_id",
+    "clearing_account_id",
+    "metadata"
+  ],
+  "CreatePaymentTransactionParams": [
+    "external_reference",
+    "occurred_at",
+    "source_entity",
+    "source_entity_id",
+    "metadata"
+  ],
+  "CreatePaymentFeeParams": [
+    "fee_account_id",
+    "tax_account_id",
+    "provider_reference",
+    "metadata"
+  ],
+  "AllocatePaymentParams": [
+    "write_off_account_id",
+    "metadata"
+  ],
+  "ReversePaymentTransactionParams": [
+    "reason",
+    "metadata"
   ],
   "CreatePaymentParams": [
     "date",
@@ -2295,6 +2334,9 @@
   ],
   "DoneStockMoveParams": [
     "company_id"
+  ],
+  "EndContactRoleParams": [
+    "reason"
   ],
   "EnqueueJobParams": [
     "scheduled_at_micros",
@@ -4486,6 +4528,9 @@
     "partner_id",
     "document_folder_id",
     "metadata"
+  ],
+  "CreatePricelistParams": [
+    "company_id"
   ],
   "UpdateProposalParams": [
     "title",

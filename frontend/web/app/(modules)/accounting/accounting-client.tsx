@@ -314,7 +314,7 @@ import {
   paymentJournalRowsToSelectOptions,
   accountMoveRowsToSelectOptions,
   saleOrderRowsToSelectOptions,
-  contactRowsToPartnerSelectOptions,
+  contactRowsToAccountingPartnerSelectOptions,
   companyRowsToSelectOptions,
   consolidationJournalRowsToSelectOptions,
   consolidationAccountRowsToSelectOptions,
@@ -974,7 +974,7 @@ function AccountingClientReady({
   )
 
   const partnerSelectOptions = useMemo(() => {
-    const fromApi = contactRowsToPartnerSelectOptions(contacts as Record<string, unknown>[])
+    const fromApi = contactRowsToAccountingPartnerSelectOptions(contacts)
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noPartners"), disabled: true }]
   }, [contacts, t])
@@ -3172,13 +3172,14 @@ function AccountingClientReady({
                     chartStructureContent={chartStructurePanel}
                     onImportAccountsCsv={() => setCsvKind("account")}
                     onAccountClick={(account) => setGlDrilldownAccount(account)}
-                    onCreate={async (data) => {
+                    onCreate={accountTypes.length > 0 ? async (data) => {
                       const p = toCreateAccountAccountParams(data as Record<string, unknown>, {
                         companyId: operatingCompanyId,
                         accountTypes,
                       })
-                      if (p) await createAccount.mutateAsync(p)
-                    }}
+                      if (!p) throw new Error("Account type configuration is unavailable")
+                      await createAccount.mutateAsync(p)
+                    } : undefined}
                   />
                 ),
               }

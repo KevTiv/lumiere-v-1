@@ -16,8 +16,6 @@ pub struct Config {
     pub mqtt_password: Option<String>,
     /// How often to poll SpacetimeDB for pending IoTActions (seconds)
     pub action_poll_secs: u64,
-    /// Default organization_id used when calling reducers from the gateway
-    pub default_org_id: u64,
 }
 
 impl Config {
@@ -33,7 +31,8 @@ impl Config {
             ),
             stdb_module: std::env::var("STDB_MODULE")
                 .context("STDB_MODULE is required (e.g. lumiere-v1)")?,
-            stdb_token: std::env::var("STDB_TOKEN").context("STDB_TOKEN is required")?,
+            stdb_token: std::env::var("STDB_IOT_GATEWAY_TOKEN")
+                .context("STDB_IOT_GATEWAY_TOKEN is required")?,
             mqtt_host: std::env::var("MQTT_HOST").unwrap_or_else(|_| "localhost".to_string()),
             mqtt_port: std::env::var("MQTT_PORT")
                 .unwrap_or_else(|_| "1883".to_string())
@@ -47,10 +46,6 @@ impl Config {
                 .unwrap_or_else(|_| "5".to_string())
                 .parse()
                 .context("ACTION_POLL_SECS must be a valid number")?,
-            default_org_id: std::env::var("DEFAULT_ORG_ID")
-                .unwrap_or_else(|_| "1".to_string())
-                .parse()
-                .context("DEFAULT_ORG_ID must be a valid number")?,
         })
     }
 }

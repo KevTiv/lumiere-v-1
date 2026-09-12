@@ -10,10 +10,10 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::Context;
-
 use crate::{
-    config::Config, providers::EmbedProvider, qdrant_client::VectorStore,
+    config::Config,
+    providers::EmbedProvider,
+    qdrant_client::VectorStore,
     stdb_embed::{
         authoritative_embedding_for_resource, company_belongs_to_organization, LumiereStdbExt,
     },
@@ -77,8 +77,14 @@ async fn process_batch(
 
         let result = match company_belongs_to_organization(stdb, org_id, payload.company_id).await {
             Ok(true) => match authoritative_embedding_for_resource(
-                stdb, org_id, payload.company_id, &payload.content_type, payload.content_id,
-            ).await {
+                stdb,
+                org_id,
+                payload.company_id,
+                &payload.content_type,
+                payload.content_id,
+            )
+            .await
+            {
                 Ok(Some(embedding)) => {
                     if embedding.text != payload.text {
                         Err(anyhow::anyhow!(
@@ -104,7 +110,8 @@ async fn process_batch(
                 }
                 Ok(None) => Err(anyhow::anyhow!(
                     "authoritative SearchEmbedding is missing for {} #{}",
-                    payload.content_type, payload.content_id
+                    payload.content_type,
+                    payload.content_id
                 )),
                 Err(error) => Err(error.context("failed to resolve authoritative embedding")),
             },

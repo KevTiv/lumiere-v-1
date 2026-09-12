@@ -31,10 +31,7 @@ pub async fn query_lead_by_id(
         "SELECT {} FROM lead WHERE id = {lead_id} AND organization_id = {org_id} LIMIT 1",
         cols.join(", ")
     );
-    let rows = client
-        .query_sql(&sql)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
     Ok(rows.into_iter().next())
 }
 
@@ -51,7 +48,7 @@ pub async fn query_org_users(
             "SELECT {col_uo} FROM user_organization WHERE organization_id = {org_id} AND is_active = true"
         ))
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(ApiError::internal)?;
     if memberships.is_empty() {
         return Ok(vec![]);
     }
@@ -91,8 +88,5 @@ pub async fn query_org_users(
         )
     };
     let sql = format!("SELECT {col_p} FROM user_profile WHERE {where_clause}");
-    client
-        .query_sql(&sql)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))
+    client.query_sql(&sql).await.map_err(ApiError::internal)
 }

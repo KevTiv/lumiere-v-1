@@ -250,8 +250,9 @@ pub fn test_pack_tax_evidence_required(ctx: &ReducerContext) -> Result<(), Strin
     if ctx
         .db
         .country_pack_definition()
-        .pack_key()
-        .find(&"au".to_string())
+        .country_pack_by_pack_key()
+        .filter((&fixture.organization_id, &"au".to_string()))
+        .next()
         .is_none()
     {
         return Err("au country pack missing — run migrations".into());
@@ -533,13 +534,40 @@ pub fn test_email_inbox_intent_batch_apply(ctx: &ReducerContext) -> Result<(), S
             metadata: None,
         },
     )?;
-    apply_pending_expense_integration_intents(ctx, fixture.organization_id, 10)?;
     let intent = ctx
         .db
         .expense_integration_intent()
         .iter()
         .find(|i| i.organization_id == fixture.organization_id && i.idempotency_key == "email-we-1")
         .ok_or("intent")?;
+    // The native harness runs with one human sender, so it can prove the
+    // service-only batch rejection and the preserved interactive path. A
+    // positive batch proof requires a distinct registered worker identity.
+    let batch = apply_pending_expense_integration_intents(ctx, fixture.organization_id, 10);
+    if !matches!(
+        &batch,
+        Err(message) if message.contains("active expense_integration_worker identity")
+    ) {
+        return Err(format!(
+            "expected human batch caller to be rejected, got: {batch:?}"
+        ));
+    }
+    let pending = ctx
+        .db
+        .expense_integration_intent()
+        .id()
+        .find(&intent.id)
+        .ok_or("intent disappeared after rejected batch")?;
+    if pending.status != "pending" {
+        return Err("rejected expense worker batch mutated the intent".into());
+    }
+    apply_expense_integration_intent(ctx, fixture.organization_id, intent.id)?;
+    let intent = ctx
+        .db
+        .expense_integration_intent()
+        .id()
+        .find(&intent.id)
+        .ok_or("intent missing after interactive apply")?;
     if intent.status != "applied" {
         return Err(format!("expected applied, got {}", intent.status));
     }
@@ -749,8 +777,9 @@ pub fn test_br_pack_expense_evidence_flags(ctx: &ReducerContext) -> Result<(), S
     let br = ctx
         .db
         .country_pack_definition()
-        .pack_key()
-        .find(&"br".to_string())
+        .country_pack_by_pack_key()
+        .filter((&fixture.organization_id, &"br".to_string()))
+        .next()
         .ok_or("br country pack missing — run migrations")?;
     let meta = br.metadata.as_deref().unwrap_or("");
     if !meta.contains("expense_require_receipt") {

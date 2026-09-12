@@ -4,6 +4,7 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::organization::{create_organization, organization, CreateOrganizationParams};
+use crate::core::users::user_organization;
 use crate::core::reference::{
     country, create_country, create_currency, create_currency_rate, create_uom,
     create_uom_category, create_uom_conversion, currency, currency_rate, uom, uom_cat,
@@ -11,8 +12,60 @@ use crate::core::reference::{
     CreateUomCategoryParams, CreateUomConversionParams, CreateUomParams,
 };
 
+fn ensure_reference_org(ctx: &ReducerContext, code: &str) -> Result<u64, String> {
+    if let Some(org) = ctx.db.organization().iter().find(|org| org.code == code) {
+        return ctx
+            .db
+            .user_organization()
+            .iter()
+            .find(|membership| {
+                membership.user_identity == ctx.sender()
+                    && membership.organization_id == org.id
+                    && membership.is_active
+            })
+            .map(|membership| membership.organization_id)
+            .ok_or_else(|| format!("sender is not a member of reference organization {code}"));
+    }
+    create_organization(
+        ctx,
+        CreateOrganizationParams {
+            name: format!("Reference {code}"),
+            code: code.to_string(),
+            timezone: "UTC".to_string(),
+            date_format: "YYYY-MM-DD".to_string(),
+            language: "en".to_string(),
+            is_active: true,
+            description: None,
+            logo_url: None,
+            website: None,
+            email: None,
+            phone: None,
+            currency_id: None,
+            metadata: Some(r#"{"test":"reference"}"#.to_string()),
+        },
+    )?;
+    let org_id = ctx
+        .db
+        .organization()
+        .iter()
+        .find(|org| org.code == code)
+        .map(|org| org.id)
+        .ok_or_else(|| format!("reference organization {code} missing"))?;
+    ctx.db
+        .user_organization()
+        .iter()
+        .find(|membership| {
+            membership.user_identity == ctx.sender()
+                && membership.organization_id == org_id
+                && membership.is_active
+        })
+        .map(|membership| membership.organization_id)
+        .ok_or_else(|| "reference test organization membership missing".to_string())
+}
+
 fn ensure_currency(
     ctx: &ReducerContext,
+    organization_id: u64,
     code: &str,
     name: &str,
     symbol: &str,
@@ -20,11 +73,14 @@ fn ensure_currency(
     rounding_factor: f64,
     position: &str,
 ) -> Result<u64, String> {
-    if let Some(currency) = ctx.db.currency().code().find(&code.to_string()) {
+    if let Some(currency) = ctx.db.currency().iter().find(|currency| {
+        currency.organization_id == organization_id && currency.code == code
+    }) {
         return Ok(currency.id);
     }
     create_currency(
         ctx,
+        organization_id,
         code.to_string(),
         CreateCurrencyParams {
             name: name.to_string(),
@@ -38,8 +94,8 @@ fn ensure_currency(
     )?;
     ctx.db
         .currency()
-        .code()
-        .find(&code.to_string())
+        .iter()
+        .find(|currency| currency.organization_id == organization_id && currency.code == code)
         .map(|currency| currency.id)
         .ok_or_else(|| format!("{code} currency not created"))
 }
@@ -47,15 +103,17 @@ fn ensure_currency(
 /// Test reference data lifecycle
 #[spacetimedb::reducer]
 pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
-    let usd_id = ensure_currency(ctx, "USD", "US Dollar", "$", 2, 0.01, "before")?;
-    let eur_id = ensure_currency(ctx, "EUR", "Euro", "€", 2, 0.01, "after")?;
-    let gbp_id = ensure_currency(ctx, "GBP", "British Pound", "£", 2, 0.01, "before")?;
-    let cad_id = ensure_currency(ctx, "CAD", "Canadian Dollar", "$", 2, 0.01, "before")?;
+    let org_id = ensure_reference_org(ctx, "REFORG")?;
+    let usd_id = ensure_currency(ctx, org_id, "USD", "US Dollar", "$", 2, 0.01, "before")?;
+    let eur_id = ensure_currency(ctx, org_id, "EUR", "Euro", "€", 2, 0.01, "after")?;
+    let gbp_id = ensure_currency(ctx, org_id, "GBP", "British Pound", "£", 2, 0.01, "before")?;
+    let cad_id = ensure_currency(ctx, org_id, "CAD", "Canadian Dollar", "$", 2, 0.01, "before")?;
 
     // Test 1: Create countries (requires superuser)
     log::info!("TEST: Creating countries...");
     create_country(
         ctx,
+        org_id,
         "US".to_string(),
         CreateCountryParams {
             name: "United States".to_string(),
@@ -72,6 +130,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
 
     create_country(
         ctx,
+        org_id,
         "CA".to_string(),
         CreateCountryParams {
             name: "Canada".to_string(),
@@ -88,6 +147,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
 
     create_country(
         ctx,
+        org_id,
         "GB".to_string(),
         CreateCountryParams {
             name: "United Kingdom".to_string(),
@@ -105,8 +165,8 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     let us = ctx
         .db
         .country()
-        .code()
-        .find(&"US".to_string())
+        .iter()
+        .find(|country| country.organization_id == org_id && country.code == "US")
         .ok_or("US country not created")?;
 
     if us.name != "United States" {
@@ -124,8 +184,8 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     let usd = ctx
         .db
         .currency()
-        .code()
-        .find(&"USD".to_string())
+        .iter()
+        .find(|currency| currency.organization_id == org_id && currency.code == "USD")
         .ok_or("USD currency not created")?;
 
     if usd.symbol != "$" {
@@ -142,6 +202,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Duplicate country prevention...");
     let duplicate = create_country(
         ctx,
+        org_id,
         "US".to_string(),
         CreateCountryParams {
             name: "Duplicate".to_string(),
@@ -165,6 +226,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Duplicate currency prevention...");
     let duplicate_curr = create_currency(
         ctx,
+        org_id,
         "USD".to_string(),
         CreateCurrencyParams {
             name: "Duplicate".to_string(),
@@ -186,6 +248,7 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
     log::info!("TEST: Invalid currency position validation...");
     let invalid_pos = create_currency(
         ctx,
+        org_id,
         "XXX".to_string(),
         CreateCurrencyParams {
             name: "Test".to_string(),
@@ -202,36 +265,6 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
         return Err("Should reject invalid position".to_string());
     }
     log::info!("✓ Invalid position rejected");
-
-    // Setup organization for rates and UOM tests
-    log::info!("TEST: Creating test organization...");
-    create_organization(
-        ctx,
-        CreateOrganizationParams {
-            name: "Reference Test Org".to_string(),
-            code: "REFORG".to_string(),
-            timezone: "UTC".to_string(),
-            date_format: "YYYY-MM-DD".to_string(),
-            language: "en".to_string(),
-            is_active: true,
-            description: None,
-            logo_url: None,
-            website: None,
-            email: None,
-            phone: None,
-            currency_id: None,
-            metadata: None,
-        },
-    )?;
-
-    let org = ctx
-        .db
-        .organization()
-        .iter()
-        .find(|o| o.code == "REFORG")
-        .ok_or("Test organization not found")?;
-
-    let org_id = org.id;
 
     // Test 6: Create currency rates
     log::info!("TEST: Creating currency rates...");
@@ -579,10 +612,12 @@ pub fn test_reference_data(ctx: &ReducerContext) -> Result<(), String> {
 /// Test country data integrity
 #[spacetimedb::reducer]
 pub fn test_country_data_integrity(ctx: &ReducerContext) -> Result<(), String> {
-    let eur_id = ensure_currency(ctx, "EUR", "Euro", "€", 2, 0.01, "after")?;
+    let org_id = ensure_reference_org(ctx, "COUNTRY")?;
+    let eur_id = ensure_currency(ctx, org_id, "EUR", "Euro", "€", 2, 0.01, "after")?;
     // Create countries
     create_country(
         ctx,
+        org_id,
         "FR".to_string(),
         CreateCountryParams {
             name: "France".to_string(),
@@ -600,8 +635,8 @@ pub fn test_country_data_integrity(ctx: &ReducerContext) -> Result<(), String> {
     let france = ctx
         .db
         .country()
-        .code()
-        .find(&"FR".to_string())
+        .iter()
+        .find(|country| country.organization_id == org_id && country.code == "FR")
         .ok_or("France not found")?;
 
     // Verify primary key is code (not auto_inc)
@@ -635,13 +670,14 @@ pub fn test_country_data_integrity(ctx: &ReducerContext) -> Result<(), String> {
 /// Test currency data integrity
 #[spacetimedb::reducer]
 pub fn test_currency_data_integrity(ctx: &ReducerContext) -> Result<(), String> {
-    let yen_id = ensure_currency(ctx, "JPY", "Japanese Yen", "¥", 0, 1.0, "before")?;
+    let org_id = ensure_reference_org(ctx, "CURRENCY")?;
+    let yen_id = ensure_currency(ctx, org_id, "JPY", "Japanese Yen", "¥", 0, 1.0, "before")?;
 
     let yen = ctx
         .db
         .currency()
-        .code()
-        .find(&"JPY".to_string())
+        .iter()
+        .find(|currency| currency.organization_id == org_id && currency.code == "JPY")
         .ok_or("JPY not found")?;
 
     // Verify zero decimal places allowed
@@ -874,8 +910,26 @@ pub fn test_currency_rate_edge_cases(ctx: &ReducerContext) -> Result<(), String>
         .ok_or("Test org not found")?;
 
     // Create currencies first
-    let chf_id = ensure_currency(ctx, "CHF", "Swiss Franc", "Fr", 2, 0.05, "before")?;
-    let sek_id = ensure_currency(ctx, "SEK", "Swedish Krona", "kr", 2, 0.01, "after")?;
+    let chf_id = ensure_currency(
+        ctx,
+        org.id,
+        "CHF",
+        "Swiss Franc",
+        "Fr",
+        2,
+        0.05,
+        "before",
+    )?;
+    let sek_id = ensure_currency(
+        ctx,
+        org.id,
+        "SEK",
+        "Swedish Krona",
+        "kr",
+        2,
+        0.01,
+        "after",
+    )?;
 
     // Test: Very small exchange rate
     log::info!("TEST: Very small exchange rate...");

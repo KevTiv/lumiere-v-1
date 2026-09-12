@@ -24,24 +24,92 @@ pub struct SubscriptionQueryContext<'a> {
 }
 
 #[derive(Debug, Deserialize)]
-struct ErpOrgRow {
-    /// Emitted as camelCase `mapKey` by `lumiere-codegen` erp_org_sql_emit.
-    #[serde(rename = "mapKey")]
-    map_key: String,
-    resource_key: String,
-    table: String,
-    extra_where: String,
+struct ErpOrgManifest {
+    schema_version: u32,
+    resources: HashMap<String, ErpOrgResource>,
 }
 
-static ERP_ORG_ROWS: Lazy<Vec<ErpOrgRow>> = Lazy::new(|| {
-    serde_json::from_str(lumiere_contracts::manifests::ERP_ORG_SQL).expect("erp-org-sql.json")
+#[derive(Debug, Deserialize)]
+struct ErpOrgResource {
+    table: String,
+    predicates: Vec<ErpOrgPredicate>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ErpOrgPredicate {
+    field: String,
+    operator: ErpOrgPredicateOperator,
+    value: ErpOrgPredicateValue,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ErpOrgPredicateOperator {
+    Eq,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum ErpOrgPredicateValue {
+    Boolean(bool),
+    String(String),
+}
+
+fn parse_erp_org_manifest(json: &str) -> Result<ErpOrgManifest, String> {
+    let manifest: ErpOrgManifest =
+        serde_json::from_str(json).map_err(|error| format!("invalid erp-org-sql.json: {error}"))?;
+    if manifest.schema_version != 1 {
+        return Err(format!(
+            "unsupported erp-org-sql.json schema version {}",
+            manifest.schema_version
+        ));
+    }
+    Ok(manifest)
+}
+
+fn predicate_sql(predicate: &ErpOrgPredicate) -> Result<String, String> {
+    if predicate.field.is_empty()
+        || !predicate
+            .field
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+    {
+        return Err(format!(
+            "invalid predicate field {:?} in erp-org-sql.json",
+            predicate.field
+        ));
+    }
+
+    let value = match &predicate.value {
+        ErpOrgPredicateValue::Boolean(value) => value.to_string(),
+        ErpOrgPredicateValue::String(value) => format!("'{}'", value.replace('\'', "''")),
+    };
+    match predicate.operator {
+        ErpOrgPredicateOperator::Eq => Ok(format!(" AND {} = {value}", predicate.field)),
+    }
+}
+
+static ERP_ORG_MANIFEST: Lazy<ErpOrgManifest> = Lazy::new(|| {
+    parse_erp_org_manifest(lumiere_contracts::manifests::ERP_ORG_SQL)
+        .expect("erp-org-sql.json must match the generated manifest schema")
 });
 
-static ERP_ORG_INDEX: Lazy<HashMap<String, usize>> = Lazy::new(|| {
-    ERP_ORG_ROWS
+static ERP_ORG_EXTRA_WHERE: Lazy<HashMap<String, String>> = Lazy::new(|| {
+    ERP_ORG_MANIFEST
+        .resources
         .iter()
-        .enumerate()
-        .map(|(i, r)| (r.map_key.clone(), i))
+        .filter_map(|(resource, descriptor)| {
+            if descriptor.predicates.is_empty() {
+                return None;
+            }
+            let clause = descriptor
+                .predicates
+                .iter()
+                .map(predicate_sql)
+                .collect::<Result<String, _>>()
+                .expect("erp-org-sql.json predicates must be valid");
+            Some((resource.clone(), clause))
+        })
         .collect()
 });
 
@@ -265,35 +333,23 @@ fn erp_org_line(
     org: u64,
     fa: Option<&FieldAccessContext>,
 ) -> Result<Option<String>, String> {
-    let Some(&idx) = ERP_ORG_INDEX.get(resource) else {
+    let Some(ent) = ERP_ORG_MANIFEST.resources.get(resource) else {
         return Ok(None);
     };
-    let ent = &ERP_ORG_ROWS[idx];
     // Realtime subscriptions only drive cache invalidation. Queue/view predicates
     // (enum state, status, receipt flags, and ordering) are reapplied by the
     // authorized HTTP read after invalidation, while SpacetimeDB subscriptions do
     // not support those predicates or ORDER BY. Keep the authenticated tenant
     // predicate here and deliberately broaden only the invalidation signal.
     Ok(Some(select_org_scoped_sql(
-        &ent.resource_key,
-        &ent.table,
-        org,
-        fa,
-        "",
-        "",
+        resource, &ent.table, org, fa, "", "",
     )?))
 }
 
-/// `extra_where` clause from `erp-org-sql.json` for a map key (includes leading ` AND …`).
-/// Used by HTTP `query_exec` so bounded exception resources match WebSocket SQL.
+/// Compiled predicate clause from `erp-org-sql.json` for a resource key.
+/// Used by HTTP `query_exec` so bounded exception resources match the generated query contract.
 pub fn erp_org_extra_where(resource: &str) -> Option<&'static str> {
-    let idx = *ERP_ORG_INDEX.get(resource)?;
-    let extra = ERP_ORG_ROWS[idx].extra_where.as_str();
-    if extra.is_empty() {
-        None
-    } else {
-        Some(extra)
-    }
+    ERP_ORG_EXTRA_WHERE.get(resource).map(String::as_str)
 }
 
 /// `Ok(None)` when the resource is unknown or required context is missing.
@@ -544,16 +600,17 @@ mod tests {
     fn subscription_queries_fail_closed_without_organization_context() {
         let context = SubscriptionQueryContext::default();
 
-        for row in ERP_ORG_ROWS
-            .iter()
-            .filter(|row| row.resource_key.starts_with("subscription"))
+        for resource in ERP_ORG_MANIFEST
+            .resources
+            .keys()
+            .filter(|resource| resource.starts_with("subscription"))
         {
-            let queries = subscription_queries_for_resource(&row.resource_key, &context)
+            let queries = subscription_queries_for_resource(resource, &context)
                 .expect("subscription SQL generation should not fail");
             assert!(
                 queries.is_none(),
                 "{} emitted SQL without authenticated organization context",
-                row.resource_key
+                resource
             );
         }
     }
@@ -565,22 +622,48 @@ mod tests {
             ..SubscriptionQueryContext::default()
         };
 
-        for row in ERP_ORG_ROWS
-            .iter()
-            .filter(|row| row.resource_key.starts_with("subscription"))
+        for resource in ERP_ORG_MANIFEST
+            .resources
+            .keys()
+            .filter(|resource| resource.starts_with("subscription"))
         {
-            let queries = subscription_queries_for_resource(&row.resource_key, &context)
+            let queries = subscription_queries_for_resource(resource, &context)
                 .expect("subscription SQL generation should not fail")
-                .unwrap_or_else(|| panic!("{} should resolve", row.resource_key));
-            assert!(!queries.is_empty(), "{} emitted no SQL", row.resource_key);
+                .unwrap_or_else(|| panic!("{resource} should resolve"));
+            assert!(!queries.is_empty(), "{resource} emitted no SQL");
             assert!(
                 queries
                     .iter()
                     .all(|query| query.contains("organization_id = 42")),
                 "{} was not scoped to the authenticated organization: {queries:?}",
-                row.resource_key
+                resource
             );
         }
+    }
+
+    #[test]
+    fn generated_erp_org_manifest_uses_supported_structural_schema() {
+        let manifest = parse_erp_org_manifest(lumiere_contracts::manifests::ERP_ORG_SQL)
+            .expect("published ERP organization query manifest should parse");
+        assert_eq!(manifest.schema_version, 1);
+        assert!(!manifest.resources.is_empty());
+        assert_eq!(
+            manifest.resources["account-account-types"].table,
+            "account_account_type"
+        );
+    }
+
+    #[test]
+    fn generated_erp_org_predicates_compile_without_legacy_extra_where() {
+        assert_eq!(
+            erp_org_extra_where("documents-deleted"),
+            Some(" AND is_deleted = true")
+        );
+        assert_eq!(
+            erp_org_extra_where("inventory-exceptions-open-qc"),
+            Some(" AND state = 'open' AND exception_type = 'open_qc'")
+        );
+        assert_eq!(erp_org_extra_where("companies"), None);
     }
 
     #[test]

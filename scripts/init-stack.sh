@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Bootstrap the local OrbStack stack without putting a token or development
+# Bootstrap the local OrbStack stack without putting tokens or a development
 # secret in version control. The local owner token is created by the host CLI,
-# then used by the containers through .env.docker.
+# and separate worker identities are minted by the local server. They are
+# passed to their intended containers through .env.docker.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -77,11 +78,56 @@ if [[ -z "$token" ]]; then
   exit 1
 fi
 
+echo "[init-stack] Minting a distinct local finalization-worker identity..."
+mint_worker_token() {
+  local worker_identity_json
+  worker_identity_json="$(curl -fsS -X POST http://127.0.0.1:3000/v1/identity)"
+  WORKER_IDENTITY_JSON="$worker_identity_json" node -e '
+  const payload = JSON.parse(process.env.WORKER_IDENTITY_JSON ?? "{}");
+  if (typeof payload.token !== "string" || payload.token.length === 0) process.exit(1);
+  process.stdout.write(payload.token);
+'
+}
+
+worker_token="$(mint_worker_token)"
+owner_report_worker_token="$(mint_worker_token)"
+workflow_worker_token="$(mint_worker_token)"
+expense_worker_token="$(mint_worker_token)"
+hr_worker_token="$(mint_worker_token)"
+project_worker_token="$(mint_worker_token)"
+iot_gateway_token="$(mint_worker_token)"
+worker_tokens=(
+  "$worker_token"
+  "$owner_report_worker_token"
+  "$workflow_worker_token"
+  "$expense_worker_token"
+  "$hr_worker_token"
+  "$project_worker_token"
+  "$iot_gateway_token"
+)
+for worker_candidate in "${worker_tokens[@]}"; do
+  if [[ -z "$worker_candidate" || "$worker_candidate" == "$token" ]]; then
+    echo "Could not obtain distinct local worker tokens" >&2
+    exit 1
+  fi
+done
+if [[ "$(printf '%s\n' "${worker_tokens[@]}" | sort -u | wc -l | tr -d ' ')" != "${#worker_tokens[@]}" ]]; then
+  echo "Could not obtain distinct local worker tokens" >&2
+  exit 1
+fi
+
 sed \
   -e "s|^STDB_SERVER_TOKEN=.*|STDB_SERVER_TOKEN=$token|" \
+  -e "s|^STDB_FINALIZATION_TOKEN=.*|STDB_FINALIZATION_TOKEN=$worker_token|" \
+  -e "s|^STDB_OWNER_REPORT_WORKER_TOKEN=.*|STDB_OWNER_REPORT_WORKER_TOKEN=$owner_report_worker_token|" \
+  -e "s|^STDB_WORKFLOW_WORKER_TOKEN=.*|STDB_WORKFLOW_WORKER_TOKEN=$workflow_worker_token|" \
+  -e "s|^STDB_EXPENSE_WORKER_TOKEN=.*|STDB_EXPENSE_WORKER_TOKEN=$expense_worker_token|" \
+  -e "s|^STDB_HR_WORKER_TOKEN=.*|STDB_HR_WORKER_TOKEN=$hr_worker_token|" \
+  -e "s|^STDB_PROJECT_WORKER_TOKEN=.*|STDB_PROJECT_WORKER_TOKEN=$project_worker_token|" \
+  -e "s|^STDB_IOT_GATEWAY_TOKEN=.*|STDB_IOT_GATEWAY_TOKEN=$iot_gateway_token|" \
   -e "s|^STDB_TOKEN=.*|STDB_TOKEN=$token|" \
   "$env_file" >"$temp_file"
 chmod 600 "$temp_file"
 mv "$temp_file" "$env_file"
 
-echo "[init-stack] Complete. Start the full stack with: make docker-dev"
+echo "[init-stack] Complete. Register each worker identity for the organizations it processes, then start the full stack with: make docker-dev"

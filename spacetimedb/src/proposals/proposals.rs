@@ -16,12 +16,14 @@ use serde_json::json;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contacts::{contact, Contact};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::projects::projects::{create_project, project_project, CreateProjectParams};
 use crate::sales::sales_core::{
-    create_sale_order, sale_order, CreateSaleOrderLineParams, CreateSaleOrderParams,
+    create_sale_order, sale_order, sale_order_line, CreateSaleOrderLineParams,
+    CreateSaleOrderParams,
 };
 
 const MAX_SOURCE_DOC_CHARS: usize = 100_000;
@@ -1952,6 +1954,12 @@ pub fn convert_proposal_to_sale_order(
         .partner_id
         .ok_or("Proposal has no partner_id — set a CRM partner before converting")?;
 
+    let partner_needs_customer_flag = ctx
+        .db
+        .contact()
+        .id()
+        .find(&partner_id)
+        .is_some_and(|partner| !partner.is_customer);
     if let Some(partner) = ctx.db.contact().id().find(&partner_id) {
         if !partner.is_customer {
             ctx.db.contact().id().update(Contact {
@@ -2092,6 +2100,66 @@ pub fn convert_proposal_to_sale_order(
             metadata: Some(r#"{"action":"CONVERT_TO_SALE_ORDER"}"#.to_string()),
         },
     );
+
+    let proposal = ctx
+        .db
+        .proposal()
+        .id()
+        .find(&proposal_id)
+        .ok_or("Proposal not found after conversion")?;
+    let sale_order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&so_id)
+        .ok_or("Sale order not found after proposal conversion")?;
+    let mut changes = Vec::new();
+    if partner_needs_customer_flag {
+        let contact = ctx
+            .db
+            .contact()
+            .id()
+            .find(&partner_id)
+            .ok_or("Proposal partner not found after conversion")?;
+        changes.push(RowChange::upsert_stdb_row(
+            "contact",
+            serde_json::json!({"id": contact.id}),
+            &contact,
+        )?);
+    }
+    changes.push(RowChange::upsert_stdb_row(
+        "proposal",
+        serde_json::json!({"id": proposal.id}),
+        &proposal,
+    )?);
+    changes.push(RowChange::upsert_stdb_row(
+        "sale_order",
+        serde_json::json!({"id": sale_order.id}),
+        &sale_order,
+    )?);
+    let mut sale_order_lines: Vec<_> = ctx
+        .db
+        .sale_order_line()
+        .iter()
+        .filter(|line| line.order_id == sale_order.id)
+        .collect();
+    sale_order_lines.sort_by_key(|line| line.id);
+    for line in sale_order_lines {
+        changes.push(RowChange::upsert_stdb_row(
+            "sale_order_line",
+            serde_json::json!({"id": line.id}),
+            &line,
+        )?);
+    }
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.convert_proposal_to_sale_order".to_string(),
+            correlation_id: format!("proposal:{proposal_id}:sale-order:{so_id}"),
+            changes,
+        },
+    )?;
 
     Ok(())
 }

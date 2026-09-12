@@ -22,7 +22,7 @@ import {
 import type { OperationInputMap } from "@lumiere/contracts/generated/operation-inputs"
 import { isSubscriptionReady, useSubscriptionCache } from "@lumiere/stdb/live"
 import type { QueryResourceKey } from "@lumiere/stdb/generated/query-registry"
-import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
+import type { QueryRowFor, QueryRowResourceKey } from "@lumiere/stdb/query-row-map"
 import {
   decodeTypedResourceQueryResponse,
   type ResourceQueryRowMap,
@@ -206,7 +206,7 @@ export function useStdbReducer<K extends NamedReducerKey>(reducerName: K) {
  * const { data } = useStdbQuery('leads', orgId)
  * const { data } = useStdbQuery('mrp-productions', orgId, { staleTime: 60_000 })
  */
-export function useStdbQuery<K extends string>(
+export function useStdbQuery<K extends QueryRowResourceKey>(
   resource: K,
   organizationId: bigint | number,
   options?: {

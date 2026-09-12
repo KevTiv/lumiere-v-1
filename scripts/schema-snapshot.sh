@@ -14,7 +14,7 @@ trap 'rm -f "$TMP"' EXIT
 
 CLI_SCHEMA=0
 if command -v spacetime >/dev/null 2>&1 && [[ "${SCHEMA_SNAPSHOT_HTTP_ONLY:-0}" != "1" ]]; then
-  if spacetime describe --json "$MODULE_NAME" -s "$SERVER" >"$TMP" && \
+  if spacetime describe "$MODULE_NAME" --json -s "$SERVER" >"$TMP" && \
     python3 - "$TMP" <<'PY'
 import json
 import sys

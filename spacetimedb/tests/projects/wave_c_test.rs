@@ -21,7 +21,11 @@ fn micros_days_from_now(ctx: &ReducerContext, days: i64) -> Timestamp {
     )
 }
 
-pub(super) fn seed_employee(ctx: &ReducerContext, fixture: &OrgFixture, name: &str) -> Result<u64, String> {
+pub(super) fn seed_employee(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    name: &str,
+) -> Result<u64, String> {
     create_employee(
         ctx,
         fixture.organization_id,
@@ -62,7 +66,11 @@ pub(super) fn seed_employee(ctx: &ReducerContext, fixture: &OrgFixture, name: &s
         .ok_or_else(|| format!("employee {name} missing"))
 }
 
-pub(super) fn seed_project(ctx: &ReducerContext, fixture: &OrgFixture, name: &str) -> Result<u64, String> {
+pub(super) fn seed_project(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    name: &str,
+) -> Result<u64, String> {
     create_project(
         ctx,
         fixture.organization_id,

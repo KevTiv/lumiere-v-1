@@ -163,7 +163,37 @@ async fn handle_mqtt_message(state: &AppState, topic: &str, payload: &[u8]) {
     };
 
     let event_type = parts[2];
-    let org_id = state.config.default_org_id;
+    let device_rows = match state
+        .stdb
+        .query_sql(&format!(
+            "SELECT organization_id FROM iot_device WHERE id = {device_id}"
+        ))
+        .await
+    {
+        Ok(rows) => rows,
+        Err(error) => {
+            tracing::error!(
+                "failed to resolve MQTT device {} tenant scope: {}",
+                device_id,
+                error
+            );
+            return;
+        }
+    };
+    let Some(org_id) = device_rows
+        .first()
+        .and_then(|row| {
+            row.get("organizationId")
+                .or_else(|| row.get("organization_id"))
+        })
+        .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
+    else {
+        tracing::warn!(
+            "MQTT device {} has no server-derived organization",
+            device_id
+        );
+        return;
+    };
 
     match event_type {
         "telemetry" => {

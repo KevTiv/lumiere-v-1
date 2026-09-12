@@ -72,10 +72,7 @@ fn filter_hits(req: &BriefingContextRequest, hits: Vec<ContextHit>) -> Vec<Conte
                 && req
                     .until_micros
                     .is_none_or(|until| hit.record.activity_timestamp <= until)
-                && module_allowed(
-                    &hit.record.semantic.resource_kind,
-                    &req.allowed_modules,
-                )
+                && module_allowed(&hit.record.semantic.resource_kind, &req.allowed_modules)
         })
         .collect()
 }
@@ -204,14 +201,9 @@ pub async fn collect_briefing_context(
             })
         })
         .collect::<Vec<_>>();
-    let snapshot_result = fetch_authorized_live_snapshots(
-        state,
-        actor,
-        req.org_id,
-        req.company_id,
-        &candidates,
-    )
-    .await;
+    let snapshot_result =
+        fetch_authorized_live_snapshots(state, actor, req.org_id, req.company_id, &candidates)
+            .await;
     if let Err(error) = &snapshot_result {
         tracing::warn!(
             org_id = req.org_id,

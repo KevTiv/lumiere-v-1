@@ -9,7 +9,8 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::operational_messaging::{operational_message, OperationalMessage};
-use crate::core::users::{user_organization, user_profile};
+use crate::core::reconstruction::require_writes_unfenced;
+use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::crm::contact_identities::contact_phone_identity;
 use crate::crm::contacts::{contact, Contact};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
@@ -417,11 +418,7 @@ fn validate_assignee(
     company_id: Option<u64>,
     assignee: Identity,
 ) -> Result<(), String> {
-    let profile = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(assignee)
+    let profile = find_user_profile_for_organization(ctx, assignee, organization_id)
         .ok_or("assigned user not found")?;
     if !profile.is_active {
         return Err("assigned user is inactive".to_string());
@@ -594,6 +591,7 @@ pub fn receive_crm_provider_message(
     organization_id: u64,
     params: ReceiveCrmProviderMessageParams,
 ) -> Result<(), String> {
+    require_writes_unfenced(ctx, organization_id)?;
     require_provider_principal(ctx, organization_id, params.provider_account_id, "messages")?;
     validate_provider_identifier("provider event id", &params.provider_event_id)?;
     validate_provider_identifier("provider message id", &params.provider_message_id)?;
@@ -778,6 +776,7 @@ pub fn record_crm_provider_delivery(
     organization_id: u64,
     params: RecordCrmProviderDeliveryParams,
 ) -> Result<(), String> {
+    require_writes_unfenced(ctx, organization_id)?;
     require_provider_principal(
         ctx,
         organization_id,

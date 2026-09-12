@@ -53,7 +53,10 @@ pub trait LumiereStdbExt {
 }
 
 fn string_field(row: &serde_json::Value, camel: &str, snake: &str) -> Option<String> {
-    row.get(camel).or_else(|| row.get(snake)).and_then(|value| value.as_str()).map(str::to_string)
+    row.get(camel)
+        .or_else(|| row.get(snake))
+        .and_then(|value| value.as_str())
+        .map(str::to_string)
 }
 
 fn u64_field(row: &serde_json::Value, camel: &str, snake: &str) -> Option<u64> {
@@ -186,17 +189,24 @@ pub async fn authoritative_embedding_for_resource(
     resource_id: u64,
 ) -> anyhow::Result<Option<AuthoritativeEmbedding>> {
     if resource_kind.is_empty()
-        || !resource_kind.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
+        || !resource_kind
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
     {
         anyhow::bail!("invalid semantic resource kind");
     }
     let sql = format!(
         "SELECT id, embedding_hash, text FROM search_embedding WHERE organization_id = {organization_id} AND company_id = {company_id} AND content_type = '{resource_kind}' AND content_id = {resource_id} AND sync_status = 'pending' LIMIT 1"
     );
-    let rows = stdb.query_sql(&sql).await.map_err(|error| anyhow::anyhow!("{error}"))?;
-    Ok(rows.into_iter().next().and_then(|row| Some(AuthoritativeEmbedding {
-        id: u64_field(&row, "id", "id")?,
-        embedding_hash: string_field(&row, "embeddingHash", "embedding_hash"),
-        text: string_field(&row, "text", "text")?,
-    })))
+    let rows = stdb
+        .query_sql(&sql)
+        .await
+        .map_err(|error| anyhow::anyhow!("{error}"))?;
+    Ok(rows.into_iter().next().and_then(|row| {
+        Some(AuthoritativeEmbedding {
+            id: u64_field(&row, "id", "id")?,
+            embedding_hash: string_field(&row, "embeddingHash", "embedding_hash"),
+            text: string_field(&row, "text", "text")?,
+        })
+    }))
 }

@@ -69,6 +69,9 @@ services:
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE}
       NEXT_PUBLIC_STDB_MODULE: ${NEXT_PUBLIC_STDB_MODULE:-}
       STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN}
+      LUMIERE_CELL_ID: ${LUMIERE_CELL_ID:?set LUMIERE_CELL_ID}
+      LUMIERE_PLACEMENT_GENERATION: ${LUMIERE_PLACEMENT_GENERATION:?set LUMIERE_PLACEMENT_GENERATION}
+      LUMIERE_DURABLE_STORE_ID: ${LUMIERE_DURABLE_STORE_ID:?set LUMIERE_DURABLE_STORE_ID}
       AI_GATEWAY_URL: http://ai-gateway:8080
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:8000}
@@ -79,9 +82,9 @@ services:
       WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID:-}
       LUMIERE_REPORT_RENDERER_URL: http://chromium-worker:8090
       LUMIERE_REPORT_ARTIFACT_DIR: /var/lib/lumiere/owner-reports
-      # Cold-tier storage (docs/plans/sliding-window-cold-tier.md). Optional: if
-      # unset, audit-log reads fall back to hot-only (see cold_tier::pg_pool).
-      # Point at the managed Postgres instance once provisioned; PG_TLS_MODE
+      # Cold-tier storage (docs/plans/sliding-window-cold-tier.md). Readiness and
+      # PG-backed reads fail closed when this durable store is unavailable.
+      # Point at the managed Postgres instance; PG_TLS_MODE
       # must be "require" here since NODE_ENV=production fails closed otherwise.
       PG_HOST: ${PG_HOST:-}
       PG_PORT: ${PG_PORT:-5432}
@@ -118,6 +121,9 @@ services:
       STDB_HOST: ${STDB_HOST:-https://maincloud.spacetimedb.com}
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE}
       STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN}
+      LUMIERE_CELL_ID: ${LUMIERE_CELL_ID:?set LUMIERE_CELL_ID}
+      LUMIERE_PLACEMENT_GENERATION: ${LUMIERE_PLACEMENT_GENERATION:?set LUMIERE_PLACEMENT_GENERATION}
+      LUMIERE_DURABLE_STORE_ID: ${LUMIERE_DURABLE_STORE_ID:?set LUMIERE_DURABLE_STORE_ID}
       AI_GATEWAY_URL: http://ai-gateway:8080
       LUMIERE_REPORT_RENDERER_URL: http://chromium-worker:8090
       LUMIERE_REPORT_ARTIFACT_DIR: /var/lib/lumiere/owner-reports
@@ -141,6 +147,9 @@ services:
       STDB_HOST: ${STDB_HOST:-https://maincloud.spacetimedb.com}
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE}
       STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN}
+      LUMIERE_CELL_ID: ${LUMIERE_CELL_ID:?set LUMIERE_CELL_ID}
+      LUMIERE_PLACEMENT_GENERATION: ${LUMIERE_PLACEMENT_GENERATION:?set LUMIERE_PLACEMENT_GENERATION}
+      LUMIERE_DURABLE_STORE_ID: ${LUMIERE_DURABLE_STORE_ID:?set LUMIERE_DURABLE_STORE_ID}
       LUMIERE_WORKFLOW_WORKER_POLL_SECS: ${LUMIERE_WORKFLOW_WORKER_POLL_SECS:-15}
       LUMIERE_WORKFLOW_WORKER_NAME: ${LUMIERE_WORKFLOW_WORKER_NAME:-workflow-worker-v1}
       LUMIERE_WORKFLOW_WORKER_PORT: 8093
@@ -153,56 +162,38 @@ services:
       - "8093"
     restart: unless-stopped
 
-  audit-cold-drainer:
+  projection-worker:
     build:
       context: .
       dockerfile: Dockerfile.rust
       args:
-        BIN: audit-cold-drainer
+        BIN: projection-worker
     environment:
       NODE_ENV: production
       STDB_HOST: ${STDB_HOST:-https://maincloud.spacetimedb.com}
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE}
       STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN}
-      # This service's only job is draining to Postgres, so PG here is
-      # required (not optional the way it is for api-server) — fails closed
-      # rather than idling silently with nothing to do.
+      LUMIERE_CELL_ID: ${LUMIERE_CELL_ID:?set LUMIERE_CELL_ID}
+      LUMIERE_PLACEMENT_GENERATION: ${LUMIERE_PLACEMENT_GENERATION:?set LUMIERE_PLACEMENT_GENERATION}
+      LUMIERE_DURABLE_STORE_ID: ${LUMIERE_DURABLE_STORE_ID:?set LUMIERE_DURABLE_STORE_ID}
+      STDB_FINALIZATION_TOKEN: ${STDB_FINALIZATION_TOKEN:?set STDB_FINALIZATION_TOKEN}
       PG_HOST: ${PG_HOST:?set PG_HOST}
       PG_PORT: ${PG_PORT:-5432}
       PG_DATABASE: ${PG_DATABASE:-lumiere}
       PG_USER: ${PG_USER:-lumiere}
-      PG_PASSWORD: ${PG_PASSWORD:?set PG_PASSWORD}
+      PG_PASSWORD: ${PG_PASSWORD:-}
       PG_TLS_MODE: ${PG_TLS_MODE:-require}
-      LUMIERE_AUDIT_DRAINER_POLL_SECS: ${LUMIERE_AUDIT_DRAINER_POLL_SECS:-5}
-      LUMIERE_AUDIT_DRAINER_BATCH: ${LUMIERE_AUDIT_DRAINER_BATCH:-200}
-      LUMIERE_AUDIT_DRAINER_PORT: 8094
+      LUMIERE_PROJECTION_WORKER_POLL_SECS: ${LUMIERE_PROJECTION_WORKER_POLL_SECS:-5}
+      LUMIERE_PROJECTION_WORKER_BATCH: ${LUMIERE_PROJECTION_WORKER_BATCH:-100}
+      LUMIERE_PROJECTION_MAX_COMMITS_PER_ORG: ${LUMIERE_PROJECTION_MAX_COMMITS_PER_ORG:-100}
+      LUMIERE_PROJECTION_MAX_BYTES_PER_ORG: ${LUMIERE_PROJECTION_MAX_BYTES_PER_ORG:-16777216}
+      LUMIERE_PROJECTION_MAX_MILLIS_PER_ORG: ${LUMIERE_PROJECTION_MAX_MILLIS_PER_ORG:-500}
+      LUMIERE_PROJECTION_ORG_CONCURRENCY: ${LUMIERE_PROJECTION_ORG_CONCURRENCY:-8}
+      LUMIERE_FINALIZATION_WORKER_BATCH: ${LUMIERE_FINALIZATION_WORKER_BATCH:-100}
+      LUMIERE_FINALIZATION_WORKER_POLL_SECS: ${LUMIERE_FINALIZATION_WORKER_POLL_SECS:-5}
+      LUMIERE_PROJECTION_WORKER_PORT: 8096
     expose:
-      - "8094"
-    restart: unless-stopped
-
-  pos-order-cold-drainer:
-    build:
-      context: .
-      dockerfile: Dockerfile.rust
-      args:
-        BIN: pos-order-cold-drainer
-    environment:
-      NODE_ENV: production
-      STDB_HOST: ${STDB_HOST:-https://maincloud.spacetimedb.com}
-      STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE}
-      STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN}
-      # Same reasoning as audit-cold-drainer: PG is this service's only job.
-      PG_HOST: ${PG_HOST:?set PG_HOST}
-      PG_PORT: ${PG_PORT:-5432}
-      PG_DATABASE: ${PG_DATABASE:-lumiere}
-      PG_USER: ${PG_USER:-lumiere}
-      PG_PASSWORD: ${PG_PASSWORD:?set PG_PASSWORD}
-      PG_TLS_MODE: ${PG_TLS_MODE:-require}
-      LUMIERE_POS_ORDER_DRAINER_POLL_SECS: ${LUMIERE_POS_ORDER_DRAINER_POLL_SECS:-5}
-      LUMIERE_POS_ORDER_DRAINER_BATCH: ${LUMIERE_POS_ORDER_DRAINER_BATCH:-200}
-      LUMIERE_POS_ORDER_DRAINER_PORT: 8095
-    expose:
-      - "8095"
+      - "8096"
     restart: unless-stopped
 
   ai-gateway:
@@ -235,6 +226,7 @@ services:
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       KONG_LLM_URL: ${KONG_LLM_URL:-}
       KONG_LLM_SERVICE_TOKEN: ${KONG_LLM_SERVICE_TOKEN:-}
+      KONG_LLM_READINESS_URL: ${KONG_LLM_READINESS_URL:-}
     expose:
       - "8080"
     restart: unless-stopped

@@ -20,7 +20,9 @@ use serde_json::{json, Value};
 use tower_cookies::Cookies;
 
 use crate::error::ApiError;
+use crate::query_exec::resolve_membership_company_id;
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session};
 
 #[derive(Debug, Deserialize)]
@@ -76,18 +78,16 @@ async fn export_statutory(
         ));
     }
 
-    // Verify company belongs to session org (read-only probe).
-    let client = state.client_with_token(&session.stdb_token);
-    let company_rows = client
-        .query_sql(&format!(
-            "SELECT id FROM company WHERE organization_id = {organization_id} AND id = {} AND deleted_at IS NULL LIMIT 1",
-            body.company_id
-        ))
-        .await
-        .map_err(|error| ApiError::Internal(error.to_string()))?;
-    if company_rows.is_empty() {
-        return Err(ApiError::NotFound("company not found".into()));
-    }
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let company_id = resolve_membership_company_id(
+        context.client(),
+        organization_id,
+        context.actor_identity(),
+        Some(body.company_id),
+        "statutory-export company scope mismatch",
+    )
+    .await?;
+    let _context = context.with_company_scope(vec![company_id])?;
 
     // Adapter registry stub — concrete NF-e / BAS / IRAS clients plug in here.
     let adapter_status = match pack.as_str() {

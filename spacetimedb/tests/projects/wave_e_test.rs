@@ -1,5 +1,5 @@
 //! Wave E — change-order dual baselines + project rev-rec isolation from subscriptions.
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::{rand::Rng, ReducerContext, Table};
 
 use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
@@ -9,11 +9,14 @@ use crate::projects::project_accounting::{
 };
 use crate::projects::projects::{create_project, project_project, CreateProjectParams};
 use crate::projects::psa_advanced::{
-    apply_project_change_order, create_project_change_order, create_project_revenue_line,
+    apply_pending_project_integration_intents, apply_project_change_order,
+    apply_project_integration_intent, create_project_change_order,
+    create_project_integration_intent, create_project_revenue_line,
     create_project_revenue_schedule, link_subcontractor_cost_to_project, project_baseline,
-    project_change_order, project_revenue_line, project_revenue_schedule,
-    recognize_project_revenue, refresh_project_earned_value, ApplyProjectChangeOrderParams,
-    CreateProjectChangeOrderParams, CreateProjectRevenueLineParams,
+    project_change_order, project_integration_intent, project_revenue_line,
+    project_revenue_schedule, recognize_project_revenue, refresh_project_earned_value,
+    ApplyProjectChangeOrderParams, CreateProjectChangeOrderParams,
+    CreateProjectIntegrationIntentParams, CreateProjectRevenueLineParams,
     CreateProjectRevenueScheduleParams, LinkSubcontractorCostParams, RecognizeProjectRevenueParams,
     RefreshProjectEarnedValueParams,
 };
@@ -415,6 +418,73 @@ pub fn test_project_revrec_isolation(ctx: &ReducerContext) -> Result<(), String>
         ));
     }
 
+    Ok(())
+}
+
+/// Human callers may apply one intent interactively, but the batch worker is
+/// restricted to the registered project integration service identity. The
+/// native harness has one caller identity, so it proves the negative worker
+/// boundary and the preserved interactive path; a distinct-service positive
+/// proof requires the disposable STDB worker identity.
+pub fn test_project_integration_worker_requires_service_identity(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let key = format!(
+        "project-worker-auth-{}-{}",
+        fixture.organization_id,
+        ctx.rng().gen::<u64>()
+    );
+    create_project_integration_intent(
+        ctx,
+        fixture.organization_id,
+        CreateProjectIntegrationIntentParams {
+            company_id: Some(fixture.company_id),
+            project_id: None,
+            intent_type: "calendar_sync".to_string(),
+            idempotency_key: key.clone(),
+            payload: "{}".to_string(),
+            metadata: None,
+        },
+    )?;
+    let intent = ctx
+        .db
+        .project_integration_intent()
+        .proj_intent_by_key()
+        .filter(&key)
+        .find(|row| row.organization_id == fixture.organization_id)
+        .ok_or("project integration intent missing")?;
+
+    let batch = apply_pending_project_integration_intents(ctx, fixture.organization_id, 1);
+    if !matches!(
+        &batch,
+        Err(message) if message.contains("active project_integration_worker identity")
+    ) {
+        return Err(format!(
+            "expected human batch caller to be rejected, got: {batch:?}"
+        ));
+    }
+    let pending = ctx
+        .db
+        .project_integration_intent()
+        .id()
+        .find(&intent.id)
+        .ok_or("project integration intent disappeared after rejected batch")?;
+    if pending.status != "pending" {
+        return Err("rejected project worker batch mutated the intent".to_string());
+    }
+
+    apply_project_integration_intent(ctx, fixture.organization_id, intent.id)?;
+    let applied = ctx
+        .db
+        .project_integration_intent()
+        .id()
+        .find(&intent.id)
+        .ok_or("project integration intent missing after interactive apply")?;
+    if applied.status != "applied" || applied.attempt_count != 1 {
+        return Err("interactive project integration apply did not persist".to_string());
+    }
     Ok(())
 }
 

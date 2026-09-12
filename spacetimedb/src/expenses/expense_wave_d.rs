@@ -1,12 +1,12 @@
 //! Wave D — integration intents, advances, policy exceptions, fraud helpers.
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::chart_of_accounts::{account_account, account_journal};
+use crate::accounting::chart_of_accounts::account_journal;
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line, AccountMove,
-    AddAccountMoveLineParams,
 };
+use crate::accounting::line_params::{journal_line_params, validate_company_account};
 use crate::core::organization::{company, company_id_from_scope};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::hr::employees::hr_employee;
@@ -17,8 +17,8 @@ use crate::types::{
 use serde_json::Value;
 
 use super::expenses::{
-    create_expense, expense_sheet, hr_expense, hr_expense_receipt, insert_expense_receipt,
-    CreateExpenseParams, CreateExpenseReceiptParams, HrExpense,
+    expense_sheet, hr_expense, hr_expense_receipt, insert_expense_receipt, CreateExpenseParams,
+    CreateExpenseReceiptParams, HrExpense,
 };
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -387,7 +387,7 @@ fn apply_create_expense_payload(
         }
     }
 
-    create_expense(
+    super::expenses::create_expense_inner(
         ctx,
         organization_id,
         CreateExpenseParams {
@@ -563,6 +563,19 @@ pub fn apply_expense_integration_intent(
     intent_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_expense", "create")?;
+    apply_expense_integration_intent_inner(ctx, organization_id, intent_id)
+}
+
+/// Apply one integration intent after the caller has authenticated its authority.
+///
+/// The interactive reducer performs the human permission check above, while the
+/// registered integration worker uses this helper after service-identity
+/// validation at its batch reducer boundary.
+pub(super) fn apply_expense_integration_intent_inner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    intent_id: u64,
+) -> Result<(), String> {
     let intent = ctx
         .db
         .expense_integration_intent()
@@ -693,73 +706,6 @@ pub fn fail_expense_integration_intent(
 
 // ── Reducers: Advances ────────────────────────────────────────────────────────
 
-fn validate_advance_account(
-    ctx: &ReducerContext,
-    company_id: u64,
-    account_id: u64,
-    label: &str,
-) -> Result<(), String> {
-    let account = ctx
-        .db
-        .account_account()
-        .id()
-        .find(&account_id)
-        .ok_or_else(|| format!("{label} account not found"))?;
-    if account.company_id != company_id {
-        return Err(format!("{label} account does not belong to this company"));
-    }
-    Ok(())
-}
-
-fn advance_line_params(
-    account_id: u64,
-    name: String,
-    debit: f64,
-    credit: f64,
-    sequence: u32,
-) -> AddAccountMoveLineParams {
-    AddAccountMoveLineParams {
-        account_id,
-        name,
-        debit,
-        credit,
-        sequence,
-        quantity: if debit > 0.0 || credit > 0.0 {
-            1.0
-        } else {
-            0.0
-        },
-        price_unit: debit.max(credit),
-        discount: 0.0,
-        tax_ids: vec![],
-        partner_id: None,
-        product_id: None,
-        product_uom_id: None,
-        product_category_id: None,
-        analytic_account_id: None,
-        analytic_tag_ids: vec![],
-        display_type: None,
-        is_downpayment: false,
-        exclude_from_invoice_tab: false,
-        blocked: false,
-        group_tax_id: None,
-        tax_line_id: None,
-        tax_group_id: None,
-        tax_repartition_line_id: None,
-        tax_audit: None,
-        reconcile_model_id: None,
-        payment_id: None,
-        statement_line_id: None,
-        matching_number: None,
-        matching_label: None,
-        expected_pay_date: None,
-        expected_pay_date_currency_id: None,
-        expected_pay_date_amount: 0.0,
-        expected_pay_date_residual: 0.0,
-        metadata: None,
-    }
-}
-
 #[reducer]
 pub fn create_expense_advance(
     ctx: &ReducerContext,
@@ -798,8 +744,8 @@ pub fn create_expense_advance(
     }
 
     ensure_accounting_period_open_for_date(ctx, company_id, params.accounting_date)?;
-    validate_advance_account(ctx, company_id, params.cash_account_id, "Cash")?;
-    validate_advance_account(ctx, company_id, params.advance_account_id, "Advance")?;
+    validate_company_account(ctx, company_id, params.cash_account_id, "Cash")?;
+    validate_company_account(ctx, company_id, params.advance_account_id, "Advance")?;
     let journal = ctx
         .db
         .account_journal()
@@ -887,7 +833,7 @@ pub fn create_expense_advance(
     insert_draft_account_move_line(
         ctx,
         &move_record,
-        advance_line_params(
+        journal_line_params(
             params.advance_account_id,
             format!("Expense advance — {}", params.name),
             amount,
@@ -898,7 +844,7 @@ pub fn create_expense_advance(
     insert_draft_account_move_line(
         ctx,
         &move_record,
-        advance_line_params(
+        journal_line_params(
             params.cash_account_id,
             format!("Cash for advance — {}", params.name),
             0.0,

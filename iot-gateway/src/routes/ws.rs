@@ -17,8 +17,8 @@
 ///
 /// ## Hub → Gateway messages
 /// ```json
-/// {"type":"ack",  "organization_id":1,"action_id":42}
-/// {"type":"fail", "organization_id":1,"action_id":42,"error":"device unreachable"}
+/// {"type":"ack",  "action_id":42}
+/// {"type":"fail", "action_id":42,"error":"device unreachable"}
 /// ```
 ///
 /// ## Disconnect
@@ -33,6 +33,7 @@ use axum::{
 use serde::Deserialize;
 use tokio::sync::mpsc;
 
+use super::auth::{authorize_target, enforce_target_scope, AuthError, TargetTable};
 use crate::state::AppState;
 
 // ── Query param ────────────────────────────────────────────────────────────
@@ -48,7 +49,6 @@ pub struct HubQuery {
 struct HubMessage {
     #[serde(rename = "type")]
     msg_type: String,
-    organization_id: u64,
     action_id: u64,
     /// Only present for "fail" messages.
     error: Option<String>,
@@ -63,11 +63,13 @@ struct HubMessage {
 pub async fn hub_websocket(
     ws: WebSocketUpgrade,
     Query(params): Query<HubQuery>,
+    headers: axum::http::HeaderMap,
     State(state): State<AppState>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, AuthError> {
     let hub_id = params.hub_id;
+    let scope = authorize_target(&state, &headers, TargetTable::Hub, hub_id).await?;
     tracing::info!("Hub {} requesting WebSocket upgrade", hub_id);
-    ws.on_upgrade(move |socket| handle_hub_socket(socket, hub_id, state))
+    Ok(ws.on_upgrade(move |socket| handle_hub_socket(socket, hub_id, scope, state)))
 }
 
 // ── Socket handler ─────────────────────────────────────────────────────────
@@ -80,7 +82,12 @@ pub async fn hub_websocket(
 ///
 /// When either side closes the connection the loop exits and the hub is
 /// removed from `hub_connections`.
-async fn handle_hub_socket(mut socket: WebSocket, hub_id: u64, state: AppState) {
+async fn handle_hub_socket(
+    mut socket: WebSocket,
+    hub_id: u64,
+    scope: super::auth::AuthorizedTarget,
+    state: AppState,
+) {
     // Create the mpsc channel the dispatcher will use to push actions.
     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
 
@@ -113,12 +120,12 @@ async fn handle_hub_socket(mut socket: WebSocket, hub_id: u64, state: AppState) 
             maybe_frame = socket.recv() => {
                 match maybe_frame {
                     Some(Ok(Message::Text(text))) => {
-                        handle_hub_message(&state, hub_id, &text).await;
+                        handle_hub_message(&state, hub_id, scope, &text).await;
                     }
                     Some(Ok(Message::Binary(bytes))) => {
                         // Some hubs send binary-encoded JSON; treat as UTF-8.
                         match std::str::from_utf8(&bytes) {
-                            Ok(text) => handle_hub_message(&state, hub_id, text).await,
+                            Ok(text) => handle_hub_message(&state, hub_id, scope, text).await,
                             Err(_) => {
                                 tracing::warn!(
                                     "Hub {} sent non-UTF8 binary frame — ignoring",
@@ -151,7 +158,12 @@ async fn handle_hub_socket(mut socket: WebSocket, hub_id: u64, state: AppState) 
 // ── Inbound message dispatch ───────────────────────────────────────────────
 
 /// Parse a JSON message from the hub and call the appropriate SpacetimeDB reducer.
-async fn handle_hub_message(state: &AppState, hub_id: u64, text: &str) {
+async fn handle_hub_message(
+    state: &AppState,
+    hub_id: u64,
+    scope: super::auth::AuthorizedTarget,
+    text: &str,
+) {
     let msg: HubMessage = match serde_json::from_str(text) {
         Ok(m) => m,
         Err(e) => {
@@ -162,7 +174,18 @@ async fn handle_hub_message(state: &AppState, hub_id: u64, text: &str) {
 
     match msg.msg_type.as_str() {
         "ack" => {
-            let args = serde_json::json!([msg.organization_id, msg.action_id, null]);
+            if let Err(error) =
+                enforce_target_scope(state, TargetTable::Action, msg.action_id, scope).await
+            {
+                tracing::warn!(
+                    "Hub {} attempted out-of-scope action {}: {}",
+                    hub_id,
+                    msg.action_id,
+                    error.message()
+                );
+                return;
+            }
+            let args = serde_json::json!([scope.organization_id(), msg.action_id, null]);
             if let Err(e) = state
                 .call_reducer(stdb_client::reducer_call!("acknowledge_iot_action", args))
                 .await
@@ -180,7 +203,18 @@ async fn handle_hub_message(state: &AppState, hub_id: u64, text: &str) {
 
         "fail" => {
             let error = msg.error.unwrap_or_else(|| "unknown error".to_string());
-            let args = serde_json::json!([msg.organization_id, msg.action_id, error]);
+            if let Err(scope_error) =
+                enforce_target_scope(state, TargetTable::Action, msg.action_id, scope).await
+            {
+                tracing::warn!(
+                    "Hub {} attempted out-of-scope action {}: {}",
+                    hub_id,
+                    msg.action_id,
+                    scope_error.message()
+                );
+                return;
+            }
+            let args = serde_json::json!([scope.organization_id(), msg.action_id, error]);
             if let Err(e) = state
                 .call_reducer(stdb_client::reducer_call!("fail_iot_action", args))
                 .await

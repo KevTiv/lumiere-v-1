@@ -41,20 +41,20 @@ use serde_json::Value;
 
 use crate::cold_tier::schema_ir::{GeneratedTableSchema, GeneratedType, LumiereSchemaManifest};
 
-/// Build the codec manifest for all archive-candidate tables.
+/// Build the codec manifest for archive-candidate tables.
 ///
-/// `candidates_json` is the raw `archive-candidates.json` text (same input as
-/// the archive manifest).  Returns the pretty-printed JSON string.
+/// `candidates_json` is the generated archive manifest derived from the
+/// reviewed storage policy. Returns the pretty-printed JSON string.
 pub fn emit_codec_manifest(
     candidates_json: &str,
     schema_manifest: &LumiereSchemaManifest,
 ) -> Result<String> {
     let config: Value =
-        serde_json::from_str(candidates_json).context("parse archive-candidates.json")?;
+        serde_json::from_str(candidates_json).context("parse generated archive manifest")?;
 
     let candidates = config["candidates"]
         .as_array()
-        .context("archive-candidates.json: missing 'candidates' array")?;
+        .context("generated archive manifest: missing 'candidates' array")?;
 
     let mut tables = serde_json::Map::new();
 
@@ -74,7 +74,7 @@ pub fn emit_codec_manifest(
                 format!("candidates[{i}]: table '{table}' not found in schema manifest")
             })?;
 
-        let entry = build_table_entry(schema, cold_table);
+        let entry = build_archive_table_entry(schema, cold_table);
         tables.insert(table.to_string(), entry);
     }
 
@@ -89,28 +89,185 @@ pub fn emit_codec_manifest(
     serde_json::to_string_pretty(&manifest).context("serialise codec manifest")
 }
 
-fn build_table_entry(schema: &GeneratedTableSchema, cold_table: &str) -> Value {
-    let columns: Vec<Value> = schema
-        .columns
-        .iter()
-        .map(|col| {
-            serde_json::json!({
-                "name": col.name,
-                "stdb_type": format!("{:?}", col.ty),
-                "pg_type": pg_type_for(&col.ty),
-                "nullable": col.nullable,
-                "pg_bind": pg_bind_fn(&col.ty),
-                "pg_from": pg_from_fn(&col.ty),
-                "api_json": api_json_repr(&col.ty),
-            })
-        })
-        .collect();
+/// Build the all-table projection codec manifest consumed by projection-aware
+/// readers. Unlike [`emit_codec_manifest`], this artifact describes every
+/// schema table and keeps archive metadata optional per table.
+pub fn emit_projection_codec_manifest(
+    candidates_json: &str,
+    schema_manifest: &LumiereSchemaManifest,
+    storage_policy_manifest: &Value,
+) -> Result<String> {
+    let config: Value =
+        serde_json::from_str(candidates_json).context("parse generated archive manifest")?;
+    let candidates = config["candidates"]
+        .as_array()
+        .context("generated archive manifest: missing 'candidates' array")?;
+
+    let mut archive_tables = std::collections::BTreeMap::new();
+    for (i, cand) in candidates.iter().enumerate() {
+        let table = cand["table"]
+            .as_str()
+            .with_context(|| format!("candidates[{i}].table is not a string"))?;
+        let cold_table = cand["cold_table"]
+            .as_str()
+            .with_context(|| format!("candidates[{i}].cold_table is not a string"))?;
+        schema_manifest
+            .tables
+            .iter()
+            .find(|schema| schema.sql_name == table)
+            .with_context(|| {
+                format!("candidates[{i}]: table '{table}' not found in schema manifest")
+            })?;
+        archive_tables.insert(table.to_string(), cold_table.to_string());
+    }
+
+    let policies = storage_policy_manifest["policies"]
+        .as_array()
+        .context("storage policy manifest: missing 'policies' array")?;
+    let mut projection_policies = std::collections::BTreeMap::new();
+    for (i, policy) in policies.iter().enumerate() {
+        let table = policy["table"]
+            .as_str()
+            .with_context(|| format!("storage policies[{i}].table is not a string"))?;
+        let module = policy["module"]
+            .as_str()
+            .with_context(|| format!("storage policies[{i}].module is not a string"))?;
+        let projection_mode = policy["projection_mode"]
+            .as_str()
+            .with_context(|| format!("storage policies[{i}].projection_mode is not a string"))?;
+        let postgres_access_path = policy["postgres_access_path"].as_str().with_context(|| {
+            format!("storage policies[{i}].postgres_access_path is not a string")
+        })?;
+        if projection_policies
+            .insert(
+                table.to_string(),
+                (module, projection_mode, postgres_access_path),
+            )
+            .is_some()
+        {
+            anyhow::bail!("storage policy manifest has duplicate table '{table}'");
+        }
+    }
+
+    let mut schemas: Vec<&GeneratedTableSchema> = schema_manifest.tables.iter().collect();
+    schemas.sort_by(|left, right| left.sql_name.cmp(&right.sql_name));
+    let mut tables = serde_json::Map::new();
+    for schema in schemas {
+        let archive_table = archive_tables.get(&schema.sql_name).map(String::as_str);
+        let (module, projection_mode, postgres_access_path) = projection_policies
+            .get(&schema.sql_name)
+            .with_context(|| format!("table '{}' lacks a storage policy", schema.sql_name))?;
+        let postgres_access_path =
+            super::pg_migration_emit::effective_access_path(&schema.sql_name, postgres_access_path);
+        tables.insert(
+            schema.sql_name.clone(),
+            build_projection_table_entry(
+                schema,
+                archive_table,
+                module,
+                projection_mode,
+                postgres_access_path,
+            ),
+        );
+    }
+
+    let manifest = serde_json::json!({
+        "version": 1,
+        "_comment": "Auto-generated by lumiere-codegen. Do not edit.",
+        "checksum_algo": "sha256",
+        "canonical_serialization": "json_sorted_keys_no_whitespace",
+        "tables": Value::Object(tables),
+    });
+    serde_json::to_string_pretty(&manifest).context("serialise projection codec manifest")
+}
+
+fn build_archive_table_entry(schema: &GeneratedTableSchema, cold_table: &str) -> Value {
+    let columns = build_columns(schema);
 
     serde_json::json!({
         "cold_table": cold_table,
         "columns": columns,
         "extra_columns": ["archived_at", "payload_checksum"],
     })
+}
+
+fn build_projection_table_entry(
+    schema: &GeneratedTableSchema,
+    archive_table: Option<&str>,
+    module: &str,
+    projection_mode: &str,
+    postgres_access_path: &str,
+) -> Value {
+    let columns = build_columns(schema);
+    let mut entry = serde_json::Map::new();
+    entry.insert(
+        "projection_table".into(),
+        Value::String(schema.sql_name.clone()),
+    );
+    entry.insert("module".into(), Value::String(module.into()));
+    entry.insert(
+        "projection_mode".into(),
+        Value::String(projection_mode.into()),
+    );
+    entry.insert(
+        "postgres_access_path".into(),
+        Value::String(postgres_access_path.into()),
+    );
+    entry.insert(
+        "primary_key".into(),
+        serde_json::json!({
+            "name": schema.primary_key.column_name,
+            "type": format!("{:?}", schema.primary_key.ty),
+        }),
+    );
+    entry.insert(
+        "organization_column".into(),
+        schema
+            .columns
+            .iter()
+            .find(|column| column.sql_name == "organization_id" && !column.nullable)
+            .map_or(Value::Null, |_| Value::String("organization_id".into())),
+    );
+    entry.insert("columns".into(), Value::Array(columns));
+
+    if let Some(archive_table) = archive_table {
+        entry.insert("archive_table".into(), Value::String(archive_table.into()));
+    }
+
+    Value::Object(entry)
+}
+
+fn build_columns(schema: &GeneratedTableSchema) -> Vec<Value> {
+    schema
+        .columns
+        .iter()
+        .map(|col| {
+            let durable_json = is_durable_json_column(&schema.sql_name, &col.sql_name);
+            serde_json::json!({
+                "name": col.name,
+                "stdb_type": format!("{:?}", col.ty),
+                "pg_type": durable_pg_type(&schema.sql_name, &col.sql_name, &col.ty),
+                "nullable": col.nullable,
+                "pg_bind": if durable_json { "to_sql_jsonb" } else { pg_bind_fn(&col.ty) },
+                "pg_from": if durable_json { "from_sql_jsonb_to_object" } else { pg_from_fn(&col.ty) },
+                "api_json": if durable_json { "object" } else { api_json_repr(&col.ty) },
+            })
+        })
+        .collect()
+}
+
+fn is_durable_json_column(table: &str, column: &str) -> bool {
+    table == "organization_row_change" && matches!(column, "row_identity_json" | "row_json")
+}
+
+/// Resolve deliberate durable-store overrides before falling back to the
+/// canonical SpacetimeDB-to-PostgreSQL type mapping.
+pub(super) fn durable_pg_type<'a>(table: &str, column: &str, ty: &'a GeneratedType) -> &'a str {
+    if is_durable_json_column(table, column) {
+        "JSONB"
+    } else {
+        pg_type_for(ty)
+    }
 }
 
 /// Map a `GeneratedType` to the Postgres DDL type string (must match pg_ddl_emit.rs).
@@ -252,6 +409,22 @@ mod tests {
         .to_string()
     }
 
+    fn projection_policies(manifest: &LumiereSchemaManifest) -> Value {
+        serde_json::json!({
+            "version": 1,
+            "policies": manifest.tables.iter().map(|table| serde_json::json!({
+                "table": table.sql_name,
+                "module": if table.sql_name == "audit_log" { "platform" } else { "localization" },
+                "projection_mode": if table.sql_name == "audit_log" {
+                    "append-history"
+                } else {
+                    "upsert-current"
+                },
+                "postgres_access_path": "organization_index",
+            })).collect::<Vec<_>>()
+        })
+    }
+
     #[test]
     fn emit_contains_expected_fields() {
         let manifest = audit_log_manifest();
@@ -314,6 +487,119 @@ mod tests {
         assert_eq!(vec_col["pg_type"], "JSONB");
         assert_eq!(vec_col["pg_bind"], "to_sql_jsonb");
         assert_eq!(vec_col["api_json"], "array");
+    }
+
+    #[test]
+    fn emit_all_tables_sorted_and_archive_fields_are_optional() {
+        let mut manifest = audit_log_manifest();
+        manifest.tables.push(GeneratedTableSchema {
+            rust_name: "Country".into(),
+            sql_name: "country".into(),
+            primary_key: GeneratedPrimaryKey {
+                column_name: "code".into(),
+                ty: GeneratedType::String,
+            },
+            columns: vec![GeneratedColumn {
+                name: "code".into(),
+                sql_name: "code".into(),
+                ty: GeneratedType::String,
+                nullable: false,
+            }],
+            indexes: vec![],
+        });
+        manifest.tables.reverse();
+
+        let policies = projection_policies(&manifest);
+        let out = emit_projection_codec_manifest(&candidates_json(), &manifest, &policies).unwrap();
+        let parsed: Value = serde_json::from_str(&out).unwrap();
+        let table_names: Vec<&str> = parsed["tables"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+
+        assert_eq!(table_names, ["audit_log", "country"]);
+
+        let country = &parsed["tables"]["country"];
+        assert_eq!(country["projection_table"], "country");
+        assert_eq!(country["primary_key"]["name"], "code");
+        assert_eq!(country["primary_key"]["type"], "String");
+        assert_eq!(country["module"], "localization");
+        assert_eq!(country["projection_mode"], "upsert-current");
+        assert_eq!(country["postgres_access_path"], "organization_index");
+        assert!(country.get("archive_table").is_none());
+        assert!(country.get("extra_columns").is_none());
+
+        let audit = &parsed["tables"]["audit_log"];
+        assert_eq!(audit["module"], "platform");
+        assert_eq!(audit["projection_mode"], "append-history");
+        assert_eq!(audit["postgres_access_path"], "organization_index");
+    }
+
+    #[test]
+    fn projection_manifest_requires_policy_for_every_schema_table() {
+        let manifest = audit_log_manifest();
+        let missing = serde_json::json!({ "version": 1, "policies": [] });
+        let error =
+            emit_projection_codec_manifest(&candidates_json(), &manifest, &missing).unwrap_err();
+
+        assert!(error.to_string().contains("audit_log"));
+    }
+
+    #[test]
+    fn projection_protocol_json_columns_match_durable_schema() {
+        let manifest = LumiereSchemaManifest {
+            version: 1,
+            tables: vec![GeneratedTableSchema {
+                rust_name: "OrganizationRowChange".into(),
+                sql_name: "organization_row_change".into(),
+                primary_key: GeneratedPrimaryKey {
+                    column_name: "id".into(),
+                    ty: GeneratedType::U64,
+                },
+                columns: vec![
+                    GeneratedColumn {
+                        name: "id".into(),
+                        sql_name: "id".into(),
+                        ty: GeneratedType::U64,
+                        nullable: false,
+                    },
+                    GeneratedColumn {
+                        name: "row_identity_json".into(),
+                        sql_name: "row_identity_json".into(),
+                        ty: GeneratedType::String,
+                        nullable: false,
+                    },
+                    GeneratedColumn {
+                        name: "row_json".into(),
+                        sql_name: "row_json".into(),
+                        ty: GeneratedType::String,
+                        nullable: true,
+                    },
+                ],
+                indexes: vec![],
+            }],
+            enum_types: vec![],
+        };
+        let policies = projection_policies(&manifest);
+        let out =
+            emit_projection_codec_manifest("{\"candidates\":[]}", &manifest, &policies).unwrap();
+        let parsed: Value = serde_json::from_str(&out).unwrap();
+        let columns = parsed["tables"]["organization_row_change"]["columns"]
+            .as_array()
+            .unwrap();
+
+        for name in ["row_identity_json", "row_json"] {
+            let column = columns
+                .iter()
+                .find(|column| column["name"] == name)
+                .unwrap();
+            assert_eq!(column["pg_type"], "JSONB");
+            assert_eq!(column["pg_bind"], "to_sql_jsonb");
+            assert_eq!(column["pg_from"], "from_sql_jsonb_to_object");
+            assert_eq!(column["api_json"], "object");
+        }
     }
 
     #[test]

@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
 import type {
   AiDocumentProcessingJob,
   AiInsight,
@@ -24,12 +25,6 @@ import type {
   KnowledgeArticle,
   KnowledgeArticleCategory,
 } from "@lumiere/stdb/types"
-
-type ScalarId = bigint | number | string
-
-function toScalarU64(v: ScalarId): bigint {
-  return typeof v === "bigint" ? v : BigInt(String(v))
-}
 
 import { responseErrorMessage as parseCallErrorDocuments } from "@lumiere/api-client/response-error"
 

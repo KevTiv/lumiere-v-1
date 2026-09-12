@@ -11,33 +11,71 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  scope:
+    name: Classify change scope
+    runs-on: ubuntu-latest
+    outputs:
+      valid: ${{ steps.scope.outputs.valid }}
+      run_e2e: ${{ steps.scope.outputs.run_e2e }}
+      run_rust: ${{ steps.scope.outputs.run_rust }}
+      run_contracts: ${{ steps.scope.outputs.run_contracts }}
+      run_frontend: ${{ steps.scope.outputs.run_frontend }}
+      run_pdf: ${{ steps.scope.outputs.run_pdf }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: scope
+        name: Determine validation scope
+        run: python3 scripts/ci-change-scope.py --github-output "$GITHUB_OUTPUT"
+      - name: Test change classifier
+        run: python3 -B -m unittest discover -s scripts/tests
+      - name: Test external readiness probe
+        run: node scripts/tests/test-compose-readiness.mjs
+
+  stdb-check:
+    name: SpacetimeDB check
+    needs: scope
+    if: needs.scope.outputs.run_contracts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: spacetimedb
+          cache-on-failure: true
+      - name: Check standalone module and tests
+        working-directory: spacetimedb
+        run: cargo check --locked --tests
+
   rust:
     name: Rust
+    needs: scope
+    if: needs.scope.outputs.run_rust == 'true'
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: lumiere
+          POSTGRES_USER: lumiere
+          POSTGRES_PASSWORD: lumiere
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U lumiere -d lumiere"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
 
-      # Generated STDB bindings + manifests live in the private
-      # KevTiv/lumiere-contracts repo, consumed as a tag-pinned git
-      # dependency. This runner needs read-only SSH access to fetch it. The
-      # deploy key on lumiere-contracts is read-only, so a compromised
-      # secret here cannot write to that repo. github.com's SSH host key is
-      # pinned to the value GitHub publishes rather than trusted on first
-      # use. See docs/plans/contracts-extraction-execution-plan.md.
-      - name: Configure SSH for private lumiere-contracts dependency
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_ed25519
-          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
-          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/setup-contracts-ssh
+        with:
+          deploy-key: ${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -45,10 +83,6 @@ jobs:
             spacetimedb
             .
           cache-on-failure: true
-
-      - name: SpacetimeDB module (cargo check --tests)
-        working-directory: spacetimedb
-        run: cargo check --tests
 
       # No `spacetime` CLI in this runner, so bindings can't be regenerated
       # from the live module here — populate .contracts-staging/ from the
@@ -59,25 +93,71 @@ jobs:
         run: make contracts-staging-from-pinned
 
       - name: Workspace members (api-server, ai-gateway, lumiere-codegen, stdb-auth)
-        run: cargo check -p api-server -p ai-gateway -p lumiere-codegen -p stdb-auth
+        run: cargo check --locked -p api-server -p ai-gateway -p lumiere-codegen -p stdb-auth
+
+      - name: C3 PostgreSQL projection matrix
+        env:
+          C3_TEST_PG: "1"
+          PG_HOST: 127.0.0.1
+          PG_PORT: "5432"
+          PG_DATABASE: lumiere
+          PG_USER: lumiere
+          PG_PASSWORD: lumiere
+          PG_TLS_MODE: disable
+        run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::commit_projection::tests::postgres_manifest_matrix -- --nocapture
+
+      - name: C4 PostgreSQL release compatibility
+        env:
+          C4_TEST_PG: "1"
+          PG_HOST: 127.0.0.1
+          PG_PORT: "5432"
+          PG_DATABASE: lumiere
+          PG_USER: lumiere
+          PG_PASSWORD: lumiere
+          PG_TLS_MODE: disable
+        run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::migrate::postgres_compatibility_tests::postgres_current_next_application_rollback -- --nocapture
+
+      - name: C5 manifest-driven finalization
+        env:
+          C5_TEST_PG: "1"
+          PG_HOST: 127.0.0.1
+          PG_PORT: "5432"
+          PG_DATABASE: lumiere
+          PG_USER: lumiere
+          PG_PASSWORD: lumiere
+          PG_TLS_MODE: disable
+        run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::finalization_worker:: -- --nocapture
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::ledger:: -- --nocapture
 
       - name: lumiere-codegen unit tests
-        run: cargo test -p lumiere-codegen
+        run: cargo test --locked -p lumiere-codegen
+
+      - name: Realtime build generation regression
+        run: bash scripts/test-build-rs-generation.sh
 
       - name: SpacetimeDB Rust generator recovery test
         run: bash scripts/test-generate-spacetimedb-rust-sdk.sh
 
-      - name: Verify generated TypeScript matches Rust registry
-        run: make check-codegen
+      - name: Verify pinned generated contracts and source policy
+        run: make check-codegen-pinned
+
+      - name: Ownership and required-test guardrails
+        run: |
+          python3 scripts/test-code-ownership.py
+          python3 scripts/check-code-ownership.py
+          python3 scripts/test-required-cargo-tests.py
 
       - name: api-server reducer contract tests
-        run: cargo test -p api-server http_app::tests
+        run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib commands::tests
 
       - name: ai-gateway unit tests
-        run: cargo test -p ai-gateway health_returns
+        run: cargo test --locked -p ai-gateway --bin gateway
 
   contracts-drift:
     name: Contracts drift
+    needs: scope
+    if: needs.scope.outputs.run_contracts == 'true'
     runs-on: ubuntu-latest
     env:
       # Must match the module crate used for authoritative schema extraction.
@@ -90,19 +170,9 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
-      # Same read-only deploy key as the Rust job — see the comment there.
-      - name: Configure SSH for private lumiere-contracts dependency
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_ed25519
-          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
-          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/setup-contracts-ssh
+        with:
+          deploy-key: ${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -111,41 +181,37 @@ jobs:
             .
           cache-on-failure: true
 
-      # Pinned to the same SpacetimeDB CLI version the generated bindings
-      # were produced with so this job's `spacetime generate` output is
-      # directly comparable to what's published. The install unpacks a
-      # ~150MB binary bundle; cached by exact version, so this only
-      # actually downloads again when SPACETIME_CLI_VERSION changes.
-      - name: Cache spacetime CLI
-        id: cache-spacetime
-        uses: actions/cache@v4
+      - uses: ./.github/actions/setup-spacetime-cli
         with:
-          path: |
-            ~/.local/bin/spacetime
-            ~/.local/share/spacetime/bin
-          key: spacetime-cli-${{ env.SPACETIME_CLI_VERSION }}-${{ runner.os }}
+          version: ${{ env.SPACETIME_CLI_VERSION }}
 
-      - name: Install spacetime CLI
-        if: steps.cache-spacetime.outputs.cache-hit != 'true'
+      - name: Start standalone SpacetimeDB
         run: |
-          curl -sSf https://install.spacetimedb.com | sh -s -- -y
-          "$HOME/.local/bin/spacetime" version install "$SPACETIME_CLI_VERSION"
-          "$HOME/.local/bin/spacetime" version use "$SPACETIME_CLI_VERSION"
+          nohup spacetime start --listen-addr 127.0.0.1:3000 > /tmp/lumiere-ci-stdb.log 2>&1 &
+          for attempt in {1..60}; do
+            if curl -fsS -X POST http://127.0.0.1:3000/v1/identity >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/lumiere-ci-stdb.log
+          exit 1
 
-      - name: Add spacetime CLI to PATH
-        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Publish production module to standalone SpacetimeDB
+        run: spacetime publish lumiere-ci-contracts --module-path spacetimedb --server local --delete-data=always -y --no-config
 
-      # Fails when the live SpacetimeDB module schema has changed but nobody
-      # ran `make publish-contracts` to release the corresponding
-      # lumiere-contracts tag — the drift check make check-codegen alone
-      # can't catch, since check-codegen only compares against whatever
-      # bindings are already in .contracts-staging/. See
-      # docs/plans/contracts-extraction-execution-plan.md.
-      - name: Verify STDB module matches pinned lumiere-contracts release
-        run: make check-contracts-drift
+      # Full source/schema/manifest comparison against an isolated database;
+      # CI correctness does not depend on a mutable Maincloud deployment.
+      - name: Verify standalone STDB matches pinned lumiere-contracts release
+        env:
+          STDB_SCHEMA_SERVER: local
+          STDB_SCHEMA_HOST: http://127.0.0.1:3000
+        run: make check-contracts-drift STDB_MODULE=lumiere-ci-contracts
 
   frontend:
     name: Frontend
+    needs: scope
+    if: needs.scope.outputs.run_frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -153,35 +219,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # pnpm resolves the @lumiere/contracts git-subdirectory dependency
-      # (packages/stdb, packages/query-hooks) over SSH — same read-only
-      # deploy key as the Rust jobs. See the comment on the Rust job's
-      # equivalent step.
-      - name: Configure SSH for private lumiere-contracts dependency
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_ed25519
-          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
-          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
-
-      - uses: pnpm/action-setup@v4
+      - uses: ./.github/actions/setup-contracts-ssh
         with:
-          version: 10.31.0
+          deploy-key: ${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+      - uses: ./.github/actions/setup-frontend
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Validate frontend build-cache graph
+        run: node ../scripts/test-frontend-build-cache.mjs
 
       - name: Check accounting double-cast rationales
         run: bash ../scripts/lint-accounting-as-unknown-as.sh
@@ -194,6 +242,10 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Validate Playwright tests load
+        working-directory: frontend/web
+        run: pnpm exec playwright test --list
 
       - name: Enforce mobile API boundary
         run: pnpm --filter mobile lint
@@ -210,48 +262,10 @@ jobs:
       - name: Unit tests (web BFF helpers)
         run: pnpm --dir web test:unit
 
-  playwright-compile:
-    name: Playwright (compile smoke)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-
-      # Same read-only deploy key as the frontend job — see its comment.
-      - name: Configure SSH for private lumiere-contracts dependency
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_ed25519
-          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
-          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.31.0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Validate Playwright tests load
-        working-directory: frontend/web
-        run: pnpm exec playwright test --list
-
   owner-report-pdf:
     name: Owner-report PDF structural regression
+    needs: scope
+    if: needs.scope.outputs.run_pdf == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -269,6 +283,8 @@ jobs:
 
       - name: Start trusted Chromium renderer
         run: docker run -d --name chromium-worker -p 8090:8090 lumiere-chromium-worker
+      - name: Validate Chromium readiness helper
+        run: node --test chromium-worker/src/readiness.test.mjs
       - name: Install PDF text extractor
         run: sudo apt-get update && sudo apt-get install -y poppler-utils
       - name: Validate deterministic report fixtures
@@ -280,6 +296,47 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          context: ./chromium-worker
-          tags: lumiere-chromium-worker
-          load: true
+          name: owner-report-pdf-diagnostics
+          path: artifacts/owner-report-pdf/
+          retention-days: 7
+
+  # Retain the historical check name for branch protection. The actual
+  # Playwright compile/list validation now runs in the frontend job.
+  playwright-compile:
+    name: Playwright (compile smoke)
+    if: always()
+    needs: [scope, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compatibility check
+        run: |
+          test "${{ needs.scope.result }}" = success
+          test "${{ needs.scope.outputs.valid }}" = true
+          case "${{ needs.scope.outputs.run_frontend }}:${{ needs.frontend.result }}" in
+            true:success|false:skipped) ;;
+            *) exit 1 ;;
+          esac
+
+  gate:
+    name: CI gate
+    if: always()
+    needs: [scope, stdb-check, rust, contracts-drift, frontend, owner-report-pdf, playwright-compile]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require scope and scheduled validations to pass
+        run: |
+          test "${{ needs.scope.result }}" = success
+          test "${{ needs.scope.outputs.valid }}" = true
+          for pair in \
+            "run_contracts:${{ needs.scope.outputs.run_contracts }}:${{ needs.stdb-check.result }}" \
+            "run_rust:${{ needs.scope.outputs.run_rust }}:${{ needs.rust.result }}" \
+            "run_contracts:${{ needs.scope.outputs.run_contracts }}:${{ needs.contracts-drift.result }}" \
+            "run_frontend:${{ needs.scope.outputs.run_frontend }}:${{ needs.frontend.result }}" \
+            "run_pdf:${{ needs.scope.outputs.run_pdf }}:${{ needs.owner-report-pdf.result }}"; do
+            IFS=: read -r name expected actual <<< "$pair"
+            case "$expected:$actual" in
+              true:success|false:skipped) ;;
+              *) echo "Unexpected result for $name: $expected:$actual"; exit 1 ;;
+            esac
+          done
+          test "${{ needs.playwright-compile.result }}" = success

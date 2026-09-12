@@ -2,12 +2,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-const EXPECTED_SCHEMA_TABLES: usize = 458;
+const EXPECTED_SCHEMA_TABLES: usize = 463;
 
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::cold_tier::schema_ir::{GeneratedTableOwnership, LumiereSchemaManifest};
+use crate::cold_tier::schema_ir::LumiereSchemaManifest;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -132,6 +132,94 @@ pub enum PostgresAccessPath {
     External,
 }
 
+/// The semantic placement of a row in the hot/cold storage model.
+///
+/// This is derived from the structural retention policy, but is emitted as a
+/// first-class value so consumers do not need to infer placement from several
+/// independent fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StorageClass {
+    AlwaysHot,
+    TerminalWindow,
+    ShortHotTail,
+    PgFirst,
+    ProjectionOnly,
+    ExternalReference,
+}
+
+impl StorageClass {
+    pub fn for_policy(policy: &StoragePolicy) -> Self {
+        match policy.hot_retention {
+            HotRetention::TerminalWindow => Self::TerminalWindow,
+            HotRetention::TimeWindow => Self::ShortHotTail,
+            HotRetention::None => Self::PgFirst,
+            HotRetention::Always => match policy.projection_mode {
+                ProjectionMode::DerivedRebuildable
+                | ProjectionMode::Snapshot
+                | ProjectionMode::Ephemeral => Self::ProjectionOnly,
+                ProjectionMode::ExternalReference => Self::ExternalReference,
+                _ => Self::AlwaysHot,
+            },
+        }
+    }
+}
+
+/// Reviewed, structural eligibility inputs. Domain reducers still evaluate
+/// the actual row state and obligations; these fields make the required
+/// checks explicit in generated manifests.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SemanticEligibility {
+    pub state: String,
+    pub age_window: String,
+    pub open_obligations: String,
+    pub workflow_state: String,
+    pub durable_watermark: String,
+    pub exact_durable_version: String,
+    pub hot_dependencies: String,
+}
+
+impl Default for SemanticEligibility {
+    fn default() -> Self {
+        Self {
+            state: "not_applicable".into(),
+            age_window: "not_applicable".into(),
+            open_obligations: "must_be_clear".into(),
+            workflow_state: "must_not_be_active".into(),
+            durable_watermark: "required".into(),
+            exact_durable_version: "required".into(),
+            hot_dependencies: "must_be_clear".into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ArchiveOrderBy {
+    pub column: String,
+    pub direction: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ArchivePolicy {
+    pub cold_table: String,
+    pub mode: String,
+    pub scope: BTreeMap<String, String>,
+    pub finalize_reducer: String,
+    pub order_by: Vec<ArchiveOrderBy>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewedPolicyFixture {
+    pub table: String,
+    pub module: String,
+    pub storage_class: StorageClass,
+    pub reviewed: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ParentReference {
@@ -178,6 +266,10 @@ pub struct StoragePolicy {
     pub hydration_policy: HydrationPolicy,
     pub delete_behavior: DeleteBehavior,
     pub postgres_access_path: PostgresAccessPath,
+    #[serde(default)]
+    pub semantic_eligibility: SemanticEligibility,
+    #[serde(default)]
+    pub archive: Option<ArchivePolicy>,
     #[serde(default, rename = "_comment", skip_serializing)]
     pub comment: Option<String>,
 }
@@ -187,6 +279,8 @@ pub struct StoragePolicy {
 pub struct StoragePolicyConfig {
     pub version: u32,
     pub policies: Vec<StoragePolicy>,
+    #[serde(default)]
+    pub reviewed_fixtures: Vec<ReviewedPolicyFixture>,
     #[serde(default, rename = "_comment", skip_serializing)]
     pub comment: Option<String>,
 }
@@ -223,12 +317,18 @@ fn emit_storage_policy_manifest_with_expected_count(
     let policies = config
         .policies
         .iter()
-        .map(|policy| serde_json::to_value(policy).context("serialise typed storage policy"))
+        .map(|policy| {
+            let mut value =
+                serde_json::to_value(policy).context("serialise typed storage policy")?;
+            value["storage_class"] = serde_json::to_value(StorageClass::for_policy(policy))?;
+            Ok(value)
+        })
         .collect::<Result<Vec<_>>>()?;
     let manifest = serde_json::json!({
         "version": config.version,
         "_comment": "Auto-generated by lumiere-codegen from storage-policy-manifest.json. Do not edit.",
         "policies": policies,
+        "reviewed_fixtures": config.reviewed_fixtures,
         "coverage": coverage,
     });
     serde_json::to_string_pretty(&manifest).context("serialise storage policy manifest")
@@ -333,14 +433,20 @@ pub fn validate_storage_policies(
         if policy.rationale.trim().is_empty() {
             bail!("policies[{index}] ('{table_name}'): rationale must not be empty");
         }
+        if !policy.cooling_eligibility_source.starts_with("reviewed:") {
+            bail!("policies[{index}] ('{table_name}'): cooling decision has not been reviewed");
+        }
         validate_c0_ownership(policy, table_name, table)?;
         validate_aggregate_and_parent(policy, table_name, table, &config.policies, &tables)?;
         validate_company_path(policy, table_name, table, &config.policies, &tables)?;
         validate_primary_key_policy(policy, table_name, table)?;
         validate_policy_coherence(policy, table_name)?;
+        validate_archive_policy(policy, table_name)?;
         *by_module.entry(policy.module.clone()).or_default() += 1;
     }
     validate_aggregate_cycles(&config.policies)?;
+    validate_archive_aggregate_coherence(&config.policies)?;
+    validate_reviewed_fixtures(config)?;
 
     let total = schema_manifest.tables.len();
     let classified = config.policies.len();
@@ -371,6 +477,149 @@ pub fn validate_storage_policies(
         unclassified: total.saturating_sub(classified),
         by_module,
     })
+}
+
+fn validate_archive_aggregate_coherence(policies: &[StoragePolicy]) -> Result<()> {
+    let by_table = policies
+        .iter()
+        .map(|policy| (policy.table.as_str(), policy))
+        .collect::<BTreeMap<_, _>>();
+    for policy in policies {
+        if policy.cooling_eligibility == CoolingEligibility::Never {
+            continue;
+        }
+        if let Some(parent) = policy.aggregate.parent.as_ref() {
+            let parent_policy = by_table.get(parent.table.as_str()).with_context(|| {
+                format!(
+                    "storage policy '{}': cooling parent '{}' has no policy",
+                    policy.table, parent.table
+                )
+            })?;
+            if parent_policy.cooling_eligibility == CoolingEligibility::Never
+                || parent_policy.archive.is_none()
+            {
+                bail!(
+                    "storage policy '{}': cooling child requires cooling-eligible archive parent '{}'",
+                    policy.table,
+                    parent.table
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_archive_policy(policy: &StoragePolicy, table_name: &str) -> Result<()> {
+    let semantic = &policy.semantic_eligibility;
+    for (name, value) in [
+        ("state", &semantic.state),
+        ("age_window", &semantic.age_window),
+        ("open_obligations", &semantic.open_obligations),
+        ("workflow_state", &semantic.workflow_state),
+        ("durable_watermark", &semantic.durable_watermark),
+        ("exact_durable_version", &semantic.exact_durable_version),
+        ("hot_dependencies", &semantic.hot_dependencies),
+    ] {
+        if value.trim().is_empty() {
+            bail!("storage policy '{table_name}': semantic_eligibility.{name} must not be empty");
+        }
+    }
+    let inherits_parent_archive = policy.aggregate.kind == AggregateKind::Child
+        && policy.cooling_eligibility == CoolingEligibility::Parent
+        && policy.dependency_behavior == DependencyBehavior::FollowParent
+        && policy.hydration_policy == HydrationPolicy::Parent;
+    if policy.cooling_eligibility == CoolingEligibility::Never {
+        if policy.archive.is_some() {
+            bail!("storage policy '{table_name}': never-cooled table must not declare archive metadata");
+        }
+    } else if inherits_parent_archive {
+        if policy.archive.is_some() {
+            bail!(
+                "storage policy '{table_name}': parent-governed aggregate child must not declare independent archive metadata"
+            );
+        }
+    } else {
+        let archive = policy.archive.as_ref().with_context(|| {
+            format!("storage policy '{table_name}': cooling-eligible table must declare archive metadata")
+        })?;
+        if archive.cold_table.trim().is_empty() {
+            bail!("storage policy '{table_name}': archive.cold_table must not be empty");
+        }
+        if archive.mode.trim().is_empty() {
+            bail!("storage policy '{table_name}': archive.mode must not be empty");
+        }
+        if archive.finalize_reducer.trim().is_empty() {
+            bail!("storage policy '{table_name}': archive.finalize_reducer must not be empty");
+        }
+        if archive.order_by.is_empty() {
+            bail!("storage policy '{table_name}': archive.order_by must not be empty");
+        }
+        for (role, column) in &archive.scope {
+            if role.trim().is_empty() || column.trim().is_empty() {
+                bail!("storage policy '{table_name}': archive scope names must not be empty");
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_reviewed_fixtures(config: &StoragePolicyConfig) -> Result<()> {
+    let policies = config
+        .policies
+        .iter()
+        .map(|policy| (policy.table.as_str(), policy))
+        .collect::<BTreeMap<_, _>>();
+    let mut seen = BTreeSet::new();
+    for (index, fixture) in config.reviewed_fixtures.iter().enumerate() {
+        if !fixture.reviewed {
+            bail!("reviewed_fixtures[{index}] must be marked reviewed");
+        }
+        let policy = policies.get(fixture.table.as_str()).with_context(|| {
+            format!(
+                "reviewed_fixtures[{index}] references unknown table '{}'",
+                fixture.table
+            )
+        })?;
+        if policy.module != fixture.module {
+            bail!(
+                "reviewed_fixtures[{index}] module '{}' disagrees with table '{}' module '{}'",
+                fixture.module,
+                fixture.table,
+                policy.module
+            );
+        }
+        let expected = StorageClass::for_policy(policy);
+        if expected != fixture.storage_class {
+            bail!(
+                "reviewed_fixtures[{index}] storage class {:?} disagrees with table '{}' class {:?}",
+                fixture.storage_class,
+                fixture.table,
+                expected
+            );
+        }
+        if !seen.insert((fixture.module.as_str(), fixture.storage_class)) {
+            bail!(
+                "reviewed_fixtures[{index}] duplicates module '{}' storage class {:?}",
+                fixture.module,
+                fixture.storage_class
+            );
+        }
+    }
+    let required = config
+        .policies
+        .iter()
+        .map(|policy| (policy.module.as_str(), StorageClass::for_policy(policy)))
+        .collect::<BTreeSet<_>>();
+    for (module, storage_class) in required {
+        if !seen.contains(&(module, storage_class)) {
+            bail!(
+                "module '{}' storage class {:?} lacks a reviewed policy fixture",
+                module,
+                storage_class
+            );
+        }
+    }
+    Ok(())
 }
 
 fn validate_aggregate_cycles(policies: &[StoragePolicy]) -> Result<()> {
@@ -405,33 +654,19 @@ fn validate_c0_ownership(
     table_name: &str,
     table: &crate::cold_tier::schema_ir::GeneratedTableSchema,
 ) -> Result<()> {
-    let actual = table.ownership().with_context(|| {
+    table.ownership().with_context(|| {
         format!("storage policy '{table_name}': schema fails C0 ownership validation")
     })?;
-    match (policy.organization_ownership, actual) {
-        (OrganizationOwnership::Direct, GeneratedTableOwnership::Organization) => {
+    match policy.organization_ownership {
+        OrganizationOwnership::Direct => {
             if policy.organization_column.as_deref() != Some("organization_id") {
                 bail!(
                     "storage policy '{table_name}': direct ownership requires organization_column 'organization_id'"
                 );
             }
         }
-        (OrganizationOwnership::PlatformGlobal, GeneratedTableOwnership::PlatformGlobal(_)) => {
-            if policy.organization_column.is_some() {
-                bail!(
-                    "storage policy '{table_name}': platform-global ownership must not declare organization_column"
-                );
-            }
-            if policy.company_ownership != CompanyOwnership::None {
-                bail!(
-                    "storage policy '{table_name}': platform-global table must have company_ownership 'none'"
-                );
-            }
-        }
-        (declared, actual) => bail!(
-            "storage policy '{table_name}': declared organization ownership {:?} disagrees with C0 schema ownership {:?}",
-            declared,
-            actual
+        OrganizationOwnership::PlatformGlobal => bail!(
+            "storage policy '{table_name}': platform-global ownership is outside the ERP manifest"
         ),
     }
     Ok(())
@@ -815,35 +1050,33 @@ mod tests {
     };
     use serde_json::Value;
 
-    fn table(name: &str, platform_global: bool) -> GeneratedTableSchema {
+    fn table(name: &str, _legacy_platform_global: bool) -> GeneratedTableSchema {
         let mut columns = vec![GeneratedColumn {
             name: "id".into(),
             sql_name: "id".into(),
             ty: GeneratedType::U64,
             nullable: false,
         }];
-        if !platform_global {
-            columns.extend([
-                GeneratedColumn {
-                    name: "organization_id".into(),
-                    sql_name: "organization_id".into(),
-                    ty: GeneratedType::U64,
-                    nullable: false,
-                },
-                GeneratedColumn {
-                    name: "company_id".into(),
-                    sql_name: "company_id".into(),
-                    ty: GeneratedType::U64,
-                    nullable: false,
-                },
-                GeneratedColumn {
-                    name: "parent_id".into(),
-                    sql_name: "parent_id".into(),
-                    ty: GeneratedType::U64,
-                    nullable: false,
-                },
-            ]);
-        }
+        columns.extend([
+            GeneratedColumn {
+                name: "organization_id".into(),
+                sql_name: "organization_id".into(),
+                ty: GeneratedType::U64,
+                nullable: false,
+            },
+            GeneratedColumn {
+                name: "company_id".into(),
+                sql_name: "company_id".into(),
+                ty: GeneratedType::U64,
+                nullable: false,
+            },
+            GeneratedColumn {
+                name: "parent_id".into(),
+                sql_name: "parent_id".into(),
+                ty: GeneratedType::U64,
+                nullable: false,
+            },
+        ]);
         GeneratedTableSchema {
             rust_name: name.into(),
             sql_name: name.into(),
@@ -852,15 +1085,11 @@ mod tests {
                 ty: GeneratedType::U64,
             },
             columns,
-            indexes: if platform_global {
-                vec![]
-            } else {
-                vec![GeneratedIndex {
-                    name: format!("{name}_organization_id"),
-                    columns: vec!["organization_id".into()],
-                    unique: false,
-                }]
-            },
+            indexes: vec![GeneratedIndex {
+                name: format!("{name}_organization_id"),
+                columns: vec!["organization_id".into()],
+                unique: false,
+            }],
         }
     }
 
@@ -871,6 +1100,7 @@ mod tests {
             rationale: "test policy".into(),
             authoritative_resources: (table == "orders")
                 .then(|| "orders".into())
+                .or_else(|| (table == "currency").then(|| "currencies".into()))
                 .into_iter()
                 .collect(),
             durability_class: DurabilityClass::DurableBusinessRecord,
@@ -891,26 +1121,21 @@ mod tests {
             projection_mode: ProjectionMode::UpsertCurrent,
             hot_retention: HotRetention::Always,
             cooling_eligibility: CoolingEligibility::Never,
-            cooling_eligibility_source: "not eligible until reviewed".into(),
+            cooling_eligibility_source:
+                "reviewed:c5/test/always-hot/missing-semantic-safety-contract".into(),
             dependency_behavior: DependencyBehavior::Independent,
             hydration_policy: HydrationPolicy::NotApplicable,
             delete_behavior: DeleteBehavior::Tombstone,
             postgres_access_path: PostgresAccessPath::OrganizationIndex,
+            semantic_eligibility: SemanticEligibility::default(),
+            archive: None,
             comment: None,
         }
     }
 
-    fn global_policy(table: &str) -> StoragePolicy {
+    fn reference_policy(table: &str) -> StoragePolicy {
         let mut policy = direct_policy(table);
-        policy.module = "platform".into();
-        policy.authoritative_resources = vec!["currencies".into()];
-        policy.durability_class = DurabilityClass::PlatformControl;
-        policy.organization_ownership = OrganizationOwnership::PlatformGlobal;
-        policy.organization_column = None;
-        policy.company_ownership = CompanyOwnership::None;
-        policy.company_column_path = None;
-        policy.company_column_nullable = None;
-        policy.postgres_access_path = PostgresAccessPath::PlatformShared;
+        policy.module = "reference".into();
         policy
     }
 
@@ -923,9 +1148,19 @@ mod tests {
     }
 
     fn config(policies: Vec<StoragePolicy>) -> StoragePolicyConfig {
+        let reviewed_fixtures = policies
+            .iter()
+            .map(|policy| ReviewedPolicyFixture {
+                table: policy.table.clone(),
+                module: policy.module.clone(),
+                storage_class: StorageClass::for_policy(policy),
+                reviewed: true,
+            })
+            .collect();
         StoragePolicyConfig {
             version: 1,
             policies,
+            reviewed_fixtures,
             comment: None,
         }
     }
@@ -947,7 +1182,7 @@ mod tests {
     fn validates_exact_coverage_and_emits_module_totals() {
         let source = serde_json::to_string(&config(vec![
             direct_policy("orders"),
-            global_policy("currency"),
+            reference_policy("currency"),
         ]))
         .unwrap();
         let value: Value =
@@ -956,21 +1191,42 @@ mod tests {
         assert_eq!(value["coverage"]["total"], 2);
         assert_eq!(value["coverage"]["unclassified"], 0);
         assert_eq!(value["coverage"]["by_module"]["test"], 1);
-        assert_eq!(value["coverage"]["by_module"]["platform"], 1);
+        assert_eq!(value["coverage"]["by_module"]["reference"], 1);
+    }
+
+    #[test]
+    fn requires_reviewed_fixture_for_each_module_storage_class() {
+        let mut fixture_config =
+            config(vec![direct_policy("orders"), reference_policy("currency")]);
+        fixture_config.reviewed_fixtures.clear();
+        let source = serde_json::to_string(&fixture_config).unwrap();
+        let error = emit_fixture(&source, &manifest()).unwrap_err().to_string();
+        assert!(error.contains("lacks a reviewed policy fixture"));
+    }
+
+    #[test]
+    fn rejects_an_unreviewed_table_decision() {
+        let mut fixture_config =
+            config(vec![direct_policy("orders"), reference_policy("currency")]);
+        fixture_config.policies[0].cooling_eligibility_source =
+            "not eligible until reviewed".into();
+        let source = serde_json::to_string(&fixture_config).unwrap();
+        let error = emit_fixture(&source, &manifest()).unwrap_err().to_string();
+        assert!(error.contains("cooling decision has not been reviewed"));
     }
 
     #[test]
     fn production_emitter_rejects_a_reduced_schema_universe() {
         let source = serde_json::to_string(&config(vec![
             direct_policy("orders"),
-            global_policy("currency"),
+            reference_policy("currency"),
         ]))
         .unwrap();
         assert!(
             emit_storage_policy_manifest(&source, &manifest(), registry())
                 .unwrap_err()
                 .to_string()
-                .contains("requires 458 schema tables")
+                .contains("requires 463 schema tables")
         );
     }
 
@@ -1002,7 +1258,7 @@ mod tests {
         let mut policy = direct_policy("orders");
         policy.authoritative_resources = vec!["missing".into()];
         let source =
-            serde_json::to_string(&config(vec![policy, global_policy("currency")])).unwrap();
+            serde_json::to_string(&config(vec![policy, reference_policy("currency")])).unwrap();
         assert!(emit_fixture(&source, &manifest())
             .unwrap_err()
             .to_string()
@@ -1011,7 +1267,7 @@ mod tests {
         let mut policy = direct_policy("orders");
         policy.authoritative_resources = vec!["currencies".into()];
         let source =
-            serde_json::to_string(&config(vec![policy, global_policy("currency")])).unwrap();
+            serde_json::to_string(&config(vec![policy, reference_policy("currency")])).unwrap();
         assert!(emit_fixture(&source, &manifest())
             .unwrap_err()
             .to_string()
@@ -1020,21 +1276,20 @@ mod tests {
 
     #[test]
     fn validates_c0_platform_agreement_and_company_path() {
-        let mut wrong_global = global_policy("currency");
-        wrong_global.organization_ownership = OrganizationOwnership::Direct;
-        wrong_global.organization_column = Some("organization_id".into());
+        let mut wrong_global = direct_policy("currency");
+        wrong_global.organization_column = Some("tenant_id".into());
         assert!(validate_storage_policies(
             &config(vec![direct_policy("orders"), wrong_global]),
             &manifest()
         )
         .unwrap_err()
         .to_string()
-        .contains("disagrees"));
+        .contains("direct ownership requires"));
 
         let mut bad_path = direct_policy("orders");
         bad_path.company_column_path = Some(vec!["missing".into()]);
         assert!(validate_storage_policies(
-            &config(vec![bad_path, global_policy("currency")]),
+            &config(vec![bad_path, reference_policy("currency")]),
             &manifest()
         )
         .unwrap_err()
@@ -1094,7 +1349,7 @@ mod tests {
         let mut root = direct_policy("orders");
         root.aggregate.kind = AggregateKind::Child;
         assert!(validate_storage_policies(
-            &config(vec![root, global_policy("currency")]),
+            &config(vec![root, reference_policy("currency")]),
             &manifest()
         )
         .unwrap_err()
@@ -1107,7 +1362,7 @@ mod tests {
         let mut policy = direct_policy("orders");
         policy.durability_class = DurabilityClass::Ephemeral;
         assert!(validate_storage_policies(
-            &config(vec![policy, global_policy("currency")]),
+            &config(vec![policy, reference_policy("currency")]),
             &manifest()
         )
         .unwrap_err()
@@ -1117,7 +1372,7 @@ mod tests {
         let mut policy = direct_policy("orders");
         policy.dependency_behavior = DependencyBehavior::FollowParent;
         assert!(validate_storage_policies(
-            &config(vec![policy, global_policy("currency")]),
+            &config(vec![policy, reference_policy("currency")]),
             &manifest()
         )
         .unwrap_err()

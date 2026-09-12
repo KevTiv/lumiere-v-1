@@ -42,14 +42,12 @@ Second-order benefit: `check-contracts-drift` currently cannot detect module dri
 | First param is `U64` but not `organization_id` | 23 | compares an unrelated id (`company_id`, `role_id`, …) against the session org |
 | First param is not `U64` | 21 | `as_u64()` returns `None` — **check skipped** |
 
-The 21 inert cases are the ones that matter most, because `Identity` serializes as a `Product`. Every reducer taking an identity first silently skips the check — including the privilege-granting and credential paths the frontend actually calls:
+The 21 inert cases are the ones that matter most, because `Identity` serializes as a `Product`. Every reducer taking an identity first silently skips the check — including membership and role-assignment paths the frontend actually calls. The credential reducers listed in the original audit have since been retired and remain only as immutable operation-history tombstones:
 
 ```
 add_org_member            (user_identity: Product, organization_id: U64, …)
 add_user_to_organization  (user_identity: Product, organization_id: U64, …)
 assign_role               (user_identity: Product, role_id: U64, organization_id: U64, …)
-create_password_reset_token, link_workos_user,
-store_sso_user_credential, store_user_credential
 ```
 
 **This is an assurance gap, not an open door.** The reducers enforce their own authorization inside STDB, which is invariant §2.1 working as designed — `assign_role` calls `check_permission(ctx, organization_id, "user_role_assignment", "create")` and verifies the role belongs to that organization; `dev_promote_caller_superuser` and `ensure_dev_admin` call `require_dev_reducers_enabled()`; `apply_global_migrations` requires `is_superuser`. Nothing here is currently exploitable through the gateway.

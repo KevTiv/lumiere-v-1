@@ -5,6 +5,7 @@ use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
 };
 use crate::accounting::journal_entries::account_move;
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::crm::contacts::{contact, Contact};
 use crate::inventory::product::product;
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
@@ -309,7 +310,58 @@ pub fn test_subscription_create_lines_bill_idempotent(ctx: &ReducerContext) -> R
     let journal_id = seed_journal(ctx, &fixture)?;
     let plan_id = seed_plan(ctx, &fixture, journal_id)?;
     let so_id = seed_confirmed_so(ctx, &fixture, "SUB-WAVE-A-SO")?;
+    let before_commits = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_org()
+        .filter(&org_id)
+        .count();
     let sub_id = create_draft_subscription(ctx, &fixture, plan_id, so_id)?;
+
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_org()
+        .filter(&org_id)
+        .collect();
+    if commits.len() != before_commits + 1 {
+        return Err("subscription creation must create exactly one commit".into());
+    }
+    let commit = commits
+        .iter()
+        .max_by_key(|commit| commit.sequence)
+        .ok_or("subscription creation commit missing")?;
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_commit()
+        .filter(&org_id)
+        .filter(|change| change.commit_sequence == commit.sequence)
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    let line_id = ctx
+        .db
+        .subscription_line()
+        .subscription_line_by_subscription()
+        .filter(&sub_id)
+        .next()
+        .map(|line| line.id)
+        .ok_or("subscription line missing after creation")?;
+    if commit.operation_id != "erp.create_subscription_from_sale_order"
+        || commit.row_change_count != 2
+        || changes.len() != 2
+        || changes[0].table_name != "subscription"
+        || changes[1].table_name != "subscription_line"
+        || changes[0].row_identity_json != format!(r#"{{"id":{sub_id}}}"#)
+        || changes[1].row_identity_json != format!(r#"{{"id":{line_id}}}"#)
+        || changes[0].ordinal != 0
+        || changes[1].ordinal != 1
+        || changes
+            .iter()
+            .any(|change| change.organization_id != org_id)
+    {
+        return Err("subscription commit did not preserve parent-before-child org rows".into());
+    }
 
     let sub = ctx
         .db

@@ -223,7 +223,7 @@ pub fn mark_action_sent(
     organization_id: u64,
     action_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "iot_action", "write")?;
+    super::require_gateway_or_permission(ctx, organization_id, "iot_action", "write")?;
 
     let action = ctx
         .db
@@ -262,7 +262,7 @@ pub fn acknowledge_iot_action(
     action_id: u64,
     result_payload: Option<String>,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "iot_action", "write")?;
+    super::require_gateway_or_permission(ctx, organization_id, "iot_action", "write")?;
 
     let action = ctx
         .db
@@ -293,7 +293,7 @@ pub fn fail_iot_action(
     action_id: u64,
     error: String,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "iot_action", "write")?;
+    super::require_gateway_or_permission(ctx, organization_id, "iot_action", "write")?;
 
     let action = ctx
         .db

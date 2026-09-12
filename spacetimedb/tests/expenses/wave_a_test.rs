@@ -214,7 +214,10 @@ pub(super) fn seed_accounts(
 /// same ctx.sender(), so this is the only way to satisfy that check here; the
 /// SoD guards (submitted_by == ctx.sender()) are still meaningfully exercised
 /// since submitted_by is independently set to ctx.sender() at submit time.
-pub(super) fn seed_caller_manager(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, String> {
+pub(super) fn seed_caller_manager(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+) -> Result<u64, String> {
     let name = format!("Caller Manager {}", fixture.organization_id);
     let manager_id = seed_employee(ctx, fixture, &name)?;
     crate::hr::employees::update_employee(

@@ -964,9 +964,6 @@ fn preview_rows(req: &ImportPreviewRequest) -> Result<ImportPreviewResponse, Str
     })
 }
 
-pub type ImportAnalyzeResult = ImportAnalyzeResponse;
-pub type ImportPreviewResult = ImportPreviewResponse;
-
 pub fn analyze_import_mapping(req: ImportAnalyzeRequest) -> Result<ImportAnalyzeResponse, String> {
     analyze_mapping(&req)
 }

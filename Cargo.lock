@@ -162,6 +162,7 @@ dependencies = [
  "tokio",
  "tokio-postgres",
  "tokio-postgres-rustls",
+ "tower 0.5.3",
  "tower-cookies",
  "tower-http 0.5.2",
  "tracing",
@@ -1093,7 +1094,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1771,9 +1772,12 @@ dependencies = [
  "axum",
  "dashmap",
  "dotenvy",
+ "hex",
+ "rand 0.8.5",
  "rumqttc",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "stdb-client",
  "stdb-config",
  "tokio",
@@ -1956,12 +1960,13 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "syn",
 ]
 
 [[package]]
 name = "lumiere-contracts"
-version = "0.3.25"
-source = "git+ssh://git@github.com/KevTiv/lumiere-contracts.git?tag=v0.3.25#22c2ec91753105f9a6cd3ffaee8e62f4431cfd89"
+version = "0.3.40"
+source = "git+ssh://git@github.com/KevTiv/lumiere-contracts.git?tag=v0.3.40#c754f2fa106cffbda6afc6632ce9c117a615cf07"
 dependencies = [
  "serde_json",
  "spacetimedb-sdk",
@@ -2087,7 +2092,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2851,7 +2856,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3277,7 +3282,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a766e1110788c36f4fa1c2b71b387a7815aa65f88ce0229841826633d93723e"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3655,7 +3660,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4560,7 +4565,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

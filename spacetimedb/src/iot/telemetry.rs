@@ -87,7 +87,7 @@ pub fn record_telemetry(
     device_id: u64,
     params: RecordTelemetryParams,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "iot_telemetry", "create")?;
+    super::require_gateway_or_permission(ctx, organization_id, "iot_telemetry", "create")?;
 
     // Validate device exists and belongs to org
     let device = ctx

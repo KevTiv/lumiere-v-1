@@ -20,6 +20,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::{account_move, account_move_line};
 use crate::core::organization::require_company_in_organization;
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contacts::contact;
 use crate::crm::leads::lead;
 use crate::expenses::expenses::{expense_sheet, hr_expense};
@@ -1724,6 +1725,8 @@ pub fn publish_form_configuration(
         insert_or_update_form_field_row(ctx, organization_id, configuration_id, field)?;
     }
 
+    let mut deleted_fields = Vec::new();
+    let mut deleted_labels = Vec::new();
     if params.replace_missing_fields {
         let configuration_fields: Vec<_> = ctx
             .db
@@ -1763,7 +1766,18 @@ pub fn publish_form_configuration(
                             .to_string(),
                     );
                 }
+                deleted_labels.push(FormFieldLabel {
+                    id: label.id,
+                    organization_id: label.organization_id,
+                    field_row_id: label.field_row_id,
+                    locale: label.locale,
+                    label: label.label,
+                    updated_at: label.updated_at,
+                });
                 ctx.db.form_field_label().id().delete(&label_id);
+            }
+            if let Some(field) = ctx.db.form_config_field().id().find(&id) {
+                deleted_fields.push(field);
             }
             ctx.db.form_config_field().id().delete(&id);
         }
@@ -1807,6 +1821,94 @@ pub fn publish_form_configuration(
             metadata: Some("publish_form_configuration".to_string()),
         },
     );
+
+    let committed_config = ctx
+        .db
+        .form_config()
+        .id()
+        .find(&configuration_id)
+        .ok_or("Form configuration disappeared before commit recording")?;
+    let mut committed_fields: Vec<_> = ctx
+        .db
+        .form_config_field()
+        .iter()
+        .filter(|field| {
+            field.organization_id == organization_id && field.configuration_id == configuration_id
+        })
+        .collect();
+    committed_fields.sort_by_key(|field| field.id);
+    let field_ids: std::collections::HashSet<u64> =
+        committed_fields.iter().map(|field| field.id).collect();
+    let mut committed_labels: Vec<_> = ctx
+        .db
+        .form_field_label()
+        .iter()
+        .filter(|label| {
+            label.organization_id == organization_id && field_ids.contains(&label.field_row_id)
+        })
+        .collect();
+    committed_labels.sort_by_key(|label| label.id);
+    let mut committed_roles: Vec<_> = ctx
+        .db
+        .form_role_config()
+        .iter()
+        .filter(|role| {
+            role.organization_id == organization_id && role.configuration_id == configuration_id
+        })
+        .collect();
+    committed_roles.sort_by_key(|role| role.id);
+    deleted_fields.sort_by_key(|field| field.id);
+    deleted_labels.sort_by_key(|label| label.id);
+    let mut changes = vec![RowChange::upsert_stdb_row(
+        "form_config",
+        serde_json::json!({"id": committed_config.id}),
+        &committed_config,
+    )?];
+    for field in &committed_fields {
+        changes.push(RowChange::upsert_stdb_row(
+            "form_config_field",
+            serde_json::json!({"id": field.id}),
+            field,
+        )?);
+    }
+    for label in &committed_labels {
+        changes.push(RowChange::upsert_stdb_row(
+            "form_field_label",
+            serde_json::json!({"id": label.id}),
+            label,
+        )?);
+    }
+    for role in &committed_roles {
+        changes.push(RowChange::upsert_stdb_row(
+            "form_role_config",
+            serde_json::json!({"id": role.id}),
+            role,
+        )?);
+    }
+    for label in &deleted_labels {
+        changes.push(RowChange::delete(
+            "form_field_label",
+            serde_json::json!({"id": label.id}),
+        ));
+    }
+    for field in &deleted_fields {
+        changes.push(RowChange::delete(
+            "form_config_field",
+            serde_json::json!({"id": field.id}),
+        ));
+    }
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.publish_form_configuration".to_string(),
+            correlation_id: format!(
+                "form:{}/{}:config:{}",
+                params.module_id, params.form_id, configuration_id
+            ),
+            changes,
+        },
+    )?;
 
     Ok(())
 }

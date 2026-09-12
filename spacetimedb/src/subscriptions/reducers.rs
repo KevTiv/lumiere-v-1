@@ -20,6 +20,7 @@ use crate::accounting::relations::{
     require_contact_in_scope,
 };
 use crate::core::organization::{company_id_from_scope, require_company_in_organization};
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::inventory::stock::require_product_in_org;
 use crate::sales::sales_core::{sale_order, sale_order_line};
@@ -609,6 +610,7 @@ pub fn create_subscription_from_sale_order(
     let inserted = ctx.db.subscription().insert(subscription);
 
     let mut line_ids: Vec<u64> = Vec::with_capacity(so_lines.len());
+    let mut committed_lines = Vec::with_capacity(so_lines.len());
     for so_line in so_lines {
         let sub_line = ctx.db.subscription_line().insert(SubscriptionLine {
             id: 0,
@@ -652,14 +654,42 @@ pub fn create_subscription_from_sale_order(
             metadata: String::new(),
         });
         line_ids.push(sub_line.id);
+        committed_lines.push(sub_line);
     }
 
     let line_count = line_ids.len();
-    ctx.db.subscription().id().update(Subscription {
+    let committed_subscription = ctx.db.subscription().id().update(Subscription {
         subscription_line_ids: line_ids,
         updated_at: ctx.timestamp,
         ..inserted.clone()
     });
+
+    let mut changes = Vec::with_capacity(committed_lines.len() + 1);
+    changes.push(RowChange::upsert_stdb_row(
+        "subscription",
+        serde_json::json!({"id": committed_subscription.id}),
+        &committed_subscription,
+    )?);
+    committed_lines.sort_by_key(|line| line.id);
+    for line in &committed_lines {
+        changes.push(RowChange::upsert_stdb_row(
+            "subscription_line",
+            serde_json::json!({"id": line.id}),
+            line,
+        )?);
+    }
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.create_subscription_from_sale_order".to_string(),
+            correlation_id: format!(
+                "subscription-from-sale-order:{}:{}",
+                params.sale_order_id, params.plan_id
+            ),
+            changes,
+        },
+    )?;
 
     write_audit_log_v2(
         ctx,

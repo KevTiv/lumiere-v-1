@@ -6,7 +6,7 @@ import { isSubscriptionReady, useSubscriptionCache } from "@lumiere/stdb/live"
 
 import { coalesceQueryInitialData, fetchQueryList, rqBigIntKey, type QueryRows } from "./http"
 import { invalidateStdbQueryResources, realtimeQueryKeysForResource } from "./hooks/stdb"
-import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
+import type { QueryRowFor, QueryRowResourceKey } from "@lumiere/stdb/query-row-map"
 
 /**
  * Skip React Query invalidation when the browser STDB subscription cache is active.
@@ -23,7 +23,7 @@ export function invalidateResourceQueries(
 /**
  * Resource list query that prefers subscription-seeded React Query cache, with HTTP fallback.
  */
-export function useSubscriptionAwareQuery<K extends string>(
+export function useSubscriptionAwareQuery<K extends QueryRowResourceKey>(
   resource: K,
   organizationId: bigint,
   options?: {

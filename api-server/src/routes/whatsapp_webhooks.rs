@@ -18,7 +18,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-use crate::{error::ApiError, state::AppState};
+use crate::{
+    commands::{dispatch_internal_reducer, InternalRouteAuthority},
+    error::ApiError,
+    state::AppState,
+};
 
 const SIGNATURE_HEADER: &str = "x-hub-signature-256";
 const WEBHOOK_SECRET_ENV: &str = "LUMIERE_WHATSAPP_WEBHOOK_APP_SECRET";
@@ -262,23 +266,14 @@ async fn receive_whatsapp_webhook(
         }
     };
 
-    // Provider principals are registered to the module-owner identity. Never
-    // fall back to a user session token (or AppState's local development token)
-    // for this server-authenticated callback boundary.
-    let owner_token = state
-        .config
-        .stdb_server_token
-        .as_deref()
-        .filter(|token| !token.is_empty())
-        .ok_or_else(|| ApiError::Internal("STDB_SERVER_TOKEN is not configured".into()))?;
-    state
-        .client_with_token(owner_token)
-        .call_reducer(stdb_client::ReducerCall::from_name(
-            reducer,
-            json!([organization_id, params]),
-        ))
-        .await
-        .map_err(|error| ApiError::Unprocessable(error.to_string()))?;
+    dispatch_internal_reducer(
+        &state,
+        InternalRouteAuthority::ProviderWebhook,
+        Some(organization_id),
+        reducer,
+        json!([organization_id, params]),
+    )
+    .await?;
     Ok((StatusCode::ACCEPTED, Json(json!({ "accepted": true }))))
 }
 

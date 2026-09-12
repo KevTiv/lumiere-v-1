@@ -8,6 +8,7 @@ use crate::accounting::payments::{
     CreatePaymentParams,
 };
 use crate::core::audit::audit_log;
+use crate::core::organization::company;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{PartnerType, PaymentState, PaymentType};
 
@@ -16,6 +17,15 @@ use super::helpers::{
     seed_bank_journal, seed_distinctive_ar_account,
 };
 use crate::test_harness::chart_keys;
+
+fn company_currency_id(ctx: &ReducerContext, company_id: u64) -> Result<u64, String> {
+    ctx.db
+        .company()
+        .id()
+        .find(&company_id)
+        .map(|company| company.currency_id)
+        .ok_or_else(|| format!("Company {company_id} not found"))
+}
 
 pub fn test_payment_reconciles_invoice(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
@@ -34,7 +44,7 @@ pub fn test_payment_reconciles_invoice(ctx: &ReducerContext) -> Result<(), Strin
         partner_type: crate::types::PartnerType::Customer,
         partner_id: fixture.partner_id,
         amount,
-        currency_id: 1,
+        currency_id: company_currency_id(ctx, company_id)?,
         date: Some(ctx.timestamp),
         journal_id: bank_journal_id,
         ref_: Some("Harness payment".to_string()),
@@ -170,7 +180,7 @@ pub fn test_payment_create_rejects_invalid_relations(ctx: &ReducerContext) -> Re
             partner_type: PartnerType::Customer,
             partner_id: fixture.partner_id,
             amount: 731.29,
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, fixture.company_id)?,
             date: Some(ctx.timestamp),
             journal_id: foreign_journal_id,
             ref_: Some("ACC-RI-006-foreign-journal".to_string()),
@@ -183,7 +193,7 @@ pub fn test_payment_create_rejects_invalid_relations(ctx: &ReducerContext) -> Re
             partner_type: PartnerType::Customer,
             partner_id: foreign.partner_id,
             amount: 731.29,
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, fixture.company_id)?,
             date: Some(ctx.timestamp),
             journal_id: bank_journal_id,
             ref_: Some("ACC-RI-006-foreign-partner".to_string()),
@@ -209,7 +219,7 @@ pub fn test_payment_create_rejects_invalid_relations(ctx: &ReducerContext) -> Re
             partner_type: PartnerType::Supplier,
             partner_id: fixture.partner_id,
             amount: 731.29,
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, fixture.company_id)?,
             date: Some(ctx.timestamp),
             journal_id: bank_journal_id,
             ref_: Some("ACC-RI-006-wrong-partner-role".to_string()),
@@ -222,7 +232,7 @@ pub fn test_payment_create_rejects_invalid_relations(ctx: &ReducerContext) -> Re
             partner_type: PartnerType::Customer,
             partner_id: fixture.partner_id,
             amount: 731.29,
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, fixture.company_id)?,
             date: None,
             journal_id: bank_journal_id,
             ref_: Some("ACC-RI-008-missing-date".to_string()),
@@ -267,7 +277,7 @@ pub fn test_cancel_payment_audited(ctx: &ReducerContext) -> Result<(), String> {
             partner_type: crate::types::PartnerType::Customer,
             partner_id: fixture.partner_id,
             amount,
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, company_id)?,
             date: Some(ctx.timestamp),
             journal_id: bank_journal_id,
             ref_: Some("Harness cancel payment".to_string()),
@@ -392,7 +402,7 @@ pub fn test_payment_multi_invoice_residual_and_clearing_account(
             partner_type: crate::types::PartnerType::Customer,
             partner_id: fixture.partner_id,
             amount: 100.0,
-            currency_id: 1,
+            currency_id: company_currency_id(ctx, company_id)?,
             date: Some(ctx.timestamp),
             journal_id: bank_journal_id,
             ref_: Some("A3 multi-invoice payment".to_string()),

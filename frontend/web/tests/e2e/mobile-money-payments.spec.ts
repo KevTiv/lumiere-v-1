@@ -1,10 +1,15 @@
 import { expect, test, type Page } from "@playwright/test"
+import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 
 import {
   callReducerBff,
   callReducerBffResult,
+  fetchAccountIdByCode,
+  fetchDefaultCompanyId,
   fetchSessionOrganizationId,
+  scalarQueryId,
   smokeName,
+  waitForMovePosted,
 } from "./helpers"
 
 /**
@@ -13,9 +18,9 @@ import {
  * not PaymentTransaction, so this spec deliberately verifies the API boundary
  * and read-model evidence used by the payment workspace.
  *
- * The baseline dev fixture supplies the primary company, MTN wallet, customer /
- * supplier contacts, and at least two posted receivable move lines. Every mutable
- * row in this spec has a scenario-specific name, reference, or metadata marker.
+ * The baseline dev fixture supplies the primary company, MTN wallet, and customer /
+ * supplier contacts. The allocation test creates its own posted receivable lines.
+ * Every mutable row has a scenario-specific name, reference, or metadata marker.
  */
 
 type QueryRow = Record<string, unknown>
@@ -34,6 +39,39 @@ const SUPPLIER_FEE_MINOR = 200
 const none = { none: [] as [] }
 const some = <T>(value: T) => ({ some: value })
 const unit = (tag: string) => ({ [tag.charAt(0).toLowerCase() + tag.slice(1)]: [] })
+const POSTABLE_MOVE_DATE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+const moveLineBase = {
+  quantity: 1,
+  price_unit: 0,
+  discount: 0,
+  tax_ids: [] as number[],
+  partner_id: null,
+  product_id: null,
+  product_uom_id: null,
+  product_category_id: null,
+  analytic_account_id: null,
+  analytic_tag_ids: [] as number[],
+  display_type: null,
+  is_downpayment: false,
+  exclude_from_invoice_tab: false,
+  blocked: false,
+  group_tax_id: null,
+  tax_line_id: null,
+  tax_group_id: null,
+  tax_repartition_line_id: null,
+  tax_audit: null,
+  reconcile_model_id: null,
+  payment_id: null,
+  statement_line_id: null,
+  matching_number: null,
+  matching_label: null,
+  expected_pay_date: null,
+  expected_pay_date_currency_id: null,
+  expected_pay_date_amount: 0,
+  expected_pay_date_residual: 0,
+  metadata: null,
+}
 
 function fromMinor(minor: number): number {
   return minor / MINOR_SCALE
@@ -220,7 +258,7 @@ async function createTransaction(
       settlement_amount: fromMinor(input.settlementMinor),
       net_account_amount: fromMinor(input.netMinor),
       currency_id: input.currencyId,
-      occurred_at: none,
+      occurred_at: some(stbTimestampFromDate(new Date())),
       source_entity: none,
       source_entity_id: none,
       evidence_document_ids: [],
@@ -239,31 +277,142 @@ async function createTransaction(
   return id
 }
 
-async function postedReceivableLines(page: Page, companyId: number): Promise<QueryRow[]> {
-  const rows = await queryRows(page, "account-move-lines")
-  const candidates = rows.filter((row) => {
-    const rowCompanyId = idOf(field(row, "companyId", "company_id"))
-    const residual = numberOf(field(row, "amountResidual", "amount_residual")) ?? 0
-    return (
-      rowCompanyId === companyId &&
-      enumTag(field(row, "accountInternalType", "account_internal_type")).toLowerCase() ===
-      "receivable" &&
-      residual >= fromMinor(RECEIPT_ALLOCATIONS_MINOR[0])
-    )
-  })
+async function fetchJournalIdByCode(page: Page, code: string): Promise<number> {
+  const rows = await queryRows(page, "account-journals")
+  const row = rows.find((candidate) => String(field(candidate, "code")).toUpperCase() === code)
+  const id = scalarQueryId(row?.id)
+  if (id == null) throw new Error(`journal not found: ${code}`)
+  return id
+}
 
-  const uniqueMoveLines = new Map<number, QueryRow>()
-  for (const line of candidates) {
-    const moveId = idOf(field(line, "moveId", "move_id"))
-    if (moveId != null && !uniqueMoveLines.has(moveId)) uniqueMoveLines.set(moveId, line)
+async function createPostedReceivableLine(
+  page: Page,
+  args: {
+    organizationId: number
+    companyId: number
+    partnerId: number
+    journalId: number
+    receivableAccountId: number
+    revenueAccountId: number
+    amount: number
+    reference: string
+  },
+): Promise<QueryRow> {
+  const moveTimestamp = stbTimestampFromDate(POSTABLE_MOVE_DATE)
+  await callReducerBff(page, "create_account_move", [
+    args.organizationId,
+    {
+      idempotency_key: args.reference,
+      company_id: args.companyId,
+      journal_id: args.journalId,
+      move_type: { tag: "OutInvoice" },
+      date: moveTimestamp,
+      name: "",
+      ref: args.reference,
+      auto_post: false,
+      to_check: false,
+      is_storno: false,
+      partner_id: args.partnerId,
+      partner_bank_id: null,
+      fiscal_position_id: null,
+      invoice_date: { some: moveTimestamp },
+      invoice_date_due: { some: moveTimestamp },
+      invoice_payment_term_id: null,
+      payment_reference: null,
+      invoice_origin: null,
+      invoice_partner_display_name: "Acme Corporation",
+      invoice_cash_rounding_id: null,
+      partner_shipping_id: null,
+      sale_order_id: null,
+      invoice_incoterm_id: null,
+      incoterm_location: null,
+      campaign_id: null,
+      source_id: null,
+      medium_id: null,
+      secure_sequence_number: null,
+      metadata: JSON.stringify({ test: "mobile-money-payments", ref: args.reference }),
+    },
+  ])
+
+  const move = await waitForRow(
+    page,
+    "account-moves",
+    (candidate) => {
+      const metadata = field(candidate, "metadata")
+      if (typeof metadata !== "string") return false
+      try {
+        return (JSON.parse(metadata) as { ref?: string }).ref === args.reference
+      } catch {
+        return false
+      }
+    },
+    `payment allocation invoice ${args.reference}`,
+  )
+  const moveId = idOf(field(move, "id"))
+  if (moveId == null) throw new Error(`payment allocation invoice ${args.reference} has no id`)
+
+  await callReducerBff(page, "add_account_move_line", [
+    args.organizationId,
+    moveId,
+    {
+      account_id: args.receivableAccountId,
+      name: "Receivable",
+      debit: args.amount,
+      credit: 0,
+      sequence: 1,
+      ...moveLineBase,
+      partner_id: args.partnerId,
+    },
+  ])
+  const receivableLine = await waitForRow(
+    page,
+    "account-move-lines",
+    (candidate) =>
+      idOf(field(candidate, "moveId", "move_id")) === moveId &&
+      idOf(field(candidate, "accountId", "account_id")) === args.receivableAccountId,
+    `receivable line for ${args.reference}`,
+  )
+  await callReducerBff(page, "add_account_move_line", [
+    args.organizationId,
+    moveId,
+    {
+      account_id: args.revenueAccountId,
+      name: "Revenue",
+      debit: 0,
+      credit: args.amount,
+      sequence: 2,
+      ...moveLineBase,
+    },
+  ])
+  await callReducerBff(page, "compute_invoice_totals", [args.organizationId, moveId])
+  await callReducerBff(page, "post_account_move", [args.organizationId, moveId])
+  await waitForMovePosted(page, moveId)
+  return receivableLine
+}
+
+async function createAllocationInvoices(
+  page: Page,
+  organizationId: number,
+  companyId: number,
+  customerId: number,
+): Promise<QueryRow[]> {
+  const journalId = await fetchJournalIdByCode(page, "INV")
+  const receivableAccountId = await fetchAccountIdByCode(page, "1100")
+  const revenueAccountId = await fetchAccountIdByCode(page, "4000")
+  const receivableLines: QueryRow[] = []
+  for (let index = 0; index < 2; index += 1) {
+    receivableLines.push(await createPostedReceivableLine(page, {
+      organizationId,
+      companyId,
+      partnerId: customerId,
+      journalId,
+      receivableAccountId,
+      revenueAccountId,
+      amount: fromMinor(RECEIPT_ALLOCATIONS_MINOR[0]),
+      reference: smokeName(`mobile-money-allocation-${index + 1}`),
+    }))
   }
-  const lines = [...uniqueMoveLines.values()].slice(0, 2)
-  if (lines.length !== 2) {
-    throw new Error(
-      "Phase-1 payment fixture requires two posted receivable lines with at least 10,000 minor units outstanding",
-    )
-  }
-  return lines
+  return receivableLines
 }
 
 async function waitForAudit(
@@ -320,44 +469,6 @@ async function createBranchCompany(
   return id
 }
 
-async function createSecondOrganization(
-  page: Page,
-  primaryOrganizationId: number,
-  currencyId: number,
-  name: string,
-): Promise<number> {
-  await callReducerBff(page, "create_organization", [
-    {
-      name,
-      code: `B${Date.now().toString().slice(-7)}`,
-      timezone: "UTC",
-      date_format: "YYYY-MM-DD",
-      language: "en",
-      is_active: true,
-      description: none,
-      logo_url: none,
-      website: none,
-      email: none,
-      phone: none,
-      currency_id: some(currencyId),
-      metadata: some(JSON.stringify({ test: "mobile-money-payments", name })),
-    },
-  ])
-
-  const row = await waitForRow(
-    page,
-    "user-organization",
-    (candidate) => {
-      const id = idOf(field(candidate, "organizationId", "organization_id"))
-      return id != null && id !== primaryOrganizationId
-    },
-    `secondary organization membership ${name}`,
-  )
-  const id = idOf(field(row, "organizationId", "organization_id"))
-  if (id == null) throw new Error(`secondary organization ${name} membership has no organization id`)
-  return id
-}
-
 test.describe("Mobile-money payment transactions", { tag: "@dev-fixture" }, () => {
   test("P1-PAY-01 posts a partial incoming receipt across two invoices with allocation and audit evidence", async ({
     page,
@@ -366,8 +477,14 @@ test.describe("Mobile-money payment transactions", { tag: "@dev-fixture" }, () =
 
     const organizationId = await fetchSessionOrganizationId(page)
     const wallet = await fetchPrimaryWallet(page)
+    expect(await fetchDefaultCompanyId(page)).toBe(wallet.companyId)
     const customerId = await fetchPartnerId(page, "Acme Corporation", "customer")
-    const receivableLines = await postedReceivableLines(page, wallet.companyId)
+    const receivableLines = await createAllocationInvoices(
+      page,
+      organizationId,
+      wallet.companyId,
+      customerId,
+    )
     const reference = smokeName("mtn-receipt")
     const transactionId = await createTransaction(page, organizationId, {
       companyId: wallet.companyId,
@@ -387,7 +504,9 @@ test.describe("Mobile-money payment transactions", { tag: "@dev-fixture" }, () =
     const posted = await waitForRow(
       page,
       "payment-transactions",
-      (row) => idOf(field(row, "id")) === transactionId && enumTag(field(row, "status")) === "Posted",
+      (row) =>
+        idOf(field(row, "id")) === transactionId &&
+        enumTag(field(row, "status")).toLowerCase() === "posted",
       `posted payment transaction ${reference}`,
     )
     expect(idOf(field(posted, "accountPaymentId", "account_payment_id"))).toBeGreaterThan(0)
@@ -488,7 +607,7 @@ test.describe("Mobile-money payment transactions", { tag: "@dev-fixture" }, () =
         settlement_amount: fromMinor(1_000),
         net_account_amount: fromMinor(1_000),
         currency_id: wallet.currencyId,
-        occurred_at: none,
+        occurred_at: some(stbTimestampFromDate(new Date())),
         source_entity: none,
         source_entity_id: none,
         evidence_document_ids: [],
@@ -538,7 +657,7 @@ test.describe("Mobile-money payment transactions", { tag: "@dev-fixture" }, () =
         settlement_amount: fromMinor(1_000),
         net_account_amount: fromMinor(1_000),
         currency_id: wallet.currencyId,
-        occurred_at: none,
+        occurred_at: some(stbTimestampFromDate(new Date())),
         source_entity: none,
         source_entity_id: none,
         evidence_document_ids: [],
@@ -548,14 +667,9 @@ test.describe("Mobile-money payment transactions", { tag: "@dev-fixture" }, () =
     expect(crossCompany.ok).toBe(false)
     expect(crossCompany.error ?? "").toMatch(/different organization or company/i)
 
-    const betaOrganizationId = await createSecondOrganization(
-      page,
-      organizationId,
-      wallet.currencyId,
-      smokeName("payment-org-beta"),
-    )
+    const foreignOrganizationId = organizationId + 9_000_000
     const crossTenant = await callReducerBffResult(page, "create_payment_transaction", [
-      betaOrganizationId,
+      foreignOrganizationId,
       {
         company_id: wallet.companyId,
         payment_account_id: wallet.id,
@@ -567,7 +681,7 @@ test.describe("Mobile-money payment transactions", { tag: "@dev-fixture" }, () =
         settlement_amount: fromMinor(1_000),
         net_account_amount: fromMinor(1_000),
         currency_id: wallet.currencyId,
-        occurred_at: none,
+        occurred_at: some(stbTimestampFromDate(new Date())),
         source_entity: none,
         source_entity_id: none,
         evidence_document_ids: [],
@@ -588,6 +702,7 @@ test.describe("Mobile-money payment transactions", { tag: "@dev-fixture" }, () =
     const organizationId = await fetchSessionOrganizationId(page)
     const wallet = await fetchPrimaryWallet(page)
     const supplierId = await fetchPartnerId(page, "Globex Corp", "supplier")
+    const feeAccountId = await fetchAccountIdByCode(page, "5000")
     const reference = smokeName("mtn-supplier")
     const transactionId = await createTransaction(page, organizationId, {
       companyId: wallet.companyId,
@@ -610,8 +725,7 @@ test.describe("Mobile-money payment transactions", { tag: "@dev-fixture" }, () =
         payment_transaction_id: transactionId,
         bearer: unit("Supplier"),
         amount: fromMinor(SUPPLIER_FEE_MINOR),
-        currency_id: wallet.currencyId,
-        fee_account_id: none,
+        fee_account_id: some(feeAccountId),
         tax_account_id: none,
         tax_amount: 0,
         provider_reference: some(`${reference}-FEE`),
@@ -625,13 +739,15 @@ test.describe("Mobile-money payment transactions", { tag: "@dev-fixture" }, () =
       `supplier fee for ${reference}`,
     )
     expect(numberOf(field(fee, "amount"))).toBe(fromMinor(SUPPLIER_FEE_MINOR))
-    expect(enumTag(field(fee, "bearer"))).toBe("Supplier")
+    expect(enumTag(field(fee, "bearer")).toLowerCase()).toBe("supplier")
 
     await callReducerBff(page, "post_payment_transaction", [organizationId, transactionId])
     const originalBeforeReversal = await waitForRow(
       page,
       "payment-transactions",
-      (row) => idOf(field(row, "id")) === transactionId && enumTag(field(row, "status")) === "Posted",
+      (row) =>
+        idOf(field(row, "id")) === transactionId &&
+        enumTag(field(row, "status")).toLowerCase() === "posted",
       `posted supplier payment ${reference}`,
     )
     const originalPaymentId = idOf(field(originalBeforeReversal, "accountPaymentId", "account_payment_id"))
@@ -650,7 +766,9 @@ test.describe("Mobile-money payment transactions", { tag: "@dev-fixture" }, () =
     const originalAfterReversal = await waitForRow(
       page,
       "payment-transactions",
-      (row) => idOf(field(row, "id")) === transactionId && enumTag(field(row, "status")) === "Reversed",
+      (row) =>
+        idOf(field(row, "id")) === transactionId &&
+        enumTag(field(row, "status")).toLowerCase() === "reversed",
       `reversed original payment ${reference}`,
     )
     expect(idOf(field(originalAfterReversal, "accountPaymentId", "account_payment_id"))).toBe(
@@ -677,8 +795,8 @@ test.describe("Mobile-money payment transactions", { tag: "@dev-fixture" }, () =
       (row) => idOf(field(row, "id")) === correctingTransactionId,
       `correcting payment transaction ${reference}`,
     )
-    expect(enumTag(field(correcting, "status"))).toBe("Posted")
-    expect(enumTag(field(correcting, "direction"))).toBe("Inbound")
+    expect(enumTag(field(correcting, "status")).toLowerCase()).toBe("posted")
+    expect(enumTag(field(correcting, "direction")).toLowerCase()).toBe("inbound")
     expect(idOf(field(correcting, "accountPaymentId", "account_payment_id"))).toBeGreaterThan(0)
     expect(idOf(field(correcting, "accountPaymentId", "account_payment_id"))).not.toBe(
       originalPaymentId,

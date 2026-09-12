@@ -11,7 +11,6 @@ import {
   FormModal,
   MissingOrganization,
   mergeSelectOptionsForFields,
-  claimIotHubForm,
   syncIotHubDevicesForm,
   iotDeviceRowForm,
   newIotHubForm,
@@ -52,7 +51,6 @@ import {
   useCreateIotAlert,
   useResolveIotAlert,
   useSetIotThreshold,
-  useClaimHubWithToken,
   useTestIotDevice,
 } from '@lumiere/query-hooks/hooks/iot';
 import type {
@@ -378,7 +376,6 @@ function IotClientLoaded({
   const createAlert = useCreateIotAlert(orgId);
   const resolveAlert = useResolveIotAlert(orgId);
   const setThreshold = useSetIotThreshold(orgId);
-  const claimHub = useClaimHubWithToken(orgId);
   const testDevice = useTestIotDevice(orgId);
 
   const [banner, setBanner] = useState<{
@@ -386,7 +383,6 @@ function IotClientLoaded({
     text: string;
   } | null>(null);
   const [toolbarError, setToolbarError] = useState<string | null>(null);
-  const [claimOpen, setClaimOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
   const [dashForm, setDashForm] = useState<{
     form: FormConfig;
@@ -494,10 +490,6 @@ function IotClientLoaded({
               form: newIotDeviceForm(t),
               action: 'registerIotDevice',
             });
-          },
-          claim_hub_dev: () => {
-            setToolbarError(null);
-            setClaimOpen(true);
           },
           sync_devices_dev: () => {
             setToolbarError(null);
@@ -924,7 +916,6 @@ function IotClientLoaded({
     createAlert.isPending ||
     resolveAlert.isPending ||
     setThreshold.isPending ||
-    claimHub.isPending ||
     testDevice.isPending;
 
   return (
@@ -975,24 +966,6 @@ function IotClientLoaded({
             setDashFormError(e instanceof Error ? e.message : String(e));
             throw e;
           }
-        }}
-      />
-      <FormModal
-        open={claimOpen}
-        onOpenChange={setClaimOpen}
-        config={claimIotHubForm(t)}
-        isPending={isIotMutationPending}
-        onSubmit={async (fd) => {
-          await claimHub.mutateAsync({
-            token: String(fd.token ?? '').trim(),
-            serial: String(fd.serial ?? '').trim(),
-            name: String(fd.name ?? '').trim(),
-            ipAddress: fd.ip_address ? String(fd.ip_address) : null,
-            firmwareVersion: fd.firmware_version
-              ? String(fd.firmware_version)
-              : null,
-          });
-          setBanner({ kind: 'ok', text: t('iot.developer.claimOk') });
         }}
       />
       <FormModal

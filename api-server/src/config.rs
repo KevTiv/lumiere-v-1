@@ -5,6 +5,10 @@ use stdb_config::{
     runtime_is_production, DEFAULT_STDB_MODULE_DEV,
 };
 
+use crate::organization_placement::{
+    ConfiguredPlacementResolver, INITIAL_CELL_ID, INITIAL_DURABLE_STORE_ID,
+};
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub port: u16,
@@ -12,11 +16,19 @@ pub struct Config {
     pub stdb_module: String,
     /// Server/admin token for SQL fallback (same as `STDB_SERVER_TOKEN` in Next.js).
     pub stdb_server_token: Option<String>,
+    /// Dedicated projection/finalization worker token. It must be distinct from
+    /// `STDB_SERVER_TOKEN`; finalizer reducers authenticate its registered identity.
+    pub stdb_finalization_token: Option<String>,
+    /// Server-owned placement used to bind every trusted operation to the
+    /// current deployment generation. Production must configure it explicitly.
+    pub organization_placement: ConfiguredPlacementResolver,
     /// Allowed browser origins for CORS (comma-separated). Empty → common localhost dev URLs.
     pub cors_origins: Vec<String>,
     pub dev_mock_org_id: Option<u64>,
     /// AI gateway base URL (no trailing slash); proposals analyze proxies to `{url}/v1/rag`.
     pub ai_gateway_url: String,
+    /// Maximum age of an unprojected commit before projection is unhealthy.
+    pub projection_lag_budget_secs: u64,
     /// When set, password auth routes return 410 (same as Next.js + WorkOS).
     pub workos_client_id: Option<String>,
     /// AES-256 key for `stdb_token_enc` (32 bytes, 64 hex chars). Required for password auth.
@@ -59,7 +71,47 @@ pub struct Config {
 }
 
 impl Config {
+    /// Load the dedicated bearer credential for a privileged worker.
+    ///
+    /// Worker clients must not silently inherit the interactive/server-owner
+    /// token or another service credential. The deployment remains responsible
+    /// for granting this identity only the reducers and reads that worker
+    /// needs.
+    pub(crate) fn require_dedicated_worker_token(&self, env_name: &str) -> Result<String> {
+        let token = std::env::var(env_name)
+            .ok()
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty())
+            .with_context(|| format!("{env_name} is required for its privileged worker"))?;
+        let configured_service_tokens = DEDICATED_SERVICE_TOKEN_ENVS
+            .iter()
+            .filter(|name| **name != env_name)
+            .filter_map(|name| {
+                std::env::var(name)
+                    .ok()
+                    .map(|value| ((*name).to_owned(), value.trim().to_owned()))
+            })
+            .collect::<Vec<_>>();
+        validate_dedicated_worker_token(
+            env_name,
+            &token,
+            self.stdb_server_token.as_deref(),
+            &configured_service_tokens,
+        )?;
+        Ok(token)
+    }
+
     pub fn from_env() -> Result<Self> {
+        Self::from_env_inner(true)
+    }
+
+    /// Standalone workers use dedicated identities and must not require the
+    /// interactive API owner credential merely to parse shared settings.
+    pub(crate) fn from_worker_env() -> Result<Self> {
+        Self::from_env_inner(false)
+    }
+
+    fn from_env_inner(require_server_token: bool) -> Result<Self> {
         let port: u16 = std::env::var("PORT")
             .ok()
             .and_then(|s| s.parse().ok())
@@ -81,11 +133,52 @@ impl Config {
 
         let stdb_server_token = std::env::var("STDB_SERVER_TOKEN")
             .ok()
+            .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty());
-        if prod && stdb_server_token.is_none() {
+        if prod && require_server_token && stdb_server_token.is_none() {
             anyhow::bail!(
                 "STDB_SERVER_TOKEN must be set in production (SpacetimeDB server/admin JWT for HTTP SQL)"
             );
+        }
+        let stdb_finalization_token = std::env::var("STDB_FINALIZATION_TOKEN")
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+
+        let placement_generation = match std::env::var("LUMIERE_PLACEMENT_GENERATION") {
+            Ok(value) => value
+                .trim()
+                .parse::<u64>()
+                .context("LUMIERE_PLACEMENT_GENERATION must be a positive integer")?,
+            Err(_) if prod => {
+                anyhow::bail!("LUMIERE_PLACEMENT_GENERATION must be set in production")
+            }
+            Err(_) => 1,
+        };
+        let placement_cell_id = match std::env::var("LUMIERE_CELL_ID") {
+            Ok(value) if !value.trim().is_empty() => value,
+            _ if prod => anyhow::bail!("LUMIERE_CELL_ID must be set in production"),
+            _ => INITIAL_CELL_ID.to_owned(),
+        };
+        let placement_durable_store = match std::env::var("LUMIERE_DURABLE_STORE_ID") {
+            Ok(value) if !value.trim().is_empty() => value,
+            _ if prod => anyhow::bail!("LUMIERE_DURABLE_STORE_ID must be set in production"),
+            _ => INITIAL_DURABLE_STORE_ID.to_owned(),
+        };
+        let mut organization_placement = ConfiguredPlacementResolver::new(
+            placement_cell_id.trim(),
+            placement_generation,
+            placement_durable_store.trim(),
+        )
+        .context("validate server-owned organization placement")?;
+        if let Some(path) = std::env::var("LUMIERE_PLACEMENT_CONTROL_PATH")
+            .ok()
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty())
+        {
+            organization_placement = organization_placement
+                .with_persistent_control_store(path)
+                .context("configure persistent organization placement control store")?;
         }
 
         // CORS_ORIGINS: comma-separated http(s)://host:port; required for credentialed cross-origin
@@ -118,6 +211,12 @@ impl Config {
         }
         .trim_end_matches('/')
         .to_string();
+
+        let projection_lag_budget_secs = parse_projection_lag_budget(
+            std::env::var("LUMIERE_PROJECTION_LAG_BUDGET_SECS")
+                .ok()
+                .as_deref(),
+        )?;
 
         if prod {
             let lower = ai_gateway_url.to_lowercase();
@@ -244,9 +343,12 @@ impl Config {
             stdb_host,
             stdb_module,
             stdb_server_token,
+            stdb_finalization_token,
+            organization_placement,
             cors_origins,
             dev_mock_org_id,
             ai_gateway_url,
+            projection_lag_budget_secs,
             workos_client_id,
             stdb_credential_encryption_key,
             resend_api_key,
@@ -270,5 +372,109 @@ impl Config {
             workflow_external_webhook_url,
             workflow_external_webhook_timeout_ms,
         })
+    }
+}
+
+const DEFAULT_PROJECTION_LAG_BUDGET_SECS: u64 = 300;
+
+const DEDICATED_SERVICE_TOKEN_ENVS: &[&str] = &[
+    "STDB_OWNER_REPORT_WORKER_TOKEN",
+    "STDB_WORKFLOW_WORKER_TOKEN",
+    "STDB_EXPENSE_WORKER_TOKEN",
+    "STDB_HR_WORKER_TOKEN",
+    "STDB_PROJECT_WORKER_TOKEN",
+    "STDB_FINALIZATION_TOKEN",
+    "STDB_RECONSTRUCTION_TOKEN",
+    "STDB_RECONSTRUCTION_READ_TOKEN",
+];
+
+fn validate_dedicated_worker_token(
+    env_name: &str,
+    token: &str,
+    server_token: Option<&str>,
+    configured_service_tokens: &[(String, String)],
+) -> Result<()> {
+    if token.is_empty() || token == "local-dev-token" {
+        anyhow::bail!("{env_name} must contain a real dedicated STDB token");
+    }
+    if server_token.map(str::trim) == Some(token) {
+        anyhow::bail!("{env_name} must be distinct from STDB_SERVER_TOKEN");
+    }
+    if let Some((other_name, _)) = configured_service_tokens
+        .iter()
+        .find(|(_, other_token)| !other_token.is_empty() && other_token.as_str() == token)
+    {
+        anyhow::bail!("{env_name} must be distinct from {other_name}");
+    }
+    Ok(())
+}
+
+fn parse_projection_lag_budget(raw: Option<&str>) -> Result<u64> {
+    let Some(raw) = raw else {
+        return Ok(DEFAULT_PROJECTION_LAG_BUDGET_SECS);
+    };
+    let value = raw
+        .trim()
+        .parse::<u64>()
+        .context("LUMIERE_PROJECTION_LAG_BUDGET_SECS must be a positive integer")?;
+    if value == 0 {
+        anyhow::bail!("LUMIERE_PROJECTION_LAG_BUDGET_SECS must be greater than zero");
+    }
+    Ok(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_projection_lag_budget, validate_dedicated_worker_token};
+
+    #[test]
+    fn projection_lag_budget_defaults_and_rejects_zero_or_invalid_values() {
+        assert_eq!(parse_projection_lag_budget(None).unwrap(), 300);
+        assert_eq!(parse_projection_lag_budget(Some(" 45 ")).unwrap(), 45);
+        assert!(parse_projection_lag_budget(Some("0")).is_err());
+        assert!(parse_projection_lag_budget(Some("not-a-number")).is_err());
+    }
+
+    #[test]
+    fn dedicated_worker_tokens_are_explicit_and_distinct() {
+        let peers = vec![
+            ("STDB_WORKFLOW_WORKER_TOKEN".into(), "workflow".into()),
+            ("STDB_FINALIZATION_TOKEN".into(), "finalizer".into()),
+        ];
+        assert!(validate_dedicated_worker_token(
+            "STDB_OWNER_REPORT_WORKER_TOKEN",
+            "",
+            Some("server"),
+            &peers
+        )
+        .is_err());
+        assert!(validate_dedicated_worker_token(
+            "STDB_OWNER_REPORT_WORKER_TOKEN",
+            "local-dev-token",
+            Some("server"),
+            &peers
+        )
+        .is_err());
+        assert!(validate_dedicated_worker_token(
+            "STDB_OWNER_REPORT_WORKER_TOKEN",
+            "server",
+            Some("server"),
+            &peers
+        )
+        .is_err());
+        assert!(validate_dedicated_worker_token(
+            "STDB_OWNER_REPORT_WORKER_TOKEN",
+            "workflow",
+            Some("server"),
+            &peers
+        )
+        .is_err());
+        assert!(validate_dedicated_worker_token(
+            "STDB_OWNER_REPORT_WORKER_TOKEN",
+            "owner-report",
+            Some("server"),
+            &peers
+        )
+        .is_ok());
     }
 }

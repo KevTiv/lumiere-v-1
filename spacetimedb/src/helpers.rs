@@ -14,7 +14,7 @@ use crate::core::permissions::{
     org_permission, role, PermissionAction, PermissionEffect, PermissionSubject,
 };
 use crate::core::reference::{document_sequence, DocumentSequence};
-use crate::core::users::{user_organization, user_profile};
+use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::types::TaxAmountType;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -80,11 +80,10 @@ pub fn check_permission(
     resource: &str,
     action: &str,
 ) -> Result<(), String> {
-    let user = ctx
-        .db
-        .user_profile()
-        .identity()
-        .find(ctx.sender())
+    if action != "read" {
+        crate::core::reconstruction::require_writes_unfenced(ctx, organization_id)?;
+    }
+    let user = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
         .ok_or("User not found")?;
 
     if !user.is_active {

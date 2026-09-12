@@ -12,9 +12,11 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use tower_cookies::Cookies;
 
+use crate::commands::dispatch_session_reducer;
 use crate::error::ApiError;
 use crate::query_exec::execute_resource_query;
 use crate::state::AppState;
+use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session};
 
 fn to_unit_enum(value: &Value) -> Result<Value, ApiError> {
@@ -47,18 +49,19 @@ fn list_meta(total: usize, offset: usize, limit: usize) -> Value {
 }
 
 async fn list_resource(
-    state: &AppState,
-    stdb_token: &str,
-    identity_hex: &str,
-    field_access: Option<&stdb_auth::FieldAccessContext>,
-    org_id: u64,
+    context: &TrustedOperationContext,
     resource: &str,
     limit: usize,
     offset: usize,
 ) -> Result<Value, ApiError> {
-    let client = state.client_with_token(stdb_token);
-    let rows =
-        execute_resource_query(&client, resource, org_id, identity_hex, field_access).await?;
+    let rows = execute_resource_query(
+        context.client(),
+        resource,
+        context.organization_id(),
+        context.actor_identity(),
+        Some(context.field_access()),
+    )
+    .await?;
     let total = rows.len();
     let data: Vec<Value> = rows.into_iter().skip(offset).take(limit).collect();
     Ok(json!({ "data": data, "meta": list_meta(total, offset, limit) }))
@@ -105,19 +108,9 @@ async fn message_templates_get(
     let session = resolve_session(&state, &headers, &cookies)
         .await?
         .ok_or(ApiError::Unauthorized)?;
-    let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
-    let data = list_resource(
-        &state,
-        &session.stdb_token,
-        &session.identity_hex,
-        session.field_access.as_ref(),
-        org_id,
-        "message-templates",
-        limit,
-        offset,
-    )
-    .await?;
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let data = list_resource(&context, "message-templates", limit, offset).await?;
     Ok(Json(data))
 }
 
@@ -132,14 +125,13 @@ async fn message_templates_post(
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
     let params = message_template_create_params(&body)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "create_message_template",
-            json!([org_id, params])
-        ))
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "create_message_template",
+        json!([org_id, params]),
+    )
+    .await?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Message template created successfully" } })),
@@ -157,14 +149,13 @@ async fn message_template_put(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "update_message_template",
-            json!([org_id, id, body])
-        ))
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "update_message_template",
+        json!([org_id, id, body]),
+    )
+    .await?;
     Ok(Json(
         json!({ "data": { "message": "Message template updated successfully" } }),
     ))
@@ -203,19 +194,9 @@ async fn operational_messages_get(
     let session = resolve_session(&state, &headers, &cookies)
         .await?
         .ok_or(ApiError::Unauthorized)?;
-    let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
-    let data = list_resource(
-        &state,
-        &session.stdb_token,
-        &session.identity_hex,
-        session.field_access.as_ref(),
-        org_id,
-        "operational-messages",
-        limit,
-        offset,
-    )
-    .await?;
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let data = list_resource(&context, "operational-messages", limit, offset).await?;
     Ok(Json(data))
 }
 
@@ -230,14 +211,13 @@ async fn operational_messages_post(
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
     let params = operational_message_create_params(&body)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "create_operational_message",
-            json!([org_id, params])
-        ))
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "create_operational_message",
+        json!([org_id, params]),
+    )
+    .await?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Operational message created successfully" } })),
@@ -254,14 +234,13 @@ async fn operational_message_copied(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "record_message_copied",
-            json!([org_id, id])
-        ))
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "record_message_copied",
+        json!([org_id, id]),
+    )
+    .await?;
     Ok(Json(
         json!({ "data": { "message": "Message copy recorded successfully" } }),
     ))
@@ -276,19 +255,9 @@ async fn message_batches_get(
     let session = resolve_session(&state, &headers, &cookies)
         .await?
         .ok_or(ApiError::Unauthorized)?;
-    let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
-    let data = list_resource(
-        &state,
-        &session.stdb_token,
-        &session.identity_hex,
-        session.field_access.as_ref(),
-        org_id,
-        "message-batches",
-        limit,
-        offset,
-    )
-    .await?;
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let data = list_resource(&context, "message-batches", limit, offset).await?;
     Ok(Json(data))
 }
 
@@ -314,14 +283,13 @@ async fn message_batches_post(
         "candidate_contact_ids": body.get("candidate_contact_ids").cloned().unwrap_or(json!([])),
         "metadata": body.get("metadata").cloned().unwrap_or(Value::Null),
     });
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "create_message_batch",
-            json!([org_id, params])
-        ))
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "create_message_batch",
+        json!([org_id, params]),
+    )
+    .await?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(json!({ "data": { "message": "Message batch created successfully" } })),
@@ -339,14 +307,13 @@ async fn message_batch_review(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "review_message_batch",
-            json!([org_id, id, body])
-        ))
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "review_message_batch",
+        json!([org_id, id, body]),
+    )
+    .await?;
     Ok(Json(
         json!({ "data": { "message": "Message batch reviewed successfully" } }),
     ))
@@ -362,14 +329,13 @@ async fn message_batch_cancel(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let org_id = require_org(&session)?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "cancel_message_batch",
-            json!([org_id, id])
-        ))
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "cancel_message_batch",
+        json!([org_id, id]),
+    )
+    .await?;
     Ok(Json(
         json!({ "data": { "message": "Message batch cancelled successfully" } }),
     ))
@@ -384,19 +350,9 @@ async fn contact_preferences_get(
     let session = resolve_session(&state, &headers, &cookies)
         .await?
         .ok_or(ApiError::Unauthorized)?;
-    let org_id = require_org(&session)?;
     let (limit, offset) = paginate_limit_offset(q.limit, q.offset);
-    let data = list_resource(
-        &state,
-        &session.stdb_token,
-        &session.identity_hex,
-        session.field_access.as_ref(),
-        org_id,
-        "contact-communication-preferences",
-        limit,
-        offset,
-    )
-    .await?;
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let data = list_resource(&context, "contact-communication-preferences", limit, offset).await?;
     Ok(Json(data))
 }
 
@@ -418,20 +374,19 @@ async fn contact_preferences_put(
         .get("opted_in")
         .and_then(|v| v.as_bool())
         .ok_or_else(|| ApiError::BadRequest("missing opted_in".into()))?;
-    let client = state.client_with_token(&session.stdb_token);
-    client
-        .call_reducer(stdb_client::reducer_call!(
-            "set_contact_communication_preference",
-            json!([
-                org_id,
-                body.get("company_id").cloned().unwrap_or(Value::Null),
-                contact_id,
-                to_unit_enum(channel)?,
-                opted_in
-            ]),
-        ))
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    dispatch_session_reducer(
+        &state,
+        &session,
+        "set_contact_communication_preference",
+        json!([
+            org_id,
+            body.get("company_id").cloned().unwrap_or(Value::Null),
+            contact_id,
+            to_unit_enum(channel)?,
+            opted_in
+        ]),
+    )
+    .await?;
     Ok(Json(
         json!({ "data": { "message": "Contact preference updated successfully" } }),
     ))

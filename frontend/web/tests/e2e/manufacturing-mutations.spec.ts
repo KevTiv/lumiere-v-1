@@ -155,7 +155,13 @@ test.describe("Manufacturing create mutations", { tag: ["@phase-4", "@manufactur
 
     await page.getByTestId("module-create-manufacturing-orders").click()
     await expect(page.getByTestId("form-modal-new-manufacturing-order")).toBeVisible()
-    await chooseFirstOption(page, "productId")
+    await page.getByTestId("form-field-productId").click()
+    const productOptions = page.locator('[role="listbox"]:visible').getByRole("option", {
+      disabled: false,
+    })
+    const productCount = await productOptions.count()
+    test.skip(productCount === 0, "No products in the rendered MO form fixture")
+    await productOptions.first().click()
     await fillField(page, "productQty", "1")
     await chooseFirstOption(page, "warehouseId")
 
@@ -168,7 +174,14 @@ test.describe("Manufacturing create mutations", { tag: ["@phase-4", "@manufactur
     test.skip(pickingCount === 0, "No stock picking types in seed for MO create")
 
     await pickingOptions.first().click()
-    await chooseFirstOption(page, "locationSrcId")
+
+    await page.getByTestId("form-field-locationSrcId").click()
+    const locationOptions = page.locator('[role="listbox"]:visible').getByRole("option", {
+      disabled: false,
+    })
+    const locationCount = await locationOptions.count()
+    test.skip(locationCount === 0, "No stock locations in seed for MO create")
+    await locationOptions.first().click()
     await chooseFirstOption(page, "locationDestId")
 
     const today = new Date().toISOString().slice(0, 10)

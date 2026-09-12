@@ -19,9 +19,11 @@ use stdb_config::runtime_is_production;
 use tower_cookies::Cookies;
 
 use crate::{
+    commands::dispatch_session_reducer,
     error::ApiError,
     session::parse_stdb_identity_hex,
     state::AppState,
+    trusted_context::TrustedOperationContext,
     web_session::{require_org, resolve_session},
 };
 
@@ -112,20 +114,17 @@ async fn request_certification(
         "fixtureId": body.fixture_id,
         "idempotencyKey": body.idempotency_key,
     });
-    state
-        .client_with_token(&session.stdb_token)
-        .call_reducer(stdb_client::reducer_call!(
-            "request_ai_skill_certification",
-            json!([organization_id, params]),
-        ))
-        .await
-        .map_err(|error| {
-            ApiError::Unprocessable(format!("request AI skill certification: {error}"))
-        })?;
+    let context = dispatch_session_reducer(
+        &state,
+        &session,
+        "request_ai_skill_certification",
+        json!([organization_id, params]),
+    )
+    .await?;
 
     let request_key = certification_request_key(
         organization_id,
-        &session.identity_hex,
+        context.actor_identity(),
         &body.idempotency_key,
     )?;
     let mut rows = state
@@ -172,24 +171,23 @@ fn certification_status_sql(organization_id: u64, request_id: Option<u64>) -> St
 }
 
 async fn load_certification_status(
-    state: &AppState,
+    client: &stdb_client::StdbClient,
     organization_id: u64,
     request_id: Option<u64>,
 ) -> Result<Vec<Value>, ApiError> {
-    let mut rows = state
-        .stdb
+    let mut rows = client
         .query_sql(&certification_status_sql(organization_id, request_id))
         .await
         .map_err(|error| {
             ApiError::Internal(format!("load AI skill certification status: {error}"))
         })?;
-    add_current_passing_evidence(state, organization_id, &mut rows).await?;
+    add_current_passing_evidence(client, organization_id, &mut rows).await?;
     rows.sort_by_key(|row| std::cmp::Reverse(row_id(row)));
     Ok(rows)
 }
 
 async fn add_current_passing_evidence(
-    state: &AppState,
+    client: &stdb_client::StdbClient,
     organization_id: u64,
     requests: &mut [Value],
 ) -> Result<(), ApiError> {
@@ -220,7 +218,7 @@ async fn add_current_passing_evidence(
     ];
     let mut results = Vec::with_capacity(queries.len());
     for query in queries {
-        results.push(state.stdb.query_sql(&query).await.map_err(|error| {
+        results.push(client.query_sql(&query).await.map_err(|error| {
             ApiError::Internal(format!("load AI certification readiness: {error}"))
         })?);
     }
@@ -440,7 +438,8 @@ async fn list_certifications(
         .ok_or(ApiError::Unauthorized)?;
     let organization_id = require_org(&session)?;
     ensure_ai_skill_access(session.field_access.as_ref(), "read")?;
-    let rows = load_certification_status(&state, organization_id, None).await?;
+    let _context = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let rows = load_certification_status(&state.stdb, organization_id, None).await?;
     Ok(Json(json!({ "data": rows })))
 }
 
@@ -460,7 +459,8 @@ async fn get_certification(
         .ok_or(ApiError::Unauthorized)?;
     let organization_id = require_org(&session)?;
     ensure_ai_skill_access(session.field_access.as_ref(), "read")?;
-    let row = load_certification_status(&state, organization_id, Some(request_id))
+    let _context = TrustedOperationContext::for_resource_read(&state, &session)?;
+    let row = load_certification_status(&state.stdb, organization_id, Some(request_id))
         .await?
         .into_iter()
         .next()

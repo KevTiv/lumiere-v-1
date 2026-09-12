@@ -1,6 +1,7 @@
 /// Draft sale order update domain tests.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::organization::company;
 use crate::inventory::product::product;
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
 use crate::sales::sales_core::{
@@ -10,11 +11,21 @@ use crate::sales::sales_core::{
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{DiscountPolicy, SaleState};
 
+fn company_currency_id(ctx: &ReducerContext, company_id: u64) -> Result<u64, String> {
+    ctx.db
+        .company()
+        .id()
+        .find(&company_id)
+        .map(|company| company.currency_id)
+        .ok_or_else(|| format!("Company {company_id} not found"))
+}
+
 pub fn test_draft_sale_order_update(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
+    let currency_id = company_currency_id(ctx, company_id)?;
 
     let product = ctx
         .db
@@ -29,7 +40,7 @@ pub fn test_draft_sale_order_update(ctx: &ReducerContext) -> Result<(), String> 
         CreatePricelistParams {
             company_id: None,
             name: "Harness Update Pricelist".to_string(),
-            currency_id: 1,
+            currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -51,7 +62,7 @@ pub fn test_draft_sale_order_update(ctx: &ReducerContext) -> Result<(), String> 
             partner_invoice_id: fixture.partner_id,
             partner_shipping_id: fixture.partner_id,
             pricelist_id,
-            currency_id: 1,
+            currency_id,
             warehouse_id: fixture.warehouse_id,
             order_lines: vec![CreateSaleOrderLineParams {
                 product_id: fixture.product_id,
