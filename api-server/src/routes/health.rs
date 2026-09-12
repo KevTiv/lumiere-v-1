@@ -366,7 +366,7 @@ mod tests {
         let release = release_metadata().expect("valid release metadata");
         assert_eq!(release.contract_version, "ir-v2");
         assert_eq!(release.migration_version, 10);
-        assert_eq!(release.contract_release, "0.3.40");
+        assert_eq!(release.contract_release, "0.3.42");
     }
 
     #[test]

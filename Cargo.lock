@@ -1965,8 +1965,8 @@ dependencies = [
 
 [[package]]
 name = "lumiere-contracts"
-version = "0.3.40"
-source = "git+ssh://git@github.com/KevTiv/lumiere-contracts.git?tag=v0.3.40#c754f2fa106cffbda6afc6632ce9c117a615cf07"
+version = "0.3.42"
+source = "git+ssh://git@github.com/KevTiv/lumiere-contracts.git?tag=v0.3.42#2ad7a4b28023df72301fba16567985c12df98fbb"
 dependencies = [
  "serde_json",
  "spacetimedb-sdk",
@@ -2856,7 +2856,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
