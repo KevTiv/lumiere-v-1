@@ -1,0 +1,416 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PreviewContract",
+  "description": "Schema catalog used by the contract exporter, not an HTTP envelope.",
+  "type": "object",
+  "properties": {
+    "options": {
+      "description": "Actor-filtered choices for the read-only composer.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/PreviewOptions"
+        }
+      ]
+    },
+    "request": {
+      "description": "Input to preview acquisition.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/PreviewRequest"
+        }
+      ]
+    },
+    "response": {
+      "description": "Validated definition and bounded display data.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/PreviewResponse"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "options",
+    "request",
+    "response"
+  ],
+  "definitions": {
+    "ComponentReference": {
+      "description": "Versioned reference into the approved component catalog.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable catalog identifier.",
+          "type": "string"
+        },
+        "version": {
+          "description": "Exact compatible catalog version.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ]
+    },
+    "ModuleDraft": {
+      "description": "A draft module definition submitted for validation or publication.",
+      "type": "object",
+      "properties": {
+        "applicationContract": {
+          "description": "Pinned application-contract release identifier.",
+          "type": "string"
+        },
+        "baseRevision": {
+          "description": "Exact base revision targeted by an update, encoded as a decimal string.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "componentCatalogVersion": {
+          "description": "Pinned component catalog revision.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "moduleId": {
+          "description": "Stable module identifier.",
+          "type": "string"
+        },
+        "pages": {
+          "description": "Ordered pages in the module.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PageDefinition"
+          }
+        },
+        "schemaVersion": {
+          "description": "Schema revision for this wire model.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "title": {
+          "description": "Human-facing module title.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "moduleId",
+        "title",
+        "applicationContract",
+        "componentCatalogVersion",
+        "pages"
+      ]
+    },
+    "PageDefinition": {
+      "description": "A composed page and its ordered presentation nodes.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable page identifier.",
+          "type": "string"
+        },
+        "nodes": {
+          "description": "Ordered nodes rendered on the page.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PageNode"
+          }
+        },
+        "title": {
+          "description": "Human-facing page title.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "nodes"
+      ]
+    },
+    "PageNode": {
+      "description": "A supported renderer-neutral page node.",
+      "oneOf": [
+        {
+          "description": "A bounded entity collection/list.",
+          "type": "object",
+          "properties": {
+            "component": {
+              "description": "Approved component implementation and version.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/ComponentReference"
+                }
+              ]
+            },
+            "fields": {
+              "description": "SQL column identifiers exposed by the actor-filtered capability dictionary.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "id": {
+              "description": "Stable node identifier.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "collection"
+            },
+            "pageSize": {
+              "description": "Requested page size; execution must separately enforce bounded acquisition.",
+              "type": "integer",
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0
+            },
+            "resource": {
+              "description": "Generated/approved read resource identifier.",
+              "type": "string"
+            },
+            "slot": {
+              "description": "Semantic host slot, independent of layout technology.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/SemanticSlot"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id",
+            "slot",
+            "component",
+            "resource",
+            "fields",
+            "pageSize"
+          ]
+        },
+        {
+          "description": "A detail view linked to a source node.",
+          "type": "object",
+          "properties": {
+            "component": {
+              "description": "Approved component implementation and version.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/ComponentReference"
+                }
+              ]
+            },
+            "fields": {
+              "description": "SQL column identifiers exposed by the source capability dictionary.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "id": {
+              "description": "Stable node identifier.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "detail"
+            },
+            "slot": {
+              "description": "Semantic host slot, independent of layout technology.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/SemanticSlot"
+                }
+              ]
+            },
+            "sourceNodeId": {
+              "description": "Stable ID of a collection node on the same page.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id",
+            "slot",
+            "component",
+            "sourceNodeId",
+            "fields"
+          ]
+        }
+      ]
+    },
+    "PreviewCollection": {
+      "description": "A bounded collection page, identified without a second placement model.",
+      "type": "object",
+      "properties": {
+        "nodeId": {
+          "description": "Owning collection node.",
+          "type": "string"
+        },
+        "pageId": {
+          "description": "Owning page.",
+          "type": "string"
+        },
+        "rows": {
+          "description": "Rows from the authorized bounded acquisition.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PreviewRow"
+          }
+        },
+        "truncated": {
+          "description": "True when an extra fetched row proves the preview is incomplete.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "pageId",
+        "nodeId",
+        "rows",
+        "truncated"
+      ]
+    },
+    "PreviewField": {
+      "description": "Text value resolved using canonical SQL-to-DTO metadata on the server.",
+      "type": "object",
+      "properties": {
+        "field": {
+          "description": "Canonical dictionary field ID.",
+          "type": "string"
+        },
+        "value": {
+          "description": "Escaped as ordinary text by renderers; null indicates no value.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "field"
+      ]
+    },
+    "PreviewOptions": {
+      "description": "Actor-filtered choices; acquisition reauthorizes every request.",
+      "type": "object",
+      "properties": {
+        "applicationContract": {
+          "description": "Currently approved application contract pin.",
+          "type": "string"
+        },
+        "fields": {
+          "description": "Fields available to this actor for the pilot resource.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "applicationContract",
+        "fields"
+      ]
+    },
+    "PreviewRequest": {
+      "description": "A complete draft plus the selected company.",
+      "type": "object",
+      "properties": {
+        "companyId": {
+          "description": "Decimal company ID; membership is resolved on the server.",
+          "type": "string"
+        },
+        "definition": {
+          "description": "Untrusted draft, validated before any acquisition.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ModuleDraft"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "definition",
+        "companyId"
+      ]
+    },
+    "PreviewResponse": {
+      "description": "Read-only preview result; not a published or persisted definition.",
+      "type": "object",
+      "properties": {
+        "collections": {
+          "description": "Bounded data for its collection nodes.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PreviewCollection"
+          }
+        },
+        "definition": {
+          "description": "Definition successfully validated for the current actor.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ModuleDraft"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "definition",
+        "collections"
+      ]
+    },
+    "PreviewRow": {
+      "description": "Display projection of a row; IDs retain full integer precision.",
+      "type": "object",
+      "properties": {
+        "fields": {
+          "description": "Actor-approved collection and linked detail fields.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PreviewField"
+          }
+        },
+        "id": {
+          "description": "Decimal entity ID.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "fields"
+      ]
+    },
+    "SemanticSlot": {
+      "description": "Semantic placement slot understood by platform renderers.",
+      "oneOf": [
+        {
+          "description": "Main page content.",
+          "type": "string",
+          "const": "primary"
+        },
+        {
+          "description": "Supporting or detail content.",
+          "type": "string",
+          "const": "secondary"
+        }
+      ]
+    }
+  }
+}

@@ -107,3 +107,18 @@ The first implementation wave after Overview covers a bounded part of P2a/P2b:
 ## Resume instruction
 
 Read this ledger and the parent plan, refresh the checkout and pin, choose the next unfulfilled slice, and assign bounded Luna lanes. State its exact gate before editing. Preserve previous accepted work and unrelated edits; update this ledger with tests, remaining blockers, and the next slice. Do not mark the whole frontend IR refactor complete from the static Overview proof.
+
+## Wave 2: authorized collection/detail preview
+
+This increment implements a read-only part of P2a/P2b and the preview portion of P3. Luna lanes own acquisition, generated-schema projection, and the shared collection/detail host; the coordinator owns wire generation, route/composer integration, checks and PR delivery.
+
+- Strict Rust preview request/options/response types generate JSON Schema and TypeScript. The browser validates responses using that schema. Row IDs remain decimal strings; display values are bounded text.
+- `GET/POST /v1/presentation/preview` discovers actor-filtered choices and validates the complete draft before acquisition. Session organization, current placement, resource/field policy and membership-derived company scope apply. Up to four collection bindings are admitted; identical resource/company/limit reads share an acquisition. Linked detail fields are included in each node's authorized projection.
+- The acquisition uses supported SQL `LIMIT n + 1` (maximum 101 rows), verifies returned organization/company/IDs, and exposes `truncated`. It is a bounded sample, not ordered pagination. The pinned SQL parser rejects `ORDER BY`; see the [SQL reference](https://spacetimedb.com/docs/reference/sql/). Sorting the bounded sample does not establish global order or a continuation cursor.
+- Projection consumes the pinned generated schema manifest and the existing STDB transport's SQL-column-to-JSON mapping. No companion contract release or handwritten frontend DTO mapping is introduced. Individual values are capped at 4096 characters and total displayed values at 1 MiB.
+- `/presentation-preview` lets an authenticated user choose collection/detail fields, title and sample limit for the active company's accounting entries. The shared host supports collection selection, linked detail, multiple pages, loading/error/empty/missing data states and truncation. Company changes abort requests and remount state; edited definitions hide stale results.
+- CI now runs all API presentation tests, including HTTP/SATS acquisition fixtures for membership, tenant predicates, limit and rejected company intent.
+
+**Validation in progress:** canonical Rust validator 13/13 and schema drift 2/2 passed; frontend core runtime/decoder tests 5/5 and typecheck passed; collection/detail host tests 5/5 passed; generated TypeScript drift, opaque-record ratchet and immutable browser transport passed. API tests and UI/web typechecks are pending at this checkpoint. Tests use a local mock STDB transport; a deployed database/browser interaction proof has not been run.
+
+**Remaining gates:** ordered pagination needs a supported indexed read contract; the full form/action/report inventory remains pending. P3 still needs durable immutable module versions, reopen/edit conflict handling, publish/revert authorization and audit/projection, and live isolation proof. The current human composer changes a read-only preview, not a saved module. P3H sandbox execution and certification remain gated on those persistence and runtime foundations. Next milestone: canonical persisted module draft/version ownership and its authorized read/write API, followed by the editor save/reopen proof.

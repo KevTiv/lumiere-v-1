@@ -2,7 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
+    "resolveJsonModule": true,
     "lib": ["ES2022"],
     "types": ["node"],
     "jsx": "preserve"
