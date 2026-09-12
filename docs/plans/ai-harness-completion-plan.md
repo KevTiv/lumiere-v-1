@@ -7,6 +7,8 @@ provider transport, and pilot-versus-full admission gates.
 
 **Execution tracking:** [AIH issues](./ai-harness-completion-issues.md).
 
+**Active Luna coordination:** [AI harness Luna execution plan](./ai-harness-luna-execution-plan.md).
+
 **Sequencing authority:** [Core deployability](./core-vertical-deployability-pruning-plan.md#6-explicitly-deferred-from-deployability).
 
 This revision defines planned requirements, not implementation completion. The
