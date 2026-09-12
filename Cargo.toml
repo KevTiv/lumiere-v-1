@@ -8,6 +8,7 @@ members = [
     "crates/stdb-config",
     "crates/stdb-client",
     "crates/stdb-auth",
+    "crates/presentation-core",
 ]
 
 [workspace.package]
@@ -50,6 +51,7 @@ dashmap = "6"
 stdb-config = { path = "crates/stdb-config" }
 stdb-client = { path = "crates/stdb-client" }
 stdb-auth = { path = "crates/stdb-auth" }
+lumiere-presentation-core = { path = "crates/presentation-core" }
 
 [profile.release]
 opt-level = 3

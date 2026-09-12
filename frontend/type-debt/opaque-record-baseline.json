@@ -213,7 +213,7 @@
   "web/app/(modules)/messages/message-batches-panel.tsx": 1,
   "web/app/(modules)/messages/messages-client.tsx": 7,
   "web/app/(modules)/modules-shell.tsx": 1,
-  "web/app/(modules)/overview/overview-client.tsx": 30,
+  "web/app/(modules)/overview/overview-client.tsx": 28,
   "web/app/(modules)/pos/pos-client.tsx": 1,
   "web/app/(modules)/pos/use-pos.ts": 20,
   "web/app/(modules)/projects/advanced-psa-panel.tsx": 1,

@@ -1,0 +1,11 @@
+[package]
+name = "lumiere-presentation-core"
+version = "0.1.0"
+edition = "2021"
+description = "Canonical wire models for composed Lumiere module presentations"
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = { version = "=1.2.1", features = ["derive"] }

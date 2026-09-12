@@ -31,6 +31,11 @@ def classify_paths(paths: list[str]) -> dict[str, str]:
         # explicitly recognized below, retain the complete gate set.
         if pure.name in {"Cargo.toml", "Cargo.lock", "package.json", "pnpm-lock.yaml"}:
             return scope(DOMAINS, "dependency configuration; full validation")
+        if path.startswith((
+                "frontend/packages/presentation-core/schema/",
+                "frontend/packages/presentation-core/src/generated/",
+                "frontend/packages/presentation-core/scripts/")):
+            return scope(DOMAINS, "shared presentation contract; full validation")
         if path.startswith("frontend/"):
             categories.add("frontend")
         elif path.startswith(("api-server/src/", "ai-gateway/src/", "iot-gateway/src/")) and pure.suffix == ".rs":
