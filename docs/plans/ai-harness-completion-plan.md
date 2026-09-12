@@ -2,7 +2,8 @@
 
 **Status:** Proposed; deferred from the first deployable core.
 
-**Plan revised:** 2026-09-05 — evidence, intellectual provenance, knowledge and interactive execution gates.
+**Plan revised:** 2026-09-12 — stacked delivery, generated capability ownership,
+provider transport, and pilot-versus-full admission gates.
 
 **Execution tracking:** [AIH issues](./ai-harness-completion-issues.md).
 
@@ -136,7 +137,9 @@ completions.
    - Hard caps: max steps (reuse `max_steps` already used in
      `run_skill_unlocked`), max tokens, and a per-run budget check against
      `AiAgent.monthly_spend` before every provider call, not only at skill
-     start — this is new; today budget is only checked once per run.
+     start. The current fixed path checks at run admission and again immediately
+     before its single synthesis call; the loop must recheck before every
+     provider call because it introduces multiple calls and fallback choices.
    - A response with no `tool_calls` is a candidate final answer: pass it through
      the §7 answer gate before presenting it as complete. If any tool requires
      `action_draft` (mutating), do not
@@ -477,6 +480,31 @@ the experimental compaction hook is inspiration, not a runtime dependency.
 
 ## Suggested Implementation Order
 
+### Stacked delivery ledger
+
+Each row is a separately reviewable PR. A child starts only after its parent's
+contract is stable; a green child does not close later runtime/admission gates.
+The stack is based on the frontend-IR foundation so generated capability
+ownership is shared with ordinary clients rather than recreated in the harness.
+
+| Stack | Scope | Parent / exit evidence |
+| --- | --- | --- |
+| H0 — plan ledger | Reconcile this plan and issue ledger with the current tree. | Frontend-IR foundation / links, dependency graph and `git diff --check`. |
+| H1 — typed provider transport | AIH-1 only: provider-neutral tool specs, assistant tool calls/results, Mistral/Kong and Gemini mapping, and a mockable completion seam. | H0 / deterministic fixtures and `cargo check --locked -p ai-gateway`; no live-provider claim. |
+| H2 — generated capability registry | Extend application-contract IR and generated exports with structural schema, risk, confirmation and result-policy metadata; register versioned runtime-native tools without duplicating ERP operation truth. | H1 / generator, Rust, TypeScript, package and drift gates. |
+| H3 — registry adapter | Adapt `ToolRegistry` to H2 descriptors and preserve action filtering; do not add implementation-local schemas to each ERP tool. | H2 / schema-validity, allowlist and denial tests. |
+| H4 — pure agent loop | AIH-3 with an injected scripted completion source, transcript round-tripping, caps and step persistence; no skill migration. | H3 / two-tool-call fixture, malformed-call stop and token/step caps. |
+| H5 — policy and budget | AIH-4/5: per-call policy, budget/fallback decisions, denial records and action-draft stop behavior. | H4 / permitted, denied, exhausted-budget and fallback fixtures. |
+| H6 — pilot admission | AIH-19 on one flagged skill with only the evidence/recovery paths required by its declared matrix. | H5 plus applicable M1–M5 gates / persisted authorized API/UI evidence and explicit deferrals. |
+| H7 — bounded migration | AIH-6, one skill or small certified batch per PR; freeze the legacy sequence. | H6 / per-path certification and no regression of deferred legacy paths. |
+| H8+ — operator, provenance and recovery slices | AIH-7–18 and AIH-20–24 in dependency order; usage follows real admitted volume. | Applicable parent / milestone-specific persisted fixtures. |
+| Optional | AIH-25/M8 specialists and AIH-26/M9 extensions. | Base M6 admission / separate capability admission. |
+
+The coordinator owns Cargo/lock changes, generated contracts and exports,
+migrations, and final cross-language gates. Luna agents receive bounded
+ownership for one row at a time; generated-contract and Cargo integration is
+serialized.
+
 1. Extend `LlmRequest`/`LlmResponse` and `complete_mistral`/`complete_gemini`
    with tool-calling support (§3.1). No behavior change for existing
    callers that don't pass `tools`.
@@ -514,7 +542,7 @@ stable labels, not a requirement to implement independent work serially.
 | M3 — Review, questions and session controls | AIH-7–9/16/20/24; M1/M2 | Reviewers inspect exact sources/authors/contributors, adaptations and history with no denied excerpt leakage. Required questions pause dependent work, survive restart and accept one current reply. Interrupt/reconnect/resume reconciles in-flight effects without duplicates; a fork compares source/decision/component alternatives without inherited execution approval or ERP rollback. |
 | M4 — Reviewed knowledge reuse | AIH-17; M1–M3 | Approve a non-executable concept and a procedure with named domain review; retrieve them for a fresh task with source lineage and current authorization. Repeated AI answers or passing execution fixtures alone cannot approve knowledge. |
 | M5 — Change and revocation safety | AIH-18; M4 | Supersede/retract a source and revoke access in persisted fixtures. Reverse dependencies flag affected work, caches cease serving it, required invalid dependencies block new reuse/execution, and historical inspection respects retention/tombstones. |
-| M6 — Harness admission and migration | AIH-19/6; M0–M5 | Run all three scenarios below through authorized APIs/UI and publish the per-capability gate matrix. Mode changes cannot grant access or bypass action/evidence gates. Every migrated answer path enforces the same requirements; legacy paths are migrated or explicitly deferred. No new skill enters the legacy sequence. |
+| M6 — Harness admission and migration | AIH-19 pilot, then AIH-6; M0–M5 as applicable to each declared path | Admit one flagged pilot against a published capability/path matrix, then migrate bounded skill batches. Run all three scenarios below before claiming full base admission. Mode changes cannot grant access or bypass action/evidence gates. Every migrated answer path enforces the same requirements; legacy paths are migrated or explicitly deferred. No new skill enters the legacy sequence. |
 | M7 — Usage and evidence quality | AIH-10/11; admitted run data | Admin sees adoption/spend, claim support, attribution and review metrics plus question wait/re-ask, repair success/cost, non-progress stops, context recovery and reconciled cancellation outcomes. Aggregates match seeded records and respect scope. AIH-12 remains optional. |
 | M8 — Bounded specialists | AIH-25; base M6 admission | Persist parent/child task lineage and validate child output/evidence. Overlapping child calls cannot overspend shared reservations, widen access, exceed depth/concurrency caps or continue past propagated cancellation. Conflicting findings stay visible; a model reviewer cannot satisfy human/domain approval. |
 | M9 — Typed lifecycle extensions | AIH-26; base M6 admission | Pin schemas/versions/order and exercise timeout, malformed output, duplicate delivery and revoked-extension fixtures. Optional failures degrade visibly; required validator failure blocks. Rewritten arguments are revalidated/reauthorized, and no hook can change trusted context or bypass gates. |

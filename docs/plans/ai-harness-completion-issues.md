@@ -6,7 +6,7 @@ issue is independently mergeable behind compatible, generated contract changes;
 sequence follows the plan's "Suggested Implementation Order." Estimates are
 rough sizing (S/M/L), not commitments.
 
-**Plan revision:** 2026-09-05. AIH-13–19 add evidence and intellectual
+**Plan revision:** 2026-09-12. AIH-13–19 add evidence and intellectual
 provenance requirements; all entries are planned, not verified by this revision.
 AIH-20–24 add interactive execution/recovery to base gates; AIH-25/26 are later
 specialist/extension admission. The advanced harness remains deferred from first core deployability. Milestone
@@ -23,6 +23,9 @@ Extend `ai-gateway/src/providers/llm.rs`:
 - `LlmRequest` gains `pub tools: Vec<ToolSpec>` (name, description, JSON
   schema).
 - `LlmResponse` gains `pub tool_calls: Vec<ToolCallRequest>`.
+- The message contract gains provider-neutral assistant-tool-call and
+  tool-result variants so AIH-3 can round-trip a multi-step transcript without
+  flattening structured calls into prose.
 - `complete_mistral`: add `tools`/`tool_choice` to the existing
   OpenAI-compatible payload (`openai_payload`); parse
   `choices[0].message.tool_calls`.
@@ -32,24 +35,28 @@ Extend `ai-gateway/src/providers/llm.rs`:
   no `tool_calls`, treat as a plain completion (no hard fail).
 
 **Acceptance:** existing callers that don't set `tools` see no behavior
-change; a unit test against a fixture Mistral/Gemini tool-call response
-correctly populates `LlmResponse.tool_calls`.
+change; fixture Mistral/Gemini tool-call responses correctly populate
+`LlmResponse.tool_calls`; a scripted/injected completion seam can be used by
+AIH-3 without live HTTP.
 
 ---
 
-### AIH-2 — Add tool JSON-schema metadata to `AgentTool`
+### AIH-2 — Connect tools to generated capability-schema metadata
 
-**Plan ref:** §3.1. **Depends on:** none (parallel with AIH-1). **Size:** S
+**Plan ref:** §3.1 and `agent-harness-capability-ir-foundation.md`.
+**Depends on:** AIH-1 and the generated capability-registry foundation. **Size:** M
 
-Add `fn schema(&self) -> serde_json::Value` to the `AgentTool` trait in
-`ai-gateway/src/tools/registry.rs`; implement for all 7 existing tools
-(`erp_snapshot`, `erp_search`, `analytics_summary`, `web_search`,
-`fetch_url`, `action_draft`, `save_artifact`). Add a
-`ToolRegistry::specs_for(allowed_actions) -> Vec<ToolSpec>` helper that
-filters by `required_action` the same way execution already does.
+Generate ERP operation schemas, stable capability keys, risk, confirmation and
+result-policy metadata from application-contract IR. Runtime-native tools use
+reviewed, versioned descriptors in the same registry. `AgentTool`
+implementations reference those descriptors; they do not define a second
+hand-written schema for canonical ERP operations. Add a
+`ToolRegistry::specs_for(allowed_actions)` adapter that filters by both the
+skill allowlist and `required_action`, while invocation remains reauthorized.
 
-**Acceptance:** schema output is valid JSON Schema and round-trips through
-AIH-1's `ToolSpec`.
+**Acceptance:** generated ERP schema output and registered runtime-native schema
+output are valid JSON Schema and round-trip through AIH-1's `ToolSpec`; drift
+checks fail if an ERP descriptor diverges from application-contract IR.
 
 ---
 
@@ -332,7 +339,9 @@ state. A retained hash without source content is not claimed as full replay.
 
 ### AIH-19 — Harness setup, certification, and admission matrix
 
-**Plan ref:** §7.5, §8, M0–M6. **Depends on:** AIH-1–5, AIH-7–9, AIH-13–18, AIH-20–24. **Size:** L
+**Plan ref:** §7.5, §8, M0–M6. **Depends on:** AIH-1–5 plus the evidence,
+inspection and recovery issues required by the pilot's declared capability/path
+matrix. **Size:** L
 
 Configure versioned evidence requirements, source capability admission, reviewer
 roles, applicability, retention, budgets and failure behavior. Bind runs to the
@@ -340,16 +349,19 @@ effective configuration. Extend certification with the plan's ERP/policy and
 intellectual-source-to-workflow and interactive-recovery scenarios on flagged
 pilot skills. Implement versioned Investigate/Design/Draft/Review mode profiles
 and transitions within server authorization; delegation remains disabled until M8.
-Record per-path capabilities, passed gates, evidence and explicit deferrals;
-reuse this admission result for AIH-6 rather than waiting for wider migration.
+Record per-path capabilities, passed gates, evidence and explicit deferrals.
+This issue admits one flagged pilot only; reuse its matrix for AIH-6 rather than
+making pilot admission depend on wider migration.
 
 **Acceptance:** all three scenarios pass using persisted records and normal authorized
 API/UI reads, including compaction, adaptation, source changes, injected content,
 fallback and revocation. Adapter fixtures cover provider variations; each
 production provider/capability has its own smoke evidence before admission.
 Mode escalation attempts deny; user steering cannot silently change approved
-scope. Base admission requires M0–M5, and base completion additionally requires
-M6/M7. Disabled specialists/extensions do not block the base, but cannot be
+scope. The pilot passes every M0–M5 gate applicable to its declared paths and
+records non-applicable/deferred paths explicitly. AIH-6 owns bounded wider
+migration and the full M6 matrix; M7 remains the usage/evidence-quality gate.
+Disabled specialists/extensions do not block the base, but cannot be
 advertised as admitted until their M8/M9 gates pass.
 
 ---
@@ -475,13 +487,14 @@ overridden. Extension execution stays disabled until M9 passes.
 
 ## Suggested batching for PRs
 
-1. AIH-1, AIH-2 (parallel, both prerequisites)
-2. AIH-3
-3. AIH-4, AIH-5 (parallel, both depend only on AIH-3)
-4. AIH-13 → AIH-14 (AIH-13 may start alongside AIH-1/2)
-5. AIH-7 → AIH-8/9; AIH-15 after AIH-3/4/5/14
-6. AIH-20 → AIH-23 → AIH-24; AIH-21 after AIH-15; AIH-22 after AIH-3/4/5
-7. AIH-16 and AIH-20/24 → AIH-17 → AIH-18
-8. AIH-19 on flagged pilot skills → AIH-6 wider migration
-9. AIH-10 → AIH-11 → optional AIH-12
-10. AIH-25 and AIH-26 as separately admitted later capabilities after AIH-19
+1. AIH-1
+2. Generated capability-registry foundation → AIH-2
+3. AIH-3
+4. AIH-4, AIH-5 (parallel, both depend only on AIH-3)
+5. AIH-13 → AIH-14 (AIH-13 may start alongside AIH-1)
+6. AIH-7 → AIH-8/9; AIH-15 after AIH-3/4/5/14
+7. AIH-20 → AIH-23 → AIH-24; AIH-21 after AIH-15; AIH-22 after AIH-3/4/5
+8. AIH-16 and AIH-20/24 → AIH-17 → AIH-18
+9. AIH-19 on one flagged pilot → AIH-6 bounded wider migration
+10. AIH-10 → AIH-11 → optional AIH-12
+11. AIH-25 and AIH-26 as separately admitted later capabilities after full M6
