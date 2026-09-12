@@ -21,6 +21,7 @@ const MAX_VERSIONS_PER_MODULE: usize = 256;
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = presentation_module,
+    index(accessor = presentation_module_by_org, btree(columns = [organization_id])),
     index(accessor = presentation_module_by_owner, btree(columns = [organization_id, owner_identity]))
 )]
 pub struct PresentationModule {
@@ -40,6 +41,7 @@ pub struct PresentationModule {
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = presentation_module_version,
+    index(accessor = presentation_module_version_by_org, btree(columns = [organization_id])),
     index(accessor = presentation_module_version_by_module, btree(columns = [module_id])),
     index(accessor = presentation_module_version_by_owner, btree(columns = [organization_id, owner_identity]))
 )]

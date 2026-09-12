@@ -206,6 +206,9 @@ jobs:
       - name: Publish production module to standalone SpacetimeDB
         run: spacetime publish lumiere-ci-contracts --module-path spacetimedb --server local --delete-data=always -y --no-config
 
+      - name: Persisted presentation draft revision and isolation proof
+        run: spacetime call lumiere-ci-contracts run_presentation_draft_tests --server local -y --no-config
+
       # Full source/schema/manifest comparison against an isolated database;
       # CI correctness does not depend on a mutable Maincloud deployment.
       - name: Verify standalone STDB matches pinned lumiere-contracts release

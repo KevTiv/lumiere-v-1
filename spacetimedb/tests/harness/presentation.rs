@@ -162,8 +162,7 @@ pub fn test_presentation_module_revision_round_trip(ctx: &ReducerContext) -> Res
         .organization_commit_cursor()
         .organization_id()
         .find(&fixture.organization_id)
-        .map(|cursor| cursor.next_sequence)
-        .ok_or("organization commit cursor missing")?;
+        .map(|cursor| cursor.next_sequence);
     let stale = match save_presentation_module(
         ctx,
         fixture.organization_id,
@@ -195,7 +194,7 @@ pub fn test_presentation_module_revision_round_trip(ctx: &ReducerContext) -> Res
         .organization_id()
         .find(&fixture.organization_id)
         .map(|cursor| cursor.next_sequence)
-        != Some(before_cursor)
+        != before_cursor
     {
         return Err("stale save advanced the organization commit cursor".into());
     }
@@ -217,8 +216,7 @@ pub fn test_presentation_module_rejects_invalid_payload(
         .organization_commit_cursor()
         .organization_id()
         .find(&fixture.organization_id)
-        .map(|cursor| cursor.next_sequence)
-        .ok_or("organization commit cursor missing")?;
+        .map(|cursor| cursor.next_sequence);
     let error =
         match save_presentation_module(ctx, fixture.organization_id, None, "{not-json".to_string())
         {
@@ -249,7 +247,7 @@ pub fn test_presentation_module_rejects_invalid_payload(
             .organization_id()
             .find(&fixture.organization_id)
             .map(|cursor| cursor.next_sequence)
-            != Some(before_cursor)
+            != before_cursor
     {
         return Err("invalid payload changed organization commit state".into());
     }
@@ -324,8 +322,7 @@ pub fn test_presentation_module_rejects_inactive_cross_org_actor(
         .organization_commit_cursor()
         .organization_id()
         .find(&other.organization_id)
-        .map(|cursor| cursor.next_sequence)
-        .ok_or("other organization commit cursor missing")?;
+        .map(|cursor| cursor.next_sequence);
     let error = match save_presentation_module(
         ctx,
         other.organization_id,
@@ -354,7 +351,7 @@ pub fn test_presentation_module_rejects_inactive_cross_org_actor(
             .organization_id()
             .find(&other.organization_id)
             .map(|cursor| cursor.next_sequence)
-            != Some(before_cursor)
+            != before_cursor
     {
         return Err("cross-org denial changed organization commit state".into());
     }
