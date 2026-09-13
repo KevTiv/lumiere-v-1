@@ -14,9 +14,16 @@ ROOT = Path(__file__).resolve().parents[1]
 VERIFIER = ROOT / "scripts" / "verify-agent-capability-artifact.py"
 
 
+REVIEW = {
+    "reviewed_by": "reviewer",
+    "reviewed_at": "2026-09-13T00:00:00Z",
+    "evidence": "fixture review",
+}
+
+
 def artifact() -> dict:
     return {
-        "artifact_version": 1,
+        "artifact_version": 2,
         "source_ir": {
             "ir_version": 2,
             "source_commit": "0" * 40,
@@ -36,6 +43,7 @@ def operation_artifact() -> dict:
             "risk": "read_only",
             "requires_confirmation": False,
             "result_policy": {"kind": "direct", "max_bytes": 4096},
+            "review": dict(REVIEW),
             "operation": {
                 "operation_name": "list_orders",
                 "operation_id": "erp.list_orders",
@@ -53,6 +61,47 @@ def operation_artifact() -> dict:
                 "codec": {"id": "spacetimedb-sats-json", "status": "assigned", "version": 1},
                 "kind": {"status": "classified", "value": "command"},
                 "evidence": "orders.rs: reviewed",
+            },
+        }
+    ]
+    return data
+
+
+def resource_artifact() -> dict:
+    data = artifact()
+    data["entries"] = [
+        {
+            "resource": "stock-quants",
+            "capability_key": "inventory.stock-quants.read",
+            "risk": "read_only",
+            "requires_confirmation": False,
+            "result_policy": {"kind": "dataset", "max_rows": 100, "max_bytes": 65536},
+            "review": dict(REVIEW),
+            "tool": {
+                "name": "inventory_stock_quants_read",
+                "description": "Read authorized stock-quants rows.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "max_rows": {"type": "integer", "minimum": 1, "maximum": 100},
+                        "company_id": {"type": "integer", "minimum": 1},
+                    },
+                    "required": [],
+                    "additionalProperties": False,
+                },
+            },
+            "resource_descriptor": {
+                "resource_name": "stock-quants",
+                "contract": {"table": "stock_quant"},
+                "query": {
+                    "authorization": "server-enforced",
+                    "status": "classified",
+                    "result_type_reference": "StockQuant",
+                },
+                "row": {"type_reference": "StockQuant"},
+                "scope": {"kind": "organization_company"},
+                "subscription": {"status": "classified"},
+                "source": {"kind": "table", "table_reference": "stock_quant"},
             },
         }
     ]
@@ -110,6 +159,71 @@ class AgentCapabilityArtifactTest(unittest.TestCase):
         result = self._run(data)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("unknown fields", result.stderr)
+
+    def test_resource_read_with_tool_descriptor_is_valid(self):
+        result = self._run(resource_artifact())
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_entry_without_a_review_record_fails_closed(self):
+        data = resource_artifact()
+        del data["entries"][0]["review"]
+        result = self._run(data)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing: review", result.stderr)
+
+    def test_non_utc_review_instant_fails_closed(self):
+        data = resource_artifact()
+        data["entries"][0]["review"]["reviewed_at"] = "2026-09-13T00:00:00+02:00"
+        result = self._run(data)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("reviewed_at", result.stderr)
+
+    def test_resource_read_without_a_tool_fails_closed(self):
+        data = resource_artifact()
+        del data["entries"][0]["tool"]
+        result = self._run(data)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must carry a tool descriptor", result.stderr)
+
+    def test_tenant_scope_as_a_model_input_fails_closed(self):
+        data = resource_artifact()
+        data["entries"][0]["tool"]["input_schema"]["properties"]["organization_id"] = {
+            "type": "integer",
+            "minimum": 1,
+        }
+        result = self._run(data)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must not accept an organization", result.stderr)
+
+    def test_row_ceiling_above_the_result_policy_fails_closed(self):
+        data = resource_artifact()
+        data["entries"][0]["tool"]["input_schema"]["properties"]["max_rows"]["maximum"] = 1000
+        result = self._run(data)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ceiling disagrees", result.stderr)
+
+    def test_open_input_schema_fails_closed(self):
+        data = resource_artifact()
+        data["entries"][0]["tool"]["input_schema"]["additionalProperties"] = True
+        result = self._run(data)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("closed object", result.stderr)
+
+    def test_operation_entry_with_a_tool_fails_closed(self):
+        data = operation_artifact()
+        data["entries"][0]["tool"] = {
+            "name": "erp_read_orders",
+            "description": "x",
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": False,
+            },
+        }
+        result = self._run(data)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must not carry a tool descriptor", result.stderr)
 
 
 if __name__ == "__main__":

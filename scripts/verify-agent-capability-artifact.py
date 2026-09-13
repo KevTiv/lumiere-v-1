@@ -14,6 +14,8 @@ from typing import Any
 GIT_OBJECT_ID = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 CAPABILITY_KEY = re.compile(r"^[a-z][a-z0-9._-]*$")
+TOOL_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
+UTC_INSTANT = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 RISKS = {"read_only", "presentation", "draft", "business_mutation", "financial_mutation"}
 
 
@@ -123,11 +125,66 @@ def verify_resource_descriptor(value: Any, entry: dict[str, Any]) -> None:
         fail("resource descriptor row/query type references disagree")
 
 
-def verify_entry(entry: Any) -> None:
+def verify_review(review: Any, key: str) -> None:
+    review = object_with_keys(
+        review,
+        {"reviewed_by", "reviewed_at", "evidence"},
+        {"reviewed_by", "reviewed_at", "evidence"},
+        f"capability {key}.review",
+    )
+    for field in ("reviewed_by", "evidence"):
+        if not isinstance(review[field], str) or not review[field].strip():
+            fail(f"capability {key}.review.{field} must be a non-empty string")
+    if not isinstance(review["reviewed_at"], str) or not UTC_INSTANT.fullmatch(review["reviewed_at"]):
+        fail(f"capability {key}.review.reviewed_at must be an RFC 3339 UTC instant")
+
+
+def verify_tool(tool: Any, key: str, policy: dict[str, Any]) -> str:
+    """Check the model-facing descriptor, and return its tool name."""
+    tool = object_with_keys(
+        tool,
+        {"name", "description", "input_schema"},
+        {"name", "description", "input_schema"},
+        f"capability {key}.tool",
+    )
+    name = tool["name"]
+    if not isinstance(name, str) or not TOOL_NAME.fullmatch(name) or name.endswith("_") or "__" in name:
+        fail(f"capability {key}.tool.name is not an identifier-shaped tool name")
+    if name != key.replace(".", "_").replace("-", "_"):
+        fail(f"capability {key}.tool.name is not derived from the capability key")
+    if not isinstance(tool["description"], str) or not tool["description"].strip():
+        fail(f"capability {key}.tool.description must be a non-empty string")
+    schema = object_with_keys(
+        tool["input_schema"],
+        {"type", "properties", "required", "additionalProperties"},
+        {"type", "properties", "required", "additionalProperties"},
+        f"capability {key}.tool.input_schema",
+    )
+    if schema["type"] != "object" or schema["additionalProperties"] is not False:
+        fail(f"capability {key} input schema must be a closed object")
+    properties = schema["properties"]
+    if not isinstance(properties, dict):
+        fail(f"capability {key} input schema properties must be an object")
+    # Tenant scope is server-derived and must never be a model input.
+    if "organization_id" in properties:
+        fail(f"capability {key} input schema must not accept an organization")
+    unknown = properties.keys() - {"max_rows", "company_id"}
+    if unknown:
+        fail(f"capability {key} input schema has unsupported inputs: {', '.join(sorted(unknown))}")
+    max_rows = properties.get("max_rows")
+    if not isinstance(max_rows, dict) or max_rows.get("type") != "integer" or max_rows.get("minimum") != 1:
+        fail(f"capability {key} input schema max_rows must be a positive integer input")
+    ceiling = policy.get("max_rows") if policy.get("kind") == "dataset" else policy.get("max_output_rows", 1)
+    if max_rows.get("maximum") != ceiling:
+        fail(f"capability {key} input schema max_rows ceiling disagrees with its result policy")
+    return name
+
+
+def verify_entry(entry: Any) -> str | None:
     entry = object_with_keys(
         entry,
-        {"capability_key", "risk", "requires_confirmation", "result_policy"},
-        {"operation_id", "resource", "capability_key", "risk", "requires_confirmation", "result_policy", "operation", "resource_descriptor"},
+        {"capability_key", "risk", "requires_confirmation", "result_policy", "review"},
+        {"operation_id", "resource", "capability_key", "risk", "requires_confirmation", "result_policy", "review", "tool", "operation", "resource_descriptor"},
         "capability entry",
     )
     key = entry["capability_key"]
@@ -144,10 +201,18 @@ def verify_entry(entry: Any) -> None:
     has_resource = isinstance(entry.get("resource"), str) and "resource_descriptor" in entry
     if has_operation == has_resource:
         fail(f"capability {key} must identify exactly one operation or resource")
+    verify_review(entry["review"], key)
     if has_operation:
         verify_operation_descriptor(entry["operation"], entry)
-    else:
-        verify_resource_descriptor(entry["resource_descriptor"], entry)
+        # Operation input schemas need IR type expansion, so an operation
+        # entry carries no advertisable tool yet.
+        if "tool" in entry:
+            fail(f"capability {key} targets an operation and must not carry a tool descriptor")
+        return None
+    verify_resource_descriptor(entry["resource_descriptor"], entry)
+    if "tool" not in entry:
+        fail(f"capability {key} is a resource read and must carry a tool descriptor")
+    return verify_tool(entry["tool"], key, entry["result_policy"])
 
 
 def main() -> None:
@@ -162,8 +227,8 @@ def main() -> None:
     except json.JSONDecodeError as error:
         fail(f"invalid JSON: {error}")
     artifact = object_with_keys(artifact, {"artifact_version", "source_ir", "entries"}, {"artifact_version", "source_ir", "entries"}, "artifact")
-    if artifact["artifact_version"] != 1:
-        fail("artifact_version must be 1")
+    if artifact["artifact_version"] != 2:
+        fail("artifact_version must be 2")
     verify_source_ir(artifact["source_ir"])
     entries = artifact["entries"]
     if not isinstance(entries, list):
@@ -171,8 +236,14 @@ def main() -> None:
     keys = [entry.get("capability_key") if isinstance(entry, dict) else None for entry in entries]
     if any(not isinstance(key, str) for key in keys) or keys != sorted(set(keys)):
         fail("entries must be sorted and unique by capability_key")
+    tool_names: set[str] = set()
     for entry in entries:
-        verify_entry(entry)
+        name = verify_entry(entry)
+        if name is None:
+            continue
+        if name in tool_names:
+            fail(f"tool name {name} is used by more than one capability")
+        tool_names.add(name)
     try:
         checksum_line = checksum_path.read_text(encoding="utf-8").strip()
     except OSError as error:
