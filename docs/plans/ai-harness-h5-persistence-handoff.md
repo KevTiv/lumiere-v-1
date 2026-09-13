@@ -115,29 +115,39 @@ snapshotted over HTTP; nothing was hand-edited in `.contracts-staging`.
 - Rust/TypeScript bindings, schema/storage/reconstruction manifests, canonical
   IR (1320 operations, 467 tables) and the checked-in reducer contract and
   reconstruction apply outputs are regenerated.
-- The C0/C1 census moves from 463 to 467 organization-owned relations (462
-  application + 5 protocol). The four tables take bootstrap storage defaults:
-  organization-owned roots with tombstone deletes; `ai_price_snapshot` and
-  `ai_spend_budget` are organization-wide (no company column). Reviewing
-  reservation/draft-request durability classes and aggregate parents remains
-  open before release.
+- Reviewed storage policies (bootstrap source): `ai_spend_reservation` is
+  durable operational state and `ai_action_draft_request` a durable business
+  record, both children of `ai_agent_run` via `run_id`; `ai_spend_budget` is
+  durable operational state; `ai_price_snapshot` remains an organization-wide
+  tombstoned business record.
 - Operation identities and classifications: `configure_ai_spend` operator /
   non-idempotent; `reserve_ai_spend` and `create_ai_run_action_draft` internal /
   request-guarded; `settle_ai_spend` internal / state-guarded. None has a
   reducer-exposure entry, so all four are `Denied` to session BFF dispatch and
   remain trusted-principal operations.
-- Operation history moves to schema v4: `added_after_revision` explicitly lists
-  the four IDs added after the C8 release-bound revision, which keeps binding its
-  exact 1316-operation baseline. A later bulk revision absorbs the additions and
-  records `previous_baseline_fingerprint` so the revision chain also survives
-  applied compatibility exceptions.
-- Local gates: codegen, contract IR, agent capability artifact, tenant
-  ownership, storage policy, C2 commit coverage, C8 ratchet, trusted-route and
-  reducer-literal lints, operation history (current and pinned v0.3.42 IR),
-  `lumiere-codegen` tests and `stdb-client` check pass.
 
-Gate 2 (transaction/concurrency/replay tests, immutable contracts publication and
-consumer pin) has not started.
+### Gate 2 combined contracts release (`codex/contracts-v0.3.44-integration`)
+
+`lumiere-contracts` v0.3.43 was already published from the presentation
+saved-drafts stack. Because a release replaces every generated output, H5b is
+released together with that stack from an integration merge of
+`codex/frontend-ir-saved-drafts` into `codex/ai-harness-h5b-release`.
+
+- The C0/C1 census becomes 469 organization-owned relations (464 application +
+  5 protocol): the four H5b tables plus `presentation_module` and
+  `presentation_module_version`.
+- Operation history follows the precedent released in v0.3.43: a third
+  release-bound revision chains from the v0.3.43 operation baseline and binds
+  the combined operation set. The H5b-only schema-v4 verifier change is not
+  carried into the integration.
+- The consumer pin updates Cargo, frontend packages, lockfiles, the release
+  compatibility manifest, the health-route release assertion and the presentation
+  dictionary `CONTRACT_PIN`, which is also the approved draft
+  `applicationContract`.
+
+No concurrent-client spend admission test or PostgreSQL-to-fresh-SpacetimeDB
+replay for these tables exists yet; those remain H5 acceptance gates and are not
+claimed by this release.
 
 ### H5b local validation
 

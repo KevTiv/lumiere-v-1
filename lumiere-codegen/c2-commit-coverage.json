@@ -161,6 +161,15 @@
       "operation": "start_workflow",
       "operation_id": "erp.start_workflow",
       "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/presentation/mod.rs",
+      "function": "save_presentation_module",
+      "operation": "save_presentation_module",
+      "operation_id": "erp.save_presentation_module",
+      "change_constructors": [
+        "upsert_stdb_row"
+      ]
     }
   ]
 }

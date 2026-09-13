@@ -107,6 +107,7 @@
     "./postcss.config": "./postcss.config.mjs",
     "./lib/*": "./src/lib/*.ts",
     "./components/*": "./src/components/*.tsx",
+    "./composed/*": "./src/composed/*.tsx",
     "./hooks/*": "./src/hooks/*.ts",
     "./map-components/*": "./src/map-components/*.tsx",
     "./stock-3d/warehouse-viewer": "./src/stock-3d/warehouse-viewer.tsx",

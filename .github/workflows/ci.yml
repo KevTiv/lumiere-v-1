@@ -95,6 +95,12 @@ jobs:
       - name: Workspace members (api-server, ai-gateway, lumiere-codegen, stdb-auth)
         run: cargo check --locked -p api-server -p ai-gateway -p lumiere-codegen -p stdb-auth
 
+      - name: Presentation contracts and draft validator
+        run: cargo test --locked -p lumiere-presentation-core
+
+      - name: Presentation discovery and authorized preview
+        run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib presentation
+
       - name: C3 PostgreSQL projection matrix
         env:
           C3_TEST_PG: "1"
@@ -200,6 +206,9 @@ jobs:
       - name: Publish production module to standalone SpacetimeDB
         run: spacetime publish lumiere-ci-contracts --module-path spacetimedb --server local --delete-data=always -y --no-config
 
+      - name: Persisted presentation draft revision and isolation proof
+        run: spacetime call lumiere-ci-contracts run_presentation_draft_tests --server local -y --no-config
+
       # Full source/schema/manifest comparison against an isolated database;
       # CI correctness does not depend on a mutable Maincloud deployment.
       - name: Verify standalone STDB matches pinned lumiere-contracts release
@@ -261,6 +270,9 @@ jobs:
 
       - name: Unit tests (presentation core)
         run: pnpm --dir packages/presentation-core test
+
+      - name: Presentation generated TypeScript drift
+        run: pnpm --dir packages/presentation-core check:contract-types
 
       - name: Unit tests (web BFF helpers)
         run: pnpm --dir web test:unit

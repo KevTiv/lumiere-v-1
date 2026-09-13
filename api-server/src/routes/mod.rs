@@ -16,6 +16,7 @@ mod mail;
 mod messaging;
 pub(crate) mod operations;
 mod proposals;
+mod presentation;
 pub(crate) mod queries;
 pub(crate) mod reports;
 mod sales;
@@ -51,6 +52,7 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(billing::router())
         .merge(admin::router())
         .merge(proposals::router())
+        .merge(presentation::router())
         .merge(reports::router())
         .merge(country_packs::router())
         .merge(statutory_adapters::router())
