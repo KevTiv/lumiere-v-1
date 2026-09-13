@@ -161,11 +161,23 @@ Writes stay on the gateway principal.
   `settle_ai_spend` and `create_ai_run_action_draft`, and performs scoped reads
   with numeric-only SQL filters; string bindings are matched in gateway code and
   foreign-organization, duplicate or cross-company rows fail closed.
-- Not yet done: routing reserve, dispatch and settle through the governed loop;
-  replacing the `ORDER BY id DESC` draft-id lookups; provisioning the
-  `ai_spend/reserve` and `ai_spend/settle` grants (an explicit admin step); and
-  gate 3 attempt-dispatch state. Recovering a reservation still does not
-  authorize redispatch.
+- `run_recorded_loop` requires a spend ledger and binding and dispatches every
+  provider attempt through `SpendAdmittedLlm`. After the loop, failure stops
+  (malformed call, denied tool, policy or tool failure, provider failure, round,
+  tool or token limit) finalize the durable run as `failed` with a fixed
+  `agent_loop_stop:*` code, the highest persisted step and the saturated token
+  total. A candidate answer (answer gate pending) and a pending approval leave
+  the run open; the module has no approval-wait status yet. A loop error leaves
+  the run untouched because its state is uncertain.
+- The action draft tool resolves exact draft ids for durable runs through
+  `create_ai_run_action_draft` and a SHA-256 input-derived request key. No
+  production path reaches it today: skill runs dispatch fixed tools and the
+  governed loop adapter rejects `action_draft` calls.
+- Not yet done: a governed route or skill that calls `run_recorded_loop`; the
+  route-level draft bridge, which has no durable run; an approval-wait run
+  status and answer-gate completion; provisioning the `ai_spend/reserve` and
+  `ai_spend/settle` grants (an explicit admin step); and gate 3 attempt-dispatch
+  state. Recovering a reservation still does not authorize redispatch.
 
 ### H5b local validation
 
