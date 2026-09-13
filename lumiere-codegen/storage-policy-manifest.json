@@ -1519,6 +1519,41 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "ai_provider_attempt",
+      "module": "ai",
+      "rationale": "Reviewed child aggregate: run_id references ai_agent_run.id.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "ai_agent_run",
+          "child_column": "run_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:c5/people-platform/always-hot/missing-semantic-safety-contract",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
       "table": "ai_reducer_allowlist",
       "module": "ai",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",

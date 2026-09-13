@@ -174,10 +174,36 @@ Writes stay on the gateway principal.
   production path reaches it today: skill runs dispatch fixed tools and the
   governed loop adapter rejects `action_draft` calls.
 - Not yet done: a governed route or skill that calls `run_recorded_loop`; the
-  route-level draft bridge, which has no durable run; an approval-wait run
-  status and answer-gate completion; provisioning the `ai_spend/reserve` and
-  `ai_spend/settle` grants (an explicit admin step); and gate 3 attempt-dispatch
-  state. Recovering a reservation still does not authorize redispatch.
+  route-level draft bridge, which has no durable run; provisioning the
+  `ai_spend/reserve` and `ai_spend/settle` grants (an explicit admin step). The
+  approval-wait status and gate 3 attempt state are added by v0.3.45 below.
+  Recovering a reservation still does not authorize redispatch.
+
+### v0.3.45 contract release (`codex/contracts-v0.3.45`)
+
+- Run wait states: `set_ai_agent_run_wait_state` moves a `running` or `pending`
+  run to `awaiting_approval` (an action draft needs approval) or `agent_settled`
+  (a candidate answer awaits the answer gate); replaying the same state is a
+  no-op. Open runs (running, pending or waiting) can still be completed or
+  cancelled; only running or pending runs accept new steps, drafts or spend
+  reservations.
+- Gate 3 attempt state: private `ai_provider_attempt` rows, children of
+  `ai_agent_run` and bound 1:1 to a spend reservation by request key, move
+  `accepted` → `dispatched` (claimed once) → `succeeded` | `failed` |
+  `outcome_unknown`; `outcome_unknown` resolves to `succeeded` or `failed` only
+  through `reconcile_ai_provider_attempt` with a required resolution
+  (`ai_spend/settle`). Accept, dispatch and result need `ai_spend/reserve`.
+  Usage is bounded by the reservation allowance, every transition is
+  replay-strict, and a recovered attempt never authorizes redispatch.
+- Presentation contracts: module-draft and preview-contract JSON schemas are
+  generated from `crates/presentation-core` into `manifests/presentation/`
+  (checked by contracts drift with only cargo) and, with their TypeScript
+  types, into the contracts package under `src/presentation/`. After the pin,
+  `@lumiere/presentation-core` consumes them from `@lumiere/contracts` and the
+  checked-in local copies and their CI drift step are removed.
+- Not yet done in the gateway: using attempt rows around dispatch in
+  `SpendAdmittedLlm` and setting wait states from loop stops; both follow the
+  v0.3.45 pin.
 
 ### H5b local validation
 
