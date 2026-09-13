@@ -1906,6 +1906,10 @@
       "name": "delete_account_reconciliation_widget",
       "shape_fingerprint": "sha256:d2993c01a0b53d5921d2abafc367ba0a929029914eceab380735bcb1d4e41a3a"
     },
+    "erp.delete_ai_capability_role_grant": {
+      "name": "delete_ai_capability_role_grant",
+      "shape_fingerprint": "sha256:11e7ff10561232ec14a05b6d86533782075448d319db9450290725d89367b1e2"
+    },
     "erp.delete_ai_reducer_allowlist": {
       "name": "delete_ai_reducer_allowlist",
       "shape_fingerprint": "sha256:a6aee3ae7b35081442f54f187e2b0bc0517c7a89dd20008a53943829b81f04d3"
@@ -4229,6 +4233,10 @@
     "erp.set_ai_agent_run_wait_state": {
       "name": "set_ai_agent_run_wait_state",
       "shape_fingerprint": "sha256:49d8b6218c9517822d06c6b66da945eb67000f28670d47f21576156f543cecc9"
+    },
+    "erp.set_ai_capability_role_grant": {
+      "name": "set_ai_capability_role_grant",
+      "shape_fingerprint": "sha256:271fdafa07299307df39d8c5040c51d51392a29d5bec5d2652335ebda6ab3c37"
     },
     "erp.set_ai_reducer_allowlist_enabled": {
       "name": "set_ai_reducer_allowlist_enabled",
