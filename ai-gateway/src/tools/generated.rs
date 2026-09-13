@@ -2,7 +2,13 @@
 //!
 //! This module is intentionally only a validation/conversion boundary.  The
 //! generated catalog does not grant authorization and SATS descriptors are
-//! never guessed into provider JSON Schema.
+//! never guessed into provider JSON Schema: a tool is advertisable only when
+//! the reviewed artifact ships its name, description and input schema, which
+//! the generator derives from the canonical contract. An entry without that
+//! descriptor (today, every operation target) stays unadvertisable.
+//!
+//! Result-policy caps are the reviewed ceilings. Narrowing them for an actor's
+//! role is a runtime decision and never happens here.
 
 use std::collections::HashSet;
 use std::fmt;
@@ -13,7 +19,7 @@ use sha2::{Digest, Sha256};
 
 use crate::providers::llm::ToolSpec;
 
-const ARTIFACT_VERSION: u64 = 1;
+const ARTIFACT_VERSION: u64 = 2;
 const IR_VERSION: u64 = 2;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -56,6 +62,15 @@ struct CapabilityEntry {
     requires_confirmation: bool,
     result_policy: ResultPolicy,
     target: Target,
+    /// Present only when the reviewed artifact ships an advertisable tool.
+    tool: Option<ToolDescriptor>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct ToolDescriptor {
+    name: String,
+    description: String,
+    input_schema: Value,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -103,17 +118,23 @@ pub(super) fn embedded_catalog() -> Result<&'static GeneratedCatalog, GeneratedC
 }
 
 impl GeneratedCatalog {
-    /// Convert the generated catalog to model tool specs. The pinned v0.3.42
-    /// artifact has no entries, so this succeeds with an empty vector;
-    /// nonempty entries remain fail-closed until a reviewed provider adapter
-    /// exists.
+    /// Convert the reviewed catalog to model tool specs.
+    ///
+    /// Only entries whose reviewed descriptor ships a name, description and
+    /// input schema are advertisable. An entry without one is fail-closed:
+    /// it is omitted here, so a model can never be offered a capability whose
+    /// input contract nobody derived.
     pub(super) fn specs(&self) -> Result<Vec<ToolSpec>, GeneratedCatalogError> {
-        if self.entries.is_empty() {
-            return Ok(Vec::new());
-        }
-        Err(GeneratedCatalogError::Unsupported(
-            "provider name, description, and JSON Schema are not present in v0.3.42".into(),
-        ))
+        Ok(self
+            .entries
+            .iter()
+            .filter_map(|entry| entry.tool.as_ref())
+            .map(|tool| ToolSpec {
+                name: tool.name.clone(),
+                description: tool.description.clone(),
+                parameters: tool.input_schema.clone(),
+            })
+            .collect())
     }
 }
 
@@ -301,12 +322,92 @@ fn parse_entry(raw: &Value) -> Result<CapabilityEntry, GeneratedCatalogError> {
     {
         return Err(invalid("mutating capability requires confirmation"));
     }
+    let tool = match object.get("tool") {
+        None => None,
+        Some(raw) => Some(parse_tool(raw, &capability_key, &target, &result_policy)?),
+    };
     Ok(CapabilityEntry {
         capability_key,
         risk,
         requires_confirmation,
         result_policy,
         target,
+        tool,
+    })
+}
+
+/// Accept a descriptor only if it matches its entry: the name must be the
+/// capability key in identifier form, the schema must be closed, it must not
+/// accept tenant scope, and its row bound must equal the reviewed ceiling.
+fn parse_tool(
+    raw: &Value,
+    capability_key: &str,
+    target: &Target,
+    result_policy: &ResultPolicy,
+) -> Result<ToolDescriptor, GeneratedCatalogError> {
+    if matches!(target, Target::Operation { .. }) {
+        return Err(invalid("operation entries cannot advertise a tool"));
+    }
+    let object = raw
+        .as_object()
+        .ok_or_else(|| invalid("tool must be an object"))?;
+    let name = string(object, "name")?;
+    if name != capability_key.replace(['.', '-'], "_") {
+        return Err(invalid("tool name is not derived from the capability key"));
+    }
+    if !name.starts_with(|c: char| c.is_ascii_lowercase())
+        || !name
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+        || name.ends_with('_')
+        || name.contains("__")
+    {
+        return Err(invalid("tool name is not identifier-shaped"));
+    }
+    let description = string(object, "description")?;
+    if description.trim().is_empty() {
+        return Err(invalid("tool description is empty"));
+    }
+    let schema = object_value(object, "input_schema")?;
+    if schema.get("type").and_then(Value::as_str) != Some("object")
+        || schema.get("additionalProperties") != Some(&Value::Bool(false))
+    {
+        return Err(invalid("tool input schema must be a closed object"));
+    }
+    let properties = schema
+        .get("properties")
+        .and_then(Value::as_object)
+        .ok_or_else(|| invalid("tool input schema has no properties"))?;
+    if properties.contains_key("organization_id") {
+        return Err(invalid("tool input schema must not accept an organization"));
+    }
+    if properties
+        .keys()
+        .any(|key| !matches!(key.as_str(), "max_rows" | "company_id"))
+    {
+        return Err(invalid("tool input schema has unsupported inputs"));
+    }
+    let ceiling = match result_policy {
+        ResultPolicy::Dataset { max_rows, .. } => *max_rows,
+        ResultPolicy::AggregateFirst {
+            max_output_rows, ..
+        } => *max_output_rows,
+        ResultPolicy::Direct { .. } => 1,
+    };
+    if properties
+        .get("max_rows")
+        .and_then(|rows| rows.get("maximum"))
+        .and_then(Value::as_u64)
+        != Some(ceiling)
+    {
+        return Err(invalid(
+            "tool input schema row bound disagrees with the reviewed ceiling",
+        ));
+    }
+    Ok(ToolDescriptor {
+        name,
+        description,
+        input_schema: Value::Object(schema.clone()),
     })
 }
 
@@ -401,16 +502,100 @@ mod tests {
             "resource_descriptor":{"resource_name":"a","query":{"status":"classified","authorization":"server-enforced"}}})
     }
 
+    /// A reviewed read whose descriptor the release derived.
+    fn advertisable() -> Value {
+        let mut entry = resource();
+        entry["result_policy"] = json!({"kind": "dataset", "max_rows": 25, "max_bytes": 4096});
+        entry["tool"] = json!({
+            "name": "erp_read_a",
+            "description": "Read authorized a rows.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "max_rows": {"type": "integer", "minimum": 1, "maximum": 25},
+                    "company_id": {"type": "integer", "minimum": 1},
+                },
+                "required": [],
+                "additionalProperties": false,
+            },
+        });
+        entry
+    }
+
     #[test]
-    fn pinned_checksum_and_cached_empty_catalog_are_valid() {
+    fn pinned_release_is_cached_and_advertises_its_reviewed_reads() {
         let first = embedded_catalog().expect("valid release");
         assert!(std::ptr::eq(
             first,
             embedded_catalog().expect("cached release")
         ));
-        assert!(first.specs().expect("empty specs").is_empty());
+        let specs = first.specs().expect("pinned specs");
+        assert_eq!(
+            specs.len(),
+            3,
+            "the pinned release ships three reviewed reads"
+        );
+        for spec in &specs {
+            assert!(spec.name.starts_with("inventory_"), "{}", spec.name);
+            assert!(!spec.description.trim().is_empty());
+            assert_eq!(spec.parameters["additionalProperties"], json!(false));
+            assert!(
+                spec.parameters["properties"]["organization_id"].is_null(),
+                "tenant scope is never advertised as an input"
+            );
+        }
         let json = artifact(json!([])).to_string();
         assert!(parse_embedded(&json, "00").is_err());
+    }
+
+    #[test]
+    fn only_entries_with_a_reviewed_descriptor_are_advertisable() {
+        let without = parse_catalog(&artifact(json!([resource()])).to_string())
+            .expect("valid entry without a tool");
+        assert!(
+            without.specs().expect("specs").is_empty(),
+            "an entry nobody derived a schema for is never offered to a model"
+        );
+
+        let with = parse_catalog(&artifact(json!([advertisable()])).to_string())
+            .expect("valid advertisable entry");
+        let specs = with.specs().expect("specs");
+        assert_eq!(specs.len(), 1);
+        assert_eq!(specs[0].name, "erp_read_a");
+        assert_eq!(
+            specs[0].parameters["properties"]["max_rows"]["maximum"],
+            json!(25)
+        );
+    }
+
+    #[test]
+    fn invalid_tool_descriptors_fail_closed() {
+        for (pointer, value) in [
+            ("/tool/name", json!("something_else")),
+            ("/tool/name", json!("Erp_Read_A")),
+            ("/tool/description", json!("   ")),
+            ("/tool/input_schema/additionalProperties", json!(true)),
+            ("/tool/input_schema/type", json!("string")),
+            (
+                "/tool/input_schema/properties/max_rows/maximum",
+                json!(1_000),
+            ),
+        ] {
+            let mut entry = advertisable();
+            *entry.pointer_mut(pointer).expect("fixture field") = value;
+            assert!(
+                parse_catalog(&artifact(json!([entry])).to_string()).is_err(),
+                "{pointer}"
+            );
+        }
+
+        let mut scoped = advertisable();
+        scoped["tool"]["input_schema"]["properties"]["organization_id"] =
+            json!({"type": "integer", "minimum": 1});
+        assert!(
+            parse_catalog(&artifact(json!([scoped])).to_string()).is_err(),
+            "an organization input must be rejected"
+        );
     }
 
     #[test]
@@ -418,7 +603,8 @@ mod tests {
         let root = artifact(json!([]));
         assert!(parse_catalog(&root.to_string()).is_ok());
         for (pointer, value) in [
-            ("/artifact_version", json!(2)),
+            ("/artifact_version", json!(1)),
+            ("/artifact_version", json!(3)),
             ("/source_ir/ir_version", json!(3)),
             ("/source_ir/source_dirty", json!(true)),
             ("/source_ir/source_commit", json!("bad")),
@@ -428,16 +614,6 @@ mod tests {
             *changed.pointer_mut(pointer).expect("fixture field") = value;
             assert!(parse_catalog(&changed.to_string()).is_err(), "{pointer}");
         }
-    }
-
-    #[test]
-    fn nonempty_resource_remains_unsupported() {
-        let catalog =
-            parse_catalog(&artifact(json!([resource()])).to_string()).expect("valid descriptor");
-        assert!(matches!(
-            catalog.specs(),
-            Err(GeneratedCatalogError::Unsupported(_))
-        ));
     }
 
     #[test]
@@ -485,10 +661,16 @@ mod tests {
                 "application_exposure":"session","client_facing":true,"schema":{"Ref":0}}});
         let catalog =
             parse_catalog(&artifact(json!([entry.clone()])).to_string()).expect("valid operation");
-        assert!(matches!(
-            catalog.specs(),
-            Err(GeneratedCatalogError::Unsupported(_))
-        ));
+        assert!(
+            catalog.specs().expect("specs").is_empty(),
+            "a reviewed operation is never advertised: nobody derived its input schema"
+        );
+        let mut with_tool = entry.clone();
+        with_tool["tool"] = advertisable()["tool"].clone();
+        assert!(
+            parse_catalog(&artifact(json!([with_tool])).to_string()).is_err(),
+            "an operation cannot carry a tool descriptor"
+        );
         for (key, value) in [
             ("operation_id", json!("other")),
             ("operation_id_status", json!("unlocked")),

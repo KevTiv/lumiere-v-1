@@ -11,7 +11,7 @@
     "./preview-decoder": "./src/preview-decoder.ts"
   },
   "dependencies": {
-    "@lumiere/contracts": "github:KevTiv/lumiere-contracts#v0.3.45&path:packages/contracts",
+    "@lumiere/contracts": "github:KevTiv/lumiere-contracts#v0.3.46&path:packages/contracts",
     "ajv": "8.18.0"
   },
   "scripts": {

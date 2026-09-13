@@ -384,13 +384,25 @@ mod generated_registry_tests {
     use super::*;
 
     #[test]
-    fn empty_generated_catalog_does_not_fall_back_to_runtime_tools() {
+    fn generated_specs_come_from_the_reviewed_catalog_only() {
         let registry = ToolRegistry::new();
         assert_eq!(registry.tool_names().len(), 7);
-        assert!(registry
+        let specs = registry
             .generated_specs()
             .expect("valid pinned catalog")
-            .is_empty());
+            .into_iter()
+            .map(|spec| spec.name)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            specs.len(),
+            3,
+            "the pinned release ships three reviewed reads"
+        );
+        // The generated namespace never falls back to, or collides with, the
+        // runtime tools.
+        for runtime in registry.tool_names() {
+            assert!(!specs.iter().any(|name| name == runtime), "{runtime}");
+        }
     }
 
     fn sample_agent() -> ResolvedAgentConfig {
