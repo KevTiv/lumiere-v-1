@@ -1,17 +1,26 @@
 //! H5b spend admission around provider completions.
 //!
 //! `SpendAdmittedLlm` wraps any `LlmCompletion` so each provider attempt is
-//! reserved before dispatch and settled with actual usage afterwards. It is an
-//! internal seam for governed routing; no HTTP handler or skill uses it yet.
+//! reserved and durably accepted before dispatch, claimed once at dispatch, and
+//! recorded plus settled afterwards. It is an internal seam for governed
+//! routing; no HTTP handler or skill uses it yet.
+//!
+//! Per call the sequence is: reserve -> accept attempt -> claim dispatch ->
+//! provider call -> record result -> settle. The attempt row is the provider
+//! truth, so it is recorded before spend is settled; a settlement failure then
+//! leaves a `succeeded` attempt against a `reserved` reservation, which is
+//! unambiguous to reconcile.
 //!
 //! Failure policy:
 //! - no budget, price snapshot or visible reservation: the provider is not called;
-//! - an existing reservation for the attempt key: the provider is not called,
-//!   because recovering a reservation does not authorize redispatch;
-//! - provider error or timeout: the reservation stays reserved (ambiguous) and
-//!   is left for reconciliation, never settled or retried here;
-//! - usage above the reserved allowance: settlement is rejected by the module
-//!   and the error propagates with the reservation still reserved.
+//! - an existing reservation or attempt for the key: the provider is not called,
+//!   because recovering either row does not authorize redispatch;
+//! - provider error or timeout: the attempt becomes `outcome_unknown` and the
+//!   reservation stays reserved; neither is retried or settled here. The
+//!   transport cannot tell a lost response from a provider that never ran, so
+//!   no dispatch error is recorded as a definite `failed`;
+//! - usage above the reserved allowance: the module rejects the result and the
+//!   error propagates with the attempt dispatched and the reservation reserved.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -21,8 +30,9 @@ use chrono::{DateTime, Utc};
 use stdb_client::StdbClient;
 
 use crate::ai_spend::{
-    self, allowance, billing_period, request_key, Allowance, PriceSnapshot, RequestKind,
-    Reservation, ReserveRequest, SpendBudget, SpendReader, STATUS_RESERVED,
+    self, allowance, billing_period, request_key, AcceptAttemptRequest, Allowance, AttemptResult,
+    PriceSnapshot, ProviderAttempt, RequestKind, Reservation, ReserveRequest, SpendBudget,
+    SpendReader, ATTEMPT_ACCEPTED, STATUS_RESERVED,
 };
 use crate::providers::llm::{LlmCompletion, LlmMessage, LlmRequest, LlmResponse};
 
@@ -57,6 +67,19 @@ pub(super) trait SpendLedger: Send + Sync {
         reservation_id: u64,
         input_tokens: u32,
         output_tokens: u32,
+    ) -> Result<()>;
+    async fn provider_attempt(
+        &self,
+        organization_id: u64,
+        run_id: u64,
+        request_key: &str,
+    ) -> Result<Option<ProviderAttempt>>;
+    async fn accept_attempt(&self, request: &AcceptAttemptRequest) -> Result<()>;
+    async fn mark_attempt_dispatched(&self, organization_id: u64, attempt_id: u64) -> Result<()>;
+    async fn record_attempt_result(
+        &self,
+        organization_id: u64,
+        result: &AttemptResult,
     ) -> Result<()>;
 }
 
@@ -106,6 +129,33 @@ impl SpendLedger for StdbSpendLedger<'_> {
 
     async fn reserve(&self, request: &ReserveRequest) -> Result<()> {
         ai_spend::reserve(self.writer, request).await
+    }
+
+    async fn provider_attempt(
+        &self,
+        organization_id: u64,
+        run_id: u64,
+        request_key: &str,
+    ) -> Result<Option<ProviderAttempt>> {
+        SpendReader::new(self.reader)
+            .provider_attempt(organization_id, run_id, request_key)
+            .await
+    }
+
+    async fn accept_attempt(&self, request: &AcceptAttemptRequest) -> Result<()> {
+        ai_spend::accept_provider_attempt(self.writer, request).await
+    }
+
+    async fn mark_attempt_dispatched(&self, organization_id: u64, attempt_id: u64) -> Result<()> {
+        ai_spend::mark_provider_attempt_dispatched(self.writer, organization_id, attempt_id).await
+    }
+
+    async fn record_attempt_result(
+        &self,
+        organization_id: u64,
+        result: &AttemptResult,
+    ) -> Result<()> {
+        ai_spend::record_provider_attempt_result(self.writer, organization_id, result).await
     }
 
     async fn settle(
@@ -238,19 +288,94 @@ impl<'a> SpendAdmittedLlm<'a> {
         ensure_binding(&reservation, &request)?;
         Ok(reservation)
     }
+
+    /// Commit attempt intent for an admitted reservation and read the row back,
+    /// because the reducer cannot return the inserted id.
+    async fn accept(&self, reservation: &Reservation, key: &str) -> Result<ProviderAttempt> {
+        let b = &self.binding;
+        let request = AcceptAttemptRequest {
+            organization_id: b.organization_id,
+            company_id: b.company_id,
+            agent_id: b.agent_id,
+            run_id: b.run_id,
+            reservation_id: reservation.id,
+            request_key: key.to_string(),
+            provider: b.provider.clone(),
+            model: b.model.clone(),
+        };
+        self.ledger.accept_attempt(&request).await?;
+        let attempt = self
+            .ledger
+            .provider_attempt(b.organization_id, b.run_id, key)
+            .await?
+            .context("provider attempt is not visible after accept")?;
+        if attempt.reservation_id != reservation.id
+            || attempt.company_id != b.company_id
+            || attempt.agent_id != b.agent_id
+            || attempt.provider != b.provider
+            || attempt.model != b.model
+        {
+            bail!("provider attempt does not match the admitted binding");
+        }
+        // Only a freshly accepted attempt may be dispatched; recovering a
+        // dispatched or finished row never authorizes calling the provider again.
+        if attempt.status != ATTEMPT_ACCEPTED {
+            bail!(
+                "provider attempt {key} is already {}; not redispatching",
+                attempt.status
+            );
+        }
+        Ok(attempt)
+    }
 }
 
 #[async_trait]
 impl LlmCompletion for SpendAdmittedLlm<'_> {
     async fn complete(&self, req: LlmRequest) -> Result<LlmResponse> {
+        let organization_id = self.binding.organization_id;
         let call = self.next_call.fetch_add(1, Ordering::SeqCst);
         let key = request_key(RequestKind::Spend, self.binding.run_id, call, 0)?;
         let reservation = self.admit(&req, &key).await?;
-        // A dispatch error leaves the reservation reserved for reconciliation.
-        let response = self.inner.complete(req).await?;
+        let attempt = self.accept(&reservation, &key).await?;
+        self.ledger
+            .mark_attempt_dispatched(organization_id, attempt.id)
+            .await
+            .with_context(|| format!("dispatch was not claimed for {key}; provider not called"))?;
+        let response = match self.inner.complete(req).await {
+            Ok(response) => response,
+            Err(error) => {
+                // The provider may have run, so the outcome is unknown rather
+                // than failed, and the reservation stays reserved.
+                self.ledger
+                    .record_attempt_result(
+                        organization_id,
+                        &AttemptResult::outcome_unknown(attempt.id, &error.to_string()),
+                    )
+                    .await
+                    .with_context(|| {
+                        format!("could not record the unknown outcome of {key}: {error}")
+                    })?;
+                return Err(error.context(format!(
+                    "provider dispatch failed for {key}; attempt left for reconciliation"
+                )));
+            }
+        };
+        self.ledger
+            .record_attempt_result(
+                organization_id,
+                &AttemptResult::succeeded(
+                    attempt.id,
+                    response.input_tokens,
+                    response.output_tokens,
+                ),
+            )
+            .await
+            .with_context(|| {
+                format!("recording the result of {key} failed; attempt and reservation left for reconciliation")
+            })?;
         self.ledger
             .settle(
-                self.binding.organization_id,
+                organization_id,
                 reservation.id,
                 response.input_tokens,
                 response.output_tokens,
@@ -320,7 +445,9 @@ fn prompt_bytes(req: &LlmRequest) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai_spend::STATUS_SETTLED;
+    use crate::ai_spend::{
+        ATTEMPT_DISPATCHED, ATTEMPT_OUTCOME_UNKNOWN, ATTEMPT_SUCCEEDED, STATUS_SETTLED,
+    };
     use anyhow::anyhow;
     use chrono::TimeZone;
     use std::sync::Mutex;
@@ -399,8 +526,13 @@ mod tests {
     struct FakeLedger {
         has_budget: bool,
         has_snapshot: bool,
+        /// Models a reader that sees an attempt recovered as already dispatched.
+        accepts_as_dispatched: bool,
         reservations: Mutex<Vec<Reservation>>,
+        attempts: Mutex<Vec<ProviderAttempt>>,
         settled: Mutex<Vec<(u64, u32, u32)>>,
+        /// Ledger writes in call order, so tests can assert the sequence.
+        writes: Mutex<Vec<String>>,
     }
 
     impl FakeLedger {
@@ -410,6 +542,20 @@ mod tests {
                 has_snapshot: true,
                 ..Self::default()
             }
+        }
+
+        fn attempt(&self, key: &str) -> ProviderAttempt {
+            self.attempts
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|attempt| attempt.request_key == key)
+                .cloned()
+                .expect("attempt was not persisted")
+        }
+
+        fn writes(&self) -> Vec<String> {
+            self.writes.lock().unwrap().clone()
         }
     }
 
@@ -454,6 +600,7 @@ mod tests {
         }
 
         async fn reserve(&self, request: &ReserveRequest) -> Result<()> {
+            self.writes.lock().unwrap().push("reserve".into());
             let mut rows = self.reservations.lock().unwrap();
             let id = rows.len() as u64 + 100;
             rows.push(Reservation {
@@ -473,6 +620,7 @@ mod tests {
         }
 
         async fn settle(&self, _: u64, id: u64, input: u32, output: u32) -> Result<()> {
+            self.writes.lock().unwrap().push("settle".into());
             let mut rows = self.reservations.lock().unwrap();
             let row = rows
                 .iter_mut()
@@ -485,14 +633,118 @@ mod tests {
             self.settled.lock().unwrap().push((id, input, output));
             Ok(())
         }
+
+        async fn provider_attempt(
+            &self,
+            _: u64,
+            _: u64,
+            key: &str,
+        ) -> Result<Option<ProviderAttempt>> {
+            Ok(self
+                .attempts
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|attempt| attempt.request_key == key)
+                .cloned())
+        }
+
+        /// Mirrors the module: replaying one binding is a no-op, and reusing a
+        /// key for a different binding is rejected.
+        async fn accept_attempt(&self, request: &AcceptAttemptRequest) -> Result<()> {
+            self.writes.lock().unwrap().push("accept".into());
+            let mut rows = self.attempts.lock().unwrap();
+            if let Some(existing) = rows
+                .iter()
+                .find(|attempt| attempt.request_key == request.request_key)
+            {
+                if existing.reservation_id != request.reservation_id
+                    || existing.company_id != request.company_id
+                    || existing.agent_id != request.agent_id
+                {
+                    bail!("request key was already used for a different provider attempt");
+                }
+                return Ok(());
+            }
+            let id = rows.len() as u64 + 200;
+            rows.push(ProviderAttempt {
+                id,
+                company_id: request.company_id,
+                agent_id: request.agent_id,
+                reservation_id: request.reservation_id,
+                request_key: request.request_key.clone(),
+                provider: request.provider.clone(),
+                model: request.model.clone(),
+                status: if self.accepts_as_dispatched {
+                    ATTEMPT_DISPATCHED.into()
+                } else {
+                    ATTEMPT_ACCEPTED.into()
+                },
+                input_tokens: 0,
+                output_tokens: 0,
+            });
+            Ok(())
+        }
+
+        async fn mark_attempt_dispatched(&self, _: u64, attempt_id: u64) -> Result<()> {
+            self.writes.lock().unwrap().push("dispatch".into());
+            let mut rows = self.attempts.lock().unwrap();
+            let row = rows
+                .iter_mut()
+                .find(|attempt| attempt.id == attempt_id)
+                .context("no attempt")?;
+            if row.status != ATTEMPT_ACCEPTED {
+                bail!("only an accepted attempt can be dispatched");
+            }
+            row.status = ATTEMPT_DISPATCHED.into();
+            Ok(())
+        }
+
+        /// Mirrors the module: a result needs a dispatched attempt, an unknown
+        /// outcome reports no usage, and usage stays within the allowance.
+        async fn record_attempt_result(&self, _: u64, result: &AttemptResult) -> Result<()> {
+            self.writes
+                .lock()
+                .unwrap()
+                .push(format!("result:{}", result.status));
+            let reservations = self.reservations.lock().unwrap();
+            let mut rows = self.attempts.lock().unwrap();
+            let row = rows
+                .iter_mut()
+                .find(|attempt| attempt.id == result.attempt_id)
+                .context("no attempt")?;
+            if row.status != ATTEMPT_DISPATCHED {
+                bail!("an attempt must be dispatched before its result");
+            }
+            if result.status == ATTEMPT_OUTCOME_UNKNOWN
+                && (result.input_tokens, result.output_tokens) != (0, 0)
+            {
+                bail!("an unknown outcome cannot report usage");
+            }
+            let reservation = reservations
+                .iter()
+                .find(|r| r.id == row.reservation_id)
+                .context("no reservation")?;
+            if result.input_tokens > reservation.input_token_allowance
+                || result.output_tokens > reservation.output_token_allowance
+            {
+                bail!("recorded usage exceeds reservation allowance");
+            }
+            row.status = result.status.into();
+            row.input_tokens = result.input_tokens;
+            row.output_tokens = result.output_tokens;
+            Ok(())
+        }
     }
 
     fn admitted<'a>(provider: &'a Provider, ledger: &'a FakeLedger) -> SpendAdmittedLlm<'a> {
         SpendAdmittedLlm::with_clock(provider, ledger, binding(), fixed_clock).unwrap()
     }
 
+    const KEY: &str = "h5:spend:run:42:step:1:attempt:0";
+
     #[tokio::test]
-    async fn reserves_before_dispatch_and_settles_actual_usage() {
+    async fn reserves_accepts_and_claims_dispatch_before_settling_actual_usage() {
         let provider = Provider::new(Ok(response(40, 20)));
         let ledger = FakeLedger::configured();
         admitted(&provider, &ledger)
@@ -502,23 +754,96 @@ mod tests {
         assert_eq!(provider.calls(), 1);
         let rows = ledger.reservations.lock().unwrap();
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].request_key, "h5:spend:run:42:step:1:attempt:0");
+        assert_eq!(rows[0].request_key, KEY);
         assert_eq!(rows[0].status, STATUS_SETTLED);
         assert_eq!(rows[0].output_token_allowance, 256);
         assert_eq!(*ledger.settled.lock().unwrap(), vec![(100, 40, 20)]);
+
+        let attempt = ledger.attempt(KEY);
+        assert_eq!(attempt.reservation_id, rows[0].id);
+        assert_eq!(attempt.status, ATTEMPT_SUCCEEDED);
+        assert_eq!((attempt.input_tokens, attempt.output_tokens), (40, 20));
+        // The attempt is the provider truth, so it is durable before dispatch
+        // and recorded before spend is settled.
+        assert_eq!(
+            ledger.writes(),
+            vec![
+                "reserve",
+                "accept",
+                "dispatch",
+                &format!("result:{ATTEMPT_SUCCEEDED}"),
+                "settle"
+            ]
+        );
     }
 
     #[tokio::test]
-    async fn provider_failure_leaves_reservation_unsettled() {
+    async fn provider_failure_records_an_unknown_outcome_and_leaves_spend_reserved() {
         let provider = Provider::new(Err(anyhow!("timeout")));
         let ledger = FakeLedger::configured();
-        assert!(admitted(&provider, &ledger)
+        let err = admitted(&provider, &ledger)
             .complete(request())
             .await
-            .is_err());
+            .unwrap_err();
+        assert!(err.to_string().contains("left for reconciliation"));
         let rows = ledger.reservations.lock().unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].status, STATUS_RESERVED);
+        assert!(ledger.settled.lock().unwrap().is_empty());
+
+        let attempt = ledger.attempt(KEY);
+        assert_eq!(attempt.status, ATTEMPT_OUTCOME_UNKNOWN);
+        assert_eq!((attempt.input_tokens, attempt.output_tokens), (0, 0));
+        assert_eq!(
+            ledger.writes(),
+            vec![
+                "reserve",
+                "accept",
+                "dispatch",
+                &format!("result:{ATTEMPT_OUTCOME_UNKNOWN}")
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn an_attempt_recovered_as_dispatched_is_not_redispatched() {
+        let provider = Provider::new(Ok(response(1, 1)));
+        let ledger = FakeLedger {
+            accepts_as_dispatched: true,
+            ..FakeLedger::configured()
+        };
+        let err = admitted(&provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("not redispatching"));
+        assert_eq!(provider.calls(), 0);
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_DISPATCHED);
+        assert_eq!(ledger.writes(), vec!["reserve", "accept"]);
+    }
+
+    #[tokio::test]
+    async fn a_key_bound_to_another_attempt_never_dispatches() {
+        let provider = Provider::new(Ok(response(1, 1)));
+        let ledger = FakeLedger::configured();
+        ledger.attempts.lock().unwrap().push(ProviderAttempt {
+            id: 7,
+            company_id: 3,
+            agent_id: 7,
+            reservation_id: 999,
+            request_key: KEY.into(),
+            provider: "mistral".into(),
+            model: "mistral-small".into(),
+            status: ATTEMPT_SUCCEEDED.into(),
+            input_tokens: 1,
+            output_tokens: 1,
+        });
+        let err = admitted(&provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("different provider attempt"));
+        assert_eq!(provider.calls(), 0);
         assert!(ledger.settled.lock().unwrap().is_empty());
     }
 
@@ -570,7 +895,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn usage_over_allowance_is_not_settled() {
+    async fn usage_over_allowance_is_neither_recorded_nor_settled() {
         let provider = Provider::new(Ok(response(40, 999)));
         let ledger = FakeLedger::configured();
         let err = admitted(&provider, &ledger)
@@ -582,6 +907,8 @@ mod tests {
             ledger.reservations.lock().unwrap()[0].status,
             STATUS_RESERVED
         );
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_DISPATCHED);
+        assert!(ledger.settled.lock().unwrap().is_empty());
     }
 
     #[tokio::test]

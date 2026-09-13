@@ -28,6 +28,15 @@ pub const MAX_ALLOWANCE_TOKENS: u32 = 10_000_000;
 pub const STATUS_RESERVED: &str = "reserved";
 pub const STATUS_SETTLED: &str = "settled";
 
+/// `ai_provider_attempt.status` values, mirroring the module's transitions.
+pub const ATTEMPT_ACCEPTED: &str = "accepted";
+pub const ATTEMPT_DISPATCHED: &str = "dispatched";
+pub const ATTEMPT_SUCCEEDED: &str = "succeeded";
+pub const ATTEMPT_FAILED: &str = "failed";
+pub const ATTEMPT_OUTCOME_UNKNOWN: &str = "outcome_unknown";
+/// Mirrors `MAX_ATTEMPT_NOTE_LEN` in the module.
+pub const ATTEMPT_NOTE_MAX_LEN: usize = 1_024;
+
 const PRICE_SNAPSHOT_COLS: &str = "id, organization_id, agent_id, provider, model, currency, \
 input_units_per_1k, output_units_per_1k, version";
 const BUDGET_COLS: &str = "id, organization_id, agent_id, billing_period, currency, limit_units, \
@@ -37,6 +46,8 @@ provider, model, billing_period, currency, price_snapshot_id, reserved_units, se
 input_token_allowance, output_token_allowance, status, settled_input_tokens, settled_output_tokens";
 const DRAFT_REQUEST_COLS: &str =
     "id, organization_id, company_id, run_id, request_key, draft_id, creation_payload_hash";
+const ATTEMPT_COLS: &str = "id, organization_id, company_id, agent_id, run_id, reservation_id, \
+request_key, provider, model, status, input_tokens, output_tokens";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RequestKind {
@@ -180,6 +191,72 @@ pub struct DraftRequest {
     pub creation_payload_hash: String,
 }
 
+/// Durable provider attempt bound 1:1 to a reservation by request key.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProviderAttempt {
+    pub id: u64,
+    pub company_id: u64,
+    pub agent_id: u64,
+    pub reservation_id: u64,
+    pub request_key: String,
+    pub provider: String,
+    pub model: String,
+    pub status: String,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+}
+
+/// Exact binding for an accepted attempt, mirroring
+/// `AcceptAiProviderAttemptParams`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AcceptAttemptRequest {
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub agent_id: u64,
+    pub run_id: u64,
+    pub reservation_id: u64,
+    pub request_key: String,
+    pub provider: String,
+    pub model: String,
+}
+
+/// Outcome of a dispatched attempt, mirroring
+/// `RecordAiProviderAttemptResultParams`. `outcome_unknown` must report no
+/// usage, which `attempt_result` enforces before the call.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AttemptResult {
+    pub attempt_id: u64,
+    pub status: &'static str,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+    pub failure_reason: Option<String>,
+}
+
+impl AttemptResult {
+    /// The provider returned a usable response with this usage.
+    pub fn succeeded(attempt_id: u64, input_tokens: u32, output_tokens: u32) -> Self {
+        Self {
+            attempt_id,
+            status: ATTEMPT_SUCCEEDED,
+            input_tokens,
+            output_tokens,
+            failure_reason: None,
+        }
+    }
+
+    /// Dispatch produced no usable result. The provider may still have run, so
+    /// the attempt reports no usage and waits for explicit reconciliation.
+    pub fn outcome_unknown(attempt_id: u64, reason: &str) -> Self {
+        Self {
+            attempt_id,
+            status: ATTEMPT_OUTCOME_UNKNOWN,
+            input_tokens: 0,
+            output_tokens: 0,
+            failure_reason: attempt_note(reason),
+        }
+    }
+}
+
 /// Exact binding for a reservation request, mirroring `ReserveAiSpendParams`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReserveRequest {
@@ -283,6 +360,27 @@ impl<'a> SpendReader<'a> {
             .context("read ai_action_draft_request")?;
         find_draft_request(&rows, organization_id, company_id, run_id, request_key)
     }
+
+    /// The attempt for one request key. `accept_provider_attempt` cannot return
+    /// the inserted id, so the row is read back before it is dispatched.
+    pub async fn provider_attempt(
+        &self,
+        organization_id: u64,
+        run_id: u64,
+        request_key: &str,
+    ) -> Result<Option<ProviderAttempt>> {
+        validate_request_key(request_key)?;
+        let sql = format!(
+            "SELECT {ATTEMPT_COLS} FROM ai_provider_attempt \
+             WHERE organization_id = {organization_id} AND run_id = {run_id}"
+        );
+        let rows = self
+            .stdb
+            .query_sql(&sql)
+            .await
+            .context("read ai_provider_attempt")?;
+        find_attempt(&rows, organization_id, run_id, request_key)
+    }
 }
 
 /// Reserve spend through the gateway principal. Replays of an identical
@@ -337,6 +435,79 @@ pub async fn settle(
     ))
     .await
     .context("settle_ai_spend reducer failed")
+}
+
+/// Commit attempt intent before any provider I/O. Replaying the same binding
+/// succeeds without creating a second attempt.
+pub async fn accept_provider_attempt(
+    stdb: &StdbClient,
+    request: &AcceptAttemptRequest,
+) -> Result<()> {
+    validate_request_key(&request.request_key)?;
+    if request.reservation_id == 0 {
+        bail!("an attempt requires the reservation it is bound to");
+    }
+    stdb.call_reducer(stdb_client::reducer_call!(
+        "accept_ai_provider_attempt",
+        json!([
+            request.organization_id,
+            {
+                "company_id": request.company_id,
+                "agent_id": request.agent_id,
+                "run_id": request.run_id,
+                "reservation_id": request.reservation_id,
+                "request_key": request.request_key,
+                "provider": request.provider,
+                "model": request.model,
+            }
+        ]),
+    ))
+    .await
+    .context("accept_ai_provider_attempt reducer failed")
+}
+
+/// Claim the single dispatch of an accepted attempt immediately before I/O.
+pub async fn mark_provider_attempt_dispatched(
+    stdb: &StdbClient,
+    organization_id: u64,
+    attempt_id: u64,
+) -> Result<()> {
+    if attempt_id == 0 {
+        bail!("dispatch requires an attempt id");
+    }
+    stdb.call_reducer(stdb_client::reducer_call!(
+        "mark_ai_provider_attempt_dispatched",
+        json!([organization_id, attempt_id]),
+    ))
+    .await
+    .context("mark_ai_provider_attempt_dispatched reducer failed")
+}
+
+/// Record the outcome of a dispatched attempt. Recording never retries or
+/// redispatches; an unknown outcome stays unknown until it is reconciled.
+pub async fn record_provider_attempt_result(
+    stdb: &StdbClient,
+    organization_id: u64,
+    result: &AttemptResult,
+) -> Result<()> {
+    if result.attempt_id == 0 {
+        bail!("recording a result requires an attempt id");
+    }
+    stdb.call_reducer(stdb_client::reducer_call!(
+        "record_ai_provider_attempt_result",
+        json!([
+            organization_id,
+            {
+                "attempt_id": result.attempt_id,
+                "status": result.status,
+                "input_tokens": result.input_tokens,
+                "output_tokens": result.output_tokens,
+                "failure_reason": result.failure_reason,
+            }
+        ]),
+    ))
+    .await
+    .context("record_ai_provider_attempt_result reducer failed")
 }
 
 /// Create a run-correlated draft. `params` is the `CreateAiActionDraftParams`
@@ -497,6 +668,72 @@ fn find_draft_request(
         });
     }
     Ok(found)
+}
+
+fn find_attempt(
+    rows: &[Value],
+    organization_id: u64,
+    run_id: u64,
+    request_key: &str,
+) -> Result<Option<ProviderAttempt>> {
+    let mut found = None;
+    for row in rows {
+        require_owner(row, organization_id)?;
+        if req_u64(row, "runId", "run_id")? != run_id
+            || req_str(row, "requestKey", "request_key")? != request_key
+        {
+            continue;
+        }
+        if found.is_some() {
+            bail!("multiple provider attempts share one request key");
+        }
+        let status = req_str(row, "status", "status")?;
+        if !matches!(
+            status.as_str(),
+            ATTEMPT_ACCEPTED
+                | ATTEMPT_DISPATCHED
+                | ATTEMPT_SUCCEEDED
+                | ATTEMPT_FAILED
+                | ATTEMPT_OUTCOME_UNKNOWN
+        ) {
+            bail!("provider attempt has unknown status '{status}'");
+        }
+        let reservation_id = req_u64(row, "reservationId", "reservation_id")?;
+        if reservation_id == 0 {
+            bail!("provider attempt is not bound to a reservation");
+        }
+        found = Some(ProviderAttempt {
+            id: req_u64(row, "id", "id")?,
+            company_id: req_u64(row, "companyId", "company_id")?,
+            agent_id: req_u64(row, "agentId", "agent_id")?,
+            reservation_id,
+            request_key: request_key.to_string(),
+            provider: req_str(row, "provider", "provider")?,
+            model: req_str(row, "model", "model")?,
+            status,
+            input_tokens: req_u32(row, "inputTokens", "input_tokens")?,
+            output_tokens: req_u32(row, "outputTokens", "output_tokens")?,
+        });
+    }
+    Ok(found)
+}
+
+/// Keep a failure reason inside the module's note limit. Truncation is marked
+/// so a persisted reason is never silently shortened.
+fn attempt_note(reason: &str) -> Option<String> {
+    const MARKER: &str = " […]";
+    let reason = reason.trim();
+    if reason.is_empty() {
+        return None;
+    }
+    if reason.len() <= ATTEMPT_NOTE_MAX_LEN {
+        return Some(reason.to_string());
+    }
+    let mut end = ATTEMPT_NOTE_MAX_LEN - MARKER.len();
+    while !reason.is_char_boundary(end) {
+        end -= 1;
+    }
+    Some(format!("{}{MARKER}", &reason[..end]))
 }
 
 /// Every returned row must belong to the requested organization; a mismatch
@@ -684,6 +921,60 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+    }
+
+    #[test]
+    fn attempt_lookup_is_exact_and_fails_closed() {
+        let key = "h5:spend:run:42:step:1:attempt:0";
+        let row = |org: u64, run: u64, key: &str, status: &str, reservation: u64| {
+            json!({
+                "id": 5, "organization_id": org, "company_id": 3, "agent_id": 7, "run_id": run,
+                "reservation_id": reservation, "request_key": key, "provider": "mistral",
+                "model": "mistral-small", "status": status, "input_tokens": 40,
+                "output_tokens": 20
+            })
+        };
+        let found = find_attempt(&[row(9, 42, key, ATTEMPT_DISPATCHED, 100)], 9, 42, key)
+            .unwrap()
+            .unwrap();
+        assert_eq!((found.reservation_id, found.input_tokens), (100, 40));
+        assert!(
+            find_attempt(&[row(9, 42, key, ATTEMPT_ACCEPTED, 100)], 9, 43, key)
+                .unwrap()
+                .is_none()
+        );
+        assert!(find_attempt(&[row(8, 42, key, ATTEMPT_ACCEPTED, 100)], 9, 42, key).is_err());
+        assert!(find_attempt(&[row(9, 42, key, "queued", 100)], 9, 42, key).is_err());
+        assert!(find_attempt(&[row(9, 42, key, ATTEMPT_ACCEPTED, 0)], 9, 42, key).is_err());
+        let twice = vec![
+            row(9, 42, key, ATTEMPT_ACCEPTED, 100),
+            row(9, 42, key, ATTEMPT_ACCEPTED, 100),
+        ];
+        assert!(find_attempt(&twice, 9, 42, key).is_err());
+    }
+
+    #[test]
+    fn attempt_results_carry_bounded_reasons_and_no_unknown_usage() {
+        let succeeded = AttemptResult::succeeded(5, 40, 20);
+        assert_eq!(succeeded.status, ATTEMPT_SUCCEEDED);
+        assert!(succeeded.failure_reason.is_none());
+
+        let unknown = AttemptResult::outcome_unknown(5, "  provider timeout  ");
+        assert_eq!(unknown.status, ATTEMPT_OUTCOME_UNKNOWN);
+        assert_eq!((unknown.input_tokens, unknown.output_tokens), (0, 0));
+        assert_eq!(unknown.failure_reason.as_deref(), Some("provider timeout"));
+        assert!(AttemptResult::outcome_unknown(5, "   ")
+            .failure_reason
+            .is_none());
+
+        // Truncation stays inside the module limit, is marked, and never splits
+        // a multi-byte character.
+        let long = "é".repeat(ATTEMPT_NOTE_MAX_LEN);
+        let note = AttemptResult::outcome_unknown(5, &long)
+            .failure_reason
+            .unwrap();
+        assert!(note.len() <= ATTEMPT_NOTE_MAX_LEN);
+        assert!(note.ends_with(" […]"));
     }
 
     #[test]

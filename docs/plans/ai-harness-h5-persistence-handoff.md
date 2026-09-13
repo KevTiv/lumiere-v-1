@@ -201,9 +201,42 @@ Writes stay on the gateway principal.
   types, into the contracts package under `src/presentation/`. After the pin,
   `@lumiere/presentation-core` consumes them from `@lumiere/contracts` and the
   checked-in local copies and their CI drift step are removed.
-- Not yet done in the gateway: using attempt rows around dispatch in
-  `SpendAdmittedLlm` and setting wait states from loop stops; both follow the
-  v0.3.45 pin.
+- Both gateway gaps this release opened are closed by
+  `codex/ai-harness-h5c-provider-attempts` below.
+
+### Gate 5 attempt and wait-state wiring (`codex/ai-harness-h5c-provider-attempts`)
+
+Stacked on the v0.3.45 pin; uses the two primitives that release added.
+
+- `SpendAdmittedLlm` now runs one sequence per provider call: reserve, accept
+  the attempt, claim dispatch, call the provider, record the result, settle.
+  `accept_ai_provider_attempt` cannot return the inserted id, so the row is read
+  back through the read principal and matched against the admitted binding; an
+  attempt read back as anything other than `accepted` is not dispatched.
+- The attempt is the provider truth, so it is recorded before spend is settled.
+  A settlement failure therefore leaves a `succeeded` attempt against a
+  `reserved` reservation, which is unambiguous to reconcile.
+- Every dispatch error records `outcome_unknown` with a bounded failure reason
+  and leaves the reservation reserved. The transport cannot distinguish a lost
+  response from a provider that never ran, so the gateway never claims a
+  definite `failed`; `failed` stays an operator conclusion through
+  `reconcile_ai_provider_attempt`.
+- Loop stops that are not failures now park the run in the matching wait state
+  instead of leaving it indistinguishable from a working run: a candidate answer
+  sets `agent_settled` and a pending approval sets `awaiting_approval`, through
+  `skill_loader::set_run_wait_state`. Failure stops still finalize as `failed`,
+  and a loop error still leaves the run untouched.
+- Still not done: a governed route or skill that calls `run_recorded_loop`, the
+  route-level draft bridge, provisioning the `ai_spend/reserve` and
+  `ai_spend/settle` grants, and any operator surface for reconciling
+  `outcome_unknown` attempts.
+- Validation: `cargo test --locked -p ai-gateway` 220 passed, 1 existing
+  integration test ignored; `cargo fmt -p ai-gateway --check`,
+  `lint-reducer-call-literals` and `lint-trusted-route-boundaries` pass. Fixtures
+  cover the full success sequence and its write order, an unknown outcome on
+  dispatch failure, a recovered dispatched attempt, a key already bound to
+  another attempt, over-allowance usage, and the wait-state mapping. No live
+  persistence or production activation is claimed.
 
 ### H5b local validation
 

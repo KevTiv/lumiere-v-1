@@ -61,21 +61,33 @@ pub(super) async fn run_recorded_loop(
         limits,
     )
     .await?;
-    if let RunFinalization::Failed { error_code } = run_finalization(&outcome.stop) {
-        super::skill_loader::complete_run(
-            &context.stdb,
-            context.org_id,
-            context.company_id,
-            context.run_id,
-            "failed",
-            None,
-            None,
-            None,
-            counted.max_step(),
-            saturating_tokens(&outcome),
-            Some(error_code.to_string()),
-        )
-        .await?;
+    match run_finalization(&outcome.stop) {
+        RunFinalization::Failed { error_code } => {
+            super::skill_loader::complete_run(
+                &context.stdb,
+                context.org_id,
+                context.company_id,
+                context.run_id,
+                "failed",
+                None,
+                None,
+                None,
+                counted.max_step(),
+                saturating_tokens(&outcome),
+                Some(error_code.to_string()),
+            )
+            .await?;
+        }
+        RunFinalization::Wait { status, .. } => {
+            super::skill_loader::set_run_wait_state(
+                &context.stdb,
+                context.org_id,
+                context.company_id,
+                context.run_id,
+                status,
+            )
+            .await?;
+        }
     }
     Ok(outcome)
 }
@@ -150,20 +162,29 @@ impl LoopRecorder for StdbLoopRecorder<'_> {
 
 /// Durable run handling for a loop outcome. Only failures are terminal here:
 /// a candidate answer still needs the answer gate, and a pending approval
-/// waits for the approval flow, so both leave the run open.
+/// waits for the approval flow, so both park the run in a wait state that says
+/// which gate it is waiting for instead of leaving it indistinguishable from a
+/// run that is still working.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum RunFinalization {
-    Failed { error_code: &'static str },
-    LeaveOpen { reason: &'static str },
+    Failed {
+        error_code: &'static str,
+    },
+    Wait {
+        status: &'static str,
+        reason: &'static str,
+    },
 }
 
 pub(super) fn run_finalization(stop: &LoopStop) -> RunFinalization {
     let failed = |error_code| RunFinalization::Failed { error_code };
     match stop {
-        LoopStop::CandidateFinal(_) => RunFinalization::LeaveOpen {
+        LoopStop::CandidateFinal(_) => RunFinalization::Wait {
+            status: "agent_settled",
             reason: "candidate answer awaits the answer gate",
         },
-        LoopStop::PendingApproval => RunFinalization::LeaveOpen {
+        LoopStop::PendingApproval => RunFinalization::Wait {
+            status: "awaiting_approval",
             reason: "action awaits approval",
         },
         LoopStop::MalformedCall => failed("agent_loop_stop:malformed_call"),
@@ -245,15 +266,15 @@ mod finalization_tests {
 
     #[test]
     fn only_failures_finalize_the_durable_run() {
-        let open = [
-            LoopStop::CandidateFinal("answer".into()),
-            LoopStop::PendingApproval,
+        let waiting = [
+            (LoopStop::CandidateFinal("answer".into()), "agent_settled"),
+            (LoopStop::PendingApproval, "awaiting_approval"),
         ];
-        for stop in open {
-            assert!(matches!(
-                run_finalization(&stop),
-                RunFinalization::LeaveOpen { .. }
-            ));
+        for (stop, expected) in waiting {
+            match run_finalization(&stop) {
+                RunFinalization::Wait { status, .. } => assert_eq!(status, expected, "{stop:?}"),
+                other => panic!("{stop:?} must park the run in a wait state, got {other:?}"),
+            }
         }
         let failed = [
             (LoopStop::MalformedCall, "malformed_call"),
