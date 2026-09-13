@@ -14,6 +14,7 @@ use std::collections::HashSet;
 use std::fmt;
 use std::sync::OnceLock;
 
+use serde::Deserialize;
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
@@ -23,7 +24,7 @@ const ARTIFACT_VERSION: u64 = 2;
 const IR_VERSION: u64 = 2;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) enum GeneratedCatalogError {
+pub(crate) enum GeneratedCatalogError {
     Invalid(String),
     Unsupported(String),
 }
@@ -42,7 +43,7 @@ impl fmt::Display for GeneratedCatalogError {
 impl std::error::Error for GeneratedCatalogError {}
 
 #[derive(Clone, Debug, PartialEq)]
-pub(super) struct GeneratedCatalog {
+pub(crate) struct GeneratedCatalog {
     artifact_version: u64,
     source_ir: SourceIr,
     entries: Vec<CapabilityEntry>,
@@ -71,6 +72,24 @@ struct ToolDescriptor {
     name: String,
     description: String,
     input_schema: Value,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct GeneratedReadGrant {
+    pub capability_key: String,
+    pub max_rows: u64,
+    pub max_bytes: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PreparedGeneratedRead {
+    pub tool_name: String,
+    pub capability_key: String,
+    pub resource: String,
+    pub company_id: u64,
+    pub max_rows: u64,
+    pub max_bytes: u64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -104,7 +123,7 @@ enum ResultPolicy {
 }
 
 /// Parse and validate the embedded generated catalog once.
-pub(super) fn embedded_catalog() -> Result<&'static GeneratedCatalog, GeneratedCatalogError> {
+pub(crate) fn embedded_catalog() -> Result<&'static GeneratedCatalog, GeneratedCatalogError> {
     static CATALOG: OnceLock<Result<GeneratedCatalog, GeneratedCatalogError>> = OnceLock::new();
     CATALOG
         .get_or_init(|| {
@@ -124,7 +143,7 @@ impl GeneratedCatalog {
     /// input schema are advertisable. An entry without one is fail-closed:
     /// it is omitted here, so a model can never be offered a capability whose
     /// input contract nobody derived.
-    pub(super) fn specs(&self) -> Result<Vec<ToolSpec>, GeneratedCatalogError> {
+    pub(crate) fn specs(&self) -> Result<Vec<ToolSpec>, GeneratedCatalogError> {
         Ok(self
             .entries
             .iter()
@@ -135,6 +154,145 @@ impl GeneratedCatalog {
                 parameters: tool.input_schema.clone(),
             })
             .collect())
+    }
+
+    pub(crate) fn specs_for_grants(
+        &self,
+        grants: &[GeneratedReadGrant],
+    ) -> Result<Vec<ToolSpec>, GeneratedCatalogError> {
+        let mut specs = Vec::new();
+        for entry in &self.entries {
+            let Some(tool) = &entry.tool else {
+                continue;
+            };
+            let Some(grant) = grants
+                .iter()
+                .find(|grant| grant.capability_key == entry.capability_key)
+            else {
+                continue;
+            };
+            if grant.max_rows == 0 || grant.max_bytes == 0 {
+                continue;
+            }
+            let ResultPolicy::Dataset { max_rows, .. } = entry.result_policy else {
+                continue;
+            };
+            let mut parameters = tool.input_schema.clone();
+            parameters["properties"]["max_rows"]["maximum"] = grant.max_rows.min(max_rows).into();
+            specs.push(ToolSpec {
+                name: tool.name.clone(),
+                description: tool.description.clone(),
+                parameters,
+            });
+        }
+        Ok(specs)
+    }
+
+    pub(crate) fn advertises(&self, tool_name: &str) -> bool {
+        self.entries.iter().any(|entry| {
+            entry
+                .tool
+                .as_ref()
+                .is_some_and(|tool| tool.name == tool_name)
+        })
+    }
+
+    /// Reauthorize a model-selected read against server-resolved actor grants.
+    ///
+    /// The generated result policy is only a global ceiling. No capability is
+    /// executable without an exact grant, and a grant can only narrow that
+    /// ceiling. Organization scope is never accepted from model arguments;
+    /// company scope must match the trusted run context.
+    pub(crate) fn prepare_read(
+        &self,
+        tool_name: &str,
+        arguments: &Value,
+        trusted_company_id: u64,
+        grants: &[GeneratedReadGrant],
+    ) -> Result<PreparedGeneratedRead, GeneratedCatalogError> {
+        if trusted_company_id == 0 {
+            return Err(invalid("trusted company must be nonzero"));
+        }
+        let entry = self
+            .entries
+            .iter()
+            .find(|entry| {
+                entry
+                    .tool
+                    .as_ref()
+                    .is_some_and(|tool| tool.name == tool_name)
+            })
+            .ok_or_else(|| invalid("tool is not in the reviewed generated catalog"))?;
+        if entry.risk != Risk::ReadOnly || entry.requires_confirmation {
+            return Err(invalid(
+                "generated read is not an unconfirmed read-only capability",
+            ));
+        }
+        let Target::Resource { name: resource, .. } = &entry.target else {
+            return Err(invalid("generated tool does not target a resource"));
+        };
+        let ResultPolicy::Dataset {
+            max_rows: reviewed_rows,
+            max_bytes: reviewed_bytes,
+        } = &entry.result_policy
+        else {
+            return Err(invalid(
+                "generated read does not have a dataset result policy",
+            ));
+        };
+        let grant = grants
+            .iter()
+            .find(|grant| grant.capability_key == entry.capability_key)
+            .ok_or_else(|| invalid("actor has no grant for the generated capability"))?;
+        if grant.max_rows == 0 || grant.max_bytes == 0 {
+            return Err(invalid("actor grant limits must be positive"));
+        }
+
+        let object = arguments
+            .as_object()
+            .ok_or_else(|| invalid("generated read arguments must be an object"))?;
+        if object
+            .keys()
+            .any(|key| !matches!(key.as_str(), "max_rows" | "company_id"))
+        {
+            return Err(invalid("generated read arguments contain an unknown field"));
+        }
+        let company_id = optional_positive(object, "company_id")?.unwrap_or(trusted_company_id);
+        if company_id != trusted_company_id {
+            return Err(invalid(
+                "requested company does not match the trusted run scope",
+            ));
+        }
+        let effective_rows = (*reviewed_rows).min(grant.max_rows);
+        let requested_rows = optional_positive(object, "max_rows")?.unwrap_or(effective_rows);
+        if requested_rows > effective_rows {
+            return Err(invalid(
+                "requested rows exceed the actor's effective ceiling",
+            ));
+        }
+
+        Ok(PreparedGeneratedRead {
+            tool_name: tool_name.to_string(),
+            capability_key: entry.capability_key.clone(),
+            resource: resource.clone(),
+            company_id,
+            max_rows: requested_rows,
+            max_bytes: (*reviewed_bytes).min(grant.max_bytes),
+        })
+    }
+}
+
+fn optional_positive(
+    object: &Map<String, Value>,
+    key: &str,
+) -> Result<Option<u64>, GeneratedCatalogError> {
+    match object.get(key) {
+        None => Ok(None),
+        Some(value) => value
+            .as_u64()
+            .filter(|value| *value > 0)
+            .map(Some)
+            .ok_or_else(|| invalid(&format!("{key} must be a positive integer"))),
     }
 }
 
@@ -566,6 +724,67 @@ mod tests {
             specs[0].parameters["properties"]["max_rows"]["maximum"],
             json!(25)
         );
+    }
+
+    #[test]
+    fn generated_reads_default_deny_without_an_actor_grant() {
+        let catalog = parse_catalog(&artifact(json!([advertisable()])).to_string())
+            .expect("valid advertisable entry");
+        let error = catalog
+            .prepare_read("erp_read_a", &json!({}), 7, &[])
+            .expect_err("missing grant must deny");
+        assert!(error.to_string().contains("no grant"));
+    }
+
+    #[test]
+    fn actor_grants_only_narrow_reviewed_read_limits() {
+        let catalog = parse_catalog(&artifact(json!([advertisable()])).to_string())
+            .expect("valid advertisable entry");
+        let grants = [GeneratedReadGrant {
+            capability_key: "erp.read.a".into(),
+            max_rows: 10,
+            max_bytes: 2_048,
+        }];
+        let prepared = catalog
+            .prepare_read(
+                "erp_read_a",
+                &json!({"max_rows": 8, "company_id": 7}),
+                7,
+                &grants,
+            )
+            .expect("narrowed read");
+        assert_eq!(
+            prepared,
+            PreparedGeneratedRead {
+                tool_name: "erp_read_a".into(),
+                capability_key: "erp.read.a".into(),
+                resource: "a".into(),
+                company_id: 7,
+                max_rows: 8,
+                max_bytes: 2_048,
+            }
+        );
+
+        assert!(catalog
+            .prepare_read("erp_read_a", &json!({"max_rows": 11}), 7, &grants)
+            .is_err());
+        assert!(catalog
+            .prepare_read("erp_read_a", &json!({"company_id": 8}), 7, &grants)
+            .is_err());
+        assert!(catalog
+            .prepare_read("erp_read_a", &json!({"organization_id": 1}), 7, &grants)
+            .is_err());
+
+        let specs = catalog.specs_for_grants(&grants).expect("granted specs");
+        assert_eq!(specs.len(), 1);
+        assert_eq!(
+            specs[0].parameters["properties"]["max_rows"]["maximum"],
+            json!(10)
+        );
+        assert!(catalog
+            .specs_for_grants(&[])
+            .expect("denied specs")
+            .is_empty());
     }
 
     #[test]
