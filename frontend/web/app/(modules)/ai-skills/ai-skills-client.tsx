@@ -527,7 +527,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
                     {run.step_count != null ? ` (${run.step_count} steps)` : ""}
                   </p>
                 </div>
-                {run.status === "running" || run.status === "pending" ? (
+                {["running", "pending", "awaiting_approval", "agent_settled"].includes(run.status) ? (
                   <button
                     type="button"
                     className="text-xs underline"

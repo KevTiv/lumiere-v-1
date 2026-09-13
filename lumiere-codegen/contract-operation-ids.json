@@ -1322,6 +1322,11 @@
     "waive_tax_deadline": "erp.waive_tax_deadline",
     "worker_heartbeat": "erp.worker_heartbeat",
     "save_presentation_module": "erp.save_presentation_module",
-    "run_presentation_draft_tests": "erp.run_presentation_draft_tests"
+    "accept_ai_provider_attempt": "erp.accept_ai_provider_attempt",
+    "mark_ai_provider_attempt_dispatched": "erp.mark_ai_provider_attempt_dispatched",
+    "reconcile_ai_provider_attempt": "erp.reconcile_ai_provider_attempt",
+    "record_ai_provider_attempt_result": "erp.record_ai_provider_attempt_result",
+    "run_presentation_draft_tests": "erp.run_presentation_draft_tests",
+    "set_ai_agent_run_wait_state": "erp.set_ai_agent_run_wait_state"
   }
 }

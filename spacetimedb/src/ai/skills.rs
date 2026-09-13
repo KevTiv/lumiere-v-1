@@ -262,6 +262,14 @@ pub struct CompleteAiAgentRunParams {
     pub error_message: Option<String>,
 }
 
+/// Non-terminal wait state for a run whose agent loop stopped without a final
+/// outcome: `awaiting_approval` (an action draft needs approval) or
+/// `agent_settled` (a candidate answer awaits the answer gate).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct SetAiAgentRunWaitStateParams {
+    pub status: String,
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
 #[reducer]
@@ -889,7 +897,7 @@ pub fn append_ai_agent_run_step(
         return Err("step replay conflicts with the existing step".to_string());
     }
 
-    if run.status != "running" && run.status != "pending" {
+    if !run_accepts_work(&run.status) {
         return Err("run is not active".to_string());
     }
     if params.tool_name.trim().is_empty() {
@@ -979,7 +987,7 @@ pub fn complete_ai_agent_run(
         ..params.clone()
     };
 
-    if run.status != "running" && run.status != "pending" {
+    if !run_is_open(&run.status) {
         if completion_matches(&run, &status, &effective_params) {
             return Ok(());
         }
@@ -1029,7 +1037,7 @@ pub fn cancel_ai_agent_run(
     check_permission(ctx, organization_id, "ai_agent_run", "write")?;
 
     let run = load_company_run(ctx, organization_id, company_id, run_id)?;
-    if run.status != "running" && run.status != "pending" {
+    if !run_is_open(&run.status) {
         return Err("run is not active".to_string());
     }
 
@@ -1059,7 +1067,69 @@ pub fn cancel_ai_agent_run(
     Ok(())
 }
 
+#[reducer]
+pub fn set_ai_agent_run_wait_state(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    params: SetAiAgentRunWaitStateParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_agent_run", "write")?;
+
+    let run = load_company_run(ctx, organization_id, company_id, run_id)?;
+    let status = params.status.trim().to_string();
+    if !is_run_wait_state(&status) {
+        return Err("wait status must be awaiting_approval or agent_settled".to_string());
+    }
+    if run.status == status {
+        return Ok(());
+    }
+    if !run_accepts_work(&run.status) {
+        return Err("only a running or pending run can enter a wait state".to_string());
+    }
+
+    let previous_status = run.status.clone();
+    ctx.db.ai_agent_run().id().update(AiAgentRun {
+        status: status.clone(),
+        write_date: ctx.timestamp,
+        ..run
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "ai_agent_run",
+            record_id: run_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "status": previous_status }).to_string()),
+            new_values: Some(serde_json::json!({ "status": status }).to_string()),
+            changed_fields: vec!["status".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/// Non-terminal statuses a stopped agent loop may leave a run in.
+fn is_run_wait_state(status: &str) -> bool {
+    matches!(status, "awaiting_approval" | "agent_settled")
+}
+
+/// A run that may still take new steps, drafts or spend reservations.
+fn run_accepts_work(status: &str) -> bool {
+    matches!(status, "running" | "pending")
+}
+
+/// A run that is not yet terminal and may still be completed or cancelled.
+fn run_is_open(status: &str) -> bool {
+    run_accepts_work(status) || is_run_wait_state(status)
+}
 
 fn is_valid_identity_hex(value: &str) -> bool {
     let hex = value
@@ -1196,8 +1266,28 @@ fn completion_matches(run: &AiAgentRun, status: &str, params: &CompleteAiAgentRu
 #[cfg(test)]
 mod tests {
     use super::{completion_matches, is_valid_identity_hex, step_payload_matches};
+    use super::{is_run_wait_state, run_accepts_work, run_is_open};
     use super::{AiAgentRun, AiAgentRunStep, AppendAiAgentRunStepParams, CompleteAiAgentRunParams};
     use spacetimedb::Timestamp;
+
+    #[test]
+    fn wait_states_are_open_but_do_not_accept_work() {
+        for status in ["awaiting_approval", "agent_settled"] {
+            assert!(is_run_wait_state(status));
+            assert!(run_is_open(status));
+            assert!(!run_accepts_work(status));
+        }
+        for status in ["running", "pending"] {
+            assert!(!is_run_wait_state(status));
+            assert!(run_is_open(status));
+            assert!(run_accepts_work(status));
+        }
+        for status in ["completed", "failed", "cancelled", "unknown", ""] {
+            assert!(!is_run_wait_state(status));
+            assert!(!run_is_open(status));
+            assert!(!run_accepts_work(status));
+        }
+    }
 
     #[test]
     fn identity_hex_validation() {

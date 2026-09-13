@@ -56,15 +56,15 @@ def full_manifest(**overrides):
         }
     )
     tables = [manifest(name=name)["tables"][0] for name in protocol]
-    tables.extend(manifest(name=f"application_{index:03d}")["tables"][0] for index in range(464))
+    tables.extend(manifest(name=f"application_{index:03d}")["tables"][0] for index in range(465))
     result = {
         "version": 1,
         "tables": tables,
         "enum_types": [],
         "ownership_summary": {
             "verified": True,
-            "erp_owned_count": 469,
-            "application_relation_count": 464,
+            "erp_owned_count": 470,
+            "application_relation_count": 465,
             "protocol_relation_count": 5,
             "platform_global_count": 0,
             "platform_global_tables": [],
@@ -114,7 +114,7 @@ class TenantOwnershipTest(unittest.TestCase):
         self.assertIn("organization_id", result.stderr)
 
     def test_accepts_full_application_and_protocol_census(self):
-        result = self.run_checker(full_manifest(), expected_table_count=469)
+        result = self.run_checker(full_manifest(), expected_table_count=470)
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_rejects_stale_452_11_summary(self):
@@ -127,7 +127,7 @@ class TenantOwnershipTest(unittest.TestCase):
                     "platform_global_tables": [],
                 }
             ),
-            expected_table_count=469,
+            expected_table_count=470,
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("erp_owned_count", result.stderr)

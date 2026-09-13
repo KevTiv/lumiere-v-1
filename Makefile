@@ -105,7 +105,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running \
 	init-stack docker-dev docker-dev-iot \
 	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift check-c9-isolation-matrix lint-trusted-route-boundaries \
-	clean-contracts-live-staging lint-reducer-call-literals api-server-run \
+	clean-contracts-live-staging generate-presentation-schemas generate-presentation-contracts lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
 	module-check module-build module-generate-ts module-generate-rust \
@@ -1109,7 +1109,7 @@ check-contracts-source-drift: clean-contracts-live-staging generate-stdb-rust-sd
 clean-contracts-live-staging:
 	rm -rf .contracts-staging
 
-check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen check-contract-ir
+check-contracts-drift: clean-contracts-live-staging generate-presentation-schemas schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen check-contract-ir
 	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
 	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
 		echo "check-contracts-drift: could not resolve the pinned lumiere-contracts checkout (run cargo fetch first); skipping" >&2; \
@@ -1146,9 +1146,19 @@ check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-std
 
 # Publish freshly generated bindings + manifests to lumiere-contracts as a new
 # tagged release, then print the Cargo.toml dependency line to bump.
-publish-contracts: schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
+publish-contracts: generate-presentation-contracts schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
 	@if [ -z "$(VERSION)" ]; then echo "usage: make publish-contracts VERSION=x.y.z" >&2; exit 1; fi
 	bash scripts/publish-contracts.sh "$(VERSION)"
+
+# Presentation wire contracts are generated from crates/presentation-core Rust
+# models. Schemas are released as manifests (checked by contracts drift, which
+# needs only cargo); TypeScript types are generated from those schemas for the
+# contracts package when publishing.
+generate-presentation-schemas:
+	node frontend/packages/presentation-core/scripts/generate-module-contract.mjs --out-staging .contracts-staging --schemas-only
+
+generate-presentation-contracts:
+	node frontend/packages/presentation-core/scripts/generate-module-contract.mjs --out-staging .contracts-staging
 
 # Fail if coverage/create-params mappers use magic FK sentinels (`?? 0n` / `|| 0n`).
 lint-no-magic-fk-zero:

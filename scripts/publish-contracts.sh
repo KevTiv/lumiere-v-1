@@ -26,6 +26,14 @@ if [[ ! -d "$STAGING/ts/generated" ]]; then
   echo "error: $STAGING/ts/generated missing — run make generate-stdb-ts-sdk && make codegen first" >&2
   exit 1
 fi
+for presentation in module-draft preview-contract; do
+  if [[ ! -f "$STAGING/ts/presentation/$presentation.ts" \
+    || ! -f "$STAGING/ts/presentation/$presentation.schema.json" \
+    || ! -f "$STAGING/manifests/presentation/$presentation.schema.json" ]]; then
+    echo "error: presentation contract $presentation missing — run make generate-presentation-contracts first" >&2
+    exit 1
+  fi
+done
 if [[ ! -f "$STAGING/ir/lumiere-contract-ir-v2.json" \
   || ! -f "$STAGING/ir/lumiere-contract-ir-v2.json.sha256" ]]; then
   echo "error: canonical contract IR v2 artifact missing — run make codegen first" >&2
@@ -272,6 +280,10 @@ rm -rf packages/contracts/src/generated
 cp -R "$STAGING/ts/generated" packages/contracts/src/generated
 cp "$STAGING/ts/stdb-generated-sql-columns.json" packages/contracts/src/
 cp "$STAGING/ts/stdb-reducer-invalidation.ts" packages/contracts/src/
+# Presentation wire contracts generated from lumiere-v-1 Rust models. The
+# schemas also ship under manifests/presentation for the Rust crate.
+rm -rf packages/contracts/src/presentation
+cp -R "$STAGING/ts/presentation" packages/contracts/src/presentation
 
 # The contracts repository owns IR-derived targets. Run its generator after
 # the immutable input has been copied so these targets are present even when

@@ -7,7 +7,7 @@ use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::ai::agents::{ai_agent, ai_team_member};
 use crate::ai::skills::{ai_agent_run, ai_skill_config};
-use crate::helpers::check_permission;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 const MAX_PERIOD_LEN: usize = 7;
 const MAX_CURRENCY_LEN: usize = 3;
@@ -16,6 +16,14 @@ const MAX_MODEL_LEN: usize = 128;
 const MAX_REQUEST_KEY_LEN: usize = 256;
 const MAX_PRICE_UNITS_PER_1K: u64 = 1_000_000_000_000;
 const MAX_ALLOWANCE_TOKENS: u32 = 10_000_000;
+const MAX_ATTEMPT_NOTE_LEN: usize = 1_024;
+
+const RESERVATION_RESERVED: &str = "reserved";
+const ATTEMPT_ACCEPTED: &str = "accepted";
+const ATTEMPT_DISPATCHED: &str = "dispatched";
+const ATTEMPT_SUCCEEDED: &str = "succeeded";
+const ATTEMPT_FAILED: &str = "failed";
+const ATTEMPT_OUTCOME_UNKNOWN: &str = "outcome_unknown";
 
 /// Immutable integer price snapshot. Monetary amounts are always millionths
 /// of the named currency (micro-USD, for example); prices are per 1,000 tokens.
@@ -101,6 +109,46 @@ pub struct AiSpendReservation {
     pub settled_output_tokens: u32,
 }
 
+/// Durable provider attempt bound 1:1 to a spend reservation by request key.
+///
+/// `accepted` commits intent before any I/O; `dispatched` is claimed exactly
+/// once immediately before the provider call. A dispatched attempt that loses
+/// its result becomes `outcome_unknown` and can only be resolved by explicit
+/// reconciliation; recovering a row never authorizes redispatch.
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = ai_provider_attempt,
+    index(accessor = ai_provider_attempt_by_org, btree(columns = [organization_id])),
+    index(accessor = ai_provider_attempt_by_request, btree(columns = [organization_id, request_key])),
+    index(accessor = ai_provider_attempt_by_run, btree(columns = [run_id]))
+)]
+pub struct AiProviderAttempt {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub agent_id: u64,
+    pub run_id: u64,
+    pub reservation_id: u64,
+    pub request_key: String,
+    pub provider: String,
+    pub model: String,
+    /// accepted | dispatched | succeeded | failed | outcome_unknown
+    pub status: String,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+    pub failure_reason: Option<String>,
+    /// Required explanation when an `outcome_unknown` attempt is reconciled.
+    pub resolution: Option<String>,
+    pub accepted_by: spacetimedb::Identity,
+    pub write_uid: spacetimedb::Identity,
+    pub created_at: Timestamp,
+    pub dispatched_at: Option<Timestamp>,
+    pub finished_at: Option<Timestamp>,
+    pub write_date: Timestamp,
+}
+
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct ConfigureAiSpendParams {
     pub billing_period: String,
@@ -132,6 +180,37 @@ pub struct SettleAiSpendParams {
     pub reservation_id: u64,
     pub input_tokens: u32,
     pub output_tokens: u32,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct AcceptAiProviderAttemptParams {
+    pub company_id: u64,
+    pub agent_id: u64,
+    pub run_id: u64,
+    pub reservation_id: u64,
+    pub request_key: String,
+    pub provider: String,
+    pub model: String,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct RecordAiProviderAttemptResultParams {
+    pub attempt_id: u64,
+    /// succeeded | failed | outcome_unknown
+    pub status: String,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+    pub failure_reason: Option<String>,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct ReconcileAiProviderAttemptParams {
+    pub attempt_id: u64,
+    /// succeeded | failed
+    pub status: String,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+    pub resolution: String,
 }
 
 /// Configure an agent's integer budget and create a new immutable price
@@ -493,6 +572,358 @@ pub fn settle_ai_spend(
     Ok(())
 }
 
+/// Commit provider-attempt intent before any external I/O. Replaying the same
+/// binding is a no-op; a different binding for the key is rejected.
+#[reducer]
+pub fn accept_ai_provider_attempt(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: AcceptAiProviderAttemptParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_spend", "reserve")?;
+    if params.request_key.trim().is_empty() || params.request_key.len() > MAX_REQUEST_KEY_LEN {
+        return Err("invalid request key".into());
+    }
+    if let Some(existing) = ctx
+        .db
+        .ai_provider_attempt()
+        .ai_provider_attempt_by_request()
+        .filter((&organization_id, &params.request_key))
+        .next()
+    {
+        if attempt_matches(&existing, &params) {
+            return Ok(());
+        }
+        return Err("request key was already used for a different provider attempt".into());
+    }
+    let reservation = ctx
+        .db
+        .ai_spend_reservation()
+        .id()
+        .find(&params.reservation_id)
+        .ok_or_else(|| "reservation not found".to_string())?;
+    if reservation.organization_id != organization_id
+        || reservation.status != RESERVATION_RESERVED
+        || reservation.request_key != params.request_key
+        || reservation.company_id != params.company_id
+        || reservation.agent_id != params.agent_id
+        || reservation.run_id != params.run_id
+        || reservation.provider != params.provider
+        || reservation.model != params.model
+    {
+        return Err("attempt does not match an open reservation".into());
+    }
+    let run = ctx
+        .db
+        .ai_agent_run()
+        .id()
+        .find(&params.run_id)
+        .ok_or_else(|| "run not found".to_string())?;
+    validate_run(
+        ctx,
+        organization_id,
+        &run,
+        params.company_id,
+        params.agent_id,
+    )?;
+
+    let row = ctx.db.ai_provider_attempt().insert(AiProviderAttempt {
+        id: 0,
+        organization_id,
+        company_id: params.company_id,
+        agent_id: params.agent_id,
+        run_id: params.run_id,
+        reservation_id: params.reservation_id,
+        request_key: params.request_key,
+        provider: params.provider,
+        model: params.model,
+        status: ATTEMPT_ACCEPTED.into(),
+        input_tokens: 0,
+        output_tokens: 0,
+        failure_reason: None,
+        resolution: None,
+        accepted_by: ctx.sender(),
+        write_uid: ctx.sender(),
+        created_at: ctx.timestamp,
+        dispatched_at: None,
+        finished_at: None,
+        write_date: ctx.timestamp,
+    });
+    audit_attempt(ctx, &row, "CREATE", None, "accepted provider attempt");
+    Ok(())
+}
+
+/// Claim the single dispatch of an accepted attempt immediately before I/O.
+#[reducer]
+pub fn mark_ai_provider_attempt_dispatched(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    attempt_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_spend", "reserve")?;
+    let attempt = load_attempt(ctx, organization_id, attempt_id)?;
+    match attempt_transition(&attempt.status, AttemptCommand::Dispatch)? {
+        AttemptTransition::Replay => Ok(()),
+        AttemptTransition::Apply(next) => {
+            let previous = attempt.status.clone();
+            let row = AiProviderAttempt {
+                status: next.into(),
+                dispatched_at: Some(ctx.timestamp),
+                write_uid: ctx.sender(),
+                write_date: ctx.timestamp,
+                ..attempt
+            };
+            ctx.db.ai_provider_attempt().id().update(row.clone());
+            audit_attempt(
+                ctx,
+                &row,
+                "UPDATE",
+                Some(&previous),
+                "dispatched provider attempt",
+            );
+            Ok(())
+        }
+    }
+}
+
+/// Record the outcome of a dispatched attempt. `outcome_unknown` is used when
+/// the provider may have completed but the result was lost.
+#[reducer]
+pub fn record_ai_provider_attempt_result(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: RecordAiProviderAttemptResultParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_spend", "reserve")?;
+    let attempt = load_attempt(ctx, organization_id, params.attempt_id)?;
+    validate_note(params.failure_reason.as_deref())?;
+    let command = AttemptCommand::Result(params.status.trim());
+    let usage = (params.input_tokens, params.output_tokens);
+    let replayed = attempt.input_tokens == params.input_tokens
+        && attempt.output_tokens == params.output_tokens
+        && attempt.failure_reason == params.failure_reason;
+    let next = match attempt_transition(&attempt.status, command)? {
+        AttemptTransition::Replay if replayed => return Ok(()),
+        AttemptTransition::Replay => {
+            return Err("result replay has different usage or reason".into())
+        }
+        AttemptTransition::Apply(next) => next,
+    };
+    if next == ATTEMPT_OUTCOME_UNKNOWN && usage != (0, 0) {
+        return Err("an unknown outcome cannot report usage".into());
+    }
+    ensure_within_allowance(ctx, &attempt, usage)?;
+    let previous = attempt.status.clone();
+    let row = AiProviderAttempt {
+        status: next.into(),
+        input_tokens: params.input_tokens,
+        output_tokens: params.output_tokens,
+        failure_reason: params.failure_reason,
+        finished_at: Some(ctx.timestamp),
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..attempt
+    };
+    ctx.db.ai_provider_attempt().id().update(row.clone());
+    audit_attempt(
+        ctx,
+        &row,
+        "UPDATE",
+        Some(&previous),
+        "recorded provider attempt result",
+    );
+    Ok(())
+}
+
+/// Resolve an `outcome_unknown` attempt with an explicit explanation. This is a
+/// separate trusted capability from recording ordinary results.
+#[reducer]
+pub fn reconcile_ai_provider_attempt(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: ReconcileAiProviderAttemptParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_spend", "settle")?;
+    let attempt = load_attempt(ctx, organization_id, params.attempt_id)?;
+    if params.resolution.trim().is_empty() {
+        return Err("reconciliation requires a resolution".into());
+    }
+    validate_note(Some(&params.resolution))?;
+    let command = AttemptCommand::Reconcile(params.status.trim());
+    let usage = (params.input_tokens, params.output_tokens);
+    let replayed = attempt.input_tokens == params.input_tokens
+        && attempt.output_tokens == params.output_tokens
+        && attempt.resolution.as_deref() == Some(params.resolution.as_str());
+    let next = match attempt_transition(&attempt.status, command)? {
+        AttemptTransition::Replay if replayed => return Ok(()),
+        AttemptTransition::Replay => {
+            return Err("reconciliation replay has different usage or resolution".into())
+        }
+        AttemptTransition::Apply(next) => next,
+    };
+    ensure_within_allowance(ctx, &attempt, usage)?;
+    let previous = attempt.status.clone();
+    let row = AiProviderAttempt {
+        status: next.into(),
+        input_tokens: params.input_tokens,
+        output_tokens: params.output_tokens,
+        resolution: Some(params.resolution),
+        finished_at: Some(ctx.timestamp),
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..attempt
+    };
+    ctx.db.ai_provider_attempt().id().update(row.clone());
+    audit_attempt(
+        ctx,
+        &row,
+        "UPDATE",
+        Some(&previous),
+        "reconciled provider attempt",
+    );
+    Ok(())
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AttemptCommand<'a> {
+    Dispatch,
+    Result(&'a str),
+    Reconcile(&'a str),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AttemptTransition {
+    Apply(&'static str),
+    /// The attempt already reflects this command; the caller compares payloads.
+    Replay,
+}
+
+/// The only allowed provider-attempt transitions.
+fn attempt_transition(
+    current: &str,
+    command: AttemptCommand<'_>,
+) -> Result<AttemptTransition, String> {
+    match command {
+        AttemptCommand::Dispatch => match current {
+            ATTEMPT_ACCEPTED => Ok(AttemptTransition::Apply(ATTEMPT_DISPATCHED)),
+            ATTEMPT_DISPATCHED => Ok(AttemptTransition::Replay),
+            _ => Err("only an accepted attempt can be dispatched".into()),
+        },
+        AttemptCommand::Result(result) => {
+            let next = match result {
+                ATTEMPT_SUCCEEDED => ATTEMPT_SUCCEEDED,
+                ATTEMPT_FAILED => ATTEMPT_FAILED,
+                ATTEMPT_OUTCOME_UNKNOWN => ATTEMPT_OUTCOME_UNKNOWN,
+                _ => return Err("result must be succeeded, failed or outcome_unknown".into()),
+            };
+            match current {
+                ATTEMPT_DISPATCHED => Ok(AttemptTransition::Apply(next)),
+                same if same == next => Ok(AttemptTransition::Replay),
+                ATTEMPT_ACCEPTED => Err("an attempt must be dispatched before its result".into()),
+                _ => Err("attempt result conflicts with the recorded outcome".into()),
+            }
+        }
+        AttemptCommand::Reconcile(result) => {
+            let next = match result {
+                ATTEMPT_SUCCEEDED => ATTEMPT_SUCCEEDED,
+                ATTEMPT_FAILED => ATTEMPT_FAILED,
+                _ => return Err("reconciliation must be succeeded or failed".into()),
+            };
+            match current {
+                ATTEMPT_OUTCOME_UNKNOWN => Ok(AttemptTransition::Apply(next)),
+                same if same == next => Ok(AttemptTransition::Replay),
+                _ => Err("only an outcome_unknown attempt can be reconciled".into()),
+            }
+        }
+    }
+}
+
+fn attempt_matches(row: &AiProviderAttempt, params: &AcceptAiProviderAttemptParams) -> bool {
+    row.company_id == params.company_id
+        && row.agent_id == params.agent_id
+        && row.run_id == params.run_id
+        && row.reservation_id == params.reservation_id
+        && row.request_key == params.request_key
+        && row.provider == params.provider
+        && row.model == params.model
+}
+
+fn load_attempt(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    attempt_id: u64,
+) -> Result<AiProviderAttempt, String> {
+    let attempt = ctx
+        .db
+        .ai_provider_attempt()
+        .id()
+        .find(&attempt_id)
+        .ok_or_else(|| "provider attempt not found".to_string())?;
+    if attempt.organization_id != organization_id {
+        return Err("provider attempt is outside the tenant".into());
+    }
+    Ok(attempt)
+}
+
+fn ensure_within_allowance(
+    ctx: &ReducerContext,
+    attempt: &AiProviderAttempt,
+    (input_tokens, output_tokens): (u32, u32),
+) -> Result<(), String> {
+    let reservation = ctx
+        .db
+        .ai_spend_reservation()
+        .id()
+        .find(&attempt.reservation_id)
+        .ok_or_else(|| "reservation not found".to_string())?;
+    if input_tokens > reservation.input_token_allowance
+        || output_tokens > reservation.output_token_allowance
+    {
+        return Err("attempt usage exceeds the reservation allowance".into());
+    }
+    Ok(())
+}
+
+fn validate_note(note: Option<&str>) -> Result<(), String> {
+    if note.is_some_and(|value| value.len() > MAX_ATTEMPT_NOTE_LEN) {
+        return Err("attempt note is too long".into());
+    }
+    Ok(())
+}
+
+fn audit_attempt(
+    ctx: &ReducerContext,
+    row: &AiProviderAttempt,
+    action: &'static str,
+    previous_status: Option<&str>,
+    summary: &str,
+) {
+    write_audit_log_v2(
+        ctx,
+        row.organization_id,
+        AuditLogParams {
+            company_id: Some(row.company_id),
+            table_name: "ai_provider_attempt",
+            record_id: row.id,
+            action,
+            old_values: previous_status
+                .map(|status| serde_json::json!({ "status": status }).to_string()),
+            new_values: Some(
+                serde_json::json!({
+                    "status": row.status,
+                    "run_id": row.run_id,
+                    "reservation_id": row.reservation_id,
+                    "input_tokens": row.input_tokens,
+                    "output_tokens": row.output_tokens,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["status".to_string()],
+            metadata: Some(serde_json::json!({ "summary": summary }).to_string()),
+        },
+    );
+}
+
 fn validate_common(
     period: &str,
     currency: &str,
@@ -732,5 +1163,66 @@ mod tests {
         assert!(settlement_replay("settled", (10, 20), (10, 20)).unwrap());
         assert!(settlement_replay("settled", (10, 20), (10, 21)).is_err());
         assert!(settlement_replay("unknown", (0, 0), (0, 0)).is_err());
+    }
+
+    #[test]
+    fn attempts_dispatch_exactly_once_after_acceptance() {
+        use AttemptCommand::*;
+        use AttemptTransition::*;
+        assert_eq!(
+            attempt_transition(ATTEMPT_ACCEPTED, Dispatch),
+            Ok(Apply(ATTEMPT_DISPATCHED))
+        );
+        assert_eq!(attempt_transition(ATTEMPT_DISPATCHED, Dispatch), Ok(Replay));
+        for terminal in [ATTEMPT_SUCCEEDED, ATTEMPT_FAILED, ATTEMPT_OUTCOME_UNKNOWN] {
+            assert!(
+                attempt_transition(terminal, Dispatch).is_err(),
+                "{terminal}"
+            );
+        }
+    }
+
+    #[test]
+    fn results_require_dispatch_and_never_rewrite_an_outcome() {
+        use AttemptCommand::*;
+        use AttemptTransition::*;
+        for result in [ATTEMPT_SUCCEEDED, ATTEMPT_FAILED, ATTEMPT_OUTCOME_UNKNOWN] {
+            assert_eq!(
+                attempt_transition(ATTEMPT_DISPATCHED, Result(result)),
+                Ok(Apply(result))
+            );
+            assert_eq!(attempt_transition(result, Result(result)), Ok(Replay));
+            assert!(attempt_transition(ATTEMPT_ACCEPTED, Result(result)).is_err());
+        }
+        assert!(attempt_transition(ATTEMPT_SUCCEEDED, Result(ATTEMPT_FAILED)).is_err());
+        assert!(attempt_transition(ATTEMPT_OUTCOME_UNKNOWN, Result(ATTEMPT_SUCCEEDED)).is_err());
+        assert!(attempt_transition(ATTEMPT_DISPATCHED, Result("settled")).is_err());
+    }
+
+    #[test]
+    fn only_unknown_outcomes_reconcile_to_a_known_result() {
+        use AttemptCommand::*;
+        use AttemptTransition::*;
+        for result in [ATTEMPT_SUCCEEDED, ATTEMPT_FAILED] {
+            assert_eq!(
+                attempt_transition(ATTEMPT_OUTCOME_UNKNOWN, Reconcile(result)),
+                Ok(Apply(result))
+            );
+            assert_eq!(attempt_transition(result, Reconcile(result)), Ok(Replay));
+            assert!(attempt_transition(ATTEMPT_DISPATCHED, Reconcile(result)).is_err());
+            assert!(attempt_transition(ATTEMPT_ACCEPTED, Reconcile(result)).is_err());
+        }
+        assert!(
+            attempt_transition(ATTEMPT_OUTCOME_UNKNOWN, Reconcile(ATTEMPT_OUTCOME_UNKNOWN))
+                .is_err()
+        );
+        assert!(attempt_transition(ATTEMPT_SUCCEEDED, Reconcile(ATTEMPT_FAILED)).is_err());
+    }
+
+    #[test]
+    fn attempt_notes_are_bounded() {
+        assert!(validate_note(None).is_ok());
+        assert!(validate_note(Some(&"x".repeat(MAX_ATTEMPT_NOTE_LEN))).is_ok());
+        assert!(validate_note(Some(&"x".repeat(MAX_ATTEMPT_NOTE_LEN + 1))).is_err());
     }
 }
