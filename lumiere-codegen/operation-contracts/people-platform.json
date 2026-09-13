@@ -521,6 +521,16 @@
       },
       "evidence": "spacetimedb/src/analytics/reports.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
     },
+    "configure_ai_spend": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "non_idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/spend.rs: body inserts or appends a new effect without a replay guard"
+    },
     "confirm_payslip": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -590,6 +600,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/ai/reducer_allowlist.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "create_ai_run_action_draft": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/action_drafts.rs: receipt/key or deterministic update returns before duplicate writes"
     },
     "create_ai_skill": {
       "semantic_kind": "command",
@@ -2641,6 +2661,16 @@
       },
       "evidence": "spacetimedb/src/ai/intelligence.rs: body writes or refreshes deterministic state and safely repeats the same input"
     },
+    "reserve_ai_spend": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/spend.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
     "reset_leave_to_draft": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -4050,6 +4080,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/workflow/migration.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "settle_ai_spend": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/spend.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
     },
     "share_dashboard": {
       "semantic_kind": "command",

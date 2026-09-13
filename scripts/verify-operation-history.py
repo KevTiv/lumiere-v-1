@@ -40,6 +40,10 @@ HISTORY_FIELDS = {
     "compatibility_exceptions",
 }
 HISTORY_V3_FIELDS = HISTORY_FIELDS | {"revisions"}
+# V4 records operation IDs added after the latest release-bound revision. The
+# revision keeps binding its exact baseline; additions stay explicit and are
+# absorbed by the next bulk revision (which emits V3 again).
+HISTORY_V4_FIELDS = HISTORY_V3_FIELDS | {"added_after_revision"}
 FINGERPRINT_FIELDS = {"algorithm", "canonicalization"}
 OPERATION_HISTORY_FIELDS = {"name", "shape_fingerprint"}
 EXCEPTION_FIELDS = {"operation_id", "previous_fingerprint", "current_fingerprint", "reason"}
@@ -225,6 +229,8 @@ def _validate_history(history: dict[str, Any]) -> None:
         _exact_fields(history, HISTORY_FIELDS, "operation history")
     elif schema_version == 3:
         _exact_fields(history, HISTORY_V3_FIELDS, "operation history")
+    elif schema_version == 4:
+        _exact_fields(history, HISTORY_V4_FIELDS, "operation history")
     else:
         fail(f"unsupported operation history schema_version {history['schema_version']!r}")
     if history["ir_version"] != 2:
@@ -275,7 +281,11 @@ def _validate_history(history: dict[str, Any]) -> None:
     previous_current: str | None = None
     for index, raw_revision in enumerate(revisions):
         revision = _object(raw_revision, f"history revision {index}")
-        _exact_fields(revision, REVISION_FIELDS, f"history revision {index}")
+        _exact_fields(
+            revision,
+            REVISION_FIELDS | ({"previous_baseline_fingerprint"} & set(revision)),
+            f"history revision {index}",
+        )
         if not isinstance(revision["previous_release"], str) or not revision[
             "previous_release"
         ].strip():
@@ -284,6 +294,7 @@ def _validate_history(history: dict[str, Any]) -> None:
             "previous_ir_sha256",
             "previous_operations_fingerprint",
             "current_operations_fingerprint",
+            *(("previous_baseline_fingerprint",) if "previous_baseline_fingerprint" in revision else ()),
         ):
             if not isinstance(revision[field], str) or not SHA256.fullmatch(
                 revision[field]
@@ -295,16 +306,41 @@ def _validate_history(history: dict[str, Any]) -> None:
             fail(f"history revision {index} operation_count must be positive")
         if not isinstance(revision["reason"], str) or not revision["reason"].strip():
             fail(f"history revision {index} reason must be non-empty")
-        if (
-            previous_current is not None
-            and revision["previous_operations_fingerprint"] != previous_current
-        ):
+        # The previous-release fingerprint includes applied compatibility
+        # exceptions and post-revision additions; the chain continues from the
+        # recorded baseline, which a revision stores when the two differ.
+        chained_from = revision.get(
+            "previous_baseline_fingerprint", revision["previous_operations_fingerprint"]
+        )
+        if previous_current is not None and chained_from != previous_current:
             fail(f"history revision {index} does not continue the fingerprint chain")
         previous_current = revision["current_operations_fingerprint"]
+    added_ids: list[Any] = []
+    if schema_version == 4:
+        added_ids = _array(history["added_after_revision"], "added_after_revision")
+        if not added_ids:
+            fail("added_after_revision must be non-empty; use schema_version 3 instead")
+        if not revisions:
+            fail("added_after_revision requires a release-bound history revision")
+        if added_ids != sorted(added_ids) or len(added_ids) != len(set(added_ids)):
+            fail("added_after_revision must be sorted and unique")
+        for operation_id in added_ids:
+            _validate_operation_id(operation_id, "added_after_revision entry")
+            if operation_id not in operations:
+                fail(f"added_after_revision entry {operation_id} is not a recorded operation")
+            if operation_id in retired_ids:
+                fail(f"added_after_revision entry {operation_id} is retired")
     if revisions:
-        current_fingerprint = operation_set_fingerprint(operations)
+        baseline = {
+            operation_id: entry
+            for operation_id, entry in operations.items()
+            if operation_id not in set(added_ids)
+        }
+        current_fingerprint = operation_set_fingerprint(baseline)
         if revisions[-1]["current_operations_fingerprint"] != current_fingerprint:
             fail("latest history revision does not bind the recorded operation baseline")
+        if schema_version == 4 and revisions[-1]["operation_count"] != len(baseline):
+            fail("latest history revision operation_count does not match the recorded baseline")
 
 
 def verify(
@@ -475,20 +511,25 @@ def advance_history(
         fail("bulk history revision release and reason must be non-empty")
     current["retired_ids"] = previous["retired_ids"]
     current["revisions"] = list(previous.get("revisions", []))
-    current["revisions"].append(
+    revision = {
+        "previous_release": previous_release,
+        "previous_ir_sha256": previous_ir_sha256,
+        "previous_operations_fingerprint": operation_set_fingerprint(previous_operations),
+        "current_operations_fingerprint": operation_set_fingerprint(current["operations"]),
+        "operation_count": len(current["operations"]),
+        "reason": reason,
+    }
+    added_ids = set(previous.get("added_after_revision", []))
+    previous_baseline = operation_set_fingerprint(
         {
-            "previous_release": previous_release,
-            "previous_ir_sha256": previous_ir_sha256,
-            "previous_operations_fingerprint": operation_set_fingerprint(
-                previous_operations
-            ),
-            "current_operations_fingerprint": operation_set_fingerprint(
-                current["operations"]
-            ),
-            "operation_count": len(current["operations"]),
-            "reason": reason,
+            operation_id: entry
+            for operation_id, entry in previous["operations"].items()
+            if operation_id not in added_ids
         }
     )
+    if current["revisions"] and previous_baseline != revision["previous_operations_fingerprint"]:
+        revision["previous_baseline_fingerprint"] = previous_baseline
+    current["revisions"].append(revision)
     return current
 
 

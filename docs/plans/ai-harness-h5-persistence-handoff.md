@@ -107,6 +107,38 @@ The native helper tests are not evidence of live concurrent admission or
 PostgreSQL-to-fresh-SpacetimeDB reconstruction. H5 remains partial until these
 gates pass.
 
+### Gate 1 source generation (`codex/ai-harness-h5b-release`)
+
+Generated from this module published to a disposable local database and
+snapshotted over HTTP; nothing was hand-edited in `.contracts-staging`.
+
+- Rust/TypeScript bindings, schema/storage/reconstruction manifests, canonical
+  IR (1320 operations, 467 tables) and the checked-in reducer contract and
+  reconstruction apply outputs are regenerated.
+- The C0/C1 census moves from 463 to 467 organization-owned relations (462
+  application + 5 protocol). The four tables take bootstrap storage defaults:
+  organization-owned roots with tombstone deletes; `ai_price_snapshot` and
+  `ai_spend_budget` are organization-wide (no company column). Reviewing
+  reservation/draft-request durability classes and aggregate parents remains
+  open before release.
+- Operation identities and classifications: `configure_ai_spend` operator /
+  non-idempotent; `reserve_ai_spend` and `create_ai_run_action_draft` internal /
+  request-guarded; `settle_ai_spend` internal / state-guarded. None has a
+  reducer-exposure entry, so all four are `Denied` to session BFF dispatch and
+  remain trusted-principal operations.
+- Operation history moves to schema v4: `added_after_revision` explicitly lists
+  the four IDs added after the C8 release-bound revision, which keeps binding its
+  exact 1316-operation baseline. A later bulk revision absorbs the additions and
+  records `previous_baseline_fingerprint` so the revision chain also survives
+  applied compatibility exceptions.
+- Local gates: codegen, contract IR, agent capability artifact, tenant
+  ownership, storage policy, C2 commit coverage, C8 ratchet, trusted-route and
+  reducer-literal lints, operation history (current and pinned v0.3.42 IR),
+  `lumiere-codegen` tests and `stdb-client` check pass.
+
+Gate 2 (transaction/concurrency/replay tests, immutable contracts publication and
+consumer pin) has not started.
+
 ### H5b local validation
 
 - Final native `cargo test --offline --locked --manifest-path spacetimedb/Cargo.toml

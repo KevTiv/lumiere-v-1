@@ -122,6 +122,81 @@ class OperationHistoryTests(unittest.TestCase):
             history_path.write_text(json.dumps(history), encoding="utf-8")
             MODULE.verify(ir_path, history_path, allow_previous_compatibility=True)
 
+    def revised_history_with_addition(self):
+        base = ir_with(operation())
+        history = MODULE.build_history_from_value(base)
+        history["revisions"] = [
+            {
+                "previous_release": "v0.3.33",
+                "previous_ir_sha256": "sha256:" + "a" * 64,
+                "previous_operations_fingerprint": "sha256:" + "b" * 64,
+                "current_operations_fingerprint": MODULE.operation_set_fingerprint(
+                    history["operations"]
+                ),
+                "operation_count": 1,
+                "reason": "classify every operation contract",
+            }
+        ]
+        current = ir_with(operation(), operation("update_order", "erp.update_order"))
+        added = MODULE.build_history_from_value(current)["operations"]
+        history["schema_version"] = 4
+        history["operations"] = added
+        history["added_after_revision"] = ["erp.update_order"]
+        return base, current, history
+
+    def test_addition_after_revision_requires_explicit_record(self):
+        base, current, history = self.revised_history_with_addition()
+        self.verify_value(current, history)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ir_path = root / "ir.json"
+            history_path = root / "history.json"
+            ir_path.write_text(json.dumps(base), encoding="utf-8")
+            history_path.write_text(json.dumps(history), encoding="utf-8")
+            MODULE.verify(ir_path, history_path, allow_previous_compatibility=True)
+
+        unlisted = copy.deepcopy(history)
+        unlisted["schema_version"] = 3
+        del unlisted["added_after_revision"]
+        with self.assertRaisesRegex(MODULE.OperationHistoryError, "does not bind"):
+            self.verify_value(current, unlisted)
+
+    def test_addition_record_cannot_hide_baseline_changes(self):
+        _, current, history = self.revised_history_with_addition()
+        mislabeled = copy.deepcopy(history)
+        mislabeled["added_after_revision"] = ["erp.create_order", "erp.update_order"]
+        with self.assertRaisesRegex(MODULE.OperationHistoryError, "does not bind"):
+            self.verify_value(current, mislabeled)
+        unknown = copy.deepcopy(history)
+        unknown["added_after_revision"] = ["erp.missing_order"]
+        with self.assertRaisesRegex(MODULE.OperationHistoryError, "not a recorded operation"):
+            self.verify_value(current, unknown)
+        empty = copy.deepcopy(history)
+        empty["added_after_revision"] = []
+        with self.assertRaisesRegex(MODULE.OperationHistoryError, "must be non-empty"):
+            self.verify_value(current, empty)
+
+    def test_bulk_revision_absorbs_recorded_additions(self):
+        _, current, history = self.revised_history_with_addition()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ir_path = root / "ir.json"
+            history_path = root / "history.json"
+            ir_path.write_text(json.dumps(current), encoding="utf-8")
+            history_path.write_text(json.dumps(history), encoding="utf-8")
+            advanced = MODULE.advance_history(
+                ir_path,
+                history_path,
+                previous_release="v0.3.43",
+                previous_ir_sha256="sha256:" + "c" * 64,
+                reason="advance after additions",
+            )
+            history_path.write_text(json.dumps(advanced), encoding="utf-8")
+            MODULE.verify(ir_path, history_path)
+            self.assertEqual(advanced["schema_version"], 3)
+            self.assertNotIn("added_after_revision", advanced)
+            self.assertEqual(advanced["revisions"][-1]["operation_count"], 2)
+
     def test_duplicate_current_ids_fail_closed(self):
         first = operation()
         second = operation(name="other_order")

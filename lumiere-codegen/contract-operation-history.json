@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "ir_version": 2,
   "fingerprint": {
     "algorithm": "sha256",
@@ -746,6 +746,10 @@
       "name": "compute_so_totals",
       "shape_fingerprint": "sha256:4ebd60a2cd64d1a1a48db121c9ee900eb4e9f05842cf732aedc7899bb4d96019"
     },
+    "erp.configure_ai_spend": {
+      "name": "configure_ai_spend",
+      "shape_fingerprint": "sha256:34a4557661ac13c1deff746c65206a7f353d57dc32dace4d5fb27be98027ff47"
+    },
     "erp.configure_contact_identity_verification_authority": {
       "name": "configure_contact_identity_verification_authority",
       "shape_fingerprint": "sha256:35d1d80a4c02e423a0af644dcdfc71532331771207d3c330851e610776b8a3c6"
@@ -897,6 +901,10 @@
     "erp.create_ai_reducer_allowlist": {
       "name": "create_ai_reducer_allowlist",
       "shape_fingerprint": "sha256:f36546158c94af83de45aa001f2123b8cd80133b7f5f05f2806cd96eca2e9428"
+    },
+    "erp.create_ai_run_action_draft": {
+      "name": "create_ai_run_action_draft",
+      "shape_fingerprint": "sha256:e4af013ce52b9dbe2c61305dde0ef2b441d7c859d74bf4988213dfc01a9f9473"
     },
     "erp.create_ai_skill": {
       "name": "create_ai_skill",
@@ -3198,6 +3206,10 @@
       "name": "request_expense_policy_exception",
       "shape_fingerprint": "sha256:628ed92461861363397072a9b82bf7c700c0f838eadfb520131d65802cefd917"
     },
+    "erp.reserve_ai_spend": {
+      "name": "reserve_ai_spend",
+      "shape_fingerprint": "sha256:7356e80c83ec5d1fbed3b1f4f883d3d8e321dbd5ebe1c56b2cf68a0608682c19"
+    },
     "erp.reserve_serial": {
       "name": "reserve_serial",
       "shape_fingerprint": "sha256:4dbb12700f65123515a77434187ab42b7ca8931910a9df54e38f8a4cebf0399f"
@@ -4310,6 +4322,10 @@
       "name": "set_workflow_migration_plan_active",
       "shape_fingerprint": "sha256:b4859c17b8e66760430b501ef7605dc4b2852b78c19d82e1792ee423a59e3a6a"
     },
+    "erp.settle_ai_spend": {
+      "name": "settle_ai_spend",
+      "shape_fingerprint": "sha256:b161e41160e50f10cd8603e3f538975a7f6d8f711ca1ee4c8b7ec846277aa655"
+    },
     "erp.settle_sale_commissions": {
       "name": "settle_sale_commissions",
       "shape_fingerprint": "sha256:204cb246117a9b34a841e00699a8d067a6c447f0fca0ceb36e2d86916ff8ed50"
@@ -5327,5 +5343,11 @@
       "operation_count": 1316,
       "reason": "classify every operation with explicit semantic kind, client exposure, authorization scope, idempotency, and codec metadata"
     }
+  ],
+  "added_after_revision": [
+    "erp.configure_ai_spend",
+    "erp.create_ai_run_action_draft",
+    "erp.reserve_ai_spend",
+    "erp.settle_ai_spend"
   ]
 }
