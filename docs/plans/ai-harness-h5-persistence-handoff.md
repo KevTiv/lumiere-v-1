@@ -149,6 +149,24 @@ No concurrent-client spend admission test or PostgreSQL-to-fresh-SpacetimeDB
 replay for these tables exists yet; those remain H5 acceptance gates and are not
 claimed by this release.
 
+### Gate 4 gateway primitives (`codex/ai-harness-h5b-gateway`)
+
+The four H5b tables are private, so the gateway reads them through a dedicated
+`AI_SPEND_READ_STDB_TOKEN` identity (rejected when it equals `STDB_TOKEN` or the
+certification token), following the api-server `workflow_reads` pattern.
+Writes stay on the gateway principal.
+
+- `ai-gateway/src/ai_spend.rs` derives deterministic run-scoped request keys,
+  sizes a conservative pre-dispatch allowance, wraps `reserve_ai_spend`,
+  `settle_ai_spend` and `create_ai_run_action_draft`, and performs scoped reads
+  with numeric-only SQL filters; string bindings are matched in gateway code and
+  foreign-organization, duplicate or cross-company rows fail closed.
+- Not yet done: routing reserve, dispatch and settle through the governed loop;
+  replacing the `ORDER BY id DESC` draft-id lookups; provisioning the
+  `ai_spend/reserve` and `ai_spend/settle` grants (an explicit admin step); and
+  gate 3 attempt-dispatch state. Recovering a reservation still does not
+  authorize redispatch.
+
 ### H5b local validation
 
 - Final native `cargo test --offline --locked --manifest-path spacetimedb/Cargo.toml

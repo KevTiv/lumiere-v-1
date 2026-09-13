@@ -1,4 +1,5 @@
 mod ai_agent;
+mod ai_spend;
 mod config;
 mod context_worker;
 mod error;

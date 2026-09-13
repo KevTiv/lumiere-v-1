@@ -1,0 +1,663 @@
+//! H5b governed spend admission and run-correlated draft lookup.
+//!
+//! Writes go through the gateway principal (`STDB_TOKEN`), which must hold the
+//! separately provisioned `ai_spend/reserve` and `ai_spend/settle` grants.
+//! The spend, price and draft-request tables are private, so reads use a
+//! dedicated read principal (`AI_SPEND_READ_STDB_TOKEN`), following the
+//! api-server `workflow_reads` pattern: fixed column lists, numeric-only SQL
+//! filters, and every string binding (request key, provider, model, currency,
+//! billing period) matched here rather than interpolated into SQL.
+//!
+//! Recovering an existing reservation does not authorize dispatching the same
+//! provider attempt again; attempt dispatch state is a separate H5 gate.
+#![allow(dead_code)] // Routed into the governed loop in a later H5b slice.
+
+use anyhow::{bail, Context, Result};
+use chrono::{DateTime, Utc};
+use serde_json::{json, Value};
+use stdb_client::StdbClient;
+
+use crate::wire_decode::row_u64;
+
+/// `ai_action_draft_request.request_key` limit; spend keys share it so one key
+/// shape is valid for both reducers.
+pub const REQUEST_KEY_MAX_LEN: usize = 160;
+/// Mirrors `MAX_ALLOWANCE_TOKENS` in the module.
+pub const MAX_ALLOWANCE_TOKENS: u32 = 10_000_000;
+
+pub const STATUS_RESERVED: &str = "reserved";
+pub const STATUS_SETTLED: &str = "settled";
+
+const PRICE_SNAPSHOT_COLS: &str = "id, organization_id, agent_id, provider, model, currency, \
+input_units_per_1k, output_units_per_1k, version";
+const BUDGET_COLS: &str = "id, organization_id, agent_id, billing_period, currency, limit_units, \
+settled_units, outstanding_units";
+const RESERVATION_COLS: &str = "id, organization_id, company_id, agent_id, run_id, request_key, \
+provider, model, billing_period, currency, price_snapshot_id, reserved_units, settled_units, \
+input_token_allowance, output_token_allowance, status, settled_input_tokens, settled_output_tokens";
+const DRAFT_REQUEST_COLS: &str =
+    "id, organization_id, company_id, run_id, request_key, draft_id, creation_payload_hash";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RequestKind {
+    Spend,
+    Draft,
+}
+
+impl RequestKind {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Spend => "spend",
+            Self::Draft => "draft",
+        }
+    }
+}
+
+/// Deterministic, run-scoped request key. The same run, step and attempt always
+/// map to the same key, so a retried reducer call replays instead of creating a
+/// second reservation or draft.
+pub fn request_key(kind: RequestKind, run_id: u64, step_no: u32, attempt: u32) -> Result<String> {
+    if run_id == 0 {
+        bail!("request key requires a durable nonzero run_id");
+    }
+    let key = format!(
+        "h5:{}:run:{run_id}:step:{step_no}:attempt:{attempt}",
+        kind.label()
+    );
+    validate_request_key(&key)?;
+    Ok(key)
+}
+
+pub fn validate_request_key(key: &str) -> Result<()> {
+    if key.is_empty() || key.len() > REQUEST_KEY_MAX_LEN {
+        bail!("request key must be 1..={REQUEST_KEY_MAX_LEN} bytes");
+    }
+    if !key
+        .bytes()
+        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b':' || b == b'_')
+    {
+        bail!("request key contains unsupported characters");
+    }
+    Ok(())
+}
+
+/// UTC calendar month, matching the module's `current_period`.
+pub fn billing_period(now: DateTime<Utc>) -> String {
+    now.format("%Y-%m").to_string()
+}
+
+/// Token allowances for one provider attempt, bound before dispatch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Allowance {
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+}
+
+/// Size a conservative allowance before dispatch. Prompt tokens are unknown
+/// until the provider answers, so input is bounded at one token per 3 UTF-8
+/// bytes (an overestimate for supported providers) plus a fixed overhead.
+/// The module separately rejects `output > agent.max_tokens` and
+/// `input + output > context_window`; this fails earlier with the same rule.
+pub fn allowance(
+    prompt_bytes: usize,
+    max_output_tokens: u32,
+    agent_max_tokens: u32,
+    context_window: u32,
+) -> Result<Allowance> {
+    const PROMPT_OVERHEAD_TOKENS: u64 = 64;
+    if max_output_tokens == 0 {
+        bail!("output allowance must be positive");
+    }
+    if max_output_tokens > agent_max_tokens {
+        bail!("output allowance exceeds agent max_tokens");
+    }
+    let input = (prompt_bytes as u64).div_ceil(3) + PROMPT_OVERHEAD_TOKENS;
+    let input = u32::try_from(input).context("prompt is too large to reserve")?;
+    if input > MAX_ALLOWANCE_TOKENS || max_output_tokens > MAX_ALLOWANCE_TOKENS {
+        bail!("token allowance exceeds the reservable maximum");
+    }
+    if u64::from(input) + u64::from(max_output_tokens) > u64::from(context_window) {
+        bail!("prompt and output allowance exceed the agent context window");
+    }
+    Ok(Allowance {
+        input_tokens: input,
+        output_tokens: max_output_tokens,
+    })
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PriceSnapshot {
+    pub id: u64,
+    pub version: u64,
+    pub input_units_per_1k: u64,
+    pub output_units_per_1k: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SpendBudget {
+    pub id: u64,
+    pub currency: String,
+    pub limit_units: u64,
+    pub settled_units: u64,
+    pub outstanding_units: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Reservation {
+    pub id: u64,
+    pub company_id: u64,
+    pub agent_id: u64,
+    pub request_key: String,
+    pub provider: String,
+    pub model: String,
+    pub price_snapshot_id: u64,
+    pub reserved_units: u64,
+    pub input_token_allowance: u32,
+    pub output_token_allowance: u32,
+    pub status: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DraftRequest {
+    pub id: u64,
+    pub draft_id: u64,
+    pub creation_payload_hash: String,
+}
+
+/// Exact binding for a reservation request, mirroring `ReserveAiSpendParams`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReserveRequest {
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub agent_id: u64,
+    pub run_id: u64,
+    pub request_key: String,
+    pub provider: String,
+    pub model: String,
+    pub billing_period: String,
+    pub currency: String,
+    pub price_snapshot_id: u64,
+    pub allowance: Allowance,
+}
+
+/// Read-only lookups over the private spend tables.
+pub struct SpendReader<'a> {
+    stdb: &'a StdbClient,
+}
+
+impl<'a> SpendReader<'a> {
+    /// `stdb` must be the dedicated `AI_SPEND_READ_STDB_TOKEN` client.
+    pub fn new(stdb: &'a StdbClient) -> Self {
+        Self { stdb }
+    }
+
+    pub async fn budget(
+        &self,
+        organization_id: u64,
+        agent_id: u64,
+        billing_period: &str,
+    ) -> Result<Option<SpendBudget>> {
+        let sql = format!(
+            "SELECT {BUDGET_COLS} FROM ai_spend_budget \
+             WHERE organization_id = {organization_id} AND agent_id = {agent_id}"
+        );
+        let rows = self
+            .stdb
+            .query_sql(&sql)
+            .await
+            .context("read ai_spend_budget")?;
+        select_budget(&rows, organization_id, agent_id, billing_period)
+    }
+
+    pub async fn latest_price_snapshot(
+        &self,
+        organization_id: u64,
+        agent_id: u64,
+        provider: &str,
+        model: &str,
+        currency: &str,
+    ) -> Result<Option<PriceSnapshot>> {
+        let sql = format!(
+            "SELECT {PRICE_SNAPSHOT_COLS} FROM ai_price_snapshot \
+             WHERE organization_id = {organization_id} AND agent_id = {agent_id}"
+        );
+        let rows = self
+            .stdb
+            .query_sql(&sql)
+            .await
+            .context("read ai_price_snapshot")?;
+        select_latest_snapshot(&rows, organization_id, agent_id, provider, model, currency)
+    }
+
+    pub async fn reservation(
+        &self,
+        organization_id: u64,
+        run_id: u64,
+        request_key: &str,
+    ) -> Result<Option<Reservation>> {
+        validate_request_key(request_key)?;
+        let sql = format!(
+            "SELECT {RESERVATION_COLS} FROM ai_spend_reservation \
+             WHERE organization_id = {organization_id} AND run_id = {run_id}"
+        );
+        let rows = self
+            .stdb
+            .query_sql(&sql)
+            .await
+            .context("read ai_spend_reservation")?;
+        find_reservation(&rows, organization_id, run_id, request_key)
+    }
+
+    pub async fn draft_request(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        run_id: u64,
+        request_key: &str,
+    ) -> Result<Option<DraftRequest>> {
+        validate_request_key(request_key)?;
+        let sql = format!(
+            "SELECT {DRAFT_REQUEST_COLS} FROM ai_action_draft_request \
+             WHERE organization_id = {organization_id} AND run_id = {run_id}"
+        );
+        let rows = self
+            .stdb
+            .query_sql(&sql)
+            .await
+            .context("read ai_action_draft_request")?;
+        find_draft_request(&rows, organization_id, company_id, run_id, request_key)
+    }
+}
+
+/// Reserve spend through the gateway principal. Replays of an identical
+/// binding succeed without a second reservation.
+pub async fn reserve(stdb: &StdbClient, request: &ReserveRequest) -> Result<()> {
+    validate_request_key(&request.request_key)?;
+    stdb.call_reducer(stdb_client::reducer_call!(
+        "reserve_ai_spend",
+        json!([
+            request.organization_id,
+            {
+                "company_id": request.company_id,
+                "agent_id": request.agent_id,
+                "run_id": request.run_id,
+                "request_key": request.request_key,
+                "provider": request.provider,
+                "model": request.model,
+                "billing_period": request.billing_period,
+                "currency": request.currency,
+                "price_snapshot_id": request.price_snapshot_id,
+                "input_token_allowance": request.allowance.input_tokens,
+                "output_token_allowance": request.allowance.output_tokens,
+            }
+        ]),
+    ))
+    .await
+    .context("reserve_ai_spend reducer failed")
+}
+
+/// Settle one reservation with actual provider usage. A replay with identical
+/// usage succeeds; different usage is rejected by the module.
+pub async fn settle(
+    stdb: &StdbClient,
+    organization_id: u64,
+    reservation_id: u64,
+    input_tokens: u32,
+    output_tokens: u32,
+) -> Result<()> {
+    if reservation_id == 0 {
+        bail!("settlement requires a reservation id");
+    }
+    stdb.call_reducer(stdb_client::reducer_call!(
+        "settle_ai_spend",
+        json!([
+            organization_id,
+            {
+                "reservation_id": reservation_id,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+            }
+        ]),
+    ))
+    .await
+    .context("settle_ai_spend reducer failed")
+}
+
+/// Create a run-correlated draft. `params` is the `CreateAiActionDraftParams`
+/// object; the module binds it to the run and request key atomically.
+pub async fn create_run_action_draft(
+    stdb: &StdbClient,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    request_key: &str,
+    params: Value,
+) -> Result<()> {
+    if run_id == 0 {
+        bail!("run-correlated drafts require a durable nonzero run_id");
+    }
+    validate_request_key(request_key)?;
+    if !params.is_object() {
+        bail!("draft params must be an object");
+    }
+    stdb.call_reducer(stdb_client::reducer_call!(
+        "create_ai_run_action_draft",
+        json!([organization_id, company_id, run_id, request_key, params]),
+    ))
+    .await
+    .context("create_ai_run_action_draft reducer failed")
+}
+
+fn select_budget(
+    rows: &[Value],
+    organization_id: u64,
+    agent_id: u64,
+    billing_period: &str,
+) -> Result<Option<SpendBudget>> {
+    let mut found = None;
+    for row in rows {
+        require_owner(row, organization_id)?;
+        if req_u64(row, "agentId", "agent_id")? != agent_id
+            || req_str(row, "billingPeriod", "billing_period")? != billing_period
+        {
+            continue;
+        }
+        if found.is_some() {
+            bail!("multiple spend budgets for one agent and billing period");
+        }
+        found = Some(SpendBudget {
+            id: req_u64(row, "id", "id")?,
+            currency: req_str(row, "currency", "currency")?,
+            limit_units: req_u64(row, "limitUnits", "limit_units")?,
+            settled_units: req_u64(row, "settledUnits", "settled_units")?,
+            outstanding_units: req_u64(row, "outstandingUnits", "outstanding_units")?,
+        });
+    }
+    Ok(found)
+}
+
+fn select_latest_snapshot(
+    rows: &[Value],
+    organization_id: u64,
+    agent_id: u64,
+    provider: &str,
+    model: &str,
+    currency: &str,
+) -> Result<Option<PriceSnapshot>> {
+    let mut latest: Option<PriceSnapshot> = None;
+    for row in rows {
+        require_owner(row, organization_id)?;
+        if req_u64(row, "agentId", "agent_id")? != agent_id
+            || req_str(row, "provider", "provider")? != provider
+            || req_str(row, "model", "model")? != model
+            || req_str(row, "currency", "currency")? != currency
+        {
+            continue;
+        }
+        let snapshot = PriceSnapshot {
+            id: req_u64(row, "id", "id")?,
+            version: req_u64(row, "version", "version")?,
+            input_units_per_1k: req_u64(row, "inputUnitsPer1k", "input_units_per_1k")?,
+            output_units_per_1k: req_u64(row, "outputUnitsPer1k", "output_units_per_1k")?,
+        };
+        match &latest {
+            Some(current) if current.version == snapshot.version => {
+                bail!("duplicate price snapshot version {}", snapshot.version)
+            }
+            Some(current) if current.version > snapshot.version => {}
+            _ => latest = Some(snapshot),
+        }
+    }
+    Ok(latest)
+}
+
+fn find_reservation(
+    rows: &[Value],
+    organization_id: u64,
+    run_id: u64,
+    request_key: &str,
+) -> Result<Option<Reservation>> {
+    let mut found = None;
+    for row in rows {
+        require_owner(row, organization_id)?;
+        if req_u64(row, "runId", "run_id")? != run_id
+            || req_str(row, "requestKey", "request_key")? != request_key
+        {
+            continue;
+        }
+        if found.is_some() {
+            bail!("multiple reservations share one request key");
+        }
+        let status = req_str(row, "status", "status")?;
+        if status != STATUS_RESERVED && status != STATUS_SETTLED {
+            bail!("reservation has unknown status '{status}'");
+        }
+        found = Some(Reservation {
+            id: req_u64(row, "id", "id")?,
+            company_id: req_u64(row, "companyId", "company_id")?,
+            agent_id: req_u64(row, "agentId", "agent_id")?,
+            request_key: request_key.to_string(),
+            provider: req_str(row, "provider", "provider")?,
+            model: req_str(row, "model", "model")?,
+            price_snapshot_id: req_u64(row, "priceSnapshotId", "price_snapshot_id")?,
+            reserved_units: req_u64(row, "reservedUnits", "reserved_units")?,
+            input_token_allowance: req_u32(row, "inputTokenAllowance", "input_token_allowance")?,
+            output_token_allowance: req_u32(row, "outputTokenAllowance", "output_token_allowance")?,
+            status,
+        });
+    }
+    Ok(found)
+}
+
+fn find_draft_request(
+    rows: &[Value],
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    request_key: &str,
+) -> Result<Option<DraftRequest>> {
+    let mut found = None;
+    for row in rows {
+        require_owner(row, organization_id)?;
+        if req_u64(row, "runId", "run_id")? != run_id
+            || req_str(row, "requestKey", "request_key")? != request_key
+        {
+            continue;
+        }
+        if req_u64(row, "companyId", "company_id")? != company_id {
+            bail!("draft request key is bound to a different company");
+        }
+        if found.is_some() {
+            bail!("multiple draft requests share one request key");
+        }
+        let draft_id = req_u64(row, "draftId", "draft_id")?;
+        if draft_id == 0 {
+            bail!("draft request has no draft id");
+        }
+        found = Some(DraftRequest {
+            id: req_u64(row, "id", "id")?,
+            draft_id,
+            creation_payload_hash: req_str(row, "creationPayloadHash", "creation_payload_hash")?,
+        });
+    }
+    Ok(found)
+}
+
+/// Every returned row must belong to the requested organization; a mismatch
+/// means the SQL filter did not apply and the whole result is rejected.
+fn require_owner(row: &Value, organization_id: u64) -> Result<()> {
+    if req_u64(row, "organizationId", "organization_id")? != organization_id {
+        bail!("private spend read returned a row outside the organization");
+    }
+    Ok(())
+}
+
+fn req_u64(row: &Value, camel: &str, snake: &str) -> Result<u64> {
+    row_u64(row, camel, snake).with_context(|| format!("row is missing integer field {snake}"))
+}
+
+fn req_u32(row: &Value, camel: &str, snake: &str) -> Result<u32> {
+    u32::try_from(req_u64(row, camel, snake)?).with_context(|| format!("{snake} exceeds u32"))
+}
+
+fn req_str(row: &Value, camel: &str, snake: &str) -> Result<String> {
+    row.get(camel)
+        .or_else(|| row.get(snake))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .with_context(|| format!("row is missing string field {snake}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    fn snapshot_row(id: u64, org: u64, version: u64, model: &str) -> Value {
+        json!({
+            "id": id, "organization_id": org, "agent_id": 7, "provider": "mistral",
+            "model": model, "currency": "EUR", "input_units_per_1k": 200,
+            "output_units_per_1k": 600, "version": version
+        })
+    }
+
+    fn reservation_row(id: u64, org: u64, run: u64, key: &str, status: &str) -> Value {
+        json!({
+            "id": id, "organization_id": org, "company_id": 3, "agent_id": 7, "run_id": run,
+            "request_key": key, "provider": "mistral", "model": "mistral-small",
+            "billing_period": "2026-09", "currency": "EUR", "price_snapshot_id": 11,
+            "reserved_units": 900, "settled_units": 0, "input_token_allowance": 1000,
+            "output_token_allowance": 500, "status": status,
+            "settled_input_tokens": 0, "settled_output_tokens": 0
+        })
+    }
+
+    #[test]
+    fn request_keys_are_deterministic_and_run_scoped() {
+        let key = request_key(RequestKind::Spend, 42, 3, 1).unwrap();
+        assert_eq!(key, "h5:spend:run:42:step:3:attempt:1");
+        assert_eq!(key, request_key(RequestKind::Spend, 42, 3, 1).unwrap());
+        assert_ne!(key, request_key(RequestKind::Draft, 42, 3, 1).unwrap());
+        assert!(request_key(RequestKind::Spend, 0, 3, 1).is_err());
+        assert!(request_key(RequestKind::Draft, u64::MAX, u32::MAX, u32::MAX).is_ok());
+    }
+
+    #[test]
+    fn request_key_validation_rejects_sql_and_oversized_input() {
+        assert!(validate_request_key("h5:spend:run:1:step:1:attempt:0").is_ok());
+        assert!(validate_request_key("").is_err());
+        assert!(validate_request_key("x' OR '1'='1").is_err());
+        assert!(validate_request_key(&"a".repeat(REQUEST_KEY_MAX_LEN + 1)).is_err());
+    }
+
+    #[test]
+    fn billing_period_is_the_utc_calendar_month() {
+        let late = Utc.with_ymd_and_hms(2026, 9, 30, 23, 59, 59).unwrap();
+        assert_eq!(billing_period(late), "2026-09");
+        let first = Utc.with_ymd_and_hms(2026, 10, 1, 0, 0, 0).unwrap();
+        assert_eq!(billing_period(first), "2026-10");
+    }
+
+    #[test]
+    fn allowance_is_conservative_and_bounded() {
+        let a = allowance(3_000, 500, 2_048, 32_000).unwrap();
+        assert_eq!(
+            a,
+            Allowance {
+                input_tokens: 1_064,
+                output_tokens: 500
+            }
+        );
+        assert!(allowance(3_000, 0, 2_048, 32_000).is_err());
+        assert!(allowance(3_000, 4_096, 2_048, 32_000).is_err());
+        assert!(allowance(96_000, 500, 2_048, 32_000).is_err());
+    }
+
+    #[test]
+    fn latest_snapshot_matches_every_binding_and_highest_version() {
+        let rows = vec![
+            snapshot_row(1, 9, 1, "mistral-small"),
+            snapshot_row(2, 9, 3, "mistral-small"),
+            snapshot_row(3, 9, 5, "mistral-large"),
+        ];
+        let latest = select_latest_snapshot(&rows, 9, 7, "mistral", "mistral-small", "EUR")
+            .unwrap()
+            .unwrap();
+        assert_eq!((latest.id, latest.version), (2, 3));
+        assert!(
+            select_latest_snapshot(&rows, 9, 7, "mistral", "mistral-small", "USD")
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn private_reads_fail_closed_on_foreign_or_ambiguous_rows() {
+        let foreign = vec![snapshot_row(1, 10, 1, "mistral-small")];
+        assert!(select_latest_snapshot(&foreign, 9, 7, "mistral", "mistral-small", "EUR").is_err());
+        let dup = vec![
+            snapshot_row(1, 9, 2, "mistral-small"),
+            snapshot_row(2, 9, 2, "mistral-small"),
+        ];
+        assert!(select_latest_snapshot(&dup, 9, 7, "mistral", "mistral-small", "EUR").is_err());
+
+        let key = "h5:spend:run:42:step:1:attempt:0";
+        let twice = vec![
+            reservation_row(1, 9, 42, key, STATUS_RESERVED),
+            reservation_row(2, 9, 42, key, STATUS_RESERVED),
+        ];
+        assert!(find_reservation(&twice, 9, 42, key).is_err());
+        let unknown = vec![reservation_row(1, 9, 42, key, "outcome_unknown")];
+        assert!(find_reservation(&unknown, 9, 42, key).is_err());
+    }
+
+    #[test]
+    fn reservation_lookup_is_exact_by_run_and_request_key() {
+        let key = "h5:spend:run:42:step:1:attempt:0";
+        let rows = vec![
+            reservation_row(
+                1,
+                9,
+                42,
+                "h5:spend:run:42:step:2:attempt:0",
+                STATUS_RESERVED,
+            ),
+            reservation_row(2, 9, 42, key, STATUS_SETTLED),
+        ];
+        let found = find_reservation(&rows, 9, 42, key).unwrap().unwrap();
+        assert_eq!((found.id, found.status.as_str()), (2, STATUS_SETTLED));
+        assert!(find_reservation(&rows, 9, 43, key).unwrap().is_none());
+    }
+
+    #[test]
+    fn draft_request_lookup_is_exact_and_company_bound() {
+        let key = "h5:draft:run:42:step:4:attempt:0";
+        let row = json!({
+            "id": 5, "organization_id": 9, "company_id": 3, "run_id": 42,
+            "request_key": key, "draft_id": 77, "creation_payload_hash": "abc"
+        });
+        let found = find_draft_request(&[row.clone()], 9, 3, 42, key)
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.draft_id, 77);
+        assert!(find_draft_request(&[row.clone()], 9, 4, 42, key).is_err());
+        assert!(
+            find_draft_request(&[row], 9, 3, 42, "h5:draft:run:42:step:5:attempt:0")
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn budget_selection_is_per_billing_period() {
+        let rows = vec![
+            json!({"id": 1, "organization_id": 9, "agent_id": 7, "billing_period": "2026-08",
+                   "currency": "EUR", "limit_units": 10, "settled_units": 10, "outstanding_units": 0}),
+            json!({"id": 2, "organization_id": 9, "agent_id": 7, "billing_period": "2026-09",
+                   "currency": "EUR", "limit_units": 50, "settled_units": 5, "outstanding_units": 3}),
+        ];
+        let budget = select_budget(&rows, 9, 7, "2026-09").unwrap().unwrap();
+        assert_eq!((budget.id, budget.outstanding_units), (2, 3));
+        assert!(select_budget(&rows, 9, 7, "2026-10").unwrap().is_none());
+    }
+}
