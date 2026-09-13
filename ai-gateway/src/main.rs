@@ -133,6 +133,13 @@ async fn main() -> anyhow::Result<()> {
             token.clone(),
         ))
     });
+    let spend_read_stdb = config.ai_spend_read_stdb_token.as_ref().map(|token| {
+        Arc::new(StdbClient::new(
+            config.stdb_host.clone(),
+            config.stdb_module.clone(),
+            token.clone(),
+        ))
+    });
     let vector_store = Arc::new(vector_store);
     let stdb = Arc::new(stdb);
     let rig = Arc::new(rig);
@@ -142,6 +149,7 @@ async fn main() -> anyhow::Result<()> {
         providers: providers.clone(),
         vector_store: vector_store.clone(),
         stdb: stdb.clone(),
+        spend_read_stdb,
         rig: rig.clone(),
         http: Arc::new(http),
         download_jobs: Arc::new(DashMap::new()),

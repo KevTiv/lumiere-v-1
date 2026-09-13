@@ -68,6 +68,22 @@ pub fn request_key(kind: RequestKind, run_id: u64, step_no: u32, attempt: u32) -
     Ok(key)
 }
 
+/// Deterministic, run-scoped key for a tool invocation without a step number.
+/// SHA-256 over the canonical input JSON keeps the key stable across builds and
+/// restarts, so a replayed invocation maps to the same draft.
+pub fn input_request_key(kind: RequestKind, run_id: u64, input: &Value) -> Result<String> {
+    use sha2::{Digest, Sha256};
+    if run_id == 0 {
+        bail!("request key requires a durable nonzero run_id");
+    }
+    let canonical = serde_json::to_vec(input).context("serialize tool input")?;
+    let digest = Sha256::digest(&canonical);
+    let hex: String = digest[..16].iter().map(|b| format!("{b:02x}")).collect();
+    let key = format!("h5:{}:run:{run_id}:input:{hex}", kind.label());
+    validate_request_key(&key)?;
+    Ok(key)
+}
+
 pub fn validate_request_key(key: &str) -> Result<()> {
     if key.is_empty() || key.len() > REQUEST_KEY_MAX_LEN {
         bail!("request key must be 1..={REQUEST_KEY_MAX_LEN} bytes");
@@ -540,6 +556,28 @@ mod tests {
         assert_ne!(key, request_key(RequestKind::Draft, 42, 3, 1).unwrap());
         assert!(request_key(RequestKind::Spend, 0, 3, 1).is_err());
         assert!(request_key(RequestKind::Draft, u64::MAX, u32::MAX, u32::MAX).is_ok());
+    }
+
+    #[test]
+    fn input_request_keys_are_stable_and_input_bound() {
+        let input = json!({"reducer_name": "confirm_sales_order", "params": {"id": 5}});
+        let key = input_request_key(RequestKind::Draft, 42, &input).unwrap();
+        assert!(key.starts_with("h5:draft:run:42:input:"));
+        assert_eq!(key.len(), "h5:draft:run:42:input:".len() + 32);
+        assert_eq!(
+            key,
+            input_request_key(RequestKind::Draft, 42, &input).unwrap()
+        );
+        let other = json!({"reducer_name": "confirm_sales_order", "params": {"id": 6}});
+        assert_ne!(
+            key,
+            input_request_key(RequestKind::Draft, 42, &other).unwrap()
+        );
+        assert_ne!(
+            key,
+            input_request_key(RequestKind::Draft, 43, &input).unwrap()
+        );
+        assert!(input_request_key(RequestKind::Draft, 0, &input).is_err());
     }
 
     #[test]

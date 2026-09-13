@@ -6,6 +6,7 @@ use serde_json::json;
 
 use super::agent_loop::{run_loop, LoopEvent, LoopLimits, LoopOutcome, LoopRecorder, LoopTools};
 use super::invocation_policy::ReviewedInvocationPolicy;
+use super::spend_admission::{SpendAdmittedLlm, SpendBinding, SpendLedger};
 use crate::{
     providers::llm::{LlmCompletion, LlmRequest, ToolCallRequest},
     tools::{
@@ -16,8 +17,13 @@ use crate::{
 
 /// Internal seam for later governed routing; the caller must first create a
 /// durable run. No HTTP handler or skill invokes this until H5 admission exists.
+/// Every provider attempt is admitted through `ledger` against `binding`, which
+/// must describe the same organization, company and durable run as `context`.
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn run_recorded_loop(
     llm: &dyn LlmCompletion,
+    ledger: &dyn SpendLedger,
+    binding: SpendBinding,
     view: &AuthorizedToolView<'_>,
     policy: &ReviewedInvocationPolicy,
     context: &ToolContext,
@@ -25,6 +31,13 @@ pub(super) async fn run_recorded_loop(
     limits: LoopLimits,
 ) -> Result<LoopOutcome> {
     policy.ensure_context(context.org_id, context.company_id, &context.skill_key)?;
+    ensure!(
+        binding.organization_id == context.org_id
+            && binding.company_id == context.company_id
+            && binding.run_id == context.run_id,
+        "spend binding does not match the durable run context"
+    );
+    let admitted = SpendAdmittedLlm::new(llm, ledger, binding)?;
     let tools = AuthorizedLoopTools { view, context };
     let recorder = StdbLoopRecorder {
         stdb: &context.stdb,
@@ -34,7 +47,7 @@ pub(super) async fn run_recorded_loop(
     };
     run_loop(
         context.run_id,
-        llm,
+        &admitted,
         &tools,
         policy,
         &recorder,

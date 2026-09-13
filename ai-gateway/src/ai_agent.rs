@@ -16,6 +16,8 @@ pub struct ResolvedAgentConfig {
     pub system_prompt: String,
     pub temperature: f64,
     pub max_tokens: u32,
+    /// Agent context window in tokens; 0 when unset, which spend admission rejects.
+    pub context_window: u32,
     pub top_p: f64,
     pub allowed_actions: Vec<String>,
     pub allowed_models: Vec<String>,
@@ -198,6 +200,7 @@ struct AgentRow {
     system_prompt: Option<String>,
     temperature: f64,
     max_tokens: u32,
+    context_window: u32,
     top_p: f64,
     allowed_actions: Vec<String>,
     allowed_models: Vec<String>,
@@ -279,6 +282,9 @@ fn parse_agent_row(row: &Value) -> Result<AgentRow> {
         max_tokens: row_u64(row, "maxTokens", "max_tokens")
             .map(|v| v as u32)
             .unwrap_or(4096),
+        context_window: row_u64(row, "contextWindow", "context_window")
+            .and_then(|v| u32::try_from(v).ok())
+            .unwrap_or(0),
         top_p: f64_field(row, "topP", Some("top_p")).unwrap_or(1.0),
         allowed_actions: string_vec_field(row, "allowedActions", Some("allowed_actions")),
         allowed_models: string_vec_field(row, "allowedModels", Some("allowed_models")),
@@ -330,6 +336,7 @@ fn row_to_agent_config(
         system_prompt,
         temperature: row.temperature,
         max_tokens: row.max_tokens,
+        context_window: row.context_window,
         top_p: row.top_p,
         allowed_actions: row.allowed_actions.clone(),
         allowed_models: row.allowed_models.clone(),
@@ -396,6 +403,7 @@ mod tests {
             system_prompt: "test".to_string(),
             temperature: 0.7,
             max_tokens: 1024,
+            context_window: 32_000,
             top_p: 1.0,
             allowed_actions: vec!["chat".to_string()],
             allowed_models: vec![],

@@ -20,6 +20,9 @@ pub struct AppState {
     pub vector_store: Arc<VectorStore>,
     pub rig: Arc<RigContext>,
     pub stdb: Arc<StdbClient>,
+    /// Read-only client for private H5b spend and draft-request tables, built
+    /// from `AI_SPEND_READ_STDB_TOKEN`. Absent disables run-correlated drafts.
+    pub spend_read_stdb: Option<Arc<StdbClient>>,
     pub http: Arc<reqwest::Client>,
     /// In-memory activity ingestion watermarks keyed by `org_id:company_id:table_name`.
     pub activity_watermarks: Arc<DashMap<String, i64>>,
