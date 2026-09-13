@@ -1188,7 +1188,7 @@
     {
       "table": "ai_action_draft_request",
       "module": "ai",
-      "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
+      "rationale": "Reviewed child aggregate: run_id references ai_agent_run.id.",
       "authoritative_resources": [],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
@@ -1199,8 +1199,12 @@
       ],
       "company_column_nullable": false,
       "aggregate": {
-        "kind": "root",
-        "parent": null
+        "kind": "child",
+        "parent": {
+          "table": "ai_agent_run",
+          "child_column": "run_id",
+          "parent_column": "id"
+        }
       },
       "primary_key": {
         "strategy": "auto_increment",
@@ -1211,7 +1215,7 @@
       "hot_retention": "always",
       "cooling_eligibility": "never",
       "cooling_eligibility_source": "reviewed:c5/people-platform/always-hot/missing-semantic-safety-contract",
-      "dependency_behavior": "independent",
+      "dependency_behavior": "follow_parent",
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",
       "postgres_access_path": "organization_index"
@@ -1850,7 +1854,7 @@
       "module": "ai",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
       "authoritative_resources": [],
-      "durability_class": "durable_business_record",
+      "durability_class": "durable_operational_state",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
       "company_ownership": "none",
@@ -1877,9 +1881,9 @@
     {
       "table": "ai_spend_reservation",
       "module": "ai",
-      "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
+      "rationale": "Reviewed child aggregate: run_id references ai_agent_run.id.",
       "authoritative_resources": [],
-      "durability_class": "durable_business_record",
+      "durability_class": "durable_operational_state",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
       "company_ownership": "direct",
@@ -1888,8 +1892,12 @@
       ],
       "company_column_nullable": false,
       "aggregate": {
-        "kind": "root",
-        "parent": null
+        "kind": "child",
+        "parent": {
+          "table": "ai_agent_run",
+          "child_column": "run_id",
+          "parent_column": "id"
+        }
       },
       "primary_key": {
         "strategy": "auto_increment",
@@ -1900,7 +1908,7 @@
       "hot_retention": "always",
       "cooling_eligibility": "never",
       "cooling_eligibility_source": "reviewed:c5/people-platform/always-hot/missing-semantic-safety-contract",
-      "dependency_behavior": "independent",
+      "dependency_behavior": "follow_parent",
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",
       "postgres_access_path": "organization_index"

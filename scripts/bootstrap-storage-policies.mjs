@@ -183,10 +183,12 @@ const PARENT_OVERRIDES = {
   account_move_line: ["account_move", "move_id", "id"],
   account_payment_term_line: ["account_payment_term", "payment_term_id", "id"],
   amortization_line: ["amortization_schedule", "schedule_id", "id"],
+  ai_action_draft_request: ["ai_agent_run", "run_id", "id"],
   ai_agent_run_step: ["ai_agent_run", "run_id", "id"],
   ai_agent_run_policy_snapshot: ["ai_agent_run", "run_id", "id"],
   ai_skill_release: ["ai_skill", "skill_id", "id"],
   ai_skill_version: ["ai_skill", "skill_id", "id"],
+  ai_spend_reservation: ["ai_agent_run", "run_id", "id"],
   bank_statement_import_line: ["bank_statement_import", "import_id", "id"],
   balance_sheet_line: ["financial_report", "report_id", "id"],
   cash_flow_line: ["financial_report", "report_id", "id"],
@@ -262,7 +264,11 @@ const SNAPSHOT_TABLES = new Set([
   "resource_utilisation_snapshot",
 ]);
 
-const OPERATIONAL_STATE_TABLES = new Set(["organization_commit_cursor"]);
+const OPERATIONAL_STATE_TABLES = new Set([
+  "ai_spend_budget",
+  "ai_spend_reservation",
+  "organization_commit_cursor",
+]);
 
 const ACTIVE_ARCHIVE_POLICIES = {
   pos_order: { cooling: "policy", hot: "terminal_window", hydration: "full_row" },
