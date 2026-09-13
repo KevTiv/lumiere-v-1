@@ -946,7 +946,7 @@ codegen: schema-snapshot
 
 check-agent-capabilities: codegen
 	python3 scripts/verify-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json
-	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts/test_verify_agent_capability_artifact.py
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts/test_verify_agent_capability_artifact.py scripts/test_compare_agent_capability_artifact.py
 
 # CI-safe capability validation for the immutable contracts release. This is
 # deliberately separate from `check-agent-capabilities`: the live source gate
@@ -957,7 +957,7 @@ check-agent-capabilities: codegen
 check-agent-capabilities-pinned: contracts-staging-from-pinned
 	cargo run -p lumiere-codegen -- --agent-capabilities-only
 	python3 scripts/verify-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json
-	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts/test_verify_agent_capability_artifact.py
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts/test_verify_agent_capability_artifact.py scripts/test_compare_agent_capability_artifact.py
 
 check-contract-ir: codegen check-agent-capabilities
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json
@@ -1131,8 +1131,7 @@ check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-std
 		test -f .contracts-staging/ir/agent-capability-registry-v1.json.sha256 && \
 		python3 scripts/verify-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json && \
 		python3 scripts/verify-agent-capability-artifact.py "$$CHECKOUT/ir/agent-capability-registry-v1.json" && \
-		diff .contracts-staging/ir/agent-capability-registry-v1.json "$$CHECKOUT/ir/agent-capability-registry-v1.json" && \
-		diff .contracts-staging/ir/agent-capability-registry-v1.json.sha256 "$$CHECKOUT/ir/agent-capability-registry-v1.json.sha256"; \
+		python3 scripts/compare-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json "$$CHECKOUT/ir/agent-capability-registry-v1.json"; \
 	fi && \
 	python3 "$$CHECKOUT/scripts/generate-from-ir.py" --check && \
 	diff -rq \
