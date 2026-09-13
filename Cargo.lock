@@ -1967,8 +1967,8 @@ dependencies = [
 
 [[package]]
 name = "lumiere-contracts"
-version = "0.3.44"
-source = "git+ssh://git@github.com/KevTiv/lumiere-contracts.git?tag=v0.3.44#4653eae21febdd63bfba5f9a66a831a763b9d4e6"
+version = "0.3.45"
+source = "git+ssh://git@github.com/KevTiv/lumiere-contracts.git?tag=v0.3.45#9b40ec6249159f02ef2f1a5d428da5c3566619e7"
 dependencies = [
  "serde_json",
  "spacetimedb-sdk",
@@ -1978,6 +1978,7 @@ dependencies = [
 name = "lumiere-presentation-core"
 version = "0.1.0"
 dependencies = [
+ "lumiere-contracts",
  "schemars 1.2.1",
  "serde",
  "serde_json",
