@@ -2,6 +2,7 @@
 
 mod accounting;
 mod admin;
+mod ai_capabilities;
 mod ai_certifications;
 mod auth;
 mod billing;
@@ -15,8 +16,8 @@ mod inventory;
 mod mail;
 mod messaging;
 pub(crate) mod operations;
-mod proposals;
 mod presentation;
+mod proposals;
 pub(crate) mod queries;
 pub(crate) mod reports;
 mod sales;
@@ -35,6 +36,7 @@ use crate::state::AppState;
 
 pub fn domain_router() -> Router<Arc<AppState>> {
     Router::new()
+        .merge(ai_capabilities::router())
         .merge(ai_certifications::router())
         .merge(auth::router())
         .merge(session::router())
