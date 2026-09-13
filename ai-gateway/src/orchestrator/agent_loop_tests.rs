@@ -36,6 +36,7 @@ fn limits() -> LoopLimits {
         max_rounds: 8,
         max_tool_calls: 8,
         max_tokens: 10_000,
+        max_unchanged_results: 8,
     }
 }
 
@@ -353,6 +354,92 @@ async fn unknown_tool_is_denied_without_execution() {
 }
 
 #[tokio::test]
+async fn repeated_results_without_new_evidence_stop_for_non_progress() {
+    // The provider keeps asking for the same lookup and the tool keeps
+    // returning the same rows, so the run stops before the round limit.
+    let provider = ScriptedProvider::new(
+        (0..6)
+            .map(|i| {
+                Ok(response(
+                    "",
+                    vec![call(&format!("c{i}"), "lookup", json!({"page": 1}))],
+                ))
+            })
+            .collect(),
+    );
+    let tools = ScriptedTools {
+        calls: Mutex::new(Vec::new()),
+        fail: false,
+    };
+    let recorder = recorder();
+    let out = run_loop(
+        11,
+        &provider,
+        &tools,
+        &allow_policy(),
+        recorder.as_ref(),
+        request(),
+        LoopLimits {
+            max_rounds: 6,
+            max_tool_calls: 6,
+            max_tokens: 10_000,
+            max_unchanged_results: 1,
+        },
+    )
+    .await
+    .expect("loop");
+    assert_eq!(out.stop, LoopStop::NoProgress);
+    // First result is new evidence, the second is the tolerated repeat, the
+    // third exceeds the allowance.
+    assert_eq!(tools.calls.lock().expect("tools lock").len(), 3);
+    let events = recorder.events.lock().expect("events lock");
+    let stalled = events
+        .iter()
+        .filter(|event| event.kind == "progress")
+        .collect::<Vec<_>>();
+    assert_eq!(stalled.len(), 2, "both repeats are recorded");
+    assert!(
+        stalled[0].error.is_none(),
+        "the tolerated repeat is not an error"
+    );
+    assert!(stalled[1]
+        .error
+        .as_deref()
+        .is_some_and(|error| error.contains("no new evidence")));
+}
+
+#[tokio::test]
+async fn bounded_polling_inside_the_allowance_still_reaches_an_answer() {
+    let provider = ScriptedProvider::new(vec![
+        Ok(response("", vec![call("p1", "lookup", json!({"page": 1}))])),
+        Ok(response("", vec![call("p2", "lookup", json!({"page": 1}))])),
+        Ok(response("done", vec![])),
+    ]);
+    let tools = ScriptedTools {
+        calls: Mutex::new(Vec::new()),
+        fail: false,
+    };
+    let out = run_loop(
+        12,
+        &provider,
+        &tools,
+        &allow_policy(),
+        recorder().as_ref(),
+        request(),
+        LoopLimits {
+            max_rounds: 6,
+            max_tool_calls: 6,
+            max_tokens: 10_000,
+            max_unchanged_results: 1,
+        },
+    )
+    .await
+    .expect("loop");
+    assert_eq!(out.stop, LoopStop::CandidateFinal("done".into()));
+    assert_eq!(tools.calls.lock().expect("tools lock").len(), 2);
+}
+
+#[tokio::test]
 async fn round_tool_and_token_caps_stop_without_unbounded_calls() {
     let provider = ScriptedProvider::new(
         (0..4)
@@ -374,6 +461,7 @@ async fn round_tool_and_token_caps_stop_without_unbounded_calls() {
             max_rounds: 1,
             max_tool_calls: 8,
             max_tokens: 100,
+            max_unchanged_results: 8,
         },
     )
     .await
@@ -401,6 +489,7 @@ async fn round_tool_and_token_caps_stop_without_unbounded_calls() {
             max_rounds: 8,
             max_tool_calls: 1,
             max_tokens: 100,
+            max_unchanged_results: 8,
         },
     )
     .await
@@ -426,6 +515,7 @@ async fn round_tool_and_token_caps_stop_without_unbounded_calls() {
             max_rounds: 8,
             max_tool_calls: 8,
             max_tokens: 2,
+            max_unchanged_results: 8,
         },
     )
     .await
@@ -460,6 +550,7 @@ async fn zero_usage_is_still_bounded() {
             max_rounds: 2,
             max_tool_calls: 2,
             max_tokens: 100,
+            max_unchanged_results: 8,
         },
     )
     .await
@@ -623,6 +714,7 @@ async fn over_budget_final_response_stops_before_candidate_acceptance() {
             max_rounds: 2,
             max_tool_calls: 2,
             max_tokens: 1,
+            max_unchanged_results: 8,
         },
     )
     .await
@@ -706,6 +798,7 @@ async fn next_provider_request_shrinks_max_tokens_after_usage() {
             max_rounds: 8,
             max_tool_calls: 8,
             max_tokens: 5,
+            max_unchanged_results: 8,
         },
     )
     .await

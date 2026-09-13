@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::collections::HashSet;
 
+use super::progress::{call_fingerprint, Progress, ProgressTracker, MAX_UNCHANGED_RESULTS};
 use crate::{
     harness::audit::{DecisionOutcome, PolicyDecision},
     providers::llm::{LlmCompletion, LlmMessage, LlmRequest, ToolCallRequest},
@@ -14,6 +15,9 @@ pub(super) struct LoopLimits {
     pub max_rounds: u32,
     pub max_tool_calls: u32,
     pub max_tokens: u64,
+    /// Consecutive tool results repeating known evidence before the loop stops
+    /// for non-progress. Bounded polling fits inside this allowance.
+    pub max_unchanged_results: u32,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -26,6 +30,9 @@ pub(super) enum LoopStop {
     PolicyFailed,
     ToolFailed,
     ProviderFailed,
+    /// Tool results stopped adding evidence. Replanning and clarification need
+    /// the question handler, which is not admitted, so the loop stops here.
+    NoProgress,
     RoundLimit,
     ToolLimit,
     TokenLimit,
@@ -95,6 +102,9 @@ pub(super) async fn run_loop(
     {
         bail!("loop limits must be positive");
     }
+    if limits.max_unchanged_results > MAX_UNCHANGED_RESULTS {
+        bail!("unchanged-result allowance must not exceed {MAX_UNCHANGED_RESULTS}");
+    }
     if request.max_tokens == 0 {
         bail!("request max_tokens must be positive");
     }
@@ -127,6 +137,9 @@ pub(super) async fn run_loop(
     .await?;
 
     let mut seen_ids = HashSet::new();
+    // Progress is tracked across rounds, so a new prompt, model or provider
+    // cannot reset the allowance.
+    let mut progress = ProgressTracker::new(limits.max_unchanged_results);
     for _round in 0..limits.max_rounds {
         let used = input_tokens.saturating_add(output_tokens);
         if used >= limits.max_tokens {
@@ -382,13 +395,49 @@ pub(super) async fn run_loop(
                         LoopEvent {
                             step_no: next_step(&mut event_step),
                             kind: "tool".to_string(),
-                            tool_name: Some(call.name),
+                            tool_name: Some(call.name.clone()),
                             input: event_input,
                             summary,
                             error: None,
                         },
                     )
                     .await?;
+                    match progress.observe(&output) {
+                        Progress::New => {}
+                        Progress::Unchanged { consecutive } | Progress::Stalled { consecutive } => {
+                            let stalled = consecutive > limits.max_unchanged_results;
+                            record(
+                                recorder,
+                                LoopEvent {
+                                    step_no: next_step(&mut event_step),
+                                    kind: "progress".to_string(),
+                                    tool_name: Some(call.name.clone()),
+                                    input: json!({
+                                        "call": call_fingerprint(&call),
+                                        "consecutive_unchanged": consecutive,
+                                        "allowance": limits.max_unchanged_results,
+                                    }),
+                                    summary: "tool result repeated known evidence".to_string(),
+                                    error: stalled.then(|| {
+                                        "no new evidence; replanning needs the unadmitted question handler"
+                                            .to_string()
+                                    }),
+                                },
+                            )
+                            .await?;
+                            if stalled {
+                                return stop(
+                                    recorder,
+                                    &mut event_step,
+                                    transcript,
+                                    LoopStop::NoProgress,
+                                    input_tokens,
+                                    output_tokens,
+                                )
+                                .await;
+                            }
+                        }
+                    }
                 }
                 Err(error) => {
                     let message = error.to_string();

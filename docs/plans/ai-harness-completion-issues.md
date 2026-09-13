@@ -411,6 +411,28 @@ trigger explicit non-progress outcomes. Legitimate bounded polling passes; model
 switches and superficial input changes cannot reset limits. If clarification is
 required but its handler is not admitted, stop with a recorded blocker.
 
+**Delivered (evidence tracking, not a closed gate):**
+`ai-gateway/src/orchestrator/progress.rs` tracks evidence fingerprints across
+rounds. A tool result that repeats evidence already seen in the run does not
+count as progress, which covers both the repeated call and the different call
+with the same empty result. Each repeat is recorded as a `progress` step event;
+past `LoopLimits::max_unchanged_results` the loop stops with `LoopStop::NoProgress`,
+finalizing the durable run as `failed` with `agent_loop_stop:no_progress` — the
+recorded blocker, since replanning and clarification need the unadmitted question
+handler (AIH-20). Evidence is the whole protected tool result and the tracker
+never keys on prompt, model or provider, so a provider switch cannot reset the
+allowance; arguments are normalized so whitespace and key-order edits share one
+call fingerprint. Unchanged errors and denied actions need no counter because
+both already stop the loop on first occurrence (`ToolFailed`, `ToolDenied`).
+Covered by `cargo test -p ai-gateway` (226 passed): allowance reset on new
+evidence, stall past the allowance, different calls with identical empty
+results, fingerprint normalization, the loop-level non-progress stop with its
+recorded events, and bounded polling still reaching a candidate answer.
+
+**Still open:** a per-tool polling policy with attempt, time and backoff bounds
+(the capability contract carries no polling metadata, so one bounded allowance
+stands in), bounded replan, and routing to an admitted question handler.
+
 ---
 
 ### AIH-23 — Checked continuation and compaction
