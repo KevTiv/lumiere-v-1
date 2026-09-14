@@ -4,6 +4,7 @@ The coordination program intentionally does not restate every architectural deta
 
 | Coordination area | Primary source plans |
 | --- | --- |
+| Repository cohesion / duplicate-authority removal / error-outcome ownership | `docs/plan/repository-cohesion-outcome-ownership-plan.md`, current implementation evidence from `BASE-00` |
 | Governed loop / answer / interaction | `docs/plans/ai-harness-completion-plan.md`, `docs/plans/ai-harness-completion-issues.md` |
 | One executor / scoped capabilities | `docs/plans/ai-enterprise-harness-plan.md`, `docs/plans/ai-unified-execution-capabilities-subagent-plan.md` |
 | Capability IR/codegen | `docs/plans/agent-harness-capability-ir-foundation.md`, `docs/plans/agent-ir-codegen-extension-plan.md`, `docs/plans/agent-generated-erp-tool-surface-plan.md` |
@@ -19,4 +20,8 @@ The coordination program intentionally does not restate every architectural deta
 | Forensic introspection | `docs/plans/forensic-introspection-causality-layer.md` |
 | Model refinement/datasets | `docs/plans/model-refinement-dataset-plane.md` |
 
-Conflict rule: use the authority hierarchy in `erp-harness-implementation-coordination-plan.md`; if two source plans materially disagree after applying that hierarchy, stop and ask the coordinator to resolve the semantic contract before implementation.
+Conflict rules:
+
+1. use the authority hierarchy in `erp-harness-implementation-coordination-plan.md` for semantic conflicts;
+2. use `repository-cohesion-outcome-ownership-plan.md` when the conflict is between two implementation generations of the same concern (for example legacy vs governed spend, duplicate permission maps, handwritten vs generated structural contracts);
+3. if two semantic source plans still materially disagree, stop and ask the coordinator to resolve the contract before implementation.
