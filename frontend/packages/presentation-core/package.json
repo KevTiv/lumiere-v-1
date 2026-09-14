@@ -4,14 +4,25 @@
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
-  "exports": { ".": "./src/index.ts", "./module-contract": "./src/generated/module-draft.ts", "./preview-contract": "./src/generated/preview-contract.ts", "./preview-decoder": "./src/preview-decoder.ts", "./saved-draft-decoder": "./src/saved-draft-decoder.ts" },
-  "dependencies": { "ajv": "8.18.0" },
+  "exports": {
+    ".": "./src/index.ts",
+    "./module-contract": "./src/contract/module-draft.ts",
+    "./preview-contract": "./src/contract/preview-contract.ts",
+    "./preview-decoder": "./src/preview-decoder.ts",
+    "./saved-draft-decoder": "./src/saved-draft-decoder.ts"
+  },
+  "dependencies": {
+    "@lumiere/contracts": "github:KevTiv/lumiere-contracts#v0.3.46&path:packages/contracts",
+    "ajv": "8.18.0"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "generate:contract": "node scripts/generate-module-contract.mjs",
-    "check:contract": "node scripts/generate-module-contract.mjs --check",
-    "check:contract-types": "node scripts/generate-module-contract.mjs --from-schema --check",
     "test": "node --import tsx --test src/*.test.ts"
   },
-  "devDependencies": { "@types/node": "^22.10.0", "json-schema-to-typescript": "15.0.4", "tsx": "^4.20.5", "typescript": "^5.5.0" }
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "json-schema-to-typescript": "15.0.4",
+    "tsx": "^4.20.5",
+    "typescript": "^5.5.0"
+  }
 }

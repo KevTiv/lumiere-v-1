@@ -15,6 +15,7 @@
 //! Every path each pipeline reads or writes lives in [`paths::Paths`] — add a
 //! new generated artifact there, not as an inline `.join(...)` in a pipeline.
 
+mod agent_capabilities;
 mod cold_tier;
 mod contract_ir;
 mod erp_org_sql;
@@ -25,7 +26,7 @@ mod read_ir;
 mod reducer_contract;
 mod support;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use paths::Paths;
 use std::path::Path;
 use support::read_to_string;
@@ -33,8 +34,19 @@ use support::read_to_string;
 fn main() -> Result<()> {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let paths = Paths::resolve(manifest_dir);
-    if std::env::args().any(|arg| arg == "--reconstruction-apply-only") {
-        return cold_tier::run_reconstruction_apply(&paths);
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    match args.as_slice() {
+        [] => {}
+        [arg] if arg == "--reconstruction-apply-only" => {
+            return cold_tier::run_reconstruction_apply(&paths);
+        }
+        [arg] if arg == "--agent-capabilities-only" => {
+            return agent_capabilities::run(&paths);
+        }
+        _ => bail!(
+            "unsupported lumiere-codegen arguments: {}; expected no arguments, --reconstruction-apply-only, or --agent-capabilities-only",
+            args.join(" ")
+        ),
     }
     // Capture provenance before any generator rewrites tracked outputs. The
     // generated files themselves are checked for drift after this process.
@@ -48,6 +60,7 @@ fn main() -> Result<()> {
     reducer_contract::run(&paths)?;
     read_ir::run(&paths)?;
     contract_ir::run(&paths, &registry_text, source_provenance)?;
+    agent_capabilities::run(&paths)?;
 
     Ok(())
 }

@@ -27,7 +27,9 @@ pub fn run_queue_foundation_tests(ctx: &ReducerContext) -> Result<(), String> {
 #[spacetimedb::reducer]
 pub fn run_core_operational_messaging_test(ctx: &ReducerContext) -> Result<(), String> {
     operational_messaging_test::test_message_template_and_single_message(ctx)
-        .map_err(|e| format!("message_template_and_single_message: {e}"))
+        .map_err(|e| format!("message_template_and_single_message: {e}"))?;
+    crate::pretenant_cert::communications_cert::run_communications_certification(ctx)?;
+    crate::pretenant_cert::state_machine_cert::run_communications_state_machine(ctx)
 }
 
 #[spacetimedb::reducer]

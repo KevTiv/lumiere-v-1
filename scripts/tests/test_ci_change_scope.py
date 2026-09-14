@@ -28,9 +28,7 @@ class ChangeScopeTests(unittest.TestCase):
                 self.assert_domains(module.classify_paths([path]), ("rust", "e2e"))
 
     def test_frontend_generated_presentation_contract_runs_rust_drift_gate(self):
-        for path in ["frontend/packages/presentation-core/schema/module-draft.schema.json",
-                     "frontend/packages/presentation-core/src/generated/module-draft.ts",
-                     "frontend/packages/presentation-core/scripts/generate-module-contract.mjs"]:
+        for path in ["frontend/packages/presentation-core/scripts/generate-module-contract.mjs"]:
             with self.subTest(path=path):
                 self.assert_domains(module.classify_paths([path]), module.DOMAINS)
 

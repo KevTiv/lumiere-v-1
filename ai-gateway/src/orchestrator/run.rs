@@ -585,13 +585,11 @@ async fn synthesize_summary(
             provider: agent.provider.clone(),
             model: agent.model.clone(),
             system,
-            messages: vec![LlmMessage {
-                role: "user".to_string(),
-                content: user,
-            }],
+            messages: vec![LlmMessage::text("user", user)],
             max_tokens: agent.max_tokens.min(2048),
             temperature: Some(agent.temperature),
             top_p: Some(agent.top_p),
+            tools: Vec::new(),
         })
         .await
         .context("skill synthesis LLM")?;

@@ -22,11 +22,14 @@ execution remain follow-up work in the coordination plan.
 
 ## Module draft contract
 
-Import `ModuleDraft` from `@lumiere/presentation-core/module-contract`. These
-types are generated from `crates/presentation-core` through checked-in Draft 7
-JSON Schema. Run `pnpm generate:contract` from this package to update both
-artifacts, and `pnpm check:contract` to verify them. CI independently checks the
-Rust/schema and schema/TypeScript edges.
+Import `ModuleDraft` from `@lumiere/presentation-core/module-contract` (and the
+preview types from `./preview-contract`). Both re-export the released
+`@lumiere/contracts/presentation/*` contracts. The Draft 7 JSON Schemas and
+TypeScript types are generated from `crates/presentation-core` by
+`make generate-presentation-contracts` and shipped in a contracts release; the
+schemas are also exposed to Rust as `lumiere_contracts::manifests::PRESENTATION_*`.
+Contracts drift and the Rust schema test fail when the models change without a
+new release.
 
 The authenticated Rust API exposes `GET /v1/presentation/capabilities` and
 `POST /v1/presentation/validate`. Discovery returns actor-filtered SQL column

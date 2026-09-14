@@ -1,6 +1,6 @@
 import Ajv from 'ajv';
-import schema from '../schema/preview-contract.schema.json';
-import type { PreviewOptions, PreviewResponse } from './generated/preview-contract';
+import schema from '@lumiere/contracts/presentation/preview-contract.schema.json';
+import type { PreviewOptions, PreviewResponse } from '@lumiere/contracts/presentation/preview-contract';
 
 const ajv = new Ajv({ allErrors: false, strict: false });
 for (const [name, maximum] of [['uint16', 65535], ['uint32', 4294967295]] as const) {

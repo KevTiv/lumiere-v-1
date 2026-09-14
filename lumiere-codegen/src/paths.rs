@@ -65,6 +65,9 @@ pub struct Paths {
     // ── canonical contract IR ───────────────────────────────────────────
     pub contract_ir_out: PathBuf,
     pub contract_ir_checksum_out: PathBuf,
+    pub agent_capability_metadata_json: PathBuf,
+    pub agent_capability_registry_out: PathBuf,
+    pub agent_capability_registry_checksum_out: PathBuf,
 
     // ── query/subscription read descriptors ────────────────────────────
     pub read_descriptor_policy_json: PathBuf,
@@ -173,6 +176,11 @@ impl Paths {
             contract_ir_out: contracts_staging_dir.join("ir/lumiere-contract-ir-v2.json"),
             contract_ir_checksum_out: contracts_staging_dir
                 .join("ir/lumiere-contract-ir-v2.json.sha256"),
+            agent_capability_metadata_json: manifest_dir.join("agent-capability-metadata.json"),
+            agent_capability_registry_out: contracts_staging_dir
+                .join("ir/agent-capability-registry-v1.json"),
+            agent_capability_registry_checksum_out: contracts_staging_dir
+                .join("ir/agent-capability-registry-v1.json.sha256"),
             read_descriptor_policy_json: manifest_dir.join("read-descriptor-policies.json"),
             read_descriptor_manifest_out: staging_manifests.join("read-plan-descriptors.json"),
         }

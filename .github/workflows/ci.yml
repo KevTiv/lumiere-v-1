@@ -271,9 +271,6 @@ jobs:
       - name: Unit tests (presentation core)
         run: pnpm --dir packages/presentation-core test
 
-      - name: Presentation generated TypeScript drift
-        run: pnpm --dir packages/presentation-core check:contract-types
-
       - name: Unit tests (web BFF helpers)
         run: pnpm --dir web test:unit
 

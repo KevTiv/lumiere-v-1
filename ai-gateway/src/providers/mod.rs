@@ -191,6 +191,7 @@ mod readiness_tests {
             stdb_module: "module".into(),
             stdb_token: "token".into(),
             ai_certification_stdb_token: None,
+            ai_spend_read_stdb_token: None,
             ai_certification_runtime_hash: None,
             ai_certification_poll_secs: 5,
             ai_certification_batch_size: 10,

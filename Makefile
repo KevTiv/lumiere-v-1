@@ -103,9 +103,10 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running \
+	e2e-pretenant pretenant-cert-stdb pretenant-cert-native \
 	init-stack docker-dev docker-dev-iot \
 	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift check-c9-isolation-matrix lint-trusted-route-boundaries \
-	clean-contracts-live-staging lint-reducer-call-literals api-server-run \
+	clean-contracts-live-staging generate-presentation-schemas generate-presentation-contracts lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
 	publish-cloud publish-cloud-clear call-tests-cloud logs-cloud \
 	module-check module-build module-generate-ts module-generate-rust \
@@ -152,6 +153,8 @@ help-legacy:
 	@echo "  codegen                 Extract canonical contract IR plus local runtime/audit artifacts"
 	@echo "  check-codegen           Fail if generated artifacts drift from sources (CI). Requires .contracts-staging/ (see contracts-staging-from-pinned)"
 	@echo "  check-contract-ir       Validate the versioned IR envelope and both SHA-256 hashes"
+	@echo "  check-agent-capabilities Validate the live-generated agent capability artifact and checksum"
+	@echo "  check-agent-capabilities-pinned Validate capabilities against pinned IR (CI-safe; no live schema)"
 	@echo "  check-operation-history Fail on reused operation IDs or unapproved contract-shape changes"
 	@echo "  check-release-compatibility Validate pinned IR, contracts, PG migration, services, and deployment generation"
 	@echo "  check-tenant-ownership  Validate C0 direct organization ownership (required by check-codegen)"
@@ -711,6 +714,20 @@ e2e-web-dev: e2e-smoke-setup
 		pnpm exec next dev --hostname 127.0.0.1 --port $(E2E_WEB_PORT); \
 	'
 
+# Pre-tenant adversarial certification (docs/plans/pre-tenant-adversarial-certification.md).
+# Browser suite is optional/nightly/manual and needs a running stack (e2e-smoke-setup or e2e-web-dev).
+e2e-pretenant:
+	@$(MAKE) --no-print-directory e2e-playwright-only E2E_GREP="@pretenant" E2E_ONLY_SPEC="$(E2E_ONLY_SPEC)"
+
+# In-module certification runs inside existing domain test reducers (no new reducers/contracts).
+pretenant-cert-stdb:
+	spacetime call "$(E2E_DB)" run_core_operational_messaging_test --server local --no-config
+	spacetime call "$(E2E_DB)" run_accounting_payment_management_test --server local --no-config
+
+# Native money-representation model and known-defect registry consistency.
+pretenant-cert-native:
+	cd spacetimedb && python3 ../scripts/run-required-cargo-tests.py --locked --lib pretenant_cert
+
 e2e-playwright-only:
 	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_ONLY_SPEC="$(E2E_ONLY_SPEC)" E2E_GREP="$(E2E_GREP)" E2E_WORKERS="$(E2E_WORKERS)" /bin/bash -c 'set -euo pipefail; \
 		ROOT="$$(pwd)"; \
@@ -942,7 +959,22 @@ docker-dev-iot:
 codegen: schema-snapshot
 	cargo run -p lumiere-codegen
 
-check-contract-ir: codegen
+check-agent-capabilities: codegen
+	python3 scripts/verify-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts/test_verify_agent_capability_artifact.py scripts/test_compare_agent_capability_artifact.py
+
+# CI-safe capability validation for the immutable contracts release. This is
+# deliberately separate from `check-agent-capabilities`: the live source gate
+# must continue to regenerate every artifact, while this target stages one
+# coherent pinned release and emits only the capability artifact from its
+# already-pinned canonical IR. Keeping the staging prerequisite here avoids
+# mixing live schema output with pinned bindings/manifests/IR.
+check-agent-capabilities-pinned: contracts-staging-from-pinned
+	cargo run -p lumiere-codegen -- --agent-capabilities-only
+	python3 scripts/verify-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts/test_verify_agent_capability_artifact.py scripts/test_compare_agent_capability_artifact.py
+
+check-contract-ir: codegen check-agent-capabilities
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json
 	python3 lumiere-codegen/tests/test_contract_ir_pin.py
 	python3 scripts/verify-operation-history.py
@@ -996,7 +1028,7 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 # CI-safe validation for a previously published immutable contract. Source-to-
 # contract regeneration belongs to check-contracts-source-drift; this target
 # must not couple ordinary Rust checks to whichever module is currently deployed.
-check-codegen-pinned: check-operation-history-pinned check-release-compatibility check-tenant-ownership check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals lint-trusted-route-boundaries
+check-codegen-pinned: check-agent-capabilities-pinned check-operation-history-pinned check-release-compatibility check-tenant-ownership check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals lint-trusted-route-boundaries
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean
 	python3 lumiere-codegen/tests/test_contract_ir_pin.py
 	node scripts/bootstrap-storage-policies.mjs --check
@@ -1042,6 +1074,14 @@ contracts-staging-from-pinned:
 	python3 scripts/verify-contract-ir.py \
 		"$$CHECKOUT/ir/lumiere-contract-ir-v2.json" \
 		--require-clean --allow-legacy-v2 --expect-pin-from "$$V2_PIN"; \
+	if [ -f "$$CHECKOUT/ir/agent-capability-registry-v1.json" ] || [ -f "$$CHECKOUT/ir/agent-capability-registry-v1.json.sha256" ]; then \
+		if [ ! -f "$$CHECKOUT/ir/agent-capability-registry-v1.json" ] || [ ! -f "$$CHECKOUT/ir/agent-capability-registry-v1.json.sha256" ]; then \
+			echo "contracts-staging-from-pinned: capability artifact and checksum sidecar must be published together" >&2; \
+			exit 1; \
+		fi; \
+		python3 scripts/verify-agent-capability-artifact.py \
+			"$$CHECKOUT/ir/agent-capability-registry-v1.json"; \
+	fi; \
 	cp -R "$$CHECKOUT/packages/contracts/src/generated/." .contracts-staging/ts/generated/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/; \
 	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" .contracts-staging/ts/; \
@@ -1068,6 +1108,7 @@ check-contracts-source-drift: clean-contracts-live-staging generate-stdb-rust-sd
 	diff -rq "$$CHECKOUT/crates/lumiere-contracts/src/bindings" .contracts-staging/bindings && \
 	diff -rq \
 		-x query-registry.ts -x operation-inputs.ts -x operation-descriptors.ts \
+		-x agent-capability-registry.ts \
 		-x operations.ts -x resources.ts -x resource-codecs.ts -x wire-codecs.ts \
 		"$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
 	echo "check-contracts-source-drift: source bindings match pinned lumiere-contracts release"
@@ -1083,7 +1124,7 @@ check-contracts-source-drift: clean-contracts-live-staging generate-stdb-rust-sd
 clean-contracts-live-staging:
 	rm -rf .contracts-staging
 
-check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen check-contract-ir
+check-contracts-drift: clean-contracts-live-staging generate-presentation-schemas schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen check-contract-ir
 	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
 	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
 		echo "check-contracts-drift: could not resolve the pinned lumiere-contracts checkout (run cargo fetch first); skipping" >&2; \
@@ -1099,9 +1140,18 @@ check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-std
 		! -name 'application-operations.json' ! -name 'resource-registry.json' | LC_ALL=C sort) && \
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean --expect-schema-hash-from "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" && \
 	python3 scripts/verify-contract-ir.py "$$CHECKOUT/ir/lumiere-contract-ir-v2.json" --require-clean --expect-pin-from "$$V2_PIN" && \
+	if [ -f "$$CHECKOUT/ir/agent-capability-registry-v1.json" ] || [ -f "$$CHECKOUT/ir/agent-capability-registry-v1.json.sha256" ]; then \
+		test -f .contracts-staging/ir/agent-capability-registry-v1.json && \
+		test -f "$$CHECKOUT/ir/agent-capability-registry-v1.json.sha256" && \
+		test -f .contracts-staging/ir/agent-capability-registry-v1.json.sha256 && \
+		python3 scripts/verify-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json && \
+		python3 scripts/verify-agent-capability-artifact.py "$$CHECKOUT/ir/agent-capability-registry-v1.json" && \
+		python3 scripts/compare-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json "$$CHECKOUT/ir/agent-capability-registry-v1.json"; \
+	fi && \
 	python3 "$$CHECKOUT/scripts/generate-from-ir.py" --check && \
 	diff -rq \
 		-x query-registry.ts -x operation-inputs.ts -x operation-descriptors.ts \
+		-x agent-capability-registry.ts \
 		-x operations.ts -x resources.ts -x resource-codecs.ts -x wire-codecs.ts \
 		"$$CHECKOUT/packages/contracts/src/generated" .contracts-staging/ts/generated && \
 	diff "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/stdb-generated-sql-columns.json && \
@@ -1110,9 +1160,19 @@ check-contracts-drift: clean-contracts-live-staging schema-snapshot generate-std
 
 # Publish freshly generated bindings + manifests to lumiere-contracts as a new
 # tagged release, then print the Cargo.toml dependency line to bump.
-publish-contracts: schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
+publish-contracts: generate-presentation-contracts schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
 	@if [ -z "$(VERSION)" ]; then echo "usage: make publish-contracts VERSION=x.y.z" >&2; exit 1; fi
 	bash scripts/publish-contracts.sh "$(VERSION)"
+
+# Presentation wire contracts are generated from crates/presentation-core Rust
+# models. Schemas are released as manifests (checked by contracts drift, which
+# needs only cargo); TypeScript types are generated from those schemas for the
+# contracts package when publishing.
+generate-presentation-schemas:
+	node frontend/packages/presentation-core/scripts/generate-module-contract.mjs --out-staging .contracts-staging --schemas-only
+
+generate-presentation-contracts:
+	node frontend/packages/presentation-core/scripts/generate-module-contract.mjs --out-staging .contracts-staging
 
 # Fail if coverage/create-params mappers use magic FK sentinels (`?? 0n` / `|| 0n`).
 lint-no-magic-fk-zero:

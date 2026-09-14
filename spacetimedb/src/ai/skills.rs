@@ -2,7 +2,8 @@
 
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::ai::agents::ai_team_member;
+use crate::ai::action_drafts::ai_action_draft;
+use crate::ai::agents::{ai_agent, ai_team_member};
 use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
@@ -259,6 +260,14 @@ pub struct CompleteAiAgentRunParams {
     pub step_count: u32,
     pub tokens_used: u32,
     pub error_message: Option<String>,
+}
+
+/// Non-terminal wait state for a run whose agent loop stopped without a final
+/// outcome: `awaiting_approval` (an action draft needs approval) or
+/// `agent_settled` (a candidate answer awaits the answer gate).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct SetAiAgentRunWaitStateParams {
+    pub status: String,
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -735,7 +744,75 @@ pub fn create_ai_agent_run(
         return Err("inputs_json is too long".to_string());
     }
 
-    let _skill = load_org_or_system_skill(ctx, organization_id, params.skill_id)?;
+    let skill = load_org_or_system_skill(ctx, organization_id, params.skill_id)?;
+    if !skill.is_active {
+        return Err("skill is not active".to_string());
+    }
+
+    let agent = ctx
+        .db
+        .ai_agent()
+        .id()
+        .find(&params.agent_id)
+        .ok_or("AI agent not found")?;
+    if agent.organization_id != organization_id {
+        return Err("AI agent does not belong to this organization".to_string());
+    }
+    if !agent.is_active {
+        return Err("AI agent is not active".to_string());
+    }
+    if agent
+        .company_id
+        .is_some_and(|scope| scope != params.company_id)
+    {
+        return Err("AI agent does not belong to this company".to_string());
+    }
+
+    if let Some(team_member_id) = params.team_member_id {
+        let member = ctx
+            .db
+            .ai_team_member()
+            .id()
+            .find(&team_member_id)
+            .ok_or("AI team member not found")?;
+        if member.organization_id != organization_id {
+            return Err("AI team member does not belong to this organization".to_string());
+        }
+        if member
+            .company_id
+            .is_some_and(|scope| scope != params.company_id)
+        {
+            return Err("AI team member does not belong to this company".to_string());
+        }
+        if !member.is_active {
+            return Err("AI team member is not active".to_string());
+        }
+        if member.ai_agent_id != params.agent_id {
+            return Err("AI team member is not linked to this AI agent".to_string());
+        }
+    }
+
+    if let Some(skill_config_id) = params.skill_config_id {
+        let config = ctx
+            .db
+            .ai_skill_config()
+            .id()
+            .find(&skill_config_id)
+            .ok_or("Skill config not found")?;
+        if config.organization_id != organization_id
+            || config
+                .company_id
+                .is_some_and(|scope| scope != params.company_id)
+            || config.skill_id != params.skill_id
+        {
+            return Err(
+                "Skill config does not match this organization, company, and skill".to_string(),
+            );
+        }
+        if !config.is_enabled {
+            return Err("Skill config is not enabled".to_string());
+        }
+    }
 
     if run_key_exists(ctx, &run_key) {
         return Err("run_key already exists".to_string());
@@ -803,7 +880,24 @@ pub fn append_ai_agent_run_step(
     check_permission(ctx, organization_id, "ai_agent_run", "write")?;
 
     let run = load_company_run(ctx, organization_id, company_id, run_id)?;
-    if run.status != "running" && run.status != "pending" {
+
+    if let Some(existing) = ctx
+        .db
+        .ai_agent_run_step()
+        .ai_agent_run_step_by_run()
+        .filter(&run_id)
+        .find(|step| step.step_no == params.step_no)
+    {
+        if existing.organization_id != run.organization_id {
+            return Err("step does not belong to this run organization".to_string());
+        }
+        if step_payload_matches(&existing, &params) {
+            return Ok(());
+        }
+        return Err("step replay conflicts with the existing step".to_string());
+    }
+
+    if !run_accepts_work(&run.status) {
         return Err("run is not active".to_string());
     }
     if params.tool_name.trim().is_empty() {
@@ -811,6 +905,13 @@ pub fn append_ai_agent_run_step(
     }
     if params.output_summary.len() > MAX_STEP_OUTPUT_SUMMARY_LEN {
         return Err("output_summary is too long".to_string());
+    }
+    let next_step = run
+        .step_count
+        .checked_add(1)
+        .ok_or("run step count overflow")?;
+    if params.step_no != next_step {
+        return Err("step_no must be the next step in sequence".to_string());
     }
 
     ctx.db.ai_agent_run_step().insert(AiAgentRunStep {
@@ -874,12 +975,31 @@ pub fn complete_ai_agent_run(
         return Err("status must be completed, failed, or cancelled".to_string());
     }
 
+    let action_draft_ids = resolve_completion_action_draft_ids(
+        ctx,
+        organization_id,
+        company_id,
+        &run,
+        &params.action_draft_ids,
+    )?;
+    let effective_params = CompleteAiAgentRunParams {
+        action_draft_ids,
+        ..params.clone()
+    };
+
+    if !run_is_open(&run.status) {
+        if completion_matches(&run, &status, &effective_params) {
+            return Ok(());
+        }
+        return Err("run completion conflicts with the existing terminal state".to_string());
+    }
+
     ctx.db.ai_agent_run().id().update(AiAgentRun {
         status: status.clone(),
         summary: params.summary,
         artifacts_json: params.artifacts_json,
         citations_json: params.citations_json,
-        action_draft_ids: params.action_draft_ids,
+        action_draft_ids: effective_params.action_draft_ids,
         step_count: params.step_count,
         tokens_used: params.tokens_used,
         error_message: params.error_message,
@@ -917,7 +1037,7 @@ pub fn cancel_ai_agent_run(
     check_permission(ctx, organization_id, "ai_agent_run", "write")?;
 
     let run = load_company_run(ctx, organization_id, company_id, run_id)?;
-    if run.status != "running" && run.status != "pending" {
+    if !run_is_open(&run.status) {
         return Err("run is not active".to_string());
     }
 
@@ -947,7 +1067,69 @@ pub fn cancel_ai_agent_run(
     Ok(())
 }
 
+#[reducer]
+pub fn set_ai_agent_run_wait_state(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    params: SetAiAgentRunWaitStateParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_agent_run", "write")?;
+
+    let run = load_company_run(ctx, organization_id, company_id, run_id)?;
+    let status = params.status.trim().to_string();
+    if !is_run_wait_state(&status) {
+        return Err("wait status must be awaiting_approval or agent_settled".to_string());
+    }
+    if run.status == status {
+        return Ok(());
+    }
+    if !run_accepts_work(&run.status) {
+        return Err("only a running or pending run can enter a wait state".to_string());
+    }
+
+    let previous_status = run.status.clone();
+    ctx.db.ai_agent_run().id().update(AiAgentRun {
+        status: status.clone(),
+        write_date: ctx.timestamp,
+        ..run
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "ai_agent_run",
+            record_id: run_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "status": previous_status }).to_string()),
+            new_values: Some(serde_json::json!({ "status": status }).to_string()),
+            changed_fields: vec!["status".to_string()],
+            metadata: None,
+        },
+    );
+
+    Ok(())
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/// Non-terminal statuses a stopped agent loop may leave a run in.
+fn is_run_wait_state(status: &str) -> bool {
+    matches!(status, "awaiting_approval" | "agent_settled")
+}
+
+/// A run that may still take new steps, drafts or spend reservations.
+fn run_accepts_work(status: &str) -> bool {
+    matches!(status, "running" | "pending")
+}
+
+/// A run that is not yet terminal and may still be completed or cancelled.
+fn run_is_open(status: &str) -> bool {
+    run_accepts_work(status) || is_run_wait_state(status)
+}
 
 fn is_valid_identity_hex(value: &str) -> bool {
     let hex = value
@@ -1029,9 +1211,83 @@ fn load_company_run(
     Ok(run)
 }
 
+fn resolve_completion_action_draft_ids(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    run: &AiAgentRun,
+    requested: &[u64],
+) -> Result<Vec<u64>, String> {
+    if requested.is_empty() {
+        return Ok(run.action_draft_ids.clone());
+    }
+
+    let mut action_draft_ids = run.action_draft_ids.clone();
+    for draft_id in requested {
+        let draft = ctx
+            .db
+            .ai_action_draft()
+            .id()
+            .find(draft_id)
+            .ok_or("Action draft not found")?;
+        if draft.organization_id != organization_id || draft.company_id != company_id {
+            return Err(
+                "Action draft does not belong to this organization and company".to_string(),
+            );
+        }
+        if !action_draft_ids.contains(draft_id) {
+            action_draft_ids.push(*draft_id);
+        }
+    }
+    Ok(action_draft_ids)
+}
+
+fn step_payload_matches(existing: &AiAgentRunStep, params: &AppendAiAgentRunStepParams) -> bool {
+    existing.tool_name == params.tool_name
+        && existing.input_hash == params.input_hash
+        && existing.output_summary == params.output_summary
+        && existing.output_row_count == params.output_row_count
+        && existing.citations_json == params.citations_json
+        && existing.duration_ms == params.duration_ms
+        && existing.error_message == params.error_message
+}
+
+fn completion_matches(run: &AiAgentRun, status: &str, params: &CompleteAiAgentRunParams) -> bool {
+    run.status == status
+        && run.summary == params.summary
+        && run.artifacts_json == params.artifacts_json
+        && run.citations_json == params.citations_json
+        && run.action_draft_ids == params.action_draft_ids
+        && run.step_count == params.step_count
+        && run.tokens_used == params.tokens_used
+        && run.error_message == params.error_message
+}
+
 #[cfg(test)]
 mod tests {
-    use super::is_valid_identity_hex;
+    use super::{completion_matches, is_valid_identity_hex, step_payload_matches};
+    use super::{is_run_wait_state, run_accepts_work, run_is_open};
+    use super::{AiAgentRun, AiAgentRunStep, AppendAiAgentRunStepParams, CompleteAiAgentRunParams};
+    use spacetimedb::Timestamp;
+
+    #[test]
+    fn wait_states_are_open_but_do_not_accept_work() {
+        for status in ["awaiting_approval", "agent_settled"] {
+            assert!(is_run_wait_state(status));
+            assert!(run_is_open(status));
+            assert!(!run_accepts_work(status));
+        }
+        for status in ["running", "pending"] {
+            assert!(!is_run_wait_state(status));
+            assert!(run_is_open(status));
+            assert!(run_accepts_work(status));
+        }
+        for status in ["completed", "failed", "cancelled", "unknown", ""] {
+            assert!(!is_run_wait_state(status));
+            assert!(!run_is_open(status));
+            assert!(!run_accepts_work(status));
+        }
+    }
 
     #[test]
     fn identity_hex_validation() {
@@ -1039,5 +1295,89 @@ mod tests {
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         ));
         assert!(!is_valid_identity_hex("abc"));
+    }
+
+    #[test]
+    fn identical_step_replay_matches_but_payload_conflict_does_not() {
+        let params = AppendAiAgentRunStepParams {
+            step_no: 1,
+            tool_name: "lookup".to_string(),
+            input_hash: "abc".to_string(),
+            output_summary: "ok".to_string(),
+            output_row_count: Some(2),
+            citations_json: Some("[]".to_string()),
+            duration_ms: 10,
+            error_message: None,
+        };
+        let existing = AiAgentRunStep {
+            id: 1,
+            organization_id: 1,
+            run_id: 2,
+            step_no: 1,
+            tool_name: params.tool_name.clone(),
+            input_hash: params.input_hash.clone(),
+            output_summary: params.output_summary.clone(),
+            output_row_count: params.output_row_count,
+            citations_json: params.citations_json.clone(),
+            duration_ms: params.duration_ms,
+            error_message: params.error_message.clone(),
+            created_at: Timestamp::from_micros_since_unix_epoch(0),
+        };
+        assert!(step_payload_matches(&existing, &params));
+        assert!(!step_payload_matches(
+            &existing,
+            &AppendAiAgentRunStepParams {
+                output_summary: "changed".to_string(),
+                ..params.clone()
+            }
+        ));
+    }
+
+    #[test]
+    fn identical_terminal_completion_matches_but_conflict_does_not() {
+        let params = CompleteAiAgentRunParams {
+            status: "completed".to_string(),
+            summary: Some("done".to_string()),
+            artifacts_json: None,
+            citations_json: Some("[]".to_string()),
+            action_draft_ids: vec![3],
+            step_count: 1,
+            tokens_used: 9,
+            error_message: None,
+        };
+        let run = AiAgentRun {
+            id: 1,
+            organization_id: 1,
+            company_id: 2,
+            skill_id: 3,
+            skill_config_id: None,
+            agent_id: 4,
+            team_member_id: None,
+            run_key: "run".to_string(),
+            status: "completed".to_string(),
+            inputs_json: "{}".to_string(),
+            summary: params.summary.clone(),
+            artifacts_json: params.artifacts_json.clone(),
+            citations_json: params.citations_json.clone(),
+            action_draft_ids: params.action_draft_ids.clone(),
+            step_count: params.step_count,
+            tokens_used: params.tokens_used,
+            error_message: None,
+            triggered_by_hex: "0".repeat(64),
+            started_at: Timestamp::from_micros_since_unix_epoch(0),
+            completed_at: Some(Timestamp::from_micros_since_unix_epoch(1)),
+            create_date: Timestamp::from_micros_since_unix_epoch(0),
+            write_date: Timestamp::from_micros_since_unix_epoch(1),
+            metadata: None,
+        };
+        assert!(completion_matches(&run, "completed", &params));
+        assert!(!completion_matches(
+            &run,
+            "failed",
+            &CompleteAiAgentRunParams {
+                status: "failed".to_string(),
+                ..params
+            }
+        ));
     }
 }

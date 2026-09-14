@@ -6,6 +6,10 @@
     "canonicalization": "json_sorted_keys_semantic_type_refs"
   },
   "operations": {
+    "erp.accept_ai_provider_attempt": {
+      "name": "accept_ai_provider_attempt",
+      "shape_fingerprint": "sha256:f5c4e3ec4296678bad9058f8b830257c7ba900edd4acd31fdd7f0db20d64e10f"
+    },
     "erp.accept_sale_order_quotation": {
       "name": "accept_sale_order_quotation",
       "shape_fingerprint": "sha256:01824a849506b81f964c47a068a49724441a458904555204642e87e3b9960a5a"
@@ -746,6 +750,10 @@
       "name": "compute_so_totals",
       "shape_fingerprint": "sha256:4ebd60a2cd64d1a1a48db121c9ee900eb4e9f05842cf732aedc7899bb4d96019"
     },
+    "erp.configure_ai_spend": {
+      "name": "configure_ai_spend",
+      "shape_fingerprint": "sha256:34a4557661ac13c1deff746c65206a7f353d57dc32dace4d5fb27be98027ff47"
+    },
     "erp.configure_contact_identity_verification_authority": {
       "name": "configure_contact_identity_verification_authority",
       "shape_fingerprint": "sha256:35d1d80a4c02e423a0af644dcdfc71532331771207d3c330851e610776b8a3c6"
@@ -897,6 +905,10 @@
     "erp.create_ai_reducer_allowlist": {
       "name": "create_ai_reducer_allowlist",
       "shape_fingerprint": "sha256:f36546158c94af83de45aa001f2123b8cd80133b7f5f05f2806cd96eca2e9428"
+    },
+    "erp.create_ai_run_action_draft": {
+      "name": "create_ai_run_action_draft",
+      "shape_fingerprint": "sha256:e4af013ce52b9dbe2c61305dde0ef2b441d7c859d74bf4988213dfc01a9f9473"
     },
     "erp.create_ai_skill": {
       "name": "create_ai_skill",
@@ -2666,6 +2678,10 @@
       "name": "mark_action_sent",
       "shape_fingerprint": "sha256:de85ccbedf814d8e6f0dd849df52e495944eedcf321a4a1a79c906285101a466"
     },
+    "erp.mark_ai_provider_attempt_dispatched": {
+      "name": "mark_ai_provider_attempt_dispatched",
+      "shape_fingerprint": "sha256:981ce5122786c99ed431ae03a0cfb244cbe91a8b6eacbca7af5f6394284f943d"
+    },
     "erp.mark_embedding_synced": {
       "name": "mark_embedding_synced",
       "shape_fingerprint": "sha256:06a8cb0bf6e2e294e29c69f3ad0988796f11652b53d81f3a57b829233c58b2c1"
@@ -2910,6 +2926,10 @@
       "name": "reconcile_account_bank_statement_line",
       "shape_fingerprint": "sha256:208d7e38dd6533e0ba35f6c91a0192b4f0c46a112099faa38a01888f34986dbb"
     },
+    "erp.reconcile_ai_provider_attempt": {
+      "name": "reconcile_ai_provider_attempt",
+      "shape_fingerprint": "sha256:4e459f9002ce56c056332829823f4364b0a95c2f8b9d718872426bb86d4aac22"
+    },
     "erp.reconcile_payment_with_invoice": {
       "name": "reconcile_payment_with_invoice",
       "shape_fingerprint": "sha256:6345d3da1ed5816697431dc61bed725044a9c28c20fa028de42091e110fc8b75"
@@ -2917,6 +2937,10 @@
     "erp.record_ai_agent_run_policy_snapshot": {
       "name": "record_ai_agent_run_policy_snapshot",
       "shape_fingerprint": "sha256:4e24461cc5be7cc1f60f52c5f0c6d69116f2d9715dc8f22229ac65f83066e967"
+    },
+    "erp.record_ai_provider_attempt_result": {
+      "name": "record_ai_provider_attempt_result",
+      "shape_fingerprint": "sha256:09db7ff12487a9b08d83e332fe016f5abd6c489c8ecef611fc58a8fcede78fe2"
     },
     "erp.record_ai_spend": {
       "name": "record_ai_spend",
@@ -3197,6 +3221,10 @@
     "erp.request_expense_policy_exception": {
       "name": "request_expense_policy_exception",
       "shape_fingerprint": "sha256:628ed92461861363397072a9b82bf7c700c0f838eadfb520131d65802cefd917"
+    },
+    "erp.reserve_ai_spend": {
+      "name": "reserve_ai_spend",
+      "shape_fingerprint": "sha256:7356e80c83ec5d1fbed3b1f4f883d3d8e321dbd5ebe1c56b2cf68a0608682c19"
     },
     "erp.reserve_serial": {
       "name": "reserve_serial",
@@ -4198,6 +4226,10 @@
       "name": "set_ai_agent_active",
       "shape_fingerprint": "sha256:89941af3704d234685720c079ecc5f79872e9955729b583a3514d2c998ebb9fe"
     },
+    "erp.set_ai_agent_run_wait_state": {
+      "name": "set_ai_agent_run_wait_state",
+      "shape_fingerprint": "sha256:49d8b6218c9517822d06c6b66da945eb67000f28670d47f21576156f543cecc9"
+    },
     "erp.set_ai_reducer_allowlist_enabled": {
       "name": "set_ai_reducer_allowlist_enabled",
       "shape_fingerprint": "sha256:8520c8ec8141779c6b78e90834a4d45fc394cb165819668d16385167a50788c4"
@@ -4317,6 +4349,10 @@
     "erp.set_workflow_migration_plan_active": {
       "name": "set_workflow_migration_plan_active",
       "shape_fingerprint": "sha256:b4859c17b8e66760430b501ef7605dc4b2852b78c19d82e1792ee423a59e3a6a"
+    },
+    "erp.settle_ai_spend": {
+      "name": "settle_ai_spend",
+      "shape_fingerprint": "sha256:b161e41160e50f10cd8603e3f538975a7f6d8f711ca1ee4c8b7ec846277aa655"
     },
     "erp.settle_sale_commissions": {
       "name": "settle_sale_commissions",
@@ -5342,6 +5378,22 @@
       "current_operations_fingerprint": "sha256:9ba1a8001e6b36eabdd2acc98a739830537f09c33282423e3b631cac19b06531",
       "operation_count": 1318,
       "reason": "add denied personal presentation draft save and persisted harness identities; preserve existing operation baselines and compatibility exceptions"
+    },
+    {
+      "previous_release": "v0.3.43",
+      "previous_ir_sha256": "sha256:c08dc9dafcc60843df573b3009cff44932b24dc6e8927d487fe164817786c63c",
+      "previous_operations_fingerprint": "sha256:9ba1a8001e6b36eabdd2acc98a739830537f09c33282423e3b631cac19b06531",
+      "current_operations_fingerprint": "sha256:192bae917632f40969758933671cf51863ab4767df90cdeeddabf6888c6b2632",
+      "operation_count": 1322,
+      "reason": "add governed AI spend reservation/settlement and run-correlated action draft operations on top of the released presentation draft baseline; preserve existing operation baselines and compatibility exceptions"
+    },
+    {
+      "previous_release": "v0.3.44",
+      "previous_ir_sha256": "sha256:a0dd60f40376a46ba7e0ef17f4b82002c7635ecccfb21bd3444aac557c94cac9",
+      "previous_operations_fingerprint": "sha256:192bae917632f40969758933671cf51863ab4767df90cdeeddabf6888c6b2632",
+      "current_operations_fingerprint": "sha256:584b54b54c83392e0fdc6dfeebfca33d72f8af7c55823cbcbbde939c62d4ce40",
+      "operation_count": 1327,
+      "reason": "add run wait states and durable provider attempt reducers on top of the released v0.3.44 baseline; preserve existing operation baselines and compatibility exceptions"
     }
   ]
 }
