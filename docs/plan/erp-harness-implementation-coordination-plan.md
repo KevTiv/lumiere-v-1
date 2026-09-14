@@ -6,25 +6,17 @@
 **Roadmap ledger:** [`erp-harness-implementation-ledger.md`](./erp-harness-implementation-ledger.md)  
 **Mandatory cohesion plan:** [`repository-cohesion-outcome-ownership-plan.md`](./repository-cohesion-outcome-ownership-plan.md)  
 **Cohesion ledger:** [`repository-cohesion-outcome-ownership-ledger.md`](./repository-cohesion-outcome-ownership-ledger.md)  
+**T0 ERP parity plan:** [`../plans/erp-module-usability-parity-program.md`](../plans/erp-module-usability-parity-program.md)  
+**T0 ERP parity ledger:** [`erp-module-usability-parity-ledger.md`](./erp-module-usability-parity-ledger.md)  
 **Worker handoff:** [`erp-harness-implementation-handoff.md`](./erp-harness-implementation-handoff.md)
 
 This document does not replace architectural plans in `docs/plans`. Those remain semantic/invariant specifications. This document owns **implementation sequencing, work-package boundaries, coordination, evidence, and promotion gates**.
 
 ## 1. Why this program exists
 
-Lumière now has strong architecture plans across:
+Lumière now has strong architecture plans across application-contract IR/codegen, governed agent execution, ERP workflows, adversarial invariants, module cleanup, evidence/recovery, WorkPrograms, sandbox execution, security/residency, learning/forensics, and optional model refinement.
 
-- application-contract IR/codegen;
-- governed agent execution;
-- ERP workflow integration and adversarial invariants;
-- evidence/questions/recovery/knowledge;
-- WorkPrograms;
-- sandbox/data/artifacts/ProgramWorkspace;
-- security/residency/retention/supply chain;
-- replay/organization learning/forensics;
-- optional model refinement.
-
-Those documents are too broad to hand directly to implementation workers. The execution model is:
+Those plans are too broad to hand directly to implementation workers. The execution model is:
 
 ```text
 semantic architecture
@@ -42,7 +34,14 @@ evidence-backed acceptance
 promotion gate
 ```
 
-A task should normally fit one focused Luna session. `2x` tasks keep one responsibility boundary across two sessions.
+A task should normally fit one focused Luna session. `2x`/`3x` parent packages authorize multiple bounded child slices, not one oversized diff.
+
+The product also needs a distinction the earlier roadmap did not make strongly enough:
+
+- **T0** answers whether the ERP itself is coherent enough for the first test organization;
+- **P0/P1** answer whether AI execution is admitted.
+
+The first organization must not depend on AI-harness completion to receive a usable ERP.
 
 ## 2. Authority hierarchy
 
@@ -51,104 +50,114 @@ When plans overlap, use this precedence:
 1. **Security/business invariants** — HSEC, ADV, current tenant/authorization contracts.
 2. **Canonical ERP contract ownership** — application-contract IR, generated capability metadata, reducer/operation history, immutable `lumiere-contracts` releases.
 3. **Domain semantics** — ERP workflow integration and domain remediation/gap plans.
-4. **Harness semantics** — AI harness completion, enterprise harness, unified execution/capabilities.
-5. **Reusable execution** — WorkProgram/sandbox/workspace/certification/security plans.
-6. **Learning/forensics/model refinement** — HLEARN, INTRO, MLEARN.
-7. **Repository cohesion plan** — resolves conflicts between multiple implementation generations of the *same* concern; it does not override semantic invariants above.
-8. **This coordination document** — sequencing and ownership only.
+4. **T0 module product coverage** — `erp-module-usability-parity-program.md` decides whether a module/surface is complete enough to expose to the first test organization.
+5. **Harness semantics** — AI harness completion, enterprise harness, unified execution/capabilities.
+6. **Reusable execution** — WorkProgram/sandbox/workspace/certification/security plans.
+7. **Learning/forensics/model refinement** — HLEARN, INTRO, MLEARN.
+8. **Repository cohesion plan** — resolves conflicts between multiple implementation generations of the same concern; it does not override semantic invariants above.
+9. **This coordination document** — sequencing and ownership only.
+
+`module-by-module-maintainability-plan.md` owns readability/ownership cleanup. Its acceptance never implies T0 usability certification.
 
 If semantic plans materially conflict after applying this hierarchy, stop and return the conflict to the coordinator. Workers do not invent a third architecture.
 
 ## 3. Starting implementation state
 
-Recheck through `BASE-00`; this is orientation, not acceptance evidence.
+Recheck through `BASE-00`, `COH-00`, and `COV-00`; this is orientation, not acceptance evidence.
 
-The recent harness stack has already introduced substantial foundations:
+The recent harness stack has already introduced substantial foundations: typed provider tool transport, generated/authorized tool registry seams, a bounded recorded loop, per-call policy checks, spend reservation/settlement, provider attempts with `outcome_unknown`, durable run wait states, non-progress detection, generated capability artifact v2, and first reviewed inventory read descriptors.
 
-- typed provider tool-call transport;
-- generated/authorized tool registry seams;
-- bounded recorded loop;
-- per-call policy checks;
-- spend reservation/settlement primitives;
-- provider attempts and `outcome_unknown`;
-- durable run wait states;
-- non-progress detection;
-- generated capability artifact v2;
-- first reviewed inventory read descriptors.
-
-However, a focused implementation pass also found parallel generations still alive:
+A focused implementation pass also found parallel generations still alive:
 
 ```text
-legacy skill executor       + governed executor
-legacy budget/spend         + reservation/attempt/settlement
-latest-row draft lookup     + request-correlated draft creation
+legacy skill executor          + governed executor
+legacy budget/spend            + reservation/attempt/settlement
+latest-row draft lookup        + request-correlated creation
 multiple action implication maps
 compiled policy reconstruction + immutable released manifests
 handwritten resource contracts + generated application IR
-inconsistent company-scope semantics across schema/policy/tool view
-request security fields     + planned trusted context
-generic/payload step logs   + planned semantic evidence/forensics
-opaque string/internal errors + desired typed outcomes
+inconsistent company-scope semantics
+request security fields        + planned trusted context
+payload-ish step logs          + planned semantic evidence
+opaque internal/string errors  + desired typed outcomes
 ```
 
-These seams are a mandatory cleanup target before broad new production capability work. See the COH plan/ledger.
+Those seams are mandatory COH work before broad production capability expansion.
 
-Separately, the pre-tenant adversarial work found confirmed business defects in communication/payment/import/recovery paths. Those remain production blockers until repaired and re-run.
+The ERP has a separate completeness problem. Backend operations and named command contracts cover many modules, and the current frontend route tree is broader than older frontend plans, but coverage is uneven. Routes, reducers, hooks, or CRUD forms do not establish complete workflows. `COV-00` must re-audit the actual current tree and classify every test-org surface before implementation.
+
+The pre-tenant adversarial work also found confirmed business defects in communication/payment/import/recovery paths. Those remain blockers for affected T0/P0 capabilities until repaired and re-run.
 
 ## 4. Sequencing spine
 
-The current delivery spine is:
+After the accepted BASE/COH foundation, ERP product readiness and AI admission become parallel lanes:
 
 ```text
 BASE — accepted implementation + known defects
    ↓
 COH — one authority / meaningful outcomes / seam eradication
-   ↓
-GOV — canonical governed production activation
-   ↓
-TRACE + CAP + ERP certification
-   ↓
-P1 single-agent production harness
-   ↓
-WPR — reusable WorkProgram runtime
-   ↓
-SBX — sandbox/data/artifacts/workspace
-   ↓
-SEC enabled-profile certification
-   ↓
-P2 reusable new-generation ERP execution
-   ↓
-LEARN + INTRO
-   ↓
-P3 learning + forensic plane
-   ↙                 ↘
-ADVAI/P4          MLEARN/P5
+   ├─────────────────────────────────────┐
+   ↓                                     ↓
+ERP-COV — module/workflow parity         GOV — governed AI activation
+   ↓                                     ↓
+T0 — first-test-org ERP ready            P0 — governed read-only AI pilot
+   │                                     ↓
+   │                                     TRACE/CAP
+   │                                     ↓
+   │                                     P1 single-agent production harness
+   └──────── certified ERP workflows ────┤
+                                         ↓
+                              WPR reusable WorkProgram runtime
+                                         ↓
+                              SBX sandbox/data/artifacts/workspace
+                                         ↓
+                              SEC enabled-profile certification
+                                         ↓
+                              P2 reusable new-generation ERP execution
+                                         ↓
+                              LEARN + INTRO → P3
+                                    ↙             ↘
+                                ADVAI/P4        MLEARN/P5
 ```
 
 This is dependency-driven, not strictly serial:
 
 - `BASE-03/04` business-defect remediation runs in parallel with COH;
-- security trusted-context/envelope work starts with COH and must converge on one type/lineage;
-- ERP human workflow/ADV certification proceeds independently of AI plumbing;
+- `COV-00` may run alongside COH census work because it inventories product completeness rather than authority seams;
+- security trusted-context/envelope work starts with COH and converges on one type/lineage;
+- ERP module completion/ADV certification proceeds independently of AI plumbing;
 - contract producers may work in parallel when the single release lane is free;
+- COV module lanes run concurrently when they do not share domain/schema/UI owners;
 - later schema design may begin early, but promotion gates cannot close before prerequisites.
 
 ## 5. Promotion targets
 
 ### Foundation gate — cohesive implementation
 
-Before production P0 admission:
+Before new production AI capability admission, relevant COH gates require one authority for identity, scope, capability, released policy, ERP structure, execution, spend and effect correlation; typed expected outcomes/errors; exact/reconcilable consequential effects; no ignored critical persistence/spend/audit failure; explicit compatibility deletion gates; generated structural contracts; and immutable released policy. Detailed acceptance is `COH-12`.
 
-- one authority is chosen for identity, scope, capability, released policy, ERP structure, execution, spend and effect correlation;
-- expected errors/outcomes retain machine semantics;
-- consequential effects are exact/idempotent/reconcilable;
-- no critical persistence/spend/audit error is silently discarded;
-- compatibility paths have explicit owners and deletion gates;
-- generated structural contracts and immutable released policy are not duplicated by handwritten runtime truth.
+### T0 — first-test-organization ERP readiness
 
-Detailed acceptance is `COH-12`.
+T0 is the minimum product gate for exposing the ERP to the first test organization.
 
-### P0 — governed read-only pilot
+Required:
+
+- `COV-00` current module/operation census accepted;
+- every module/surface visible to the test organization is **U5 first-test-org certified** under the parity program;
+- non-U5/internal/developer surfaces are hidden or explicitly disabled;
+- every exposed module has discoverable records, complete primary lifecycle, canonical result readback and direct cross-module links;
+- expected errors/outcomes use the common COH semantics on migrated boundaries;
+- approval, stale-state, retry, idempotency, committed-response-lost and tenant behavior are explicit where applicable;
+- horizontal documents/activity/messages/approvals/audit/report/import capabilities are integrated rather than copied per module;
+- one reproducible seeded organization/persona pack supports all module E2E tests;
+- no exposed stub route, empty promised tab, dead quick action, fake local success, or accidentally orphaned test-org operation remains;
+- module golden-path Playwright and applicable adversarial tests actually run;
+- Order-to-Cash, Procure-to-Pay and other enabled cross-module verticals satisfy their deeper INT/ADV gates;
+- representative refresh/reconnect and responsive/mobile checks pass.
+
+T0 does **not** require exposing every reducer. Every user-facing operation must instead be classified as primary-workflow, secondary-advanced, horizontal, internal-support, future-disabled, or obsolete/duplicate.
+
+### P0 — governed read-only AI pilot
 
 Required:
 
@@ -161,63 +170,27 @@ Required:
 - run/provider ambiguity is inspectable/reconcilable;
 - read-only authority/tenancy/fallback E2E passes.
 
+P0 may run in the first test organization only when its visible AI surface is itself stable; P0 does not substitute for T0 ERP readiness.
+
 ### P1 — single-agent production harness
 
-Required:
-
-- P0;
-- base interactive/recovery/evidence semantics equivalent to AIH M0–M7;
-- all enabled production skills use one execution authority or are disabled;
-- admitted generated/scoped capability surface covers production use cases;
-- consequential ERP capabilities reuse certified human workflows;
-- current-policy reauthorization/action-draft invariants pass;
-- admin/operator surfaces expose runs, evidence, waits, errors and recovery.
-
-M8/M9 may remain disabled.
+Required: P0; base interactive/recovery/evidence semantics equivalent to AIH M0–M7; one production skill execution authority; admitted generated/scoped capabilities; consequential ERP capabilities limited to T0/INT/ADV-certified workflows; current-policy/action-draft invariants; and operator run/evidence/recovery surfaces. M8/M9 may remain disabled.
 
 ### P2 — reusable new-generation ERP execution
 
-Required:
-
-- P1;
-- immutable WorkProgram compiler/runtime;
-- durable ProgramRun/checkpoint/resume;
-- simulate/dry-run/preview/live modes;
-- sandbox dataset/evidence/artifact boundary;
-- approved Python runtime profiles + Lumière SDK;
-- WorkProgram certification/compatibility/dependency graph;
-- shared ProgramRun UI;
-- HSEC/supply-chain gates for every enabled runtime profile.
+Required: P1; immutable WorkProgram compiler/runtime; durable ProgramRun/checkpoint/resume; simulate/dry-run/preview/live modes; sandbox dataset/evidence/artifact boundary; approved runtime profiles + Lumière SDK; certification/compatibility/dependency graph; shared ProgramRun UI; and HSEC/supply-chain gates for every enabled profile.
 
 ### P3 — learning + forensic production plane
 
-Required:
-
-- P2;
-- observable decision/correction/replay/comparison;
-- ExperienceCases and governed org preferences/knowledge/heuristics/recipes/skills;
-- causal introspection event/index/API/UI/export;
-- retention/legal-hold/integrity for forensic data.
+Required: P2 plus observable decision/correction/replay/comparison, ExperienceCases, governed organization learning, causal introspection/index/API/UI/export, and retention/legal-hold/integrity.
 
 ### P4 — optional advanced execution
 
-Separately admitted:
-
-- bounded specialists;
-- typed lifecycle extensions.
+Separately admitted bounded specialists and typed lifecycle extensions.
 
 ### P5 — model-refinement plane
 
-Separately admitted unless product policy changes:
-
-- training permissions;
-- ExperienceCase compiler;
-- immutable datasets/benchmarks;
-- capability ranker and later task models;
-- model registry/shadow/canary;
-- optional private/vertical adapters.
-
-Production traces are never trainable by default.
+Separately admitted training permissions, ExperienceCase compiler, immutable datasets/benchmarks, capability ranker/later task models, model registry/shadow/canary and optional adapters. Production traces are never trainable by default.
 
 ## 6. Non-negotiable implementation invariants
 
@@ -230,7 +203,7 @@ Every task preserves:
 5. Browser/model input never grants org/company/role/capability/region/processor/credential/path/reducer/SQL authority.
 6. Child execution only narrows parent authority.
 7. Agent configuration narrows; it does not become permission authority.
-8. Consequential AI effects are draft/approval/certified capability effects, not direct model mutation.
+8. Consequential AI effects are draft/approval/certified-capability effects, not direct model mutation.
 9. Consequential creates use exact correlation/idempotency; “latest row” is not effect identity.
 10. `outcome_unknown` is distinct from failure and has reconciliation ownership.
 11. Critical ledger/audit/spend/effect errors are never silently ignored.
@@ -242,6 +215,9 @@ Every task preserves:
 17. Rejected operations leave zero unauthorized/partial business delta.
 18. AI failure never blocks ordinary ERP operation.
 19. Unit tests alone do not close an integration/promotion gate.
+20. A route/reducer/hook/CRUD screen alone is not module completion; exposed T0 modules require complete primary workflows.
+21. A non-U5 feature may remain in code, but must not be accidentally exposed to the first test organization.
+22. Cross-module workflow code composes canonical domain operations; it never becomes a frontend business-rule engine.
 
 ## 7. Meaningful code and outcome ownership
 
@@ -250,14 +226,15 @@ A cohesive path should read:
 ```text
 thin transport adapter
 → trusted context + typed intent
-→ application service/executor
+→ application service/workflow/executor
 → generated/domain capability
 → infrastructure adapter
 → typed outcome/error
 → one transport mapper
+→ canonical readback / direct record ref
 ```
 
-Expected consequential outcomes are semantically one of:
+Expected consequential outcomes are semantically:
 
 ```text
 Applied
@@ -267,9 +244,7 @@ Waiting
 OutcomeUnknown(reconciliation ref)
 ```
 
-Expected failures should preserve stable classes such as invalid input, forbidden, stale/conflict, precondition, rate/budget, dependency unavailable, timeout and outcome unknown until the API/UI boundary.
-
-Do not solve this with a giant global error enum. Cohesive subsystems own typed errors and convert once at boundaries.
+Expected failures preserve stable classes such as invalid input, forbidden, stale/conflict, precondition, rate/budget, dependency unavailable, timeout and outcome unknown until the API/UI boundary. Do not solve this with a giant global error enum.
 
 ## 8. Coordinator operating contract
 
@@ -279,13 +254,15 @@ Responsibilities:
 
 - start from latest **accepted** revision;
 - inspect current code/open PRs/contracts/known failures before assignment;
-- reconcile historical work through `BASE-00`, not assumptions;
+- reconcile historical work through `BASE-00`;
 - run `COH-00` before broad production capability expansion;
-- maintain both ledgers and accepted dependency graph;
-- reserve shared integration surfaces;
+- run `COV-00` before module-completeness estimates or broad ERP assignment;
+- maintain the main, COH and COV ledgers and accepted dependency graph;
+- reserve shared integration surfaces and one contract/release lane;
 - review actual diffs and surrounding code;
 - inspect authority, retry/idempotency, stale-state, error/outcome and effect certainty;
-- run integrated validation after batches;
+- for COV work, verify user reachability, lifecycle completeness, canonical readback, direct record links and no visible stubs;
+- run integrated/adversarial validation after batches;
 - stop dependent work when prerequisites are not accepted;
 - record blockers rather than converting missing evidence into passes.
 
@@ -293,32 +270,32 @@ With four slots:
 
 ```text
 primary coordinator: integration/review/release lane
-worker A: runtime/backend package
-worker B: independent domain/security package
-worker C: frontend/tests/contract-producer package
+worker A: runtime/backend or one bounded module slice
+worker B: independent domain/security/module slice
+worker C: frontend/tests/contract-producer or independent module slice
 ```
 
 ## 9. Reserved integration surfaces
 
 Coordinator-owned by default unless transferred explicitly:
 
-- `ai-gateway/src/main.rs` and root route registration;
-- canonical execution dispatch selection;
-- shared trusted-context integration;
-- `ai-gateway/src/tools/registry.rs` when multiple packages touch it;
-- shared harness/orchestrator module exports;
-- shared AI schema/module wiring under STDB;
-- Cargo manifests/lockfile;
+- root route/navigation registration when multiple modules touch it;
+- canonical ERP workflow/result/error/record-ref shared surface;
+- canonical AI execution dispatch/trusted-context integration;
+- shared tool/harness registry integration;
+- shared STDB module/schema wiring;
+- Cargo/package manifests/lockfiles;
 - generated contract output/staging;
 - release manifests and contract pins;
-- root frontend shared generated/API exports;
+- shared frontend generated/API exports;
+- T0 launch/exposure manifest;
 - coordination plans/ledgers.
 
-One owner at a time for any schema/registry/release surface.
+One owner at a time for schema/registry/release/shared workflow surfaces.
 
 ## 10. Contract/schema release protocol
 
-Any task changing STDB schema, operation signatures, generated capability metadata, shared schemas, or canonical IR splits into:
+Any task changing STDB schema, operation signatures, generated capability metadata, shared schemas or canonical IR splits into:
 
 ```text
 A producer source change
@@ -328,48 +305,25 @@ B deterministic codegen + immutable contracts release
 C consumer pin + runtime/frontend wiring
 ```
 
-Rules:
-
-- producer does not hand-edit generated output;
-- consumer does not assume unpublished contract;
-- one release lane at a time;
-- publication/pinning is an explicit package/coordinator action;
-- operation history, tenant ownership, storage policy, capability artifact, schema/release compatibility gates run before consumers advance;
-- discovered contract expansion stops the current task unless its assignment explicitly includes that lane.
-
-Applies equally to current harness, WorkProgram, HLEARN, INTRO and MLEARN persistence.
+Producer does not hand-edit generated output; consumer does not assume unpublished contracts; one release lane is active at a time; release compatibility gates run before consumers advance; contract expansion outside assignment stops the current task.
 
 ## 11. Work-package assignment contract
 
-Every worker receives:
+Every worker receives task ID/objective, promotion target, source-plan sections, base revision/prerequisites, allowed files/schemas, reserved owners, exact deliverables, invariants, forbidden scope, focused validation, integration evidence, release role, and handoff requirements.
+
+COV assignments additionally state:
 
 ```text
-Task ID/objective
-promotion target/source-plan sections
-base revision + accepted prerequisites
-allowed files/schemas
-reserved files/active owners
-exact deliverables
-behavior/security/outcome invariants
-forbidden scope
-focused validation
-integration evidence required
-contract release side: none | producer | publisher | consumer
-handoff requirements
+module/surface
+current U-level + evidence
+target U-level for the slice
+primary workflow/sub-workflow
+visible deferrals that must remain hidden
+expected resulting-record links
+required personas/viewports/E2E cases
 ```
 
-Workers must not:
-
-- broaden scope because adjacent code is unfinished;
-- add another registry/policy/executor/context/error abstraction when a canonical owner exists;
-- preserve duplicate logic by copying it into a “shared” third implementation;
-- disable checks/authorization or add fallbacks just to pass;
-- introduce latest-row effect discovery;
-- turn expected outcome semantics into string parsing;
-- discard critical persistence errors;
-- edit generated output manually;
-- publish/pin contracts unless assigned;
-- start another task without coordinator assignment.
+Workers must not broaden scope; add duplicate registries/policies/executors/workflow owners; disable checks; use latest-row effect discovery; turn outcomes into string parsing; discard critical errors; edit generated output; publish contracts unless assigned; expose incomplete module features; or start another task without assignment.
 
 ## 12. Acceptance loop
 
@@ -379,62 +333,81 @@ For every worker return:
 2. identify canonical owners touched/retired;
 3. reject opportunistic redesign and parallel authority;
 4. inspect org/company/current-policy derivation;
-5. inspect capability narrowing and released-policy use;
+5. inspect capability narrowing/released-policy use;
 6. inspect retry/idempotency/stale/outcome-unknown behavior;
 7. inspect typed error/outcome propagation;
-8. inspect critical persistence/audit/spend failure handling;
+8. inspect critical persistence/audit/spend handling;
 9. verify generated contracts remain structural truth;
-10. integrate shared wiring after worker ownership ends;
-11. run focused checks on integrated tree;
-12. run required adversarial/E2E gate;
-13. record revision, reviewer, commands/results, compatibility remnants and blockers;
-14. unblock dependents only after acceptance.
+10. for COV work, exercise the feature from the owning UI workflow through durable canonical readback and downstream record links;
+11. verify incomplete secondary features remain hidden/disabled;
+12. integrate shared wiring after worker ownership ends;
+13. run focused tests on the integrated tree;
+14. run required adversarial/E2E gate;
+15. record revision, reviewer, commands/results, U-level where applicable, compatibility remnants and blockers;
+16. unblock dependents only after acceptance.
 
 An isolated green worker branch is evidence, not acceptance.
 
 ## 13. Execution lanes
 
 ### Lane A — BASE / business correctness
-
-Accepted integration baseline, known communication/payment/import/recovery defects and pre-tenant E2E.
+Accepted integration baseline, communication/payment/import/recovery defects and pre-tenant E2E.
 
 ### Lane B — COH / authority and outcome convergence
-
 Trusted context, capability authority, immutable release consumption, generated structural contracts, scope consistency, exact effect correlation, one executor/spend path, typed errors/outcomes, semantic events, file boundary and compatibility ratchets.
 
-### Lane C — GOV/TRACE
+### Lane C — ERP-COV / first-test-org parity
+Module census, shared workflow/result UX, seeded test org, CRM/Sales/Purchasing/Inventory/Manufacturing/Finance/HR/Projects/Expenses/Subscriptions/POS/Helpdesk/Fleet/IoT/Proposals and horizontal Documents/Calendar/Messages/Reports/Approvals/Workflows/Imports/Forms/Templates/Settings/Distributor completion through U5.
 
+### Lane D — ERP/ADV vertical certification
+Order-to-Cash, Procure-to-Pay and other human canonical cross-module workflows plus business-invariant certification. This lane and ERP-COV cross-check each other; neither substitutes for the other.
+
+### Lane E — GOV/TRACE
 Canonical production loop activation, answer/action gates, questions, repair, continuation, session controls, evidence and knowledge.
 
-### Lane D — CAP/contracts
+### Lane F — CAP/contracts
+Generated/scoped capabilities and serialized immutable releases. Consequential exposure waits for certified human workflow semantics.
 
-Generated/scoped capabilities and serialized immutable releases.
-
-### Lane E — ERP/ADV
-
-Human canonical workflows and business-invariant certification.
-
-### Lane F — WPR/SBX
-
+### Lane G — WPR/SBX
 Reusable runtime, sandbox, artifacts, workspace and CLI.
 
-### Lane G — SEC
+### Lane H — SEC
+Authority/residency/retention/sandbox/supply-chain proof. SEC context/envelope work converges with COH rather than creating a sibling type.
 
-Authority/residency/retention/sandbox/supply-chain proof. SEC context/envelope work must converge with COH context rather than create a sibling type.
-
-### Lane H — LEARN/INTRO
-
+### Lane I — LEARN/INTRO
 Decision trace, corrections/replay/org learning and forensic causal platform.
 
-### Lane I — ADVAI/MLEARN
-
+### Lane J — ADVAI/MLEARN
 Separately admitted specialists/extensions and model refinement.
 
 ## 14. System validation matrices
 
-### Canonical execution
+### T0 module parity
 
-For each admitted AI/program path:
+For every exposed module:
+
+```text
+discovery/navigation
+core list/search/detail
+create/edit/domain-equivalent operations
+primary lifecycle from start to terminal/wait/cancel
+direct upstream/downstream record links
+allowed actor / denied actor
+company/tenant isolation
+stale-state conflict
+duplicate submission
+committed-response-lost / retry semantics
+approval / separation of duties where applicable
+loading/empty/error/denied UX
+refresh/reconnect canonical readback
+documents/activity/messages/audit where applicable
+responsive/mobile viewport proof
+persisted Playwright golden path
+applicable ADV/pre-tenant cases
+non-U5 deferrals hidden
+```
+
+### Canonical AI/program execution
 
 ```text
 actor allowed / denied
@@ -451,8 +424,6 @@ interrupt/reconnect/resume
 
 ### Consequential effects
 
-For each admitted mutation workflow:
-
 ```text
 valid draft/effect
 idempotent replay
@@ -468,55 +439,19 @@ cross-tenant reference
 
 ### Error/outcome contract
 
-For protected API/UI paths:
-
-```text
-invalid input
-unauthenticated / forbidden
-not found
-stale/conflict
-precondition
-rate/budget
-retryable dependency failure
-timeout
-outcome unknown
-internal invariant
-```
-
-Verify stable code, safe message, correlation ID and correct retry advice. No client behavior may depend on parsing internal strings.
+Verify invalid input, unauthenticated/forbidden, not found, stale/conflict, precondition, rate/budget, dependency failure, timeout, outcome unknown and internal invariant map to stable code, safe message, correlation ID and correct retry advice. Clients do not parse internal strings.
 
 ### Sandbox
 
-```text
-no standing secrets
-network deny/default
-host-path denial
-cross-tenant scratch reuse
-expired/revoked dataset handle
-artifact disclosure limits
-resource/time exhaustion
-snapshot/warm-pool cleanup
-brokered external capability
-```
+Verify no standing secrets, network deny/default, host-path denial, cross-tenant scratch reuse, expired/revoked handles, artifact disclosure limits, resource exhaustion, warm-pool cleanup and brokered external capabilities.
 
 ### Residency/retention
 
-```text
-allowed region
-forbidden fallback
-zero-retention/training-use constraints
-artifact/search/vector/sandbox placement
-logs/traces classification
-delete lifecycle
-legal hold
-backup/recovery inventory
-```
+Verify allowed region, forbidden fallback, zero-retention/training constraints, artifact/search/vector/sandbox placement, logs/traces classification, delete lifecycle, legal hold and backup/recovery inventory.
 
 ## 15. New-generation ERP scope discipline
 
-The harness is not a second ERP architecture.
-
-Stable work should graduate downward:
+The harness is not a second ERP architecture. Stable work graduates:
 
 ```text
 ad-hoc run
@@ -526,15 +461,18 @@ ad-hoc run
 → deterministic generated capability / first-class ERP feature
 ```
 
-Ownership stays clear:
+Ownership remains:
 
 - business rules → STDB/domain;
 - capability structure → application IR/codegen;
-- reusable orchestration → WorkProgram;
-- presentation → renderer-neutral UI contracts;
+- human workflow composition → typed ERP workflow/application layer;
+- reusable AI/program orchestration → WorkProgram;
+- presentation → renderer-neutral/shared UI contracts;
 - authorization → server/Casbin;
 - sandbox → isolated analysis/artifact execution;
-- training/model layers → selection/reasoning patterns, never runtime authority.
+- model layers → selection/reasoning patterns, never authority.
+
+Module parity does not justify exposing every reducer. Product surfaces are designed around business workflows, while every operation is classified and intentionally owned.
 
 ## 16. Stop rules
 
@@ -542,35 +480,36 @@ Stop and return to coordinator when:
 
 - task requires unassigned schema/contract expansion;
 - generated output unexpectedly differs from canonical source;
-- there are two plausible authorities for the same concern and COH has not resolved them;
+- two plausible authorities exist for one concern and COH has not resolved them;
 - current authorization cannot be derived from trusted server context;
 - task needs raw SQL/reducer/path/credential authority not admitted;
 - dependent business workflow has not passed its invariant gate;
-- fallback would weaken residency/privacy/retention/training-use;
-- consequential outcome is uncertain without a reconciliation contract;
-- expected failure semantics would need string parsing or generic 500 to proceed;
+- fallback would weaken security/residency/privacy/retention/training-use;
+- consequential outcome is uncertain without reconciliation;
+- expected failure semantics require string parsing/generic 500;
 - critical persistence failure would have to be ignored;
 - test reveals cross-tenant/partial business mutation;
 - worker would need files owned by another active task;
-- only path to green is loosening a gate/disabling a check.
+- only path to green is loosening a gate/disabling a check;
+- a COV slice would expose a visibly incomplete feature simply to increase coverage;
+- a module's primary lifecycle depends on manual database/admin intervention or manually searching downstream records.
 
 ## 17. Promotion evidence
 
-Every promotion record includes at least:
+Every promotion record includes promotion target, revisions, contracts versions, config/runtime versions, focused tests, E2E/adversarial results, expected skips, security/residency evidence, error/outcome evidence, reviewer, open deferrals and rollback/disable control.
+
+T0 additionally includes:
 
 ```text
-promotion target
-implementation revision(s)
-contracts version(s)
-config/runtime versions
-focused tests/results
-E2E/adversarial results
-expected skips + justification
-security/residency evidence when applicable
-error/outcome matrix evidence
-reviewer
-open defects/deferrals
-rollback/disable control
+current module exposure manifest
+U0–U5 matrix for every exposed module
+seed/test-org revision
+personas exercised
+module golden-path specs
+cross-module INT/ADV evidence
+responsive/reconnect evidence
+operation classification report
+explicit hidden/disabled non-U5 capabilities
 ```
 
 No prose-only “looks good” promotion.
@@ -579,19 +518,22 @@ No prose-only “looks good” promotion.
 
 The coordinated program is complete only when:
 
-- the repository exposes one obvious authority for every enabled runtime concern;
+- the first test organization sees only U5-certified business modules/horizontal surfaces;
+- all enabled modules have profound primary workflow completion rather than route/reducer-only coverage;
+- cross-module result records are directly navigable and canonical state survives refresh/reconnect;
+- every enabled runtime concern has one obvious implementation authority;
 - each production AI path uses the canonical executor;
 - expected effects/errors/retries are owned and machine-readable;
 - generated contracts describe every model-visible ERP capability;
 - immutable released policy controls admitted skills/programs;
-- consequential AI operations reuse certified canonical ERP workflows;
+- consequential AI/offline operations reuse T0/INT/ADV-certified ERP workflows;
 - WorkPrograms/sandboxes/artifacts/UI/CLI/automation converge on the same typed capability layer;
 - authorization/tenancy/approval/idempotency/stale/residency/retention/deletion/sandbox/supply-chain gates pass for enabled classes;
-- operators can inspect, reconcile, revoke, resume/reproduce where allowed and roll back configuration/version promotion without database surgery;
+- operators can inspect, reconcile, revoke and recover without database surgery;
 - organization learning is explicit/reviewable/revocable/tenant-isolated;
 - forensic causality exists without universal raw request/response shadow logging;
 - optional advanced execution is separately admitted;
 - model-refinement assets are governed/reproducible/reversible and never grant authority;
 - disabled/deferred capabilities cannot be reached by alternate routes.
 
-The **main roadmap ledger plus the mandatory COH ledger** are the implementation checklists for completing this program.
+The **main roadmap ledger, mandatory COH ledger, and mandatory T0 COV ledger** together are the implementation checklists for this program.
