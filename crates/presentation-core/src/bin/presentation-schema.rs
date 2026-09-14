@@ -1,10 +1,12 @@
-use lumiere_presentation_core::{ModuleDraft, PreviewContract};
+use lumiere_presentation_core::{ModuleDraft, PreviewContract, SavedDraftContract};
 use schemars::generate::SchemaSettings;
 
 fn main() {
     let generator = SchemaSettings::draft07().into_generator();
     let schema = if std::env::args().nth(1).as_deref() == Some("preview") {
         generator.into_root_schema_for::<PreviewContract>()
+    } else if std::env::args().nth(1).as_deref() == Some("saved") {
+        generator.into_root_schema_for::<SavedDraftContract>()
     } else {
         generator.into_root_schema_for::<ModuleDraft>()
     };

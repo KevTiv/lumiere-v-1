@@ -8,7 +8,8 @@
     ".": "./src/index.ts",
     "./module-contract": "./src/contract/module-draft.ts",
     "./preview-contract": "./src/contract/preview-contract.ts",
-    "./preview-decoder": "./src/preview-decoder.ts"
+    "./preview-decoder": "./src/preview-decoder.ts",
+    "./saved-draft-decoder": "./src/saved-draft-decoder.ts"
   },
   "dependencies": {
     "@lumiere/contracts": "github:KevTiv/lumiere-contracts#v0.3.46&path:packages/contracts",

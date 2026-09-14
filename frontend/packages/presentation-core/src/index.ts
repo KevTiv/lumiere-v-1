@@ -131,3 +131,5 @@ export type OverviewDashboardData = DashboardData & {
   readonly series: Readonly<Record<"revenue", readonly SeriesPoint[]>>
   readonly tables: Readonly<Record<"needs-attention", readonly OverviewAttentionRow[]>>
 }
+
+export type { SavedDraft, SavedDraftSummary, SavedDraftList, SaveDraftRequest } from './generated/saved-draft-contract';

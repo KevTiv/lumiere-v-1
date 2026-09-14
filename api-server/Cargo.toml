@@ -81,6 +81,7 @@ futures-util = "0.3"
 # Must match `spacetimedb` in `spacetimedb/Cargo.toml` and the `spacetime` CLI used for `spacetime generate`.
 # Do not use bare "2.0.1" — Cargo will pick 2.1.x and break generated client bindings.
 spacetimedb-sdk = "2.0.1"
+spacetimedb-sats = "=2.8.2"
 
 [dev-dependencies]
 base64.workspace = true

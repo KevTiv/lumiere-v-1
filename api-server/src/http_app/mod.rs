@@ -3,7 +3,11 @@ mod cors;
 mod router;
 
 use crate::{config::Config, state::AppState};
-use std::sync::Arc;
+use anyhow::Context;
+use std::{
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 fn load_dotenv_files() {
@@ -30,19 +34,23 @@ pub(crate) async fn serve() -> anyhow::Result<()> {
 
     let cors = cors::layer(&config);
 
-    let port = config.port;
+    // Operators can keep disposable authenticated fixtures on loopback.
+    let bind_ip: IpAddr = std::env::var("LUMIERE_API_BIND_IP")
+        .unwrap_or_else(|_| "0.0.0.0".into())
+        .parse()
+        .context("LUMIERE_API_BIND_IP must be an IP address")?;
+    let addr = SocketAddr::new(bind_ip, config.port);
     let state = Arc::new(AppState::new(config));
     tracing::info!(
-        "api-server on 0.0.0.0:{} → STDB {} / {}",
-        port,
+        "api-server on {} → STDB {} / {}",
+        addr,
         state.config.stdb_host,
         state.config.stdb_module
     );
 
     let app = router::app(state, cors);
 
-    let addr = format!("0.0.0.0:{}", port);
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
     Ok(())
 }

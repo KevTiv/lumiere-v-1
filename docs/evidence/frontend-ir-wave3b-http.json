@@ -1,0 +1,37 @@
+{
+  "proof": "presentation-draft-http",
+  "apiBase": "http://127.0.0.1:48082",
+  "stdbHost": "http://127.0.0.1:3917",
+  "module": "lumiere-c7-presentation-source",
+  "runtimeSlug": "runtime-proof",
+  "statuses": {
+    "capabilities": 200,
+    "initialList": 200,
+    "createRevision1": 200,
+    "reopenRevision1": 200,
+    "updateRevision2": 200,
+    "staleUpdate": 409,
+    "finalReadRevision2": 200,
+    "forgedIdentityHintList": 200,
+    "secondOwnerList": 200,
+    "secondOwnerForeignDraftRead": 404
+  },
+  "assertions": [
+    "capability-derived contract and fields were accepted",
+    "reopened definition carried baseRevision 1",
+    "update returned exact revision 2",
+    "stale expectedRevision returned HTTP 409 and did not overwrite revision 2",
+    "forged identity hint did not switch the authenticated owner view"
+  ],
+  "secondOwner": {
+    "status": "passed",
+    "organizationId": 13,
+    "organizationSetup": "canonical create_organization reducer using a local /v1/identity token",
+    "assertions": [
+      "second authenticated organization list returned 200 without the first owner's runtime-proof draft",
+      "second authenticated organization direct read of runtime-proof returned 404"
+    ]
+  },
+  "credentials": "not recorded",
+  "script": "scripts/check-presentation-draft-http.py"
+}

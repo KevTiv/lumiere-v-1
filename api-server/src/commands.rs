@@ -8,7 +8,7 @@ use crate::state::AppState;
 use crate::trusted_context::{opaque_correlation_id, TrustedOperationContext};
 use axum::Json;
 use serde_json::{json, Value};
-use stdb_client::{Exposure, ReducerCall, ReducerContract, StdbClientError};
+use stdb_client::{Exposure, ReducerCall, ReducerContract, ScalarKind, StdbClientError};
 
 /// Narrow server-owned authorities for routes that cannot run as an ordinary
 /// organization session. Each variant has an explicit reducer allowlist.
@@ -182,6 +182,61 @@ pub(crate) async fn dispatch_session_reducer(
         ApiError::Internal("trusted route reducer arguments must be an array".into())
     })?;
     let contract = session_reducer_contract(reducer)?;
+    let client = state.client_with_token(&session.stdb_token);
+    let context = TrustedOperationContext::from_session_with_placement(
+        session,
+        client,
+        contract.contract_operation_id,
+        &state.organization_placements,
+    )?;
+    let company_scope = validate_reducer_scope(contract, &args, context.organization_id())?;
+    let company_scope = authorize_reducer_company_scope(&context, company_scope).await?;
+    let context = context.with_company_scope(company_scope)?;
+    context.require_current_placement(&state.organization_placements)?;
+    let _ = execute_reducer_call(&context, contract, args).await?;
+    Ok(context)
+}
+
+/// Dispatch the presentation draft save through an explicit API-only path.
+///
+/// The reducer intentionally remains `Exposure::Denied`: it must not become a
+/// generic operation merely because the presentation route needs persistence.
+/// This path retains the authenticated session token so SpacetimeDB derives
+/// the personal owner from `ctx.sender()`.
+pub(crate) async fn dispatch_presentation_save(
+    state: &AppState,
+    session: &ApiSession,
+    args: Value,
+) -> Result<TrustedOperationContext, ApiError> {
+    const REDUCER: &str = "save_presentation_module";
+    let contract = stdb_client::reducer_contract(REDUCER).ok_or_else(|| {
+        ApiError::Forbidden("presentation save reducer is absent from the module contract".into())
+    })?;
+    let signature_ok = contract.name == REDUCER
+        && contract.contract_operation_id == "erp.save_presentation_module"
+        && contract.exposure == Exposure::Denied
+        && contract.organization_position == Some(0)
+        && contract.params.len() == 3
+        && contract
+            .params
+            .iter()
+            .zip([
+                ("organization_id", ScalarKind::UnsignedInteger),
+                ("expected_revision", ScalarKind::OptionalUnsignedInteger),
+                ("definition_json", ScalarKind::String),
+            ])
+            .all(|(actual, (name, kind))| {
+                actual.name == name && actual.kind == kind && actual.ref_target.is_none()
+            });
+    if !signature_ok {
+        return Err(ApiError::Forbidden(
+            "presentation save reducer must remain denied to generic operations".into(),
+        ));
+    }
+    let args = args
+        .as_array()
+        .cloned()
+        .ok_or_else(|| ApiError::Internal("presentation save arguments must be an array".into()))?;
     let client = state.client_with_token(&session.stdb_token);
     let context = TrustedOperationContext::from_session_with_placement(
         session,
