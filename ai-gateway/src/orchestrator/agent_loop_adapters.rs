@@ -20,10 +20,11 @@ use crate::{
     },
 };
 
-/// Internal seam for later governed routing; the caller must first create a
-/// durable run. No HTTP handler or skill invokes this until H5 admission exists.
-/// Every provider attempt is admitted through `ledger` against `binding`, which
-/// must describe the same organization, company and durable run as `context`.
+/// Internal seam for governed routing; the caller must first create a durable
+/// run. Invoked via `run::run_skill_admitted`, which wires the H5b spend layer,
+/// H4 policy engine and H3 tool view. Every provider attempt is admitted through
+/// `ledger` against `binding`, which must describe the same organization, company
+/// and durable run as `context`.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn run_recorded_loop(
     llm: &dyn LlmCompletion,
