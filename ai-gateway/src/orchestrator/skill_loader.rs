@@ -281,6 +281,25 @@ pub async fn complete_run(
     Ok(())
 }
 
+/// Park an open run in a non-terminal wait state. `status` must be a wait state
+/// the module accepts (`awaiting_approval` or `agent_settled`); a run already in
+/// that state replays without change.
+pub async fn set_run_wait_state(
+    stdb: &StdbClient,
+    org_id: u64,
+    company_id: u64,
+    run_id: u64,
+    status: &str,
+) -> Result<()> {
+    stdb.call_reducer(stdb_client::reducer_call!(
+        "set_ai_agent_run_wait_state",
+        serde_json::json!([org_id, company_id, run_id, { "status": status }]),
+    ))
+    .await
+    .context("set_ai_agent_run_wait_state")?;
+    Ok(())
+}
+
 pub async fn list_skills(stdb: &StdbClient, org_id: u64) -> Result<Vec<Value>> {
     let sql = format!(
         "SELECT * FROM ai_skill \

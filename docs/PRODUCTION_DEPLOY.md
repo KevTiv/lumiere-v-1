@@ -37,6 +37,7 @@ These variables use `${VAR:?set VAR}` in `docker-compose.yml` — Compose fails 
 | `STDB_TOKEN` | ai-gateway | Service token for SpacetimeDB HTTP API (not the same as `STDB_SERVER_TOKEN`) |
 | `AI_CERTIFICATION_STDB_TOKEN` | ai-gateway | Dedicated certification executor token; never reuse browser, API, or general gateway credentials |
 | `AI_CERTIFICATION_RUNTIME_HASH` | ai-gateway | Registered immutable executor digest (`sha256:` plus 64 lowercase hex characters) |
+| `AI_SPEND_READ_STDB_TOKEN` | ai-gateway | Dedicated read-only identity for private H5b spend and draft-request tables; never reuse `STDB_TOKEN` or the certification token |
 | `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | web, api-server, ai-gateway | Shared secret (`X-Lumiere-Gateway-Secret`) |
 
 Common optional host overrides (have defaults in compose):
@@ -139,6 +140,7 @@ Realtime WebSocket: Kong/same-origin deployments use `wss://<host>/v1/realtime/w
 | `STDB_TOKEN` | yes | Service account token |
 | `AI_CERTIFICATION_STDB_TOKEN` | yes | Dedicated token matching the active organization certification runtime profile |
 | `AI_CERTIFICATION_RUNTIME_HASH` | yes | Exact digest registered in that runtime profile |
+| `AI_SPEND_READ_STDB_TOKEN` | no | Needed only once governed spend admission or run-correlated drafts are enabled; the gateway principal also needs `ai_spend/reserve` and `ai_spend/settle` grants |
 | `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` | yes | |
 | `QDRANT_URL` | in compose | `http://qdrant:6334` (gRPC) |
 | `STDB_HOST` | recommended | Defaults in gateway dev config only |

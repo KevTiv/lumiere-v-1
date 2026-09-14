@@ -292,6 +292,15 @@ fn snake_to_camel(s: &str) -> String {
     out
 }
 
+/// Convert a SQL column name to the JSON key emitted by the SATS row parser.
+///
+/// This is the canonical transport mapping used by `parse_row`; callers that
+/// need to project generated SQL metadata must use this helper rather than
+/// reimplementing snake/camel conversion.
+pub fn sql_column_json_key(column: &str) -> String {
+    snake_to_camel(column)
+}
+
 fn element_name(el: &Value) -> String {
     let name = &el["name"];
     if let Some(s) = name.get("some").and_then(|v| v.as_str()) {
@@ -633,7 +642,8 @@ fn encode_canonical_sats(
 mod tests {
     use super::{
         encode_reducer_wire_args, normalize_spacetime_identity_header, parse_sats_sql_response,
-        parse_sats_sql_response_canonical, reducer_contract, AUTHENTICATED_IDENTITY_PROBE_SQL,
+        parse_sats_sql_response_canonical, reducer_contract, sql_column_json_key,
+        AUTHENTICATED_IDENTITY_PROBE_SQL,
     };
     use serde_json::json;
 
@@ -727,8 +737,14 @@ mod tests {
         let rows = parse_sats_sql_response(body).expect("parse");
         assert_eq!(rows.len(), 1);
         let row = &rows[0];
-        assert_eq!(row["moveType"], json!("OutInvoice"));
-        assert_eq!(row["invoicePartnerDisplayName"], json!("Acme Corporation"));
+        assert_eq!(
+            row.get(&sql_column_json_key("move_type")),
+            Some(&json!("OutInvoice"))
+        );
+        assert_eq!(
+            row.get(&sql_column_json_key("invoice_partner_display_name")),
+            Some(&json!("Acme Corporation"))
+        );
         assert_eq!(row["state"], json!("Posted"));
     }
 

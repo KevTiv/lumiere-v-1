@@ -43,437 +43,444 @@ pub(crate) fn generated_restore_order(table: &str) -> Option<u32> {
         "ai_chat_session" => Some(30),
         "ai_document_processing_job" => Some(31),
         "ai_insight" => Some(32),
-        "ai_reducer_allowlist" => Some(33),
-        "ai_skill" => Some(34),
-        "ai_skill_certification_environment" => Some(35),
-        "ai_skill_certification_evidence" => Some(36),
-        "ai_skill_certification_request" => Some(37),
-        "ai_skill_certification_runtime_profile" => Some(38),
-        "ai_skill_config" => Some(39),
-        "ai_skill_fixture" => Some(40),
-        "ai_skill_test_run" => Some(41),
-        "ai_team_member" => Some(42),
-        "ai_team_member_skill" => Some(43),
-        "amortization_schedule" => Some(44),
-        "analytics_metric" => Some(45),
-        "assignment_rule" => Some(46),
-        "audit_log" => Some(47),
-        "audit_rule" => Some(48),
-        "bank_match_candidate" => Some(49),
-        "bank_statement_import" => Some(50),
-        "barcode_nomenclature" => Some(51),
-        "barcode_rule" => Some(52),
-        "barcode_scan" => Some(53),
-        "billing_account" => Some(54),
-        "bom_explosion_result" => Some(55),
-        "budget_post" => Some(56),
-        "calendar_event" => Some(57),
-        "capacity_forecast_snapshot" => Some(58),
-        "cartonization_result" => Some(59),
-        "commodity_price_index" => Some(60),
-        "company" => Some(61),
-        "company_country_pack" => Some(62),
-        "company_vertical_pack" => Some(63),
-        "consignment_agreement" => Some(64),
-        "consolidation_account" => Some(65),
-        "consolidation_company_rate" => Some(66),
-        "consolidation_elimination_entry" => Some(67),
-        "consolidation_journal" => Some(68),
-        "contact" => Some(69),
-        "contact_category" => Some(70),
-        "contact_communication_preference" => Some(71),
-        "contact_duplicate_candidate" => Some(72),
-        "contact_identity_verification_authority" => Some(73),
-        "contact_identity_verification_proof" => Some(74),
-        "contact_phone_identity" => Some(75),
-        "contact_relationship" => Some(76),
-        "contact_relationship_insight" => Some(77),
-        "contact_segment" => Some(78),
-        "contact_tag" => Some(79),
-        "country" => Some(80),
-        "country_pack_definition" => Some(81),
-        "country_pack_tax_rule" => Some(82),
-        "crm_conversation" => Some(83),
-        "crm_forecast_snapshot" => Some(84),
-        "crm_provider_event_receipt" => Some(85),
-        "crm_provider_principal" => Some(86),
-        "crm_team" => Some(87),
-        "crossovered_budget" => Some(88),
-        "crossovered_budget_lines" => Some(89),
-        "currency" => Some(90),
-        "currency_rate" => Some(91),
-        "dashboard" => Some(92),
-        "dashboard_widget" => Some(93),
-        "data_classification" => Some(94),
-        "data_classification_rule" => Some(95),
-        "deferred_revenue_schedule" => Some(96),
-        "delegated_admin_scope" => Some(97),
-        "delivery_carrier" => Some(98),
-        "doc_folder" => Some(99),
-        "document" => Some(100),
-        "document_external_ref" => Some(101),
-        "document_legal_hold" => Some(102),
-        "document_presence" => Some(103),
-        "document_retention_purge_job" => Some(104),
-        "document_sequence" => Some(105),
-        "document_signature_request" => Some(106),
-        "document_template" => Some(107),
-        "expense_card_statement_line" => Some(108),
-        "expense_integration_intent" => Some(109),
-        "expense_sheet" => Some(110),
-        "field_permission" => Some(111),
-        "financial_report" => Some(112),
-        "fleet_vehicle" => Some(113),
-        "fleet_vehicle_service_type" => Some(114),
-        "form_config" => Some(115),
-        "fx_revaluation_run" => Some(116),
-        "generated_owner_report" => Some(117),
-        "google_drive_connection" => Some(118),
-        "guarded_action_receipt" => Some(119),
-        "helpdesk_sla" => Some(120),
-        "helpdesk_sla_check_job" => Some(121),
-        "helpdesk_stage" => Some(122),
-        "helpdesk_team" => Some(123),
-        "helpdesk_ticket" => Some(124),
-        "hr_applicant" => Some(125),
-        "hr_attendance" => Some(126),
-        "hr_benefit_enrollment" => Some(127),
-        "hr_benefit_plan" => Some(128),
-        "hr_capacity_forecast" => Some(129),
-        "hr_compensation_event" => Some(130),
-        "hr_contract" => Some(131),
-        "hr_country_pack_leave_default" => Some(132),
-        "hr_department" => Some(133),
-        "hr_employee" => Some(134),
-        "hr_employee_document" => Some(135),
-        "hr_employee_skill" => Some(136),
-        "hr_expense" => Some(137),
-        "hr_expense_advance" => Some(138),
-        "hr_expense_mileage_rate" => Some(139),
-        "hr_expense_per_diem_rate" => Some(140),
-        "hr_expense_policy" => Some(141),
-        "hr_expense_receipt" => Some(142),
-        "hr_global_assignment" => Some(143),
-        "hr_integration_intent" => Some(144),
-        "hr_job_position" => Some(145),
-        "hr_labor_cost_snapshot" => Some(146),
-        "hr_leave" => Some(147),
-        "hr_leave_type" => Some(148),
-        "hr_offboarding_checklist" => Some(149),
-        "hr_onboarding_progress" => Some(150),
-        "hr_onboarding_template" => Some(151),
-        "hr_payroll_export_intent" => Some(152),
-        "hr_payroll_structure" => Some(153),
-        "hr_payslip" => Some(154),
-        "hr_performance_cycle" => Some(155),
-        "hr_performance_goal" => Some(156),
-        "hr_performance_review" => Some(157),
-        "hr_pii_access_log" => Some(158),
-        "hr_resource" => Some(159),
-        "hr_salary_rule" => Some(160),
-        "hr_shift_opt_job" => Some(161),
-        "hr_skill" => Some(162),
-        "hr_statutory_id" => Some(163),
-        "hr_work_schedule" => Some(164),
-        "import_job" => Some(165),
-        "import_mapping_template" => Some(166),
-        "intercompany_rule" => Some(167),
-        "intercompany_transaction" => Some(168),
-        "inventory_adjustment" => Some(169),
-        "inventory_audit_run" => Some(170),
-        "inventory_audit_violation" => Some(171),
-        "inventory_close" => Some(172),
-        "inventory_close_line" => Some(173),
-        "inventory_exception" => Some(174),
-        "inventory_integration_intent" => Some(175),
-        "inventory_valuation" => Some(176),
-        "iot_action" => Some(177),
-        "iot_alert" => Some(178),
-        "iot_device" => Some(179),
-        "iot_hub" => Some(180),
-        "iot_pairing_token" => Some(181),
-        "iot_telemetry" => Some(182),
-        "iot_threshold" => Some(183),
-        "kb_category" => Some(184),
-        "knowledge_article" => Some(185),
-        "knowledge_article_presence" => Some(186),
-        "lead" => Some(187),
-        "lead_lost_reason" => Some(188),
-        "lead_score" => Some(189),
-        "lead_score_factor" => Some(190),
-        "lead_source" => Some(191),
-        "mail_follower" => Some(192),
-        "mail_message" => Some(193),
-        "mail_template" => Some(194),
-        "message_batch" => Some(195),
-        "message_template" => Some(196),
-        "mrp_bom" => Some(197),
-        "mrp_loss_category" => Some(198),
-        "mrp_production" => Some(199),
-        "mrp_routing_workcenter" => Some(200),
-        "mrp_workcenter" => Some(201),
-        "mrp_workcenter_productivity" => Some(202),
-        "mrp_workorder" => Some(203),
-        "operational_message" => Some(204),
-        "opp_stage" => Some(205),
-        "opportunity" => Some(206),
-        "opportunity_presence" => Some(207),
-        "org_permission" => Some(208),
-        "org_schema_migration" => Some(209),
-        "organization" => Some(210),
-        "organization_commit" => Some(211),
-        "organization_commit_cursor" => Some(212),
-        "organization_row_change" => Some(213),
-        "organization_settings" => Some(214),
-        "packaging_material" => Some(215),
-        "partner_credit_control" => Some(216),
-        "password_reset_token" => Some(217),
-        "payment_account" => Some(218),
-        "payment_fee" => Some(219),
-        "payment_reconciliation" => Some(220),
-        "payment_reversal" => Some(221),
-        "payment_transaction" => Some(222),
-        "picking_wave" => Some(223),
-        "pos_config" => Some(224),
-        "pos_loyalty_card" => Some(225),
-        "pos_loyalty_program" => Some(226),
-        "pos_order" => Some(227),
-        "pos_payment_method" => Some(228),
-        "pos_session" => Some(229),
-        "pos_terminal" => Some(230),
-        "privacy_consent" => Some(231),
-        "product" => Some(232),
-        "product_attribute" => Some(233),
-        "product_attribute_value" => Some(234),
-        "product_category" => Some(235),
-        "product_packaging" => Some(236),
-        "product_pricelist" => Some(237),
-        "product_supplier_info" => Some(238),
-        "product_variant" => Some(239),
-        "profit_loss_line" => Some(240),
-        "project_baseline" => Some(241),
-        "project_change_order" => Some(242),
-        "project_earned_value_snapshot" => Some(243),
-        "project_integration_intent" => Some(244),
-        "project_milestone" => Some(245),
-        "project_project" => Some(246),
-        "project_rate_card" => Some(247),
-        "project_revenue_schedule" => Some(248),
-        "project_subcontractor_cost" => Some(249),
-        "project_task" => Some(250),
-        "project_task_stage" => Some(251),
-        "project_timesheet" => Some(252),
-        "project_timesheet_approval" => Some(253),
-        "proposal" => Some(254),
-        "proposal_analysis" => Some(255),
-        "proposal_bid_decision" => Some(256),
-        "proposal_clarification" => Some(257),
-        "proposal_clause" => Some(258),
-        "proposal_comment" => Some(259),
-        "proposal_compliance_requirement" => Some(260),
-        "proposal_integration_intent" => Some(261),
-        "proposal_presence" => Some(262),
-        "proposal_procurement_score" => Some(263),
-        "proposal_source_doc" => Some(264),
-        "proposal_template" => Some(265),
-        "public_holiday" => Some(266),
-        "purchase_approval_delegate" => Some(267),
-        "purchase_blanket_order" => Some(268),
-        "purchase_contract" => Some(269),
-        "purchase_order" => Some(270),
-        "purchase_requisition" => Some(271),
-        "purchase_return" => Some(272),
-        "purchase_rfq" => Some(273),
-        "purchasing_integration_intent" => Some(274),
-        "quality_alert" => Some(275),
-        "quality_alert_reason" => Some(276),
-        "quality_check" => Some(277),
-        "quality_point" => Some(278),
-        "quality_team" => Some(279),
-        "queue_attempt" => Some(280),
-        "queue_effect_receipt" => Some(281),
-        "queue_job" => Some(282),
-        "queue_worker" => Some(283),
-        "record_custom_field_value" => Some(284),
-        "replenishment_rule" => Some(285),
-        "report_template" => Some(286),
-        "res_partner_bank" => Some(287),
-        "resource_allocation" => Some(288),
-        "resource_capacity_snapshot" => Some(289),
-        "resource_utilisation_snapshot" => Some(290),
-        "return_order" => Some(291),
-        "revenue_recognition_rule" => Some(292),
-        "role" => Some(293),
-        "sale_commission" => Some(294),
-        "sale_commission_plan" => Some(295),
-        "sale_contract" => Some(296),
-        "sale_cpq_constraint" => Some(297),
-        "sale_order" => Some(298),
-        "sale_promotion" => Some(299),
-        "sales_integration_intent" => Some(300),
-        "sales_sla_escalation_job" => Some(301),
-        "saved_report" => Some(302),
-        "scheduled_report" => Some(303),
-        "scheduled_report_run" => Some(304),
-        "schema_migration" => Some(305),
-        "search_embedding" => Some(306),
-        "serial_lot_traceability" => Some(307),
-        "shipping_method" => Some(308),
-        "sod_conflict_rule" => Some(309),
-        "stock_count_sheet" => Some(310),
-        "stock_cycle_count" => Some(311),
-        "stock_inventory" => Some(312),
-        "stock_landed_cost" => Some(313),
-        "stock_landed_cost_lines" => Some(314),
-        "stock_location" => Some(315),
-        "stock_move" => Some(316),
-        "stock_package" => Some(317),
-        "stock_picking_batch" => Some(318),
-        "stock_production_lot" => Some(319),
-        "stock_production_serial" => Some(320),
-        "stock_quant" => Some(321),
-        "stock_reorder_group" => Some(322),
-        "stock_route" => Some(323),
-        "stock_rule" => Some(324),
-        "stock_traceability_report" => Some(325),
-        "subscription" => Some(326),
-        "subscription_amendment" => Some(327),
-        "subscription_billing_run" => Some(328),
-        "subscription_bundle" => Some(329),
-        "subscription_collection" => Some(330),
-        "subscription_commitment" => Some(331),
-        "subscription_entitlement" => Some(332),
-        "subscription_payment_intent" => Some(333),
-        "subscription_plan" => Some(334),
-        "subscription_price_index" => Some(335),
-        "subscription_price_tier" => Some(336),
-        "subscription_tax_settle_intent" => Some(337),
-        "subscription_usage_charge" => Some(338),
-        "supplier_intake_request" => Some(339),
-        "tax_deadline" => Some(340),
-        "tax_deadline_status_job" => Some(341),
-        "tax_jurisdiction" => Some(342),
-        "tax_schedule" => Some(343),
-        "trial_balance" => Some(344),
-        "uom" => Some(345),
-        "uom_cat" => Some(346),
-        "uom_conversion" => Some(347),
-        "user_credential" => Some(348),
-        "user_custom_field" => Some(349),
-        "user_invite" => Some(350),
-        "user_organization" => Some(351),
-        "user_profile" => Some(352),
-        "user_role_assignment" => Some(353),
-        "user_session" => Some(354),
-        "utm_campaign" => Some(355),
-        "utm_medium" => Some(356),
-        "utm_source" => Some(357),
-        "vendor_risk_flag" => Some(358),
-        "vendor_scorecard" => Some(359),
-        "warehouse" => Some(360),
-        "warehouse_3_d_zone" => Some(361),
-        "warehouse_geo" => Some(362),
-        "warehouse_sync_intent" => Some(363),
-        "warehouse_task" => Some(364),
-        "whatsapp_business_account" => Some(365),
-        "workflow" => Some(366),
-        "workflow_calendar" => Some(367),
-        "workflow_candidate_group_member" => Some(368),
-        "workflow_command_receipt" => Some(369),
-        "workflow_delegation" => Some(370),
-        "workflow_delivery_attempt" => Some(371),
-        "workflow_delivery_receipt" => Some(372),
-        "workflow_edge" => Some(373),
-        "workflow_fork" => Some(374),
-        "workflow_human_task" => Some(375),
-        "workflow_human_task_receipt" => Some(376),
-        "workflow_instance" => Some(377),
-        "workflow_join_arrival" => Some(378),
-        "workflow_migration_instance_result" => Some(379),
-        "workflow_migration_plan" => Some(380),
-        "workflow_migration_preflight" => Some(381),
-        "workflow_node" => Some(382),
-        "workflow_outbox" => Some(383),
-        "workflow_simulation_result" => Some(384),
-        "workflow_timer" => Some(385),
-        "workflow_token" => Some(386),
-        "working_calendar" => Some(387),
-        "account_asset_depreciation_line" => Some(388),
-        "account_bank_statement_line" => Some(389),
-        "account_move_line" => Some(390),
-        "account_payment_term_line" => Some(391),
-        "account_period" => Some(392),
-        "ai_agent_run_policy_snapshot" => Some(393),
-        "ai_agent_run_step" => Some(394),
-        "ai_skill_release" => Some(395),
-        "ai_skill_version" => Some(396),
-        "amortization_line" => Some(397),
-        "balance_sheet_line" => Some(398),
-        "bank_statement_import_line" => Some(399),
-        "cash_flow_line" => Some(400),
-        "contact_category_assignment" => Some(401),
-        "contact_role_assignment" => Some(402),
-        "contact_segment_rule" => Some(403),
-        "contact_tag_assignment" => Some(404),
-        "crm_conversation_message" => Some(405),
-        "deferred_revenue_line" => Some(406),
-        "delivery_price_rule" => Some(407),
-        "document_version" => Some(408),
-        "form_config_field" => Some(409),
-        "form_role_config" => Some(410),
-        "helpdesk_team_member" => Some(411),
-        "hr_expense_advance_application" => Some(412),
-        "hr_expense_allocation" => Some(413),
-        "hr_expense_policy_exception" => Some(414),
-        "hr_leave_allocation" => Some(415),
-        "hr_onboarding_template_item" => Some(416),
-        "import_job_error" => Some(417),
-        "import_job_record" => Some(418),
-        "mrp_bom_line" => Some(419),
-        "opportunity_line" => Some(420),
-        "pos_order_line" => Some(421),
-        "pos_payment" => Some(422),
-        "product_attribute_line" => Some(423),
-        "product_pricelist_item" => Some(424),
-        "project_rate_card_line" => Some(425),
-        "project_revenue_line" => Some(426),
-        "proposal_line_item" => Some(427),
-        "proposal_section" => Some(428),
-        "proposal_version" => Some(429),
-        "purchase_blanket_order_line" => Some(430),
-        "purchase_blanket_release" => Some(431),
-        "purchase_order_line" => Some(432),
-        "purchase_requisition_line" => Some(433),
-        "purchase_return_line" => Some(434),
-        "purchase_rfq_bid" => Some(435),
-        "purchase_rfq_line" => Some(436),
-        "return_order_line" => Some(437),
-        "sale_commission_plan_split" => Some(438),
-        "sale_order_line" => Some(439),
-        "sale_order_option" => Some(440),
-        "segment_member" => Some(441),
-        "stock_inventory_line" => Some(442),
-        "stock_landed_cost_allocation" => Some(443),
-        "stock_landed_cost_application" => Some(444),
-        "stock_move_line" => Some(445),
-        "stock_picking" => Some(446),
-        "subscription_bundle_item" => Some(447),
-        "subscription_line" => Some(448),
-        "subscription_usage_event" => Some(449),
-        "tax_deadline_reminder" => Some(450),
-        "workflow_calendar_version" => Some(451),
-        "workflow_decision_event" => Some(452),
-        "workflow_human_task_candidate" => Some(453),
-        "workflow_human_task_event" => Some(454),
-        "workflow_simulation_step" => Some(455),
-        "workflow_version" => Some(456),
-        "form_field_label" => Some(457),
-        "workflow_calendar_exception" => Some(458),
+        "ai_price_snapshot" => Some(33),
+        "ai_reducer_allowlist" => Some(34),
+        "ai_skill" => Some(35),
+        "ai_skill_certification_environment" => Some(36),
+        "ai_skill_certification_evidence" => Some(37),
+        "ai_skill_certification_request" => Some(38),
+        "ai_skill_certification_runtime_profile" => Some(39),
+        "ai_skill_config" => Some(40),
+        "ai_skill_fixture" => Some(41),
+        "ai_skill_test_run" => Some(42),
+        "ai_spend_budget" => Some(43),
+        "ai_team_member" => Some(44),
+        "ai_team_member_skill" => Some(45),
+        "amortization_schedule" => Some(46),
+        "analytics_metric" => Some(47),
+        "assignment_rule" => Some(48),
+        "audit_log" => Some(49),
+        "audit_rule" => Some(50),
+        "bank_match_candidate" => Some(51),
+        "bank_statement_import" => Some(52),
+        "barcode_nomenclature" => Some(53),
+        "barcode_rule" => Some(54),
+        "barcode_scan" => Some(55),
+        "billing_account" => Some(56),
+        "bom_explosion_result" => Some(57),
+        "budget_post" => Some(58),
+        "calendar_event" => Some(59),
+        "capacity_forecast_snapshot" => Some(60),
+        "cartonization_result" => Some(61),
+        "commodity_price_index" => Some(62),
+        "company" => Some(63),
+        "company_country_pack" => Some(64),
+        "company_vertical_pack" => Some(65),
+        "consignment_agreement" => Some(66),
+        "consolidation_account" => Some(67),
+        "consolidation_company_rate" => Some(68),
+        "consolidation_elimination_entry" => Some(69),
+        "consolidation_journal" => Some(70),
+        "contact" => Some(71),
+        "contact_category" => Some(72),
+        "contact_communication_preference" => Some(73),
+        "contact_duplicate_candidate" => Some(74),
+        "contact_identity_verification_authority" => Some(75),
+        "contact_identity_verification_proof" => Some(76),
+        "contact_phone_identity" => Some(77),
+        "contact_relationship" => Some(78),
+        "contact_relationship_insight" => Some(79),
+        "contact_segment" => Some(80),
+        "contact_tag" => Some(81),
+        "country" => Some(82),
+        "country_pack_definition" => Some(83),
+        "country_pack_tax_rule" => Some(84),
+        "crm_conversation" => Some(85),
+        "crm_forecast_snapshot" => Some(86),
+        "crm_provider_event_receipt" => Some(87),
+        "crm_provider_principal" => Some(88),
+        "crm_team" => Some(89),
+        "crossovered_budget" => Some(90),
+        "crossovered_budget_lines" => Some(91),
+        "currency" => Some(92),
+        "currency_rate" => Some(93),
+        "dashboard" => Some(94),
+        "dashboard_widget" => Some(95),
+        "data_classification" => Some(96),
+        "data_classification_rule" => Some(97),
+        "deferred_revenue_schedule" => Some(98),
+        "delegated_admin_scope" => Some(99),
+        "delivery_carrier" => Some(100),
+        "doc_folder" => Some(101),
+        "document" => Some(102),
+        "document_external_ref" => Some(103),
+        "document_legal_hold" => Some(104),
+        "document_presence" => Some(105),
+        "document_retention_purge_job" => Some(106),
+        "document_sequence" => Some(107),
+        "document_signature_request" => Some(108),
+        "document_template" => Some(109),
+        "expense_card_statement_line" => Some(110),
+        "expense_integration_intent" => Some(111),
+        "expense_sheet" => Some(112),
+        "field_permission" => Some(113),
+        "financial_report" => Some(114),
+        "fleet_vehicle" => Some(115),
+        "fleet_vehicle_service_type" => Some(116),
+        "form_config" => Some(117),
+        "fx_revaluation_run" => Some(118),
+        "generated_owner_report" => Some(119),
+        "google_drive_connection" => Some(120),
+        "guarded_action_receipt" => Some(121),
+        "helpdesk_sla" => Some(122),
+        "helpdesk_sla_check_job" => Some(123),
+        "helpdesk_stage" => Some(124),
+        "helpdesk_team" => Some(125),
+        "helpdesk_ticket" => Some(126),
+        "hr_applicant" => Some(127),
+        "hr_attendance" => Some(128),
+        "hr_benefit_enrollment" => Some(129),
+        "hr_benefit_plan" => Some(130),
+        "hr_capacity_forecast" => Some(131),
+        "hr_compensation_event" => Some(132),
+        "hr_contract" => Some(133),
+        "hr_country_pack_leave_default" => Some(134),
+        "hr_department" => Some(135),
+        "hr_employee" => Some(136),
+        "hr_employee_document" => Some(137),
+        "hr_employee_skill" => Some(138),
+        "hr_expense" => Some(139),
+        "hr_expense_advance" => Some(140),
+        "hr_expense_mileage_rate" => Some(141),
+        "hr_expense_per_diem_rate" => Some(142),
+        "hr_expense_policy" => Some(143),
+        "hr_expense_receipt" => Some(144),
+        "hr_global_assignment" => Some(145),
+        "hr_integration_intent" => Some(146),
+        "hr_job_position" => Some(147),
+        "hr_labor_cost_snapshot" => Some(148),
+        "hr_leave" => Some(149),
+        "hr_leave_type" => Some(150),
+        "hr_offboarding_checklist" => Some(151),
+        "hr_onboarding_progress" => Some(152),
+        "hr_onboarding_template" => Some(153),
+        "hr_payroll_export_intent" => Some(154),
+        "hr_payroll_structure" => Some(155),
+        "hr_payslip" => Some(156),
+        "hr_performance_cycle" => Some(157),
+        "hr_performance_goal" => Some(158),
+        "hr_performance_review" => Some(159),
+        "hr_pii_access_log" => Some(160),
+        "hr_resource" => Some(161),
+        "hr_salary_rule" => Some(162),
+        "hr_shift_opt_job" => Some(163),
+        "hr_skill" => Some(164),
+        "hr_statutory_id" => Some(165),
+        "hr_work_schedule" => Some(166),
+        "import_job" => Some(167),
+        "import_mapping_template" => Some(168),
+        "intercompany_rule" => Some(169),
+        "intercompany_transaction" => Some(170),
+        "inventory_adjustment" => Some(171),
+        "inventory_audit_run" => Some(172),
+        "inventory_audit_violation" => Some(173),
+        "inventory_close" => Some(174),
+        "inventory_close_line" => Some(175),
+        "inventory_exception" => Some(176),
+        "inventory_integration_intent" => Some(177),
+        "inventory_valuation" => Some(178),
+        "iot_action" => Some(179),
+        "iot_alert" => Some(180),
+        "iot_device" => Some(181),
+        "iot_hub" => Some(182),
+        "iot_pairing_token" => Some(183),
+        "iot_telemetry" => Some(184),
+        "iot_threshold" => Some(185),
+        "kb_category" => Some(186),
+        "knowledge_article" => Some(187),
+        "knowledge_article_presence" => Some(188),
+        "lead" => Some(189),
+        "lead_lost_reason" => Some(190),
+        "lead_score" => Some(191),
+        "lead_score_factor" => Some(192),
+        "lead_source" => Some(193),
+        "mail_follower" => Some(194),
+        "mail_message" => Some(195),
+        "mail_template" => Some(196),
+        "message_batch" => Some(197),
+        "message_template" => Some(198),
+        "mrp_bom" => Some(199),
+        "mrp_loss_category" => Some(200),
+        "mrp_production" => Some(201),
+        "mrp_routing_workcenter" => Some(202),
+        "mrp_workcenter" => Some(203),
+        "mrp_workcenter_productivity" => Some(204),
+        "mrp_workorder" => Some(205),
+        "operational_message" => Some(206),
+        "opp_stage" => Some(207),
+        "opportunity" => Some(208),
+        "opportunity_presence" => Some(209),
+        "org_permission" => Some(210),
+        "org_schema_migration" => Some(211),
+        "organization" => Some(212),
+        "organization_commit" => Some(213),
+        "organization_commit_cursor" => Some(214),
+        "organization_row_change" => Some(215),
+        "organization_settings" => Some(216),
+        "packaging_material" => Some(217),
+        "partner_credit_control" => Some(218),
+        "password_reset_token" => Some(219),
+        "payment_account" => Some(220),
+        "payment_fee" => Some(221),
+        "payment_reconciliation" => Some(222),
+        "payment_reversal" => Some(223),
+        "payment_transaction" => Some(224),
+        "picking_wave" => Some(225),
+        "pos_config" => Some(226),
+        "pos_loyalty_card" => Some(227),
+        "pos_loyalty_program" => Some(228),
+        "pos_order" => Some(229),
+        "pos_payment_method" => Some(230),
+        "pos_session" => Some(231),
+        "pos_terminal" => Some(232),
+        "presentation_module" => Some(233),
+        "privacy_consent" => Some(234),
+        "product" => Some(235),
+        "product_attribute" => Some(236),
+        "product_attribute_value" => Some(237),
+        "product_category" => Some(238),
+        "product_packaging" => Some(239),
+        "product_pricelist" => Some(240),
+        "product_supplier_info" => Some(241),
+        "product_variant" => Some(242),
+        "profit_loss_line" => Some(243),
+        "project_baseline" => Some(244),
+        "project_change_order" => Some(245),
+        "project_earned_value_snapshot" => Some(246),
+        "project_integration_intent" => Some(247),
+        "project_milestone" => Some(248),
+        "project_project" => Some(249),
+        "project_rate_card" => Some(250),
+        "project_revenue_schedule" => Some(251),
+        "project_subcontractor_cost" => Some(252),
+        "project_task" => Some(253),
+        "project_task_stage" => Some(254),
+        "project_timesheet" => Some(255),
+        "project_timesheet_approval" => Some(256),
+        "proposal" => Some(257),
+        "proposal_analysis" => Some(258),
+        "proposal_bid_decision" => Some(259),
+        "proposal_clarification" => Some(260),
+        "proposal_clause" => Some(261),
+        "proposal_comment" => Some(262),
+        "proposal_compliance_requirement" => Some(263),
+        "proposal_integration_intent" => Some(264),
+        "proposal_presence" => Some(265),
+        "proposal_procurement_score" => Some(266),
+        "proposal_source_doc" => Some(267),
+        "proposal_template" => Some(268),
+        "public_holiday" => Some(269),
+        "purchase_approval_delegate" => Some(270),
+        "purchase_blanket_order" => Some(271),
+        "purchase_contract" => Some(272),
+        "purchase_order" => Some(273),
+        "purchase_requisition" => Some(274),
+        "purchase_return" => Some(275),
+        "purchase_rfq" => Some(276),
+        "purchasing_integration_intent" => Some(277),
+        "quality_alert" => Some(278),
+        "quality_alert_reason" => Some(279),
+        "quality_check" => Some(280),
+        "quality_point" => Some(281),
+        "quality_team" => Some(282),
+        "queue_attempt" => Some(283),
+        "queue_effect_receipt" => Some(284),
+        "queue_job" => Some(285),
+        "queue_worker" => Some(286),
+        "record_custom_field_value" => Some(287),
+        "replenishment_rule" => Some(288),
+        "report_template" => Some(289),
+        "res_partner_bank" => Some(290),
+        "resource_allocation" => Some(291),
+        "resource_capacity_snapshot" => Some(292),
+        "resource_utilisation_snapshot" => Some(293),
+        "return_order" => Some(294),
+        "revenue_recognition_rule" => Some(295),
+        "role" => Some(296),
+        "sale_commission" => Some(297),
+        "sale_commission_plan" => Some(298),
+        "sale_contract" => Some(299),
+        "sale_cpq_constraint" => Some(300),
+        "sale_order" => Some(301),
+        "sale_promotion" => Some(302),
+        "sales_integration_intent" => Some(303),
+        "sales_sla_escalation_job" => Some(304),
+        "saved_report" => Some(305),
+        "scheduled_report" => Some(306),
+        "scheduled_report_run" => Some(307),
+        "schema_migration" => Some(308),
+        "search_embedding" => Some(309),
+        "serial_lot_traceability" => Some(310),
+        "shipping_method" => Some(311),
+        "sod_conflict_rule" => Some(312),
+        "stock_count_sheet" => Some(313),
+        "stock_cycle_count" => Some(314),
+        "stock_inventory" => Some(315),
+        "stock_landed_cost" => Some(316),
+        "stock_landed_cost_lines" => Some(317),
+        "stock_location" => Some(318),
+        "stock_move" => Some(319),
+        "stock_package" => Some(320),
+        "stock_picking_batch" => Some(321),
+        "stock_production_lot" => Some(322),
+        "stock_production_serial" => Some(323),
+        "stock_quant" => Some(324),
+        "stock_reorder_group" => Some(325),
+        "stock_route" => Some(326),
+        "stock_rule" => Some(327),
+        "stock_traceability_report" => Some(328),
+        "subscription" => Some(329),
+        "subscription_amendment" => Some(330),
+        "subscription_billing_run" => Some(331),
+        "subscription_bundle" => Some(332),
+        "subscription_collection" => Some(333),
+        "subscription_commitment" => Some(334),
+        "subscription_entitlement" => Some(335),
+        "subscription_payment_intent" => Some(336),
+        "subscription_plan" => Some(337),
+        "subscription_price_index" => Some(338),
+        "subscription_price_tier" => Some(339),
+        "subscription_tax_settle_intent" => Some(340),
+        "subscription_usage_charge" => Some(341),
+        "supplier_intake_request" => Some(342),
+        "tax_deadline" => Some(343),
+        "tax_deadline_status_job" => Some(344),
+        "tax_jurisdiction" => Some(345),
+        "tax_schedule" => Some(346),
+        "trial_balance" => Some(347),
+        "uom" => Some(348),
+        "uom_cat" => Some(349),
+        "uom_conversion" => Some(350),
+        "user_credential" => Some(351),
+        "user_custom_field" => Some(352),
+        "user_invite" => Some(353),
+        "user_organization" => Some(354),
+        "user_profile" => Some(355),
+        "user_role_assignment" => Some(356),
+        "user_session" => Some(357),
+        "utm_campaign" => Some(358),
+        "utm_medium" => Some(359),
+        "utm_source" => Some(360),
+        "vendor_risk_flag" => Some(361),
+        "vendor_scorecard" => Some(362),
+        "warehouse" => Some(363),
+        "warehouse_3_d_zone" => Some(364),
+        "warehouse_geo" => Some(365),
+        "warehouse_sync_intent" => Some(366),
+        "warehouse_task" => Some(367),
+        "whatsapp_business_account" => Some(368),
+        "workflow" => Some(369),
+        "workflow_calendar" => Some(370),
+        "workflow_candidate_group_member" => Some(371),
+        "workflow_command_receipt" => Some(372),
+        "workflow_delegation" => Some(373),
+        "workflow_delivery_attempt" => Some(374),
+        "workflow_delivery_receipt" => Some(375),
+        "workflow_edge" => Some(376),
+        "workflow_fork" => Some(377),
+        "workflow_human_task" => Some(378),
+        "workflow_human_task_receipt" => Some(379),
+        "workflow_instance" => Some(380),
+        "workflow_join_arrival" => Some(381),
+        "workflow_migration_instance_result" => Some(382),
+        "workflow_migration_plan" => Some(383),
+        "workflow_migration_preflight" => Some(384),
+        "workflow_node" => Some(385),
+        "workflow_outbox" => Some(386),
+        "workflow_simulation_result" => Some(387),
+        "workflow_timer" => Some(388),
+        "workflow_token" => Some(389),
+        "working_calendar" => Some(390),
+        "account_asset_depreciation_line" => Some(391),
+        "account_bank_statement_line" => Some(392),
+        "account_move_line" => Some(393),
+        "account_payment_term_line" => Some(394),
+        "account_period" => Some(395),
+        "ai_action_draft_request" => Some(396),
+        "ai_agent_run_policy_snapshot" => Some(397),
+        "ai_agent_run_step" => Some(398),
+        "ai_provider_attempt" => Some(399),
+        "ai_skill_release" => Some(400),
+        "ai_skill_version" => Some(401),
+        "ai_spend_reservation" => Some(402),
+        "amortization_line" => Some(403),
+        "balance_sheet_line" => Some(404),
+        "bank_statement_import_line" => Some(405),
+        "cash_flow_line" => Some(406),
+        "contact_category_assignment" => Some(407),
+        "contact_role_assignment" => Some(408),
+        "contact_segment_rule" => Some(409),
+        "contact_tag_assignment" => Some(410),
+        "crm_conversation_message" => Some(411),
+        "deferred_revenue_line" => Some(412),
+        "delivery_price_rule" => Some(413),
+        "document_version" => Some(414),
+        "form_config_field" => Some(415),
+        "form_role_config" => Some(416),
+        "helpdesk_team_member" => Some(417),
+        "hr_expense_advance_application" => Some(418),
+        "hr_expense_allocation" => Some(419),
+        "hr_expense_policy_exception" => Some(420),
+        "hr_leave_allocation" => Some(421),
+        "hr_onboarding_template_item" => Some(422),
+        "import_job_error" => Some(423),
+        "import_job_record" => Some(424),
+        "mrp_bom_line" => Some(425),
+        "opportunity_line" => Some(426),
+        "pos_order_line" => Some(427),
+        "pos_payment" => Some(428),
+        "presentation_module_version" => Some(429),
+        "product_attribute_line" => Some(430),
+        "product_pricelist_item" => Some(431),
+        "project_rate_card_line" => Some(432),
+        "project_revenue_line" => Some(433),
+        "proposal_line_item" => Some(434),
+        "proposal_section" => Some(435),
+        "proposal_version" => Some(436),
+        "purchase_blanket_order_line" => Some(437),
+        "purchase_blanket_release" => Some(438),
+        "purchase_order_line" => Some(439),
+        "purchase_requisition_line" => Some(440),
+        "purchase_return_line" => Some(441),
+        "purchase_rfq_bid" => Some(442),
+        "purchase_rfq_line" => Some(443),
+        "return_order_line" => Some(444),
+        "sale_commission_plan_split" => Some(445),
+        "sale_order_line" => Some(446),
+        "sale_order_option" => Some(447),
+        "segment_member" => Some(448),
+        "stock_inventory_line" => Some(449),
+        "stock_landed_cost_allocation" => Some(450),
+        "stock_landed_cost_application" => Some(451),
+        "stock_move_line" => Some(452),
+        "stock_picking" => Some(453),
+        "subscription_bundle_item" => Some(454),
+        "subscription_line" => Some(455),
+        "subscription_usage_event" => Some(456),
+        "tax_deadline_reminder" => Some(457),
+        "workflow_calendar_version" => Some(458),
+        "workflow_decision_event" => Some(459),
+        "workflow_human_task_candidate" => Some(460),
+        "workflow_human_task_event" => Some(461),
+        "workflow_simulation_step" => Some(462),
+        "workflow_version" => Some(463),
+        "form_field_label" => Some(464),
+        "workflow_calendar_exception" => Some(465),
         _ => None,
     }
 }
 
-pub(crate) const GENERATED_FINAL_RESTORE_ORDER: u32 = 458;
+pub(crate) const GENERATED_FINAL_RESTORE_ORDER: u32 = 465;
 
 pub(crate) fn apply_generated_reconstruction_row(
     ctx: &ReducerContext,
@@ -1936,6 +1943,52 @@ pub(crate) fn apply_generated_reconstruction_row(
                 }
             }
         },
+        "ai_price_snapshot" => {
+            use crate::ai::spend::{ai_price_snapshot as _, AiPriceSnapshot};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiPriceSnapshot>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for ai_price_snapshot: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.ai_price_snapshot();
+            if let Some(existing) = rows.id().find(&row.id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing ai_price_snapshot row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming ai_price_snapshot row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                let desired_id = row.id;
+                loop {
+                    let spacetimedb_sats::serde::SerdeWrapper(candidate) =
+                        serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiPriceSnapshot>>(row_json)
+                            .map_err(|error| format!("invalid canonical row JSON for ai_price_snapshot: {error}"))?;
+                    let inserted = rows.insert(AiPriceSnapshot {
+                        id: 0,
+                        ..candidate
+                    });
+                    if inserted.id == desired_id {
+                        break Ok(GeneratedApplyOutcome::Inserted);
+                    }
+                    let generated_id = inserted.id;
+                    rows.id().delete(&generated_id);
+                    if generated_id > desired_id {
+                        break Err(format!(
+                            "reconstruction sequence for ai_price_snapshot advanced past restored primary key {desired_id}"
+                        ));
+                    }
+                }
+            }
+        },
         "ai_reducer_allowlist" => {
             use crate::ai::reducer_allowlist::{ai_reducer_allowlist as _, AiReducerAllowlist};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -2345,6 +2398,52 @@ pub(crate) fn apply_generated_reconstruction_row(
                     if generated_id > desired_id {
                         break Err(format!(
                             "reconstruction sequence for ai_skill_test_run advanced past restored primary key {desired_id}"
+                        ));
+                    }
+                }
+            }
+        },
+        "ai_spend_budget" => {
+            use crate::ai::spend::{ai_spend_budget as _, AiSpendBudget};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiSpendBudget>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for ai_spend_budget: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.ai_spend_budget();
+            if let Some(existing) = rows.id().find(&row.id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing ai_spend_budget row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming ai_spend_budget row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                let desired_id = row.id;
+                loop {
+                    let spacetimedb_sats::serde::SerdeWrapper(candidate) =
+                        serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiSpendBudget>>(row_json)
+                            .map_err(|error| format!("invalid canonical row JSON for ai_spend_budget: {error}"))?;
+                    let inserted = rows.insert(AiSpendBudget {
+                        id: 0,
+                        ..candidate
+                    });
+                    if inserted.id == desired_id {
+                        break Ok(GeneratedApplyOutcome::Inserted);
+                    }
+                    let generated_id = inserted.id;
+                    rows.id().delete(&generated_id);
+                    if generated_id > desired_id {
+                        break Err(format!(
+                            "reconstruction sequence for ai_spend_budget advanced past restored primary key {desired_id}"
                         ));
                     }
                 }
@@ -10900,6 +10999,52 @@ pub(crate) fn apply_generated_reconstruction_row(
                 }
             }
         },
+        "presentation_module" => {
+            use crate::presentation::{presentation_module as _, PresentationModule};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PresentationModule>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for presentation_module: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.presentation_module();
+            if let Some(existing) = rows.id().find(&row.id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing presentation_module row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming presentation_module row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                let desired_id = row.id;
+                loop {
+                    let spacetimedb_sats::serde::SerdeWrapper(candidate) =
+                        serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PresentationModule>>(row_json)
+                            .map_err(|error| format!("invalid canonical row JSON for presentation_module: {error}"))?;
+                    let inserted = rows.insert(PresentationModule {
+                        id: 0,
+                        ..candidate
+                    });
+                    if inserted.id == desired_id {
+                        break Ok(GeneratedApplyOutcome::Inserted);
+                    }
+                    let generated_id = inserted.id;
+                    rows.id().delete(&generated_id);
+                    if generated_id > desired_id {
+                        break Err(format!(
+                            "reconstruction sequence for presentation_module advanced past restored primary key {desired_id}"
+                        ));
+                    }
+                }
+            }
+        },
         "privacy_consent" => {
             use crate::core::privacy::{privacy_consent as _, PrivacyConsent};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -18280,6 +18425,52 @@ pub(crate) fn apply_generated_reconstruction_row(
                 }
             }
         },
+        "ai_action_draft_request" => {
+            use crate::ai::action_drafts::{ai_action_draft_request as _, AiActionDraftRequest};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiActionDraftRequest>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for ai_action_draft_request: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.ai_action_draft_request();
+            if let Some(existing) = rows.id().find(&row.id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing ai_action_draft_request row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming ai_action_draft_request row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                let desired_id = row.id;
+                loop {
+                    let spacetimedb_sats::serde::SerdeWrapper(candidate) =
+                        serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiActionDraftRequest>>(row_json)
+                            .map_err(|error| format!("invalid canonical row JSON for ai_action_draft_request: {error}"))?;
+                    let inserted = rows.insert(AiActionDraftRequest {
+                        id: 0,
+                        ..candidate
+                    });
+                    if inserted.id == desired_id {
+                        break Ok(GeneratedApplyOutcome::Inserted);
+                    }
+                    let generated_id = inserted.id;
+                    rows.id().delete(&generated_id);
+                    if generated_id > desired_id {
+                        break Err(format!(
+                            "reconstruction sequence for ai_action_draft_request advanced past restored primary key {desired_id}"
+                        ));
+                    }
+                }
+            }
+        },
         "ai_agent_run_policy_snapshot" => {
             use crate::ai::skill_registry::{ai_agent_run_policy_snapshot as _, AiAgentRunPolicySnapshot};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -18372,6 +18563,52 @@ pub(crate) fn apply_generated_reconstruction_row(
                 }
             }
         },
+        "ai_provider_attempt" => {
+            use crate::ai::spend::{ai_provider_attempt as _, AiProviderAttempt};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiProviderAttempt>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for ai_provider_attempt: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.ai_provider_attempt();
+            if let Some(existing) = rows.id().find(&row.id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing ai_provider_attempt row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming ai_provider_attempt row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                let desired_id = row.id;
+                loop {
+                    let spacetimedb_sats::serde::SerdeWrapper(candidate) =
+                        serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiProviderAttempt>>(row_json)
+                            .map_err(|error| format!("invalid canonical row JSON for ai_provider_attempt: {error}"))?;
+                    let inserted = rows.insert(AiProviderAttempt {
+                        id: 0,
+                        ..candidate
+                    });
+                    if inserted.id == desired_id {
+                        break Ok(GeneratedApplyOutcome::Inserted);
+                    }
+                    let generated_id = inserted.id;
+                    rows.id().delete(&generated_id);
+                    if generated_id > desired_id {
+                        break Err(format!(
+                            "reconstruction sequence for ai_provider_attempt advanced past restored primary key {desired_id}"
+                        ));
+                    }
+                }
+            }
+        },
         "ai_skill_release" => {
             use crate::ai::skill_registry::{ai_skill_release as _, AiSkillRelease};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -18459,6 +18696,52 @@ pub(crate) fn apply_generated_reconstruction_row(
                     if generated_id > desired_id {
                         break Err(format!(
                             "reconstruction sequence for ai_skill_version advanced past restored primary key {desired_id}"
+                        ));
+                    }
+                }
+            }
+        },
+        "ai_spend_reservation" => {
+            use crate::ai::spend::{ai_spend_reservation as _, AiSpendReservation};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiSpendReservation>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for ai_spend_reservation: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.ai_spend_reservation();
+            if let Some(existing) = rows.id().find(&row.id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing ai_spend_reservation row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming ai_spend_reservation row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                let desired_id = row.id;
+                loop {
+                    let spacetimedb_sats::serde::SerdeWrapper(candidate) =
+                        serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<AiSpendReservation>>(row_json)
+                            .map_err(|error| format!("invalid canonical row JSON for ai_spend_reservation: {error}"))?;
+                    let inserted = rows.insert(AiSpendReservation {
+                        id: 0,
+                        ..candidate
+                    });
+                    if inserted.id == desired_id {
+                        break Ok(GeneratedApplyOutcome::Inserted);
+                    }
+                    let generated_id = inserted.id;
+                    rows.id().delete(&generated_id);
+                    if generated_id > desired_id {
+                        break Err(format!(
+                            "reconstruction sequence for ai_spend_reservation advanced past restored primary key {desired_id}"
                         ));
                     }
                 }
@@ -19655,6 +19938,52 @@ pub(crate) fn apply_generated_reconstruction_row(
                     if generated_id > desired_id {
                         break Err(format!(
                             "reconstruction sequence for pos_payment advanced past restored primary key {desired_id}"
+                        ));
+                    }
+                }
+            }
+        },
+        "presentation_module_version" => {
+            use crate::presentation::{presentation_module_version as _, PresentationModuleVersion};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PresentationModuleVersion>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for presentation_module_version: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.presentation_module_version();
+            if let Some(existing) = rows.id().find(&row.id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing presentation_module_version row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming presentation_module_version row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                let desired_id = row.id;
+                loop {
+                    let spacetimedb_sats::serde::SerdeWrapper(candidate) =
+                        serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<PresentationModuleVersion>>(row_json)
+                            .map_err(|error| format!("invalid canonical row JSON for presentation_module_version: {error}"))?;
+                    let inserted = rows.insert(PresentationModuleVersion {
+                        id: 0,
+                        ..candidate
+                    });
+                    if inserted.id == desired_id {
+                        break Ok(GeneratedApplyOutcome::Inserted);
+                    }
+                    let generated_id = inserted.id;
+                    rows.id().delete(&generated_id);
+                    if generated_id > desired_id {
+                        break Err(format!(
+                            "reconstruction sequence for presentation_module_version advanced past restored primary key {desired_id}"
                         ));
                     }
                 }

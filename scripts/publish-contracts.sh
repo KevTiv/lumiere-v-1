@@ -26,14 +26,58 @@ if [[ ! -d "$STAGING/ts/generated" ]]; then
   echo "error: $STAGING/ts/generated missing — run make generate-stdb-ts-sdk && make codegen first" >&2
   exit 1
 fi
+for presentation in module-draft preview-contract; do
+  if [[ ! -f "$STAGING/ts/presentation/$presentation.ts" \
+    || ! -f "$STAGING/ts/presentation/$presentation.schema.json" \
+    || ! -f "$STAGING/manifests/presentation/$presentation.schema.json" ]]; then
+    echo "error: presentation contract $presentation missing — run make generate-presentation-contracts first" >&2
+    exit 1
+  fi
+done
 if [[ ! -f "$STAGING/ir/lumiere-contract-ir-v2.json" \
   || ! -f "$STAGING/ir/lumiere-contract-ir-v2.json.sha256" ]]; then
   echo "error: canonical contract IR v2 artifact missing — run make codegen first" >&2
   exit 1
 fi
+if [[ ! -f "$STAGING/ir/agent-capability-registry-v1.json" \
+  || ! -f "$STAGING/ir/agent-capability-registry-v1.json.sha256" ]]; then
+  echo "error: agent capability artifact or checksum sidecar missing — run make codegen first" >&2
+  exit 1
+fi
 
 python3 "$ROOT/scripts/verify-contract-ir.py" \
   "$STAGING/ir/lumiere-contract-ir-v2.json" --require-clean
+python3 "$ROOT/scripts/verify-agent-capability-artifact.py" \
+  "$STAGING/ir/agent-capability-registry-v1.json"
+
+# The verifier validates the capability artifact's own shape and checksum. A
+# publisher must also prove that it is the clean output for the exact IR being
+# transferred; otherwise an old, valid artifact could be paired with a newer
+# contract release.
+python3 - "$STAGING/ir/lumiere-contract-ir-v2.json" \
+  "$STAGING/ir/agent-capability-registry-v1.json" <<'PY'
+import json
+import sys
+
+ir_path, capability_path = sys.argv[1:]
+with open(ir_path, encoding="utf-8") as source:
+    ir = json.load(source)
+with open(capability_path, encoding="utf-8") as source:
+    capability = json.load(source)
+
+if ir.get("source_dirty") is not False:
+    raise SystemExit("publish-contracts: canonical IR source is dirty")
+source_ir = capability.get("source_ir")
+if not isinstance(source_ir, dict):
+    raise SystemExit("publish-contracts: capability artifact source_ir is missing")
+for field in ("ir_version", "source_commit", "source_dirty", "schema_hash"):
+    if source_ir.get(field) != ir.get(field):
+        raise SystemExit(
+            f"publish-contracts: capability artifact source_ir.{field} does not match canonical IR"
+        )
+if source_ir.get("source_dirty") is not False:
+    raise SystemExit("publish-contracts: capability artifact source IR is dirty")
+PY
 
 SOURCE_REPO="$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)"
 if [[ -z "$SOURCE_REPO" ]]; then
@@ -56,8 +100,19 @@ IR_VERSION="${IR_METADATA[1]}"
 SCHEMA_HASH="${IR_METADATA[2]}"
 IR_SHA256="${IR_METADATA[3]}"
 
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+# A prepare directory retains a fully checked local candidate for review.
+# No remote branch or immutable tag is changed in this mode.
+if [[ -n "${LUMIERE_CONTRACTS_PREPARE_DIR:-}" ]]; then
+  WORK="$LUMIERE_CONTRACTS_PREPARE_DIR"
+  if [[ -e "$WORK" ]]; then
+    echo "error: prepare directory already exists: $WORK" >&2
+    exit 1
+  fi
+  mkdir -p "$WORK"
+else
+  WORK="$(mktemp -d)"
+  trap 'rm -rf "$WORK"' EXIT
+fi
 
 git clone --quiet "$CONTRACTS_REPO" "$WORK/repo"
 cd "$WORK/repo"
@@ -68,6 +123,8 @@ mkdir -p ir
 rm -f ir/lumiere-contract-ir-v1.json ir/lumiere-contract-ir-v1.json.sha256 ir/PIN-v1.json
 cp "$STAGING/ir/lumiere-contract-ir-v2.json" ir/
 cp "$STAGING/ir/lumiere-contract-ir-v2.json.sha256" ir/
+cp "$STAGING/ir/agent-capability-registry-v1.json" ir/
+cp "$STAGING/ir/agent-capability-registry-v1.json.sha256" ir/
 
 # Keep one immutable provenance pin per IR generation. `PIN.json` is only the
 # active-generation pointer consumed by downstream emitters. The source commit
@@ -114,6 +171,32 @@ rm -f manifests/application-operations.json manifests/resource-registry.json
 echo "$VERSION" > CONTRACT_VERSION
 
 # Restore contracts-owned manifests before the Rust crate enumerates them.
+# Preserve reviewed capability entries while binding them to the new source.
+# The companion generator below validates every retained descriptor against
+# the new canonical IR and fails if any entry no longer matches. This does
+# not admit new capabilities, including newly added operations.
+python3 - <<'PY'
+import hashlib
+import json
+from pathlib import Path
+
+path = Path("ir/agent-capability-registry-v1.json")
+checksum = path.with_suffix(path.suffix + ".sha256")
+raw = path.read_bytes()
+if checksum.read_text().split() != [hashlib.sha256(raw).hexdigest(), path.name]:
+    raise SystemExit("existing agent capability checksum mismatch")
+artifact = json.loads(raw)
+pin = json.loads(Path("ir/PIN.json").read_text())
+artifact["source_ir"] = {
+    "ir_version": pin["ir_version"],
+    "source_commit": pin["source_commit"],
+    "source_dirty": False,
+    "schema_hash": pin["schema_hash"],
+}
+raw = (json.dumps(artifact, indent=2) + "\n").encode()
+path.write_bytes(raw)
+checksum.write_text(f"{hashlib.sha256(raw).hexdigest()}  {path.name}\n")
+PY
 python3 scripts/generate-from-ir.py
 
 # lib.rs re-exports the generated bindings module tree and exposes each
@@ -156,11 +239,20 @@ rm -f crates/lumiere-contracts/Cargo.toml.bak
 # surface on every release so a drifted companion main branch cannot silently
 # drop the bindings/v2 API required by pinned consumers.
 python3 - <<'PY'
+import re
 from pathlib import Path
 
 path = Path("crates/lumiere-contracts/Cargo.toml")
-package = path.read_text(encoding="utf-8").split("[features]", 1)[0]
-package = package.split("[dependencies]", 1)[0].rstrip()
+manifest = path.read_text(encoding="utf-8")
+# Retain companion-owned test/build/target sections while reasserting the
+# generated feature/dependency surface. New fixture dependencies must survive.
+sections = re.split(r"(?=^\[)", manifest, flags=re.MULTILINE)
+retained = "".join(
+    section for section in sections
+    if section.startswith("[")
+    and section.splitlines()[0] not in {"[package]", "[features]", "[dependencies]"}
+)
+package = next(section for section in sections if section.startswith("[package]\n")).rstrip()
 path.write_text(
     package
     + f'''\n\n[features]
@@ -171,7 +263,7 @@ v2 = []
 [dependencies]
 spacetimedb-sdk = {{ version = "=2.8.2", optional = true }}
 serde_json = "1.0"
-''',
+''' + ("\n" + retained if retained else ""),
     encoding="utf-8",
 )
 PY
@@ -188,6 +280,10 @@ rm -rf packages/contracts/src/generated
 cp -R "$STAGING/ts/generated" packages/contracts/src/generated
 cp "$STAGING/ts/stdb-generated-sql-columns.json" packages/contracts/src/
 cp "$STAGING/ts/stdb-reducer-invalidation.ts" packages/contracts/src/
+# Presentation wire contracts generated from lumiere-v-1 Rust models. The
+# schemas also ship under manifests/presentation for the Rust crate.
+rm -rf packages/contracts/src/presentation
+cp -R "$STAGING/ts/presentation" packages/contracts/src/presentation
 
 # The contracts repository owns IR-derived targets. Run its generator after
 # the immutable input has been copied so these targets are present even when
@@ -197,6 +293,18 @@ python3 scripts/generate-from-ir.py
 for generated in query-registry.ts operation-inputs.ts operation-descriptors.ts; do
   if [[ ! -f "packages/contracts/src/generated/$generated" ]]; then
     echo "error: contracts generator did not emit packages/contracts/src/generated/$generated" >&2
+    exit 1
+  fi
+done
+
+# H2b's companion generator owns the language-specific capability surfaces;
+# the JSON artifact above remains the immutable source handoff. Keep these
+# assertions explicit so a release cannot silently omit one consumer surface.
+for generated in \
+  crates/lumiere-contracts/src/generated/agent_capabilities.rs \
+  packages/contracts/src/generated/agent-capability-registry.ts; do
+  if [[ ! -f "$generated" ]]; then
+    echo "error: contracts generator did not emit $generated" >&2
     exit 1
   fi
 done
@@ -226,6 +334,13 @@ if git diff --cached --quiet; then
 fi
 git -c user.name="lumiere-codegen" -c user.email="codegen@lumiere.local" \
   commit --quiet -m "chore: publish generated contracts v$VERSION"
+if [[ -n "${LUMIERE_CONTRACTS_PREPARE_DIR:-}" ]]; then
+  echo "Prepared contracts v$VERSION at $WORK/repo"
+  echo "Candidate commit: $(git rev-parse HEAD)"
+  echo "Remote destination: $CONTRACTS_REPO (main and v$VERSION)"
+  echo "No remote commit or tag was published."
+  exit 0
+fi
 git push --quiet origin main
 git tag -a "v$VERSION" -m "Generated contracts release v$VERSION"
 git push --quiet origin "v$VERSION"

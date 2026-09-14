@@ -8,6 +8,7 @@ members = [
     "crates/stdb-config",
     "crates/stdb-client",
     "crates/stdb-auth",
+    "crates/presentation-core",
 ]
 
 [workspace.package]
@@ -18,7 +19,7 @@ version = "0.1.0"
 # Generated STDB bindings + manifests, published from lumiere-codegen's
 # staging output. Pin a tag or immutable SHA — never the default branch.
 # See docs/plans/contracts-extraction-execution-plan.md.
-lumiere-contracts = { git = "ssh://git@github.com/KevTiv/lumiere-contracts.git", tag = "v0.3.40", default-features = false, features = ["v2"] }
+lumiere-contracts = { git = "ssh://git@github.com/KevTiv/lumiere-contracts.git", tag = "v0.3.46", default-features = false, features = ["v2"] }
 anyhow = "1"
 aes-gcm = "0.10"
 axum = { version = "0.7", features = ["macros"] }
@@ -50,6 +51,7 @@ dashmap = "6"
 stdb-config = { path = "crates/stdb-config" }
 stdb-client = { path = "crates/stdb-client" }
 stdb-auth = { path = "crates/stdb-auth" }
+lumiere-presentation-core = { path = "crates/presentation-core" }
 
 [profile.release]
 opt-level = 3

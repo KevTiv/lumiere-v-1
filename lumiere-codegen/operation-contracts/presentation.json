@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "operations": {
+    "run_presentation_draft_tests": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/harness/mod.rs: run_presentation_draft_tests is a denied test reducer exercising persisted draft invariants.",
+      "idempotency": "not_applicable",
+      "semantic_kind": "test"
+    },
+    "save_presentation_module": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/presentation/mod.rs: save_presentation_module checks caller membership and expected head revision before appending an immutable snapshot; generic browser admission is denied.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    }
+  }
+}
