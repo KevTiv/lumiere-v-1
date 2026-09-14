@@ -189,6 +189,39 @@ pub(super) struct SpendBinding {
     pub context_window: u32,
 }
 
+/// Build a [`SpendBinding`] from a resolved agent and durable run context.
+///
+/// Returns an error if `context_window` is zero (spend admission requires it
+/// for allowance calculation) or if `organization_id` / `company_id` are zero.
+/// The `run_id` may be zero here; [`SpendAdmittedLlm`] will reject it at
+/// construction time if it is still zero when the binding is consumed.
+pub(super) fn spend_binding_from_agent(
+    agent: &crate::ai_agent::ResolvedAgentConfig,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+) -> anyhow::Result<SpendBinding> {
+    if organization_id == 0 || company_id == 0 {
+        bail!("organization and company are required for spend admission");
+    }
+    if agent.context_window == 0 {
+        bail!(
+            "agent {} has no context_window configured; spend admission requires it",
+            agent.agent_id
+        );
+    }
+    Ok(SpendBinding {
+        organization_id,
+        company_id,
+        agent_id: agent.agent_id,
+        run_id,
+        provider: agent.provider.clone(),
+        model: agent.model.clone(),
+        agent_max_tokens: agent.max_tokens,
+        context_window: agent.context_window,
+    })
+}
+
 pub(super) struct SpendAdmittedLlm<'a> {
     inner: &'a dyn LlmCompletion,
     ledger: &'a dyn SpendLedger,
@@ -942,5 +975,58 @@ mod tests {
             prompt_bytes(&req),
             "system".len() + "userhello".len() + "c1lookuprows".len()
         );
+    }
+
+    fn sample_agent(context_window: u32) -> crate::ai_agent::ResolvedAgentConfig {
+        crate::ai_agent::ResolvedAgentConfig {
+            agent_id: 5,
+            provider: "mistral".into(),
+            model: "mistral-small".into(),
+            system_prompt: "sys".into(),
+            temperature: 0.7,
+            max_tokens: 512,
+            context_window,
+            top_p: 1.0,
+            allowed_actions: vec!["skill_run".into()],
+            allowed_models: vec![],
+            monthly_budget: None,
+            monthly_spend: 0.0,
+            cost_per_1k_tokens: 0.0,
+            rate_limit_per_minute: 0,
+        }
+    }
+
+    #[test]
+    fn spend_binding_from_agent_builds_correct_binding() {
+        let agent = sample_agent(32_000);
+        let b = spend_binding_from_agent(&agent, 9, 3, 42).unwrap();
+        assert_eq!(b.organization_id, 9);
+        assert_eq!(b.company_id, 3);
+        assert_eq!(b.agent_id, 5);
+        assert_eq!(b.run_id, 42);
+        assert_eq!(b.provider, "mistral");
+        assert_eq!(b.model, "mistral-small");
+        assert_eq!(b.agent_max_tokens, 512);
+        assert_eq!(b.context_window, 32_000);
+    }
+
+    #[test]
+    fn spend_binding_from_agent_rejects_zero_fields() {
+        let agent = sample_agent(32_000);
+        assert!(spend_binding_from_agent(&agent, 0, 3, 1).is_err(), "zero org");
+        assert!(spend_binding_from_agent(&agent, 9, 0, 1).is_err(), "zero company");
+        let no_window = sample_agent(0);
+        assert!(
+            spend_binding_from_agent(&no_window, 9, 3, 1).is_err(),
+            "zero context_window"
+        );
+    }
+
+    #[test]
+    fn spend_binding_from_agent_allows_zero_run_id_at_construction() {
+        // run_id == 0 is permitted here; SpendAdmittedLlm::new rejects it.
+        let agent = sample_agent(8_000);
+        let b = spend_binding_from_agent(&agent, 9, 3, 0).unwrap();
+        assert_eq!(b.run_id, 0);
     }
 }

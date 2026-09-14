@@ -9,14 +9,28 @@ use crate::{
         enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed,
         ensure_within_budget, record_ai_spend, resolve_agent,
     },
-    harness::ActorCredentials,
+    harness::{
+        data_scope_resolver::ResourceRegistry,
+        policy_engine::{
+            ExecutionMetadata, ExecutionPlan, PlannedToolCall, PolicyEngine, PolicyExecutionRequest,
+        },
+        release_registry::load_active_manifest,
+        skill_registry::SkillRegistry,
+        ActorCredentials,
+    },
     orchestrator::skill_loader::{complete_run, create_run, load_skill, LoadedSkill},
-    providers::llm::LlmMessage,
+    providers::llm::{LlmMessage, LlmRequest},
     state::AppState,
     tools::{
         registry::ToolRegistry,
         types::{SkillCitation, ToolContext},
     },
+};
+use super::{
+    agent_loop::{LoopLimits, LoopStop},
+    agent_loop_adapters::{run_finalization, run_recorded_loop, RunFinalization},
+    invocation_policy::ReviewedInvocationPolicy,
+    spend_admission::{spend_binding_from_agent, StdbSpendLedger},
 };
 
 const DEFAULT_MAX_STEPS: u32 = 5;
@@ -408,6 +422,198 @@ pub async fn run_skill_unlocked(
         artifacts,
         citations,
         steps,
+        agent_id: agent.agent_id,
+        skill_key: skill.skill_key,
+    })
+}
+
+/// Request for a spend-admitted governed skill run.
+///
+/// The caller supplies pre-reviewed tool calls and the LLM request that drives
+/// the loop. H5c will insert a durable accepted-intent row before each provider
+/// dispatch; this entry point wires together the H5b spend layer, the H4 policy
+/// engine, and the H3 invocation seam.
+#[derive(Debug)]
+pub struct AdmittedRunRequest {
+    pub org_id: u64,
+    pub company_id: u64,
+    pub skill_key: String,
+    pub skill_version: u32,
+    pub inputs: Value,
+    pub agent_id: Option<u64>,
+    pub team_member_id: Option<u64>,
+    pub triggered_by_hex: Option<String>,
+    pub stdb_token: Option<String>,
+    pub correlation_id: String,
+    pub reviewed_calls: Vec<PlannedToolCall>,
+    pub llm_request: LlmRequest,
+    pub max_steps: Option<u32>,
+}
+
+/// Execute a skill run through the full H5b admission stack.
+///
+/// Requires `AppState::spend_read_stdb` to be present; returns an error when
+/// the state was started without spend-read support.
+pub async fn run_skill_admitted(
+    state: &AppState,
+    req: AdmittedRunRequest,
+) -> Result<RunSkillResponse> {
+    if req.org_id == 0 {
+        anyhow::bail!("org_id is required");
+    }
+    if req.company_id == 0 {
+        anyhow::bail!("company_id is required");
+    }
+    let skill_key = req.skill_key.trim().to_string();
+    if skill_key.is_empty() {
+        anyhow::bail!("skill_key is required");
+    }
+    let correlation_id = req.correlation_id.trim().to_string();
+    if correlation_id.is_empty() {
+        anyhow::bail!("correlation_id is required");
+    }
+    if req.reviewed_calls.is_empty() {
+        anyhow::bail!("reviewed_calls must be nonempty");
+    }
+
+    // H5b: a paired read ledger is required for spend admission.
+    let spend_reader = state
+        .spend_read_stdb
+        .as_deref()
+        .context("spend_read_stdb is required for admitted runs (H5b)")?;
+
+    let actor = req
+        .stdb_token
+        .as_ref()
+        .zip(req.triggered_by_hex.as_ref())
+        .and_then(|(token, identity)| ActorCredentials::new(token.clone(), identity.clone()).ok());
+    let stdb = req
+        .stdb_token
+        .as_ref()
+        .filter(|t| !t.trim().is_empty())
+        .map(|token| state.stdb.with_token(token.clone()))
+        .unwrap_or_else(|| state.stdb.as_ref().clone());
+
+    let skill = load_skill(&stdb, req.org_id, req.company_id, &skill_key).await?;
+    if !skill.enabled {
+        anyhow::bail!("skill '{skill_key}' is disabled for this company");
+    }
+
+    let agent = resolve_agent(&stdb, req.org_id, req.agent_id, req.team_member_id).await?;
+    ensure_allowed_action(&agent, "skill_run")?;
+    ensure_model_allowed(&agent)?;
+    ensure_within_budget(&agent)?;
+
+    let run_key = Uuid::new_v4().to_string();
+    let inputs_json = serde_json::to_string(&req.inputs).context("serialize inputs")?;
+    let triggered_by_hex = req
+        .triggered_by_hex
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or("0000000000000000000000000000000000000000000000000000000000000000")
+        .to_string();
+    let run_id = if skill.id > 0 {
+        create_run(
+            &stdb,
+            req.org_id,
+            req.company_id,
+            &skill,
+            agent.agent_id,
+            req.team_member_id,
+            &run_key,
+            &inputs_json,
+            &triggered_by_hex,
+        )
+        .await?
+    } else {
+        0
+    };
+
+    let manifest = load_active_manifest(&stdb, req.org_id, &skill_key, req.skill_version)
+        .await
+        .map_err(|message| anyhow::anyhow!(message))?;
+
+    let ledger = StdbSpendLedger {
+        writer: &state.stdb,
+        reader: spend_reader,
+    };
+    let binding = spend_binding_from_agent(&agent, req.org_id, req.company_id, run_id)?;
+
+    let registry = ToolRegistry::new();
+    let view = registry.authorized_view(&agent, &manifest.allowed_tools);
+
+    let max_steps = req
+        .max_steps
+        .unwrap_or(manifest.limits.max_steps)
+        .min(manifest.limits.max_steps);
+    let plan = ExecutionPlan {
+        named_resources: manifest.named_resources.clone(),
+        tool_calls: req.reviewed_calls.clone(),
+        steps: max_steps,
+        expected_rows: 0,
+        output_type: manifest.output_type.clone(),
+    };
+    let base = PolicyExecutionRequest {
+        skill: manifest.skill.clone(),
+        organization_id: req.org_id,
+        company_id: req.company_id,
+        correlation_id,
+        metadata: ExecutionMetadata::default(),
+        input: req.inputs.clone(),
+        plan,
+    };
+    let engine = PolicyEngine::new(SkillRegistry::exact(manifest.clone()), ResourceRegistry::built_in());
+    let policy = ReviewedInvocationPolicy::new(engine, base, req.reviewed_calls)?;
+
+    let tool_ctx = ToolContext {
+        state: state.clone(),
+        stdb: Arc::new(stdb),
+        org_id: req.org_id,
+        company_id: req.company_id,
+        run_id,
+        skill_key: skill.skill_key.clone(),
+        config_json: skill.config_json.clone(),
+        inputs: req.inputs.clone(),
+        allowed_action_drafts: skill.allowed_action_drafts.clone(),
+        actor,
+    };
+
+    let limits = LoopLimits {
+        max_rounds: max_steps.max(1),
+        max_tool_calls: manifest.limits.max_tool_calls.max(1),
+        max_tokens: u64::from(agent.context_window),
+        max_unchanged_results: 3,
+    };
+
+    let outcome = run_recorded_loop(
+        state.providers.llm.as_ref(),
+        &ledger,
+        binding,
+        &view,
+        &policy,
+        &tool_ctx,
+        req.llm_request,
+        limits,
+    )
+    .await?;
+
+    let summary = match &outcome.stop {
+        LoopStop::CandidateFinal(answer) => answer.clone(),
+        stop => format!("agent loop stopped: {stop:?}"),
+    };
+    let status = match run_finalization(&outcome.stop) {
+        RunFinalization::Wait { status, .. } => status.to_string(),
+        RunFinalization::Failed { error_code } => error_code.to_string(),
+    };
+
+    Ok(RunSkillResponse {
+        run_id,
+        run_key,
+        status,
+        summary,
+        artifacts: Vec::new(),
+        citations: Vec::new(),
+        steps: Vec::new(),
         agent_id: agent.agent_id,
         skill_key: skill.skill_key,
     })
