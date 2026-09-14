@@ -28,12 +28,12 @@ async function readResponse(response: Response): Promise<unknown> {
   return body
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null }
-
 function savedList(value: unknown): SavedDraftList { return decodeSavedDraftList(value) }
 
 function serverRevision(value: unknown): string | null {
-  return isRecord(value) && typeof value.revision === 'string' ? value.revision : null
+  if (typeof value !== 'object' || value === null) return null
+  const revision = (value as { revision?: unknown }).revision
+  return typeof revision === 'string' ? revision : null
 }
 
 function firstNode(definition: ModuleDraft, kind: PageNode['kind']): PageNode | undefined {

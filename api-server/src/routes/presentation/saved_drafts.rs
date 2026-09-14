@@ -416,7 +416,14 @@ mod draft_tests {
     }
 
     fn snapshot() -> DraftVersionRow {
-        let definition = json!({"schemaVersion":1,"componentCatalogVersion":1,"applicationContract":"v0.3.43",
+        // Derive the pin from the approved capability dictionary so this fixture
+        // tracks the current release instead of a stale hardcoded version.
+        let contract_pin = crate::presentation_dictionary::account_moves_capability(Some(
+            test_context().field_access(),
+        ))
+        .expect("approved presentation capability")
+        .contract_pin;
+        let definition = json!({"schemaVersion":1,"componentCatalogVersion":1,"applicationContract":contract_pin.clone(),
             "moduleId":"sample","title":"Sample","baseRevision":null,
             "pages":[{"id":"entries","title":"Entries","nodes":[{"kind":"collection","id":"entries",
                 "slot":"primary","component":{"id":"erp.collection","version":1},"resource":"account-moves","fields":["name"],"pageSize":25}]}]});
@@ -433,7 +440,7 @@ mod draft_tests {
             definition_hash: hex::encode(Sha256::digest(prepared.definition_json.as_bytes())),
             definition_json: prepared.definition_json,
             schema_version: 1,
-            application_contract: "v0.3.43".into(),
+            application_contract: contract_pin.to_string(),
             component_catalog_version: 1,
             created_at: spacetimedb_sdk::Timestamp::from_micros_since_unix_epoch(1),
             created_by: owner,
