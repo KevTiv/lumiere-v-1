@@ -33,10 +33,10 @@ The harness implementation stack is one linear chain; the top branch contains ev
 | #33 | h5c-provider-attempts | provider attempts + run wait states wiring | contained |
 | #34 | aih22-non-progress | stop the governed loop on non-progress | contained |
 | #35–#36 | capability-allowlist / review-entries | propose + accept the first reviewed capability entries | contained |
-| **#37** | `codex/contracts-v0.3.46-pin` | **pin release v0.3.46 — accepted chain tip** | **land as BASE-01** |
-| #45 | `codex/ai-harness-role-capability-grants` → main | role-scoped capability grants (STDB `ai/capability_grants.rs` + tests, api-server routes, orchestrator/spend admission) + contracts v0.3.47 attempt | **open, Rust CI red** — repair operation-history binding via release lane, then merge |
-| #19–#25 | `codex/frontend-ir-saved-drafts` / `codex/frontend-ir-save-reopen` | presentation IR canonical personal draft snapshots + save/reopen (13 commits total) | independent side chain, CI green — land after the harness chain |
-| #27 | `test/pre-tenant-adversarial-certification` → main | pre-tenant adversarial suite: Playwright specs (agent, communications, IR, payments, mobile) + Rust `pretenant` certs (payments, communications, money, state machine) | independent, 2 commits, CI fully green (16/16) |
+| **#37** | `codex/contracts-v0.3.46-pin` | **pin release v0.3.46 — accepted chain tip** | **landed via PR #47** |
+| #45 | `codex/ai-harness-role-capability-grants` → main | role-scoped capability grants (STDB `ai/capability_grants.rs` + tests, api-server routes, orchestrator/spend admission) + contracts v0.3.47 attempt | **open, Rust CI red** — repair operation-history binding via release lane, then merge; the only remaining harness-chain PR |
+| #19–#25 | `codex/frontend-ir-saved-drafts` / `codex/frontend-ir-save-reopen` | presentation IR canonical personal draft snapshots + save/reopen (13 commits total) | **landed via PR #48** (conflict reconciliation + integration fixes on the branch) |
+| #27 | `test/pre-tenant-adversarial-certification` → main | pre-tenant adversarial suite: Playwright specs (agent, communications, IR, payments, mobile) + Rust `pretenant` certs (payments, communications, money, state machine) | **merged (PR #27)** |
 | #1, #2 | copilot WIP / vibe plan | unrelated | out of program scope |
 
 ## 3. Package matrix (delivered / partial / missing)
@@ -101,9 +101,10 @@ All rows **missing** — no code found at the tips in this pass; the plans for t
 1. **#45 contracts drift (active, chain tip):** `check-operation-history-pinned` fails; v0.3.47 pin hand-edited without a release. Repair through the release lane on the #45 branch.
 2. **Communication blockers** (BASE-03): tenant reference crossing, consent/identity recheck, immutable approved content, separation of duties, stale provider callback, number-change behavior.
 3. **Payment/import/recovery blockers** (BASE-04): payment post/reversal retry semantics, conflicting idempotency-key replay, money boundary handling, statement CSV/idempotency.
-4. **PR #25 chain vs harness chain overlap:** both touch `frontend/packages/*` and generated-contract consumers; the merge order in §5 controls this.
+4. **PR #25 chain vs harness chain overlap:** both touch `frontend/packages/*` and generated-contract consumers; the merge order in §5 controls this. Resolved in PR #48 (integration fixes `ff17a293e`/`adb8157a8`).
+5. **Pre-tenant E2E on integrated main (run 34889586620): 190 passed / 11 failed / 19 skipped.** Ten failures are the suite's deliberate `capability-pending` guards — the capabilities became available when #47/#48 landed but their adversarial certifications are not yet written (AG-07, AG-08 agent loop; IR-01/IR-02×5/IR-03 presentation IR; M-04 mobile). One is a real defect: **PAY-06-E2E** overpayment allocation produces a NaN `writeOffAmount` — a BASE-04 payment-semantics defect, not an integration regression.
 
-## 5. Proposed BASE-01 consolidation order
+## 5. BASE-01 consolidation order (proposed; executed 2026-09-14)
 
 Reuse the existing PR branches; each chain lands on `main` through its top branch (the top branch carries all ancestor commits):
 
@@ -114,3 +115,22 @@ Reuse the existing PR branches; each chain lands on `main` through its top branc
 5. Then run **BASE-02** validation on integrated `main`.
 
 One release lane at a time; no merging into intermediate branches.
+
+## 6. Execution record — 2026-09-14
+
+BASE-01 and BASE-02 were executed as written in §5:
+
+| Step | PR | Result |
+| --- | --- | --- |
+| Harness chain → `main` | #47 (`codex/contracts-v0.3.46-pin`) | merged; 100 files; contracts **v0.3.46** now authoritative on `main` |
+| Pre-tenant suite | #27 (`test/pre-tenant-adversarial-certification`) | merged (was draft) |
+| Frontend IR chain | #48 (`codex/frontend-ir-save-reopen`) | merged after on-branch reconciliation: kept v0.3.46 pins/manifest/Cargo authority and the Makefile-owned generator; preserved saved-draft decoder/schema; dropped stale v0.3.43-era generated files; fixed the saved-draft pin fixture (derives from `account_moves_capability`), regenerated `Cargo.lock` (+`spacetimedb-sats`), fixed the opaque-record ratchet in `preview-composer.tsx` |
+| #45 role-scoped grants | #45 | **open** — first release-lane package (operation-history rebind, proper v0.3.47 publish) |
+
+Validation on integrated `main` (`a088500cd`):
+
+- CI run 34889586554 **success**: `check-codegen-pinned` (IR v2 valid, capability artifact, operation history), Contracts drift (schema/release + storage policy), Rust suite, Frontend, SpacetimeDB check, Playwright compile smoke, PDF regression.
+- i18n / params-cohesion / semantic-index Q0 all success.
+- E2E smoke (run 34889586620) **failed as designed against unfinished certification**: 190 passed / 11 failed (10 `capability-pending` guards + 1 real PAY-06 payment defect) / 19 skipped. See §4 item 5. This is the BASE-05 frontier, not a BASE-02 regression.
+
+Ledger updates: `BASE-01` → ACCEPTED, `BASE-02` → ACCEPTED (contracts version **v0.3.46**), `BASE-05` remains open with recorded evidence.
