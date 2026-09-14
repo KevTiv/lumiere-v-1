@@ -10,6 +10,8 @@ Primary plans:
 - [`repository-cohesion-outcome-ownership-ledger.md`](./repository-cohesion-outcome-ownership-ledger.md)
 - [`../plans/erp-module-usability-parity-program.md`](../plans/erp-module-usability-parity-program.md)
 - [`erp-module-usability-parity-ledger.md`](./erp-module-usability-parity-ledger.md)
+- [`../plans/erp-ui-design-system-completion-plan.md`](../plans/erp-ui-design-system-completion-plan.md)
+- [`erp-ui-completion-ledger.md`](./erp-ui-completion-ledger.md)
 
 ## Coordinator startup
 
@@ -20,9 +22,10 @@ Primary plans:
 5. Update ledger statuses from evidence; do not redo delivered work merely because rows begin as `TODO`.
 6. Run `COH-00` against that accepted base before broad GOV/CAP/WPR feature expansion.
 7. Run `COV-00` before making module-completeness estimates or assigning large ERP completion packages; historical frontend/reducer matrices are not current truth.
-8. Select only packages whose dependencies are accepted.
-9. Reserve shared integration surfaces and one contract/codegen lane before delegation.
-10. Keep the primary session free for review/integration; use workers for disjoint packages.
+8. For UI work, run `UX-00` to reconcile shared components/configs with the separate presentation-IR implementation and current immutable contracts. Do not recreate a package merely because the planning branch lacks it.
+9. Select only packages whose dependencies are accepted.
+10. Reserve shared integration surfaces and one contract/codegen lane before delegation.
+11. Keep the primary session free for review/integration; use workers for disjoint packages.
 
 ## Worker assignment prompt
 
@@ -41,7 +44,16 @@ Module/surface:
 Current U-level and evidence:
 Target U-level for this slice:
 Primary workflow/sub-workflow owned by this task:
-Explicit visible deferrals that must remain hidden:
+Explicit unfinished features requiring safe temporary disablement:
+
+If this touches UI/config/IR:
+Existing component/form/chart/theme owners:
+Static renderer config versus persisted wire definition:
+Approved field/resource/operation/component bindings:
+Applicable UX packages and COV adoption owner:
+Data/error/outcome states to exercise:
+Themes/density/viewports and keyboard checks:
+Contract role: none / producer / publisher / pinned consumer:
 
 Allowed files/directories/schemas:
 Reserved files / other active owners:
@@ -75,7 +87,21 @@ T0 module-parity checks when applicable:
 - stale state, duplicate submit, retry/lost response and permission behavior are explicit;
 - shared documents/activity/messages/approvals/audit capabilities are reused where applicable;
 - no visible stub/dead action/fake local success is added;
-- any unfinished capability remains hidden/disabled for the test organization.
+- unfinished capabilities remain safely disabled but stay on the completion matrix;
+- workers cannot shrink the module/workflow target without an explicit product decision.
+
+UI/config checks when applicable:
+- use the existing shared renderers and token/theme owner;
+- no Saved toast/close unless the outcome actually admits success;
+- preserve field identity, cardinality, null/absent/zero/false and patch semantics;
+- invalid stored filters/definitions fail visibly, never widen displayed results silently;
+- missing/partial/stale metrics do not become a confirmed zero/full total;
+- unit/currency/period/scope/freshness and drill-through are explicit;
+- persisted definitions contain approved data-only references, never React callbacks/JS/SQL;
+- custom checked-in renderers may remain when justified; do not serialize them;
+- theme changes cannot change permission, query scope, mutation behavior or status meaning;
+- chart/card rendering cannot implicitly run expensive programs;
+- keyboard/focus and screen-reader behavior are not inferred from screenshots.
 
 Forbidden scope:
 - unrelated cleanup/refactors;
@@ -86,6 +112,8 @@ Forbidden scope:
 - generic string errors where a stable expected outcome is required;
 - latest-row discovery as the identity of a consequential create;
 - exposing a partial module feature merely to increase route/reducer coverage;
+- hiding required modules merely to claim completion;
+- a parallel UI schema/renderer, form engine, chart library migration or arbitrary theme-code execution;
 - starting another ledger task.
 
 Required validation:
@@ -102,7 +130,8 @@ Required handoff:
 9. remaining integration work;
 10. whether a contract release is now required;
 11. compatibility code retained and its removal gate;
-12. for COV work: resulting U-level, remaining U5 blockers, and visible deferrals hidden from the test org.
+12. for COV work: resulting U-level, remaining U5 blockers, safe exposure controls and unchanged module scope;
+13. for UI work: actual state/theme/viewport captures, accessibility and data-semantic evidence; distinguish source inspection, fixture proof and real integrated workflow proof.
 
 Stop and return to the coordinator if a dependency or contract expansion outside this assignment is required.
 ```
@@ -140,10 +169,20 @@ For COV/T0 work additionally:
 [ ] created/downstream records are linked directly
 [ ] loading/empty/error/denied/waiting/terminal UX exists
 [ ] no new visible stub/dead tab/dead quick action
-[ ] unfinished secondary capability is explicitly hidden/disabled
+[ ] unfinished capability is safely disabled without disappearing from scope
 [ ] module U-level is supported by evidence, not assertion
 [ ] test-org personas/seed work without DB surgery
 [ ] responsive/refresh/reconnect behavior checked where required
+
+For UI/config/IR work additionally:
+[ ] existing shared owners reused; static and persisted definitions distinguished
+[ ] exact field/value/outcome semantics preserved
+[ ] invalid filter or missing metric cannot become plausible false output
+[ ] chart/table/export labels and effective scope agree
+[ ] theme tokens preserve status meaning and measured contrast
+[ ] keyboard, focus and applicable manual accessibility checks run
+[ ] existing IR producer/release/consumer and admin admission paths reused
+[ ] no screenshot-only claim of functional completion
 ```
 
 ## Suggested initial execution shape
@@ -174,9 +213,11 @@ ERP/T0 lane                         AI/P0 lane
 ───────────                         ──────────
 COV-01 shared workflow result seam  COH/GOV canonical executor work
 COV-02 seeded test org              SEC trusted envelope convergence
-commercial/supply/finance modules   generated read capability admission
-horizontal module parity            governed read-only pilot
+UX shared components/config/IR     generated read capability admission
+module + horizontal adoption        governed read-only pilot
 ```
+
+After UX-00 selects the accepted baseline, early disjoint UI work can cover tokens/CSS, form-field fidelity and stored-report correctness. The coordinator reserves shared exports, module shell and the single presentation-contract release lane. Shared components feed COV workers; they do not create a duplicate module implementation lane.
 
 Within ERP completion, prefer module groups with low overlap:
 
@@ -190,4 +231,4 @@ Lane E  Documents / Calendar / Messages / Reports / Approvals / Imports / Settin
 
 Large module entries must be split into bounded suffix tasks (`COV-08a`, `COV-08b`, etc.) rather than one giant diff.
 
-Do not activate a new production governed AI route against uncertain identity/capability/release semantics. Do not expose a non-U5 business module to the first test organization merely because its route exists. Contract release packages remain serialized through the coordinator.
+Do not activate a new production governed AI route against uncertain identity/capability/release semantics. Do not expose a non-U5 business module merely because its route exists. Safe temporary disablement is not product completion. Contract release packages remain serialized through the coordinator.
