@@ -158,7 +158,7 @@ pub(crate) async fn get_query(
         ));
     }
 
-    let data = execute_resource_query_for_company(
+    let mut data = execute_resource_query_for_company(
         &client,
         &resource,
         org_id,
@@ -167,6 +167,9 @@ pub(crate) async fn get_query(
         q.company_id,
     )
     .await?;
+    if let Some(limit) = q.limit {
+        data.truncate(limit as usize);
+    }
 
     Ok(Json(json!({ "data": data })))
 }

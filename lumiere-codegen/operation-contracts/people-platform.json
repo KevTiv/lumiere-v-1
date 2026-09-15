@@ -1271,6 +1271,16 @@
       },
       "evidence": "spacetimedb/src/workflow/approvals.rs: body inserts or appends a new effect without a replay guard"
     },
+    "delete_ai_capability_role_grant": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/capability_grants.rs: body loads the organization-owned grant before deleting it"
+    },
     "delete_ai_reducer_allowlist": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -4010,6 +4020,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/ai/agents.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "set_ai_capability_role_grant": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/capability_grants.rs: body upserts one organization, role, and capability tuple to deterministic limits"
     },
     "set_ai_agent_run_wait_state": {
       "semantic_kind": "internal",
