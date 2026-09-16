@@ -2,6 +2,7 @@
 pub mod embedding_isolation_test;
 pub mod lineage_test;
 pub mod provenance_test;
+pub mod questions_test;
 pub mod relational_integrity_test;
 
 use spacetimedb::ReducerContext;
@@ -51,12 +52,30 @@ pub fn run_ai_lineage_tests(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 #[spacetimedb::reducer]
+pub fn run_ai_questions_tests(ctx: &ReducerContext) -> Result<(), String> {
+    questions_test::test_question_required_blocks_only_dependent(ctx)
+        .map_err(|e| format!("questions_required: {e}"))?;
+    questions_test::test_question_reconnect_does_not_reask(ctx)
+        .map_err(|e| format!("questions_reconnect: {e}"))?;
+    questions_test::test_question_duplicate_idempotent(ctx)
+        .map_err(|e| format!("questions_duplicate: {e}"))?;
+    questions_test::test_question_stale_and_unauthorized_denied(ctx)
+        .map_err(|e| format!("questions_stale: {e}"))?;
+    questions_test::test_question_timeout_grants_no_answer(ctx)
+        .map_err(|e| format!("questions_timeout: {e}"))?;
+    questions_test::test_question_changed_requirements_cannot_reuse(ctx)
+        .map_err(|e| format!("questions_changed: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_insight_org_scope_test(ctx)?;
     run_ai_document_processing_job_document_relation_test(ctx)?;
     run_ai_embedding_org_isolation_test(ctx)?;
     run_ai_provenance_tests(ctx)?;
     run_ai_lineage_tests(ctx)?;
+    run_ai_questions_tests(ctx)?;
     log::info!("✅ run_all_ai_tests complete");
     Ok(())
 }
