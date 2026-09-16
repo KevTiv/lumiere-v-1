@@ -1,5 +1,6 @@
 //! AI domain test suite — invoke via `run_all_ai_tests` reducer.
 pub mod embedding_isolation_test;
+pub mod lineage_test;
 pub mod provenance_test;
 pub mod relational_integrity_test;
 
@@ -41,11 +42,21 @@ pub fn run_ai_provenance_tests(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 #[spacetimedb::reducer]
+pub fn run_ai_lineage_tests(ctx: &ReducerContext) -> Result<(), String> {
+    lineage_test::test_lineage_reconstructs_after_fork(ctx)
+        .map_err(|e| format!("lineage_fork: {e}"))?;
+    lineage_test::test_lineage_changed_requires_review(ctx)
+        .map_err(|e| format!("lineage_review: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_insight_org_scope_test(ctx)?;
     run_ai_document_processing_job_document_relation_test(ctx)?;
     run_ai_embedding_org_isolation_test(ctx)?;
     run_ai_provenance_tests(ctx)?;
+    run_ai_lineage_tests(ctx)?;
     log::info!("✅ run_all_ai_tests complete");
     Ok(())
 }
