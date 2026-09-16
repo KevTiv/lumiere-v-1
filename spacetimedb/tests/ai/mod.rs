@@ -1,4 +1,5 @@
 //! AI domain test suite — invoke via `run_all_ai_tests` reducer.
+pub mod continuation_test;
 pub mod embedding_isolation_test;
 pub mod lineage_test;
 pub mod provenance_test;
@@ -69,6 +70,23 @@ pub fn run_ai_questions_tests(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 #[spacetimedb::reducer]
+pub fn run_ai_continuation_tests(ctx: &ReducerContext) -> Result<(), String> {
+    continuation_test::test_continuation_dropped_source_ref_errors(ctx)
+        .map_err(|e| format!("continuation_dropped_source: {e}"))?;
+    continuation_test::test_continuation_changed_constraints_blocked(ctx)
+        .map_err(|e| format!("continuation_constraints: {e}"))?;
+    continuation_test::test_continuation_forged_budget_rejected(ctx)
+        .map_err(|e| format!("continuation_budget: {e}"))?;
+    continuation_test::test_continuation_required_question_still_open(ctx)
+        .map_err(|e| format!("continuation_question: {e}"))?;
+    continuation_test::test_continuation_recalled_source_unavailable_no_leak(ctx)
+        .map_err(|e| format!("continuation_recalled: {e}"))?;
+    continuation_test::test_continuation_summary_cannot_grant_permission(ctx)
+        .map_err(|e| format!("continuation_summary: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_insight_org_scope_test(ctx)?;
     run_ai_document_processing_job_document_relation_test(ctx)?;
@@ -76,6 +94,7 @@ pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_provenance_tests(ctx)?;
     run_ai_lineage_tests(ctx)?;
     run_ai_questions_tests(ctx)?;
+    run_ai_continuation_tests(ctx)?;
     log::info!("✅ run_all_ai_tests complete");
     Ok(())
 }

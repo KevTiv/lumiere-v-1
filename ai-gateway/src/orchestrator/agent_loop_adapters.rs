@@ -11,6 +11,7 @@ use super::agent_loop::{
 use super::invocation_policy::ReviewedInvocationPolicy;
 use super::spend_admission::{SpendAdmittedLlm, SpendBinding, SpendLedger};
 use crate::{
+    harness::answer_gate::{run_answer_gate, GateOutcome},
     providers::llm::{LlmCompletion, LlmRequest, ToolCallRequest},
     tools::{
         registry::AuthorizedToolView,
@@ -197,6 +198,85 @@ pub(super) fn run_finalization(stop: &LoopStop) -> RunFinalization {
         LoopStop::ToolLimit => failed("agent_loop_stop:tool_limit"),
         LoopStop::TokenLimit => failed("agent_loop_stop:token_limit"),
     }
+}
+
+/// Apply the answer gate to a durable run that has reached `agent_settled`.
+///
+/// Runs deterministic checks on every cited source and passage, records the
+/// per-check results and the aggregate outcome in SpacetimeDB, then finalizes
+/// the durable run:
+///
+/// | Gate outcome | Run status |
+/// |---|---|
+/// | `Passed` | `completed` |
+/// | `DomainReviewRequired` | `awaiting_domain_review` |
+/// | `Failed` | `failed` (error_code = `answer_gate:failed`) |
+///
+/// Returns the `GateOutcome` so the caller can decide next steps (e.g. send a
+/// notification or surface the failure reason to the user).
+pub async fn apply_answer_gate(
+    context: &ToolContext,
+    candidate_text: &str,
+    cited_source_ids: &[u64],
+    cited_passage_ids: &[u64],
+) -> Result<GateOutcome> {
+    let outcome = run_answer_gate(
+        &context.stdb,
+        context.org_id,
+        context.company_id,
+        context.run_id,
+        cited_source_ids,
+        cited_passage_ids,
+    )
+    .await?;
+
+    match &outcome {
+        GateOutcome::Passed => {
+            super::skill_loader::complete_run(
+                &context.stdb,
+                context.org_id,
+                context.company_id,
+                context.run_id,
+                "completed",
+                Some(candidate_text.chars().take(2000).collect()),
+                None,
+                None,
+                0,
+                0,
+                None,
+            )
+            .await?;
+        }
+        GateOutcome::DomainReviewRequired => {
+            super::skill_loader::set_run_wait_state(
+                &context.stdb,
+                context.org_id,
+                context.company_id,
+                context.run_id,
+                "awaiting_domain_review",
+            )
+            .await?;
+        }
+        GateOutcome::Failed(checks) => {
+            let error = format!("answer_gate:failed ({})", checks.join(", "));
+            super::skill_loader::complete_run(
+                &context.stdb,
+                context.org_id,
+                context.company_id,
+                context.run_id,
+                "failed",
+                None,
+                None,
+                None,
+                0,
+                0,
+                Some(error),
+            )
+            .await?;
+        }
+    }
+
+    Ok(outcome)
 }
 
 fn saturating_tokens(outcome: &LoopOutcome) -> u32 {

@@ -7329,6 +7329,7 @@ pub mod reducer_names {
     pub const CLOSE_TICKET: ReducerName = ReducerName::new("close_ticket");
     pub const COMPLETE_ACTIVITY: ReducerName = ReducerName::new("complete_activity");
     pub const COMPLETE_AI_AGENT_RUN: ReducerName = ReducerName::new("complete_ai_agent_run");
+    pub const COMPLETE_AI_ANSWER_GATE: ReducerName = ReducerName::new("complete_ai_answer_gate");
     pub const COMPLETE_AI_SKILL_CERTIFICATION: ReducerName = ReducerName::new("complete_ai_skill_certification");
     pub const COMPLETE_DOCUMENT_PROCESSING_JOB: ReducerName = ReducerName::new("complete_document_processing_job");
     pub const COMPLETE_DOCUMENT_SIGNATURE_REQUEST: ReducerName = ReducerName::new("complete_document_signature_request");
@@ -7899,6 +7900,9 @@ pub mod reducer_names {
     pub const RECONCILE_AI_PROVIDER_ATTEMPT: ReducerName = ReducerName::new("reconcile_ai_provider_attempt");
     pub const RECONCILE_PAYMENT_WITH_INVOICE: ReducerName = ReducerName::new("reconcile_payment_with_invoice");
     pub const RECORD_AI_AGENT_RUN_POLICY_SNAPSHOT: ReducerName = ReducerName::new("record_ai_agent_run_policy_snapshot");
+    pub const RECORD_AI_CLAIM_VALIDATION: ReducerName = ReducerName::new("record_ai_claim_validation");
+    pub const RECORD_DIAGNOSTIC_RESULT: ReducerName = ReducerName::new("record_diagnostic_result");
+    pub const RECORD_REPAIR_ATTEMPT: ReducerName = ReducerName::new("record_repair_attempt");
     pub const RECORD_AI_PROVIDER_ATTEMPT_RESULT: ReducerName = ReducerName::new("record_ai_provider_attempt_result");
     pub const RECORD_AI_SPEND: ReducerName = ReducerName::new("record_ai_spend");
     pub const RECORD_BARCODE_SCAN: ReducerName = ReducerName::new("record_barcode_scan");
@@ -8660,6 +8664,7 @@ macro_rules! reducer_call {
     ("close_ticket", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CLOSE_TICKET, $args) };
     ("complete_activity", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::COMPLETE_ACTIVITY, $args) };
     ("complete_ai_agent_run", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::COMPLETE_AI_AGENT_RUN, $args) };
+    ("complete_ai_answer_gate", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::COMPLETE_AI_ANSWER_GATE, $args) };
     ("complete_ai_skill_certification", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::COMPLETE_AI_SKILL_CERTIFICATION, $args) };
     ("complete_document_processing_job", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::COMPLETE_DOCUMENT_PROCESSING_JOB, $args) };
     ("complete_document_signature_request", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::COMPLETE_DOCUMENT_SIGNATURE_REQUEST, $args) };
@@ -9230,6 +9235,9 @@ macro_rules! reducer_call {
     ("reconcile_ai_provider_attempt", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECONCILE_AI_PROVIDER_ATTEMPT, $args) };
     ("reconcile_payment_with_invoice", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECONCILE_PAYMENT_WITH_INVOICE, $args) };
     ("record_ai_agent_run_policy_snapshot", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_AI_AGENT_RUN_POLICY_SNAPSHOT, $args) };
+    ("record_ai_claim_validation", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_AI_CLAIM_VALIDATION, $args) };
+    ("record_diagnostic_result", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_DIAGNOSTIC_RESULT, $args) };
+    ("record_repair_attempt", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_REPAIR_ATTEMPT, $args) };
     ("record_ai_provider_attempt_result", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_AI_PROVIDER_ATTEMPT_RESULT, $args) };
     ("record_ai_spend", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_AI_SPEND, $args) };
     ("record_barcode_scan", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_BARCODE_SCAN, $args) };

@@ -11,7 +11,10 @@
 pub mod action_draft_lifecycle;
 pub mod action_drafts;
 pub mod agents;
+pub mod answer_gate;
 pub mod chat;
+pub mod continuation;
+pub mod diagnostics;
 pub mod intelligence;
 pub mod lineage;
 pub mod provenance;
@@ -23,7 +26,10 @@ pub mod spend;
 
 pub use action_drafts::*;
 pub use agents::*;
+pub use answer_gate::*;
 pub use chat::*;
+pub use continuation::*;
+pub use diagnostics::*;
 pub use intelligence::*;
 pub use lineage::*;
 pub use provenance::*;

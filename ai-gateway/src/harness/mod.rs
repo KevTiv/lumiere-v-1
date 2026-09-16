@@ -1,10 +1,12 @@
 pub mod action_draft_bridge;
+pub mod answer_gate;
 pub mod audit;
 pub mod audit_logger;
 pub mod certification;
 pub mod certification_fixtures;
 pub mod daily_briefing;
 pub mod data_scope_resolver;
+pub mod diagnostics;
 pub mod distributor_controls;
 pub mod entity_registry;
 pub mod governed_llm_skills;
