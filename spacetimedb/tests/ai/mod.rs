@@ -1,5 +1,6 @@
 //! AI domain test suite — invoke via `run_all_ai_tests` reducer.
 pub mod embedding_isolation_test;
+pub mod provenance_test;
 pub mod relational_integrity_test;
 
 use spacetimedb::ReducerContext;
@@ -25,10 +26,26 @@ pub fn run_ai_embedding_org_isolation_test(ctx: &ReducerContext) -> Result<(), S
 }
 
 #[spacetimedb::reducer]
+pub fn run_ai_provenance_tests(ctx: &ReducerContext) -> Result<(), String> {
+    provenance_test::test_provenance_round_trip(ctx)
+        .map_err(|e| format!("provenance_round_trip: {e}"))?;
+    provenance_test::test_provenance_unknown_preservation(ctx)
+        .map_err(|e| format!("provenance_unknown: {e}"))?;
+    provenance_test::test_provenance_recalled_stays_unverified(ctx)
+        .map_err(|e| format!("provenance_recalled: {e}"))?;
+    provenance_test::test_provenance_cross_scope_denied(ctx)
+        .map_err(|e| format!("provenance_cross_scope: {e}"))?;
+    provenance_test::test_provenance_snapshot_identity(ctx)
+        .map_err(|e| format!("provenance_snapshot: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_insight_org_scope_test(ctx)?;
     run_ai_document_processing_job_document_relation_test(ctx)?;
     run_ai_embedding_org_isolation_test(ctx)?;
+    run_ai_provenance_tests(ctx)?;
     log::info!("✅ run_all_ai_tests complete");
     Ok(())
 }
