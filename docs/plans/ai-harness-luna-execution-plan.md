@@ -1,8 +1,8 @@
 # AI Harness Luna Execution Plan
 
-**Status:** Active coordination — 2026-09-12  
-**Stack base:** `codex/ai-harness-tool-calling` / PR #15  
-**Scope:** H2–H8 from the AI harness completion plan.  
+**Status:** Active coordination — 2026-09-12
+**Stack base:** `codex/ai-harness-tool-calling` / PR #15
+**Scope:** H2–H8 from the AI harness completion plan.
 **Authority:** This ledger coordinates implementation; milestone acceptance
 remains owned by `ai-harness-completion-plan.md` and immutable contract gates.
 
@@ -51,7 +51,7 @@ weakening generated ERP authorization or approval boundaries.
 | 9 | [H5d provider instances + capability truth](./ai-harness-t3-control-plane-adoption.md#2-adopt-provider-driver-and-provider-instance-are-different-concepts) | new child / H5c | Luna provider agent | Driver/instance split, account/region isolation, normalized provider events, authoritative capability downgrade and auditable selection | Blocked on H5c |
 | 10 | Evidence foundation | parallel child after stable generated IDs | Luna provenance agent | Versioned source/passage/contribution/claim/decision/component records and invalidation tests | Blocked on contract IDs |
 | 11 | Answer and recovery gates | child / evidence foundation | Luna validation agent | Publication gate, questions, repair, non-progress, compaction and resume fixtures | Blocked on evidence |
-| 12 | H6 `low_stock` pilot | child / H5d plus applicable evidence gates | Luna pilot agent | Persisted scoped certification through authorized API/UI; extended effect/provider settlement gates and explicit path deferrals | Blocked on H5/evidence/control-plane gates |
+| 12 | H6 `low_stock` pilot | `codex/ai-harness-h6-pilot-low-stock` / `codex/ai-harness-role-capability-grants` @ `db832126a` (origin/main `afa23b702`) | Luna pilot agent | Persisted scoped certification for `low_stock` through `run_skill_admitted` + role-grant narrowing; legacy_fence stays frozen; explicit deferrals for AIH-13/14/15/20/21/23/H5c/H5d | **In progress** — this handoff; blocked on #45 merge to `main` for base contracts |
 | 13 | H7 bounded migrations | one child per skill/batch / pilot | Luna skill agents | Per-skill certification; legacy fence changes only after admission | Blocked on pilot |
 | 14 | H8 resumable run stream + operator surfaces | child / durable run and evidence reads | Luna UI/BFF agents | Authorized redacted sequence-based transcript, reconnect cursor, capability descriptor, sources, run/cost/settlement views | Blocked on durable reads and H5c/H5d |
 | 15 | H8 usage/evidence metrics | child / admitted volume | Luna read-model agent | Seeded aggregates match scoped records and verification classes remain distinct | Blocked on admitted data |
