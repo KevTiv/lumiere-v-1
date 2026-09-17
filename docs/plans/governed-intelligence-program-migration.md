@@ -2,11 +2,11 @@
 
 **Status:** Execution companion to `governed-intelligence-program-architecture.md`
 **Date:** 2026-09-17
-**Related:** `decision-precedent-memory-layer.md`
+**Extends:** `decision-precedent-memory-layer.md` and `typed-decision-graph-and-run-review-plan.md`
 
 ## Purpose
 
-Convert the landed bounded-agent harness into a governed-program runtime while preserving useful H3-H5 infrastructure, removing execution authority from the model loop, and adding tenant-scoped decision precedent as reusable institutional memory.
+Convert the landed bounded-agent harness into a governed typed-decision runtime while preserving useful H3-H5 infrastructure and removing execution authority from the model loop.
 
 This is a restructuring sequence, not a rewrite.
 
@@ -38,28 +38,41 @@ extract shared governed execution services
       ↓
 loop emits typed proposals
       ↓
-add immutable DecisionCase + PrecedentStore
+introduce typed DecisionType + DecisionGraph IR
       ↓
-GovernedProgram retrieves precedent and executes decisions through shared runtime
+GovernedProgram validates/executes graph
       ↓
-known workflows move to explicit program graphs
+known workflows move to explicit graphs
       ↓
 loop remains only as ReasoningStep
 ```
 
-Target invariants:
+The target invariant is:
 
 ```text
-ReasoningProvider proposes.
+AI supplies narrow typed judgments.
 Precedent informs.
-Governed runtime authorizes, executes and verifies.
+Program IR composes.
+Policy gates consequences.
+Governed runtime executes and verifies.
+Independent review judges the completed run.
 ```
 
 ## Work packages
 
 ### GP-01 — intelligence contracts
 
-Deliver provider-neutral contracts for `DecisionProvider`, `GenerationProvider`, `ReasoningProvider`, `ReasoningOutcome`, `CapabilityProposal`, `DecisionProposal`, `ProgramPatchProposal`, `ClarificationRequest`, strict validation and deterministic request hashing.
+Deliver provider-neutral contracts for:
+
+- `DecisionProvider`;
+- `GenerationProvider`;
+- `ReasoningProvider`;
+- `ReasoningOutcome`;
+- `CapabilityProposal`;
+- `DecisionProposal`;
+- `ProgramPatchProposal`;
+- `ClarificationRequest`;
+- strict validation and deterministic request hashing.
 
 No production route switch yet.
 
@@ -97,178 +110,182 @@ FinalAnswerAdmission
 Requirements:
 
 - `DecisionStep`, `CapabilityStep`, and accepted `ReasoningStep` proposals reuse the same services;
-- one authorization/policy path, not a loop-specific copy;
+- there is one authorization/policy path, not a loop-specific copy;
 - generated capability IR remains the only executable ERP vocabulary;
 - mutation recovery never depends on model retry behavior.
 
 ### GP-04 — proposal-only loop mode
 
-Refactor `agent_loop.rs` so a model-selected capability becomes a `CapabilityProposal` instead of immediate execution.
+Refactor `agent_loop.rs` so model-selected capabilities become typed proposals instead of immediate tool execution.
 
-Keep bounded transcript/state, model rounds, malformed-output handling, duplicate/non-progress detection, bounded planning/replanning and clarification proposals.
+Keep bounded transcript/state, model rounds, malformed-output handling, duplicate/non-progress detection, bounded planning/replanning, and clarification proposals.
 
-Remove capability execution, authorization/policy authority, spend reservation/settlement, approvals, mutation retry/reconciliation, evidence verification and final-answer admission from loop ownership.
-
-A compatibility adapter may preserve existing tests/routes temporarily, but new harness work must target proposal mode.
+Remove capability execution, authorization/policy authority, spend reservation/settlement, approvals, mutation retry/reconciliation, evidence verification, final-answer admission, and precedent persistence from loop ownership.
 
 ### GP-05 — durable decision/reasoning events
 
-Persist:
-
-```text
-DecisionRequested
-DecisionAnswered
-DecisionVerified
-DecisionEscalated
-ReasoningRequested
-ReasoningProposed
-ReasoningProposalAccepted
-ReasoningProposalRejected
-```
-
-Bind each to program/version, step id, provider/model attempt, input hash, candidate set / allowed proposal kinds, output, and verification/rejection reason.
+Persist typed decision/reasoning requests, outputs, verification, escalation, acceptance/rejection, and provider-attempt links.
 
 ### GP-06 — decision precedent foundation
 
-Introduce the institutional-memory layer from `decision-precedent-memory-layer.md`.
+Deliver immutable `DecisionCase`, corrections/outcomes, tenant-scoped `PrecedentStore`, hybrid retrieval, decision-pattern candidates, and policy/version-aware precedent filtering.
 
-Deliver:
+### GP-07 — DecisionType registry
 
-- immutable `DecisionCase` records;
-- correction/supersession links rather than mutation;
-- outcome/verification refs;
-- tenant-scoped `PrecedentStore`;
-- hybrid retrieval by decision type + program/step + entity/context shape + constraints + semantic similarity + outcome/review quality;
-- compact precedent context for providers;
-- durable precedent events;
-- stale/rejected/superseded filtering;
-- `DecisionPattern` candidate records.
+Introduce versioned `DecisionTypeDefinition` with:
 
-Hard requirements:
+- input/output schemas;
+- required evidence;
+- risk class;
+- precedent policy;
+- verification policy;
+- escalation policy.
 
-- historical approval is not current approval;
-- historical authorization is not current authorization;
-- precedent cannot execute capabilities;
-- cross-tenant precedent is forbidden by default;
-- current facts/policy dominate stale precedent.
+Bind decision cases to decision type/version.
 
-### GP-07 — governed program core
+### GP-08 — typed DecisionGraph IR
 
-Introduce typed program execution:
+Introduce graph nodes:
 
 ```text
-DeterministicStep
-DecisionStep
-CapabilityStep
-VerificationStep
-GenerationStep
-ReasoningStep
-ApprovalStep
+Compute
+Choice
+Score
+Probability
+DecisionBatch
+AcquireEvidence
+Gate
+EarlyStop
+Capability
+Verify
+Reason
+Generate
+RequireApproval
 ```
 
-The program owns control flow. Intelligence providers return bounded values/proposals only. `DecisionStep` may declare a `PrecedentPolicy` and retrieve prior cases before provider invocation.
+Requirements:
 
-### GP-08 — first read-only governed program with precedent
+- deterministic computation before model judgment;
+- graph validation before execution;
+- no provider-owned control flow;
+- cycles only through explicit bounded constructs.
 
-Choose one production-shaped read-only workflow already represented by reviewed generated capabilities and with a meaningful recurring decision point.
+### GP-09 — probabilistic program state
+
+Add first-class probabilistic state/distribution metadata and deterministic threshold gates.
+
+Requirements:
+
+- provider confidence separated from calibrated confidence;
+- calibration profile refs persisted;
+- thresholds owned by policy/program configuration;
+- signals separated from operational disposition.
+
+### GP-10 — conditional evidence + early stops
+
+Add authorized evidence acquisition nodes that run only when needed and re-evaluate affected nodes only.
+
+Add hard stop/escalation semantics that providers cannot override.
+
+### GP-11 — parallel decision batches
+
+Execute independent typed questions concurrently while preserving per-question events, provider usage, calibration, and deterministic dependency ordering.
+
+### GP-12 — first production-shaped typed governed program
+
+Choose one read-only recurrence-heavy ERP workflow.
 
 Target happy path:
 
 ```text
 objective
- -> deterministic discovery
- -> PrecedentRetriever
- -> DecisionStep
+ -> deterministic Compute nodes
+ -> precedent retrieval
+ -> parallel bounded decisions
+ -> Gate
+ -> conditional AcquireEvidence if needed
  -> CapabilityStep
  -> VerificationStep
- -> DecisionCase record
- -> DecisionStep(sufficiency)
+ -> DecisionCase
  -> GenerationStep
 ```
 
 `ReasoningStep` must not be required on the normal path.
 
-Compare against the current loop for provider calls, tokens, latency, selection failures, policy denials, evidence coverage, correctness/eval outcome, precedent hit rate and correction rate.
+Compare against the current loop for provider calls, tokens, latency, selection failures, evidence coverage, corrections, correctness, and cost.
 
-Run an A/B eval with precedent disabled vs enabled to prove lift rather than assume it.
+### GP-13 — reasoning escalation
 
-### GP-09 — reasoning escalation path
+Add `ReasoningStep` only when the typed graph cannot resolve the state.
 
-Add `ReasoningStep` only for states the explicit program cannot resolve.
+A reasoning step declares allowed proposal kinds, bounded candidate capability/discovery surface, remaining rounds/tokens, patch scope, and clarification policy.
 
-A reasoning step declares allowed proposal kinds, candidate capability set/discovery boundary, remaining rounds/tokens, acceptable program-patch scope, clarification policy, and whether bounded precedent summaries may be included.
+Accepted proposals return to normal governed execution.
 
-Accepted proposals return to normal governed execution. Rejected/malformed proposals never execute provider-side.
+### GP-14 — independent RunReviewProgram
 
-### GP-10 — intelligence router
+Review completed observable traces/evidence/outcomes independently from execution.
 
-Route independently by primitive and eval profile:
-
-```text
-decide(choice, cardinality=6, reliability>=X, precedent=enabled)
-generate(report-summary, budget=Y)
-reason(exploratory-analysis, max_rounds=Z)
-```
-
-Do not route an entire workflow to a provider.
-
-### GP-11 — shadow providers and calibration
-
-Allow non-authoritative decision providers to receive identical bounded requests.
-
-Shadow providers cannot affect control flow, execute capabilities, alter approval state or write business state; they are separately budgeted and recorded.
-
-Eval dimensions include:
-
-- accuracy/calibration;
-- latency/cost;
-- correction rate;
-- outcome quality;
-- with-precedent vs without-precedent lift.
-
-This is the Jev/System-One evaluation seam.
-
-### GP-12 — decision-pattern promotion and deterministic graduation
-
-Aggregate repeated verified cases into reviewed `DecisionPattern` candidates.
-
-Promotion flow:
+Typed dispositions:
 
 ```text
-repeated verified cases
-  -> cluster/pattern candidate
-  -> outcome/correction metrics
-  -> human/eval review
-  -> reviewed DecisionPattern
-  -> optional deterministic program branch / policy / native ERP feature
+Healthy
+ReviewRequired
+Defect
+IncidentCandidate
 ```
 
-Do not auto-promote based on frequency alone. Promotion requires applicability bounds, outcome evidence, correction-rate review and normal product/policy governance.
+Review checks objective satisfaction, unsupported claims, branch/capability errors, policy anomalies, suspicious effects, unresolved uncertainty, and precedent contradictions.
 
-### GP-13 — migrate known ERP programs
+Where practical, route review through a different provider/profile from execution.
+
+### GP-15 — intelligence router + shadow paths
+
+Route `decide` / `generate` / `reason` independently by eval profile.
+
+Support shadow decision providers, candidate policy versions, and deterministic decision-pattern candidates over the same versioned decision snapshot with zero live side effects.
+
+### GP-16 — deterministic graduation
+
+Track decision frequency, provider disagreement, correction rate, verified outcome rate, entropy, precedent consistency, policy stability, and cost.
+
+Promote stable repeated decisions through:
+
+```text
+DecisionPattern candidate
+ -> fixtures/evals/review
+ -> deterministic shadow implementation
+ -> comparison against live outcomes
+ -> reviewed deterministic program/policy/native ERP behavior
+```
+
+Graduation remains versioned and reversible.
+
+### GP-17 — migrate known ERP programs
 
 For each workflow:
 
-1. define explicit program graph;
-2. use deterministic code when semantics are known;
-3. use `DecisionStep` for bounded uncertainty;
-4. retrieve precedent only for recurrence-heavy decision classes;
-5. use `CapabilityStep` for execution;
-6. use `GenerationStep` for synthesis;
-7. use `ReasoningStep` only for genuine open-ended escalation;
-8. flag stable repeated decisions as deterministic-graduation candidates;
-9. keep all authorization/evidence/budget gates in shared runtime services.
+1. define explicit typed graph;
+2. compute deterministic facts in code;
+3. use bounded typed decisions only for genuine uncertainty;
+4. use DecisionBatch where independent judgments can run concurrently;
+5. retrieve precedent by DecisionType/version where useful;
+6. acquire additional evidence conditionally;
+7. use deterministic gates/early stops for consequences;
+8. use `ReasoningStep` only for genuine open-ended escalation;
+9. enable RunReviewProgram according to risk;
+10. identify deterministic-graduation candidates.
 
-### GP-14 — Jev admission
+### GP-18 — Jev/System-One admission
 
 When Jev API access/stability is sufficient:
 
 - implement `JevDecisionProvider` only;
-- start in shadow mode;
-- compare calibration, accuracy, latency and cost against LLM adapters;
-- compare with/without precedent context;
-- admit only decision classes that pass normal eval gates;
-- never add Jev-specific ERP semantics or workflow branches.
+- map it to Choice/Score/Probability nodes;
+- begin shadow-only;
+- evaluate batching, calibration, latency, cost and precedent lift;
+- admit decision classes through normal routing policy;
+- no Jev-specific ERP semantics or workflow branches.
 
 ## Explicit non-goals
 
@@ -280,24 +297,28 @@ When Jev API access/stability is sufficient:
 - forcing exploratory work into static graphs;
 - exposing the full capability catalog by default;
 - treating provider probabilities as calibrated truth;
-- treating historical approval/authorization as current authority;
-- cross-tenant precedent retrieval by default;
-- auto-promoting frequent decisions into policy/business rules.
+- allowing model output to override deterministic hard stops;
+- using raw transcript history as organizational decision memory.
 
 ## Review gate
 
 No new harness feature should add provider-specific orchestration when it can be expressed as:
 
 ```text
-decide
+compute
+decide(choice/score/probability)
+batch
+precedent
+acquire_evidence
+gate / early_stop
 generate
 reason -> proposal
-precedent -> bounded context
 capability
 verify
 approval
+run_review
 ```
 
-No new `ReasoningStep` may directly call an ERP executor. No precedent record may bypass current runtime admission.
+No new `ReasoningStep` may directly call an ERP executor. No model output may directly own disposition when the program can derive disposition from typed signals and explicit policy gates.
 
 Exceptions require an explicit architecture decision and evidence that the primitive set is insufficient.
