@@ -1,6 +1,7 @@
 export const SEMANTIC_OPERATION_OUTCOME_EVENT = "lumiere:semantic-operation-outcome"
 
 export interface SemanticOperationOutcomeDetail {
+  readonly formId: string
   readonly kind: "converged" | "already-applied"
   readonly resource: string
   readonly recordId: string
