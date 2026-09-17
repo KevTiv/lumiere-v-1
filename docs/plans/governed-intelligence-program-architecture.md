@@ -9,46 +9,60 @@
 
 Lumiere's AI harness is a **governed program runtime**, not an LLM-shaped agent runtime.
 
-Models are replaceable intelligence primitives inside an explicit program. They do not own authorization, ERP semantics, workflow state, business mutation semantics, or the execution graph by default.
+Models are replaceable intelligence primitives inside an explicit program. They do not own authorization, ERP semantics, workflow state, business mutation semantics, or execution authority.
 
 The runtime exposes three distinct intelligence operations:
 
 ```text
 decide()    -> bounded classification / choice / score / probability
-reason()    -> bounded open-ended agent loop when the program cannot be predetermined
 generate()  -> prose/code/artifact synthesis
+reason()    -> bounded proposal generation when the program cannot determine the next step
+```
+
+The important boundary is:
+
+```text
+model proposes
+runtime authorizes / executes / verifies
 ```
 
 Initial providers remain Mistral/Gemini/Kong/Ollama where already admitted. A future Jev/System-One provider implements `decide()` without forcing a redesign of the harness.
 
-The design target is:
+Target architecture:
 
 ```text
 User objective
       ↓
 Context compiler
       ↓
-Governed Program
-      ├── deterministic step
-      ├── decide(...)
-      ├── capability(...)
-      ├── verify(...)
-      ├── reason(...)        # exceptional/open-ended path
-      └── generate(...)
+GovernedProgram
+      ├── DeterministicStep
+      ├── DecisionStep
+      ├── CapabilityStep
+      ├── VerificationStep
+      ├── GenerationStep
+      ├── ReasoningStep  -> typed proposal only
+      └── ApprovalStep
       ↓
-Policy / authorization / budgets / evidence gates
+shared runtime admission
+      ├── authorization
+      ├── invocation policy
+      ├── spend/budget admission
+      ├── approval state
+      ├── evidence/provenance
+      └── execution/recovery
       ↓
 Generated ERP capability surface
       ↓
-STDB / authoritative read models / action-draft approval paths
+STDB / authoritative read models / action-draft paths
 ```
 
 ## 2. Why change direction
 
-The existing H3-H5 implementation is valuable and remains the execution substrate:
+The existing H3-H5 implementation is valuable and remains infrastructure:
 
-- provider-neutral tool transport;
-- bounded model/tool/token limits;
+- normalized provider transport;
+- bounded rounds/model/tool/token limits;
 - per-invocation policy checks;
 - approval stops;
 - spend admission;
@@ -56,90 +70,41 @@ The existing H3-H5 implementation is valuable and remains the execution substrat
 - durable execution events;
 - non-progress detection.
 
-The architectural correction is to stop treating a tool-calling conversation loop as the universal intelligence API.
+The correction is to stop treating a tool-calling conversation loop as the universal runtime and to stop letting the reasoning loop own execution semantics.
 
-For known ERP workflows, asking a generative model to reconstruct the next-state machine on every run wastes context, makes evaluation harder, encourages tool-selection variance, and couples orchestration to chat-provider semantics.
+For known ERP workflows, asking a generative model to reconstruct the next-state machine wastes context, makes evaluation harder, increases tool-selection variance, and couples orchestration to chat-provider semantics.
 
-Instead, Lumiere should encode the program graph explicitly whenever the graph is known and call model intelligence only at bounded decision/generation/reasoning nodes.
+For unknown/open-ended work, the model may still help determine a next step, but it should return a typed proposal that the governed runtime independently validates and executes.
 
 ## 3. Non-negotiable invariants
 
-1. `DecisionProvider`, `GenerationProvider`, and `ReasoningProvider` never become authorization authorities.
-2. Generated capability IR remains the canonical application operation vocabulary.
+1. `DecisionProvider`, `GenerationProvider`, and `ReasoningProvider` never become authorization or execution authorities.
+2. Generated capability IR remains the canonical application-operation vocabulary.
 3. Casbin/server authorization is re-evaluated for every consequential capability invocation.
 4. STDB reducers/business invariants remain authoritative for mutation semantics.
 5. Decision confidence is advisory input to deterministic admission policy; it cannot grant permissions or bypass confirmation.
-6. Provider-reported confidence is not assumed calibrated. Production calibration must use verified outcomes/evals.
-7. Unknown/low-confidence/high-risk decisions escalate to verification, clarification, review, or bounded `reason()`; they do not silently widen authority.
-8. The agent loop remains bounded and auditable, but becomes a fallback primitive rather than the default workflow engine.
+6. Provider-reported confidence is not assumed calibrated. Production calibration uses verified outcomes/evals.
+7. Unknown/low-confidence/high-risk states escalate to verification, clarification, review, or bounded `reason()`; they do not silently widen authority.
+8. `ReasoningStep` may propose but may not directly execute capabilities, approve drafts, retry mutations, or admit final answers.
 9. Provider substitution must not change durable program semantics.
-10. Every intelligence call is replay/inspection friendly without storing hidden chain-of-thought.
+10. Every intelligence call is replay/inspection friendly without persisting hidden chain-of-thought.
+11. Shared runtime services own authorization, policy, budgets, approval, execution, recovery and verification for every step kind.
+12. New fixed ERP workflows must not be implemented as generic agent loops when their program graph is known.
 
-## 4. Runtime primitives
+## 4. Intelligence primitives
 
-### 4.1 Decision provider
+### 4.1 DecisionProvider
 
 ```rust
 #[async_trait]
 pub trait DecisionProvider: Send + Sync {
     async fn decide(&self, request: DecisionRequest) -> Result<DecisionResponse>;
 }
-
-pub struct DecisionRequest {
-    pub state: serde_json::Value,
-    pub questions: Vec<DecisionQuestion>,
-    pub budget: DecisionBudget,
-}
-
-pub enum DecisionQuestion {
-    Choice {
-        key: String,
-        instructions: String,
-        options: Vec<DecisionOption>,
-    },
-    Score {
-        key: String,
-        instructions: String,
-        min: f64,
-        max: f64,
-    },
-    Probability {
-        key: String,
-        instructions: String,
-    },
-}
-
-pub struct DecisionResponse {
-    pub answers: Vec<DecisionAnswer>,
-    pub provider: String,
-    pub model: String,
-    pub usage: IntelligenceUsage,
-}
 ```
 
-Initial implementation:
+`DecisionRequest` contains bounded state, explicit questions and candidate values. Initial implementation uses `LlmDecisionAdapter` over Mistral/Gemini. Future Jev integration implements the same contract.
 
-```text
-DecisionProvider
-      ↓
-LlmDecisionAdapter
-      ├── Mistral
-      └── Gemini
-```
-
-Future implementation:
-
-```text
-DecisionProvider
-      ├── LlmDecisionAdapter
-      └── JevDecisionProvider
-```
-
-No orchestration change should be required to introduce Jev.
-
-### 4.2 Generation provider
-
-Generation remains text/artifact oriented:
+### 4.2 GenerationProvider
 
 ```rust
 #[async_trait]
@@ -148,24 +113,89 @@ pub trait GenerationProvider: Send + Sync {
 }
 ```
 
-This covers prose synthesis, document drafting, code/program authoring, presentation composition, and other genuinely generative work.
+Generation covers prose synthesis, code/program authoring, documents, reports and presentation composition. Generated output remains subject to evidence and final-answer admission.
 
-### 4.3 Reasoning provider / bounded loop
+### 4.3 ReasoningProvider
 
-The existing tool-calling agent loop remains the implementation basis for `reason()`.
+The existing agent loop is refactored behind a proposal-only reasoning interface:
 
-Use it only when:
+```rust
+#[async_trait]
+pub trait ReasoningProvider: Send + Sync {
+    async fn reason(&self, request: ReasoningRequest) -> Result<ReasoningOutcome>;
+}
+
+pub enum ReasoningOutcome {
+    DecisionProposal(DecisionProposal),
+    CapabilityProposal(CapabilityProposal),
+    ProgramPatchProposal(ProgramPatchProposal),
+    ClarificationRequest(ClarificationRequest),
+    FinalDraft(FinalDraft),
+    UnableToProgress(UnableToProgress),
+}
+```
+
+`ReasoningProvider` owns only bounded reasoning state, provider interaction, malformed-output handling and non-progress detection.
+
+It does **not** own:
+
+- capability execution;
+- authorization;
+- policy admission;
+- spend reservation/settlement;
+- approval/draft lifecycle;
+- mutation retry/recovery;
+- verification;
+- final-answer admission.
+
+Those remain shared governed-runtime services.
+
+## 5. ReasoningStep contract
+
+`ReasoningStep` is exceptional, not the default control plane.
+
+Use it when:
 
 - the execution graph cannot be usefully predetermined;
 - hypotheses must be revised from evidence;
-- tool ordering depends on unbounded semantic observations;
-- a governed program explicitly admits open-ended reasoning.
+- tool/capability ordering depends on semantic observations not captured by the static program;
+- recovery requires choosing among several admissible next actions;
+- the user request is exploratory by nature.
 
-`reason()` inherits current limits, policy checks, spend admission, approval stops, persistence and non-progress controls.
+A reasoning step receives only an admitted view:
 
-## 5. Governed program model
+```text
+objective
+bounded state summary
+current evidence refs/summaries
+candidate CapabilityKeys and schemas
+allowed proposal kinds
+remaining reasoning budget
+```
 
-A program is a typed, versioned graph of admitted steps.
+It returns a proposal. The runtime then handles it:
+
+```text
+ReasoningOutcome::CapabilityProposal
+      ↓
+schema validation
+      ↓
+authorization
+      ↓
+policy/risk/approval
+      ↓
+spend/tool admission
+      ↓
+capability execution
+      ↓
+verification/evidence
+      ↓
+program continues
+```
+
+The reasoning provider never receives a raw execution handle that lets it bypass this path.
+
+## 6. GovernedProgram model
 
 ```rust
 pub struct GovernedProgram {
@@ -188,194 +218,199 @@ pub enum ProgramStep {
 }
 ```
 
-The program owns control flow. Providers supply bounded intelligence results.
+The program owns control flow. Providers provide bounded intelligence results.
 
-Example:
+Known workflow example:
 
 ```text
 objective
   ↓
 deterministic capability discovery
   ↓
-decide: rank 3-10 admitted candidates
+DecisionStep: choose from 3-10 admitted candidates
   ↓
-policy threshold
-  ├── low confidence -> clarification/reason/review
-  └── accepted
-        ↓
-capability execution
-        ↓
-verify evidence/result
-        ↓
-decide: sufficient evidence?
+CapabilityStep
+  ↓
+VerificationStep
+  ↓
+DecisionStep: evidence sufficient?
   ├── no -> bounded acquisition branch
-  └── yes
-        ↓
-generate presentation
+  └── yes -> GenerationStep
 ```
 
-## 6. Capability discovery and decision routing
+Open-ended escalation example:
+
+```text
+known graph cannot resolve state
+  ↓
+ReasoningStep
+  ↓
+CapabilityProposal / ClarificationRequest / ProgramPatchProposal
+  ↓
+governed runtime validates proposal
+  ↓
+normal governed execution resumes
+```
+
+## 7. Capability discovery and routing
 
 Keep deterministic narrowing first:
 
 ```text
 objective
   ↓
-lexical/tag/semantic candidate discovery
+lexical/tag/semantic discovery
   ↓
 Casbin-filtered candidate set
   ↓
 3-10 generated CapabilityKeys
   ↓
-decide(choice)
+DecisionStep or ReasoningStep over that bounded set
 ```
 
-A model does not receive the global operation surface by default.
+No provider receives the full operation catalog by default.
 
-Decision routing uses task shape rather than vendor identity:
+Routing is by primitive and eval profile rather than provider brand:
 
-```rust
-pub struct IntelligenceCapabilityProfile {
-    pub provider: String,
-    pub model: String,
-    pub choice_accuracy: Option<f64>,
-    pub calibration_error: Option<f64>,
-    pub verification_accuracy: Option<f64>,
-    pub p50_latency_ms: Option<u64>,
-    pub cost_class: CostClass,
-    pub max_choice_cardinality: Option<u32>,
-    pub supports_generation: bool,
-    pub supports_reasoning_loop: bool,
-}
+```text
+decide(choice, cardinality=6, reliability>=X)
+generate(report-summary, budget=Y)
+reason(exploratory-analysis, max_rounds=Z, proposal_kinds=[...])
 ```
 
-Profiles are eval-derived and versioned.
+## 8. Confidence, verification and shadowing
 
-## 7. Confidence and calibration
-
-Provider confidence is never treated as a permission.
-
-The runtime records:
+Persist:
 
 ```text
 DecisionRequested
 DecisionAnswered
 DecisionVerified
-DecisionRejected
 DecisionEscalated
+ReasoningRequested
+ReasoningProposed
+ReasoningProposalAccepted
+ReasoningProposalRejected
 ```
 
-with:
+Provider confidence is never a permission. Calibration comes from verified outcomes.
 
-```rust
-pub struct DecisionRecord {
-    pub decision_key: String,
-    pub provider: String,
-    pub model: String,
-    pub input_hash: String,
-    pub selected: serde_json::Value,
-    pub confidence: Option<f64>,
-    pub distribution: Option<serde_json::Value>,
-    pub verification_ref: Option<String>,
-}
-```
+Shadow providers may evaluate the same decision request but cannot affect control flow, execute capabilities or alter business state.
 
-Calibration is computed from verified outcomes, not from self-reported model confidence.
-
-This enables provider shadowing:
+This is the Jev insertion path:
 
 ```text
-production: Gemini decision
-shadow: Jev decision
-verified outcome
-      ↓
-offline calibration / routing policy update
+production DecisionProvider: Gemini/Mistral
+shadow DecisionProvider: Jev
+         ↓
+verified outcome/eval
+         ↓
+calibration + routing update
 ```
 
-Shadow results never affect production execution until explicitly admitted.
+## 9. What happens to `agent_loop.rs`
 
-## 8. Where the existing agent loop moves
+`orchestrator/agent_loop.rs` is retained but refactored.
 
-Current `orchestrator/agent_loop.rs` is not deleted.
+Current responsibilities should be split as follows:
 
-It becomes the implementation of a bounded `ReasoningStep` and remains appropriate for:
+### Keep in the loop/reasoner
 
-- research;
-- exploratory analysis;
-- unfamiliar multi-tool objectives;
-- hypothesis loops;
-- recovery when deterministic/decision steps cannot resolve ambiguity and policy allows escalation.
+- bounded transcript/state;
+- model interaction rounds;
+- malformed proposal handling;
+- duplicate/non-progress detection;
+- proposal construction;
+- clarification proposal generation;
+- bounded planning/replanning.
 
-Known ERP paths should progressively migrate to explicit program graphs.
+### Move out to governed-runtime services
 
-## 9. Migration sequence
+- provider routing policy;
+- spend reservation/settlement;
+- capability authorization;
+- invocation policy;
+- direct tool/capability execution;
+- approval lifecycle;
+- mutation retry/reconciliation;
+- evidence verification;
+- final-answer admission.
 
-### GIP-0 — vocabulary and seams
+During migration, existing direct-execution behavior may remain behind a compatibility adapter until proposal-mode parity is proven. It must not become the design target for new work.
 
-- [ ] add provider-neutral decision types;
-- [ ] add `DecisionProvider` and `LlmDecisionAdapter`;
-- [ ] keep existing `LlmCompletion` as transport/internal adapter during migration;
-- [ ] add `DecisionRequested/Answered/Verified/Escalated` durable events;
-- [ ] add eval/calibration metadata without changing authorization semantics.
+## 10. Migration milestones
 
-### GIP-1 — first governed program
+### GIP-0 — intelligence seams
 
-Use a read-only, low-risk ERP objective:
+- [ ] add `DecisionProvider`;
+- [ ] add `GenerationProvider` where current generation is still coupled to completion transport;
+- [ ] add proposal-only `ReasoningProvider` / `ReasoningOutcome` types;
+- [ ] retain `LlmCompletion` as provider transport/internal adapter;
+- [ ] add decision/reasoning durable events.
+
+### GIP-1 — extract execution authority from agent loop
+
+- [ ] create shared governed-runtime capability executor;
+- [ ] move authorization/policy/spend/approval/execution out of loop ownership;
+- [ ] make loop capability output a `CapabilityProposal`;
+- [ ] add compatibility adapter for existing loop tests/paths;
+- [ ] prove no proposal can bypass generated capability validation.
+
+### GIP-2 — first governed program
+
+Use a read-only production-shaped workflow:
 
 ```text
-objective -> candidate discovery -> decision -> capability -> evidence verification -> generation
+objective -> discovery -> DecisionStep -> CapabilityStep -> VerificationStep -> GenerationStep
 ```
 
-Requirements:
+No `ReasoningStep` should be required for the happy path.
 
-- [ ] no global tool prompt;
-- [ ] 3-10 candidate capabilities maximum by default;
-- [ ] deterministic confidence/admission policy;
-- [ ] existing per-call policy and budget gates preserved;
-- [ ] compare latency/cost/tool-error rate against agent-loop baseline.
+### GIP-3 — reasoning escalation
 
-### GIP-2 — decision router
+- [ ] add `ReasoningStep` to governed programs;
+- [ ] constrain allowed proposal kinds/candidate capabilities per step;
+- [ ] resume the governed program after accepted proposals;
+- [ ] reject malformed/unauthorized proposals without provider-side execution.
 
-- [ ] route by decision task shape and eval profile;
-- [ ] support Mistral/Gemini decision adapters;
-- [ ] retain model/provider attempts and spend accounting;
-- [ ] add shadow-provider execution with zero authority.
+### GIP-4 — intelligence router
 
-### GIP-3 — reason() demotion
+- [ ] route `decide` / `generate` / `reason` independently by eval profile;
+- [ ] retain provider-attempt persistence and spend accounting;
+- [ ] add shadow decision providers.
 
-- [ ] make explicit governed programs the default for known migrated ERP workflows;
-- [ ] use `reason()` only from admitted `ReasoningStep`s;
-- [ ] prohibit new fixed ERP workflows from being implemented as unconstrained generic loops when a program graph is known.
+### GIP-5 — migrate known ERP programs
 
-### GIP-4 — System-One/Jev admission
+- [ ] explicit graphs for known workflows;
+- [ ] decision nodes for bounded semantic uncertainty;
+- [ ] reasoning only for genuine open-ended escalation;
+- [ ] no new provider-specific orchestration branches.
 
-When Jev access is available and its API contract is stable enough:
+### GIP-6 — Jev/System-One admission
 
 - [ ] implement `JevDecisionProvider` only;
-- [ ] do not modify program semantics;
-- [ ] run shadow decisions first;
-- [ ] collect accuracy/calibration/latency/cost evidence;
-- [ ] admit selected decision classes only after eval gates pass;
-- [ ] keep Mistral/Gemini fallback where policy allows.
-
-## 10. Plan impact
-
-The following plan interpretation changes immediately:
-
-- `ai-harness-completion-plan.md`: H4/H5 bounded loop remains valid implementation work, but future work must target governed-program primitives instead of expanding the generic loop as the universal runtime.
-- `agent-control-plane-model-routing-plan.md`: model routing becomes intelligence-operation routing (`decide` / `reason` / `generate`), with explicit program state owning control flow.
-- `ai-enterprise-harness-plan.md`: provider seams remain, but the primary abstraction is governed execution rather than model-authored orchestration.
-- `model-refinement-dataset-plane.md`: evals should produce per-decision capability/calibration profiles in addition to broad model profiles.
-- `erp-harness-implementation-ledger.md`: new harness milestones should reference GIP-* and must not create a second competing execution model.
+- [ ] begin shadow-only;
+- [ ] compare calibration/accuracy/latency/cost;
+- [ ] admit decision classes through normal routing policy;
+- [ ] no Jev-specific ERP semantics or orchestration.
 
 ## 11. Acceptance criteria
 
-This architecture is considered adopted when:
+The architecture is adopted when:
 
-1. a production-shaped read-only ERP workflow executes through `GovernedProgram` with explicit `DecisionStep` and `CapabilityStep` nodes;
-2. Mistral/Gemini can satisfy `DecisionProvider` without the program knowing provider-specific tool-call formats;
-3. the same program can shadow a second decision provider without changing business execution;
-4. `agent_loop` remains available through `ReasoningStep` but is no longer required for that workflow;
-5. authorization, policy, budget, evidence and approval gates remain unchanged or stronger;
-6. decision correctness can be evaluated independently of final prose quality;
-7. adding Jev requires a provider adapter + routing/eval configuration, not an orchestration rewrite.
+1. at least one production-shaped ERP workflow runs without the generic loop;
+2. the agent loop can operate in proposal-only mode;
+3. a capability proposed by reasoning is executed only by shared governed-runtime services;
+4. Mistral/Gemini decision adapters and reasoning providers can be routed independently;
+5. reasoning-provider replacement cannot alter authorization or business semantics;
+6. known workflows default to explicit program graphs;
+7. decision correctness and reasoning-proposal quality can be evaluated separately from final prose quality;
+8. adding Jev requires only a `DecisionProvider` adapter plus eval/routing configuration.
+
+## 12. Plan impact
+
+- `ai-harness-completion-plan.md`: H4/H5 loop work is retained as migration substrate; future work must extract execution authority from the loop rather than expand it.
+- `agent-control-plane-model-routing-plan.md`: routing is per intelligence primitive; governed program state owns control flow and shared runtime services own execution.
+- `ai-enterprise-harness-plan.md`: provider seams remain, but provider outputs are proposals/decisions/generation results, never execution authority.
+- `model-refinement-dataset-plane.md`: evals should produce per-decision and per-reasoning capability profiles.
+- `erp-harness-implementation-ledger.md`: new milestones must reference governed-program primitives and may not create a second execution model.
