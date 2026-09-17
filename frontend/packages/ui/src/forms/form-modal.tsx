@@ -91,7 +91,8 @@ export function FormModal({
 
     let semanticOutcome: SemanticOperationOutcomeDetail | undefined
     const captureSemanticOutcome = (event: Event) => {
-      semanticOutcome = (event as CustomEvent<SemanticOperationOutcomeDetail>).detail
+      const detail = (event as CustomEvent<SemanticOperationOutcomeDetail>).detail
+      if (detail.formId === config.id) semanticOutcome = detail
     }
 
     if (typeof window !== "undefined") {
