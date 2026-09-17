@@ -6,7 +6,7 @@ import {
   decodeOperationDispatch,
 } from "@lumiere/api-client"
 
-test("current ok response decodes only as transport acceptance", async () => {
+test("legacy ok response still decodes only as transport acceptance", async () => {
   const receipt = await decodeOperationDispatch(
     new Response(JSON.stringify({ ok: true }), {
       status: 200,
@@ -17,7 +17,7 @@ test("current ok response decodes only as transport acceptance", async () => {
   assert.deepEqual(receipt, { kind: "accepted" })
 })
 
-test("future correlation metadata is preserved without changing semantics", async () => {
+test("server operation receipt preserves canonical operation and correlation metadata", async () => {
   const receipt = await decodeOperationDispatch(
     new Response(
       JSON.stringify({
