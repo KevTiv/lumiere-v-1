@@ -35,11 +35,14 @@ export function resolveUniqueEffect<Row, Ref extends CanonicalRecordRef>(
   return toRef(matched[0]!)
 }
 
+export type OperationEffectWarning = "refresh-failed"
+
 export type OperationEffectOutcome<Ref extends CanonicalRecordRef = CanonicalRecordRef> =
   | {
       readonly kind: "applied"
       readonly ref: Ref
       readonly receipt: OperationDispatchReceipt
+      readonly warnings?: readonly OperationEffectWarning[]
     }
   | {
       readonly kind: "already-applied"
@@ -54,19 +57,21 @@ export type OperationEffectOutcome<Ref extends CanonicalRecordRef = CanonicalRec
       readonly reason: "dispatch-unknown" | "readback-missing" | "readback-failed"
       readonly correlationId?: string
       readonly receipt?: OperationDispatchReceipt
+      readonly warnings?: readonly OperationEffectWarning[]
     }
 
 export interface ExecuteOperationWithReadbackArgs<Ref extends CanonicalRecordRef> {
   /**
    * Resolve the exact business effect by a stable key (for example
    * sale_order.opportunity_id). Never implement this as "latest row".
+   * This must bypass stale UI cache when used for correctness.
    */
   readonly resolveEffect: () => Promise<Ref | null>
-  /** Dispatch the generated typed operation. */
+  /** Dispatch the generated typed operation once. */
   readonly dispatch: () => Promise<OperationDispatchReceipt>
-  /** Refresh/invalidate affected read surfaces after dispatch. */
+  /** Refresh/invalidate affected UI read surfaces after effect resolution. */
   readonly afterDispatch?: () => void | Promise<void>
-  /** Small bounded readback window for STDB/query propagation. */
+  /** Small bounded exact-readback window for STDB/query projection propagation. */
   readonly readbackAttempts?: number
   readonly readbackDelayMs?: number
   /** Injectable for deterministic tests. */
@@ -77,15 +82,32 @@ function defaultWait(delayMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delayMs))
 }
 
+async function attachRefreshWarning<Ref extends CanonicalRecordRef>(
+  outcome:
+    | Extract<OperationEffectOutcome<Ref>, { kind: "applied" }>
+    | Extract<OperationEffectOutcome<Ref>, { kind: "outcome-unknown" }>,
+  afterDispatch?: () => void | Promise<void>,
+): Promise<typeof outcome> {
+  if (!afterDispatch) return outcome
+
+  try {
+    await afterDispatch()
+    return outcome
+  } catch {
+    return { ...outcome, warnings: ["refresh-failed"] }
+  }
+}
+
 /**
  * Reference COV-01 mutation protocol.
  *
  * 1. Resolve the exact effect before dispatch: an idempotent replay returns
  *    AlreadyApplied without creating another effect.
- * 2. Dispatch through the generated operation boundary.
- * 3. Resolve the exact canonical effect after dispatch.
+ * 2. Dispatch through the generated operation boundary exactly once.
+ * 3. Resolve the exact canonical effect after dispatch using a cache-independent read.
  * 4. If dispatch/readback is ambiguous, return OutcomeUnknown. Never blind-retry.
  * 5. Multiple exact effects are a hard invariant failure, not a selection problem.
+ * 6. Cache refresh happens after effect resolution and cannot rewrite effect certainty.
  */
 export async function executeOperationWithCanonicalReadback<
   Ref extends CanonicalRecordRef,
@@ -116,8 +138,6 @@ export async function executeOperationWithCanonicalReadback<
     }
   }
 
-  await args.afterDispatch?.()
-
   const attempts = Math.max(1, args.readbackAttempts ?? 3)
   const delayMs = Math.max(0, args.readbackDelayMs ?? 100)
   const wait = args.wait ?? defaultWait
@@ -125,26 +145,37 @@ export async function executeOperationWithCanonicalReadback<
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       const ref = await args.resolveEffect()
-      if (ref) return { kind: "applied", ref, receipt }
+      if (ref) {
+        return attachRefreshWarning(
+          { kind: "applied", ref, receipt },
+          args.afterDispatch,
+        )
+      }
     } catch (error) {
       if (error instanceof AmbiguousOperationEffectError) throw error
       if (attempt === attempts - 1) {
-        return {
-          kind: "outcome-unknown",
-          reason: "readback-failed",
-          correlationId: receipt.correlationId,
-          receipt,
-        }
+        return attachRefreshWarning(
+          {
+            kind: "outcome-unknown",
+            reason: "readback-failed",
+            correlationId: receipt.correlationId,
+            receipt,
+          },
+          args.afterDispatch,
+        )
       }
     }
 
     if (attempt < attempts - 1 && delayMs > 0) await wait(delayMs)
   }
 
-  return {
-    kind: "outcome-unknown",
-    reason: "readback-missing",
-    correlationId: receipt.correlationId,
-    receipt,
-  }
+  return attachRefreshWarning(
+    {
+      kind: "outcome-unknown",
+      reason: "readback-missing",
+      correlationId: receipt.correlationId,
+      receipt,
+    },
+    args.afterDispatch,
+  )
 }
