@@ -69,7 +69,33 @@ async fn post_operation_inner(
     let company_scope = authorize_reducer_company_scope(&context, company_scope).await?;
     let context = context.with_company_scope(company_scope)?;
     context.require_current_placement(&state.organization_placements)?;
-    execute_reducer_call(&context, contract, args).await
+
+    let correlation_id = context.correlation_id().to_string();
+    let response = execute_reducer_call(&context, contract, args).await?;
+    attach_operation_receipt(
+        response,
+        contract.contract_operation_id,
+        correlation_id.as_str(),
+    )
+}
+
+fn attach_operation_receipt(
+    mut response: Json<Value>,
+    operation_id: &str,
+    correlation_id: &str,
+) -> Result<Json<Value>, ApiError> {
+    let object = response.0.as_object_mut().ok_or_else(|| {
+        ApiError::Internal("trusted operation acknowledgement must be a JSON object".into())
+    })?;
+    object.insert(
+        "operationId".to_string(),
+        Value::String(operation_id.to_string()),
+    );
+    object.insert(
+        "correlationId".to_string(),
+        Value::String(correlation_id.to_string()),
+    );
+    Ok(response)
 }
 
 pub(crate) async fn post_compat_reducer(
@@ -104,4 +130,41 @@ pub(crate) async fn post_compat_reducer(
     let context = context.with_company_scope(company_scope)?;
     context.require_current_placement(&state.organization_placements)?;
     execute_reducer_call(&context, contract, args).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn typed_operation_receipt_preserves_ack_and_adds_server_metadata() {
+        let receipt = attach_operation_receipt(
+            Json(json!({ "ok": true })),
+            "erp.convert_opportunity_to_sale_order",
+            "corr-test-1",
+        )
+        .expect("receipt");
+
+        assert_eq!(
+            receipt.0,
+            json!({
+                "ok": true,
+                "operationId": "erp.convert_opportunity_to_sale_order",
+                "correlationId": "corr-test-1"
+            })
+        );
+    }
+
+    #[test]
+    fn typed_operation_receipt_rejects_non_object_acknowledgement() {
+        let error = attach_operation_receipt(
+            Json(Value::Null),
+            "erp.convert_opportunity_to_sale_order",
+            "corr-test-2",
+        )
+        .expect_err("non-object acknowledgement must fail closed");
+
+        assert!(matches!(error, ApiError::Internal(_)));
+    }
 }
