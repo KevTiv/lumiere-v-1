@@ -4,7 +4,9 @@ import test from "node:test"
 import { OperationRequestError } from "@lumiere/api-client"
 
 import {
+  AmbiguousOperationEffectError,
   executeOperationWithCanonicalReadback,
+  resolveUniqueEffect,
   type CanonicalRecordRef,
 } from "./operation-effect"
 
@@ -127,4 +129,21 @@ test("returns OutcomeUnknown when successful dispatch has no exact readback", as
     assert.equal(outcome.reason, "readback-missing")
     assert.equal(outcome.correlationId, "corr-missing")
   }
+})
+
+test("duplicate exact effects fail instead of choosing newest", () => {
+  const rows = [
+    { id: "100", opportunityId: "7" },
+    { id: "101", opportunityId: "7" },
+  ]
+
+  assert.throws(
+    () =>
+      resolveUniqueEffect(
+        rows,
+        (row) => row.opportunityId === "7",
+        (row) => ref(row.id),
+      ),
+    AmbiguousOperationEffectError,
+  )
 })
