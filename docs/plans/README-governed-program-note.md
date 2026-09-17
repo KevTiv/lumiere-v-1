@@ -9,19 +9,22 @@ The authoritative restructuring for post-H5 harness work is documented in:
 
 Existing harness/control-plane/model-routing plans must be interpreted through those documents where older language assumes a generic tool-calling LLM loop is the universal runtime, provider output owns execution, uncertainty is collapsed directly into actions, or raw transcript history substitutes for governed decision memory.
 
-The target harness shape is now:
+The target harness shape is:
 
 ```text
 Typed DecisionGraph
   ├── deterministic Compute nodes
-  ├── bounded Choice / Score / Probability nodes
+  ├── versioned DecisionType nodes
+  │      ├── Choice
+  │      ├── Score
+  │      └── Probability
   ├── parallel DecisionBatch nodes
+  ├── precedent-aware bounded context
   ├── conditional AcquireEvidence nodes
   ├── deterministic Gate / EarlyStop nodes
-  ├── precedent-aware DecisionTypes
   ├── proposal-only ReasoningStep
   ├── governed Capability / Approval / Verification steps
   └── independent RunReviewProgram
 ```
 
-AI supplies narrow typed judgments. Program IR and policy own composition and consequences. Repeated stable decisions are candidates for reviewed deterministic graduation rather than permanent model dependence.
+AI supplies narrow typed judgments. Program IR and policy own composition and consequences. Probabilistic state remains typed until explicit gates convert it into program control. Repeated stable decisions are candidates for reviewed deterministic graduation rather than permanent model dependence.
