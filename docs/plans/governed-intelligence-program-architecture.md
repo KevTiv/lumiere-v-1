@@ -27,7 +27,7 @@ compute()           -> deterministic facts
 precedent()         -> scoped prior decision context
 batch()             -> independent parallel decisions
 acquire_evidence()  -> conditional authorized evidence
- gate()/early_stop  -> deterministic consequence mapping
+gate()/early_stop() -> deterministic consequence mapping
 capability()        -> governed ERP execution
 verify()            -> evidence/result validation
 approval()          -> human/policy-controlled transition
