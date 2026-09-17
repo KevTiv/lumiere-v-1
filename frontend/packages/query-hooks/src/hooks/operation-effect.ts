@@ -41,7 +41,8 @@ export type OperationEffectOutcome<Ref extends CanonicalRecordRef = CanonicalRec
   | {
       readonly kind: "applied"
       readonly ref: Ref
-      readonly receipt: OperationDispatchReceipt
+      readonly receipt?: OperationDispatchReceipt
+      readonly correlationId?: string
       readonly warnings?: readonly OperationEffectWarning[]
     }
   | {
@@ -104,10 +105,13 @@ async function attachRefreshWarning<Ref extends CanonicalRecordRef>(
  * 1. Resolve the exact effect before dispatch: an idempotent replay returns
  *    AlreadyApplied without creating another effect.
  * 2. Dispatch through the generated operation boundary exactly once.
- * 3. Resolve the exact canonical effect after dispatch using a cache-independent read.
- * 4. If dispatch/readback is ambiguous, return OutcomeUnknown. Never blind-retry.
- * 5. Multiple exact effects are a hard invariant failure, not a selection problem.
- * 6. Cache refresh happens after effect resolution and cannot rewrite effect certainty.
+ * 3. Whether dispatch is acknowledged or ambiguous, reconcile through the same
+ *    cache-independent exact readback. Never redispatch to discover the answer.
+ * 4. An observed exact effect is Applied even when the HTTP response was lost;
+ *    the result records the available correlation/receipt evidence.
+ * 5. If exact readback remains unresolved, return OutcomeUnknown.
+ * 6. Multiple exact effects are a hard invariant failure, not a selection problem.
+ * 7. Cache refresh happens after effect resolution and cannot rewrite effect certainty.
  */
 export async function executeOperationWithCanonicalReadback<
   Ref extends CanonicalRecordRef,
@@ -117,24 +121,21 @@ export async function executeOperationWithCanonicalReadback<
   const existing = await args.resolveEffect()
   if (existing) return { kind: "already-applied", ref: existing }
 
-  let receipt: OperationDispatchReceipt
+  let receipt: OperationDispatchReceipt | undefined
+  let dispatchCorrelationId: string | undefined
+  let dispatchWasAmbiguous = false
+
   try {
     receipt = await args.dispatch()
+    dispatchCorrelationId = receipt.correlationId
   } catch (error) {
-    if (error instanceof OperationRequestError) {
-      if (error.retry !== "reconcile") {
-        return { kind: "rejected", error }
-      }
-      return {
-        kind: "outcome-unknown",
-        reason: "dispatch-unknown",
-        correlationId: error.correlationId,
-      }
+    if (error instanceof OperationRequestError && error.retry !== "reconcile") {
+      return { kind: "rejected", error }
     }
 
-    return {
-      kind: "outcome-unknown",
-      reason: "dispatch-unknown",
+    dispatchWasAmbiguous = true
+    if (error instanceof OperationRequestError) {
+      dispatchCorrelationId = error.correlationId
     }
   }
 
@@ -147,7 +148,12 @@ export async function executeOperationWithCanonicalReadback<
       const ref = await args.resolveEffect()
       if (ref) {
         return attachRefreshWarning(
-          { kind: "applied", ref, receipt },
+          {
+            kind: "applied",
+            ref,
+            receipt,
+            correlationId: dispatchCorrelationId,
+          },
           args.afterDispatch,
         )
       }
@@ -158,7 +164,7 @@ export async function executeOperationWithCanonicalReadback<
           {
             kind: "outcome-unknown",
             reason: "readback-failed",
-            correlationId: receipt.correlationId,
+            correlationId: dispatchCorrelationId,
             receipt,
           },
           args.afterDispatch,
@@ -172,8 +178,8 @@ export async function executeOperationWithCanonicalReadback<
   return attachRefreshWarning(
     {
       kind: "outcome-unknown",
-      reason: "readback-missing",
-      correlationId: receipt.correlationId,
+      reason: dispatchWasAmbiguous ? "dispatch-unknown" : "readback-missing",
+      correlationId: dispatchCorrelationId,
       receipt,
     },
     args.afterDispatch,
