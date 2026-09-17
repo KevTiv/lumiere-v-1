@@ -56,7 +56,8 @@ test("returns Applied only after canonical readback resolves the resulting recor
   assert.equal(dispatches, 1)
   if (outcome.kind === "applied") {
     assert.equal(outcome.ref.id, "77")
-    assert.equal(outcome.receipt.correlationId, "corr-1")
+    assert.equal(outcome.receipt?.correlationId, "corr-1")
+    assert.equal(outcome.correlationId, "corr-1")
   }
 })
 
@@ -103,6 +104,36 @@ test("does not blind-retry an ambiguous server failure", async () => {
   if (outcome.kind === "outcome-unknown") {
     assert.equal(outcome.reason, "dispatch-unknown")
     assert.equal(outcome.correlationId, "corr-unknown")
+  }
+})
+
+test("response-lost dispatch reconciles to Applied when exact effect appears", async () => {
+  let reads = 0
+  let dispatches = 0
+  const outcome = await executeOperationWithCanonicalReadback({
+    resolveEffect: async () => {
+      reads += 1
+      return reads >= 3 ? ref("88") : null
+    },
+    dispatch: async () => {
+      dispatches += 1
+      throw new OperationRequestError({
+        code: "dependency_unavailable",
+        status: 503,
+        retry: "reconcile",
+        message: "response lost",
+        correlationId: "corr-lost",
+      })
+    },
+    wait: noWait,
+  })
+
+  assert.equal(outcome.kind, "applied")
+  assert.equal(dispatches, 1)
+  if (outcome.kind === "applied") {
+    assert.equal(outcome.ref.id, "88")
+    assert.equal(outcome.receipt, undefined)
+    assert.equal(outcome.correlationId, "corr-lost")
   }
 })
 
