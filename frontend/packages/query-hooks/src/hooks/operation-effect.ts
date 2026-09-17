@@ -95,7 +95,7 @@ async function attachRefreshWarning<Ref extends CanonicalRecordRef>(
     await afterDispatch()
     return outcome
   } catch {
-    return { ...outcome, warnings: ["refresh-failed"] }
+    return { ...outcome, warnings: ["refresh-failed"] as const }
   }
 }
 
