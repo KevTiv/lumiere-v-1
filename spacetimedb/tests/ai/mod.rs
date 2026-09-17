@@ -1,10 +1,12 @@
 //! AI domain test suite — invoke via `run_all_ai_tests` reducer.
 pub mod continuation_test;
 pub mod embedding_isolation_test;
+pub mod inspector_test;
 pub mod lineage_test;
 pub mod provenance_test;
 pub mod questions_test;
 pub mod relational_integrity_test;
+pub mod session_controls_test;
 
 use spacetimedb::ReducerContext;
 
@@ -87,6 +89,48 @@ pub fn run_ai_continuation_tests(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 #[spacetimedb::reducer]
+pub fn run_ai_inspector_tests(ctx: &ReducerContext) -> Result<(), String> {
+    inspector_test::test_inspector_claim_shows_exact_source_passage(ctx)
+        .map_err(|e| format!("inspector_claim_passage: {e}"))?;
+    inspector_test::test_inspector_denied_source_redacts_excerpt(ctx)
+        .map_err(|e| format!("inspector_denied_redaction: {e}"))?;
+    inspector_test::test_inspector_unavailable_source_is_explicit(ctx)
+        .map_err(|e| format!("inspector_unavailable: {e}"))?;
+    inspector_test::test_inspector_component_navigates_to_decision(ctx)
+        .map_err(|e| format!("inspector_component: {e}"))?;
+    inspector_test::test_inspector_answer_links_validations_and_claims(ctx)
+        .map_err(|e| format!("inspector_answer: {e}"))?;
+    inspector_test::test_inspector_decision_redacts_denied_supporting_source(ctx)
+        .map_err(|e| format!("inspector_decision_sources: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn run_ai_session_controls_tests(ctx: &ReducerContext) -> Result<(), String> {
+    session_controls_test::test_session_duplicate_resume_is_idempotent(ctx)
+        .map_err(|e| format!("session_duplicate_resume: {e}"))?;
+    session_controls_test::test_session_stale_control_version_rejects(ctx)
+        .map_err(|e| format!("session_stale_version: {e}"))?;
+    session_controls_test::test_session_resume_requires_provider_reconciliation(ctx)
+        .map_err(|e| format!("session_reconciliation: {e}"))?;
+    session_controls_test::test_session_interrupt_parks_and_terminal_rejects(ctx)
+        .map_err(|e| format!("session_interrupt: {e}"))?;
+    session_controls_test::test_session_resume_rechecks_manifest_questions(ctx)
+        .map_err(|e| format!("session_manifest_questions: {e}"))?;
+    session_controls_test::test_session_resume_rejects_recalled_source(ctx)
+        .map_err(|e| format!("session_recalled_source: {e}"))?;
+    session_controls_test::test_session_fork_creates_run_and_manifest(ctx)
+        .map_err(|e| format!("session_fork: {e}"))?;
+    session_controls_test::test_session_compare_records_manifest_diff(ctx)
+        .map_err(|e| format!("session_compare: {e}"))?;
+    session_controls_test::test_session_event_cursor_upsert_and_monotonic(ctx)
+        .map_err(|e| format!("session_event_cursor: {e}"))?;
+    session_controls_test::test_session_inspect_reports_run_state(ctx)
+        .map_err(|e| format!("session_inspect: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_insight_org_scope_test(ctx)?;
     run_ai_document_processing_job_document_relation_test(ctx)?;
@@ -95,6 +139,8 @@ pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_lineage_tests(ctx)?;
     run_ai_questions_tests(ctx)?;
     run_ai_continuation_tests(ctx)?;
+    run_ai_inspector_tests(ctx)?;
+    run_ai_session_controls_tests(ctx)?;
     log::info!("✅ run_all_ai_tests complete");
     Ok(())
 }

@@ -118,7 +118,8 @@ pub struct AiAgentRun {
     pub team_member_id: Option<u64>,
     /// Client-generated correlation id for gateway lookup after insert.
     pub run_key: String,
-    /// pending | running | completed | failed | cancelled
+    /// pending | running | awaiting_approval | agent_settled | interrupted |
+    /// completed | failed | cancelled (wait states are non-terminal)
     pub status: String,
     pub inputs_json: String,
     pub summary: Option<String>,
@@ -263,8 +264,10 @@ pub struct CompleteAiAgentRunParams {
 }
 
 /// Non-terminal wait state for a run whose agent loop stopped without a final
-/// outcome: `awaiting_approval` (an action draft needs approval) or
-/// `agent_settled` (a candidate answer awaits the answer gate).
+/// outcome: `awaiting_approval` (an action draft needs approval),
+/// `agent_settled` (a candidate answer awaits the answer gate), or
+/// `interrupted` (AIH-24 session controls parked the run; it accepts no new
+/// work until resumed).
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct SetAiAgentRunWaitStateParams {
     pub status: String,
@@ -1080,13 +1083,15 @@ pub fn set_ai_agent_run_wait_state(
     let run = load_company_run(ctx, organization_id, company_id, run_id)?;
     let status = params.status.trim().to_string();
     if !is_run_wait_state(&status) {
-        return Err("wait status must be awaiting_approval or agent_settled".to_string());
+        return Err(
+            "wait status must be awaiting_approval, agent_settled, or interrupted".to_string(),
+        );
     }
     if run.status == status {
         return Ok(());
     }
-    if !run_accepts_work(&run.status) {
-        return Err("only a running or pending run can enter a wait state".to_string());
+    if !run_is_open(&run.status) {
+        return Err("only a pending, running, or waiting run can enter a wait state".to_string());
     }
 
     let previous_status = run.status.clone();
@@ -1116,9 +1121,14 @@ pub fn set_ai_agent_run_wait_state(
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/// Non-terminal statuses a stopped agent loop may leave a run in.
+/// Non-terminal statuses a stopped or parked agent loop may leave a run in.
+/// `interrupted` is set by AIH-24 session controls; the run stays open
+/// (completable/cancellable) but accepts no new work until resumed.
 fn is_run_wait_state(status: &str) -> bool {
-    matches!(status, "awaiting_approval" | "agent_settled")
+    matches!(
+        status,
+        "awaiting_approval" | "agent_settled" | "interrupted"
+    )
 }
 
 /// A run that may still take new steps, drafts or spend reservations.
@@ -1272,7 +1282,7 @@ mod tests {
 
     #[test]
     fn wait_states_are_open_but_do_not_accept_work() {
-        for status in ["awaiting_approval", "agent_settled"] {
+        for status in ["awaiting_approval", "agent_settled", "interrupted"] {
             assert!(is_run_wait_state(status));
             assert!(run_is_open(status));
             assert!(!run_accepts_work(status));

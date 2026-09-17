@@ -251,6 +251,9 @@ async fn main() -> anyhow::Result<()> {
             "/v1/skills/supplier-discovery",
             post(routes::harness_skills::post_supplier_discovery),
         )
+        .route("/v1/runs", get(routes::runs::list_runs))
+        .route("/v1/runs/:run_id/steps", get(routes::runs::run_steps))
+        .route("/v1/inspector", post(routes::inspector::post_inspect))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             require_gateway_secret,

@@ -191,9 +191,11 @@ export type {
 export { mlSnippets, reportTemplates as notebookReportTemplates } from "./lib/notebook-types";
 
 // Feature components
-export * from "./ai-chat/ai-chat-panel";
-export * from "./ai-chat/ai-action-draft-card";
-export * from "./ai-chat/ai-action-draft-diff-panel";
+export * from "./ai-chat/ai-chat-panel"
+export * from "./ai-chat/ai-action-draft-card"
+export * from "./ai-chat/ai-action-draft-diff-panel"
+export * from "./ai-chat/ai-run-transcript"
+export * from "./ai-chat/ai-run-inspector";
 export * from "./entry-table/entry-table-viewer";
 export * from "./entry-table/entry-detail-modal";
 export * from "./entry-table/entry-table-cell";
