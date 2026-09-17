@@ -5,76 +5,144 @@
 
 ## Purpose
 
-Convert the already-landed bounded agent harness into a governed-program runtime without discarding the H3-H5 work.
+Convert the landed bounded-agent harness into a governed-program runtime while preserving useful H3-H5 infrastructure and removing execution authority from the model loop.
 
 This is a restructuring sequence, not a rewrite.
 
 ## Existing assets to retain
 
-The following remain first-class runtime infrastructure:
+Retain as first-class infrastructure:
 
 - `providers/llm.rs` normalized provider transport;
-- `orchestrator/agent_loop.rs` bounded reasoning loop;
-- `orchestrator/invocation_policy.rs` per-call policy;
-- `orchestrator/spend_admission.rs` budget/spend admission;
-- `orchestrator/progress.rs` non-progress detection;
-- provider attempt persistence;
+- `orchestrator/agent_loop.rs` bounded reasoning mechanics;
+- `orchestrator/invocation_policy.rs`;
+- `orchestrator/spend_admission.rs`;
+- `orchestrator/progress.rs`;
+- provider-attempt persistence;
 - run/step event persistence;
 - generated capability registry and policy filtering;
 - approval/draft semantics;
-- evidence/provenance and answer admission work.
+- evidence/provenance and answer-admission work.
 
 ## Migration rule
 
-No existing provider or loop behavior is removed until the equivalent governed-program path is proven by fixtures/evals.
+Do not delete the current loop first. Refactor it behind compatibility seams until proposal-only reasoning reaches parity.
 
-The migration direction is:
+Target direction:
 
 ```text
-existing agent loop
+existing loop with direct tool execution
       ↓
-extract decision seam
+extract shared governed execution services
       ↓
-route bounded decisions through DecisionProvider
+loop emits typed proposals
       ↓
-introduce GovernedProgram graph
+GovernedProgram validates/executes proposals
       ↓
-move known ERP flows to explicit graph
+known workflows move to explicit program graphs
       ↓
-retain agent loop as ReasoningStep
+loop remains only as ReasoningStep
+```
+
+The target invariant is:
+
+```text
+ReasoningProvider proposes.
+Governed runtime authorizes, executes and verifies.
 ```
 
 ## Work packages
 
-### GP-01 — decision contract
+### GP-01 — intelligence contracts
 
-Deliver:
+Deliver provider-neutral contracts for:
 
-- `DecisionRequest`;
-- `DecisionQuestion::{Choice,Score,Probability}`;
-- `DecisionResponse`;
-- `DecisionAnswer`;
-- `DecisionProvider` trait;
-- validation that option keys are unique and bounded;
-- deterministic request hashing;
-- redaction-safe persistence contract.
+- `DecisionProvider`;
+- `GenerationProvider`;
+- `ReasoningProvider`;
+- `ReasoningOutcome`;
+- `CapabilityProposal`;
+- `DecisionProposal`;
+- `ProgramPatchProposal`;
+- `ClarificationRequest`;
+- strict validation and deterministic request hashing.
 
-No runtime routing change yet.
+No production route switch yet.
 
-### GP-02 — LLM decision adapter
+### GP-02 — LLM adapters
 
-Implement `LlmDecisionAdapter` over current Mistral/Gemini transport.
+Implement:
+
+```text
+DecisionProvider -> LlmDecisionAdapter -> Mistral/Gemini
+ReasoningProvider -> AgentLoopReasoner -> existing LlmCompletion transport
+GenerationProvider -> current generation transport/adapters
+```
 
 Requirements:
 
-- strict schema-constrained output;
-- malformed decision output fails closed;
-- no direct capability execution from adapter output;
-- provider confidence is optional/untrusted metadata;
-- token/spend accounting uses existing admission path;
-- provider attempts remain durable.
+- malformed typed outputs fail closed;
+- adapter outputs cannot directly execute capabilities;
+- provider confidence remains untrusted metadata;
+- provider attempts and usage remain durable.
 
-### GP-03 — decision events and verification
+### GP-03 — shared governed execution services
+
+Extract the responsibilities currently embedded in/around the loop into shared runtime services:
+
+```text
+CapabilityAdmission
+CapabilityExecutor
+SpendAdmission/Settlement
+ApprovalCoordinator
+VerificationService
+ExecutionRecovery
+FinalAnswerAdmission
+```
+
+Requirements:
+
+- `DecisionStep`, `CapabilityStep`, and accepted `ReasoningStep` proposals reuse the same services;
+- there is one authorization/policy path, not a loop-specific copy;
+- generated capability IR remains the only executable ERP vocabulary;
+- mutation recovery never depends on model retry behavior.
+
+### GP-04 — proposal-only loop mode
+
+Refactor `agent_loop.rs` so a model-selected capability becomes:
+
+```text
+CapabilityProposal {
+  capability_key,
+  typed_arguments,
+  proposal_context,
+}
+```
+
+instead of an immediate tool execution.
+
+Keep in the loop:
+
+- bounded transcript/state;
+- model rounds;
+- malformed-output handling;
+- duplicate/non-progress detection;
+- bounded planning/replanning;
+- clarification proposals.
+
+Remove from loop ownership:
+
+- capability execution;
+- authorization/policy authority;
+- spend reservation/settlement;
+- approvals;
+- mutation retry/reconciliation;
+- evidence verification;
+- final-answer admission.
+
+A compatibility adapter may preserve existing tests/routes temporarily, but new harness work must target proposal mode.
+
+### GP-05 — durable decision/reasoning events
 
 Persist:
 
@@ -83,19 +151,23 @@ DecisionRequested
 DecisionAnswered
 DecisionVerified
 DecisionEscalated
+ReasoningRequested
+ReasoningProposed
+ReasoningProposalAccepted
+ReasoningProposalRejected
 ```
 
-Bind each decision to:
+Bind each to:
 
 - program/version;
 - step id;
-- input hash;
 - provider/model attempt;
-- selected output;
-- optional distribution/confidence;
-- verification outcome/reference.
+- input hash;
+- candidate set / allowed proposal kinds;
+- output;
+- verification or rejection reason.
 
-### GP-04 — governed program core
+### GP-06 — governed program core
 
 Introduce typed program execution:
 
@@ -109,46 +181,55 @@ ReasoningStep
 ApprovalStep
 ```
 
-Program execution must reuse existing:
+The program owns control flow. Intelligence providers return bounded values/proposals only.
 
-- authorization;
-- invocation policy;
-- spend admission;
-- approval stops;
-- run state;
-- evidence and artifact ownership.
+### GP-07 — first read-only governed program
 
-Do not create a parallel policy or execution subsystem.
+Choose one production-shaped read-only workflow already represented by reviewed generated capabilities.
 
-### GP-05 — first read-only program
-
-Choose one production-shaped, read-only workflow already represented by reviewed generated capabilities.
-
-Target flow:
+Target happy path:
 
 ```text
 objective
-  -> deterministic candidate discovery
-  -> DecisionStep(choice)
-  -> CapabilityStep
-  -> VerificationStep
-  -> DecisionStep(probability/sufficiency)
-  -> GenerationStep
+ -> deterministic discovery
+ -> DecisionStep
+ -> CapabilityStep
+ -> VerificationStep
+ -> DecisionStep(sufficiency)
+ -> GenerationStep
 ```
 
-Compare against the current agent-loop route for:
+`ReasoningStep` must not be required on the normal path.
+
+Compare against the current loop for:
 
 - provider calls;
 - tokens;
 - latency;
-- tool-selection failures;
+- selection failures;
 - policy denials;
-- final evidence coverage;
+- evidence coverage;
 - correctness/eval outcome.
 
-### GP-06 — intelligence router
+### GP-08 — reasoning escalation path
 
-Route by primitive and eval profile rather than provider name.
+Add `ReasoningStep` only for states the explicit program cannot resolve.
+
+A reasoning step must declare:
+
+```text
+allowed proposal kinds
+candidate capability set or discovery boundary
+remaining rounds/tokens
+acceptable program patch scope
+clarification policy
+```
+
+Accepted proposals return to normal governed execution. Rejected/malformed proposals never execute provider-side.
+
+### GP-09 — intelligence router
+
+Route independently by primitive and eval profile:
 
 ```text
 decide(choice, cardinality=6, reliability>=X)
@@ -156,66 +237,68 @@ generate(report-summary, budget=Y)
 reason(exploratory-analysis, max_rounds=Z)
 ```
 
-Provider routing remains budget/policy constrained.
+Do not route an entire workflow to a provider.
 
-### GP-07 — shadow decision providers
+### GP-10 — shadow providers and calibration
 
-Allow a non-authoritative provider to receive the same bounded decision request and record a shadow result.
+Allow non-authoritative decision providers to receive identical bounded requests.
 
 Shadow providers:
 
-- cannot change control flow;
-- cannot execute tools;
+- cannot affect control flow;
+- cannot execute capabilities;
 - cannot alter approval state;
 - cannot write business state;
-- are budgeted separately;
-- are visible in eval/calibration data.
+- are separately budgeted and recorded.
 
-This is the insertion point for Jev/System-One evaluation.
+This is the Jev/System-One evaluation seam.
 
-### GP-08 — migrate known ERP programs
+### GP-11 — migrate known ERP programs
 
-For each migrated ERP workflow:
+For each workflow:
 
 1. define explicit program graph;
-2. retain generated capabilities as operation authority;
-3. move classification/selection/sufficiency checks to `DecisionStep`;
-4. keep generative synthesis in `GenerationStep`;
-5. call `ReasoningStep` only when the graph genuinely cannot resolve the task;
-6. retain all existing evidence/authorization/budget gates.
+2. use deterministic code when semantics are known;
+3. use `DecisionStep` for bounded uncertainty;
+4. use `CapabilityStep` for execution;
+5. use `GenerationStep` for synthesis;
+6. use `ReasoningStep` only for genuine open-ended escalation;
+7. keep all authorization/evidence/budget gates in shared runtime services.
 
-### GP-09 — Jev provider admission
+### GP-12 — Jev admission
 
-When Jev access/API stability is sufficient:
+When Jev API access/stability is sufficient:
 
-- implement `JevDecisionProvider`;
-- map only to the `DecisionProvider` contract;
-- begin in shadow mode;
-- measure calibration, accuracy, latency and cost against LLM adapters;
-- admit only decision classes that pass the same eval gates;
-- never add Jev-specific ERP semantics to programs.
+- implement `JevDecisionProvider` only;
+- start in shadow mode;
+- compare calibration, accuracy, latency and cost against LLM decision adapters;
+- admit only decision classes that pass normal eval gates;
+- never add Jev-specific ERP semantics or workflow branches.
 
 ## Explicit non-goals
 
+- deleting the current loop before migration parity;
 - replacing STDB business logic with model decisions;
 - replacing Casbin with confidence thresholds;
-- making Jev or any LLM an authorization source;
-- removing the bounded agent loop;
-- forcing all workflows into static graphs;
-- exposing the entire generated capability catalog to a provider;
-- treating provider-reported probabilities as calibrated truth.
+- letting reasoning providers execute capabilities directly;
+- letting providers own retries for consequential mutations;
+- forcing exploratory work into static graphs;
+- exposing the full capability catalog by default;
+- treating provider probabilities as calibrated truth.
 
 ## Review gate
 
-No new harness feature should introduce a provider-specific orchestration branch if it can be expressed as one of:
+No new harness feature should add provider-specific orchestration when it can be expressed as:
 
 ```text
 decide
-reason
 generate
+reason -> proposal
 capability
 verify
 approval
 ```
+
+No new `ReasoningStep` may directly call an ERP executor. It must return through the shared governed-runtime admission path.
 
 Exceptions require an explicit architecture decision and evidence that the primitive set is insufficient.
