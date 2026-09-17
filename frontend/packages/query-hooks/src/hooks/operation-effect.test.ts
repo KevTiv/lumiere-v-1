@@ -5,7 +5,9 @@ import { OperationRequestError } from "@lumiere/api-client"
 
 import {
   AmbiguousOperationEffectError,
+  UnresolvedOperationEffectError,
   executeOperationWithCanonicalReadback,
+  requireResolvedOperationEffect,
   resolveUniqueEffect,
   type CanonicalRecordRef,
 } from "./operation-effect"
@@ -33,7 +35,7 @@ test("returns AlreadyApplied without dispatch when exact effect already exists",
   assert.equal(dispatches, 0)
 })
 
-test("returns Applied only after canonical readback resolves the resulting record", async () => {
+test("returns Converged only after canonical readback resolves the resulting record", async () => {
   let reads = 0
   let dispatches = 0
   const outcome = await executeOperationWithCanonicalReadback({
@@ -52,10 +54,11 @@ test("returns Applied only after canonical readback resolves the resulting recor
     wait: noWait,
   })
 
-  assert.equal(outcome.kind, "applied")
+  assert.equal(outcome.kind, "converged")
   assert.equal(dispatches, 1)
-  if (outcome.kind === "applied") {
+  if (outcome.kind === "converged") {
     assert.equal(outcome.ref.id, "77")
+    assert.equal(outcome.dispatch, "acknowledged")
     assert.equal(outcome.receipt?.correlationId, "corr-1")
     assert.equal(outcome.correlationId, "corr-1")
   }
@@ -107,7 +110,7 @@ test("does not blind-retry an ambiguous server failure", async () => {
   }
 })
 
-test("response-lost dispatch reconciles to Applied when exact effect appears", async () => {
+test("response-lost dispatch reconciles to Converged without claiming Applied", async () => {
   let reads = 0
   let dispatches = 0
   const outcome = await executeOperationWithCanonicalReadback({
@@ -128,10 +131,11 @@ test("response-lost dispatch reconciles to Applied when exact effect appears", a
     wait: noWait,
   })
 
-  assert.equal(outcome.kind, "applied")
+  assert.equal(outcome.kind, "converged")
   assert.equal(dispatches, 1)
-  if (outcome.kind === "applied") {
+  if (outcome.kind === "converged") {
     assert.equal(outcome.ref.id, "88")
+    assert.equal(outcome.dispatch, "ambiguous")
     assert.equal(outcome.receipt, undefined)
     assert.equal(outcome.correlationId, "corr-lost")
   }
@@ -160,6 +164,29 @@ test("returns OutcomeUnknown when successful dispatch has no exact readback", as
     assert.equal(outcome.reason, "readback-missing")
     assert.equal(outcome.correlationId, "corr-missing")
   }
+})
+
+test("requireResolvedOperationEffect preserves rejection and unknown failure semantics", () => {
+  const conflict = new OperationRequestError({
+    code: "conflict",
+    status: 409,
+    retry: "refresh",
+    message: "stale version",
+  })
+
+  assert.throws(
+    () => requireResolvedOperationEffect({ kind: "rejected", error: conflict }),
+    (error: unknown) => error === conflict,
+  )
+  assert.throws(
+    () =>
+      requireResolvedOperationEffect({
+        kind: "outcome-unknown",
+        reason: "readback-missing",
+        correlationId: "corr-2",
+      }),
+    UnresolvedOperationEffectError,
+  )
 })
 
 test("duplicate exact effects fail instead of choosing newest", () => {
