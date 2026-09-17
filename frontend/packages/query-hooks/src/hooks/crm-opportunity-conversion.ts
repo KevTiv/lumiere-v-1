@@ -4,7 +4,6 @@ import { decodeOperationDispatch } from "@lumiere/api-client"
 import { parseStrictU64, scalarToU64, type ScalarId } from "@lumiere/erp-shared/u64"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
-import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
 import type { ConvertOpportunityParams } from "@lumiere/stdb/types"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 
@@ -18,9 +17,12 @@ import {
   type ResolvedOperationEffectOutcome,
 } from "./operation-effect"
 
-type SaleOrderEffectRow = QueryRowFor<"sale-orders"> & {
-  opportunity_id?: unknown
-  company_id?: unknown
+export interface SaleOrderEffectProjection {
+  readonly id?: unknown
+  readonly opportunityId?: unknown
+  readonly opportunity_id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
 }
 
 export interface SaleOrderEffectRef extends CanonicalRecordRef {
@@ -29,7 +31,7 @@ export interface SaleOrderEffectRef extends CanonicalRecordRef {
   readonly companyId: string
 }
 
-function requiredRowId(row: SaleOrderEffectRow): bigint {
+function requiredRowId(row: SaleOrderEffectProjection): bigint {
   const id = parseStrictU64(row.id)
   if (id == null || id === 0n) {
     throw new Error("Sale-order readback returned an invalid canonical id")
@@ -43,7 +45,7 @@ function requiredRowId(row: SaleOrderEffectRow): bigint {
  * Multiple matches are an invariant failure; never choose the newest row.
  */
 export function resolveSaleOrderForOpportunity(
-  rows: readonly SaleOrderEffectRow[],
+  rows: readonly SaleOrderEffectProjection[],
   opportunityId: bigint,
   companyId: bigint,
 ): SaleOrderEffectRef | null {
