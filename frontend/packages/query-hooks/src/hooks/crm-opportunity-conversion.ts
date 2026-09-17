@@ -18,6 +18,8 @@ import {
   type ResolvedOperationEffectOutcome,
 } from "./operation-effect"
 
+const CONVERT_OPPORTUNITY_FORM_ID = "convert-opportunity-order"
+
 export interface SaleOrderEffectProjection {
   readonly id?: unknown
   readonly opportunityId?: unknown
@@ -87,6 +89,7 @@ export function emitOpportunitySaleOrderOutcome(
   outcome: ResolvedOperationEffectOutcome<SaleOrderEffectRef>,
 ): void {
   emitSemanticOperationOutcome({
+    formId: CONVERT_OPPORTUNITY_FORM_ID,
     kind: outcome.kind,
     resource: outcome.ref.resource,
     recordId: outcome.ref.id,
