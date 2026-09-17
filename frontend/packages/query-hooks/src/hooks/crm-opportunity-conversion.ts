@@ -1,13 +1,14 @@
 "use client"
 
 import { decodeOperationDispatch } from "@lumiere/api-client"
-import { parseStrictU64, scalarToU64, type ScalarId } from "@lumiere/erp-shared/u64"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { parseStrictU64, scalarToU64, type ScalarId } from "@lumiere/erp-shared/u64"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import type { ConvertOpportunityParams } from "@lumiere/stdb/types"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch, fetchQueryList } from "../http"
+import { emitSemanticOperationOutcome } from "../semantic-operation-outcome"
 import { invalidateResourceQueries } from "../subscription-query"
 import {
   executeOperationWithCanonicalReadback,
@@ -82,12 +83,31 @@ async function readSaleOrderEffect(
   return resolveSaleOrderForOpportunity(rows, opportunityId, companyId)
 }
 
+export function emitOpportunitySaleOrderOutcome(
+  outcome: ResolvedOperationEffectOutcome<SaleOrderEffectRef>,
+): void {
+  emitSemanticOperationOutcome({
+    kind: outcome.kind,
+    resource: outcome.ref.resource,
+    recordId: outcome.ref.id,
+    href: outcome.ref.href,
+    message:
+      outcome.kind === "already-applied"
+        ? "This opportunity already has a sales order."
+        : "Sales order ready.",
+    actionLabel: "Open sales order",
+    correlationId: outcome.kind === "converged" ? outcome.correlationId : undefined,
+  })
+}
+
 /**
- * COV-01b reference migration for CRM opportunity → sale order.
+ * COV-01b/01c reference migration for CRM opportunity → sale order.
  *
  * The public mutation resolves only after canonical state proves the intended
  * sale order exists. Transport acceptance alone is insufficient. Ambiguous
- * dispatch is reconciled by readback and never redispatched.
+ * dispatch is reconciled by readback and never redispatched. Once resolved,
+ * a semantic UI outcome containing the canonical Sales record ref is emitted;
+ * presentation decides how to render/navigation that ref.
  */
 export function useConvertOpportunityToSaleOrder(
   organizationId: bigint,
@@ -151,6 +171,7 @@ export function useConvertOpportunityToSaleOrder(
         void invalidateResourceQueries(qc, organizationId, ["opportunities"])
         void invalidateResourceQueries(qc, organizationId, ["sale-orders"])
       }
+      emitOpportunitySaleOrderOutcome(resolved)
       return resolved
     },
   })
