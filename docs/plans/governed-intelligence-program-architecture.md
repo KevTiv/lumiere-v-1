@@ -4,12 +4,13 @@
 **Date:** 2026-09-17
 **Supersedes:** model-first / generic-agent-loop assumptions in future harness work
 **Preserves:** generated ERP capability authority, Casbin/STDB authority, per-call policy, spend admission, approval stops, durable run events, evidence/verification contracts
+**Extends:** `decision-precedent-memory-layer.md`
 
 ## 1. Decision
 
 Lumiere's AI harness is a **governed program runtime**, not an LLM-shaped agent runtime.
 
-Models are replaceable intelligence primitives inside an explicit program. They do not own authorization, ERP semantics, workflow state, business mutation semantics, or execution authority.
+Models are replaceable intelligence primitives inside an explicit program. They do not own authorization, ERP semantics, workflow state, business mutation semantics, execution authority, or organizational precedent.
 
 The runtime exposes three distinct intelligence operations:
 
@@ -23,6 +24,7 @@ The important boundary is:
 
 ```text
 model proposes
+precedent informs
 runtime authorizes / executes / verifies
 ```
 
@@ -38,6 +40,7 @@ Context compiler
 GovernedProgram
       ├── DeterministicStep
       ├── DecisionStep
+      │      └── PrecedentRetriever -> bounded prior cases/patterns
       ├── CapabilityStep
       ├── VerificationStep
       ├── GenerationStep
@@ -50,6 +53,7 @@ shared runtime admission
       ├── spend/budget admission
       ├── approval state
       ├── evidence/provenance
+      ├── precedent governance
       └── execution/recovery
       ↓
 Generated ERP capability surface
@@ -76,6 +80,8 @@ For known ERP workflows, asking a generative model to reconstruct the next-state
 
 For unknown/open-ended work, the model may still help determine a next step, but it should return a typed proposal that the governed runtime independently validates and executes.
 
+For recurring business decisions, the runtime should also retrieve prior verified cases and outcomes so providers reason from organizational precedent instead of starting from zero on every run.
+
 ## 3. Non-negotiable invariants
 
 1. `DecisionProvider`, `GenerationProvider`, and `ReasoningProvider` never become authorization or execution authorities.
@@ -90,6 +96,10 @@ For unknown/open-ended work, the model may still help determine a next step, but
 10. Every intelligence call is replay/inspection friendly without persisting hidden chain-of-thought.
 11. Shared runtime services own authorization, policy, budgets, approval, execution, recovery and verification for every step kind.
 12. New fixed ERP workflows must not be implemented as generic agent loops when their program graph is known.
+13. Precedent informs current decisions but never becomes current authorization, approval, or business-rule authority.
+14. Corrections/supersessions are append-only and remain linked to the original decision case.
+15. Precedent retrieval is tenant-scoped by default and must preserve material constraints/outcome provenance.
+16. Stable repeated decisions should be candidates for deterministic graduation instead of permanent model dependence.
 
 ## 4. Intelligence primitives
 
@@ -102,7 +112,7 @@ pub trait DecisionProvider: Send + Sync {
 }
 ```
 
-`DecisionRequest` contains bounded state, explicit questions and candidate values. Initial implementation uses `LlmDecisionAdapter` over Mistral/Gemini. Future Jev integration implements the same contract.
+`DecisionRequest` contains bounded state, explicit questions, candidate values and optional compact precedent context. Initial implementation uses `LlmDecisionAdapter` over Mistral/Gemini. Future Jev integration implements the same contract.
 
 ### 4.2 GenerationProvider
 
@@ -137,30 +147,61 @@ pub enum ReasoningOutcome {
 
 `ReasoningProvider` owns only bounded reasoning state, provider interaction, malformed-output handling and non-progress detection.
 
-It does **not** own:
-
-- capability execution;
-- authorization;
-- policy admission;
-- spend reservation/settlement;
-- approval/draft lifecycle;
-- mutation retry/recovery;
-- verification;
-- final-answer admission.
+It does **not** own capability execution, authorization, policy admission, spend reservation/settlement, approval/draft lifecycle, mutation retry/recovery, verification, final-answer admission, or precedent mutation.
 
 Those remain shared governed-runtime services.
 
-## 5. ReasoningStep contract
+## 5. Decision precedent and institutional memory
+
+Decision memory is a separate first-class layer from knowledge memory and execution memory.
+
+```text
+KnowledgeMemory  -> facts, documents, policies, source passages
+DecisionMemory   -> prior cases, crossroads, corrections, outcomes, promoted patterns
+ExecutionMemory  -> program runs, capability traces, artifacts, recipes
+```
+
+`DecisionStep` may declare a precedent policy and retrieve the strongest admissible prior cases before calling `DecisionProvider`.
+
+```text
+current bounded decision state
+      ↓
+PrecedentRetriever
+      ↓
+verified prior cases / corrections / outcomes / patterns
+      ↓
+compact precedent context
+      ↓
+DecisionProvider
+```
+
+Retrieval is hybrid rather than embedding-only and must account for decision type, tenant/company scope, program/step compatibility, entity/context shape, material constraints, semantic similarity, verification/outcome quality, review status, recency and supersession/rejection state.
+
+Precedent is never executable authority. Historical approval is not current approval; historical authorization is not current authorization.
+
+Repeated stable decisions may be promoted through a reviewed `DecisionPattern` lifecycle:
+
+```text
+individual cases
+  ↓
+verified precedent cluster
+  ↓
+DecisionPattern candidate
+  ↓
+human/eval review
+  ↓
+reviewed pattern
+  ↓
+deterministic program branch / policy / native ERP feature
+```
+
+See `decision-precedent-memory-layer.md` for canonical records, retrieval and governance.
+
+## 6. ReasoningStep contract
 
 `ReasoningStep` is exceptional, not the default control plane.
 
-Use it when:
-
-- the execution graph cannot be usefully predetermined;
-- hypotheses must be revised from evidence;
-- tool/capability ordering depends on semantic observations not captured by the static program;
-- recovery requires choosing among several admissible next actions;
-- the user request is exploratory by nature.
+Use it when the execution graph cannot be predetermined, hypotheses must be revised from evidence, capability ordering depends on semantic observations not captured by the static program, recovery requires choosing among several admissible next actions, or the request is exploratory by nature.
 
 A reasoning step receives only an admitted view:
 
@@ -168,34 +209,15 @@ A reasoning step receives only an admitted view:
 objective
 bounded state summary
 current evidence refs/summaries
+bounded precedent summaries where enabled
 candidate CapabilityKeys and schemas
 allowed proposal kinds
 remaining reasoning budget
 ```
 
-It returns a proposal. The runtime then handles it:
+It returns a proposal. The runtime handles it through schema validation, authorization, policy/risk/approval, spend/tool admission, execution and verification. The reasoning provider never receives a raw execution handle that lets it bypass this path.
 
-```text
-ReasoningOutcome::CapabilityProposal
-      ↓
-schema validation
-      ↓
-authorization
-      ↓
-policy/risk/approval
-      ↓
-spend/tool admission
-      ↓
-capability execution
-      ↓
-verification/evidence
-      ↓
-program continues
-```
-
-The reasoning provider never receives a raw execution handle that lets it bypass this path.
-
-## 6. GovernedProgram model
+## 7. GovernedProgram model
 
 ```rust
 pub struct GovernedProgram {
@@ -227,32 +249,24 @@ objective
   ↓
 deterministic capability discovery
   ↓
-DecisionStep: choose from 3-10 admitted candidates
+DecisionStep
+  ├── retrieve precedent
+  └── choose from 3-10 admitted candidates
   ↓
 CapabilityStep
   ↓
 VerificationStep
+  ↓
+record DecisionCase + Outcome
   ↓
 DecisionStep: evidence sufficient?
   ├── no -> bounded acquisition branch
   └── yes -> GenerationStep
 ```
 
-Open-ended escalation example:
+Open-ended escalation still returns through normal governed execution.
 
-```text
-known graph cannot resolve state
-  ↓
-ReasoningStep
-  ↓
-CapabilityProposal / ClarificationRequest / ProgramPatchProposal
-  ↓
-governed runtime validates proposal
-  ↓
-normal governed execution resumes
-```
-
-## 7. Capability discovery and routing
+## 8. Capability discovery and routing
 
 Keep deterministic narrowing first:
 
@@ -273,20 +287,28 @@ No provider receives the full operation catalog by default.
 Routing is by primitive and eval profile rather than provider brand:
 
 ```text
-decide(choice, cardinality=6, reliability>=X)
+decide(choice, cardinality=6, reliability>=X, precedent=enabled)
 generate(report-summary, budget=Y)
 reason(exploratory-analysis, max_rounds=Z, proposal_kinds=[...])
 ```
 
-## 8. Confidence, verification and shadowing
+## 9. Confidence, verification, precedent and shadowing
 
 Persist:
 
 ```text
 DecisionRequested
+PrecedentQueryRequested
+PrecedentMatchesReturned
+PrecedentUsed
 DecisionAnswered
 DecisionVerified
 DecisionEscalated
+DecisionCaseRecorded
+DecisionCaseCorrected
+DecisionPatternProposed
+DecisionPatternPromoted
+DecisionPatternSuperseded
 ReasoningRequested
 ReasoningProposed
 ReasoningProposalAccepted
@@ -295,57 +317,26 @@ ReasoningProposalRejected
 
 Provider confidence is never a permission. Calibration comes from verified outcomes.
 
-Shadow providers may evaluate the same decision request but cannot affect control flow, execute capabilities or alter business state.
+Shadow providers may evaluate the same decision request but cannot affect control flow, execute capabilities or alter business state. Evals should compare provider quality both with and without precedent context so the system can measure whether precedent actually improves correctness/cost.
 
-This is the Jev insertion path:
-
-```text
-production DecisionProvider: Gemini/Mistral
-shadow DecisionProvider: Jev
-         ↓
-verified outcome/eval
-         ↓
-calibration + routing update
-```
-
-## 9. What happens to `agent_loop.rs`
+## 10. What happens to `agent_loop.rs`
 
 `orchestrator/agent_loop.rs` is retained but refactored.
 
-Current responsibilities should be split as follows:
+Keep bounded transcript/state, model interaction rounds, malformed proposal handling, duplicate/non-progress detection, proposal construction, clarification proposal generation and bounded planning/replanning.
 
-### Keep in the loop/reasoner
-
-- bounded transcript/state;
-- model interaction rounds;
-- malformed proposal handling;
-- duplicate/non-progress detection;
-- proposal construction;
-- clarification proposal generation;
-- bounded planning/replanning.
-
-### Move out to governed-runtime services
-
-- provider routing policy;
-- spend reservation/settlement;
-- capability authorization;
-- invocation policy;
-- direct tool/capability execution;
-- approval lifecycle;
-- mutation retry/reconciliation;
-- evidence verification;
-- final-answer admission.
+Move provider routing policy, spend reservation/settlement, capability authorization, invocation policy, direct capability execution, approval lifecycle, mutation retry/reconciliation, evidence verification, final-answer admission and precedent persistence out to governed-runtime services.
 
 During migration, existing direct-execution behavior may remain behind a compatibility adapter until proposal-mode parity is proven. It must not become the design target for new work.
 
-## 10. Migration milestones
+## 11. Migration milestones
 
 ### GIP-0 — intelligence seams
 
 - [ ] add `DecisionProvider`;
-- [ ] add `GenerationProvider` where current generation is still coupled to completion transport;
+- [ ] add `GenerationProvider` where needed;
 - [ ] add proposal-only `ReasoningProvider` / `ReasoningOutcome` types;
-- [ ] retain `LlmCompletion` as provider transport/internal adapter;
+- [ ] retain `LlmCompletion` as transport/internal adapter;
 - [ ] add decision/reasoning durable events.
 
 ### GIP-1 — extract execution authority from agent loop
@@ -356,61 +347,76 @@ During migration, existing direct-execution behavior may remain behind a compati
 - [ ] add compatibility adapter for existing loop tests/paths;
 - [ ] prove no proposal can bypass generated capability validation.
 
-### GIP-2 — first governed program
+### GIP-2 — decision precedent foundation
+
+- [ ] add `DecisionCase`, correction/outcome refs and immutable status lifecycle;
+- [ ] add tenant-scoped `PrecedentStore`;
+- [ ] add hybrid retrieval and compact precedent context;
+- [ ] record precedent refs on accepted decisions/proposals;
+- [ ] add precedent events and stale/superseded filtering;
+- [ ] add `DecisionPattern` candidate/promotion records.
+
+### GIP-3 — first governed program
 
 Use a read-only production-shaped workflow:
 
 ```text
-objective -> discovery -> DecisionStep -> CapabilityStep -> VerificationStep -> GenerationStep
+objective -> discovery -> precedent retrieval -> DecisionStep -> CapabilityStep -> VerificationStep -> DecisionCase -> GenerationStep
 ```
 
 No `ReasoningStep` should be required for the happy path.
 
-### GIP-3 — reasoning escalation
+### GIP-4 — reasoning escalation
 
 - [ ] add `ReasoningStep` to governed programs;
 - [ ] constrain allowed proposal kinds/candidate capabilities per step;
+- [ ] optionally include bounded precedent summaries;
 - [ ] resume the governed program after accepted proposals;
 - [ ] reject malformed/unauthorized proposals without provider-side execution.
 
-### GIP-4 — intelligence router
+### GIP-5 — intelligence router and calibration
 
 - [ ] route `decide` / `generate` / `reason` independently by eval profile;
 - [ ] retain provider-attempt persistence and spend accounting;
-- [ ] add shadow decision providers.
+- [ ] add shadow decision providers;
+- [ ] compare decision quality with/without precedent context.
 
-### GIP-5 — migrate known ERP programs
+### GIP-6 — migrate known ERP programs
 
 - [ ] explicit graphs for known workflows;
 - [ ] decision nodes for bounded semantic uncertainty;
+- [ ] precedent retrieval where the decision class is recurrence-heavy;
 - [ ] reasoning only for genuine open-ended escalation;
+- [ ] identify stable repeated decisions as deterministic-graduation candidates;
 - [ ] no new provider-specific orchestration branches.
 
-### GIP-6 — Jev/System-One admission
+### GIP-7 — Jev/System-One admission
 
 - [ ] implement `JevDecisionProvider` only;
 - [ ] begin shadow-only;
-- [ ] compare calibration/accuracy/latency/cost;
+- [ ] compare calibration/accuracy/latency/cost with and without precedent;
 - [ ] admit decision classes through normal routing policy;
 - [ ] no Jev-specific ERP semantics or orchestration.
 
-## 11. Acceptance criteria
+## 12. Acceptance criteria
 
 The architecture is adopted when:
 
 1. at least one production-shaped ERP workflow runs without the generic loop;
 2. the agent loop can operate in proposal-only mode;
 3. a capability proposed by reasoning is executed only by shared governed-runtime services;
-4. Mistral/Gemini decision adapters and reasoning providers can be routed independently;
-5. reasoning-provider replacement cannot alter authorization or business semantics;
-6. known workflows default to explicit program graphs;
-7. decision correctness and reasoning-proposal quality can be evaluated separately from final prose quality;
-8. adding Jev requires only a `DecisionProvider` adapter plus eval/routing configuration.
+4. a `DecisionStep` can retrieve scoped prior cases before provider invocation;
+5. corrections/supersessions preserve immutable historical decisions;
+6. precedent cannot bypass authorization/policy/approval;
+7. repeated stable decisions can be surfaced as `DecisionPattern`/deterministic-graduation candidates;
+8. Mistral/Gemini decision adapters and reasoning providers can be routed independently;
+9. reasoning-provider replacement cannot alter authorization or business semantics;
+10. adding Jev requires only a `DecisionProvider` adapter plus eval/routing configuration.
 
-## 12. Plan impact
+## 13. Plan impact
 
 - `ai-harness-completion-plan.md`: H4/H5 loop work is retained as migration substrate; future work must extract execution authority from the loop rather than expand it.
 - `agent-control-plane-model-routing-plan.md`: routing is per intelligence primitive; governed program state owns control flow and shared runtime services own execution.
 - `ai-enterprise-harness-plan.md`: provider seams remain, but provider outputs are proposals/decisions/generation results, never execution authority.
-- `model-refinement-dataset-plane.md`: evals should produce per-decision and per-reasoning capability profiles.
-- `erp-harness-implementation-ledger.md`: new milestones must reference governed-program primitives and may not create a second execution model.
+- `model-refinement-dataset-plane.md`: evals should produce per-decision/per-reasoning capability profiles and measure precedent lift/correction rate.
+- `erp-harness-implementation-ledger.md`: new milestones must reference governed-program primitives, precedent memory where relevant, and may not create a second execution model.
