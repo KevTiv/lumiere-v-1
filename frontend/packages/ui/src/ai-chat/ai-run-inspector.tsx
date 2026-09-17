@@ -24,6 +24,7 @@ import {
 import type {
   AiInspectorViewKind,
   ClaimView,
+  InspectionClaimRef,
   InspectionComponentDetail,
   InspectionContribution,
   InspectionDecisionDetail,
@@ -97,6 +98,18 @@ function isClaimView(raw: unknown): raw is ClaimView {
   if (raw == null || typeof raw !== "object") return false
   const record = raw as Record<string, unknown>
   return typeof record["id"] === "number" && typeof record["statement"] === "string"
+}
+
+function isDecisionView(raw: unknown): raw is InspectionDecisionDetail {
+  if (raw == null || typeof raw !== "object") return false
+  const record = raw as Record<string, unknown>
+  return typeof record["id"] === "number" && "rationale" in record
+}
+
+function isComponentView(raw: unknown): raw is InspectionComponentDetail {
+  if (raw == null || typeof raw !== "object") return false
+  const record = raw as Record<string, unknown>
+  return typeof record["id"] === "number" && "component_key" in record
 }
 
 function gateOutcomeVariant(
@@ -463,6 +476,62 @@ function ClaimDetail({
   )
 }
 
+/** Minimal claim reference inside decision views; click loads the full claim. */
+function ClaimRefRow({
+  claimRef,
+  onInspectClaim,
+}: {
+  claimRef: InspectionClaimRef
+  onInspectClaim?: (claimId: number) => void
+}) {
+  const { t } = useTranslation()
+  const canClick = onInspectClaim != null
+  const summary =
+    claimRef.statement_summary ?? `#${claimRef.id}`
+
+  if (canClick) {
+    return (
+      <button
+        type="button"
+        data-testid="inspector-claim-ref"
+        data-claim-id={claimRef.id}
+        className="flex flex-wrap items-center gap-2 rounded-lg border p-3 text-left text-sm underline-offset-2 hover:underline"
+        onClick={() => onInspectClaim?.(claimRef.id)}
+      >
+        <Badge variant="outline">#{claimRef.id}</Badge>
+        {claimRef.kind != null && claimRef.kind !== "" && (
+          <Badge variant="outline">{claimRef.kind}</Badge>
+        )}
+        {claimRef.status != null && claimRef.status !== "" && (
+          <Badge variant="secondary">{claimRef.status}</Badge>
+        )}
+        <span className="break-words text-muted-foreground">{summary}</span>
+        <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+          <SearchCheck className="size-3.5" />
+          {t("aiHarness.inspector.inspectClaimHint")}
+        </span>
+      </button>
+    )
+  }
+
+  return (
+    <div
+      data-testid="inspector-claim-ref"
+      data-claim-id={claimRef.id}
+      className="flex flex-wrap items-center gap-2 rounded-lg border p-3 text-sm"
+    >
+      <Badge variant="outline">#{claimRef.id}</Badge>
+      {claimRef.kind != null && claimRef.kind !== "" && (
+        <Badge variant="outline">{claimRef.kind}</Badge>
+      )}
+      {claimRef.status != null && claimRef.status !== "" && (
+        <Badge variant="secondary">{claimRef.status}</Badge>
+      )}
+      <span className="break-words text-muted-foreground">{summary}</span>
+    </div>
+  )
+}
+
 function DecisionDetail({
   decision,
   onInspectClaim,
@@ -535,7 +604,7 @@ function DecisionDetail({
           <p className="text-xs font-medium text-muted-foreground">
             {t("aiHarness.inspector.claimsTitle")}
           </p>
-          <ClaimDetail claim={decision.claim} onInspectClaim={onInspectClaim} />
+          <ClaimRefRow claimRef={decision.claim} onInspectClaim={onInspectClaim} />
         </div>
       )}
 
@@ -544,12 +613,11 @@ function DecisionDetail({
           <p className="text-xs font-medium text-muted-foreground">
             {t("aiHarness.inspector.supportingClaimsLabel")}
           </p>
-          {decision.supporting_claims.map((claim) => (
-            <ClaimDetail
-              key={claim.id}
-              claim={claim}
+          {decision.supporting_claims.map((claimRef) => (
+            <ClaimRefRow
+              key={claimRef.id}
+              claimRef={claimRef}
               onInspectClaim={onInspectClaim}
-              clickable={false}
             />
           ))}
         </div>
@@ -790,10 +858,21 @@ export function AiRunInspector({
           ? "aiHarness.inspector.decisionTitle"
           : "aiHarness.inspector.componentTitle"
 
+  // The gateway returns the view object for the requested kind directly;
+  // fall back to wrapped branches for defensive compatibility.
   const claim =
-    payload?.claim ?? (payload != null && isClaimView(payload) ? payload : null)
-  const decision = payload?.decision ?? null
-  const component = payload?.component ?? null
+    payload?.claim ??
+    (payload != null && viewKind === "claim" && isClaimView(payload) ? payload : null)
+  const decision =
+    payload?.decision ??
+    (payload != null && viewKind === "decision" && isDecisionView(payload)
+      ? payload
+      : null)
+  const component =
+    payload?.component ??
+    (payload != null && viewKind === "component" && isComponentView(payload)
+      ? payload
+      : null)
 
   return (
     <Card data-testid="ai-run-inspector">

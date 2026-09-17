@@ -146,6 +146,14 @@ export type InspectionDecisionSummary = {
   rationale_summary: string | null
 }
 
+/** Minimal claim reference used inside decision views (full view via inspect). */
+export type InspectionClaimRef = {
+  id: number
+  kind: string | null
+  statement_summary: string | null
+  status: string | null
+}
+
 export type InspectionValidation = {
   id: number
   run_id: number
@@ -187,8 +195,8 @@ export type InspectionDecisionDetail = {
   rationale: string | null
   contributor_identity: string | null
   reviewer_identity: string | null
-  claim: ClaimView | null
-  supporting_claims: ClaimView[]
+  claim: InspectionClaimRef | null
+  supporting_claims: InspectionClaimRef[]
   supporting_sources: InspectionSourceVersion[]
 }
 
@@ -204,9 +212,12 @@ export type InspectionComponentDetail = {
 }
 
 /**
- * Union-ish payload: the gateway fills the branch matching `view_kind`.
- * For `view_kind === "claim"` the payload may be the ClaimView itself
- * (with optional context) — consumers should fall back to `payload.claim`.
+ * Loose payload record: the gateway returns the view object matching
+ * `view_kind` directly — an answer inspection for "answer", a ClaimView for
+ * "claim", a decision detail for "decision", a component detail for
+ * "component". The optional `claim`/`decision`/`component` branches below
+ * additionally accept a wrapped `{ claim: … }` style payload; consumers use
+ * runtime shape guards to pick the right branch.
  */
 export type InspectionPayload = {
   // answer view
@@ -215,11 +226,11 @@ export type InspectionPayload = {
   gate_result?: InspectionGateResult | null
   validations?: InspectionValidation[]
   claims?: ClaimView[]
-  // claim view
+  // claim view (wrapped variant; the direct ClaimView lacks these keys)
   claim?: ClaimView | null
-  // decision view
+  // decision view (wrapped variant)
   decision?: InspectionDecisionDetail | null
-  // component view
+  // component view (wrapped variant)
   component?: InspectionComponentDetail | null
 }
 

@@ -568,15 +568,22 @@ fn apply_control_advance(
     new_version: u32,
     intent_id: u64,
 ) {
+    let control_id = control.id;
     let previous_version = control.control_version;
+    let previous_phase = control.phase.clone();
+    let new_phase = phase
+        .map(|p| p.to_string())
+        .unwrap_or_else(|| previous_phase.clone());
+    let mut changed_fields = vec!["control_version".to_string()];
+    if phase.is_some() {
+        changed_fields.push("phase".to_string());
+    }
     ctx.db
         .ai_run_control_state()
         .id()
         .update(AiRunControlState {
             control_version: new_version,
-            phase: phase
-                .map(|p| p.to_string())
-                .unwrap_or(control.phase.clone()),
+            phase: new_phase.clone(),
             last_intent_id: Some(intent_id),
             write_uid: ctx.sender(),
             write_date: ctx.timestamp,
@@ -588,19 +595,24 @@ fn apply_control_advance(
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "ai_run_control_state",
-            record_id: intent_id,
+            record_id: control_id,
             action: "update",
             old_values: Some(
-                serde_json::json!({ "control_version": previous_version }).to_string(),
+                serde_json::json!({
+                    "control_version": previous_version,
+                    "phase": previous_phase,
+                })
+                .to_string(),
             ),
             new_values: Some(
                 serde_json::json!({
                     "control_version": new_version,
+                    "phase": new_phase,
                     "last_intent_id": intent_id,
                 })
                 .to_string(),
             ),
-            changed_fields: vec!["control_version".to_string()],
+            changed_fields,
             metadata: None,
         },
     );
