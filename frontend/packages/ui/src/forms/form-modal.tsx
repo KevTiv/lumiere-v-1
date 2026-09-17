@@ -1,9 +1,12 @@
 "use client"
 
-
-import React from "react"
+import type { SemanticOperationOutcomeDetail } from "@lumiere/query-hooks/semantic-operation-outcome"
+import { SEMANTIC_OPERATION_OUTCOME_EVENT } from "@lumiere/query-hooks/semantic-operation-outcome"
 import { useTranslation } from "@lumiere/i18n"
+import * as Icons from "lucide-react"
+import React from "react"
 import { toast } from "sonner"
+
 import {
   Dialog,
   DialogContent,
@@ -11,10 +14,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/dialog"
-import { cn } from "../lib/utils"
 import type { AiFormAssistConfig, FormConfig } from "../lib/form-types"
+import { cn } from "../lib/utils"
 import { ModularForm } from "./modular-form"
-import * as Icons from "lucide-react"
 
 const sizeClasses: Record<string, string> = {
   md: "sm:max-w-[600px]",
@@ -34,8 +36,9 @@ interface FormModalProps {
    */
   closeOnSubmit?: boolean
   /**
-   * After `onSubmit` resolves without throwing, show Sonner success.
-   * Defaults: `true` when `closeOnSubmit` is true; `false` when `closeOnSubmit` is false (avoid duplicate toasts for flows that close manually).
+   * After `onSubmit` resolves without throwing, show Sonner success unless the
+   * submit emitted a semantic operation outcome with its own canonical feedback.
+   * Defaults: `true` when `closeOnSubmit` is true; `false` when `closeOnSubmit` is false.
    */
   showSubmitSuccessToast?: boolean
   /** Message for Sonner success; defaults to translated `common.formSubmit.saved`. */
@@ -50,6 +53,18 @@ interface FormModalProps {
   aiAssist?: AiFormAssistConfig
   /** Forwarded to {@link ModularForm} — e.g. swap dependent select options when a field changes. */
   onValuesChange?: (values: Record<string, unknown>) => void
+}
+
+function showSemanticOutcome(detail: SemanticOperationOutcomeDetail): void {
+  const action =
+    detail.href && detail.actionLabel
+      ? {
+          label: detail.actionLabel,
+          onClick: () => window.location.assign(detail.href!),
+        }
+      : undefined
+
+  toast.success(detail.message, action ? { action } : undefined)
 }
 
 export function FormModal({
@@ -70,12 +85,37 @@ export function FormModal({
   const { t } = useTranslation()
 
   const handleSubmit = async (data: Record<string, unknown>) => {
-    if (onSubmit) {
-      await onSubmit(data)
+    // A form without an admitted submit binding must never report a successful
+    // save. Leave it open so the missing binding is visible during integration.
+    if (!onSubmit) return
+
+    let semanticOutcome: SemanticOperationOutcomeDetail | undefined
+    const captureSemanticOutcome = (event: Event) => {
+      const detail = (event as CustomEvent<SemanticOperationOutcomeDetail>).detail
+      if (detail.formId === config.id) semanticOutcome = detail
     }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener(SEMANTIC_OPERATION_OUTCOME_EVENT, captureSemanticOutcome)
+    }
+
+    try {
+      await onSubmit(data)
+    } finally {
+      if (typeof window !== "undefined") {
+        window.removeEventListener(SEMANTIC_OPERATION_OUTCOME_EVENT, captureSemanticOutcome)
+      }
+    }
+
     if (closeOnSubmit) {
       onOpenChange(false)
     }
+
+    if (semanticOutcome) {
+      showSemanticOutcome(semanticOutcome)
+      return
+    }
+
     const shouldToastSuccess =
       showSubmitSuccessToast !== undefined ? showSubmitSuccessToast : closeOnSubmit
     if (shouldToastSuccess) {
