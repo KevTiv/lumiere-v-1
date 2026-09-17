@@ -9,6 +9,32 @@ export interface CanonicalRecordRef {
   readonly href?: string
 }
 
+export class AmbiguousOperationEffectError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "AmbiguousOperationEffectError"
+  }
+}
+
+/**
+ * Resolve zero-or-one effect from an exact business key. More than one match is
+ * an invariant failure; callers must never hide it by choosing the newest row.
+ */
+export function resolveUniqueEffect<Row, Ref extends CanonicalRecordRef>(
+  rows: readonly Row[],
+  matches: (row: Row) => boolean,
+  toRef: (row: Row) => Ref,
+): Ref | null {
+  const matched = rows.filter(matches)
+  if (matched.length === 0) return null
+  if (matched.length > 1) {
+    throw new AmbiguousOperationEffectError(
+      `Expected one canonical effect, found ${matched.length}`,
+    )
+  }
+  return toRef(matched[0]!)
+}
+
 export type OperationEffectOutcome<Ref extends CanonicalRecordRef = CanonicalRecordRef> =
   | {
       readonly kind: "applied"
@@ -59,6 +85,7 @@ function defaultWait(delayMs: number): Promise<void> {
  * 2. Dispatch through the generated operation boundary.
  * 3. Resolve the exact canonical effect after dispatch.
  * 4. If dispatch/readback is ambiguous, return OutcomeUnknown. Never blind-retry.
+ * 5. Multiple exact effects are a hard invariant failure, not a selection problem.
  */
 export async function executeOperationWithCanonicalReadback<
   Ref extends CanonicalRecordRef,
@@ -99,7 +126,8 @@ export async function executeOperationWithCanonicalReadback<
     try {
       const ref = await args.resolveEffect()
       if (ref) return { kind: "applied", ref, receipt }
-    } catch {
+    } catch (error) {
+      if (error instanceof AmbiguousOperationEffectError) throw error
       if (attempt === attempts - 1) {
         return {
           kind: "outcome-unknown",
