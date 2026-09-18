@@ -11,6 +11,7 @@
 pub mod action_draft_lifecycle;
 pub mod action_drafts;
 pub mod agents;
+pub mod calibration_profile;
 pub mod capability_grants;
 pub mod chat;
 pub mod decision_events;
@@ -25,6 +26,7 @@ pub mod spend;
 
 pub use action_drafts::*;
 pub use agents::*;
+pub use calibration_profile::*;
 pub use capability_grants::*;
 pub use chat::*;
 pub use decision_events::*;

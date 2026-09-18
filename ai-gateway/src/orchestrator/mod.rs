@@ -13,6 +13,7 @@ mod intelligence_router;
 mod invocation_policy;
 mod model_configuration;
 mod precedent;
+mod probabilistic;
 mod progress;
 mod proposal_loop;
 mod run_review;
