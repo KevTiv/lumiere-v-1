@@ -551,6 +551,16 @@
       },
       "evidence": "spacetimedb/src/hr/payroll.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
     },
+    "correct_ai_decision_case": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/decision_precedent.rs: governed-intelligence reducer validates scope/state and fails closed on conflicting replay or invalid lifecycle transition"
+    },
     "create_ai_action_draft": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -2441,6 +2451,16 @@
       },
       "evidence": "spacetimedb/src/ai/skill_registry.rs: body inserts or appends a new effect without a replay guard"
     },
+    "propose_ai_decision_pattern": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/decision_precedent.rs: governed-intelligence reducer validates scope/state and fails closed on conflicting replay or invalid lifecycle transition"
+    },
     "publish_form_configuration": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -2501,6 +2521,26 @@
       },
       "evidence": "spacetimedb/src/ai/skill_registry.rs: body inserts or appends a new effect without a replay guard"
     },
+    "record_ai_decision_case": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/decision_precedent.rs: governed-intelligence reducer validates scope/state and fails closed on conflicting replay or invalid lifecycle transition"
+    },
+    "record_ai_decision_event": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/decision_events.rs: governed-intelligence reducer validates scope/state and fails closed on conflicting replay or invalid lifecycle transition"
+    },
     "record_ai_provider_attempt_result": {
       "semantic_kind": "internal",
       "client_facing": false,
@@ -2510,6 +2550,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/ai/spend.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "record_ai_reasoning_event": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/decision_events.rs: governed-intelligence reducer validates scope/state and fails closed on conflicting replay or invalid lifecycle transition"
     },
     "record_ai_spend": {
       "semantic_kind": "command",
@@ -2630,6 +2680,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/hr/leaves.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "register_ai_decision_type": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/decision_type_registry.rs: governed-intelligence reducer validates scope/state and fails closed on conflicting replay or invalid lifecycle transition"
     },
     "register_ai_skill_certification_runtime_profile": {
       "semantic_kind": "internal",
@@ -4021,6 +4081,16 @@
       },
       "evidence": "spacetimedb/src/ai/agents.rs: body writes or refreshes deterministic state and safely repeats the same input"
     },
+    "set_ai_agent_run_wait_state": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/skills.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
     "set_ai_capability_role_grant": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -4031,7 +4101,7 @@
       },
       "evidence": "spacetimedb/src/ai/capability_grants.rs: body upserts one organization, role, and capability tuple to deterministic limits"
     },
-    "set_ai_agent_run_wait_state": {
+    "set_ai_decision_case_outcome": {
       "semantic_kind": "internal",
       "client_facing": false,
       "idempotency": "state_guarded",
@@ -4039,7 +4109,77 @@
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/ai/skills.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+      "evidence": "spacetimedb/src/ai/decision_precedent.rs: governed-intelligence reducer validates scope/state and fails closed on conflicting replay or invalid lifecycle transition"
+    },
+    "set_ai_decision_case_status": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/decision_precedent.rs: governed-intelligence reducer validates scope/state and fails closed on conflicting replay or invalid lifecycle transition"
+    },
+    "set_ai_decision_case_verification": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/decision_precedent.rs: governed-intelligence reducer validates scope/state and fails closed on conflicting replay or invalid lifecycle transition"
+    },
+    "set_ai_decision_pattern_status": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/decision_precedent.rs: governed-intelligence reducer validates scope/state and fails closed on conflicting replay or invalid lifecycle transition"
+    },
+    "set_ai_decision_type_active": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/decision_type_registry.rs: governed-intelligence reducer validates scope/state and fails closed on conflicting replay or invalid lifecycle transition"
+    },
+    "set_ai_intelligence_event_acceptance": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/decision_events.rs: governed-intelligence reducer validates scope/state and fails closed on conflicting replay or invalid lifecycle transition"
+    },
+    "set_ai_intelligence_event_escalation": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/decision_events.rs: governed-intelligence reducer validates scope/state and fails closed on conflicting replay or invalid lifecycle transition"
+    },
+    "set_ai_intelligence_event_verification": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/decision_events.rs: governed-intelligence reducer validates scope/state and fails closed on conflicting replay or invalid lifecycle transition"
     },
     "set_ai_reducer_allowlist_enabled": {
       "semantic_kind": "command",
