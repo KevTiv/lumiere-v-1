@@ -1133,11 +1133,209 @@ impl ModelShadowRecorder for StdbModelShadowRecorder<'_> {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum DriftReason {
+    ConformanceBelowThreshold,
+    CorrectionDrift,
+    PolicyDrift,
+    ApplicabilityDrift,
+    ReviewDefect,
+    PatternSuperseded,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct AuthorityDowngrade {
+    pub pattern_ref: String,
+    pub implementation_ref: String,
+    pub from: DecisionExecutionMode,
+    pub to: DecisionExecutionMode,
+    pub reasons: Vec<DriftReason>,
+}
+
+fn next_lower_authority(mode: DecisionExecutionMode) -> Option<DecisionExecutionMode> {
+    match mode {
+        DecisionExecutionMode::DeterministicOnly => Some(DecisionExecutionMode::DeterministicPrimaryModelShadow),
+        DecisionExecutionMode::DeterministicPrimaryModelShadow => Some(DecisionExecutionMode::ModelPrimary),
+        DecisionExecutionMode::DeterministicShadow | DecisionExecutionMode::ModelPrimary => None,
+    }
+}
+
+#[async_trait]
+pub(super) trait DriftMonitor: Send + Sync {
+    async fn evaluate(
+        &self,
+        context: &DecisionResolutionContext,
+        request: &DecisionRequest,
+        resolution: &PromotedDeterministicResolution,
+    ) -> Result<Option<AuthorityDowngrade>>;
+}
+
+pub(super) struct StdbDriftMonitor<'a> {
+    pub reader: &'a StdbClient,
+}
+
+#[async_trait]
+impl DriftMonitor for StdbDriftMonitor<'_> {
+    async fn evaluate(
+        &self,
+        context: &DecisionResolutionContext,
+        request: &DecisionRequest,
+        resolution: &PromotedDeterministicResolution,
+    ) -> Result<Option<AuthorityDowngrade>> {
+        let Some(to) = next_lower_authority(resolution.mode) else {
+            return Ok(None);
+        };
+        let policy_store = StdbGraduationPolicyStore {
+            reader: self.reader,
+            organization_id: context.organization_id,
+        };
+        let policy = policy_store.policy_for(&request.decision_type).await?;
+        let mut reasons = Vec::new();
+
+        let aggregate = StdbConformanceAggregator { reader: self.reader }
+            .aggregate(
+                context.organization_id,
+                context.company_id,
+                &request.decision_type,
+                &resolution.implementation_ref,
+                MAX_ANALYSIS_ROWS,
+            )
+            .await?;
+        if let Some(rate) = aggregate.conformance_rate() {
+            if aggregate.successful_evaluations >= policy.minimum_shadow_cases
+                && rate < policy.minimum_shadow_conformance_rate
+            {
+                reasons.push(DriftReason::ConformanceBelowThreshold);
+            }
+        }
+
+        let rows = self.reader.query_sql(&format!(
+            "SELECT * FROM ai_decision_pattern WHERE organization_id = {} AND pattern_key = '{}' LIMIT 1",
+            context.organization_id,
+            sql_escape(&resolution.pattern_ref)
+        )).await.context("load promoted pattern for drift evaluation")?;
+        let Some(pattern) = rows.first() else {
+            return Ok(Some(AuthorityDowngrade {
+                pattern_ref: resolution.pattern_ref.clone(),
+                implementation_ref: resolution.implementation_ref.clone(),
+                from: resolution.mode,
+                to: DecisionExecutionMode::ModelPrimary,
+                reasons: vec![DriftReason::PatternSuperseded],
+            }));
+        };
+
+        if row_string(pattern, "status").as_deref() != Some("promoted") {
+            reasons.push(DriftReason::PatternSuperseded);
+        }
+
+        let applicability_raw = row_string(pattern, "applicabilityJson")
+            .context("pattern applicability missing")?;
+        let applicability: PatternApplicabilityEvidence =
+            serde_json::from_str(&applicability_raw).context("decode pattern applicability")?;
+        let candidate_values = request
+            .candidates
+            .iter()
+            .map(|value| Value::String(value.clone()))
+            .collect::<Vec<_>>();
+        if applicability.company_id != context.company_id
+            || applicability.program_ref != context.program_ref
+            || applicability.step_id != context.step_id
+            || applicability.context_fingerprint != json_fingerprint(&request.bounded_state)?
+            || applicability.candidate_set_hash != canonical_string_list(&candidate_values)
+            || applicability.evidence_shape != value_shape(&request.bounded_state)
+        {
+            reasons.push(DriftReason::ApplicabilityDrift);
+        }
+
+        let support_ids = row_value(pattern, "supportingCaseIds")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        for id in support_ids.iter().filter_map(Value::as_u64) {
+            let case_rows = self.reader.query_sql(&format!(
+                "SELECT status FROM ai_decision_case WHERE organization_id = {} AND id = {} LIMIT 1",
+                context.organization_id, id
+            )).await.context("check supporting case drift")?;
+            if case_rows.first().and_then(|row| row_string(row, "status"))
+                .is_some_and(|status| matches!(status.as_str(), "rejected" | "superseded"))
+            {
+                reasons.push(DriftReason::CorrectionDrift);
+                break;
+            }
+        }
+
+        if applicability.material_policy_refs.is_empty() && policy.minimum_policy_stability.is_some() {
+            reasons.push(DriftReason::PolicyDrift);
+        }
+
+        let review_rows = self.reader.query_sql(&format!(
+            "SELECT disposition FROM ai_run_review WHERE organization_id = {} AND company_id = {} LIMIT {}",
+            context.organization_id, context.company_id, MAX_ANALYSIS_ROWS
+        )).await.context("check run-review drift")?;
+        if review_rows.iter().any(|row| {
+            row_string(row, "disposition")
+                .is_some_and(|d| matches!(d.as_str(), "defect" | "incident_candidate"))
+        }) {
+            reasons.push(DriftReason::ReviewDefect);
+        }
+
+        reasons.sort_by_key(|reason| format!("{reason:?}"));
+        reasons.dedup();
+        Ok((!reasons.is_empty()).then(|| AuthorityDowngrade {
+            pattern_ref: resolution.pattern_ref.clone(),
+            implementation_ref: resolution.implementation_ref.clone(),
+            from: resolution.mode,
+            to,
+            reasons,
+        }))
+    }
+}
+
+#[async_trait]
+pub(super) trait AuthorityRollbackRecorder: Send + Sync {
+    async fn record(
+        &self,
+        context: &DecisionResolutionContext,
+        decision_type: &DecisionTypeRef,
+        downgrade: &AuthorityDowngrade,
+    ) -> Result<()>;
+}
+
+pub(super) struct StdbAuthorityRollbackRecorder<'a> {
+    pub writer: &'a StdbClient,
+}
+
+#[async_trait]
+impl AuthorityRollbackRecorder for StdbAuthorityRollbackRecorder<'_> {
+    async fn record(
+        &self,
+        context: &DecisionResolutionContext,
+        decision_type: &DecisionTypeRef,
+        downgrade: &AuthorityDowngrade,
+    ) -> Result<()> {
+        self.writer.call_reducer(ReducerCall::from_name(
+            "record_ai_graduation_authority_rollback",
+            json!([context.organization_id, context.company_id, context.run_id, {
+                "decision_type_name": decision_type.name,
+                "decision_type_version": decision_type.version,
+                "pattern_ref": downgrade.pattern_ref,
+                "implementation_ref": downgrade.implementation_ref,
+                "from_mode": serde_json::to_value(downgrade.from)?,
+                "to_mode": serde_json::to_value(downgrade.to)?,
+                "reasons_json": serde_json::to_string(&downgrade.reasons)?,
+            }]),
+        )).await.context("record deterministic authority rollback")
+    }
+}
+
 pub(super) struct GovernedDecisionResolver<'a> {
     pub policy: &'a dyn DecisionResolutionPolicy,
     pub candidates: &'a DeterministicCandidateRegistry,
     pub model: &'a dyn super::intelligence::DecisionProvider,
     pub model_shadow_recorder: &'a dyn ModelShadowRecorder,
+    pub drift_monitor: Option<&'a dyn DriftMonitor>,
+    pub rollback_recorder: Option<&'a dyn AuthorityRollbackRecorder>,
 }
 
 impl GovernedDecisionResolver<'_> {
@@ -1147,9 +1345,21 @@ impl GovernedDecisionResolver<'_> {
         request: DecisionRequest,
     ) -> Result<DecisionResponse> {
         let resolution = self.policy.resolve(context, &request).await?;
-        let Some(resolution) = resolution else {
+        let Some(mut resolution) = resolution else {
             return self.model.decide(request).await;
         };
+
+        if let Some(monitor) = self.drift_monitor {
+            if let Some(downgrade) = monitor.evaluate(context, &request, &resolution).await? {
+                if let Some(recorder) = self.rollback_recorder {
+                    recorder.record(context, &request.decision_type, &downgrade).await?;
+                }
+                resolution.mode = downgrade.to;
+                if resolution.mode == DecisionExecutionMode::ModelPrimary {
+                    return self.model.decide(request).await;
+                }
+            }
+        }
 
         let candidate = self
             .candidates
@@ -2252,6 +2462,8 @@ mod tests {
             candidates: &registry,
             model: &FailingModel,
             model_shadow_recorder: &NoopModelShadowRecorder,
+            drift_monitor: None,
+            rollback_recorder: None,
         };
         let response = resolver
             .decide(
