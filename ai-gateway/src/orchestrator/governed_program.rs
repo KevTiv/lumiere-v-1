@@ -2141,6 +2141,7 @@ mod threshold_gate_tests {
         let recorder = NoopIntelligenceEventRecorder;
         let executor = GovernedProgramExecutor {
             decision_provider: &decision_provider,
+            checkpoint_store: None,
             decision_resolver: None,
             generation_provider: &generation_provider,
             reasoning_provider: &reasoning_provider,
@@ -2393,6 +2394,7 @@ mod threshold_gate_tests {
         let calibration = InMemoryCalibrationProfileStore::new();
         let executor = GovernedProgramExecutor {
             decision_provider: &decision_provider,
+            checkpoint_store: None,
             decision_resolver: None,
             generation_provider: &generation_provider,
             reasoning_provider: &reasoning_provider,
