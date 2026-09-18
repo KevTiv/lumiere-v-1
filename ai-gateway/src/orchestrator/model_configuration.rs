@@ -834,6 +834,8 @@ mod tests {
                     }),
                     review: None,
                     shadows: Vec::new(),
+                    require_distinct_review_profile: false,
+                    prefer_distinct_review_provider: false,
                 },
             )]),
             fallbacks: HashMap::new(),
