@@ -51,6 +51,8 @@ pub(super) struct LlmDecisionAdapter<'a> {
     provider: String,
     model: String,
     max_tokens: u32,
+    temperature: Option<f64>,
+    top_p: Option<f64>,
 }
 
 impl<'a> LlmDecisionAdapter<'a> {
@@ -60,6 +62,8 @@ impl<'a> LlmDecisionAdapter<'a> {
             provider,
             model,
             max_tokens: 512,
+            temperature: Some(0.0),
+            top_p: None,
         }
     }
 
@@ -69,6 +73,8 @@ impl<'a> LlmDecisionAdapter<'a> {
             provider: profile.provider.clone(),
             model: profile.model.clone(),
             max_tokens: profile.max_tokens.min(512),
+            temperature: profile.temperature.or(Some(0.0)),
+            top_p: profile.top_p,
         }
     }
 }
@@ -86,9 +92,8 @@ impl DecisionProvider for LlmDecisionAdapter<'_> {
             system,
             messages: vec![LlmMessage::text("user", request.question.clone())],
             max_tokens: self.max_tokens,
-            // Typed judgments favor determinism over creative variance.
-            temperature: Some(0.0),
-            top_p: None,
+            temperature: self.temperature,
+            top_p: self.top_p,
             tools: vec![tool],
         };
 
@@ -218,6 +223,8 @@ pub(super) struct LlmGenerationAdapter<'a> {
     provider: String,
     model: String,
     max_tokens: u32,
+    temperature: Option<f64>,
+    top_p: Option<f64>,
 }
 
 impl<'a> LlmGenerationAdapter<'a> {
@@ -232,6 +239,8 @@ impl<'a> LlmGenerationAdapter<'a> {
             provider,
             model,
             max_tokens,
+            temperature: None,
+            top_p: None,
         }
     }
 
@@ -241,6 +250,8 @@ impl<'a> LlmGenerationAdapter<'a> {
             provider: profile.provider.clone(),
             model: profile.model.clone(),
             max_tokens: profile.max_tokens,
+            temperature: profile.temperature,
+            top_p: profile.top_p,
         }
     }
 }
@@ -262,8 +273,8 @@ impl GenerationProvider for LlmGenerationAdapter<'_> {
             system,
             messages: vec![LlmMessage::text("user", request.objective.clone())],
             max_tokens: self.max_tokens,
-            temperature: None,
-            top_p: None,
+            temperature: self.temperature,
+            top_p: self.top_p,
             tools: Vec::new(),
         };
         let response = self.transport.complete(llm_request).await?;
@@ -293,6 +304,8 @@ pub(super) struct AgentLoopReasoner<'a> {
     provider: String,
     model: String,
     max_tokens: u32,
+    temperature: Option<f64>,
+    top_p: Option<f64>,
 }
 
 impl<'a> AgentLoopReasoner<'a> {
@@ -302,6 +315,8 @@ impl<'a> AgentLoopReasoner<'a> {
             provider,
             model,
             max_tokens: 1024,
+            temperature: Some(0.2),
+            top_p: None,
         }
     }
 
@@ -311,6 +326,8 @@ impl<'a> AgentLoopReasoner<'a> {
             provider: profile.provider.clone(),
             model: profile.model.clone(),
             max_tokens: profile.max_tokens.min(1024),
+            temperature: profile.temperature.or(Some(0.2)),
+            top_p: profile.top_p,
         }
     }
 }
@@ -328,8 +345,8 @@ impl ReasoningProvider for AgentLoopReasoner<'_> {
             system,
             messages: vec![LlmMessage::text("user", request.objective.clone())],
             max_tokens: self.max_tokens,
-            temperature: Some(0.2),
-            top_p: None,
+            temperature: self.temperature,
+            top_p: self.top_p,
             tools,
         };
 
