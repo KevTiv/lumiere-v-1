@@ -50,6 +50,7 @@ use super::{
     intelligence_adapters::{AgentLoopReasoner, LlmDecisionAdapter, LlmGenerationAdapter},
     invocation_policy::ReviewedInvocationPolicy,
     precedent::StdbPrecedentStore,
+    run_review::{RunReviewDisposition, RunReviewProgram},
     spend_admission::{
         spend_binding_from_agent, SpendAdmittedLlm, StdbSpendLedger,
     },
@@ -684,6 +685,54 @@ pub async fn run_skill_admitted(
         let program = executor
             .run(&report_analysis_graph(), &program_context)
             .await?;
+
+        let review = if matches!(&program.stop, GovernedProgramStop::Completed) {
+            Some(
+                RunReviewProgram::new(&decision_provider)
+                    .review(&program_context.objective, &program)
+                    .await?,
+            )
+        } else {
+            None
+        };
+
+        if let Some(review) = &review {
+            if review.disposition != RunReviewDisposition::Healthy {
+                set_run_wait_state(
+                    state.stdb.as_ref(),
+                    req.org_id,
+                    req.company_id,
+                    run_id,
+                    "agent_settled",
+                )
+                .await?;
+                let rationale = review
+                    .rationale
+                    .clone()
+                    .unwrap_or_else(|| format!("independent review: {:?}", review.disposition));
+                return Ok(RunSkillResponse {
+                    run_id,
+                    run_key,
+                    status: "agent_settled".to_string(),
+                    summary: rationale,
+                    artifacts: Vec::new(),
+                    citations: Vec::new(),
+                    steps: program
+                        .trace
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, step)| RunSkillStepSummary {
+                            step_no: (index + 1) as u32,
+                            tool: step.kind.to_string(),
+                            duration_ms: 0,
+                            summary: step.summary,
+                        })
+                        .collect(),
+                    agent_id: agent.agent_id,
+                    skill_key: skill.skill_key,
+                });
+            }
+        }
 
         let (status, summary, terminal_error) = match &program.stop {
             GovernedProgramStop::Completed => (
