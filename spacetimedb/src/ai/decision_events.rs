@@ -198,6 +198,17 @@ pub struct RecordAiDecisionShadowEventParams {
     pub shadow_error: Option<String>,
 }
 
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct RecordAiDeterministicShadowEventParams {
+    pub pattern_ref: String,
+    pub implementation_ref: String,
+    pub decision_type_name: String,
+    pub decision_type_version: u32,
+    pub request_hash: String,
+    pub request_json: String,
+    pub evidence_json: String,
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
 /// Persist one `DecisionProvider::decide` call. Idempotent by
@@ -500,6 +511,101 @@ pub fn record_ai_decision_shadow_event(
     Ok(())
 }
 
+/// Persist one zero-authority deterministic candidate evaluation (DG-05).
+#[reducer]
+pub fn record_ai_deterministic_shadow_event(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    params: RecordAiDeterministicShadowEventParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_intelligence_event", "create")?;
+    load_active_run(ctx, organization_id, company_id, run_id)?;
+
+    if params.pattern_ref.trim().is_empty() || params.implementation_ref.trim().is_empty() {
+        return Err("pattern_ref and implementation_ref are required".to_string());
+    }
+    if params.decision_type_name.trim().is_empty() || params.decision_type_version == 0 {
+        return Err("decision_type_name and positive decision_type_version are required".to_string());
+    }
+    if params.request_hash.trim().is_empty() {
+        return Err("request_hash is required".to_string());
+    }
+    if params.request_json.len() > MAX_JSON_FIELD_LEN
+        || params.evidence_json.len() > MAX_JSON_FIELD_LEN
+    {
+        return Err("deterministic shadow JSON field exceeds size limit".to_string());
+    }
+
+    let evidence: serde_json::Value = serde_json::from_str(&params.evidence_json)
+        .map_err(|_| "evidence_json must be valid JSON".to_string())?;
+    if evidence.get("schema_version").and_then(serde_json::Value::as_u64) != Some(1) {
+        return Err("deterministic shadow evidence schema_version must be 1".to_string());
+    }
+    if evidence.get("pattern_ref").and_then(serde_json::Value::as_str)
+        != Some(params.pattern_ref.as_str())
+        || evidence.get("implementation_ref").and_then(serde_json::Value::as_str)
+            != Some(params.implementation_ref.as_str())
+        || evidence.get("request_hash").and_then(serde_json::Value::as_str)
+            != Some(params.request_hash.as_str())
+    {
+        return Err("deterministic shadow evidence identity does not match params".to_string());
+    }
+
+    let shadow_ref = format!("deterministic:{}", params.implementation_ref);
+    if let Some(existing) =
+        find_deterministic_shadow_event(ctx, run_id, &params.request_hash, &shadow_ref)
+    {
+        if existing.organization_id == organization_id
+            && existing.decision_type_name.as_deref() == Some(params.decision_type_name.as_str())
+            && existing.decision_type_version == Some(params.decision_type_version)
+            && existing.request_json == params.request_json
+            && existing.output_json == params.evidence_json
+            && existing.model == params.implementation_ref
+        {
+            return Ok(());
+        }
+        return Err("deterministic shadow replay conflicts with the existing event".to_string());
+    }
+
+    ctx.db.ai_intelligence_event().insert(AiIntelligenceEvent {
+        id: 0,
+        organization_id,
+        company_id,
+        run_id,
+        step_no: 0,
+        event_kind: "deterministic_shadow".to_string(),
+        decision_type_name: Some(params.decision_type_name),
+        decision_type_version: Some(params.decision_type_version),
+        request_hash: params.request_hash,
+        request_json: params.request_json,
+        outcome_kind: "deterministic".to_string(),
+        output_json: params.evidence_json,
+        confidence: None,
+        provider: "deterministic".to_string(),
+        model: params.implementation_ref,
+        provider_attempt_id: None,
+        input_tokens: 0,
+        output_tokens: 0,
+        verification_status: None,
+        verification_reason: None,
+        escalation_status: "none".to_string(),
+        escalation_reason: None,
+        acceptance_status: "rejected".to_string(),
+        acceptance_reason: Some(
+            "deterministic shadow evaluation carries zero live authority".to_string(),
+        ),
+        shadow_profile_ref: Some(shadow_ref),
+        shadow_error: None,
+        create_uid: ctx.sender(),
+        create_date: ctx.timestamp,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+    });
+    Ok(())
+}
+
 /// Record `VerificationService`'s (or, later, AIH-15's) outcome for one
 /// event.
 #[reducer]
@@ -653,6 +759,23 @@ fn find_shadow_event(
         .filter(&run_id)
         .find(|event| {
             event.event_kind == "decision_shadow"
+                && event.request_hash == request_hash
+                && event.shadow_profile_ref.as_deref() == Some(shadow_profile_ref)
+        })
+}
+
+fn find_deterministic_shadow_event(
+    ctx: &ReducerContext,
+    run_id: u64,
+    request_hash: &str,
+    shadow_profile_ref: &str,
+) -> Option<AiIntelligenceEvent> {
+    ctx.db
+        .ai_intelligence_event()
+        .ai_intelligence_event_by_run()
+        .filter(&run_id)
+        .find(|event| {
+            event.event_kind == "deterministic_shadow"
                 && event.request_hash == request_hash
                 && event.shadow_profile_ref.as_deref() == Some(shadow_profile_ref)
         })
