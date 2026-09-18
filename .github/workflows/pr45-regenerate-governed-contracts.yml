@@ -59,14 +59,38 @@ jobs:
             --advance-history-from-release v0.3.47 \
             --previous-ir-sha256 sha256:620d492a3cfd506e11661dae4e0641e279442ba384e36799dd01d669bec0b71d \
             --revision-reason "Add governed intelligence persistence and typed decision runtime contracts"
-      - name: Commit generated source artifacts
+      - name: Publish immutable contracts v0.3.48
+        run: make publish-contracts VERSION=0.3.48
+
+      - name: Pin v0.3.48 consumers
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          paths = subprocess.check_output(
+              ["git", "grep", "-l", "0.3.47", "--", ":!docs/**", ":!.github/workflows/pr45-regenerate-governed-contracts.yml"],
+              text=True,
+          ).splitlines()
+          for raw in paths:
+              path = Path(raw)
+              if not path.is_file():
+                  continue
+              text = path.read_text(encoding="utf-8")
+              updated = text.replace("0.3.47", "0.3.48")
+              if updated != text:
+                  path.write_text(updated, encoding="utf-8")
+          PY
+          cargo update -p lumiere-contracts
+
+      - name: Commit regenerated artifacts and release pin
         run: |
           git status --short
-          git add -u
+          git add -A
           if git diff --cached --quiet; then
-            echo "No generated changes"
+            echo "No generated or pin changes"
             exit 0
           fi
           git -c user.name="lumiere-codegen" -c user.email="codegen@lumiere.local" \
-            commit -m "chore(contracts): regenerate governed intelligence contracts"
+            commit -m "chore(contracts): publish and pin governed contracts v0.3.48"
           git push origin HEAD:codex/ai-harness-role-capability-grants
