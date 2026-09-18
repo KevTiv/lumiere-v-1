@@ -583,7 +583,7 @@ impl GovernedProgramExecutor<'_> {
                         .await?;
                     let draft = FinalDraft {
                         content: response.content.clone(),
-                        citations: context.evidence.clone(),
+                        citations: evidence_for_node(&node, &values, &context.evidence),
                     };
                     match self.answer_admission.admit(&draft).await? {
                         AnswerAdmissionOutcome::Admitted => {
@@ -1003,6 +1003,108 @@ fn decision_value(response: &DecisionResponse) -> Result<Value> {
 fn json_fingerprint(value: &Value) -> Result<String> {
     let encoded = serde_json::to_vec(value)?;
     Ok(format!("{:x}", Sha256::digest(encoded)))
+}
+
+
+fn evidence_for_node(
+    node: &GraphNode,
+    values: &HashMap<String, NodeValue>,
+    base: &[EvidenceRef],
+) -> Vec<EvidenceRef> {
+    let mut evidence = base.to_vec();
+    for dependency in &node.depends_on {
+        if matches!(values.get(dependency), Some(NodeValue::Tool(_))) {
+            evidence.push(EvidenceRef {
+                kind: "capability_output".to_string(),
+                id: dependency.clone(),
+            });
+        }
+    }
+    evidence
+}
+
+pub(super) fn report_analysis_graph() -> DecisionGraph {
+    use super::decision_graph::{
+        CapabilityNode, ComputeNode, GateBranch, GateNode, GenerateNode,
+        ProbabilityDecisionNode, VerifyNode,
+    };
+    use super::intelligence::DecisionTypeRef;
+
+    DecisionGraph {
+        entry: "input".to_string(),
+        nodes: vec![
+            GraphNode {
+                id: "input".to_string(),
+                depends_on: Vec::new(),
+                next: Some("analytics".to_string()),
+                kind: DecisionNode::Compute(ComputeNode {
+                    function_ref: "program_input".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "analytics".to_string(),
+                depends_on: vec!["input".to_string()],
+                next: Some("verify_analytics".to_string()),
+                kind: DecisionNode::Capability(CapabilityNode {
+                    capability: "analytics_summary".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "verify_analytics".to_string(),
+                depends_on: vec!["analytics".to_string()],
+                next: Some("attention".to_string()),
+                kind: DecisionNode::Verify(VerifyNode {
+                    source: "analytics".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "attention".to_string(),
+                depends_on: vec!["analytics".to_string()],
+                next: Some("route".to_string()),
+                kind: DecisionNode::Probability(ProbabilityDecisionNode {
+                    decision_type: DecisionTypeRef {
+                        name: "ReportAttentionNeed".to_string(),
+                        version: 1,
+                    },
+                    question: "How likely is it that this analytics summary contains a material pattern that deserves focused human follow-up?".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "route".to_string(),
+                depends_on: vec!["attention".to_string()],
+                next: None,
+                kind: DecisionNode::Gate(GateNode {
+                    source: "attention".to_string(),
+                    branches: vec![
+                        GateBranch {
+                            condition: GateCondition::ProbabilityAtLeast(0.5),
+                            target: "generate_attention".to_string(),
+                        },
+                        GateBranch {
+                            condition: GateCondition::Default,
+                            target: "generate_standard".to_string(),
+                        },
+                    ],
+                }),
+            },
+            GraphNode {
+                id: "generate_attention".to_string(),
+                depends_on: vec!["analytics".to_string(), "attention".to_string()],
+                next: None,
+                kind: DecisionNode::Generate(GenerateNode {
+                    format: "concise report highlighting material patterns and follow-up items".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "generate_standard".to_string(),
+                depends_on: vec!["analytics".to_string(), "attention".to_string()],
+                next: None,
+                kind: DecisionNode::Generate(GenerateNode {
+                    format: "concise analytical summary".to_string(),
+                }),
+            },
+        ],
+    }
 }
 
 fn decision_kind_label(kind: DecisionKind) -> &'static str {
