@@ -45,7 +45,7 @@ use super::{
         graph_requests_generated_capabilities, BuiltinComputeService, GovernedProgramContext,
         GovernedProgramExecutor, GovernedProgramStop, StdbIntelligenceEventRecorder,
     },
-    governed_programs::{report_analysis_graph, REPORT_ANALYSIS_PROGRAM_REF},
+    governed_programs::governed_program_for_skill,
     governed_services::{
         DeterministicFinalAnswerAdmission, GovernedCapabilityService,
         PolicyBackedCapabilityAdmission, ShapeOnlyVerificationService, StdbApprovalCoordinator,
@@ -503,9 +503,15 @@ pub async fn run_skill_admitted(
     if correlation_id.is_empty() {
         anyhow::bail!("correlation_id is required");
     }
-    if req.reviewed_calls.is_empty() {
-        anyhow::bail!("reviewed_calls must be nonempty");
-    }
+    let governed_catalog = governed_program_for_skill(&skill_key);
+    let reviewed_calls = if req.reviewed_calls.is_empty() {
+        governed_catalog
+            .as_ref()
+            .map(|entry| entry.reviewed_calls.clone())
+            .context("reviewed_calls must be nonempty for non-governed admitted runs")?
+    } else {
+        req.reviewed_calls.clone()
+    };
 
     // H5b: a paired read ledger is required for spend admission.
     let spend_reader = state
@@ -579,7 +585,7 @@ pub async fn run_skill_admitted(
         .min(manifest.limits.max_steps);
     let plan = ExecutionPlan {
         named_resources: manifest.named_resources.clone(),
-        tool_calls: req.reviewed_calls.clone(),
+        tool_calls: reviewed_calls.clone(),
         steps: max_steps,
         expected_rows: 0,
         output_type: manifest.output_type.clone(),
@@ -594,7 +600,7 @@ pub async fn run_skill_admitted(
         plan,
     };
     let engine = PolicyEngine::new(SkillRegistry::exact(manifest.clone()), ResourceRegistry::built_in());
-    let policy = ReviewedInvocationPolicy::new(engine, base, req.reviewed_calls)?;
+    let policy = ReviewedInvocationPolicy::new(engine, base, reviewed_calls)?;
 
     let tool_ctx = ToolContext {
         state: state.clone(),
@@ -609,7 +615,7 @@ pub async fn run_skill_admitted(
         actor,
     };
 
-    if skill_key == "report_analysis" {
+    if let Some(catalog) = governed_catalog {
         let model_config_store = StdbModelConfigurationStore {
             reader: tool_ctx.stdb.as_ref(),
         };
@@ -625,7 +631,7 @@ pub async fn run_skill_admitted(
             intelligence_policy_ref,
         )?;
         route_resolver
-            .validate_review_independence("ReportAttentionNeed")
+            .validate_review_independence(catalog.review_independence_key)
             .await?;
         let intelligence_router = ConfiguredIntelligenceRouter::new(route_resolver);
         let shadow_recorder = StdbShadowDecisionRecorder {
@@ -688,7 +694,7 @@ pub async fn run_skill_admitted(
             reader: tool_ctx.stdb.as_ref(),
         };
 
-        let graph = report_analysis_graph();
+        let graph = catalog.graph;
         let generated_grants = if graph_requests_generated_capabilities(&graph)? {
             resolve_actor_grants(&tool_ctx).await?
         } else {
@@ -722,22 +728,24 @@ pub async fn run_skill_admitted(
         let verification = ShapeOnlyVerificationService;
         let answer_admission = DeterministicFinalAnswerAdmission;
         let compute = BuiltinComputeService;
-        state
-            .stdb
-            .call_reducer(ReducerCall::from_name(
-                "register_ai_calibration_profile",
-                json!([
-                    req.org_id,
-                    {
-                        "profile_name": "report-attention",
-                        "profile_version": 1,
-                        "description": "Initial reviewed calibration profile for ReportAttentionNeed@1; versioned explicitly so routing never gates on unlabelled raw confidence.",
-                        "breakpoints_json": "[[0.0,0.0],[0.35,0.35],[0.65,0.65],[1.0,1.0]]"
-                    }
-                ]),
-            ))
-            .await
-            .context("register report attention calibration profile")?;
+        if skill_key == "report_analysis" {
+            state
+                .stdb
+                .call_reducer(ReducerCall::from_name(
+                    "register_ai_calibration_profile",
+                    json!([
+                        req.org_id,
+                        {
+                            "profile_name": "report-attention",
+                            "profile_version": 1,
+                            "description": "Initial reviewed calibration profile for ReportAttentionNeed@1; versioned explicitly so routing never gates on unlabelled raw confidence.",
+                            "breakpoints_json": "[[0.0,0.0],[0.35,0.35],[0.65,0.65],[1.0,1.0]]"
+                        }
+                    ]),
+                ))
+                .await
+                .context("register report attention calibration profile")?;
+        }
         let calibration = StdbCalibrationProfileStore {
             reader: tool_ctx.stdb.as_ref(),
         };
@@ -776,13 +784,25 @@ pub async fn run_skill_admitted(
             recorder: &recorder,
             calibration: &calibration,
         };
+        let mut governed_inputs = req.inputs.clone();
+        if let Some(object) = governed_inputs.as_object_mut() {
+            if object
+                .get("query")
+                .and_then(Value::as_str)
+                .is_none_or(|value| value.trim().is_empty())
+            {
+                if let Some(query) = build_web_search_query(&skill_key, &req.inputs, "") {
+                    object.insert("query".to_string(), Value::String(query));
+                }
+            }
+        }
         let program_context = GovernedProgramContext {
             organization_id: req.org_id,
             company_id: req.company_id,
             run_id,
-            program_ref: REPORT_ANALYSIS_PROGRAM_REF.to_string(),
+            program_ref: catalog.program_ref.to_string(),
             objective: skill.prompt_template.clone(),
-            bounded_state: req.inputs.clone(),
+            bounded_state: governed_inputs,
             evidence: vec![EvidenceRef {
                 kind: "governed_run_step".to_string(),
                 id: format!("run:{run_id}:analytics"),
@@ -801,7 +821,7 @@ pub async fn run_skill_admitted(
                 req.org_id,
                 req.company_id,
                 run_id,
-                REPORT_ANALYSIS_PROGRAM_REF,
+                catalog.program_ref,
                 &result,
             )
             .await?;
@@ -854,7 +874,7 @@ pub async fn run_skill_admitted(
                 program
                     .final_content
                     .clone()
-                    .unwrap_or_else(|| "governed report analysis completed".to_string()),
+                    .unwrap_or_else(|| format!("governed {} completed", skill_key)),
                 None,
             ),
             GovernedProgramStop::EarlyStop(reason) => (
