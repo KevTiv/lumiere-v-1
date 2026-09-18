@@ -6,9 +6,11 @@
 use super::{
     decision_graph::{
         CapabilityNode, DecisionGraph, DecisionNode, GateBranch, GateCondition, GateNode,
-        GenerateNode, GraphNode, ProbabilityDecisionNode, VerifyNode,
+        GenerateNode, GraphNode, ProbabilityDecisionNode, ReasonNode, VerifyNode,
     },
-    intelligence::{DecisionTypeRef},
+    intelligence::{
+        DecisionTypeRef, PROPOSAL_KIND_CLARIFICATION, PROPOSAL_KIND_FINAL_DRAFT,
+    },
 };
 
 pub(super) const REPORT_ANALYSIS_PROGRAM_REF: &str = "skill:report_analysis@1";
@@ -57,10 +59,27 @@ pub(super) fn report_analysis_graph() -> DecisionGraph {
                             target: "generate_attention".to_string(),
                         },
                         GateBranch {
-                            condition: GateCondition::Default,
+                            condition: GateCondition::ProbabilityBelow(0.35),
                             target: "generate_summary".to_string(),
                         },
+                        GateBranch {
+                            condition: GateCondition::Default,
+                            target: "reason_ambiguous".to_string(),
+                        },
                     ],
+                }),
+            },
+            GraphNode {
+                id: "reason_ambiguous".to_string(),
+                depends_on: vec!["analytics".to_string(), "attention_need".to_string()],
+                next: Some("generate_attention".to_string()),
+                kind: DecisionNode::Reason(ReasonNode {
+                    allowed_proposal_kinds: vec![
+                        PROPOSAL_KIND_CLARIFICATION.to_string(),
+                        PROPOSAL_KIND_FINAL_DRAFT.to_string(),
+                    ],
+                    max_iterations: 1,
+                    loop_back_to: None,
                 }),
             },
             GraphNode {
