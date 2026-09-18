@@ -2308,6 +2308,13 @@ mod threshold_gate_tests {
         executor.run(&graph(condition), &context()).await
     }
 
+    #[test]
+    fn graph_hash_changes_when_graph_semantics_change() {
+        let first = graph(super::super::decision_graph::GateCondition::ProbabilityAtLeast(0.5));
+        let second = graph(super::super::decision_graph::GateCondition::ProbabilityAtLeast(0.6));
+        assert_ne!(graph_hash(&first), graph_hash(&second));
+    }
+
     #[tokio::test]
     async fn raw_confidence_above_hard_stop_escalates() {
         let calibration = InMemoryCalibrationProfileStore::new();
