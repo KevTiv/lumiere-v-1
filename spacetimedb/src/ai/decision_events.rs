@@ -180,6 +180,15 @@ pub struct RecordAiReasoningEventParams {
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
+pub struct RecordAiProgramCheckpointParams {
+    pub program_ref: String,
+    pub graph_hash: String,
+    pub checkpoint_hash: String,
+    pub checkpoint_json: String,
+    pub status: String,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
 pub struct RecordAiDecisionShadowEventParams {
     pub shadow_profile_ref: String,
     pub decision_type_name: String,
@@ -522,6 +531,110 @@ pub fn record_ai_decision_shadow_event(
     Ok(())
 }
 
+/// Persist one append-only governed-program checkpoint. A checkpoint is
+/// resumable state, not provider output or authority. Idempotent by
+/// checkpoint_hash within a run.
+#[reducer]
+pub fn record_ai_program_checkpoint(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    params: RecordAiProgramCheckpointParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_intelligence_event", "create")?;
+    load_checkpointable_run(ctx, organization_id, company_id, run_id)?;
+
+    if params.program_ref.trim().is_empty()
+        || params.graph_hash.trim().is_empty()
+        || params.checkpoint_hash.trim().is_empty()
+    {
+        return Err("program_ref, graph_hash and checkpoint_hash are required".to_string());
+    }
+    if !matches!(
+        params.status.as_str(),
+        "running" | "awaiting_approval" | "agent_settled" | "completed"
+    ) {
+        return Err("checkpoint status is invalid".to_string());
+    }
+    if params.checkpoint_json.len() > MAX_JSON_FIELD_LEN {
+        return Err("checkpoint_json exceeds size limit".to_string());
+    }
+    let checkpoint: serde_json::Value = serde_json::from_str(&params.checkpoint_json)
+        .map_err(|_| "checkpoint_json must be valid JSON".to_string())?;
+    if checkpoint
+        .get("schema_version")
+        .and_then(serde_json::Value::as_u64)
+        != Some(1)
+    {
+        return Err("program checkpoint schema_version must be 1".to_string());
+    }
+    if checkpoint
+        .get("program_ref")
+        .and_then(serde_json::Value::as_str)
+        != Some(params.program_ref.as_str())
+        || checkpoint
+            .get("graph_hash")
+            .and_then(serde_json::Value::as_str)
+            != Some(params.graph_hash.as_str())
+    {
+        return Err("program checkpoint identity does not match params".to_string());
+    }
+
+    if let Some(existing) = ctx
+        .db
+        .ai_intelligence_event()
+        .ai_intelligence_event_by_request_hash()
+        .filter(&(organization_id, params.checkpoint_hash.clone()))
+        .find(|event| event.run_id == run_id && event.event_kind == "program_checkpoint")
+    {
+        if existing.output_json == params.checkpoint_json
+            && existing.shadow_profile_ref.as_deref() == Some(params.program_ref.as_str())
+        {
+            return Ok(());
+        }
+        return Err("checkpoint replay conflicts with existing checkpoint".to_string());
+    }
+
+    ctx.db.ai_intelligence_event().insert(AiIntelligenceEvent {
+        id: 0,
+        organization_id,
+        company_id,
+        run_id,
+        step_no: 0,
+        event_kind: "program_checkpoint".to_string(),
+        decision_type_name: None,
+        decision_type_version: None,
+        request_hash: params.checkpoint_hash,
+        request_json: serde_json::json!({
+            "program_ref": params.program_ref,
+            "graph_hash": params.graph_hash,
+        })
+        .to_string(),
+        outcome_kind: params.status,
+        output_json: params.checkpoint_json,
+        confidence: None,
+        provider: "governed-runtime".to_string(),
+        model: params.graph_hash,
+        provider_attempt_id: None,
+        input_tokens: 0,
+        output_tokens: 0,
+        verification_status: Some("verified".to_string()),
+        verification_reason: None,
+        escalation_status: "none".to_string(),
+        escalation_reason: None,
+        acceptance_status: "accepted".to_string(),
+        acceptance_reason: Some("durable governed-program checkpoint".to_string()),
+        shadow_profile_ref: Some(params.program_ref),
+        shadow_error: None,
+        create_uid: ctx.sender(),
+        create_date: ctx.timestamp,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+    });
+    Ok(())
+}
+
 /// Persist one zero-authority deterministic candidate evaluation (DG-05).
 #[reducer]
 pub fn record_ai_deterministic_shadow_event(
@@ -810,6 +923,30 @@ pub fn set_ai_intelligence_event_acceptance(
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+fn load_checkpointable_run(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+) -> Result<crate::ai::skills::AiAgentRun, String> {
+    let run = ctx
+        .db
+        .ai_agent_run()
+        .id()
+        .find(&run_id)
+        .ok_or("Run not found")?;
+    if run.organization_id != organization_id || run.company_id != company_id {
+        return Err("Run does not belong to this organization/company".to_string());
+    }
+    if !matches!(
+        run.status.as_str(),
+        "running" | "pending" | "awaiting_approval" | "agent_settled"
+    ) {
+        return Err("Run is not checkpointable".to_string());
+    }
+    Ok(run)
+}
 
 fn load_active_run(
     ctx: &ReducerContext,
