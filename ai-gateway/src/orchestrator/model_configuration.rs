@@ -270,6 +270,7 @@ pub(super) struct IntelligenceRouteResolver<'a> {
     organization_id: u64,
     policy_key: Option<String>,
     policy_version: Option<u32>,
+    explicit_policy: bool,
     legacy_profile: ModelProfile,
 }
 
@@ -280,6 +281,7 @@ impl<'a> IntelligenceRouteResolver<'a> {
         agent: &ResolvedAgentConfig,
         policy_ref: Option<&str>,
     ) -> Result<Self> {
+        let explicit_policy = policy_ref.is_some_and(|value| !value.trim().is_empty());
         let (policy_key, policy_version) = match policy_ref {
             Some(value) if !value.trim().is_empty() => {
                 let parsed = ModelProfileRef::parse(value)
@@ -293,6 +295,7 @@ impl<'a> IntelligenceRouteResolver<'a> {
             organization_id,
             policy_key,
             policy_version,
+            explicit_policy,
             legacy_profile: ModelProfile::legacy(agent),
         })
     }
@@ -310,6 +313,15 @@ impl<'a> IntelligenceRouteResolver<'a> {
             .policy(self.organization_id, policy_key, self.policy_version)
             .await?
         else {
+            if self.explicit_policy {
+                bail!(
+                    "explicit intelligence policy '{}{}' was not found",
+                    policy_key,
+                    self.policy_version
+                        .map(|version| format!("@{version}"))
+                        .unwrap_or_default()
+                );
+            }
             return self.legacy_route(role);
         };
 
