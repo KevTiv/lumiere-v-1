@@ -24,6 +24,7 @@ use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 
+use super::model_configuration::ModelProfile;
 use super::intelligence::{
     CapabilityProposal, ClarificationRequest, DecisionKind, DecisionProposal, DecisionProvider,
     DecisionRequest, DecisionResponse, DecisionTypeRef, FinalDraft, GenerationProvider,
@@ -59,6 +60,15 @@ impl<'a> LlmDecisionAdapter<'a> {
             provider,
             model,
             max_tokens: 512,
+        }
+    }
+
+    pub fn from_profile(transport: &'a dyn LlmCompletion, profile: &ModelProfile) -> Self {
+        Self {
+            transport,
+            provider: profile.provider.clone(),
+            model: profile.model.clone(),
+            max_tokens: profile.max_tokens.min(512),
         }
     }
 }
@@ -224,6 +234,15 @@ impl<'a> LlmGenerationAdapter<'a> {
             max_tokens,
         }
     }
+
+    pub fn from_profile(transport: &'a dyn LlmCompletion, profile: &ModelProfile) -> Self {
+        Self {
+            transport,
+            provider: profile.provider.clone(),
+            model: profile.model.clone(),
+            max_tokens: profile.max_tokens,
+        }
+    }
 }
 
 #[async_trait]
@@ -283,6 +302,15 @@ impl<'a> AgentLoopReasoner<'a> {
             provider,
             model,
             max_tokens: 1024,
+        }
+    }
+
+    pub fn from_profile(transport: &'a dyn LlmCompletion, profile: &ModelProfile) -> Self {
+        Self {
+            transport,
+            provider: profile.provider.clone(),
+            model: profile.model.clone(),
+            max_tokens: profile.max_tokens.min(1024),
         }
     }
 }
