@@ -28,6 +28,9 @@
 
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::ai::decision_events::ai_intelligence_event;
+use crate::ai::decision_type_registry::ai_decision_type_definition;
+use crate::ai::run_review::ai_run_review;
 use crate::ai::skills::ai_agent_run;
 use crate::ai::spend::ai_provider_attempt;
 use crate::helpers::check_permission;
@@ -182,6 +185,40 @@ struct PatternMetricsSnapshot {
     proposed_expression_kind: String,
 }
 
+#[derive(Clone, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GraduationPromotionPolicy {
+    #[serde(default)]
+    enabled: bool,
+    minimum_cases: u64,
+    minimum_verified_cases: u64,
+    maximum_correction_rate: f64,
+    maximum_provider_disagreement_rate: Option<f64>,
+    maximum_entropy: f64,
+    minimum_precedent_consistency: f64,
+    minimum_policy_stability: Option<f64>,
+    minimum_evidence_shape_stability: f64,
+    minimum_candidate_set_stability: Option<f64>,
+    minimum_shadow_cases: u64,
+    #[serde(default = "default_minimum_shadow_conformance_rate")]
+    minimum_shadow_conformance_rate: f64,
+}
+
+fn default_minimum_shadow_conformance_rate() -> f64 {
+    0.98
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DeterministicShadowPromotionEvidence {
+    schema_version: u32,
+    pattern_ref: String,
+    implementation_ref: String,
+    request_hash: String,
+    conformant: Option<bool>,
+    evaluation_error: Option<String>,
+}
+
 // ── Input params ─────────────────────────────────────────────────────────────
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -221,6 +258,13 @@ pub struct ProposeAiDecisionPatternParams {
     pub supporting_case_ids: Vec<u64>,
     pub outcome_metrics_json: String,
     pub correction_rate: f64,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct PromoteAiDecisionPatternParams {
+    pub pattern_id: u64,
+    pub implementation_ref: String,
+    pub note: Option<String>,
 }
 
 // ── Reducers: decision cases ────────────────────────────────────────────────
@@ -573,9 +617,9 @@ pub fn propose_ai_decision_pattern(
     Ok(())
 }
 
-/// Advance a pattern's status. Valid transitions: candidate -> reviewed,
-/// reviewed -> promoted, and {candidate, reviewed, promoted} -> superseded.
-/// Any other transition (including skipping review) is rejected.
+/// Advance a pattern's non-promotion status. Valid transitions: candidate -> reviewed
+/// and {candidate, reviewed, promoted} -> superseded. Promotion is available only
+/// through `promote_ai_decision_pattern`, which enforces DG-07 evidence gates.
 #[reducer]
 pub fn set_ai_decision_pattern_status(
     ctx: &ReducerContext,
@@ -600,7 +644,6 @@ pub fn set_ai_decision_pattern_status(
 
     let allowed = match (pattern.status.as_str(), status.as_str()) {
         ("candidate", "reviewed") => true,
-        ("reviewed", "promoted") => true,
         ("candidate" | "reviewed" | "promoted", "superseded") => true,
         _ => false,
     };
@@ -615,6 +658,108 @@ pub fn set_ai_decision_pattern_status(
         status,
         reviewed_by: Some(ctx.sender()),
         reviewed_note: note,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..pattern
+    });
+    Ok(())
+}
+
+/// Promote a reviewed deterministic decision pattern only after re-validating
+/// its immutable eligibility evidence and durable deterministic-shadow conformance.
+/// This is the only reducer allowed to perform reviewed -> promoted.
+#[reducer]
+pub fn promote_ai_decision_pattern(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: PromoteAiDecisionPatternParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_decision_pattern", "write")?;
+
+    if params.implementation_ref.trim().is_empty()
+        || !params.implementation_ref.contains('@')
+    {
+        return Err("implementation_ref must be a nonempty immutable versioned ref".to_string());
+    }
+
+    let pattern = ctx
+        .db
+        .ai_decision_pattern()
+        .id()
+        .find(&params.pattern_id)
+        .ok_or("Decision pattern not found")?;
+    if pattern.organization_id != organization_id {
+        return Err("Decision pattern does not belong to this organization".to_string());
+    }
+    if pattern.status != "reviewed" {
+        return Err("only a reviewed pattern can be promoted".to_string());
+    }
+
+    let applicability: PatternApplicabilityEvidence =
+        serde_json::from_str(&pattern.applicability_json)
+            .map_err(|_| "stored pattern applicability evidence is invalid".to_string())?;
+    validate_pattern_applicability(&applicability)?;
+
+    let metrics: PatternMetricsSnapshot =
+        serde_json::from_str(&pattern.outcome_metrics_json)
+            .map_err(|_| "stored pattern metrics evidence is invalid".to_string())?;
+    validate_pattern_metrics(&metrics, pattern.correction_rate)?;
+
+    revalidate_supporting_cases(ctx, organization_id, &pattern, &applicability)?;
+
+    let policy = load_graduation_promotion_policy(
+        ctx,
+        organization_id,
+        &pattern.decision_type_name,
+        pattern.decision_type_version,
+    )?;
+    validate_promotion_policy(&policy)?;
+    validate_metrics_against_promotion_policy(&metrics, &policy)?;
+
+    let (shadow_count, conformant_count) = deterministic_shadow_conformance(
+        ctx,
+        organization_id,
+        applicability.company_id,
+        &pattern,
+        &params.implementation_ref,
+    )?;
+    if shadow_count < policy.minimum_shadow_cases {
+        return Err(format!(
+            "deterministic shadow sample count {shadow_count} is below required {}",
+            policy.minimum_shadow_cases
+        ));
+    }
+    let conformance_rate = conformant_count as f64 / shadow_count as f64;
+    if conformance_rate < policy.minimum_shadow_conformance_rate {
+        return Err(format!(
+            "deterministic shadow conformance rate {conformance_rate:.6} is below required {:.6}",
+            policy.minimum_shadow_conformance_rate
+        ));
+    }
+
+    reject_review_defects_for_shadow_runs(
+        ctx,
+        organization_id,
+        applicability.company_id,
+        &pattern,
+        &params.implementation_ref,
+    )?;
+
+    let promotion_evidence = serde_json::json!({
+        "schema_version": 1,
+        "implementation_ref": params.implementation_ref,
+        "graduation_policy_ref": applicability.graduation_policy_ref,
+        "shadow_cases": shadow_count,
+        "conformant_cases": conformant_count,
+        "conformance_rate": conformance_rate,
+        "reviewer_note": params.note,
+    })
+    .to_string();
+
+    ctx.db.ai_decision_pattern().id().update(AiDecisionPattern {
+        status: "promoted".to_string(),
+        reviewed_by: Some(ctx.sender()),
+        reviewed_note: Some(promotion_evidence),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..pattern
