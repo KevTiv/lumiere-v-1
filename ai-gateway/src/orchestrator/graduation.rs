@@ -991,7 +991,9 @@ impl DecisionResolutionPolicy for StdbDecisionResolutionPolicy<'_> {
         let graduation = policy_store.policy_for(&request.decision_type).await?;
         match graduation.execution_mode {
             DecisionExecutionMode::ModelPrimary => return Ok(None),
-            DecisionExecutionMode::DeterministicShadow => return Ok(None),
+            DecisionExecutionMode::DeterministicShadow => {
+                bail!("deterministic_shadow execution mode is not admitted for live routing; use DG-05 shadow evaluation")
+            }
             DecisionExecutionMode::DeterministicPrimaryModelShadow
             | DecisionExecutionMode::DeterministicOnly => {}
         }
@@ -1184,6 +1186,7 @@ impl GovernedDecisionResolver<'_> {
                         }
                     }
                     Err(error) => {
+                        let message = error.to_string();
                         if let Err(record_error) = self
                             .model_shadow_recorder
                             .record_model_shadow(
@@ -1191,7 +1194,7 @@ impl GovernedDecisionResolver<'_> {
                                 context.company_id,
                                 context.run_id,
                                 &request,
-                                Err(error.to_string().as_str()),
+                                Err(message.as_str()),
                             )
                             .await
                         {
