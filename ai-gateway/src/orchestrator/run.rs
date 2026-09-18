@@ -47,13 +47,15 @@ use super::{
         ToolsBackedCapabilityExecutor,
     },
     intelligence::EvidenceRef,
-    intelligence_adapters::{AgentLoopReasoner, LlmDecisionAdapter, LlmGenerationAdapter},
+    intelligence_router::{
+        ConfiguredIntelligenceRouter, RoutedDecisionProvider, RoutedGenerationProvider,
+        RoutedReasoningProvider,
+    },
     invocation_policy::ReviewedInvocationPolicy,
+    model_configuration::{IntelligenceRole, IntelligenceRouteResolver, StdbModelConfigurationStore},
     precedent::StdbPrecedentStore,
     run_review::{RunReviewDisposition, RunReviewProgram},
-    spend_admission::{
-        spend_binding_from_agent, SpendAdmittedLlm, StdbSpendLedger,
-    },
+    spend_admission::{spend_binding_from_agent, StdbSpendLedger},
 };
 
 const DEFAULT_MAX_STEPS: u32 = 5;
@@ -602,26 +604,58 @@ pub async fn run_skill_admitted(
     };
 
     if skill_key == "report_analysis" {
-        let admitted_llm = SpendAdmittedLlm::new(
+        let model_config_store = StdbModelConfigurationStore {
+            reader: tool_ctx.stdb.as_ref(),
+        };
+        let intelligence_policy_ref = skill
+            .config_json
+            .get("intelligencePolicyRef")
+            .or_else(|| skill.config_json.get("intelligence_policy_ref"))
+            .and_then(Value::as_str);
+        let route_resolver = IntelligenceRouteResolver::new(
+            &model_config_store,
+            req.org_id,
+            &agent,
+            intelligence_policy_ref,
+        )?;
+        let intelligence_router = ConfiguredIntelligenceRouter::new(route_resolver);
+        let decision_provider = RoutedDecisionProvider::new(
+            &intelligence_router,
             state.providers.llm.as_ref(),
             &ledger,
-            binding.clone(),
+            &agent,
+            req.org_id,
+            req.company_id,
+            run_id,
+            IntelligenceRole::Decision,
         )?;
-        let decision_provider = LlmDecisionAdapter::new(
-            &admitted_llm,
-            binding.provider.clone(),
-            binding.model.clone(),
+        let review_provider = RoutedDecisionProvider::new(
+            &intelligence_router,
+            state.providers.llm.as_ref(),
+            &ledger,
+            &agent,
+            req.org_id,
+            req.company_id,
+            run_id,
+            IntelligenceRole::Review,
+        )?;
+        let generation_provider = RoutedGenerationProvider::new(
+            &intelligence_router,
+            state.providers.llm.as_ref(),
+            &ledger,
+            &agent,
+            req.org_id,
+            req.company_id,
+            run_id,
         );
-        let generation_provider = LlmGenerationAdapter::new(
-            &admitted_llm,
-            binding.provider.clone(),
-            binding.model.clone(),
-            binding.agent_max_tokens.min(2048).max(256),
-        );
-        let reasoning_provider = AgentLoopReasoner::new(
-            &admitted_llm,
-            binding.provider.clone(),
-            binding.model.clone(),
+        let reasoning_provider = RoutedReasoningProvider::new(
+            &intelligence_router,
+            state.providers.llm.as_ref(),
+            &ledger,
+            &agent,
+            req.org_id,
+            req.company_id,
+            run_id,
         );
 
         let decision_types = StdbDecisionTypeRegistry {
@@ -688,7 +722,7 @@ pub async fn run_skill_admitted(
 
         let review = if matches!(&program.stop, GovernedProgramStop::Completed) {
             Some(
-                RunReviewProgram::new(&decision_provider)
+                RunReviewProgram::new(&review_provider)
                     .review(&program_context.objective, &program)
                     .await?,
             )
