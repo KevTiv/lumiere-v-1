@@ -1114,6 +1114,44 @@ pub fn set_ai_agent_run_wait_state(
     Ok(())
 }
 
+#[reducer]
+pub fn resume_ai_agent_run(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_agent_run", "write")?;
+    let run = load_company_run(ctx, organization_id, company_id, run_id)?;
+    if run.status == "running" {
+        return Ok(());
+    }
+    if !is_run_wait_state(&run.status) {
+        return Err("only a waiting run can be resumed".to_string());
+    }
+    let previous_status = run.status.clone();
+    ctx.db.ai_agent_run().id().update(AiAgentRun {
+        status: "running".to_string(),
+        write_date: ctx.timestamp,
+        ..run
+    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "ai_agent_run",
+            record_id: run_id,
+            action: "UPDATE",
+            old_values: Some(serde_json::json!({ "status": previous_status }).to_string()),
+            new_values: Some(serde_json::json!({ "status": "running" }).to_string()),
+            changed_fields: vec!["status".to_string()],
+            metadata: Some(r#"{"source":"governed_program_resume"}"#.to_string()),
+        },
+    );
+    Ok(())
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /// Non-terminal statuses a stopped agent loop may leave a run in.
