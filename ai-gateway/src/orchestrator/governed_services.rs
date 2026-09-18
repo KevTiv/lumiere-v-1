@@ -1,0 +1,762 @@
+//! GP-03 (governed intelligence program): shared governed execution
+//! services.
+//!
+//! `governed-intelligence-program-migration.md` names seven responsibilities
+//! that must be extracted from the loop into shared services so that a
+//! typed `CapabilityStep`/`DecisionStep` (GP-08) and an accepted
+//! `ReasoningStep` proposal (GP-02/GP-04) all execute through **one**
+//! authorization/policy/recovery path instead of a loop-specific copy:
+//!
+//! ```text
+//! CapabilityAdmission
+//! CapabilityExecutor
+//! SpendAdmission/Settlement
+//! ApprovalCoordinator
+//! VerificationService
+//! ExecutionRecovery
+//! FinalAnswerAdmission
+//! ```
+//!
+//! Disposition of each, in this module:
+//!
+//! - `CapabilityAdmission` / `CapabilityExecutor`: new traits here, but they
+//!   are thin wrappers over the *same* `LoopPolicy`/`LoopTools` trait
+//!   objects `run_loop` already uses (`agent_loop.rs`). This is
+//!   deliberate: the requirement is one policy/execution path, not a
+//!   second one that happens to agree with the first. A
+//!   `CapabilityProposal` (GP-01) is converted to the existing
+//!   `ToolCallRequest` shape and handed to the same objects.
+//! - `SpendAdmission`/`Settlement`: already a shared service
+//!   (`spend_admission::SpendLedger`/`SpendAdmittedLlm`), explicitly
+//!   retained per the migration doc. Nothing new is added here; the GP-02
+//!   adapters are already generic over `&dyn LlmCompletion`, so composing
+//!   them with `SpendAdmittedLlm` gives durable spend admission for
+//!   `DecisionProvider`/`ReasoningProvider` calls with no code change.
+//! - `ExecutionRecovery`: new. Computes a deterministic, content-addressed
+//!   recovery key from `(run_id, capability, arguments)` — never a
+//!   model-supplied id — so a proposal repeated by model retry (same
+//!   round or a resumed run) replays the recorded outcome instead of
+//!   re-executing. This is what "mutation recovery never depends on model
+//!   retry behavior" requires structurally.
+//! - `ApprovalCoordinator`: new, minimal. A `DraftOnly` admission decision
+//!   already exists as `LoopStop::PendingApproval` in the current loop,
+//!   backed by the H5 action-draft reducer path. This trait names that
+//!   seam so `GovernedCapabilityService` can surface it uniformly; binding
+//!   it to the H5 draft-creation reducer is a GP-04 wiring step; a draft
+//!   is not fabricated here.
+//! - `VerificationService` / `FinalAnswerAdmission`: new, intentionally
+//!   minimal placeholders. The full evidence/answer gate is AIH-15's
+//!   dedicated scope (§7.3 of the completion plan) — citation resolution,
+//!   applicability checks, arithmetic verification. These traits exist so
+//!   later steps route through *a* gate rather than none; the bundled
+//!   implementations only enforce shape, not domain correctness, and say
+//!   so in their own docs.
+//!
+//! `GovernedCapabilityService::run` is the composed entry point: admission
+//! -> recovery lookup -> execution -> output protection -> recovery
+//! record. No production caller constructs it yet (no route switch); it is
+//! the seam GP-04 wires the loop's accepted `CapabilityProposal`s through.
+
+use anyhow::{bail, Context, Result};
+use async_trait::async_trait;
+use serde_json::Value;
+use sha2::{Digest, Sha256};
+
+use super::agent_loop::{LoopPolicy, LoopTools};
+use super::intelligence::{CapabilityProposal, EvidenceRef, FinalDraft};
+use crate::{
+    harness::audit::{DecisionOutcome, PolicyDecision},
+    providers::llm::ToolCallRequest,
+    tools::types::ToolOutput,
+};
+
+fn proposal_to_call(proposal: &CapabilityProposal) -> ToolCallRequest {
+    ToolCallRequest {
+        id: None,
+        name: proposal.capability.clone(),
+        arguments: proposal.arguments.clone(),
+        arguments_error: None,
+    }
+}
+
+fn reason_summary(decision: &PolicyDecision) -> String {
+    if decision.reasons.is_empty() {
+        return format!("{:?}", decision.outcome);
+    }
+    decision
+        .reasons
+        .iter()
+        .map(|r| r.message.as_str())
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
+/// Authorization/policy admission for one capability proposal. The only
+/// production implementation (`PolicyBackedCapabilityAdmission`) delegates
+/// to the same `LoopPolicy` the direct-execution loop uses today.
+#[async_trait]
+pub(super) trait CapabilityAdmission: Send + Sync {
+    async fn admit(
+        &self,
+        proposal: &CapabilityProposal,
+        completed_calls: u32,
+    ) -> Result<PolicyDecision>;
+
+    async fn protect_output(
+        &self,
+        proposal: &CapabilityProposal,
+        completed_calls: u32,
+        output: ToolOutput,
+    ) -> Result<ToolOutput>;
+}
+
+pub(super) struct PolicyBackedCapabilityAdmission<'a> {
+    policy: &'a dyn LoopPolicy,
+}
+
+impl<'a> PolicyBackedCapabilityAdmission<'a> {
+    pub fn new(policy: &'a dyn LoopPolicy) -> Self {
+        Self { policy }
+    }
+}
+
+#[async_trait]
+impl CapabilityAdmission for PolicyBackedCapabilityAdmission<'_> {
+    async fn admit(
+        &self,
+        proposal: &CapabilityProposal,
+        completed_calls: u32,
+    ) -> Result<PolicyDecision> {
+        self.policy
+            .evaluate(&proposal_to_call(proposal), completed_calls)
+            .await
+    }
+
+    async fn protect_output(
+        &self,
+        proposal: &CapabilityProposal,
+        completed_calls: u32,
+        output: ToolOutput,
+    ) -> Result<ToolOutput> {
+        self.policy
+            .protect_output(&proposal_to_call(proposal), completed_calls, output)
+            .await
+    }
+}
+
+/// Executes one admitted capability proposal. The only production
+/// implementation (`ToolsBackedCapabilityExecutor`) delegates to the same
+/// `LoopTools` the direct-execution loop uses today — generated capability
+/// IR remains the only executable ERP vocabulary either way.
+#[async_trait]
+pub(super) trait CapabilityExecutor: Send + Sync {
+    async fn execute(&self, proposal: &CapabilityProposal) -> Result<ToolOutput>;
+}
+
+pub(super) struct ToolsBackedCapabilityExecutor<'a> {
+    tools: &'a dyn LoopTools,
+}
+
+impl<'a> ToolsBackedCapabilityExecutor<'a> {
+    pub fn new(tools: &'a dyn LoopTools) -> Self {
+        Self { tools }
+    }
+}
+
+#[async_trait]
+impl CapabilityExecutor for ToolsBackedCapabilityExecutor<'_> {
+    async fn execute(&self, proposal: &CapabilityProposal) -> Result<ToolOutput> {
+        self.tools.execute(&proposal_to_call(proposal)).await
+    }
+}
+
+/// Deduplicates capability execution by a deterministic, content-addressed
+/// key rather than anything the model supplies, so a repeated proposal
+/// (model retry, resumed run) replays the recorded outcome instead of
+/// re-executing a mutation.
+#[async_trait]
+pub(super) trait ExecutionRecovery: Send + Sync {
+    fn recovery_key(&self, run_id: u64, proposal: &CapabilityProposal) -> Result<String>;
+    async fn already_executed(&self, key: &str) -> Result<Option<ToolOutput>>;
+    async fn record_outcome(&self, key: &str, output: &ToolOutput) -> Result<()>;
+}
+
+/// Reference implementation. Production wiring binds this to a durable
+/// store (mirroring `ai_spend::input_request_key`'s pattern for provider
+/// attempts); an in-process cache is sufficient to prove and test the
+/// recovery-key contract itself.
+pub(super) struct InMemoryExecutionRecovery {
+    seen: std::sync::Mutex<std::collections::HashMap<String, ToolOutput>>,
+}
+
+impl InMemoryExecutionRecovery {
+    pub fn new() -> Self {
+        Self {
+            seen: std::sync::Mutex::new(std::collections::HashMap::new()),
+        }
+    }
+}
+
+impl Default for InMemoryExecutionRecovery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[async_trait]
+impl ExecutionRecovery for InMemoryExecutionRecovery {
+    fn recovery_key(&self, run_id: u64, proposal: &CapabilityProposal) -> Result<String> {
+        if run_id == 0 {
+            bail!("recovery key requires a durable nonzero run_id");
+        }
+        let canonical = serde_json::to_vec(&(run_id, &proposal.capability, &proposal.arguments))
+            .context("serialize capability proposal for recovery key")?;
+        let digest = Sha256::digest(&canonical);
+        Ok(format!("gp03:capability:{digest:x}"))
+    }
+
+    async fn already_executed(&self, key: &str) -> Result<Option<ToolOutput>> {
+        Ok(self.seen.lock().unwrap().get(key).cloned())
+    }
+
+    async fn record_outcome(&self, key: &str, output: &ToolOutput) -> Result<()> {
+        self.seen
+            .lock()
+            .unwrap()
+            .insert(key.to_string(), output.clone());
+        Ok(())
+    }
+}
+
+/// Names the seam a `DraftOnly` admission decision routes through. Binding
+/// this to the existing H5 action-draft reducer path is a GP-04 wiring
+/// step; this trait only makes the seam explicit and shared, rather than
+/// leaving each caller to re-derive its own draft-creation call.
+#[async_trait]
+pub(super) trait ApprovalCoordinator: Send + Sync {
+    async fn request_approval(
+        &self,
+        proposal: &CapabilityProposal,
+        decision: &PolicyDecision,
+    ) -> Result<ApprovalRequest>;
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct ApprovalRequest {
+    pub capability: String,
+    pub reason: String,
+}
+
+/// Records the approval requirement without creating a durable draft.
+/// Placeholder until GP-04 binds this to the H5 action-draft reducer.
+pub(super) struct RecordingApprovalCoordinator;
+
+#[async_trait]
+impl ApprovalCoordinator for RecordingApprovalCoordinator {
+    async fn request_approval(
+        &self,
+        proposal: &CapabilityProposal,
+        decision: &PolicyDecision,
+    ) -> Result<ApprovalRequest> {
+        Ok(ApprovalRequest {
+            capability: proposal.capability.clone(),
+            reason: reason_summary(decision),
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum VerificationOutcome {
+    Verified,
+    RequiresReview { reason: String },
+    Failed { reason: String },
+}
+
+/// Validates a capability's output/evidence before it may feed a decision
+/// or final answer. This is a **shape-only placeholder**: it does not
+/// resolve citations, check applicability/effective dates, or verify
+/// arithmetic. AIH-15 owns that full evidence/answer gate; this trait only
+/// reserves the seam so later steps route through *a* verification call
+/// rather than none.
+#[async_trait]
+pub(super) trait VerificationService: Send + Sync {
+    async fn verify(
+        &self,
+        output: &ToolOutput,
+        evidence: &[EvidenceRef],
+    ) -> Result<VerificationOutcome>;
+}
+
+pub(super) struct ShapeOnlyVerificationService;
+
+#[async_trait]
+impl VerificationService for ShapeOnlyVerificationService {
+    async fn verify(
+        &self,
+        output: &ToolOutput,
+        evidence: &[EvidenceRef],
+    ) -> Result<VerificationOutcome> {
+        if output.summary.trim().is_empty() {
+            return Ok(VerificationOutcome::Failed {
+                reason: "capability output has no summary to verify".to_string(),
+            });
+        }
+        for reference in evidence {
+            if let Err(error) = reference.validate() {
+                return Ok(VerificationOutcome::Failed {
+                    reason: format!("invalid evidence reference: {error}"),
+                });
+            }
+        }
+        if evidence.is_empty() && matches!(output.data, Value::Null) {
+            return Ok(VerificationOutcome::RequiresReview {
+                reason: "no evidence and no structured output data to check".to_string(),
+            });
+        }
+        Ok(VerificationOutcome::Verified)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum AnswerAdmissionOutcome {
+    Admitted,
+    RequiresReview { reason: String },
+    Blocked { reason: String },
+}
+
+/// Gate a `FinalDraft` must pass before it is presented as complete. This
+/// is a **shape-only placeholder** for the same reason as
+/// `VerificationService`: it checks structural validity and citation
+/// presence, not claim coverage or prose-to-evidence consistency, which
+/// remain AIH-15's scope.
+#[async_trait]
+pub(super) trait FinalAnswerAdmission: Send + Sync {
+    async fn admit(&self, draft: &FinalDraft) -> Result<AnswerAdmissionOutcome>;
+}
+
+pub(super) struct ShapeOnlyFinalAnswerAdmission;
+
+#[async_trait]
+impl FinalAnswerAdmission for ShapeOnlyFinalAnswerAdmission {
+    async fn admit(&self, draft: &FinalDraft) -> Result<AnswerAdmissionOutcome> {
+        if let Err(error) = draft.validate() {
+            return Ok(AnswerAdmissionOutcome::Blocked {
+                reason: error.to_string(),
+            });
+        }
+        if draft.citations.is_empty() {
+            return Ok(AnswerAdmissionOutcome::RequiresReview {
+                reason: "final draft carries no evidence citations".to_string(),
+            });
+        }
+        Ok(AnswerAdmissionOutcome::Admitted)
+    }
+}
+
+/// Outcome of routing one capability proposal through the composed
+/// governed path.
+#[derive(Clone, Debug)]
+pub(super) enum CapabilityStepOutcome {
+    Executed(ToolOutput),
+    /// A prior identical proposal already ran for this run; the recorded
+    /// outcome was replayed instead of executing again.
+    Replayed(ToolOutput),
+    Denied(String),
+    PendingApproval(ApprovalRequest),
+}
+
+/// The single composed path a typed `CapabilityStep`, `DecisionStep`
+/// (indirectly, via a `CapabilityProposal` it emits) and an accepted
+/// `ReasoningStep` proposal all use: admission -> recovery lookup ->
+/// execution -> output protection -> recovery record. No caller wires
+/// this into `run.rs`/`agent_loop.rs` yet (GP-04 does).
+pub(super) struct GovernedCapabilityService<'a> {
+    admission: &'a dyn CapabilityAdmission,
+    executor: &'a dyn CapabilityExecutor,
+    recovery: &'a dyn ExecutionRecovery,
+    approvals: &'a dyn ApprovalCoordinator,
+}
+
+impl<'a> GovernedCapabilityService<'a> {
+    pub fn new(
+        admission: &'a dyn CapabilityAdmission,
+        executor: &'a dyn CapabilityExecutor,
+        recovery: &'a dyn ExecutionRecovery,
+        approvals: &'a dyn ApprovalCoordinator,
+    ) -> Self {
+        Self {
+            admission,
+            executor,
+            recovery,
+            approvals,
+        }
+    }
+
+    pub async fn run(
+        &self,
+        run_id: u64,
+        proposal: &CapabilityProposal,
+        completed_calls: u32,
+    ) -> Result<CapabilityStepOutcome> {
+        proposal.validate().context("invalid capability proposal")?;
+
+        let decision = self.admission.admit(proposal, completed_calls).await?;
+        match decision.outcome {
+            DecisionOutcome::Deny => {
+                return Ok(CapabilityStepOutcome::Denied(reason_summary(&decision)));
+            }
+            DecisionOutcome::DraftOnly => {
+                let request = self.approvals.request_approval(proposal, &decision).await?;
+                return Ok(CapabilityStepOutcome::PendingApproval(request));
+            }
+            DecisionOutcome::Allow => {}
+        }
+
+        let key = self.recovery.recovery_key(run_id, proposal)?;
+        if let Some(cached) = self.recovery.already_executed(&key).await? {
+            return Ok(CapabilityStepOutcome::Replayed(cached));
+        }
+
+        let output = self.executor.execute(proposal).await?;
+        let output = self
+            .admission
+            .protect_output(proposal, completed_calls, output)
+            .await?;
+        self.recovery.record_outcome(&key, &output).await?;
+        Ok(CapabilityStepOutcome::Executed(output))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::harness::audit::{
+        CorrelationMetadata, DecisionHashes, DecisionReason, PolicyReasonCode,
+    };
+    use crate::harness::manifest::SkillVersionRef;
+    use serde_json::json;
+    use std::sync::Mutex as StdMutex;
+
+    fn proposal() -> CapabilityProposal {
+        CapabilityProposal {
+            capability: "erp.search".to_string(),
+            arguments: json!({"q": "PO-42"}),
+            rationale: None,
+        }
+    }
+
+    fn output(summary: &str) -> ToolOutput {
+        ToolOutput {
+            summary: summary.to_string(),
+            data: json!({"rows": 1}),
+            citations: vec![],
+            row_count: Some(1),
+        }
+    }
+
+    fn decision(outcome: DecisionOutcome) -> PolicyDecision {
+        PolicyDecision {
+            outcome,
+            skill: SkillVersionRef::new("test-skill", 1),
+            risk: None,
+            reasons: vec![DecisionReason::new(
+                PolicyReasonCode::Allowed,
+                "test policy",
+            )],
+            correlation: CorrelationMetadata {
+                correlation_id: "test-correlation".into(),
+                organization_id: 1,
+                company_id: 1,
+                actor_id: Some("test-actor".into()),
+                causation_id: Some("test-causation".into()),
+            },
+            hashes: DecisionHashes {
+                request_hash: "request-hash".into(),
+                input_hash: "input-hash".into(),
+                manifest_hash: Some("manifest-hash".into()),
+            },
+            enforced_limits: None,
+        }
+    }
+
+    struct FakePolicy {
+        outcome: DecisionOutcome,
+        evaluate_calls: StdMutex<u32>,
+    }
+
+    #[async_trait]
+    impl LoopPolicy for FakePolicy {
+        async fn evaluate(
+            &self,
+            _call: &ToolCallRequest,
+            _completed_calls: u32,
+        ) -> Result<PolicyDecision> {
+            *self.evaluate_calls.lock().unwrap() += 1;
+            Ok(decision(self.outcome.clone()))
+        }
+
+        async fn protect_output(
+            &self,
+            _call: &ToolCallRequest,
+            _completed_calls: u32,
+            output: ToolOutput,
+        ) -> Result<ToolOutput> {
+            Ok(output)
+        }
+    }
+
+    struct FakeTools {
+        execute_calls: StdMutex<u32>,
+    }
+
+    #[async_trait]
+    impl LoopTools for FakeTools {
+        async fn execute(&self, call: &ToolCallRequest) -> Result<ToolOutput> {
+            *self.execute_calls.lock().unwrap() += 1;
+            Ok(output(&format!("executed {}", call.name)))
+        }
+    }
+
+    #[tokio::test]
+    async fn allow_executes_and_records_recovery() {
+        let policy = FakePolicy {
+            outcome: DecisionOutcome::Allow,
+            evaluate_calls: StdMutex::new(0),
+        };
+        let tools = FakeTools {
+            execute_calls: StdMutex::new(0),
+        };
+        let admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let executor = ToolsBackedCapabilityExecutor::new(&tools);
+        let recovery = InMemoryExecutionRecovery::new();
+        let approvals = RecordingApprovalCoordinator;
+        let service = GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
+
+        let outcome = service.run(7, &proposal(), 0).await.unwrap();
+        match outcome {
+            CapabilityStepOutcome::Executed(output) => {
+                assert_eq!(output.summary, "executed erp.search");
+            }
+            other => panic!("expected Executed, got {other:?}"),
+        }
+        assert_eq!(*tools.execute_calls.lock().unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn repeated_proposal_replays_instead_of_re_executing() {
+        let policy = FakePolicy {
+            outcome: DecisionOutcome::Allow,
+            evaluate_calls: StdMutex::new(0),
+        };
+        let tools = FakeTools {
+            execute_calls: StdMutex::new(0),
+        };
+        let admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let executor = ToolsBackedCapabilityExecutor::new(&tools);
+        let recovery = InMemoryExecutionRecovery::new();
+        let approvals = RecordingApprovalCoordinator;
+        let service = GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
+
+        let first = service.run(7, &proposal(), 0).await.unwrap();
+        assert!(matches!(first, CapabilityStepOutcome::Executed(_)));
+        let second = service.run(7, &proposal(), 1).await.unwrap();
+        assert!(matches!(second, CapabilityStepOutcome::Replayed(_)));
+        // Only the first call actually executed the underlying tool.
+        assert_eq!(*tools.execute_calls.lock().unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn different_run_ids_do_not_share_recovery_state() {
+        let policy = FakePolicy {
+            outcome: DecisionOutcome::Allow,
+            evaluate_calls: StdMutex::new(0),
+        };
+        let tools = FakeTools {
+            execute_calls: StdMutex::new(0),
+        };
+        let admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let executor = ToolsBackedCapabilityExecutor::new(&tools);
+        let recovery = InMemoryExecutionRecovery::new();
+        let approvals = RecordingApprovalCoordinator;
+        let service = GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
+
+        service.run(7, &proposal(), 0).await.unwrap();
+        service.run(8, &proposal(), 0).await.unwrap();
+        assert_eq!(*tools.execute_calls.lock().unwrap(), 2);
+    }
+
+    #[tokio::test]
+    async fn deny_short_circuits_before_execution() {
+        let policy = FakePolicy {
+            outcome: DecisionOutcome::Deny,
+            evaluate_calls: StdMutex::new(0),
+        };
+        let tools = FakeTools {
+            execute_calls: StdMutex::new(0),
+        };
+        let admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let executor = ToolsBackedCapabilityExecutor::new(&tools);
+        let recovery = InMemoryExecutionRecovery::new();
+        let approvals = RecordingApprovalCoordinator;
+        let service = GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
+
+        let outcome = service.run(7, &proposal(), 0).await.unwrap();
+        assert!(matches!(outcome, CapabilityStepOutcome::Denied(_)));
+        assert_eq!(*tools.execute_calls.lock().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn draft_only_routes_through_approval_coordinator() {
+        let policy = FakePolicy {
+            outcome: DecisionOutcome::DraftOnly,
+            evaluate_calls: StdMutex::new(0),
+        };
+        let tools = FakeTools {
+            execute_calls: StdMutex::new(0),
+        };
+        let admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let executor = ToolsBackedCapabilityExecutor::new(&tools);
+        let recovery = InMemoryExecutionRecovery::new();
+        let approvals = RecordingApprovalCoordinator;
+        let service = GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
+
+        let outcome = service.run(7, &proposal(), 0).await.unwrap();
+        match outcome {
+            CapabilityStepOutcome::PendingApproval(request) => {
+                assert_eq!(request.capability, "erp.search");
+            }
+            other => panic!("expected PendingApproval, got {other:?}"),
+        }
+        assert_eq!(*tools.execute_calls.lock().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn invalid_proposal_is_rejected_before_admission() {
+        let policy = FakePolicy {
+            outcome: DecisionOutcome::Allow,
+            evaluate_calls: StdMutex::new(0),
+        };
+        let tools = FakeTools {
+            execute_calls: StdMutex::new(0),
+        };
+        let admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let executor = ToolsBackedCapabilityExecutor::new(&tools);
+        let recovery = InMemoryExecutionRecovery::new();
+        let approvals = RecordingApprovalCoordinator;
+        let service = GovernedCapabilityService::new(&admission, &executor, &recovery, &approvals);
+
+        let mut bad = proposal();
+        bad.capability = String::new();
+        assert!(service.run(7, &bad, 0).await.is_err());
+        assert_eq!(*policy.evaluate_calls.lock().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn recovery_key_requires_nonzero_run_id() {
+        let recovery = InMemoryExecutionRecovery::new();
+        assert!(recovery.recovery_key(0, &proposal()).is_err());
+    }
+
+    #[tokio::test]
+    async fn recovery_key_is_deterministic_and_argument_sensitive() {
+        let recovery = InMemoryExecutionRecovery::new();
+        let a = recovery.recovery_key(1, &proposal()).unwrap();
+        let b = recovery.recovery_key(1, &proposal()).unwrap();
+        assert_eq!(a, b);
+
+        let mut different = proposal();
+        different.arguments = json!({"q": "PO-99"});
+        let c = recovery.recovery_key(1, &different).unwrap();
+        assert_ne!(a, c);
+    }
+
+    #[tokio::test]
+    async fn shape_only_verification_flags_missing_summary() {
+        let service = ShapeOnlyVerificationService;
+        let empty = ToolOutput {
+            summary: String::new(),
+            data: Value::Null,
+            citations: vec![],
+            row_count: None,
+        };
+        let outcome = service.verify(&empty, &[]).await.unwrap();
+        assert!(matches!(outcome, VerificationOutcome::Failed { .. }));
+    }
+
+    #[tokio::test]
+    async fn shape_only_verification_requires_review_without_evidence_or_data() {
+        let service = ShapeOnlyVerificationService;
+        let bare = ToolOutput {
+            summary: "did a thing".to_string(),
+            data: Value::Null,
+            citations: vec![],
+            row_count: None,
+        };
+        let outcome = service.verify(&bare, &[]).await.unwrap();
+        assert!(matches!(
+            outcome,
+            VerificationOutcome::RequiresReview { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn shape_only_verification_rejects_malformed_evidence() {
+        let service = ShapeOnlyVerificationService;
+        let bad_evidence = [EvidenceRef {
+            kind: String::new(),
+            id: "x".to_string(),
+        }];
+        let outcome = service.verify(&output("ok"), &bad_evidence).await.unwrap();
+        assert!(matches!(outcome, VerificationOutcome::Failed { .. }));
+    }
+
+    #[tokio::test]
+    async fn shape_only_verification_passes_with_evidence() {
+        let service = ShapeOnlyVerificationService;
+        let evidence = [EvidenceRef {
+            kind: "erp_record".to_string(),
+            id: "PO-42".to_string(),
+        }];
+        let outcome = service.verify(&output("ok"), &evidence).await.unwrap();
+        assert_eq!(outcome, VerificationOutcome::Verified);
+    }
+
+    #[tokio::test]
+    async fn shape_only_final_answer_admission_blocks_invalid_draft() {
+        let service = ShapeOnlyFinalAnswerAdmission;
+        let empty = FinalDraft {
+            content: String::new(),
+            citations: vec![],
+        };
+        let outcome = service.admit(&empty).await.unwrap();
+        assert!(matches!(outcome, AnswerAdmissionOutcome::Blocked { .. }));
+    }
+
+    #[tokio::test]
+    async fn shape_only_final_answer_admission_requires_review_without_citations() {
+        let service = ShapeOnlyFinalAnswerAdmission;
+        let draft = FinalDraft {
+            content: "the answer".to_string(),
+            citations: vec![],
+        };
+        let outcome = service.admit(&draft).await.unwrap();
+        assert!(matches!(
+            outcome,
+            AnswerAdmissionOutcome::RequiresReview { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn shape_only_final_answer_admission_admits_cited_draft() {
+        let service = ShapeOnlyFinalAnswerAdmission;
+        let draft = FinalDraft {
+            content: "the answer".to_string(),
+            citations: vec![EvidenceRef {
+                kind: "erp_record".to_string(),
+                id: "PO-42".to_string(),
+            }],
+        };
+        let outcome = service.admit(&draft).await.unwrap();
+        assert_eq!(outcome, AnswerAdmissionOutcome::Admitted);
+    }
+}
