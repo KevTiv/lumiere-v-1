@@ -31,8 +31,36 @@ use crate::{
         skill_registry::SkillRegistry,
         ActorCredentials,
     },
+    orchestrator::governed_bootstrap::{
+        bootstrap_governed_intelligence, GovernedBootstrapResult,
+    },
     state::AppState,
 };
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GatewayGovernedBootstrapRequest {
+    pub org_id: u64,
+    pub intelligence_policy_ref: Option<String>,
+}
+
+pub async fn post_governed_bootstrap(
+    State(state): State<AppState>,
+    Json(req): Json<GatewayGovernedBootstrapRequest>,
+) -> AppResult<Json<GovernedBootstrapResult>> {
+    if req.org_id == 0 {
+        return Err(AppError::BadRequest("org_id is required".into()));
+    }
+    let result = bootstrap_governed_intelligence(
+        state.stdb.as_ref(),
+        state.stdb.as_ref(),
+        req.org_id,
+        req.intelligence_policy_ref.as_deref(),
+    )
+    .await
+    .map_err(AppError::Internal)?;
+    Ok(Json(result))
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
