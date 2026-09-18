@@ -99,13 +99,36 @@ fn endpoints(skill_key: &str) -> Result<SkillEndpoints, String> {
 }
 
 fn green_manifest(skill_key: &str, resource: &str, output_type: &str) -> SkillManifest {
+    let (mut allowed_tools, mut allowed_capabilities) = match skill_key {
+        REPORT_ANALYSIS_SKILL_KEY => (
+            vec!["analytics_summary".to_string()],
+            vec![Capability::NamedRead],
+        ),
+        PROCESS_RESEARCH_SKILL_KEY => (
+            vec!["analytics_summary".to_string(), "erp_search".to_string()],
+            vec![Capability::NamedRead],
+        ),
+        PRICE_SEARCH_SKILL_KEY | SUPPLIER_DISCOVERY_SKILL_KEY => (
+            vec!["erp_search".to_string(), "web_search".to_string()],
+            vec![Capability::NamedRead, Capability::Network],
+        ),
+        _ => (Vec::new(), Vec::new()),
+    };
+    // The route-level release/policy fence remains a reviewed named read.
+    if !allowed_tools.iter().any(|tool| tool == NAMED_READ_TOOL) {
+        allowed_tools.push(NAMED_READ_TOOL.to_string());
+    }
+    if !allowed_capabilities.contains(&Capability::NamedRead) {
+        allowed_capabilities.push(Capability::NamedRead);
+    }
+
     SkillManifest {
         skill: SkillVersionRef::new(skill_key, LLM_BUNDLED_SKILL_VERSION),
         review: reviewed(),
         risk: RiskClass::Green,
         named_resources: vec![resource.to_string()],
-        allowed_tools: vec![NAMED_READ_TOOL.to_string()],
-        allowed_capabilities: vec![Capability::NamedRead],
+        allowed_tools,
+        allowed_capabilities,
         output_type: output_type.to_string(),
         limits: ExecutionLimits {
             max_rows: 200,
