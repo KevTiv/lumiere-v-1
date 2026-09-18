@@ -32,12 +32,16 @@
 //!   adapters are already generic over `&dyn LlmCompletion`, so composing
 //!   them with `SpendAdmittedLlm` gives durable spend admission for
 //!   `DecisionProvider`/`ReasoningProvider` calls with no code change.
-//! - `ExecutionRecovery`: new. Computes a deterministic, content-addressed
+//! - `ExecutionRecovery`: computes a deterministic, content-addressed
 //!   recovery key from `(run_id, capability, arguments)` — never a
 //!   model-supplied id — so a proposal repeated by model retry (same
 //!   round or a resumed run) replays the recorded outcome instead of
 //!   re-executing. This is what "mutation recovery never depends on model
-//!   retry behavior" requires structurally.
+//!   retry behavior" requires structurally. `InMemoryExecutionRecovery` is
+//!   the reference/test implementation; `StdbExecutionRecovery` binds this
+//!   to the durable `ai_capability_execution` store
+//!   (`spacetimedb/src/ai/capability_execution.rs`) so recovery survives a
+//!   process restart, not just a single run.
 //! - `ApprovalCoordinator`: new, minimal. A `DraftOnly` admission decision
 //!   already exists as `LoopStop::PendingApproval` in the current loop,
 //!   backed by the H5 action-draft reducer path. This trait names that
@@ -54,8 +58,8 @@
 //!
 //! `GovernedCapabilityService::run` is the composed entry point: admission
 //! -> recovery lookup -> execution -> output protection -> recovery
-//! record. No production caller constructs it yet (no route switch); it is
-//! the seam GP-04 wires the loop's accepted `CapabilityProposal`s through.
+//! record. `run.rs`/`proposal_loop.rs` construct it with
+//! `StdbExecutionRecovery` for the `report_analysis` governed program path.
 
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
@@ -177,14 +181,38 @@ impl CapabilityExecutor for ToolsBackedCapabilityExecutor<'_> {
 #[async_trait]
 pub(super) trait ExecutionRecovery: Send + Sync {
     fn recovery_key(&self, run_id: u64, proposal: &CapabilityProposal) -> Result<String>;
-    async fn already_executed(&self, key: &str) -> Result<Option<ToolOutput>>;
-    async fn record_outcome(&self, key: &str, output: &ToolOutput) -> Result<()>;
+    async fn already_executed(
+        &self,
+        run_id: u64,
+        proposal: &CapabilityProposal,
+        key: &str,
+    ) -> Result<Option<ToolOutput>>;
+    async fn record_outcome(
+        &self,
+        run_id: u64,
+        proposal: &CapabilityProposal,
+        key: &str,
+        output: &ToolOutput,
+    ) -> Result<()>;
 }
 
-/// Reference implementation. Production wiring binds this to a durable
-/// store (mirroring `ai_spend::input_request_key`'s pattern for provider
-/// attempts); an in-process cache is sufficient to prove and test the
-/// recovery-key contract itself.
+/// Deterministic, content-addressed recovery key derivation shared by every
+/// `ExecutionRecovery` implementation — `(run_id, capability, arguments)`,
+/// never a model-supplied id, so a proposal repeated by model retry or a
+/// resumed run maps to the same durable key.
+fn capability_recovery_key(run_id: u64, proposal: &CapabilityProposal) -> Result<String> {
+    if run_id == 0 {
+        bail!("recovery key requires a durable nonzero run_id");
+    }
+    let canonical = serde_json::to_vec(&(run_id, &proposal.capability, &proposal.arguments))
+        .context("serialize capability proposal for recovery key")?;
+    let digest = Sha256::digest(&canonical);
+    Ok(format!("gp03:capability:{digest:x}"))
+}
+
+/// Reference implementation used in tests and by any caller that does not
+/// require durability across process restarts. `StdbExecutionRecovery`
+/// below is the production implementation.
 pub(super) struct InMemoryExecutionRecovery {
     seen: std::sync::Mutex<std::collections::HashMap<String, ToolOutput>>,
 }
@@ -206,26 +234,193 @@ impl Default for InMemoryExecutionRecovery {
 #[async_trait]
 impl ExecutionRecovery for InMemoryExecutionRecovery {
     fn recovery_key(&self, run_id: u64, proposal: &CapabilityProposal) -> Result<String> {
-        if run_id == 0 {
-            bail!("recovery key requires a durable nonzero run_id");
-        }
-        let canonical = serde_json::to_vec(&(run_id, &proposal.capability, &proposal.arguments))
-            .context("serialize capability proposal for recovery key")?;
-        let digest = Sha256::digest(&canonical);
-        Ok(format!("gp03:capability:{digest:x}"))
+        capability_recovery_key(run_id, proposal)
     }
 
-    async fn already_executed(&self, key: &str) -> Result<Option<ToolOutput>> {
+    async fn already_executed(
+        &self,
+        _run_id: u64,
+        _proposal: &CapabilityProposal,
+        key: &str,
+    ) -> Result<Option<ToolOutput>> {
         Ok(self.seen.lock().unwrap().get(key).cloned())
     }
 
-    async fn record_outcome(&self, key: &str, output: &ToolOutput) -> Result<()> {
+    async fn record_outcome(
+        &self,
+        _run_id: u64,
+        _proposal: &CapabilityProposal,
+        key: &str,
+        output: &ToolOutput,
+    ) -> Result<()> {
         self.seen
             .lock()
             .unwrap()
             .insert(key.to_string(), output.clone());
         Ok(())
     }
+}
+
+/// Production implementation. Binds `ExecutionRecovery` to the durable,
+/// organization-owned `ai_capability_execution` store
+/// (`spacetimedb/src/ai/capability_execution.rs`) so a capability proposal
+/// repeated by model retry or a *resumed run* replays the recorded outcome
+/// instead of re-executing a mutation — the in-process
+/// `InMemoryExecutionRecovery` above only survives one process lifetime.
+///
+/// `writer` calls the two `ai_capability_execution` reducers and must be a
+/// principal already granted `ai_capability_execution/write`. `reader`
+/// queries the row back (the table is private, so a plain client cannot
+/// subscribe to it) — mirroring `StdbSpendLedger`, this reuses the
+/// dedicated `AI_SPEND_READ_STDB_TOKEN` read principal rather than adding a
+/// second one, since both are internal ledger-style tables read by the same
+/// gateway process.
+///
+/// A row found in status `"claimed"` (an earlier claim with no recorded
+/// outcome — either genuinely in flight or left behind by a crashed
+/// process) is deliberately *not* treated as safe to re-execute: unlike
+/// `ai_spend`'s `outcome_unknown`, nothing here can distinguish "still
+/// running" from "crashed before recording," so silently proceeding could
+/// double-execute a mutation. It surfaces as an error requiring explicit
+/// reconciliation instead.
+pub(super) struct StdbExecutionRecovery<'a> {
+    pub writer: &'a stdb_client::StdbClient,
+    pub reader: &'a stdb_client::StdbClient,
+    pub organization_id: u64,
+    pub company_id: u64,
+}
+
+#[derive(Debug)]
+struct CapabilityExecutionRow {
+    status: String,
+    output_json: Option<String>,
+    failure_reason: Option<String>,
+}
+
+impl StdbExecutionRecovery<'_> {
+    async fn load(&self, key: &str) -> Result<Option<CapabilityExecutionRow>> {
+        let key = key.replace('\'', "''");
+        let rows = self
+            .reader
+            .query_sql(&format!(
+                "SELECT * FROM ai_capability_execution WHERE organization_id = {} \
+                 AND recovery_key = '{key}' LIMIT 1",
+                self.organization_id
+            ))
+            .await
+            .context("load durable capability execution recovery row")?;
+        rows.first().map(decode_capability_execution_row).transpose()
+    }
+
+    async fn claim(&self, run_id: u64, proposal: &CapabilityProposal, key: &str) -> Result<()> {
+        self.writer
+            .call_reducer(stdb_client::ReducerCall::from_name(
+                "claim_ai_capability_execution",
+                serde_json::json!([
+                    self.organization_id,
+                    {
+                        "company_id": self.company_id,
+                        "run_id": run_id,
+                        "recovery_key": key,
+                        "capability": proposal.capability,
+                    }
+                ]),
+            ))
+            .await
+            .context("claim durable capability execution")
+    }
+}
+
+#[async_trait]
+impl ExecutionRecovery for StdbExecutionRecovery<'_> {
+    fn recovery_key(&self, run_id: u64, proposal: &CapabilityProposal) -> Result<String> {
+        capability_recovery_key(run_id, proposal)
+    }
+
+    async fn already_executed(
+        &self,
+        run_id: u64,
+        proposal: &CapabilityProposal,
+        key: &str,
+    ) -> Result<Option<ToolOutput>> {
+        if self.organization_id == 0 || self.company_id == 0 {
+            bail!("durable execution recovery requires organization and company context");
+        }
+        if let Some(row) = self.load(key).await? {
+            return match row.status.as_str() {
+                "succeeded" => {
+                    let output_json = row
+                        .output_json
+                        .context("succeeded capability execution row is missing output_json")?;
+                    let output: ToolOutput = serde_json::from_str(&output_json)
+                        .context("decode replayed capability execution output")?;
+                    Ok(Some(output))
+                }
+                "failed" => bail!(
+                    "capability execution for recovery key '{key}' previously failed ({}); \
+                     requires reconciliation before retry",
+                    row.failure_reason.as_deref().unwrap_or("no reason recorded")
+                ),
+                "claimed" => bail!(
+                    "capability execution for recovery key '{key}' is claimed but unresolved; \
+                     requires reconciliation before retry, not automatic re-execution"
+                ),
+                other => bail!("unexpected capability execution status '{other}'"),
+            };
+        }
+        self.claim(run_id, proposal, key).await?;
+        Ok(None)
+    }
+
+    async fn record_outcome(
+        &self,
+        _run_id: u64,
+        _proposal: &CapabilityProposal,
+        key: &str,
+        output: &ToolOutput,
+    ) -> Result<()> {
+        let output_json = serde_json::to_string(output).context("serialize capability output")?;
+        let output_hash = format!("{:x}", Sha256::digest(output_json.as_bytes()));
+        self.writer
+            .call_reducer(stdb_client::ReducerCall::from_name(
+                "record_ai_capability_execution_result",
+                serde_json::json!([
+                    self.organization_id,
+                    {
+                        "recovery_key": key,
+                        "status": "succeeded",
+                        "output_json": output_json,
+                        "output_hash": output_hash,
+                        "failure_reason": null,
+                    }
+                ]),
+            ))
+            .await
+            .context("record durable capability execution result")
+    }
+}
+
+fn decode_capability_execution_row(row: &Value) -> Result<CapabilityExecutionRow> {
+    let status = row
+        .get("status")
+        .and_then(Value::as_str)
+        .context("capability execution row missing status")?
+        .to_string();
+    let output_json = row
+        .get("outputJson")
+        .or_else(|| row.get("output_json"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let failure_reason = row
+        .get("failureReason")
+        .or_else(|| row.get("failure_reason"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    Ok(CapabilityExecutionRow {
+        status,
+        output_json,
+        failure_reason,
+    })
 }
 
 /// Names the seam a `DraftOnly` admission decision routes through. Binding
@@ -413,7 +608,7 @@ impl<'a> GovernedCapabilityService<'a> {
         }
 
         let key = self.recovery.recovery_key(run_id, proposal)?;
-        if let Some(cached) = self.recovery.already_executed(&key).await? {
+        if let Some(cached) = self.recovery.already_executed(run_id, proposal, &key).await? {
             return Ok(CapabilityStepOutcome::Replayed(cached));
         }
 
@@ -422,7 +617,9 @@ impl<'a> GovernedCapabilityService<'a> {
             .admission
             .protect_output(proposal, completed_calls, output)
             .await?;
-        self.recovery.record_outcome(&key, &output).await?;
+        self.recovery
+            .record_outcome(run_id, proposal, &key, &output)
+            .await?;
         Ok(CapabilityStepOutcome::Executed(output))
     }
 }
@@ -758,5 +955,51 @@ mod tests {
         };
         let outcome = service.admit(&draft).await.unwrap();
         assert_eq!(outcome, AnswerAdmissionOutcome::Admitted);
+    }
+
+    #[test]
+    fn capability_recovery_key_is_stable_and_requires_a_durable_run_id() {
+        let a = capability_recovery_key(1, &proposal()).unwrap();
+        let b = capability_recovery_key(1, &proposal()).unwrap();
+        assert_eq!(a, b);
+
+        let mut other = proposal();
+        other.arguments = json!({"q": "different"});
+        let c = capability_recovery_key(1, &other).unwrap();
+        assert_ne!(a, c);
+
+        assert!(capability_recovery_key(0, &proposal()).is_err());
+    }
+
+    #[test]
+    fn decode_capability_execution_row_reads_camel_case_fields() {
+        let row = json!({
+            "status": "succeeded",
+            "outputJson": "{\"summary\":\"ok\"}",
+            "failureReason": null,
+        });
+        let decoded = decode_capability_execution_row(&row).unwrap();
+        assert_eq!(decoded.status, "succeeded");
+        assert_eq!(decoded.output_json.as_deref(), Some("{\"summary\":\"ok\"}"));
+        assert!(decoded.failure_reason.is_none());
+    }
+
+    #[test]
+    fn decode_capability_execution_row_falls_back_to_snake_case_fields() {
+        let row = json!({
+            "status": "failed",
+            "output_json": null,
+            "failure_reason": "provider timeout",
+        });
+        let decoded = decode_capability_execution_row(&row).unwrap();
+        assert_eq!(decoded.status, "failed");
+        assert!(decoded.output_json.is_none());
+        assert_eq!(decoded.failure_reason.as_deref(), Some("provider timeout"));
+    }
+
+    #[test]
+    fn decode_capability_execution_row_requires_status() {
+        let row = json!({"outputJson": null, "failureReason": null});
+        assert!(decode_capability_execution_row(&row).is_err());
     }
 }

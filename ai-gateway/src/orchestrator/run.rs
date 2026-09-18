@@ -41,7 +41,7 @@ use super::{
     },
     governed_programs::{report_analysis_graph, REPORT_ANALYSIS_PROGRAM_REF},
     governed_services::{
-        GovernedCapabilityService, InMemoryExecutionRecovery,
+        GovernedCapabilityService, StdbExecutionRecovery,
         PolicyBackedCapabilityAdmission, RecordingApprovalCoordinator,
         ShapeOnlyFinalAnswerAdmission, ShapeOnlyVerificationService,
         ToolsBackedCapabilityExecutor,
@@ -686,7 +686,12 @@ pub async fn run_skill_admitted(
         };
         let capability_admission = PolicyBackedCapabilityAdmission::new(&policy);
         let capability_executor = ToolsBackedCapabilityExecutor::new(&loop_tools);
-        let recovery = InMemoryExecutionRecovery::new();
+        let recovery = StdbExecutionRecovery {
+            writer: state.stdb.as_ref(),
+            reader: spend_reader,
+            organization_id: req.org_id,
+            company_id: req.company_id,
+        };
         let approvals = RecordingApprovalCoordinator;
         let capabilities = GovernedCapabilityService::new(
             &capability_admission,
