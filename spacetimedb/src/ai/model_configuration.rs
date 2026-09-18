@@ -365,6 +365,56 @@ fn validate_policy_params(
                     validate_profile_ref(ctx, organization_id, profile_ref, "shadow")?;
                 }
             }
+
+            let require_distinct_profile =
+                bool_override(object, "requireDistinctReviewProfile")?;
+            let require_distinct_provider =
+                bool_override(object, "requireDistinctReviewProvider")?;
+            let _prefer_distinct_provider =
+                bool_override(object, "preferDistinctReviewProvider")?;
+
+            if require_distinct_provider {
+                let decision_ref = object
+                    .get("primary")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or(params.default_decision_profile.as_str());
+                let review_ref = object
+                    .get("review")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or(params.default_review_profile.as_str());
+
+                if decision_ref == review_ref {
+                    return Err(
+                        "requireDistinctReviewProvider also requires distinct decision/review profiles"
+                            .to_string(),
+                    );
+                }
+                let decision_provider =
+                    provider_for_profile_ref(ctx, organization_id, decision_ref)?;
+                let review_provider =
+                    provider_for_profile_ref(ctx, organization_id, review_ref)?;
+                if decision_provider == review_provider {
+                    return Err(format!(
+                        "requireDistinctReviewProvider resolved both profiles to provider '{}'",
+                        decision_provider
+                    ));
+                }
+            } else if require_distinct_profile {
+                let decision_ref = object
+                    .get("primary")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or(params.default_decision_profile.as_str());
+                let review_ref = object
+                    .get("review")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or(params.default_review_profile.as_str());
+                if decision_ref == review_ref {
+                    return Err(
+                        "requireDistinctReviewProfile resolved decision and review to the same profile"
+                            .to_string(),
+                    );
+                }
+            }
         }
     }
 
@@ -387,6 +437,32 @@ fn validate_policy_params(
         }
     }
     Ok(())
+}
+
+fn bool_override(
+    object: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+) -> Result<bool, String> {
+    match object.get(key) {
+        None => Ok(false),
+        Some(value) => value
+            .as_bool()
+            .ok_or_else(|| format!("{key} must be a boolean")),
+    }
+}
+
+fn provider_for_profile_ref(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    profile_ref: &str,
+) -> Result<String, String> {
+    let (key, version) = parse_profile_ref(profile_ref)?;
+    let profile = find_model_profile(ctx, organization_id, key, version)
+        .ok_or_else(|| format!("model profile '{profile_ref}' not found"))?;
+    if !profile.is_active {
+        return Err(format!("model profile '{profile_ref}' is inactive"));
+    }
+    Ok(profile.provider.trim().to_lowercase())
 }
 
 fn validate_profile_ref(
