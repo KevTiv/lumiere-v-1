@@ -11,6 +11,7 @@ pub mod intelligence;
 mod intelligence_adapters;
 mod intelligence_router;
 mod invocation_policy;
+mod model_configuration;
 mod precedent;
 mod progress;
 mod proposal_loop;
