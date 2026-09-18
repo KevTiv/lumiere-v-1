@@ -5,6 +5,7 @@ mod agent_loop_tests;
 mod decision_graph;
 mod decision_type;
 mod governed_services;
+mod governed_bootstrap;
 mod graduation;
 mod governed_program;
 mod governed_programs;
