@@ -2278,6 +2278,166 @@ fn sql_escape(value: &str) -> String {
     value.replace('\'', "''")
 }
 
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReviewedGraduationFixtureSuite {
+    schema_version: u32,
+    suite_ref: String,
+    fixtures: Vec<ReviewedGraduationFixture>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReviewedGraduationFixture {
+    id: String,
+    category: String,
+    implementation_ref: String,
+    organization_id: u64,
+    company_id: u64,
+    decision_type: DecisionTypeRef,
+    request: DecisionRequest,
+    expected: Option<DeterministicDecisionResponse>,
+    #[serde(default)]
+    expect_validation_error: bool,
+    absolute_tolerance: f64,
+    relative_tolerance: f64,
+    threshold_gate: Option<FixtureThresholdGate>,
+    calibration_profile: Option<FixtureCalibrationProfile>,
+    policy_refs: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureThresholdGate {
+    name: String,
+    hard_stop_at_least: Option<f64>,
+    continue_below: Option<f64>,
+    require_calibrated: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureCalibrationProfile {
+    name: String,
+    version: u32,
+    breakpoints: Vec<(f64, f64)>,
+}
+
+const REVIEWED_GRADUATION_FIXTURES: &str =
+    include_str!("../../fixtures/deterministic-graduation/reviewed-v1.json");
+const REVIEWED_GRADUATION_FIXTURES_SHA256: &str =
+    "b9fe9f152ecc193c2301e38c84c3b855893e9a899536be2c144a9d9d235d112a";
+
+async fn run_reviewed_fixture_suite(
+    registry: &DeterministicCandidateRegistry,
+    raw: &str,
+) -> Result<()> {
+    let digest = format!("{:x}", Sha256::digest(raw.as_bytes()));
+    if digest != REVIEWED_GRADUATION_FIXTURES_SHA256 {
+        bail!(
+            "reviewed graduation fixtures changed without updating reviewed checksum: {digest}"
+        );
+    }
+
+    let suite: ReviewedGraduationFixtureSuite =
+        serde_json::from_str(raw).context("decode reviewed deterministic graduation fixtures")?;
+    if suite.schema_version != 1 || suite.suite_ref.trim().is_empty() || suite.fixtures.is_empty() {
+        bail!("reviewed graduation fixture suite is invalid");
+    }
+
+    let mut ids = HashSet::new();
+    for fixture in suite.fixtures {
+        if !ids.insert(fixture.id.clone()) {
+            bail!("duplicate reviewed graduation fixture id '{}'", fixture.id);
+        }
+        if fixture.organization_id == 0 || fixture.company_id == 0 {
+            bail!("fixture '{}' has invalid tenant scope", fixture.id);
+        }
+        fixture.decision_type.validate()?;
+        if fixture
+            .policy_refs
+            .iter()
+            .any(|reference| reference.trim().is_empty())
+        {
+            bail!("fixture '{}' contains an empty policy ref", fixture.id);
+        }
+
+        let request_validation = fixture.request.validate();
+        if fixture.expect_validation_error {
+            if request_validation.is_ok() {
+                bail!("fixture '{}' expected request validation failure", fixture.id);
+            }
+            continue;
+        }
+        request_validation.with_context(|| format!("fixture '{}' request invalid", fixture.id))?;
+        if fixture.request.decision_type != fixture.decision_type {
+            bail!("fixture '{}' DecisionType metadata disagrees with request", fixture.id);
+        }
+
+        let candidate = registry
+            .get(&fixture.implementation_ref)
+            .with_context(|| {
+                format!(
+                    "fixture '{}' references unregistered implementation '{}'",
+                    fixture.id, fixture.implementation_ref
+                )
+            })?;
+        if candidate.decision_type() != fixture.decision_type {
+            bail!("fixture '{}' implementation DecisionType mismatch", fixture.id);
+        }
+
+        let actual = candidate
+            .evaluate(&fixture.request)
+            .await
+            .with_context(|| format!("fixture '{}' deterministic evaluation failed", fixture.id))?;
+        actual
+            .validate_against(&fixture.request)
+            .with_context(|| format!("fixture '{}' output invalid", fixture.id))?;
+
+        let expected = fixture
+            .expected
+            .as_ref()
+            .with_context(|| format!("fixture '{}' expected output missing", fixture.id))?;
+        expected.validate_against(&fixture.request)?;
+
+        let threshold_gate = fixture.threshold_gate.map(|gate| ThresholdGatePolicy {
+            name: gate.name,
+            hard_stop_at_least: gate.hard_stop_at_least,
+            continue_below: gate.continue_below,
+            require_calibrated: gate.require_calibrated,
+        });
+        let calibration_profile = fixture.calibration_profile.map(|profile| CalibrationProfile {
+            profile_ref: super::probabilistic::CalibrationProfileRef {
+                name: profile.name,
+                version: profile.version,
+            },
+            breakpoints: profile.breakpoints,
+        });
+        let conformance_policy = DecisionConformancePolicy {
+            numeric_tolerance: NumericTolerance {
+                absolute: fixture.absolute_tolerance,
+                relative: fixture.relative_tolerance,
+            },
+            threshold_gate,
+            calibration_profile,
+        };
+        conformance_policy.validate()?;
+
+        let production = deterministic_to_decision_response(expected.clone(), "fixture-expected@1");
+        let comparison =
+            compare_conformance(&fixture.request, &production, &actual, &conformance_policy)
+                .with_context(|| format!("fixture '{}' conformance comparison failed", fixture.id))?;
+        if !comparison.conformant {
+            bail!(
+                "fixture '{}' ({}) is nonconformant",
+                fixture.id,
+                fixture.category
+            );
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2325,6 +2485,86 @@ mod tests {
         policy.minimum_policy_stability = Some(0.95);
         let result = policy.evaluate(&metrics());
         assert!(result.eligible, "{:?}", result.reasons);
+    }
+
+    struct FixtureChoiceCandidate;
+
+    #[async_trait]
+    impl DeterministicDecisionCandidate for FixtureChoiceCandidate {
+        fn implementation_ref(&self) -> &str {
+            "fixture:choice-by-state@1"
+        }
+
+        fn decision_type(&self) -> DecisionTypeRef {
+            DecisionTypeRef {
+                name: "FixtureChoice".into(),
+                version: 1,
+            }
+        }
+
+        async fn evaluate(
+            &self,
+            request: &DecisionRequest,
+        ) -> Result<DeterministicDecisionResponse> {
+            let choice = request
+                .bounded_state
+                .get("deterministic_choice")
+                .and_then(Value::as_str)
+                .context("deterministic_choice missing")?;
+            Ok(DeterministicDecisionResponse {
+                kind: DecisionKind::Choice,
+                choice: Some(choice.to_string()),
+                score: None,
+                probability: None,
+                rationale: None,
+            })
+        }
+    }
+
+    struct FixtureProbabilityCandidate;
+
+    #[async_trait]
+    impl DeterministicDecisionCandidate for FixtureProbabilityCandidate {
+        fn implementation_ref(&self) -> &str {
+            "fixture:probability-by-state@1"
+        }
+
+        fn decision_type(&self) -> DecisionTypeRef {
+            DecisionTypeRef {
+                name: "FixtureProbability".into(),
+                version: 1,
+            }
+        }
+
+        async fn evaluate(
+            &self,
+            request: &DecisionRequest,
+        ) -> Result<DeterministicDecisionResponse> {
+            let probability = request
+                .bounded_state
+                .get("deterministic_probability")
+                .and_then(Value::as_f64)
+                .context("deterministic_probability missing")?;
+            Ok(DeterministicDecisionResponse {
+                kind: DecisionKind::Probability,
+                choice: None,
+                score: None,
+                probability: Some(probability),
+                rationale: None,
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn deterministic_graduation_conformance_suite() {
+        let registry = DeterministicCandidateRegistry::default();
+        registry.register(Arc::new(FixtureChoiceCandidate)).unwrap();
+        registry
+            .register(Arc::new(FixtureProbabilityCandidate))
+            .unwrap();
+        run_reviewed_fixture_suite(&registry, REVIEWED_GRADUATION_FIXTURES)
+            .await
+            .unwrap();
     }
 
     struct FixedDeterministicCandidate;
