@@ -664,6 +664,17 @@ fn definitions_equal(a: &DecisionTypeDefinition, b: &DecisionTypeDefinition) -> 
         && a.required_evidence_kinds == b.required_evidence_kinds
         && schemas_equal(&a.input_schema, &b.input_schema)
         && schemas_equal(&a.output_schema, &b.output_schema)
+        && a.precedent_policy.enabled == b.precedent_policy.enabled
+        && a.precedent_policy.max_cases == b.precedent_policy.max_cases
+        && a.precedent_policy.minimum_status == b.precedent_policy.minimum_status
+        && a.precedent_policy.require_same_program_step
+            == b.precedent_policy.require_same_program_step
+        && a.precedent_policy.include_patterns == b.precedent_policy.include_patterns
+        && a.graduation_policy == b.graduation_policy
+        && a.verification_policy.required == b.verification_policy.required
+        && a.escalation_policy.min_confidence == b.escalation_policy.min_confidence
+        && a.escalation_policy.always_escalate_risk_classes
+            == b.escalation_policy.always_escalate_risk_classes
 }
 
 fn schemas_equal(a: &StructuralSchema, b: &StructuralSchema) -> bool {
