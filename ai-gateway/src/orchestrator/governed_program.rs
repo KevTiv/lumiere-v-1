@@ -816,9 +816,15 @@ impl GovernedProgramExecutor<'_> {
             match &node.kind {
                 DecisionNode::Compute(compute) => {
                     let deps = dependency_json(&node, &values);
+                    let program_state = state_for_node_with_evidence(
+                        &node,
+                        &values,
+                        &context.bounded_state,
+                        &evidence_overlays,
+                    );
                     let value = self
                         .compute
-                        .compute(&compute.function_ref, &context.bounded_state, &deps)
+                        .compute(&compute.function_ref, &program_state, &deps)
                         .await?;
                     values.insert(node.id.clone(), NodeValue::Json(value));
                     trace.push(step(&node, "deterministic compute completed"));
@@ -1784,10 +1790,19 @@ fn state_for_node_with_evidence(
     let Some(overlays) = evidence_overlays.get(&node.id) else {
         return base;
     };
-    json!({
-        "state": base,
-        "acquired_evidence": overlays,
-    })
+    match base {
+        Value::Object(mut object) => {
+            object.insert(
+                "acquired_evidence".to_string(),
+                Value::Array(overlays.clone()),
+            );
+            Value::Object(object)
+        }
+        other => json!({
+            "value": other,
+            "acquired_evidence": overlays,
+        }),
+    }
 }
 
 fn affected_closure(graph: &DecisionGraph, roots: &[String]) -> std::collections::HashSet<String> {
@@ -2427,6 +2442,80 @@ mod threshold_gate_tests {
             calibration,
         };
         executor.run(&graph(condition), &context()).await
+    }
+
+    #[test]
+    fn affected_closure_invalidates_only_declared_downstream_dependents() {
+        let graph = DecisionGraph {
+            entry: "a".into(),
+            nodes: vec![
+                GraphNode {
+                    id: "a".into(),
+                    depends_on: vec![],
+                    next: Some("b".into()),
+                    kind: DecisionNode::Compute(super::super::decision_graph::ComputeNode {
+                        function_ref: "program_input".into(),
+                    }),
+                },
+                GraphNode {
+                    id: "b".into(),
+                    depends_on: vec!["a".into()],
+                    next: Some("c".into()),
+                    kind: DecisionNode::Compute(super::super::decision_graph::ComputeNode {
+                        function_ref: "dependency_object".into(),
+                    }),
+                },
+                GraphNode {
+                    id: "c".into(),
+                    depends_on: vec!["b".into()],
+                    next: None,
+                    kind: DecisionNode::Generate(super::super::decision_graph::GenerateNode {
+                        format: "x".into(),
+                    }),
+                },
+                GraphNode {
+                    id: "unrelated".into(),
+                    depends_on: vec![],
+                    next: None,
+                    kind: DecisionNode::Compute(super::super::decision_graph::ComputeNode {
+                        function_ref: "program_input".into(),
+                    }),
+                },
+            ],
+        };
+        let affected = affected_closure(&graph, &["a".to_string()]);
+        assert!(affected.contains("a"));
+        assert!(affected.contains("b"));
+        assert!(affected.contains("c"));
+        assert!(!affected.contains("unrelated"));
+    }
+
+    #[test]
+    fn evidence_overlay_preserves_original_object_shape() {
+        let node = GraphNode {
+            id: "decision".into(),
+            depends_on: vec![],
+            next: None,
+            kind: DecisionNode::Probability(ProbabilityDecisionNode {
+                decision_type: super::super::intelligence::DecisionTypeRef {
+                    name: "StockReorderPriority".into(),
+                    version: 1,
+                },
+                question: "q".into(),
+            }),
+        };
+        let overlays = HashMap::from([(
+            "decision".to_string(),
+            vec![json!({"summary":"new evidence"})],
+        )]);
+        let state = state_for_node_with_evidence(
+            &node,
+            &HashMap::new(),
+            &json!({"sku":"SKU-1"}),
+            &overlays,
+        );
+        assert_eq!(state["sku"], "SKU-1");
+        assert_eq!(state["acquired_evidence"][0]["summary"], "new evidence");
     }
 
     #[test]
