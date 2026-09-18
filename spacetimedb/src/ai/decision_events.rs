@@ -209,6 +209,17 @@ pub struct RecordAiDeterministicShadowEventParams {
     pub evidence_json: String,
 }
 
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct RecordAiGraduationAuthorityRollbackParams {
+    pub decision_type_name: String,
+    pub decision_type_version: u32,
+    pub pattern_ref: String,
+    pub implementation_ref: String,
+    pub from_mode: String,
+    pub to_mode: String,
+    pub reasons_json: String,
+}
+
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
 /// Persist one `DecisionProvider::decide` call. Idempotent by
@@ -604,6 +615,113 @@ pub fn record_ai_deterministic_shadow_event(
         write_date: ctx.timestamp,
     });
     Ok(())
+}
+
+/// Persist an append-only DG-09 reduction of deterministic authority.
+/// Rollback can only reduce authority; it can never reactivate or promote.
+#[reducer]
+pub fn record_ai_graduation_authority_rollback(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    params: RecordAiGraduationAuthorityRollbackParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_intelligence_event", "create")?;
+    load_active_run(ctx, organization_id, company_id, run_id)?;
+
+    if params.decision_type_name.trim().is_empty() || params.decision_type_version == 0 {
+        return Err("decision type is required for authority rollback".to_string());
+    }
+    if params.pattern_ref.trim().is_empty() || params.implementation_ref.trim().is_empty() {
+        return Err("pattern_ref and implementation_ref are required".to_string());
+    }
+    if !valid_authority_downgrade(&params.from_mode, &params.to_mode) {
+        return Err("authority rollback must strictly reduce deterministic authority".to_string());
+    }
+    if params.reasons_json.len() > MAX_JSON_FIELD_LEN {
+        return Err("rollback reasons_json is too long".to_string());
+    }
+    let reasons: serde_json::Value = serde_json::from_str(&params.reasons_json)
+        .map_err(|_| "rollback reasons_json must be valid JSON".to_string())?;
+    if !reasons.as_array().is_some_and(|items| !items.is_empty()) {
+        return Err("authority rollback requires at least one reason".to_string());
+    }
+
+    let rollback_key = format!(
+        "graduation-rollback:{}:{}:{}:{}",
+        params.pattern_ref, params.implementation_ref, params.from_mode, params.to_mode
+    );
+    if let Some(existing) = ctx
+        .db
+        .ai_intelligence_event()
+        .ai_intelligence_event_by_run()
+        .filter(&run_id)
+        .find(|event| {
+            event.event_kind == "graduation_rollback"
+                && event.request_hash == rollback_key
+        })
+    {
+        if existing.organization_id == organization_id {
+            return Ok(());
+        }
+        return Err("rollback event belongs to another organization".to_string());
+    }
+
+    let evidence_json = serde_json::json!({
+        "schema_version": 1,
+        "decision_type_name": params.decision_type_name,
+        "decision_type_version": params.decision_type_version,
+        "pattern_ref": params.pattern_ref,
+        "implementation_ref": params.implementation_ref,
+        "from_mode": params.from_mode,
+        "to_mode": params.to_mode,
+        "reasons": reasons,
+    })
+    .to_string();
+
+    ctx.db.ai_intelligence_event().insert(AiIntelligenceEvent {
+        id: 0,
+        organization_id,
+        company_id,
+        run_id,
+        step_no: 0,
+        event_kind: "graduation_rollback".to_string(),
+        decision_type_name: Some(params.decision_type_name),
+        decision_type_version: Some(params.decision_type_version),
+        request_hash: rollback_key,
+        request_json: "{}".to_string(),
+        outcome_kind: "authority_downgrade".to_string(),
+        output_json: evidence_json,
+        confidence: None,
+        provider: "deterministic-governance".to_string(),
+        model: params.implementation_ref,
+        provider_attempt_id: None,
+        input_tokens: 0,
+        output_tokens: 0,
+        verification_status: None,
+        verification_reason: None,
+        escalation_status: "none".to_string(),
+        escalation_reason: None,
+        acceptance_status: "accepted".to_string(),
+        acceptance_reason: Some("automatic authority reduction; never promotion".to_string()),
+        shadow_profile_ref: Some(params.pattern_ref),
+        shadow_error: None,
+        create_uid: ctx.sender(),
+        create_date: ctx.timestamp,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+    });
+    Ok(())
+}
+
+fn valid_authority_downgrade(from: &str, to: &str) -> bool {
+    matches!(
+        (from, to),
+        ("deterministic_only", "deterministic_primary_model_shadow")
+            | ("deterministic_only", "model_primary")
+            | ("deterministic_primary_model_shadow", "model_primary")
+    )
 }
 
 /// Record `VerificationService`'s (or, later, AIH-15's) outcome for one
