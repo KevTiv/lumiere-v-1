@@ -28,7 +28,7 @@ use std::collections::HashMap;
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use stdb_client::StdbClient;
+use stdb_client::{ReducerCall, StdbClient};
 
 use super::intelligence::{DecisionTypeRef, PrecedentSummaryRef};
 
@@ -287,9 +287,7 @@ impl PrecedentStore for StdbPrecedentStore<'_> {
             bail!("request_hash and context_fingerprint are required");
         }
         self.writer
-            .call_reducer(stdb_client::reducer_call!(
-                record_ai_decision_case,
-                json!([
+            .call_reducer(ReducerCall::from_name("record_ai_decision_case", json!([
                     case.organization_id,
                     case.company_id,
                     {
@@ -307,8 +305,7 @@ impl PrecedentStore for StdbPrecedentStore<'_> {
                         "provider_attempt_id": case.provider_attempt_id,
                         "precedent_refs": case.precedent_refs.clone(),
                     }
-                ])
-            ))
+                ])))
             .await
             .context("record governed decision precedent")?;
         let escaped = sql_escape(&case.request_hash);
