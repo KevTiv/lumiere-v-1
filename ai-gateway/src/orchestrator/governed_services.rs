@@ -368,8 +368,8 @@ pub(super) enum CapabilityStepOutcome {
 /// The single composed path a typed `CapabilityStep`, `DecisionStep`
 /// (indirectly, via a `CapabilityProposal` it emits) and an accepted
 /// `ReasoningStep` proposal all use: admission -> recovery lookup ->
-/// execution -> output protection -> recovery record. No caller wires
-/// this into `run.rs`/`agent_loop.rs` yet (GP-04 does).
+/// execution -> output protection -> recovery record. The governed program
+/// runtime and proposal-only reasoning path both reuse this service.
 pub(super) struct GovernedCapabilityService<'a> {
     admission: &'a dyn CapabilityAdmission,
     executor: &'a dyn CapabilityExecutor,
