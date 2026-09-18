@@ -589,7 +589,7 @@ pub async fn run_skill_admitted(
 
     let tool_ctx = ToolContext {
         state: state.clone(),
-        stdb: Arc::new(stdb),
+        stdb: Arc::new(stdb.clone()),
         org_id: req.org_id,
         company_id: req.company_id,
         run_id,
