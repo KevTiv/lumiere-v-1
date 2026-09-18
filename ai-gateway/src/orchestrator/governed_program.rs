@@ -355,6 +355,9 @@ impl GovernedProgramExecutor<'_> {
                 }
                 DecisionNode::Batch(batch) => {
                     let mut work = Vec::with_capacity(batch.members.len());
+                    let values_ref = &values;
+                    let context_ref = context;
+                    let executor_ref = self;
                     for member_id in &batch.members {
                         let member = graph
                             .get(member_id)
