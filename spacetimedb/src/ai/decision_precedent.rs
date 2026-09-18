@@ -294,7 +294,7 @@ pub fn correct_ai_decision_case(
         }
     }
 
-    if let Some(existing) = find_case_by_hash(ctx, organization_id, &params.request_hash) {
+    if let Some(existing) = find_case_by_hash(ctx, organization_id, params.run_id, &params.request_hash) {
         if existing.correction_of == Some(params.original_case_id)
             && existing.selected_json == params.selected_json
         {
