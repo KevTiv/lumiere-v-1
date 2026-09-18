@@ -25,9 +25,10 @@
 
 use std::collections::HashMap;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
-use serde_json::Value;
+use serde_json::{json, Value};
+use stdb_client::StdbClient;
 
 use super::intelligence::{DecisionTypeRef, PrecedentSummaryRef};
 
@@ -68,6 +69,12 @@ pub(super) struct DecisionCaseRecord {
     pub id: u64,
     pub organization_id: u64,
     pub company_id: u64,
+    pub run_id: u64,
+    pub step_no: u32,
+    pub request_hash: String,
+    pub context_fingerprint: String,
+    pub provider_attempt_id: Option<u64>,
+    pub precedent_refs: Vec<u64>,
     pub decision_type: DecisionTypeRef,
     /// e.g. "skill:low_stock_reorder@3" — program + version this case ran under.
     pub program_ref: String,
@@ -223,6 +230,215 @@ impl PrecedentStore for InMemoryPrecedentStore {
     }
 }
 
+
+pub(super) struct StdbPrecedentStore<'a> {
+    pub writer: &'a StdbClient,
+    pub reader: &'a StdbClient,
+}
+
+#[async_trait]
+impl PrecedentStore for StdbPrecedentStore<'_> {
+    async fn retrieve(&self, query: &PrecedentQuery) -> Result<Vec<PrecedentMatch>> {
+        query.validate()?;
+        if !query.policy.enabled {
+            return Ok(Vec::new());
+        }
+        let name = sql_escape(&query.decision_type.name);
+        let sql = format!(
+            "SELECT * FROM ai_decision_case \
+             WHERE organization_id = {} AND company_id = {} \
+             AND decision_type_name = '{}' AND decision_type_version = {} \
+             LIMIT {}",
+            query.organization_id,
+            query.company_id,
+            name,
+            query.decision_type.version,
+            query.policy.max_cases.saturating_mul(8).max(query.policy.max_cases)
+        );
+        let rows = self
+            .reader
+            .query_sql(&sql)
+            .await
+            .context("query governed decision precedent")?;
+        let mut matches = rows
+            .iter()
+            .filter_map(|row| decode_case(row).transpose())
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .filter(|case| passes_hard_filters(case, query))
+            .map(|case| score_case(&case, query))
+            .collect::<Vec<_>>();
+        matches.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.case.recorded_at_micros.cmp(&a.case.recorded_at_micros))
+        });
+        matches.truncate(query.policy.max_cases as usize);
+        Ok(matches)
+    }
+
+    async fn record(&self, case: DecisionCaseRecord) -> Result<u64> {
+        if case.organization_id == 0 || case.company_id == 0 || case.run_id == 0 {
+            bail!("organization_id, company_id and run_id must be nonzero");
+        }
+        case.decision_type.validate()?;
+        if case.request_hash.trim().is_empty() || case.context_fingerprint.trim().is_empty() {
+            bail!("request_hash and context_fingerprint are required");
+        }
+        self.writer
+            .call_reducer(stdb_client::reducer_call!(
+                "record_ai_decision_case",
+                json!([
+                    case.organization_id,
+                    case.company_id,
+                    {
+                        "run_id": case.run_id,
+                        "step_no": case.step_no,
+                        "decision_type_name": case.decision_type.name,
+                        "decision_type_version": case.decision_type.version,
+                        "program_ref": case.program_ref,
+                        "step_id": case.step_id,
+                        "request_hash": case.request_hash,
+                        "context_fingerprint": case.context_fingerprint,
+                        "material_constraints_json": serde_json::to_string(&case.material_constraints)?,
+                        "selected_json": serde_json::to_string(&case.selected)?,
+                        "confidence": case.confidence,
+                        "provider_attempt_id": case.provider_attempt_id,
+                        "precedent_refs": case.precedent_refs,
+                    }
+                ])
+            ))
+            .await
+            .context("record governed decision precedent")?;
+        let escaped = sql_escape(&case.request_hash);
+        let sql = format!(
+            "SELECT id FROM ai_decision_case WHERE organization_id = {} \
+             AND request_hash = '{}' LIMIT 1",
+            case.organization_id, escaped
+        );
+        let rows = self
+            .reader
+            .query_sql(&sql)
+            .await
+            .context("resolve recorded decision case")?;
+        rows.first()
+            .and_then(|row| row_u64(row, "id"))
+            .context("recorded decision case not found after reducer")
+    }
+}
+
+fn decode_case(row: &Value) -> Result<Option<DecisionCaseRecord>> {
+    let Some(id) = row_u64(row, "id") else {
+        return Ok(None);
+    };
+    let status = match row_string(row, "status").as_deref() {
+        Some("observed") => DecisionCaseStatus::Observed,
+        Some("verified") => DecisionCaseStatus::Verified,
+        Some("reviewed") => DecisionCaseStatus::Reviewed,
+        Some("approved") => DecisionCaseStatus::Approved,
+        Some("rejected") => DecisionCaseStatus::Rejected,
+        Some("superseded") => DecisionCaseStatus::Superseded,
+        Some(other) => bail!("unknown decision case status '{other}'"),
+        None => bail!("decision case status is missing"),
+    };
+    let material_constraints = parse_json_field(row, "materialConstraintsJson")?;
+    let selected = parse_json_field(row, "selectedJson")?;
+    Ok(Some(DecisionCaseRecord {
+        id,
+        organization_id: row_u64(row, "organizationId").unwrap_or_default(),
+        company_id: row_u64(row, "companyId").unwrap_or_default(),
+        run_id: row_u64(row, "runId").unwrap_or_default(),
+        step_no: row_u64(row, "stepNo").unwrap_or_default() as u32,
+        request_hash: row_string(row, "requestHash").unwrap_or_default(),
+        context_fingerprint: row_string(row, "contextFingerprint").unwrap_or_default(),
+        provider_attempt_id: row_u64(row, "providerAttemptId"),
+        precedent_refs: row_u64_list(row, "precedentRefs"),
+        decision_type: DecisionTypeRef {
+            name: row_string(row, "decisionTypeName").unwrap_or_default(),
+            version: row_u64(row, "decisionTypeVersion").unwrap_or_default() as u32,
+        },
+        program_ref: row_string(row, "programRef").unwrap_or_default(),
+        step_id: row_string(row, "stepId").unwrap_or_default(),
+        material_constraints,
+        selected,
+        confidence: row_f64(row, "confidence"),
+        status,
+        correction_of: row_u64(row, "correctionOf"),
+        recorded_at_micros: timestamp_micros(
+            row.get("createDate").or_else(|| row.get("create_date")),
+        ),
+    }))
+}
+
+fn parse_json_field(row: &Value, camel: &str) -> Result<Value> {
+    let snake = camel_to_snake(camel);
+    let raw = row
+        .get(camel)
+        .or_else(|| row.get(&snake))
+        .and_then(Value::as_str)
+        .with_context(|| format!("missing JSON field '{camel}'"))?;
+    serde_json::from_str(raw).with_context(|| format!("parse JSON field '{camel}'"))
+}
+
+fn row_u64(row: &Value, key: &str) -> Option<u64> {
+    let snake = camel_to_snake(key);
+    row.get(key)
+        .or_else(|| row.get(&snake))
+        .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
+}
+
+fn row_f64(row: &Value, key: &str) -> Option<f64> {
+    let snake = camel_to_snake(key);
+    row.get(key)
+        .or_else(|| row.get(&snake))
+        .and_then(|value| value.as_f64().or_else(|| value.as_str()?.parse().ok()))
+}
+
+fn row_string(row: &Value, key: &str) -> Option<String> {
+    let snake = camel_to_snake(key);
+    row.get(key)
+        .or_else(|| row.get(&snake))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+fn row_u64_list(row: &Value, key: &str) -> Vec<u64> {
+    let snake = camel_to_snake(key);
+    row.get(key)
+        .or_else(|| row.get(&snake))
+        .and_then(Value::as_array)
+        .map(|items| items.iter().filter_map(Value::as_u64).collect())
+        .unwrap_or_default()
+}
+
+fn timestamp_micros(value: Option<&Value>) -> i64 {
+    let Some(value) = value else { return 0; };
+    value
+        .as_object()
+        .and_then(|object| object.get("__timestamp_micros_since_unix_epoch__"))
+        .and_then(Value::as_i64)
+        .or_else(|| value.as_i64())
+        .unwrap_or_default()
+}
+
+fn camel_to_snake(value: &str) -> String {
+    let mut out = String::with_capacity(value.len() + 4);
+    for ch in value.chars() {
+        if ch.is_ascii_uppercase() {
+            out.push('_');
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+fn sql_escape(value: &str) -> String {
+    value.replace('\'', "''")
+}
+
 fn passes_hard_filters(case: &DecisionCaseRecord, query: &PrecedentQuery) -> bool {
     // No cross-tenant precedent leakage (invariant #17): scope must match
     // exactly, not merely overlap.
@@ -366,6 +582,12 @@ mod tests {
             id,
             organization_id: org,
             company_id: company,
+            run_id: 1,
+            step_no: 1,
+            request_hash: format!("request-{id}"),
+            context_fingerprint: format!("context-{id}"),
+            provider_attempt_id: None,
+            precedent_refs: Vec::new(),
             decision_type: decision_type(),
             program_ref: "skill:low_stock_reorder@3".to_string(),
             step_id: "priority".to_string(),
