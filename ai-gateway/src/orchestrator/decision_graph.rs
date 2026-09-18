@@ -210,6 +210,10 @@ pub(super) struct GraphNode {
     /// Data dependencies: nodes whose output this node consumes. This is
     /// the graph the deterministic-first/no-cycle rule applies to.
     pub depends_on: Vec<NodeId>,
+    /// Normal deterministic control-flow successor. Gates choose one of
+    /// their branch targets instead; bounded Reason nodes may loop through
+    /// loop_back_to.
+    pub next: Option<NodeId>,
     pub kind: DecisionNode,
 }
 
@@ -230,6 +234,9 @@ impl DecisionGraph {
 /// does not repeat the same "does this id exist" check per node kind.
 fn referenced_ids(node: &GraphNode) -> Vec<&str> {
     let mut ids: Vec<&str> = node.depends_on.iter().map(String::as_str).collect();
+    if let Some(next) = node.next.as_deref() {
+        ids.push(next);
+    }
     match &node.kind {
         DecisionNode::Batch(batch) => ids.extend(batch.members.iter().map(String::as_str)),
         DecisionNode::AcquireEvidence(evidence) => {
@@ -264,13 +271,20 @@ fn referenced_ids(node: &GraphNode) -> Vec<&str> {
 /// constructs") — a `Reason` node with `max_iterations == 0` contributes no
 /// edge at all, so it cannot bound anything.
 fn control_flow_edges(node: &GraphNode) -> Vec<&str> {
+    let mut edges = node.next.as_deref().into_iter().collect::<Vec<_>>();
     match &node.kind {
-        DecisionNode::Gate(gate) => gate.branches.iter().map(|b| b.target.as_str()).collect(),
-        DecisionNode::Reason(reason) if reason.max_iterations > 0 => {
-            reason.loop_back_to.as_deref().into_iter().collect()
+        DecisionNode::Gate(gate) => {
+            edges.clear();
+            edges.extend(gate.branches.iter().map(|b| b.target.as_str()));
         }
-        _ => Vec::new(),
+        DecisionNode::Reason(reason) if reason.max_iterations > 0 => {
+            if let Some(target) = reason.loop_back_to.as_deref() {
+                edges.push(target);
+            }
+        }
+        _ => {}
     }
+    edges
 }
 
 /// Compiles/validates a `DecisionGraph` before it may execute (GP-08's
@@ -324,6 +338,9 @@ pub(super) fn validate_graph(graph: &DecisionGraph) -> Result<()> {
 
 
 fn validate_node_contract(node: &GraphNode) -> Result<()> {
+    if matches!(node.kind, DecisionNode::Gate(_)) && node.next.is_some() {
+        bail!("gate node '{}' must use branch targets instead of next", node.id);
+    }
     match &node.kind {
         DecisionNode::Choice(decision) => {
             decision.decision_type.validate()?;
@@ -565,6 +582,7 @@ mod tests {
         GraphNode {
             id: id.to_string(),
             depends_on: depends_on.iter().map(|s| s.to_string()).collect(),
+            next: None,
             kind: DecisionNode::Compute(ComputeNode {
                 function_ref: "sum_open_invoices".to_string(),
             }),
@@ -575,6 +593,7 @@ mod tests {
         GraphNode {
             id: id.to_string(),
             depends_on: depends_on.iter().map(|s| s.to_string()).collect(),
+            next: None,
             kind: DecisionNode::Probability(ProbabilityDecisionNode {
                 decision_type: decision_type("FraudConcern"),
                 question: "How likely is this transaction to be fraudulent?".to_string(),
@@ -586,6 +605,7 @@ mod tests {
         GraphNode {
             id: id.to_string(),
             depends_on: vec![source.to_string()],
+            next: None,
             kind: DecisionNode::Gate(GateNode {
                 source: source.to_string(),
                 branches,
@@ -661,6 +681,7 @@ mod tests {
                 GraphNode {
                     id: "batch".to_string(),
                     depends_on: vec![],
+            next: None,
                     kind: DecisionNode::Batch(DecisionBatchNode {
                         members: vec!["only_one".to_string()],
                     }),
@@ -681,6 +702,7 @@ mod tests {
                 GraphNode {
                     id: "batch".to_string(),
                     depends_on: vec![],
+            next: None,
                     kind: DecisionNode::Batch(DecisionBatchNode {
                         members: vec!["q1".to_string(), "q2".to_string()],
                     }),
@@ -702,6 +724,7 @@ mod tests {
                 GraphNode {
                     id: "batch".to_string(),
                     depends_on: vec![],
+            next: None,
                     kind: DecisionNode::Batch(DecisionBatchNode {
                         members: vec!["q1".to_string(), "q2".to_string()],
                     }),
@@ -777,6 +800,7 @@ mod tests {
                 GraphNode {
                     id: "route_a".to_string(),
                     depends_on: vec!["risk".to_string()],
+            next: None,
                     kind: DecisionNode::Gate(GateNode {
                         source: "risk".to_string(),
                         branches: vec![GateBranch {
@@ -788,6 +812,7 @@ mod tests {
                 GraphNode {
                     id: "route_b".to_string(),
                     depends_on: vec!["risk".to_string()],
+            next: None,
                     kind: DecisionNode::Gate(GateNode {
                         source: "risk".to_string(),
                         branches: vec![GateBranch {
@@ -828,6 +853,7 @@ mod tests {
                 GraphNode {
                     id: "reason".to_string(),
                     depends_on: vec![],
+            next: None,
                     kind: DecisionNode::Reason(ReasonNode {
                         allowed_proposal_kinds: vec!["clarification".to_string()],
                         max_iterations: 3,
@@ -865,6 +891,7 @@ mod tests {
                 GraphNode {
                     id: "reason".to_string(),
                     depends_on: vec![],
+            next: None,
                     kind: DecisionNode::Reason(ReasonNode {
                         allowed_proposal_kinds: vec!["clarification".to_string()],
                         max_iterations: 0,
@@ -883,6 +910,7 @@ mod tests {
             vec![GraphNode {
                 id: "stop".to_string(),
                 depends_on: vec![],
+            next: None,
                 kind: DecisionNode::EarlyStop(EarlyStopNode {
                     source: "missing".to_string(),
                     reason: StopReason::AlreadySettled,
@@ -900,6 +928,7 @@ mod tests {
                 GraphNode {
                     id: "capability".to_string(),
                     depends_on: vec![],
+            next: None,
                     kind: DecisionNode::Capability(CapabilityNode {
                         capability: "erp.search".to_string(),
                     }),
@@ -907,6 +936,7 @@ mod tests {
                 GraphNode {
                     id: "generate".to_string(),
                     depends_on: vec!["capability".to_string()],
+            next: None,
                     kind: DecisionNode::Generate(GenerateNode {
                         format: "prose".to_string(),
                     }),
@@ -922,6 +952,7 @@ mod tests {
         let capability = GraphNode {
             id: "capability".to_string(),
             depends_on: vec![],
+            next: None,
             kind: DecisionNode::Capability(CapabilityNode {
                 capability: "erp.mutate".to_string(),
             }),
@@ -929,6 +960,7 @@ mod tests {
         let verify = GraphNode {
             id: "verify".to_string(),
             depends_on: vec!["capability".to_string()],
+            next: None,
             kind: DecisionNode::Verify(VerifyNode {
                 source: "capability".to_string(),
             }),
@@ -936,6 +968,7 @@ mod tests {
         let approval = GraphNode {
             id: "approval".to_string(),
             depends_on: vec!["verify".to_string()],
+            next: None,
             kind: DecisionNode::RequireApproval(RequireApprovalNode {
                 source: "verify".to_string(),
             }),
@@ -958,6 +991,7 @@ mod tests {
                 GraphNode {
                     id: "evidence".to_string(),
                     depends_on: vec![],
+            next: None,
                     kind: DecisionNode::AcquireEvidence(AcquireEvidenceNode {
                         capability: "erp.search".to_string(),
                         max_rows: 50,
