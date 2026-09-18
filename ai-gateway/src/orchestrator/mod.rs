@@ -3,6 +3,7 @@ mod agent_loop_adapters;
 #[cfg(test)]
 mod agent_loop_tests;
 pub mod intelligence;
+mod intelligence_adapters;
 mod invocation_policy;
 mod progress;
 pub mod run;
