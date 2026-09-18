@@ -207,6 +207,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "apply_organization_reconstruction_batch",
+      "exposure": "denied",
+      "reason": "trusted registered reconstruction service only; never exposed through the session BFF"
+    },
+    {
       "name": "apply_proposal_analysis",
       "exposure": "session",
       "reason": "reviewed proposal reducer: requires proposal write permission and validates organization/company scope before every write"
@@ -220,11 +225,6 @@
       "name": "apply_reconciliation_rules",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
-    },
-    {
-      "name": "apply_organization_reconstruction_batch",
-      "exposure": "denied",
-      "reason": "trusted registered reconstruction service only; never exposed through the session BFF"
     },
     {
       "name": "apply_sale_order_options",
@@ -392,6 +392,11 @@
       "reason": "trusted registered reconstruction service only; never exposed through the session BFF"
     },
     {
+      "name": "bill_timesheets",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "bind_password_reset_token",
       "exposure": "denied",
       "reason": "trusted API-server platform-control path only; never exposed through the session BFF"
@@ -405,11 +410,6 @@
       "name": "bind_user_profile",
       "exposure": "denied",
       "reason": "trusted API-server platform-control path only; never exposed through the session BFF"
-    },
-    {
-      "name": "bill_timesheets",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
       "name": "block_serial",
@@ -457,14 +457,14 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
-      "name": "cancel_message_batch",
-      "exposure": "session",
-      "reason": "invoked by the authenticated messaging command API"
-    },
-    {
       "name": "cancel_manufacturing_order",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "cancel_message_batch",
+      "exposure": "session",
+      "reason": "invoked by the authenticated messaging command API"
     },
     {
       "name": "cancel_payment",
@@ -633,6 +633,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "complete_organization_reconstruction",
+      "exposure": "denied",
+      "reason": "trusted registered reconstruction service only; never exposed through the session BFF"
+    },
+    {
       "name": "complete_performance_review",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -651,11 +656,6 @@
       "name": "complete_productivity_log",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
-    },
-    {
-      "name": "complete_organization_reconstruction",
-      "exposure": "denied",
-      "reason": "trusted registered reconstruction service only; never exposed through the session BFF"
     },
     {
       "name": "complete_tax_deadline",
@@ -786,6 +786,11 @@
       "name": "convert_purchase_requisition_to_po",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "correct_ai_decision_case",
+      "exposure": "denied",
+      "reason": "internal governed-intelligence persistence; never exposed through the session BFF"
     },
     {
       "name": "create_account_account",
@@ -1383,6 +1388,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_operational_message",
+      "exposure": "session",
+      "reason": "invoked by the authenticated messaging command API"
+    },
+    {
       "name": "create_opportunity",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -1859,6 +1869,16 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_user_invite",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "create_user_session",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
       "name": "create_utm_campaign",
       "exposure": "session",
       "reason": "invoked by the CRM browser mutation API and tenant-isolation fixtures"
@@ -1872,16 +1892,6 @@
       "name": "create_utm_source",
       "exposure": "session",
       "reason": "invoked by the CRM browser mutation API and tenant-isolation fixtures"
-    },
-    {
-      "name": "create_user_invite",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site"
-    },
-    {
-      "name": "create_user_session",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
       "name": "create_vendor_credit_from_purchase_return",
@@ -2064,16 +2074,6 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
-      "name": "delete_integration",
-      "exposure": "session",
-      "reason": "reviewed interactive integration action guarded by reducer delete permission and organization ownership checks"
-    },
-    {
-      "name": "delete_record_custom_field_values",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site"
-    },
-    {
       "name": "delete_hr_employee_document",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2082,6 +2082,11 @@
       "name": "delete_import_mapping_template",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "delete_integration",
+      "exposure": "session",
+      "reason": "reviewed interactive integration action guarded by reducer delete permission and organization ownership checks"
     },
     {
       "name": "delete_intercompany_rule",
@@ -2180,6 +2185,11 @@
     },
     {
       "name": "delete_quality_team",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "delete_record_custom_field_values",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
@@ -2350,14 +2360,14 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
-      "name": "fail_quality_check",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site"
-    },
-    {
       "name": "fail_organization_reconstruction",
       "exposure": "denied",
       "reason": "trusted registered reconstruction service only; never exposed through the session BFF"
+    },
+    {
+      "name": "fail_quality_check",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
       "name": "fail_warehouse_sync_intent",
@@ -2985,14 +2995,19 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "project_user_profile",
+      "exposure": "denied",
+      "reason": "trusted API-server platform-control projection only; organization and identity are server-derived"
+    },
+    {
       "name": "promote_ai_skill_version",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
-      "name": "project_user_profile",
+      "name": "propose_ai_decision_pattern",
       "exposure": "denied",
-      "reason": "trusted API-server platform-control projection only; organization and identity are server-derived"
+      "reason": "internal governed-intelligence persistence; never exposed through the session BFF"
     },
     {
       "name": "publish_form_configuration",
@@ -3058,6 +3073,21 @@
       "name": "reconcile_payment_with_invoice",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "record_ai_decision_case",
+      "exposure": "denied",
+      "reason": "internal governed-intelligence persistence; never exposed through the session BFF"
+    },
+    {
+      "name": "record_ai_decision_event",
+      "exposure": "denied",
+      "reason": "internal governed-intelligence persistence; never exposed through the session BFF"
+    },
+    {
+      "name": "record_ai_reasoning_event",
+      "exposure": "denied",
+      "reason": "internal governed-intelligence persistence; never exposed through the session BFF"
     },
     {
       "name": "record_ai_spend",
@@ -3178,6 +3208,11 @@
       "name": "refuse_leave",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "register_ai_decision_type",
+      "exposure": "denied",
+      "reason": "internal governed-intelligence persistence; never exposed through the session BFF"
     },
     {
       "name": "register_iot_device",
@@ -3450,6 +3485,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "save_presentation_module",
+      "exposure": "denied",
+      "reason": "personal draft persistence awaits pinned contract and owner-scoped API admission"
+    },
+    {
       "name": "save_proposal_version",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3493,6 +3533,46 @@
       "name": "set_ai_capability_role_grant",
       "exposure": "session",
       "reason": "invoked by the authenticated AI capability-policy administration boundary"
+    },
+    {
+      "name": "set_ai_decision_case_outcome",
+      "exposure": "denied",
+      "reason": "internal governed-intelligence persistence; never exposed through the session BFF"
+    },
+    {
+      "name": "set_ai_decision_case_status",
+      "exposure": "denied",
+      "reason": "internal governed-intelligence persistence; never exposed through the session BFF"
+    },
+    {
+      "name": "set_ai_decision_case_verification",
+      "exposure": "denied",
+      "reason": "internal governed-intelligence persistence; never exposed through the session BFF"
+    },
+    {
+      "name": "set_ai_decision_pattern_status",
+      "exposure": "denied",
+      "reason": "internal governed-intelligence persistence; never exposed through the session BFF"
+    },
+    {
+      "name": "set_ai_decision_type_active",
+      "exposure": "denied",
+      "reason": "internal governed-intelligence persistence; never exposed through the session BFF"
+    },
+    {
+      "name": "set_ai_intelligence_event_acceptance",
+      "exposure": "denied",
+      "reason": "internal governed-intelligence persistence; never exposed through the session BFF"
+    },
+    {
+      "name": "set_ai_intelligence_event_escalation",
+      "exposure": "denied",
+      "reason": "internal governed-intelligence persistence; never exposed through the session BFF"
+    },
+    {
+      "name": "set_ai_intelligence_event_verification",
+      "exposure": "denied",
+      "reason": "internal governed-intelligence persistence; never exposed through the session BFF"
     },
     {
       "name": "set_ai_reducer_allowlist_enabled",
@@ -3540,11 +3620,6 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
-      "name": "create_operational_message",
-      "exposure": "session",
-      "reason": "invoked by the authenticated messaging command API"
-    },
-    {
       "name": "set_contact_communication_preference",
       "exposure": "session",
       "reason": "invoked by the messaging command API and CRM tenant-isolation fixtures"
@@ -3580,11 +3655,6 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
-      "name": "set_record_custom_field_values",
-      "exposure": "session",
-      "reason": "invoked by an enumerated frontend BFF call site"
-    },
-    {
       "name": "set_intercompany_rule_active",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3601,6 +3671,11 @@
     },
     {
       "name": "set_purchase_approval_delegate",
+      "exposure": "session",
+      "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "set_record_custom_field_values",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
     },
@@ -4445,21 +4520,6 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
-      "name": "update_utm_campaign",
-      "exposure": "session",
-      "reason": "reviewed CRM UTM reducer: requires utm update permission and verifies the campaign belongs to the authenticated organization before writing"
-    },
-    {
-      "name": "update_utm_medium",
-      "exposure": "session",
-      "reason": "reviewed CRM UTM reducer: requires utm update permission and verifies the medium belongs to the authenticated organization before writing"
-    },
-    {
-      "name": "update_utm_source",
-      "exposure": "session",
-      "reason": "reviewed CRM UTM reducer: requires utm update permission and verifies the source belongs to the authenticated organization before writing"
-    },
-    {
       "name": "update_user_email",
       "exposure": "denied",
       "reason": "legacy direct projection mutation retired in favor of canonical platform-control profile updates"
@@ -4474,6 +4534,21 @@
       "name": "update_user_profile",
       "exposure": "denied",
       "reason": "legacy direct projection mutation retired in favor of canonical platform-control profile updates"
+    },
+    {
+      "name": "update_utm_campaign",
+      "exposure": "session",
+      "reason": "reviewed CRM UTM reducer: requires utm update permission and verifies the campaign belongs to the authenticated organization before writing"
+    },
+    {
+      "name": "update_utm_medium",
+      "exposure": "session",
+      "reason": "reviewed CRM UTM reducer: requires utm update permission and verifies the medium belongs to the authenticated organization before writing"
+    },
+    {
+      "name": "update_utm_source",
+      "exposure": "session",
+      "reason": "reviewed CRM UTM reducer: requires utm update permission and verifies the source belongs to the authenticated organization before writing"
     },
     {
       "name": "update_vehicle_position",
@@ -4576,14 +4651,14 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
-      "name": "validate_c_0_organization_ownership_backfill",
-      "exposure": "denied",
-      "reason": "operator-only organization ownership validation; never exposed through the session BFF"
-    },
-    {
       "name": "validate_budget",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "validate_c_0_organization_ownership_backfill",
+      "exposure": "denied",
+      "reason": "operator-only organization ownership validation; never exposed through the session BFF"
     },
     {
       "name": "validate_consolidation",
@@ -4624,11 +4699,6 @@
       "name": "waive_tax_deadline",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
-    },
-    {
-      "name": "save_presentation_module",
-      "exposure": "denied",
-      "reason": "personal draft persistence awaits pinned contract and owner-scoped API admission"
     }
   ]
 }
