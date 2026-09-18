@@ -247,19 +247,27 @@ Support shadow decision providers, candidate policy versions, and deterministic 
 
 ### GP-16 — deterministic graduation
 
-Track decision frequency, provider disagreement, correction rate, verified outcome rate, entropy, precedent consistency, policy stability, and cost.
+Execution plan: `deterministic-graduation-execution-plan.md`.
 
-Promote stable repeated decisions through:
+Track structurally compatible decision cohorts by DecisionType/version and applicability fingerprint. Measure correction rate, verified outcomes, provider disagreement, entropy, precedent consistency, policy/evidence/candidate-set stability, latency and cost.
+
+Promote only through a reviewed, reversible lifecycle:
 
 ```text
 DecisionPattern candidate
- -> fixtures/evals/review
- -> deterministic shadow implementation
- -> comparison against live outcomes
- -> reviewed deterministic program/policy/native ERP behavior
+ -> versioned graduation eligibility policy
+ -> reviewed pattern
+ -> deterministic implementation
+ -> zero-authority deterministic shadow
+ -> fixture + live conformance
+ -> reviewed promotion
+ -> deterministic-primary / model-shadow
+ -> optional deterministic-only
 ```
 
-Graduation remains versioned and reversible.
+Graduation must sit above provider routing rather than masquerading as another provider. Authorization, capability admission, verification, approval and STDB business invariants remain unchanged.
+
+Promotion is never automatic from frequency or cost. Drift, corrections, policy changes or review defects can downgrade deterministic authority back to model-primary without deleting historical evidence.
 
 ### GP-17 — migrate known ERP programs
 
