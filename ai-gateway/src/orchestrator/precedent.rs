@@ -288,7 +288,7 @@ impl PrecedentStore for StdbPrecedentStore<'_> {
         }
         self.writer
             .call_reducer(stdb_client::reducer_call!(
-                "record_ai_decision_case",
+                record_ai_decision_case,
                 json!([
                     case.organization_id,
                     case.company_id,
