@@ -17,8 +17,6 @@ use crate::{
     trusted_context::TrustedOperationContext, web_session::stdb_identity_hex_hint,
 };
 
-const RESOLVE_CAPABILITY_GRANTS_OPERATION_ID: &str = "ai.resolve_capability_grants";
-
 #[derive(Debug, Serialize)]
 struct CapabilityGrant {
     capability_key: String,
@@ -50,12 +48,7 @@ async fn get_capability_grants(
     )
     .await?
     .ok_or(ApiError::Unauthorized)?;
-    let context = TrustedOperationContext::from_session_with_placement(
-        &session,
-        state.client_with_token(&session.stdb_token),
-        RESOLVE_CAPABILITY_GRANTS_OPERATION_ID,
-        &state.organization_placements,
-    )?;
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
     context.require_current_placement(&state.organization_placements)?;
 
     let identity = identity_sql_literal(context.actor_identity()).map_err(ApiError::Internal)?;
