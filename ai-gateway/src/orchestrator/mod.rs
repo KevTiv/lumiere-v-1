@@ -6,6 +6,7 @@ mod decision_graph;
 mod decision_type;
 mod governed_services;
 mod governed_program;
+mod governed_programs;
 pub mod intelligence;
 mod intelligence_adapters;
 mod invocation_policy;
