@@ -20,17 +20,17 @@
 //! exists in this crate; adding one is a separate decision, not a
 //! prerequisite for binding cases to a decision type/version.
 //!
-//! Registry storage is in-memory here, same posture as every prior GP
-//! step: production wiring binds this to a durable, versioned STDB table
-//! (`spacetimedb/src/ai/decision_type_registry.rs`) once client bindings
-//! are regenerated.
+//! The in-memory registry remains for unit tests. Production callers use
+//! `StdbDecisionTypeRegistry`, which binds this contract to the durable,
+//! versioned STDB `ai_decision_type_definition` table.
 
 use std::collections::HashMap;
 use std::sync::RwLock;
 
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
-use serde_json::Value;
+use serde_json::{json, Value};
+use stdb_client::StdbClient;
 
 use super::intelligence::{DecisionKind, DecisionRequest, DecisionResponse, DecisionTypeRef};
 use super::precedent::{DecisionCaseStatus, PrecedentPolicy};
@@ -281,6 +281,341 @@ impl DecisionTypeRegistry for InMemoryDecisionTypeRegistry {
 
     async fn register(&self, definition: DecisionTypeDefinition) -> Result<()> {
         self.register_sync(definition)
+    }
+}
+
+
+pub(super) struct StdbDecisionTypeRegistry<'a> {
+    pub writer: &'a StdbClient,
+    pub reader: &'a StdbClient,
+    pub organization_id: u64,
+}
+
+impl StdbDecisionTypeRegistry<'_> {
+    async fn query_one(&self, sql: &str) -> Result<Option<DecisionTypeDefinition>> {
+        let rows = self
+            .reader
+            .query_sql(sql)
+            .await
+            .context("query durable decision type registry")?;
+        rows.first().map(decode_definition).transpose()
+    }
+}
+
+#[async_trait]
+impl DecisionTypeRegistry for StdbDecisionTypeRegistry<'_> {
+    async fn get(&self, name: &str, version: u32) -> Result<Option<DecisionTypeDefinition>> {
+        if self.organization_id == 0 {
+            bail!("organization_id must be nonzero");
+        }
+        let name = sql_escape(name);
+        self.query_one(&format!(
+            "SELECT * FROM ai_decision_type_definition \
+             WHERE organization_id = {} AND decision_type_name = '{}' \
+             AND decision_type_version = {} AND is_active = true LIMIT 1",
+            self.organization_id, name, version
+        ))
+        .await
+    }
+
+    async fn latest(&self, name: &str) -> Result<Option<DecisionTypeDefinition>> {
+        if self.organization_id == 0 {
+            bail!("organization_id must be nonzero");
+        }
+        let name = sql_escape(name);
+        self.query_one(&format!(
+            "SELECT * FROM ai_decision_type_definition \
+             WHERE organization_id = {} AND decision_type_name = '{}' \
+             AND is_active = true ORDER BY decision_type_version DESC LIMIT 1",
+            self.organization_id, name
+        ))
+        .await
+    }
+
+    async fn register(&self, definition: DecisionTypeDefinition) -> Result<()> {
+        if self.organization_id == 0 {
+            bail!("organization_id must be nonzero");
+        }
+        definition.validate()?;
+        self.writer
+            .call_reducer(stdb_client::reducer_call!(
+                "register_ai_decision_type",
+                json!([
+                    self.organization_id,
+                    {
+                        "decision_type_name": definition.decision_type.name,
+                        "decision_type_version": definition.decision_type.version,
+                        "description": definition.description,
+                        "kind": decision_kind_label(definition.kind),
+                        "input_schema_json": encode_structural_schema(&definition.input_schema).to_string(),
+                        "output_schema_json": encode_structural_schema(&definition.output_schema).to_string(),
+                        "required_evidence_kinds": definition.required_evidence_kinds,
+                        "risk_class": risk_class_label(definition.risk_class),
+                        "precedent_policy_json": encode_precedent_policy(&definition.precedent_policy).to_string(),
+                        "verification_required": definition.verification_policy.required,
+                        "escalation_policy_json": encode_escalation_policy(&definition.escalation_policy).to_string(),
+                    }
+                ])
+            ))
+            .await
+            .context("register durable decision type")
+    }
+}
+
+fn decode_definition(row: &Value) -> Result<DecisionTypeDefinition> {
+    let kind = match row_string(row, "kind").as_deref() {
+        Some("choice") => DecisionKind::Choice,
+        Some("score") => DecisionKind::Score,
+        Some("probability") => DecisionKind::Probability,
+        Some(other) => bail!("unknown decision kind '{other}'"),
+        None => bail!("decision kind is missing"),
+    };
+    let risk_class = match row_string(row, "riskClass").as_deref() {
+        Some("low") => RiskClass::Low,
+        Some("medium") => RiskClass::Medium,
+        Some("high") => RiskClass::High,
+        Some("critical") => RiskClass::Critical,
+        Some(other) => bail!("unknown risk class '{other}'"),
+        None => bail!("risk class is missing"),
+    };
+    let input_schema = decode_structural_schema(&parse_json_string(row, "inputSchemaJson")?)?;
+    let output_schema = decode_structural_schema(&parse_json_string(row, "outputSchemaJson")?)?;
+    let precedent_policy =
+        decode_precedent_policy(&parse_json_string(row, "precedentPolicyJson")?)?;
+    let escalation_policy =
+        decode_escalation_policy(&parse_json_string(row, "escalationPolicyJson")?)?;
+    let definition = DecisionTypeDefinition {
+        decision_type: DecisionTypeRef {
+            name: row_string(row, "decisionTypeName").unwrap_or_default(),
+            version: row_u64(row, "decisionTypeVersion").unwrap_or_default() as u32,
+        },
+        description: row_string(row, "description").unwrap_or_default(),
+        kind,
+        input_schema,
+        output_schema,
+        required_evidence_kinds: row_string_list(row, "requiredEvidenceKinds"),
+        risk_class,
+        precedent_policy,
+        verification_policy: VerificationPolicy {
+            required: row_bool(row, "verificationRequired").unwrap_or(false),
+        },
+        escalation_policy,
+    };
+    definition.validate()?;
+    Ok(definition)
+}
+
+fn encode_structural_schema(schema: &StructuralSchema) -> Value {
+    json!({
+        "fields": schema.fields.iter().map(|field| json!({
+            "name": field.name,
+            "kind": field_kind_label(field.kind),
+            "required": field.required,
+        })).collect::<Vec<_>>()
+    })
+}
+
+fn decode_structural_schema(value: &Value) -> Result<StructuralSchema> {
+    let fields = value
+        .get("fields")
+        .and_then(Value::as_array)
+        .context("structural schema must contain fields")?;
+    let mut decoded = Vec::with_capacity(fields.len());
+    for field in fields {
+        let name = field
+            .get("name")
+            .and_then(Value::as_str)
+            .context("structural schema field name is required")?
+            .to_string();
+        let kind = match field.get("kind").and_then(Value::as_str) {
+            Some("string") => FieldKind::String,
+            Some("number") => FieldKind::Number,
+            Some("boolean") => FieldKind::Boolean,
+            Some("object") => FieldKind::Object,
+            Some("array") => FieldKind::Array,
+            Some(other) => bail!("unknown structural field kind '{other}'"),
+            None => bail!("structural schema field kind is required"),
+        };
+        decoded.push(FieldSchema {
+            name,
+            kind,
+            required: field
+                .get("required")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+        });
+    }
+    Ok(StructuralSchema { fields: decoded })
+}
+
+fn encode_precedent_policy(policy: &PrecedentPolicy) -> Value {
+    json!({
+        "enabled": policy.enabled,
+        "max_cases": policy.max_cases,
+        "minimum_status": decision_case_status_label(policy.minimum_status),
+        "require_same_program_step": policy.require_same_program_step,
+        "include_patterns": policy.include_patterns,
+    })
+}
+
+fn decode_precedent_policy(value: &Value) -> Result<PrecedentPolicy> {
+    let minimum_status = match value.get("minimum_status").and_then(Value::as_str) {
+        Some("observed") => DecisionCaseStatus::Observed,
+        Some("verified") => DecisionCaseStatus::Verified,
+        Some("reviewed") => DecisionCaseStatus::Reviewed,
+        Some("approved") => DecisionCaseStatus::Approved,
+        Some("rejected") => DecisionCaseStatus::Rejected,
+        Some("superseded") => DecisionCaseStatus::Superseded,
+        Some(other) => bail!("unknown precedent minimum status '{other}'"),
+        None => DecisionCaseStatus::Observed,
+    };
+    Ok(PrecedentPolicy {
+        enabled: value.get("enabled").and_then(Value::as_bool).unwrap_or(true),
+        max_cases: value
+            .get("max_cases")
+            .and_then(Value::as_u64)
+            .unwrap_or(5) as u32,
+        minimum_status,
+        require_same_program_step: value
+            .get("require_same_program_step")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        include_patterns: value
+            .get("include_patterns")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+    })
+}
+
+fn encode_escalation_policy(policy: &EscalationPolicy) -> Value {
+    json!({
+        "min_confidence": policy.min_confidence,
+        "always_escalate_risk_classes": policy
+            .always_escalate_risk_classes
+            .iter()
+            .map(|risk| risk_class_label(*risk))
+            .collect::<Vec<_>>(),
+    })
+}
+
+fn decode_escalation_policy(value: &Value) -> Result<EscalationPolicy> {
+    let mut always_escalate_risk_classes = Vec::new();
+    for risk in value
+        .get("always_escalate_risk_classes")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let risk = match risk.as_str() {
+            Some("low") => RiskClass::Low,
+            Some("medium") => RiskClass::Medium,
+            Some("high") => RiskClass::High,
+            Some("critical") => RiskClass::Critical,
+            Some(other) => bail!("unknown escalation risk class '{other}'"),
+            None => bail!("escalation risk class must be a string"),
+        };
+        always_escalate_risk_classes.push(risk);
+    }
+    Ok(EscalationPolicy {
+        min_confidence: value.get("min_confidence").and_then(Value::as_f64),
+        always_escalate_risk_classes,
+    })
+}
+
+fn parse_json_string(row: &Value, key: &str) -> Result<Value> {
+    let raw = row_string(row, key).with_context(|| format!("missing JSON field '{key}'"))?;
+    serde_json::from_str(&raw).with_context(|| format!("parse JSON field '{key}'"))
+}
+
+fn row_string(row: &Value, key: &str) -> Option<String> {
+    let snake = camel_to_snake(key);
+    row.get(key)
+        .or_else(|| row.get(&snake))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+fn row_u64(row: &Value, key: &str) -> Option<u64> {
+    let snake = camel_to_snake(key);
+    row.get(key)
+        .or_else(|| row.get(&snake))
+        .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
+}
+
+fn row_bool(row: &Value, key: &str) -> Option<bool> {
+    let snake = camel_to_snake(key);
+    row.get(key)
+        .or_else(|| row.get(&snake))
+        .and_then(Value::as_bool)
+}
+
+fn row_string_list(row: &Value, key: &str) -> Vec<String> {
+    let snake = camel_to_snake(key);
+    row.get(key)
+        .or_else(|| row.get(&snake))
+        .and_then(Value::as_array)
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn camel_to_snake(value: &str) -> String {
+    let mut out = String::with_capacity(value.len() + 4);
+    for ch in value.chars() {
+        if ch.is_ascii_uppercase() {
+            out.push('_');
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+fn sql_escape(value: &str) -> String {
+    value.replace('\'', "''")
+}
+
+fn decision_kind_label(kind: DecisionKind) -> &'static str {
+    match kind {
+        DecisionKind::Choice => "choice",
+        DecisionKind::Score => "score",
+        DecisionKind::Probability => "probability",
+    }
+}
+
+fn risk_class_label(risk: RiskClass) -> &'static str {
+    match risk {
+        RiskClass::Low => "low",
+        RiskClass::Medium => "medium",
+        RiskClass::High => "high",
+        RiskClass::Critical => "critical",
+    }
+}
+
+fn field_kind_label(kind: FieldKind) -> &'static str {
+    match kind {
+        FieldKind::String => "string",
+        FieldKind::Number => "number",
+        FieldKind::Boolean => "boolean",
+        FieldKind::Object => "object",
+        FieldKind::Array => "array",
+    }
+}
+
+fn decision_case_status_label(status: DecisionCaseStatus) -> &'static str {
+    match status {
+        DecisionCaseStatus::Observed => "observed",
+        DecisionCaseStatus::Verified => "verified",
+        DecisionCaseStatus::Reviewed => "reviewed",
+        DecisionCaseStatus::Approved => "approved",
+        DecisionCaseStatus::Rejected => "rejected",
+        DecisionCaseStatus::Superseded => "superseded",
     }
 }
 
