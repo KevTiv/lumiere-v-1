@@ -727,15 +727,18 @@ pub(super) fn admit_decision(
         bail!("decision response kind does not match the definition's kind");
     }
 
-    let escalation_required = definition
+    let deterministic = response.provider == "deterministic";
+    let risk_escalation = definition
         .escalation_policy
-        .should_escalate(definition.risk_class, response.confidence);
-    let escalation_reason = escalation_required.then(|| {
-        if definition
+        .always_escalate_risk_classes
+        .contains(&definition.risk_class);
+    let confidence_escalation = !deterministic
+        && definition
             .escalation_policy
-            .always_escalate_risk_classes
-            .contains(&definition.risk_class)
-        {
+            .should_escalate(definition.risk_class, response.confidence);
+    let escalation_required = risk_escalation || confidence_escalation;
+    let escalation_reason = escalation_required.then(|| {
+        if risk_escalation {
             format!(
                 "risk class {:?} always requires escalation",
                 definition.risk_class
