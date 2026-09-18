@@ -624,6 +624,9 @@ pub async fn run_skill_admitted(
             &agent,
             intelligence_policy_ref,
         )?;
+        route_resolver
+            .validate_review_independence("ReportAttentionNeed")
+            .await?;
         let intelligence_router = ConfiguredIntelligenceRouter::new(route_resolver);
         let shadow_recorder = StdbShadowDecisionRecorder {
             writer: state.stdb.as_ref(),
