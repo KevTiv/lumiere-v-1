@@ -22,6 +22,7 @@ use super::{
         validate_graph, DecisionGraph, DecisionNode, GateCondition, GraphNode, StopReason,
     },
     decision_type::{admit_decision, DecisionTypeRegistry},
+    graduation::{DecisionResolutionContext, GovernedDecisionResolver},
     governed_services::{
         AnswerAdmissionOutcome, CapabilityStepOutcome, FinalAnswerAdmission,
         GovernedCapabilityService, VerificationOutcome, VerificationService,
@@ -464,6 +465,7 @@ fn reasoning_outcome_model(_outcome: &ReasoningOutcome) -> &'static str {
 
 pub(super) struct GovernedProgramExecutor<'a> {
     pub decision_provider: &'a dyn DecisionProvider,
+    pub decision_resolver: Option<&'a GovernedDecisionResolver<'a>>,
     pub generation_provider: &'a dyn GenerationProvider,
     pub reasoning_provider: &'a dyn ReasoningProvider,
     pub decision_types: &'a dyn DecisionTypeRegistry,
@@ -1134,7 +1136,22 @@ impl GovernedProgramExecutor<'_> {
         };
         request.validate()?;
         let request_hash = decision_request_hash(&request)?;
-        let response = self.decision_provider.decide(request.clone()).await?;
+        let response = if let Some(resolver) = self.decision_resolver {
+            resolver
+                .decide(
+                    &DecisionResolutionContext {
+                        organization_id: context.organization_id,
+                        company_id: context.company_id,
+                        run_id: context.run_id,
+                        program_ref: context.program_ref.clone(),
+                        step_id: node.id.clone(),
+                    },
+                    request.clone(),
+                )
+                .await?
+        } else {
+            self.decision_provider.decide(request.clone()).await?
+        };
         response.validate_against(&request)?;
         let admission = admit_decision(&definition, &request, &response)?;
 
@@ -1825,6 +1842,7 @@ mod threshold_gate_tests {
         let recorder = NoopIntelligenceEventRecorder;
         let executor = GovernedProgramExecutor {
             decision_provider: &decision_provider,
+            decision_resolver: None,
             generation_provider: &generation_provider,
             reasoning_provider: &reasoning_provider,
             decision_types: &decision_types,
@@ -2076,6 +2094,7 @@ mod threshold_gate_tests {
         let calibration = InMemoryCalibrationProfileStore::new();
         let executor = GovernedProgramExecutor {
             decision_provider: &decision_provider,
+            decision_resolver: None,
             generation_provider: &generation_provider,
             reasoning_provider: &reasoning_provider,
             decision_types: &decision_types,
