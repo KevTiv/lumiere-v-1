@@ -123,7 +123,7 @@ struct PendingApprovalCheckpoint {
     node_id: String,
     capability: String,
     reason: String,
-    draft_id: u64,
+    draft_id: Option<u64>,
     next_node: String,
 }
 
@@ -704,13 +704,27 @@ impl GovernedProgramExecutor<'_> {
         let max_steps = graph.nodes.len().saturating_mul(16).max(32);
 
         if let Some(pending) = pending_approval {
-            match self.capabilities.approval_status(pending.draft_id).await? {
+            let Some(draft_id) = pending.draft_id else {
+                return Ok(outcome(
+                    GovernedProgramStop::PendingApproval {
+                        capability: pending.capability,
+                        reason: pending.reason,
+                        draft_id: None,
+                    },
+                    None,
+                    values,
+                    trace,
+                    decision_calls,
+                    capability_calls,
+                ));
+            };
+            match self.capabilities.approval_status(draft_id).await? {
                 super::governed_services::ApprovalStatus::Approved => {
                     values.insert(
                         pending.node_id.clone(),
                         NodeValue::Json(json!({
                             "approved": true,
-                            "draft_id": pending.draft_id,
+                            "draft_id": draft_id,
                             "capability": pending.capability,
                         })),
                     );
@@ -726,7 +740,7 @@ impl GovernedProgramExecutor<'_> {
                         GovernedProgramStop::PendingApproval {
                             capability: pending.capability,
                             reason: pending.reason,
-                            draft_id: Some(pending.draft_id),
+                            draft_id: Some(draft_id),
                         },
                         None,
                         values,
@@ -1323,12 +1337,65 @@ impl GovernedProgramExecutor<'_> {
                         capability_calls,
                     ));
                 }
-                DecisionNode::RequireApproval(_) => {
-                    return Ok(outcome(
-                        GovernedProgramStop::ReviewRequired(format!(
-                            "explicit approval node '{}' requires human approval",
-                            node.id
+                DecisionNode::RequireApproval(approval) => {
+                    let source = values.get(&approval.source).with_context(|| {
+                        format!("approval source '{}' has no output", approval.source)
+                    })?;
+                    let proposal = CapabilityProposal {
+                        capability: approval.capability.clone(),
+                        arguments: source.as_json(),
+                        rationale: Some(format!(
+                            "explicit approval gate '{}' for capability '{}'",
+                            node.id, approval.capability
                         )),
+                    };
+                    let request = match self
+                        .capabilities
+                        .request_explicit_approval(context.run_id, &proposal, capability_calls)
+                        .await?
+                    {
+                        Ok(request) => request,
+                        Err(reason) => {
+                            return Ok(outcome(
+                                GovernedProgramStop::Denied(reason),
+                                None,
+                                values,
+                                trace,
+                                decision_calls,
+                                capability_calls,
+                            ));
+                        }
+                    };
+                    let next_node = node.next.clone().with_context(|| {
+                        format!("approval node '{}' has no continuation", node.id)
+                    })?;
+                    let pending = PendingApprovalCheckpoint {
+                        node_id: node.id.clone(),
+                        capability: request.capability.clone(),
+                        reason: request.reason.clone(),
+                        draft_id: request.draft_id,
+                        next_node,
+                    };
+                    self.checkpoint(
+                        context,
+                        &graph_hash,
+                        &node.id,
+                        &values,
+                        &trace,
+                        event_step,
+                        decision_calls,
+                        capability_calls,
+                        &reason_iterations,
+                        Some(pending),
+                        "awaiting_approval",
+                    )
+                    .await?;
+                    return Ok(outcome(
+                        GovernedProgramStop::PendingApproval {
+                            capability: request.capability,
+                            reason: request.reason,
+                            draft_id: request.draft_id,
+                        },
                         None,
                         values,
                         trace,
