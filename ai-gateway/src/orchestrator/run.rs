@@ -35,6 +35,10 @@ use super::{
         run_finalization, run_recorded_loop, AuthorizedLoopTools, RunFinalization,
     },
     decision_type::{register_builtin_decision_types, StdbDecisionTypeRegistry},
+    graduation::{
+        DeterministicCandidateRegistry, GovernedDecisionResolver,
+        StdbDecisionResolutionPolicy, StdbModelShadowRecorder,
+    },
     governed_program::{
         graph_requests_generated_capabilities, BuiltinComputeService, GovernedProgramContext,
         GovernedProgramExecutor, GovernedProgramStop, StdbIntelligenceEventRecorder,
@@ -716,8 +720,22 @@ pub async fn run_skill_admitted(
         let calibration = StdbCalibrationProfileStore {
             reader: tool_ctx.stdb.as_ref(),
         };
+        let deterministic_candidates = DeterministicCandidateRegistry::default();
+        let decision_resolution_policy = StdbDecisionResolutionPolicy {
+            reader: tool_ctx.stdb.as_ref(),
+        };
+        let model_shadow_recorder = StdbModelShadowRecorder {
+            writer: state.stdb.as_ref(),
+        };
+        let decision_resolver = GovernedDecisionResolver {
+            policy: &decision_resolution_policy,
+            candidates: &deterministic_candidates,
+            model: &decision_provider,
+            model_shadow_recorder: &model_shadow_recorder,
+        };
         let executor = GovernedProgramExecutor {
             decision_provider: &decision_provider,
+            decision_resolver: Some(&decision_resolver),
             generation_provider: &generation_provider,
             reasoning_provider: &reasoning_provider,
             decision_types: &decision_types,
