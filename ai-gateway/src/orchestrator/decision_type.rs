@@ -995,6 +995,28 @@ mod tests {
         assert!(schema.validate(&json!({})).is_ok());
     }
 
+    #[test]
+    fn deterministic_response_skips_model_confidence_floor_but_keeps_risk_escalation() {
+        let mut definition = choice_definition();
+        definition.escalation_policy.min_confidence = Some(0.9);
+
+        let req = request(definition.decision_type.clone(), json!({"amount": 100}));
+        let mut deterministic = response(None);
+        deterministic.provider = "deterministic".to_string();
+        deterministic.model = "deterministic:test@1".to_string();
+
+        let admitted = admit_decision(&definition, &req, &deterministic).unwrap();
+        assert!(!admitted.escalation_required);
+
+        definition.risk_class = RiskClass::Critical;
+        definition
+            .escalation_policy
+            .always_escalate_risk_classes
+            .push(RiskClass::Critical);
+        let admitted = admit_decision(&definition, &req, &deterministic).unwrap();
+        assert!(admitted.escalation_required);
+    }
+
     #[tokio::test]
     async fn registry_round_trips_and_is_immutable_per_version() {
         let registry = InMemoryDecisionTypeRegistry::new();
