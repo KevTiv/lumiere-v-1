@@ -944,6 +944,62 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn required_distinct_review_provider_rejects_same_provider() {
+        let store = FakeStore::new();
+        store.insert_profile(9, profile("decision", IntelligenceRole::Decision, "decision-model"));
+        store.insert_profile(9, profile("review", IntelligenceRole::Review, "review-model"));
+        let mut policy = policy();
+        policy.overrides.insert(
+            "PaymentDisposition".to_string(),
+            DecisionTypeOverride {
+                primary: None,
+                review: None,
+                shadows: Vec::new(),
+                require_distinct_review_profile: true,
+                require_distinct_review_provider: true,
+                prefer_distinct_review_provider: false,
+            },
+        );
+        store.insert_policy(9, policy);
+
+        let resolver = IntelligenceRouteResolver::new_governed(&store, 9, &agent(), None).unwrap();
+        let error = resolver
+            .validate_review_independence("PaymentDisposition")
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("review provider must be distinct"));
+    }
+
+    #[tokio::test]
+    async fn required_distinct_review_provider_accepts_different_provider() {
+        let store = FakeStore::new();
+        let decision = profile("decision", IntelligenceRole::Decision, "decision-model");
+        let mut review = profile("review", IntelligenceRole::Review, "review-model");
+        review.provider = "gemini".to_string();
+        store.insert_profile(9, decision);
+        store.insert_profile(9, review);
+        let mut policy = policy();
+        policy.overrides.insert(
+            "PaymentDisposition".to_string(),
+            DecisionTypeOverride {
+                primary: None,
+                review: None,
+                shadows: Vec::new(),
+                require_distinct_review_profile: true,
+                require_distinct_review_provider: true,
+                prefer_distinct_review_provider: false,
+            },
+        );
+        store.insert_policy(9, policy);
+
+        let resolver = IntelligenceRouteResolver::new_governed(&store, 9, &agent(), None).unwrap();
+        resolver
+            .validate_review_independence("PaymentDisposition")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
     async fn governed_resolver_fails_closed_when_default_policy_is_absent() {
         let store = InMemoryModelConfigurationStore::new();
         let resolver =
