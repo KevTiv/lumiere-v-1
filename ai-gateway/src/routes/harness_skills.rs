@@ -58,7 +58,7 @@ pub async fn post_governed_bootstrap(
         req.intelligence_policy_ref.as_deref(),
     )
     .await
-    .map_err(AppError::Internal)?;
+    .map_err(|error| AppError::Internal(error.to_string()))?;
     Ok(Json(result))
 }
 
