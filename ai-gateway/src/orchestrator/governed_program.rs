@@ -139,7 +139,9 @@ struct GovernedProgramCheckpoint {
     decision_calls: u32,
     capability_calls: u32,
     reason_iterations: HashMap<String, u32>,
+    #[serde(default)]
     evidence_overlays: HashMap<String, Vec<Value>>,
+    #[serde(default)]
     evidence_acquisitions: HashMap<String, u32>,
     pending_approval: Option<PendingApprovalCheckpoint>,
 }
