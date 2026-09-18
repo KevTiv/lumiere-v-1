@@ -5,7 +5,7 @@
 //! routing, execute capabilities, or mutate ERP state.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, OnceLock, RwLock};
 
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
@@ -81,6 +81,77 @@ pub(super) trait DeterministicDecisionCandidate: Send + Sync {
     async fn evaluate(&self, request: &DecisionRequest) -> Result<DeterministicDecisionResponse>;
 }
 
+struct ReportAttentionInputProbabilityCandidate;
+
+#[async_trait]
+impl DeterministicDecisionCandidate for ReportAttentionInputProbabilityCandidate {
+    fn implementation_ref(&self) -> &str {
+        "deterministic:report-attention-input-probability@1"
+    }
+
+    fn decision_type(&self) -> DecisionTypeRef {
+        DecisionTypeRef {
+            name: "ReportAttentionNeed".to_string(),
+            version: 1,
+        }
+    }
+
+    async fn evaluate(&self, request: &DecisionRequest) -> Result<DeterministicDecisionResponse> {
+        let probability = request
+            .bounded_state
+            .get("deterministic_attention_probability")
+            .and_then(Value::as_f64)
+            .context(
+                "deterministic_attention_probability is required by report-attention deterministic implementation",
+            )?;
+        Ok(DeterministicDecisionResponse {
+            kind: DecisionKind::Probability,
+            choice: None,
+            score: None,
+            probability: Some(probability),
+            rationale: Some(
+                "program-owned deterministic attention probability from bounded state".to_string(),
+            ),
+        })
+    }
+}
+
+struct PaymentDispositionInputCandidate;
+
+#[async_trait]
+impl DeterministicDecisionCandidate for PaymentDispositionInputCandidate {
+    fn implementation_ref(&self) -> &str {
+        "deterministic:payment-disposition-input@1"
+    }
+
+    fn decision_type(&self) -> DecisionTypeRef {
+        DecisionTypeRef {
+            name: "PaymentDisposition".to_string(),
+            version: 1,
+        }
+    }
+
+    async fn evaluate(&self, request: &DecisionRequest) -> Result<DeterministicDecisionResponse> {
+        let choice = request
+            .bounded_state
+            .get("deterministic_payment_disposition")
+            .and_then(Value::as_str)
+            .context(
+                "deterministic_payment_disposition is required by payment disposition implementation",
+            )?
+            .to_string();
+        Ok(DeterministicDecisionResponse {
+            kind: DecisionKind::Choice,
+            choice: Some(choice),
+            score: None,
+            probability: None,
+            rationale: Some(
+                "program-owned deterministic payment disposition from bounded state".to_string(),
+            ),
+        })
+    }
+}
+
 #[derive(Default)]
 pub(super) struct DeterministicCandidateRegistry {
     candidates: RwLock<HashMap<String, Arc<dyn DeterministicDecisionCandidate>>>,
@@ -109,6 +180,22 @@ impl DeterministicCandidateRegistry {
             .get(implementation_ref)
             .cloned()
     }
+}
+
+static PRODUCTION_DETERMINISTIC_CANDIDATES: OnceLock<DeterministicCandidateRegistry> =
+    OnceLock::new();
+
+pub(super) fn production_deterministic_candidates() -> &'static DeterministicCandidateRegistry {
+    PRODUCTION_DETERMINISTIC_CANDIDATES.get_or_init(|| {
+        let registry = DeterministicCandidateRegistry::default();
+        registry
+            .register(Arc::new(ReportAttentionInputProbabilityCandidate))
+            .expect("unique built-in deterministic implementation ref");
+        registry
+            .register(Arc::new(PaymentDispositionInputCandidate))
+            .expect("unique built-in deterministic implementation ref");
+        registry
+    })
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -2565,6 +2652,19 @@ mod tests {
         run_reviewed_fixture_suite(&registry, REVIEWED_GRADUATION_FIXTURES)
             .await
             .unwrap();
+    }
+
+    #[test]
+    fn production_deterministic_catalog_is_process_stable_and_versioned() {
+        let first = production_deterministic_candidates() as *const _;
+        let second = production_deterministic_candidates() as *const _;
+        assert_eq!(first, second);
+        assert!(production_deterministic_candidates()
+            .get("deterministic:report-attention-input-probability@1")
+            .is_some());
+        assert!(production_deterministic_candidates()
+            .get("deterministic:payment-disposition-input@1")
+            .is_some());
     }
 
     struct FixedDeterministicCandidate;
