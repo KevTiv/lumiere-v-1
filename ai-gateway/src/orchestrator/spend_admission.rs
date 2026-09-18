@@ -269,6 +269,7 @@ pub(super) struct SpendAdmittedLlm<'a> {
     ledger: &'a dyn SpendLedger,
     binding: SpendBinding,
     clock: fn() -> DateTime<Utc>,
+    call_scope: u32,
     next_call: AtomicU32,
 }
 
@@ -278,7 +279,16 @@ impl<'a> SpendAdmittedLlm<'a> {
         ledger: &'a dyn SpendLedger,
         binding: SpendBinding,
     ) -> Result<Self> {
-        Self::with_clock(inner, ledger, binding, Utc::now)
+        Self::with_clock_and_scope(inner, ledger, binding, Utc::now, 0)
+    }
+
+    pub fn new_scoped(
+        inner: &'a dyn LlmCompletion,
+        ledger: &'a dyn SpendLedger,
+        binding: SpendBinding,
+        call_scope: u32,
+    ) -> Result<Self> {
+        Self::with_clock_and_scope(inner, ledger, binding, Utc::now, call_scope)
     }
 
     fn with_clock(
@@ -287,6 +297,16 @@ impl<'a> SpendAdmittedLlm<'a> {
         binding: SpendBinding,
         clock: fn() -> DateTime<Utc>,
     ) -> Result<Self> {
+        Self::with_clock_and_scope(inner, ledger, binding, clock, 0)
+    }
+
+    fn with_clock_and_scope(
+        inner: &'a dyn LlmCompletion,
+        ledger: &'a dyn SpendLedger,
+        binding: SpendBinding,
+        clock: fn() -> DateTime<Utc>,
+        call_scope: u32,
+    ) -> Result<Self> {
         if binding.organization_id == 0
             || binding.company_id == 0
             || binding.agent_id == 0
@@ -294,11 +314,15 @@ impl<'a> SpendAdmittedLlm<'a> {
         {
             bail!("spend admission requires organization, company, agent and durable run ids");
         }
+        if call_scope > 9_999 {
+            bail!("spend call scope must be <= 9999");
+        }
         Ok(Self {
             inner,
             ledger,
             binding,
             clock,
+            call_scope,
             next_call: AtomicU32::new(1),
         })
     }
@@ -409,7 +433,12 @@ impl LlmCompletion for SpendAdmittedLlm<'_> {
     async fn complete(&self, req: LlmRequest) -> Result<LlmResponse> {
         let organization_id = self.binding.organization_id;
         let call = self.next_call.fetch_add(1, Ordering::SeqCst);
-        let key = request_key(RequestKind::Spend, self.binding.run_id, call, 0)?;
+        let step = self
+            .call_scope
+            .checked_mul(100_000)
+            .and_then(|base| base.checked_add(call))
+            .context("spend request key call scope overflow")?;
+        let key = request_key(RequestKind::Spend, self.binding.run_id, step, 0)?;
         let reservation = self.admit(&req, &key).await?;
         let attempt = self.accept(&reservation, &key).await?;
         self.ledger
