@@ -301,3 +301,30 @@ pub async fn run_governed_llm_skill(
         audit: audit.into_trail(),
     })
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gp17_manifests_authorize_catalog_runtime_tools() {
+        let process = process_research_manifest();
+        assert!(process.allowed_tools.iter().any(|tool| tool == "analytics_summary"));
+        assert!(process.allowed_tools.iter().any(|tool| tool == "erp_search"));
+        assert!(process.allowed_capabilities.contains(&Capability::NamedRead));
+
+        let supplier = supplier_discovery_manifest();
+        assert!(supplier.allowed_tools.iter().any(|tool| tool == "erp_search"));
+        assert!(supplier.allowed_tools.iter().any(|tool| tool == "web_search"));
+        assert!(supplier.allowed_capabilities.contains(&Capability::Network));
+
+        let price = price_search_manifest();
+        assert!(price.allowed_tools.iter().any(|tool| tool == "erp_search"));
+        assert!(price.allowed_tools.iter().any(|tool| tool == "web_search"));
+        assert!(
+            !price.allowed_capabilities.contains(&Capability::ActionExecute),
+            "first GP-17 price-search graph must remain non-executing"
+        );
+    }
+}
