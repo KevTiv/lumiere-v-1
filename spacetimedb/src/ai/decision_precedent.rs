@@ -837,3 +837,68 @@ fn case_payload_matches(existing: &AiDecisionCase, params: &RecordAiDecisionCase
         && existing.provider_attempt_id == params.provider_attempt_id
         && existing.precedent_refs == params.precedent_refs
 }
+
+
+#[cfg(test)]
+mod graduation_pattern_tests {
+    use super::*;
+
+    fn applicability() -> PatternApplicabilityEvidence {
+        PatternApplicabilityEvidence {
+            schema_version: 1,
+            applicability_fingerprint: "sha256:test".to_string(),
+            company_id: 7,
+            program_ref: "skill:test@1".to_string(),
+            step_id: "decision".to_string(),
+            context_fingerprint: "context-v1".to_string(),
+            candidate_set_hash: "candidate-set-v1".to_string(),
+            evidence_shape: "amount:number|currency:string".to_string(),
+            graduation_policy_ref: "decision-type:Test@1/graduation".to_string(),
+            material_policy_refs: vec![],
+        }
+    }
+
+    fn metrics() -> PatternMetricsSnapshot {
+        PatternMetricsSnapshot {
+            schema_version: 1,
+            observed_cases: 2,
+            verified_cases: 2,
+            reviewed_cases: 1,
+            correction_rate: 0.0,
+            verified_outcome_rate: 1.0,
+            provider_disagreement_rate: Some(0.0),
+            shadow_cases: 2,
+            decision_entropy: 0.0,
+            precedent_consistency: 1.0,
+            policy_stability_rate: None,
+            evidence_shape_stability: 1.0,
+            candidate_set_stability: Some(1.0),
+            average_cost_microunits: Some(10),
+            average_latency_ms: Some(20),
+            proposed_expression_kind: "lookup_policy".to_string(),
+        }
+    }
+
+    #[test]
+    fn hardened_applicability_requires_versioned_decision_type_policy_ref() {
+        assert!(validate_pattern_applicability(&applicability()).is_ok());
+
+        let mut invalid = applicability();
+        invalid.graduation_policy_ref = "model-profile:cheap@1".to_string();
+        assert!(validate_pattern_applicability(&invalid).is_err());
+    }
+
+    #[test]
+    fn hardened_metrics_reject_incoherent_case_counts() {
+        assert!(validate_pattern_metrics(&metrics(), 0.0).is_ok());
+
+        let mut invalid = metrics();
+        invalid.verified_cases = 3;
+        assert!(validate_pattern_metrics(&invalid, 0.0).is_err());
+    }
+
+    #[test]
+    fn hardened_metrics_reject_top_level_correction_rate_drift() {
+        assert!(validate_pattern_metrics(&metrics(), 0.1).is_err());
+    }
+}
