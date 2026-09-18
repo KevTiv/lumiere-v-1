@@ -185,7 +185,7 @@ impl IntelligenceEventRecorder for StdbIntelligenceEventRecorder<'_> {
     ) -> Result<()> {
         self.writer
             .call_reducer(stdb_client::reducer_call!(
-                "record_ai_decision_event",
+                record_ai_decision_event,
                 json!([
                     context.organization_id,
                     context.company_id,
