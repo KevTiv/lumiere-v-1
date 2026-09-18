@@ -3,6 +3,8 @@
 //! Known ERP workflows belong here as explicit typed graphs. Providers never
 //! author these graphs at runtime.
 
+use crate::harness::{manifest::Capability, policy_engine::PlannedToolCall};
+
 use super::{
     decision_graph::{
         AcquireEvidenceNode, CapabilityNode, ChoiceDecisionNode, ComputeNode, DecisionGraph,
@@ -328,6 +330,214 @@ pub(super) fn consequential_mutation_reference_graph() -> DecisionGraph {
     }
 }
 
+pub(super) struct GovernedProgramCatalogEntry {
+    pub program_ref: &'static str,
+    pub graph: DecisionGraph,
+    pub review_independence_key: &'static str,
+    pub reviewed_calls: Vec<PlannedToolCall>,
+}
+
+pub(super) fn governed_program_for_skill(
+    skill_key: &str,
+) -> Option<GovernedProgramCatalogEntry> {
+    match skill_key {
+        "report_analysis" => Some(GovernedProgramCatalogEntry {
+            program_ref: REPORT_ANALYSIS_PROGRAM_REF,
+            graph: report_analysis_graph(),
+            review_independence_key: "ReportAttentionNeed",
+            reviewed_calls: vec![named_read_call("analytics_summary")],
+        }),
+        "process_research" => Some(GovernedProgramCatalogEntry {
+            program_ref: "skill:process_research@1",
+            graph: process_research_graph(),
+            review_independence_key: "RunReviewDisposition",
+            reviewed_calls: vec![
+                named_read_call("analytics_summary"),
+                named_read_call("erp_search"),
+            ],
+        }),
+        "supplier_discovery" => Some(GovernedProgramCatalogEntry {
+            program_ref: "skill:supplier_discovery@1",
+            graph: supplier_discovery_graph(),
+            review_independence_key: "RunReviewDisposition",
+            reviewed_calls: vec![
+                named_read_call("erp_search"),
+                network_call("web_search"),
+            ],
+        }),
+        "price_search" => Some(GovernedProgramCatalogEntry {
+            program_ref: "skill:price_search@1",
+            graph: price_search_graph(),
+            review_independence_key: "RunReviewDisposition",
+            reviewed_calls: vec![
+                named_read_call("erp_search"),
+                network_call("web_search"),
+            ],
+        }),
+        _ => None,
+    }
+}
+
+fn named_read_call(tool_name: &str) -> PlannedToolCall {
+    PlannedToolCall {
+        tool_name: tool_name.to_string(),
+        capability: Capability::NamedRead,
+        named_resource: None,
+    }
+}
+
+fn network_call(tool_name: &str) -> PlannedToolCall {
+    PlannedToolCall {
+        tool_name: tool_name.to_string(),
+        capability: Capability::Network,
+        named_resource: None,
+    }
+}
+
+pub(super) fn process_research_graph() -> DecisionGraph {
+    DecisionGraph {
+        entry: "analytics".to_string(),
+        nodes: vec![
+            GraphNode {
+                id: "analytics".to_string(),
+                depends_on: Vec::new(),
+                next: Some("verify_analytics".to_string()),
+                kind: DecisionNode::Capability(CapabilityNode {
+                    capability: "analytics_summary".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "verify_analytics".to_string(),
+                depends_on: vec!["analytics".to_string()],
+                next: Some("erp_context".to_string()),
+                kind: DecisionNode::Verify(VerifyNode {
+                    source: "analytics".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "erp_context".to_string(),
+                depends_on: Vec::new(),
+                next: Some("verify_context".to_string()),
+                kind: DecisionNode::Capability(CapabilityNode {
+                    capability: "erp_search".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "verify_context".to_string(),
+                depends_on: vec!["erp_context".to_string()],
+                next: Some("generate".to_string()),
+                kind: DecisionNode::Verify(VerifyNode {
+                    source: "erp_context".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "generate".to_string(),
+                depends_on: vec!["analytics".to_string(), "erp_context".to_string()],
+                next: None,
+                kind: DecisionNode::Generate(GenerateNode {
+                    format: "concise operations research summary identifying bottlenecks, delays, state distributions, and evidence-backed anomalies".to_string(),
+                }),
+            },
+        ],
+    }
+}
+
+pub(super) fn supplier_discovery_graph() -> DecisionGraph {
+    DecisionGraph {
+        entry: "erp_context".to_string(),
+        nodes: vec![
+            GraphNode {
+                id: "erp_context".to_string(),
+                depends_on: Vec::new(),
+                next: Some("verify_erp".to_string()),
+                kind: DecisionNode::Capability(CapabilityNode {
+                    capability: "erp_search".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "verify_erp".to_string(),
+                depends_on: vec!["erp_context".to_string()],
+                next: Some("web_candidates".to_string()),
+                kind: DecisionNode::Verify(VerifyNode {
+                    source: "erp_context".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "web_candidates".to_string(),
+                depends_on: Vec::new(),
+                next: Some("verify_web".to_string()),
+                kind: DecisionNode::Capability(CapabilityNode {
+                    capability: "web_search".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "verify_web".to_string(),
+                depends_on: vec!["web_candidates".to_string()],
+                next: Some("generate".to_string()),
+                kind: DecisionNode::Verify(VerifyNode {
+                    source: "web_candidates".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "generate".to_string(),
+                depends_on: vec!["erp_context".to_string(), "web_candidates".to_string()],
+                next: None,
+                kind: DecisionNode::Generate(GenerateNode {
+                    format: "ranked supplier shortlist grounded in authorized ERP vendor context and retrieved web evidence, with credibility and region-fit caveats".to_string(),
+                }),
+            },
+        ],
+    }
+}
+
+pub(super) fn price_search_graph() -> DecisionGraph {
+    DecisionGraph {
+        entry: "erp_context".to_string(),
+        nodes: vec![
+            GraphNode {
+                id: "erp_context".to_string(),
+                depends_on: Vec::new(),
+                next: Some("verify_erp".to_string()),
+                kind: DecisionNode::Capability(CapabilityNode {
+                    capability: "erp_search".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "verify_erp".to_string(),
+                depends_on: vec!["erp_context".to_string()],
+                next: Some("web_prices".to_string()),
+                kind: DecisionNode::Verify(VerifyNode {
+                    source: "erp_context".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "web_prices".to_string(),
+                depends_on: Vec::new(),
+                next: Some("verify_web".to_string()),
+                kind: DecisionNode::Capability(CapabilityNode {
+                    capability: "web_search".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "verify_web".to_string(),
+                depends_on: vec!["web_prices".to_string()],
+                next: Some("generate".to_string()),
+                kind: DecisionNode::Verify(VerifyNode {
+                    source: "web_prices".to_string(),
+                }),
+            },
+            GraphNode {
+                id: "generate".to_string(),
+                depends_on: vec!["erp_context".to_string(), "web_prices".to_string()],
+                next: None,
+                kind: DecisionNode::Generate(GenerateNode {
+                    format: "procurement price comparison grounded in internal ERP context and cited external supplier evidence; do not create or execute a purchase order".to_string(),
+                }),
+            },
+        ],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -346,5 +556,14 @@ mod tests {
     #[test]
     fn consequential_mutation_reference_program_is_valid() {
         validate_graph(&consequential_mutation_reference_graph()).unwrap();
+    }
+
+    #[test]
+    fn first_gp17_programs_are_valid() {
+        for skill in ["process_research", "supplier_discovery", "price_search"] {
+            let entry = governed_program_for_skill(skill).unwrap();
+            validate_graph(&entry.graph).unwrap();
+            assert!(!entry.reviewed_calls.is_empty());
+        }
     }
 }
