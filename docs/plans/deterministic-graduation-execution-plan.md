@@ -455,7 +455,8 @@ Savings are observability outputs, never promotion criteria by themselves.
 
 - **DG-01 foundation implemented:** typed metrics/candidate contracts, structural cohort fingerprinting, STDB case/event analysis, entropy/correction/outcome/evidence-shape/candidate-set metrics, provider-shadow disagreement, and spend/latency aggregation.
 - **DG-02 foundation implemented:** typed validated `GraduationPolicy`, fail-closed eligibility evaluation, and optional policy persistence inside the existing immutable organization-scoped `DecisionTypeDefinition.precedent_policy_json` envelope under `graduation`. Existing definitions without the field remain backward-compatible and graduation-disabled.
-- Policy stability remains intentionally `None` until DG-03 persists materially relevant policy/version refs on pattern/case evidence; missing required metrics fail eligibility rather than being inferred.
+- **DG-03 foundation implemented:** candidate persistence now uses typed immutable evidence envelopes inside the existing `AiDecisionPattern.applicability_json` and `outcome_metrics_json` fields, avoiding a schema/contract release. The reducer enforces DecisionType/version, company/program/step/context partition compatibility, unique supporting cases, exact metric/sample count agreement, and rejects rejected/superseded positive support.
+- Graduation evidence persists the immutable DecisionType graduation-policy ref and explicit material policy refs. Current cases still lack operational policy-version refs, so `policy_stability_rate` remains intentionally `None`; missing required metrics fail eligibility rather than being inferred.
 
 ### DG-01 — metrics foundation
 
