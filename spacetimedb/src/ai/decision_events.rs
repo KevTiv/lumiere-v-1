@@ -540,8 +540,8 @@ pub fn record_ai_deterministic_shadow_event(
 
     let evidence: serde_json::Value = serde_json::from_str(&params.evidence_json)
         .map_err(|_| "evidence_json must be valid JSON".to_string())?;
-    if evidence.get("schema_version").and_then(serde_json::Value::as_u64) != Some(1) {
-        return Err("deterministic shadow evidence schema_version must be 1".to_string());
+    if evidence.get("schema_version").and_then(serde_json::Value::as_u64) != Some(2) {
+        return Err("deterministic shadow evidence schema_version must be 2".to_string());
     }
     if evidence.get("pattern_ref").and_then(serde_json::Value::as_str)
         != Some(params.pattern_ref.as_str())
