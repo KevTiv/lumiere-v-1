@@ -582,3 +582,232 @@ fn row_string_list(row: &Value, key: &str) -> Vec<String> {
         })
         .unwrap_or_default()
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    struct FakeStore {
+        profiles: Mutex<HashMap<(u64, String, u32), ModelProfile>>,
+        policies: Mutex<HashMap<(u64, String, u32), IntelligencePolicy>>,
+    }
+
+    impl FakeStore {
+        fn new() -> Self {
+            Self {
+                profiles: Mutex::new(HashMap::new()),
+                policies: Mutex::new(HashMap::new()),
+            }
+        }
+
+        fn insert_profile(&self, organization_id: u64, profile: ModelProfile) {
+            self.profiles.lock().unwrap().insert(
+                (
+                    organization_id,
+                    profile.reference.key.clone(),
+                    profile.reference.version,
+                ),
+                profile,
+            );
+        }
+
+        fn insert_policy(&self, organization_id: u64, policy: IntelligencePolicy) {
+            self.policies.lock().unwrap().insert(
+                (organization_id, policy.key.clone(), policy.version),
+                policy,
+            );
+        }
+    }
+
+    #[async_trait]
+    impl ModelConfigurationStore for FakeStore {
+        async fn profile(
+            &self,
+            organization_id: u64,
+            reference: &ModelProfileRef,
+        ) -> Result<Option<ModelProfile>> {
+            Ok(self
+                .profiles
+                .lock()
+                .unwrap()
+                .get(&(organization_id, reference.key.clone(), reference.version))
+                .cloned())
+        }
+
+        async fn policy(
+            &self,
+            organization_id: u64,
+            policy_key: &str,
+            policy_version: Option<u32>,
+        ) -> Result<Option<IntelligencePolicy>> {
+            let policies = self.policies.lock().unwrap();
+            if let Some(version) = policy_version {
+                return Ok(policies
+                    .get(&(organization_id, policy_key.to_string(), version))
+                    .cloned());
+            }
+            Ok(policies
+                .iter()
+                .filter(|((org, key, _), _)| *org == organization_id && key == policy_key)
+                .max_by_key(|((_, _, version), _)| *version)
+                .map(|(_, policy)| policy.clone()))
+        }
+    }
+
+    fn agent() -> ResolvedAgentConfig {
+        ResolvedAgentConfig {
+            agent_id: 7,
+            provider: "mistral".to_string(),
+            model: "legacy-model".to_string(),
+            system_prompt: "test".to_string(),
+            temperature: 0.7,
+            max_tokens: 2048,
+            context_window: 32_000,
+            top_p: 1.0,
+            allowed_actions: vec!["skill_run".to_string()],
+            allowed_models: Vec::new(),
+            monthly_budget: None,
+            monthly_spend: 0.0,
+            cost_per_1k_tokens: 0.0,
+            rate_limit_per_minute: 60,
+        }
+    }
+
+    fn profile(key: &str, role: IntelligenceRole, model: &str) -> ModelProfile {
+        ModelProfile {
+            reference: ModelProfileRef {
+                key: key.to_string(),
+                version: 1,
+            },
+            provider: "mistral".to_string(),
+            model: model.to_string(),
+            allowed_roles: vec![role],
+            temperature: Some(0.1),
+            top_p: Some(0.9),
+            max_tokens: 1024,
+            context_window: 32_000,
+            timeout_ms: 30_000,
+            max_retries: 0,
+            max_concurrency: 1,
+            supports_tool_calling: !matches!(role, IntelligenceRole::Generation),
+            supports_structured_output: true,
+            supports_parallel_requests: true,
+            input_cost_per_1k_microunits: None,
+            output_cost_per_1k_microunits: None,
+            per_request_cost_ceiling_microunits: None,
+        }
+    }
+
+    fn policy() -> IntelligencePolicy {
+        IntelligencePolicy {
+            key: "default".to_string(),
+            version: 1,
+            defaults: HashMap::from([
+                (
+                    IntelligenceRole::Decision,
+                    ModelProfileRef {
+                        key: "decision".to_string(),
+                        version: 1,
+                    },
+                ),
+                (
+                    IntelligenceRole::Reasoning,
+                    ModelProfileRef {
+                        key: "reasoning".to_string(),
+                        version: 1,
+                    },
+                ),
+                (
+                    IntelligenceRole::Generation,
+                    ModelProfileRef {
+                        key: "generation".to_string(),
+                        version: 1,
+                    },
+                ),
+                (
+                    IntelligenceRole::Review,
+                    ModelProfileRef {
+                        key: "review".to_string(),
+                        version: 1,
+                    },
+                ),
+            ]),
+            shadows: Vec::new(),
+            overrides: HashMap::from([(
+                "FraudConcern".to_string(),
+                DecisionTypeOverride {
+                    primary: Some(ModelProfileRef {
+                        key: "fraud".to_string(),
+                        version: 1,
+                    }),
+                    review: None,
+                    shadows: Vec::new(),
+                },
+            )]),
+            fallbacks: HashMap::new(),
+        }
+    }
+
+    #[tokio::test]
+    async fn resolves_default_profile_by_intelligence_role() {
+        let store = FakeStore::new();
+        store.insert_profile(9, profile("decision", IntelligenceRole::Decision, "decision-model"));
+        store.insert_policy(9, policy());
+
+        let resolver = IntelligenceRouteResolver::new(&store, 9, &agent(), None).unwrap();
+        let route = resolver
+            .resolve(IntelligenceRole::Decision, Some("PaymentDisposition"))
+            .await
+            .unwrap();
+
+        assert_eq!(route.primary.model, "decision-model");
+        assert_eq!(route.policy_ref, "default@1");
+    }
+
+    #[tokio::test]
+    async fn decision_type_override_changes_profile_not_program_semantics() {
+        let store = FakeStore::new();
+        store.insert_profile(9, profile("decision", IntelligenceRole::Decision, "decision-model"));
+        store.insert_profile(9, profile("fraud", IntelligenceRole::Decision, "fraud-model"));
+        store.insert_policy(9, policy());
+
+        let resolver = IntelligenceRouteResolver::new(&store, 9, &agent(), None).unwrap();
+        let route = resolver
+            .resolve(IntelligenceRole::Decision, Some("FraudConcern"))
+            .await
+            .unwrap();
+
+        assert_eq!(route.primary.reference.key, "fraud");
+        assert_eq!(route.primary.model, "fraud-model");
+    }
+
+    #[tokio::test]
+    async fn explicit_policy_missing_fails_closed() {
+        let store = FakeStore::new();
+        let resolver =
+            IntelligenceRouteResolver::new(&store, 9, &agent(), Some("production@7")).unwrap();
+
+        let error = resolver
+            .resolve(IntelligenceRole::Decision, Some("FraudConcern"))
+            .await
+            .unwrap_err();
+
+        assert!(error.to_string().contains("explicit intelligence policy"));
+    }
+
+    #[tokio::test]
+    async fn absent_default_policy_uses_legacy_agent_profile() {
+        let store = FakeStore::new();
+        let resolver = IntelligenceRouteResolver::new(&store, 9, &agent(), None).unwrap();
+
+        let route = resolver
+            .resolve(IntelligenceRole::Generation, None)
+            .await
+            .unwrap();
+
+        assert_eq!(route.policy_ref, "legacy-agent-default@1");
+        assert_eq!(route.primary.model, "legacy-model");
+    }
+}
