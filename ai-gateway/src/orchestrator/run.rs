@@ -20,7 +20,7 @@ use crate::{
         ActorCredentials,
     },
     orchestrator::skill_loader::{
-        complete_run, create_run, load_skill, set_run_wait_state, LoadedSkill,
+        complete_run, create_run, load_run_key, load_skill, resume_run, set_run_wait_state, LoadedSkill,
     },
     providers::llm::{LlmMessage, LlmRequest},
     state::AppState,
@@ -83,6 +83,8 @@ pub struct RunSkillRequest {
 #[derive(Debug, Deserialize, Default)]
 pub struct RunSkillOverrides {
     pub max_steps: Option<u32>,
+    /// Resume an existing governed run/checkpoint instead of creating a new run.
+    pub resume_run_id: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -542,7 +544,6 @@ pub async fn run_skill_admitted(
     ensure_model_allowed(&agent)?;
     ensure_within_budget(&agent)?;
 
-    let run_key = Uuid::new_v4().to_string();
     let inputs_json = serde_json::to_string(&req.inputs).context("serialize inputs")?;
     let triggered_by_hex = req
         .triggered_by_hex
@@ -550,21 +551,30 @@ pub async fn run_skill_admitted(
         .filter(|s| !s.trim().is_empty())
         .unwrap_or("0000000000000000000000000000000000000000000000000000000000000000")
         .to_string();
-    let run_id = if skill.id > 0 {
-        create_run(
-            &stdb,
-            req.org_id,
-            req.company_id,
-            &skill,
-            agent.agent_id,
-            req.team_member_id,
-            &run_key,
-            &inputs_json,
-            &triggered_by_hex,
-        )
-        .await?
+    let (run_id, run_key) = if let Some(resume_run_id) = req.resume_run_id {
+        let run_key =
+            load_run_key(&stdb, req.org_id, req.company_id, resume_run_id).await?;
+        resume_run(&stdb, req.org_id, req.company_id, resume_run_id).await?;
+        (resume_run_id, run_key)
     } else {
-        0
+        let run_key = Uuid::new_v4().to_string();
+        let run_id = if skill.id > 0 {
+            create_run(
+                &stdb,
+                req.org_id,
+                req.company_id,
+                &skill,
+                agent.agent_id,
+                req.team_member_id,
+                &run_key,
+                &inputs_json,
+                &triggered_by_hex,
+            )
+            .await?
+        } else {
+            0
+        };
+        (run_id, run_key)
     };
 
     let manifest = load_active_manifest(&stdb, req.org_id, &skill_key, req.skill_version)
