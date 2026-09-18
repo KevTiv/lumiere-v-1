@@ -54,7 +54,7 @@ use super::{
     model_configuration::{IntelligenceRole, IntelligenceRouteResolver, StdbModelConfigurationStore},
     precedent::StdbPrecedentStore,
     probabilistic::StdbCalibrationProfileStore,
-    run_review::{RunReviewDisposition, RunReviewProgram},
+    run_review::{RunReviewDisposition, RunReviewProgram, RunReviewRecorder, StdbRunReviewRecorder},
     spend_admission::{spend_binding_from_agent, StdbSpendLedger},
 };
 
@@ -741,11 +741,21 @@ pub async fn run_skill_admitted(
             .await?;
 
         let review = if matches!(&program.stop, GovernedProgramStop::Completed) {
-            Some(
-                RunReviewProgram::new(&review_provider)
-                    .review(&program_context.objective, &program)
-                    .await?,
+            let result = RunReviewProgram::new(&review_provider)
+                .review(&program_context.objective, &program)
+                .await?;
+            StdbRunReviewRecorder {
+                writer: state.stdb.as_ref(),
+            }
+            .record(
+                req.org_id,
+                req.company_id,
+                run_id,
+                REPORT_ANALYSIS_PROGRAM_REF,
+                &result,
             )
+            .await?;
+            Some(result)
         } else {
             None
         };

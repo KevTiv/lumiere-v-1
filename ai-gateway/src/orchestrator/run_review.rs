@@ -1,11 +1,24 @@
 //! Independent review of completed governed program runs.
 //!
 //! Review consumes only the observable completed trace/state. It cannot
-//! execute capabilities, approve effects, or change the reviewed run.
+//! execute capabilities, approve effects, or change the reviewed run —
+//! `RunReviewProgram::review` stays a pure classification with no
+//! recording side effect of its own, which is why `RunReviewRecorder` is a
+//! separate seam the caller (`run.rs`) threads through explicitly, rather
+//! than folded into `review()` itself.
+//!
+//! Durable persistence (GP-14) closes the loop that computing a typed
+//! disposition and then discarding it left open: without
+//! `record_ai_run_review` (`spacetimedb/src/ai/run_review.rs`), an
+//! `IncidentCandidate` disposition — exactly the signal an ops/security
+//! review would need to find later — only ever existed in one HTTP
+//! response body.
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use stdb_client::{ReducerCall, StdbClient};
 
 use super::governed_program::GovernedProgramOutcome;
 use super::intelligence::{
@@ -19,6 +32,21 @@ pub(super) enum RunReviewDisposition {
     ReviewRequired,
     Defect,
     IncidentCandidate,
+}
+
+impl RunReviewDisposition {
+    /// Matches this enum's own `#[serde(rename_all = "snake_case")]` and,
+    /// deliberately, `spacetimedb/src/ai/run_review.rs`'s `DISPOSITIONS`
+    /// constant — a durable write with a value the reducer doesn't
+    /// recognize fails closed rather than silently storing a stray label.
+    fn label(self) -> &'static str {
+        match self {
+            Self::Healthy => "healthy",
+            Self::ReviewRequired => "review_required",
+            Self::Defect => "defect",
+            Self::IncidentCandidate => "incident_candidate",
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -99,6 +127,72 @@ impl<'a> RunReviewProgram<'a> {
     }
 }
 
+/// Durable evidence for one `RunReviewProgram::review` result. Separate
+/// from `RunReviewProgram` itself — see module docs on why `review()`
+/// stays free of recording side effects.
+#[async_trait]
+pub(super) trait RunReviewRecorder: Send + Sync {
+    async fn record(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        run_id: u64,
+        program_ref: &str,
+        result: &RunReviewResult,
+    ) -> Result<()>;
+}
+
+pub(super) struct NoopRunReviewRecorder;
+
+#[async_trait]
+impl RunReviewRecorder for NoopRunReviewRecorder {
+    async fn record(
+        &self,
+        _organization_id: u64,
+        _company_id: u64,
+        _run_id: u64,
+        _program_ref: &str,
+        _result: &RunReviewResult,
+    ) -> Result<()> {
+        Ok(())
+    }
+}
+
+pub(super) struct StdbRunReviewRecorder<'a> {
+    pub writer: &'a StdbClient,
+}
+
+#[async_trait]
+impl RunReviewRecorder for StdbRunReviewRecorder<'_> {
+    async fn record(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        run_id: u64,
+        program_ref: &str,
+        result: &RunReviewResult,
+    ) -> Result<()> {
+        self.writer
+            .call_reducer(ReducerCall::from_name(
+                "record_ai_run_review",
+                json!([
+                    organization_id,
+                    company_id,
+                    {
+                        "run_id": run_id,
+                        "program_ref": program_ref,
+                        "disposition": result.disposition.label(),
+                        "rationale": result.rationale,
+                        "provider": result.provider,
+                        "model": result.model,
+                    }
+                ]),
+            ))
+            .await
+            .context("record durable run review")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -149,5 +243,70 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(result.disposition, RunReviewDisposition::Healthy);
+    }
+
+    #[test]
+    fn disposition_labels_match_the_durable_reducer_s_accepted_set() {
+        // Mirrors spacetimedb/src/ai/run_review.rs's DISPOSITIONS constant
+        // exactly — a mismatch here would make every durable run review
+        // write fail validation server-side.
+        assert_eq!(RunReviewDisposition::Healthy.label(), "healthy");
+        assert_eq!(RunReviewDisposition::ReviewRequired.label(), "review_required");
+        assert_eq!(RunReviewDisposition::Defect.label(), "defect");
+        assert_eq!(
+            RunReviewDisposition::IncidentCandidate.label(),
+            "incident_candidate"
+        );
+    }
+
+    struct RecordingRunReviewRecorder {
+        calls: std::sync::Mutex<Vec<(u64, u64, u64, String, RunReviewDisposition)>>,
+    }
+
+    #[async_trait]
+    impl RunReviewRecorder for RecordingRunReviewRecorder {
+        async fn record(
+            &self,
+            organization_id: u64,
+            company_id: u64,
+            run_id: u64,
+            program_ref: &str,
+            result: &RunReviewResult,
+        ) -> Result<()> {
+            self.calls.lock().unwrap().push((
+                organization_id,
+                company_id,
+                run_id,
+                program_ref.to_string(),
+                result.disposition,
+            ));
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn recorder_receives_the_reviewed_run_s_identity_and_disposition() {
+        let outcome = GovernedProgramOutcome {
+            stop: GovernedProgramStop::Completed,
+            final_content: Some("done".to_string()),
+            outputs: Default::default(),
+            trace: vec![],
+            decision_calls: 0,
+            capability_calls: 0,
+        };
+        let result = RunReviewProgram::new(&Reviewer)
+            .review("summarize", &outcome)
+            .await
+            .unwrap();
+        let recorder = RecordingRunReviewRecorder {
+            calls: std::sync::Mutex::new(Vec::new()),
+        };
+        recorder
+            .record(9, 3, 42, "test-program@1", &result)
+            .await
+            .unwrap();
+        let calls = recorder.calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], (9, 3, 42, "test-program@1".to_string(), RunReviewDisposition::Healthy));
     }
 }
