@@ -5,6 +5,7 @@
 //! routing, execute capabilities, or mutate ERP state.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::sync::{Arc, RwLock};
 
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
@@ -13,9 +14,250 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use stdb_client::{ReducerCall, StdbClient};
 
-use super::intelligence::DecisionTypeRef;
+use super::intelligence::{decision_request_hash, DecisionKind, DecisionRequest, DecisionResponse, DecisionTypeRef};
 
 const MAX_ANALYSIS_ROWS: u32 = 5_000;
+
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub(super) struct DeterministicDecisionResponse {
+    pub kind: DecisionKind,
+    pub choice: Option<String>,
+    pub score: Option<f64>,
+    pub probability: Option<f64>,
+    pub rationale: Option<String>,
+}
+
+impl DeterministicDecisionResponse {
+    pub fn validate_against(&self, request: &DecisionRequest) -> Result<()> {
+        if self.kind != request.kind {
+            bail!("deterministic decision kind does not match request");
+        }
+        let populated = usize::from(self.choice.is_some())
+            + usize::from(self.score.is_some())
+            + usize::from(self.probability.is_some());
+        if populated != 1 {
+            bail!("deterministic decision must set exactly one typed signal");
+        }
+        match self.kind {
+            DecisionKind::Choice => {
+                let choice = self.choice.as_deref().context("choice result missing")?;
+                if !request.candidates.iter().any(|candidate| candidate == choice) {
+                    bail!("deterministic choice is not in the request candidate set");
+                }
+            }
+            DecisionKind::Score => {
+                let score = self.score.context("score result missing")?;
+                if !score.is_finite() {
+                    bail!("deterministic score must be finite");
+                }
+            }
+            DecisionKind::Probability => {
+                let probability = self.probability.context("probability result missing")?;
+                if !(0.0..=1.0).contains(&probability) {
+                    bail!("deterministic probability must be within [0, 1]");
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn signal_json(&self) -> Value {
+        json!({
+            "kind": self.kind,
+            "choice": self.choice,
+            "score": self.score,
+            "probability": self.probability,
+        })
+    }
+}
+
+#[async_trait]
+pub(super) trait DeterministicDecisionCandidate: Send + Sync {
+    fn implementation_ref(&self) -> &str;
+    fn decision_type(&self) -> DecisionTypeRef;
+
+    async fn evaluate(&self, request: &DecisionRequest) -> Result<DeterministicDecisionResponse>;
+}
+
+#[derive(Default)]
+pub(super) struct DeterministicCandidateRegistry {
+    candidates: RwLock<HashMap<String, Arc<dyn DeterministicDecisionCandidate>>>,
+}
+
+impl DeterministicCandidateRegistry {
+    pub fn register(&self, candidate: Arc<dyn DeterministicDecisionCandidate>) -> Result<()> {
+        let implementation_ref = candidate.implementation_ref().trim();
+        if implementation_ref.is_empty() {
+            bail!("deterministic implementation_ref must be nonempty");
+        }
+        candidate.decision_type().validate()?;
+
+        let mut candidates = self.candidates.write().unwrap();
+        if candidates.contains_key(implementation_ref) {
+            bail!("deterministic implementation_ref '{implementation_ref}' is already registered");
+        }
+        candidates.insert(implementation_ref.to_string(), candidate);
+        Ok(())
+    }
+
+    pub fn get(&self, implementation_ref: &str) -> Option<Arc<dyn DeterministicDecisionCandidate>> {
+        self.candidates
+            .read()
+            .unwrap()
+            .get(implementation_ref)
+            .cloned()
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct DeterministicShadowEvidence {
+    pub schema_version: u32,
+    pub pattern_ref: String,
+    pub implementation_ref: String,
+    pub request_hash: String,
+    pub deterministic_output: Option<DeterministicDecisionResponse>,
+    pub production_signal: Value,
+    pub exact_match: Option<bool>,
+    pub evaluation_error: Option<String>,
+    pub latency_ms: u64,
+}
+
+#[async_trait]
+pub(super) trait DeterministicShadowRecorder: Send + Sync {
+    async fn record(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        run_id: u64,
+        decision_type: &DecisionTypeRef,
+        request: &DecisionRequest,
+        evidence: &DeterministicShadowEvidence,
+    ) -> Result<()>;
+}
+
+pub(super) struct StdbDeterministicShadowRecorder<'a> {
+    pub writer: &'a StdbClient,
+}
+
+#[async_trait]
+impl DeterministicShadowRecorder for StdbDeterministicShadowRecorder<'_> {
+    async fn record(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        run_id: u64,
+        decision_type: &DecisionTypeRef,
+        request: &DecisionRequest,
+        evidence: &DeterministicShadowEvidence,
+    ) -> Result<()> {
+        self.writer
+            .call_reducer(ReducerCall::from_name(
+                "record_ai_deterministic_shadow_event",
+                json!([
+                    organization_id,
+                    company_id,
+                    run_id,
+                    {
+                        "pattern_ref": evidence.pattern_ref,
+                        "implementation_ref": evidence.implementation_ref,
+                        "decision_type_name": decision_type.name,
+                        "decision_type_version": decision_type.version,
+                        "request_hash": evidence.request_hash,
+                        "request_json": serde_json::to_string(request)?,
+                        "evidence_json": serde_json::to_string(evidence)?,
+                    }
+                ]),
+            ))
+            .await
+            .context("record deterministic graduation shadow event")
+    }
+}
+
+pub(super) struct DeterministicShadowEvaluator<'a> {
+    pub registry: &'a DeterministicCandidateRegistry,
+    pub recorder: &'a dyn DeterministicShadowRecorder,
+}
+
+impl DeterministicShadowEvaluator<'_> {
+    #[allow(clippy::too_many_arguments)]
+    pub async fn evaluate(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        run_id: u64,
+        pattern_ref: &str,
+        implementation_ref: &str,
+        request: &DecisionRequest,
+        production: &DecisionResponse,
+    ) -> Result<DeterministicShadowEvidence> {
+        if organization_id == 0 || company_id == 0 || run_id == 0 {
+            bail!("deterministic shadow requires nonzero organization/company/run ids");
+        }
+        if pattern_ref.trim().is_empty() || implementation_ref.trim().is_empty() {
+            bail!("pattern_ref and implementation_ref must be nonempty");
+        }
+        request.validate()?;
+        production.validate_against(request)?;
+
+        let candidate = self
+            .registry
+            .get(implementation_ref)
+            .with_context(|| format!("deterministic candidate '{implementation_ref}' is not registered"))?;
+        if candidate.decision_type() != request.decision_type {
+            bail!("deterministic candidate DecisionType does not match request");
+        }
+
+        let request_hash = decision_request_hash(request)?;
+        let started = std::time::Instant::now();
+        let result = candidate.evaluate(request).await;
+        let latency_ms = started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
+
+        let production_signal = decision_response_signal(production);
+        let (deterministic_output, exact_match, evaluation_error) = match result {
+            Ok(output) => {
+                output.validate_against(request)?;
+                let exact_match = output.signal_json() == production_signal;
+                (Some(output), Some(exact_match), None)
+            }
+            Err(error) => (None, None, Some(error.to_string())),
+        };
+
+        let evidence = DeterministicShadowEvidence {
+            schema_version: 1,
+            pattern_ref: pattern_ref.to_string(),
+            implementation_ref: implementation_ref.to_string(),
+            request_hash,
+            deterministic_output,
+            production_signal,
+            exact_match,
+            evaluation_error,
+            latency_ms,
+        };
+
+        self.recorder
+            .record(
+                organization_id,
+                company_id,
+                run_id,
+                &request.decision_type,
+                request,
+                &evidence,
+            )
+            .await?;
+        Ok(evidence)
+    }
+}
+
+fn decision_response_signal(response: &DecisionResponse) -> Value {
+    json!({
+        "kind": response.kind,
+        "choice": response.choice,
+        "score": response.score,
+        "probability": response.probability,
+    })
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -1089,6 +1331,122 @@ mod tests {
         policy.minimum_policy_stability = Some(0.95);
         let result = policy.evaluate(&metrics());
         assert!(result.eligible, "{:?}", result.reasons);
+    }
+
+    struct FixedDeterministicCandidate;
+
+    #[async_trait]
+    impl DeterministicDecisionCandidate for FixedDeterministicCandidate {
+        fn implementation_ref(&self) -> &str {
+            "deterministic:test@1"
+        }
+
+        fn decision_type(&self) -> DecisionTypeRef {
+            DecisionTypeRef {
+                name: "Test".into(),
+                version: 1,
+            }
+        }
+
+        async fn evaluate(
+            &self,
+            _request: &DecisionRequest,
+        ) -> Result<DeterministicDecisionResponse> {
+            Ok(DeterministicDecisionResponse {
+                kind: DecisionKind::Choice,
+                choice: Some("a".into()),
+                score: None,
+                probability: None,
+                rationale: None,
+            })
+        }
+    }
+
+    struct RecordingShadowRecorder {
+        calls: std::sync::Mutex<Vec<DeterministicShadowEvidence>>,
+    }
+
+    #[async_trait]
+    impl DeterministicShadowRecorder for RecordingShadowRecorder {
+        async fn record(
+            &self,
+            _organization_id: u64,
+            _company_id: u64,
+            _run_id: u64,
+            _decision_type: &DecisionTypeRef,
+            _request: &DecisionRequest,
+            evidence: &DeterministicShadowEvidence,
+        ) -> Result<()> {
+            self.calls.lock().unwrap().push(evidence.clone());
+            Ok(())
+        }
+    }
+
+    fn shadow_request() -> DecisionRequest {
+        DecisionRequest {
+            decision_type: DecisionTypeRef {
+                name: "Test".into(),
+                version: 1,
+            },
+            kind: DecisionKind::Choice,
+            question: "pick".into(),
+            bounded_state: json!({}),
+            candidates: vec!["a".into(), "b".into()],
+            precedent: vec![],
+            evidence: vec![],
+        }
+    }
+
+    #[tokio::test]
+    async fn deterministic_shadow_uses_exact_request_and_has_zero_authority() {
+        let registry = DeterministicCandidateRegistry::default();
+        registry
+            .register(Arc::new(FixedDeterministicCandidate))
+            .unwrap();
+        let recorder = RecordingShadowRecorder {
+            calls: std::sync::Mutex::new(Vec::new()),
+        };
+        let evaluator = DeterministicShadowEvaluator {
+            registry: &registry,
+            recorder: &recorder,
+        };
+        let production = DecisionResponse {
+            kind: DecisionKind::Choice,
+            choice: Some("a".into()),
+            score: None,
+            probability: None,
+            confidence: Some(0.9),
+            rationale: None,
+            model: "m".into(),
+            provider: "p".into(),
+            input_tokens: 1,
+            output_tokens: 1,
+        };
+        let evidence = evaluator
+            .evaluate(
+                1,
+                2,
+                3,
+                "pattern:test@1",
+                "deterministic:test@1",
+                &shadow_request(),
+                &production,
+            )
+            .await
+            .unwrap();
+        assert_eq!(evidence.exact_match, Some(true));
+        assert_eq!(recorder.calls.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn deterministic_registry_rejects_duplicate_implementation_refs() {
+        let registry = DeterministicCandidateRegistry::default();
+        registry
+            .register(Arc::new(FixedDeterministicCandidate))
+            .unwrap();
+        assert!(registry
+            .register(Arc::new(FixedDeterministicCandidate))
+            .is_err());
     }
 
     #[test]
