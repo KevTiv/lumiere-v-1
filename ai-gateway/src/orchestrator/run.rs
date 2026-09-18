@@ -618,7 +618,7 @@ pub async fn run_skill_admitted(
             .get("intelligencePolicyRef")
             .or_else(|| skill.config_json.get("intelligence_policy_ref"))
             .and_then(Value::as_str);
-        let route_resolver = IntelligenceRouteResolver::new(
+        let route_resolver = IntelligenceRouteResolver::new_governed(
             &model_config_store,
             req.org_id,
             &agent,
