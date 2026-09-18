@@ -134,14 +134,17 @@ impl DecisionProvider for RoutedDecisionProvider<'_> {
 
         let mut failures = Vec::new();
         for profile in profiles {
-            let scope = next_call_scope(self.role, &self.next_scope)?;
-            match self.attempt(&profile, request.clone(), scope).await {
-                Ok(response) => return Ok(response),
-                Err(error) => failures.push(format!(
-                    "{}: {}",
-                    profile.reference.stable_ref(),
-                    error
-                )),
+            for attempt_no in 0..=profile.max_retries {
+                let scope = next_call_scope(self.role, &self.next_scope)?;
+                match self.attempt(&profile, request.clone(), scope).await {
+                    Ok(response) => return Ok(response),
+                    Err(error) => failures.push(format!(
+                        "{} attempt {}: {}",
+                        profile.reference.stable_ref(),
+                        attempt_no + 1,
+                        error
+                    )),
+                }
             }
         }
         bail!(
@@ -198,26 +201,29 @@ impl ReasoningProvider for RoutedReasoningProvider<'_> {
         profiles.extend(route.fallbacks);
         let mut failures = Vec::new();
         for profile in profiles {
-            let binding = spend_binding_for_profile(
-                self.agent,
-                &profile,
-                self.organization_id,
-                self.company_id,
-                self.run_id,
-            )?;
-            let scope = next_call_scope(IntelligenceRole::Reasoning, &self.next_scope)?;
-            let admitted =
-                SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?;
-            match AgentLoopReasoner::from_profile(&admitted, &profile)
-                .reason(request.clone())
-                .await
-            {
-                Ok(response) => return Ok(response),
-                Err(error) => failures.push(format!(
-                    "{}: {}",
-                    profile.reference.stable_ref(),
-                    error
-                )),
+            for attempt_no in 0..=profile.max_retries {
+                let binding = spend_binding_for_profile(
+                    self.agent,
+                    &profile,
+                    self.organization_id,
+                    self.company_id,
+                    self.run_id,
+                )?;
+                let scope = next_call_scope(IntelligenceRole::Reasoning, &self.next_scope)?;
+                let admitted =
+                    SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?;
+                match AgentLoopReasoner::from_profile(&admitted, &profile)
+                    .reason(request.clone())
+                    .await
+                {
+                    Ok(response) => return Ok(response),
+                    Err(error) => failures.push(format!(
+                        "{} attempt {}: {}",
+                        profile.reference.stable_ref(),
+                        attempt_no + 1,
+                        error
+                    )),
+                }
             }
         }
         bail!("all configured reasoning profiles failed: {}", failures.join(" | "))
@@ -270,26 +276,29 @@ impl GenerationProvider for RoutedGenerationProvider<'_> {
         profiles.extend(route.fallbacks);
         let mut failures = Vec::new();
         for profile in profiles {
-            let binding = spend_binding_for_profile(
-                self.agent,
-                &profile,
-                self.organization_id,
-                self.company_id,
-                self.run_id,
-            )?;
-            let scope = next_call_scope(IntelligenceRole::Generation, &self.next_scope)?;
-            let admitted =
-                SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?;
-            match LlmGenerationAdapter::from_profile(&admitted, &profile)
-                .generate(request.clone())
-                .await
-            {
-                Ok(response) => return Ok(response),
-                Err(error) => failures.push(format!(
-                    "{}: {}",
-                    profile.reference.stable_ref(),
-                    error
-                )),
+            for attempt_no in 0..=profile.max_retries {
+                let binding = spend_binding_for_profile(
+                    self.agent,
+                    &profile,
+                    self.organization_id,
+                    self.company_id,
+                    self.run_id,
+                )?;
+                let scope = next_call_scope(IntelligenceRole::Generation, &self.next_scope)?;
+                let admitted =
+                    SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?;
+                match LlmGenerationAdapter::from_profile(&admitted, &profile)
+                    .generate(request.clone())
+                    .await
+                {
+                    Ok(response) => return Ok(response),
+                    Err(error) => failures.push(format!(
+                        "{} attempt {}: {}",
+                        profile.reference.stable_ref(),
+                        attempt_no + 1,
+                        error
+                    )),
+                }
             }
         }
         bail!("all configured generation profiles failed: {}", failures.join(" | "))
