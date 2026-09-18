@@ -202,10 +202,16 @@ struct GraduationPromotionPolicy {
     minimum_shadow_cases: u64,
     #[serde(default = "default_minimum_shadow_conformance_rate")]
     minimum_shadow_conformance_rate: f64,
+    #[serde(default = "default_decision_execution_mode")]
+    execution_mode: String,
 }
 
 fn default_minimum_shadow_conformance_rate() -> f64 {
     0.98
+}
+
+fn default_decision_execution_mode() -> String {
+    "model_primary".to_string()
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
@@ -802,6 +808,12 @@ fn validate_promotion_policy(policy: &GraduationPromotionPolicy) -> Result<(), S
     if !policy.enabled {
         return Err("graduation policy is disabled".to_string());
     }
+    if !matches!(
+        policy.execution_mode.as_str(),
+        "model_primary" | "deterministic_shadow" | "deterministic_primary_model_shadow" | "deterministic_only"
+    ) {
+        return Err("graduation policy execution_mode is invalid".to_string());
+    }
     if policy.minimum_cases < 2 || policy.minimum_verified_cases > policy.minimum_cases {
         return Err("graduation policy case thresholds are invalid".to_string());
     }
@@ -1326,6 +1338,7 @@ mod graduation_pattern_tests {
             minimum_candidate_set_stability: Some(0.9),
             minimum_shadow_cases: 2,
             minimum_shadow_conformance_rate: 0.98,
+            execution_mode: "model_primary".to_string(),
         };
         let mut snapshot = metrics();
         snapshot.policy_stability_rate = None;
@@ -1347,6 +1360,7 @@ mod graduation_pattern_tests {
             minimum_candidate_set_stability: Some(0.95),
             minimum_shadow_cases: 2,
             minimum_shadow_conformance_rate: 0.98,
+            execution_mode: "model_primary".to_string(),
         };
         assert!(validate_promotion_policy(&policy).is_ok());
         assert!(validate_metrics_against_promotion_policy(&metrics(), &policy).is_ok());
