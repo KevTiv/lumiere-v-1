@@ -169,6 +169,8 @@ struct DecisionTypeOverrideWire {
     shadows: Vec<String>,
     #[serde(default, rename = "requireDistinctReviewProfile")]
     require_distinct_review_profile: bool,
+    #[serde(default, rename = "requireDistinctReviewProvider")]
+    require_distinct_review_provider: bool,
     #[serde(default, rename = "preferDistinctReviewProvider")]
     prefer_distinct_review_provider: bool,
 }
@@ -179,6 +181,7 @@ struct DecisionTypeOverride {
     review: Option<ModelProfileRef>,
     shadows: Vec<ModelProfileRef>,
     require_distinct_review_profile: bool,
+    require_distinct_review_provider: bool,
     prefer_distinct_review_provider: bool,
 }
 
@@ -390,13 +393,23 @@ impl<'a> IntelligenceRouteResolver<'a> {
             .policy(self.organization_id, policy_key, self.policy_version)
             .await?
             .context("governed review independence policy not found")?;
-        let (mut require_distinct_profile, mut prefer_distinct_provider) =
-            policy.review_independence(Some(decision_type));
-        if self.require_policy && !require_distinct_profile && !prefer_distinct_provider {
+        let (
+            mut require_distinct_profile,
+            require_distinct_provider,
+            mut prefer_distinct_provider,
+        ) = policy.review_independence(Some(decision_type));
+        if self.require_policy
+            && !require_distinct_profile
+            && !require_distinct_provider
+            && !prefer_distinct_provider
+        {
             require_distinct_profile = true;
             prefer_distinct_provider = true;
         }
-        if !require_distinct_profile && !prefer_distinct_provider {
+        if require_distinct_provider {
+            require_distinct_profile = true;
+        }
+        if !require_distinct_profile && !require_distinct_provider && !prefer_distinct_provider {
             return Ok(());
         }
 
@@ -411,9 +424,16 @@ impl<'a> IntelligenceRouteResolver<'a> {
                 decision_type
             );
         }
-        if prefer_distinct_provider
-            && normalize_provider(&decision.provider) == normalize_provider(&review.provider)
-        {
+        let same_provider =
+            normalize_provider(&decision.provider) == normalize_provider(&review.provider);
+        if require_distinct_provider && same_provider {
+            bail!(
+                "review provider must be distinct from decision provider for '{}' (both resolve to '{}')",
+                decision_type,
+                normalize_provider(&decision.provider)
+            );
+        }
+        if prefer_distinct_provider && same_provider {
             tracing::warn!(
                 decision_type,
                 provider = %decision.provider,
@@ -485,16 +505,17 @@ impl IntelligencePolicy {
     fn review_independence(
         &self,
         decision_type: Option<&str>,
-    ) -> (bool, bool) {
+    ) -> (bool, bool, bool) {
         decision_type
             .and_then(|name| self.overrides.get(name))
             .map(|override_| {
                 (
                     override_.require_distinct_review_profile,
+                    override_.require_distinct_review_provider,
                     override_.prefer_distinct_review_provider,
                 )
             })
-            .unwrap_or((false, false))
+            .unwrap_or((false, false, false))
     }
 
     fn shadow_refs(&self, decision_type: Option<&str>) -> Vec<&ModelProfileRef> {
@@ -570,6 +591,7 @@ fn decode_policy(row: &Value) -> Result<IntelligencePolicy> {
                     .map(|value| ModelProfileRef::parse(value))
                     .collect::<Result<Vec<_>>>()?,
                 require_distinct_review_profile: wire.require_distinct_review_profile,
+                require_distinct_review_provider: wire.require_distinct_review_provider,
                 prefer_distinct_review_provider: wire.prefer_distinct_review_provider,
             },
         );
@@ -835,6 +857,7 @@ mod tests {
                     review: None,
                     shadows: Vec::new(),
                     require_distinct_review_profile: false,
+                    require_distinct_review_provider: false,
                     prefer_distinct_review_provider: false,
                 },
             )]),
