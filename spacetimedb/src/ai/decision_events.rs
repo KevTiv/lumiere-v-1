@@ -991,3 +991,29 @@ fn shadow_payload_matches(
         && existing.output_tokens == params.output_tokens
         && existing.shadow_error == params.shadow_error
 }
+
+
+#[cfg(test)]
+mod graduation_rollback_tests {
+    use super::*;
+
+    #[test]
+    fn rollback_edges_only_reduce_authority() {
+        assert!(valid_authority_downgrade(
+            "deterministic_only",
+            "deterministic_primary_model_shadow"
+        ));
+        assert!(valid_authority_downgrade(
+            "deterministic_primary_model_shadow",
+            "model_primary"
+        ));
+        assert!(!valid_authority_downgrade(
+            "model_primary",
+            "deterministic_primary_model_shadow"
+        ));
+        assert!(!valid_authority_downgrade(
+            "deterministic_primary_model_shadow",
+            "deterministic_only"
+        ));
+    }
+}
