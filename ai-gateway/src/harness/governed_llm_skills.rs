@@ -1,7 +1,8 @@
 //! Policy-gated harness adapters for LLM-backed bundled skills.
 //!
-//! After release + NamedRead policy succeed, execution continues through
-//! `run_skill_unlocked` so tool/LLM behavior stays shared with the legacy body.
+//! After release + NamedRead policy succeed, migrated skills continue through
+//! the admitted typed governed-program runtime. The generic legacy loop remains
+//! only for skills not yet present in the GP-17 program catalog.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -18,7 +19,8 @@ use super::{
     policy_engine::PolicyEngine,
 };
 use crate::{
-    orchestrator::run::{run_skill_unlocked, RunSkillOverrides, RunSkillRequest, RunSkillResponse},
+    orchestrator::run::{run_skill_admitted, AdmittedRunRequest, RunSkillResponse},
+    providers::llm::LlmRequest,
     state::AppState,
 };
 
@@ -254,20 +256,36 @@ pub async fn run_governed_llm_skill(
     }
 
     let mut audit = outcome.audit;
-    let run = run_skill_unlocked(
+    let run = run_skill_admitted(
         state,
-        RunSkillRequest {
+        AdmittedRunRequest {
             org_id: organization_id,
             company_id,
             skill_key: skill_key.to_string(),
+            skill_version: LLM_BUNDLED_SKILL_VERSION,
             inputs: input.inputs,
             agent_id: input.agent_id,
             team_member_id: input.team_member_id,
             triggered_by_hex: Some(identity_hex.to_string()),
             stdb_token: Some(stdb_token.to_string()),
-            overrides: input.max_steps.map(|max_steps| RunSkillOverrides {
-                max_steps: Some(max_steps),
-            }),
+            correlation_id: uuid::Uuid::new_v4().to_string(),
+            // Catalogued governed programs derive their reviewed call plan
+            // server-side from the immutable graph catalog.
+            reviewed_calls: Vec::new(),
+            // This request is intentionally unused for GP-17 catalog entries.
+            // Role-specific Decision/Generation/Reasoning adapters construct
+            // their own typed provider requests inside the governed runtime.
+            llm_request: LlmRequest {
+                provider: "governed-program".to_string(),
+                model: "governed-program".to_string(),
+                system: String::new(),
+                messages: Vec::new(),
+                max_tokens: 1,
+                temperature: None,
+                top_p: None,
+                tools: Vec::new(),
+            },
+            max_steps: input.max_steps,
         },
     )
     .await
