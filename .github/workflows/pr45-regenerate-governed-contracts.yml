@@ -1,0 +1,71 @@
+name: PR45 regenerate governed contracts
+
+on:
+  push:
+    branches: [codex/ai-harness-role-capability-grants]
+    paths:
+      - .github/workflows/pr45-regenerate-governed-contracts.yml
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    env:
+      SPACETIME_CLI_VERSION: "2.8.2"
+      STDB_MODULE: lumiere-pr45-codegen
+      STDB_SCHEMA_SERVER: local
+      STDB_SCHEMA_HOST: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/ai-harness-role-capability-grants
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: ./.github/actions/setup-contracts-ssh
+        with:
+          deploy-key: ${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            spacetimedb
+            .
+          cache-on-failure: true
+      - uses: ./.github/actions/setup-spacetime-cli
+        with:
+          version: ${{ env.SPACETIME_CLI_VERSION }}
+      - name: Start standalone SpacetimeDB
+        run: |
+          nohup spacetime start --listen-addr 127.0.0.1:3000 > /tmp/lumiere-pr45-stdb.log 2>&1 &
+          for attempt in {1..60}; do
+            if curl -fsS -X POST http://127.0.0.1:3000/v1/identity >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/lumiere-pr45-stdb.log
+          exit 1
+      - name: Publish module
+        run: spacetime publish "$STDB_MODULE" --module-path spacetimedb --server local --delete-data=always -y --no-config
+      - name: Regenerate canonical contracts
+        run: |
+          make clean-contracts-live-staging
+          make generate-presentation-schemas schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
+          python3 scripts/verify-operation-history.py \
+            --advance-history-from-release v0.3.47 \
+            --previous-ir-sha256 sha256:620d492a3cfd506e11661dae4e0641e279442ba384e36799dd01d669bec0b71d \
+            --revision-reason "Add governed intelligence persistence and typed decision runtime contracts"
+      - name: Commit generated source artifacts
+        run: |
+          git status --short
+          git add -u
+          if git diff --cached --quiet; then
+            echo "No generated changes"
+            exit 0
+          fi
+          git -c user.name="lumiere-codegen" -c user.email="codegen@lumiere.local" \
+            commit -m "chore(contracts): regenerate governed intelligence contracts"
+          git push origin HEAD:codex/ai-harness-role-capability-grants
