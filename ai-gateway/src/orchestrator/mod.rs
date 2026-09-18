@@ -7,6 +7,7 @@ pub mod intelligence;
 mod intelligence_adapters;
 mod invocation_policy;
 mod progress;
+mod proposal_loop;
 pub mod run;
 pub mod skill_loader;
 mod spend_admission;
