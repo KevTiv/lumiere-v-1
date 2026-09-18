@@ -291,11 +291,11 @@ pub async fn resume_run(
     run_id: u64,
 ) -> Result<()> {
     stdb.call_reducer(stdb_client::reducer_call!(
-        "resume_ai_agent_run",
-        serde_json::json!([org_id, company_id, run_id]),
+        "set_ai_agent_run_wait_state",
+        serde_json::json!([org_id, company_id, run_id, { "status": "running" }]),
     ))
     .await
-    .context("resume_ai_agent_run")?;
+    .context("resume governed ai_agent_run")?;
     Ok(())
 }
 
