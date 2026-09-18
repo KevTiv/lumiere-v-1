@@ -173,6 +173,8 @@ pub(super) struct GenerateNode {
 #[derive(Clone, Debug)]
 pub(super) struct RequireApprovalNode {
     pub source: NodeId,
+    /// Exact governed capability that may continue after human approval.
+    pub capability: String,
 }
 
 #[derive(Clone, Debug)]
@@ -1118,6 +1120,7 @@ mod tests {
             next: None,
             kind: DecisionNode::RequireApproval(RequireApprovalNode {
                 source: "verify".to_string(),
+                capability: "test_mutation".to_string(),
             }),
         };
         let g = graph(vec![capability, verify, approval], "capability");
@@ -1126,6 +1129,7 @@ mod tests {
         let mut broken = g.clone();
         broken.nodes[2].kind = DecisionNode::RequireApproval(RequireApprovalNode {
             source: "missing".to_string(),
+            capability: "test_mutation".to_string(),
         });
         assert!(validate_graph(&broken).is_err());
     }
