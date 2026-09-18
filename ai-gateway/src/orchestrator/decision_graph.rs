@@ -397,12 +397,11 @@ fn validate_node_contract(node: &GraphNode) -> Result<()> {
             if acquire.max_rows == 0 {
                 bail!("acquire evidence node '{}' max_rows must be positive", node.id);
             }
-            if acquire.affects.is_empty() {
-                bail!("acquire evidence node '{}' must declare at least one affected node", node.id);
-            }
-            let unique = acquire.affects.iter().collect::<HashSet<_>>();
-            if unique.len() != acquire.affects.len() {
-                bail!("acquire evidence node '{}' affects must be unique", node.id);
+            if acquire.affects.len() != 1 {
+                bail!(
+                    "acquire evidence node '{}' must declare exactly one re-evaluation root; downstream dependents are invalidated automatically",
+                    node.id
+                );
             }
             if acquire.affects.iter().any(|affected| affected == &node.id) {
                 bail!("acquire evidence node '{}' cannot affect itself", node.id);
@@ -586,12 +585,12 @@ fn validate_control_flow_cycles_are_bounded(graph: &DecisionGraph) -> Result<()>
             Some(Mark::Done) => return Ok(()),
             Some(Mark::Visiting) => {
                 stack.push(id);
-                let cycle_has_bounded_reason = stack
+                let cycle_has_bounded_node = stack
                     .iter()
                     .any(|node_id| is_bounded_cycle_node(graph, node_id));
-                if !cycle_has_bounded_reason {
+                if !cycle_has_bounded_node {
                     bail!(
-                        "unbounded control-flow cycle: {} (add a Reason node with max_iterations > 0 to the cycle to make it explicit and bounded)",
+                        "unbounded control-flow cycle: {} (add a bounded Reason or AcquireEvidence re-evaluation node)",
                         stack.join(" -> ")
                     );
                 }
