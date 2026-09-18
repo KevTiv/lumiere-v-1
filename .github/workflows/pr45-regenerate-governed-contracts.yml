@@ -1,5 +1,5 @@
 name: PR45 regenerate governed contracts
-# Retrigger after STDB replay-scope fix.
+# Retrigger after governed storage census and projection-policy updates.
 
 on:
   push:
