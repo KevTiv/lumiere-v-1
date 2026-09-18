@@ -453,7 +453,7 @@ fn decode_capability_execution_row(row: &Value) -> Result<CapabilityExecutionRow
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum ApprovalStatus {
     Pending,
-    Approved,
+    Approved { execution_record_id: Option<u64> },
     Rejected(String),
 }
 
@@ -610,7 +610,12 @@ impl ApprovalCoordinator for StdbApprovalCoordinator<'_> {
             .context("approval draft status missing")?;
         Ok(match status {
             "pending" => ApprovalStatus::Pending,
-            "approved" => ApprovalStatus::Approved,
+            "approved" => ApprovalStatus::Approved {
+                execution_record_id: row
+                    .get("executionRecordId")
+                    .or_else(|| row.get("execution_record_id"))
+                    .and_then(Value::as_u64),
+            },
             "rejected" => ApprovalStatus::Rejected(
                 row.get("rejectReason")
                     .or_else(|| row.get("reject_reason"))
