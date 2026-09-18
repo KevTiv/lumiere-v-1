@@ -584,9 +584,13 @@ pub fn record_ai_program_checkpoint(
     if let Some(existing) = ctx
         .db
         .ai_intelligence_event()
-        .ai_intelligence_event_by_request_hash()
-        .filter(&(organization_id, params.checkpoint_hash.clone()))
-        .find(|event| event.run_id == run_id && event.event_kind == "program_checkpoint")
+        .ai_intelligence_event_by_run()
+        .filter(&run_id)
+        .find(|event| {
+            event.organization_id == organization_id
+                && event.event_kind == "program_checkpoint"
+                && event.request_hash == params.checkpoint_hash
+        })
     {
         if existing.output_json == params.checkpoint_json
             && existing.shadow_profile_ref.as_deref() == Some(params.program_ref.as_str())
