@@ -8,9 +8,10 @@
 //!
 //! A version, once registered, is immutable — `register_ai_decision_type`
 //! is idempotent on an identical replay and rejects a differing one, same
-//! contract as every other GP table. `organization_id = 0` is a
-//! system-wide definition available to all organizations, following
-//! `AiSkill`'s existing convention (`ai/skills.rs`).
+//! contract as every other GP table. `organization_id` always identifies a
+//! real organization; there is no cross-org sharing here, matching the
+//! codebase's dominant convention of rejecting `organization_id == 0` as
+//! invalid input, not treating it as a sentinel.
 //!
 //! Additive only: no reducer here is called by production code yet.
 
@@ -39,7 +40,6 @@ pub struct AiDecisionTypeDefinition {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    /// `0` = system-wide definition available to all organizations.
     pub organization_id: u64,
     pub decision_type_name: String,
     pub decision_type_version: u32,
@@ -76,15 +76,17 @@ pub struct RegisterAiDecisionTypeParams {
     pub escalation_policy_json: String,
 }
 
-/// Register (or idempotently replay) one immutable decision type version.
-/// `organization_id = 0` registers a system-wide definition; any other
-/// value scopes it to that organization only.
+/// Register (or idempotently replay) one immutable decision type version,
+/// scoped to `organization_id`.
 #[reducer]
 pub fn register_ai_decision_type(
     ctx: &ReducerContext,
     organization_id: u64,
     params: RegisterAiDecisionTypeParams,
 ) -> Result<(), String> {
+    if organization_id == 0 {
+        return Err("register_ai_decision_type requires a non-zero organization_id".to_string());
+    }
     check_permission(
         ctx,
         organization_id,
@@ -168,6 +170,9 @@ pub fn set_ai_decision_type_active(
     decision_type_version: u32,
     is_active: bool,
 ) -> Result<(), String> {
+    if organization_id == 0 {
+        return Err("set_ai_decision_type_active requires a non-zero organization_id".to_string());
+    }
     check_permission(ctx, organization_id, "ai_decision_type_definition", "write")?;
 
     let definition = find_definition(
