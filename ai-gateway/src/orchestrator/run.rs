@@ -1239,6 +1239,44 @@ fn reject_legacy_analytics_sql(inputs: &Value) -> Result<()> {
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn governed_runtime_preflight_never_bootstraps_missing_calibration() {
+        let decision_types =
+            super::super::decision_type::InMemoryDecisionTypeRegistry::with_builtins();
+        let calibration =
+            super::super::probabilistic::InMemoryCalibrationProfileStore::new();
+        let graph = super::super::governed_programs::report_analysis_graph();
+
+        let error = validate_governed_runtime_configuration(
+            9,
+            &graph,
+            &decision_types,
+            &calibration,
+        )
+        .await
+        .unwrap_err();
+        assert!(error.to_string().contains("run governed bootstrap first"));
+
+        calibration
+            .register(super::super::probabilistic::CalibrationProfile {
+                profile_ref: super::super::probabilistic::CalibrationProfileRef {
+                    name: "report-attention".to_string(),
+                    version: 1,
+                },
+                breakpoints: vec![(0.0, 0.0), (0.35, 0.35), (0.65, 0.65), (1.0, 1.0)],
+            })
+            .unwrap();
+
+        validate_governed_runtime_configuration(
+            9,
+            &graph,
+            &decision_types,
+            &calibration,
+        )
+        .await
+        .unwrap();
+    }
+
     #[test]
     fn rejects_legacy_sql_inputs() {
         assert!(reject_legacy_analytics_sql(&json!({"analysis_sql": "SELECT 1"})).is_err());
