@@ -176,7 +176,7 @@ pub(super) enum DecisionNode {
 }
 
 impl DecisionNode {
-    fn label(&self) -> &'static str {
+    pub(super) fn label(&self) -> &'static str {
         match self {
             DecisionNode::Compute(_) => "compute",
             DecisionNode::Choice(_) => "choice",
@@ -338,7 +338,7 @@ pub(super) fn validate_graph(graph: &DecisionGraph) -> Result<()> {
 
 
 fn validate_node_contract(node: &GraphNode) -> Result<()> {
-    if matches!(node.kind, DecisionNode::Gate(_)) && node.next.is_some() {
+    if matches!(&node.kind, DecisionNode::Gate(_)) && node.next.is_some() {
         bail!("gate node '{}' must use branch targets instead of next", node.id);
     }
     match &node.kind {
