@@ -30,7 +30,7 @@ use std::sync::RwLock;
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use stdb_client::StdbClient;
+use stdb_client::{ReducerCall, StdbClient};
 
 use super::intelligence::{DecisionKind, DecisionRequest, DecisionResponse, DecisionTypeRef};
 use super::precedent::{DecisionCaseStatus, PrecedentPolicy};
@@ -338,9 +338,7 @@ impl DecisionTypeRegistry for StdbDecisionTypeRegistry<'_> {
         }
         definition.validate()?;
         self.writer
-            .call_reducer(stdb_client::reducer_call!(
-                register_ai_decision_type,
-                json!([
+            .call_reducer(ReducerCall::from_name("register_ai_decision_type", json!([
                     self.organization_id,
                     {
                         "decision_type_name": definition.decision_type.name,
@@ -355,8 +353,7 @@ impl DecisionTypeRegistry for StdbDecisionTypeRegistry<'_> {
                         "verification_required": definition.verification_policy.required,
                         "escalation_policy_json": encode_escalation_policy(&definition.escalation_policy).to_string(),
                     }
-                ])
-            ))
+                ])))
             .await
             .context("register durable decision type")
     }
