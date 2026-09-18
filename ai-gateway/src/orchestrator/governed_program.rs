@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use chrono::Utc;
-use futures::future::try_join_all;
+use futures::future::join_all;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use stdb_client::StdbClient;
@@ -192,15 +192,15 @@ impl IntelligenceEventRecorder for StdbIntelligenceEventRecorder<'_> {
                     context.run_id,
                     {
                         "step_no": step_no,
-                        "decision_type_name": request.decision_type.name,
+                        "decision_type_name": request.decision_type.name.clone(),
                         "decision_type_version": request.decision_type.version,
                         "request_hash": request_hash,
                         "request_json": serde_json::to_string(request)?,
                         "outcome_kind": decision_kind_label(response.kind),
                         "output_json": serde_json::to_string(response)?,
                         "confidence": response.confidence,
-                        "provider": response.provider,
-                        "model": response.model,
+                        "provider": response.provider.clone(),
+                        "model": response.model.clone(),
                         "provider_attempt_id": null,
                         "input_tokens": response.input_tokens,
                         "output_tokens": response.output_tokens,
@@ -264,7 +264,7 @@ impl GovernedProgramExecutor<'_> {
                         .await?;
                     values.insert(node.id.clone(), NodeValue::Json(value));
                     trace.push(step(&node, "deterministic compute completed"));
-                    current = next_or_complete(&node, &values, trace, decision_calls, capability_calls)?;
+                    current = next_or_complete(&node)?;
                 }
                 DecisionNode::Choice(decision) => {
                     event_step += 1;
@@ -294,7 +294,7 @@ impl GovernedProgramExecutor<'_> {
                             capability_calls,
                         ));
                     }
-                    current = next_or_complete(&node, &values, trace, decision_calls, capability_calls)?;
+                    current = next_or_complete(&node)?;
                 }
                 DecisionNode::Score(decision) => {
                     event_step += 1;
@@ -324,7 +324,7 @@ impl GovernedProgramExecutor<'_> {
                             capability_calls,
                         ));
                     }
-                    current = next_or_complete(&node, &values, trace, decision_calls, capability_calls)?;
+                    current = next_or_complete(&node)?;
                 }
                 DecisionNode::Probability(decision) => {
                     event_step += 1;
@@ -354,7 +354,7 @@ impl GovernedProgramExecutor<'_> {
                             capability_calls,
                         ));
                     }
-                    current = next_or_complete(&node, &values, trace, decision_calls, capability_calls)?;
+                    current = next_or_complete(&node)?;
                 }
                 DecisionNode::Batch(batch) => {
                     let mut work = Vec::with_capacity(batch.members.len());
@@ -401,7 +401,7 @@ impl GovernedProgramExecutor<'_> {
                         };
                         work.push(async move { (member_id.clone(), future.await) });
                     }
-                    let results = try_join_all(work)
+                    let results = join_all(work)
                         .await
                         .into_iter()
                         .map(|(id, result)| result.map(|value| (id, value)))
@@ -427,7 +427,7 @@ impl GovernedProgramExecutor<'_> {
                         NodeValue::Json(Value::Object(batch_json)),
                     );
                     trace.push(step(&node, "parallel decision batch completed"));
-                    current = next_or_complete(&node, &values, trace, decision_calls, capability_calls)?;
+                    current = next_or_complete(&node)?;
                 }
                 DecisionNode::Gate(gate) => {
                     let source = values
@@ -460,7 +460,7 @@ impl GovernedProgramExecutor<'_> {
                         | CapabilityStepOutcome::Replayed(output) => {
                             values.insert(node.id.clone(), NodeValue::Tool(output));
                             trace.push(step(&node, "governed capability completed"));
-                            current = next_or_complete(&node, &values, trace, decision_calls, capability_calls)?;
+                            current = next_or_complete(&node)?;
                         }
                         CapabilityStepOutcome::Denied(reason) => {
                             return Ok(outcome(
@@ -508,7 +508,7 @@ impl GovernedProgramExecutor<'_> {
                         | CapabilityStepOutcome::Replayed(output) => {
                             values.insert(node.id.clone(), NodeValue::Tool(output));
                             trace.push(step(&node, "conditional evidence acquired"));
-                            current = next_or_complete(&node, &values, trace, decision_calls, capability_calls)?;
+                            current = next_or_complete(&node)?;
                         }
                         CapabilityStepOutcome::Denied(reason) => {
                             return Ok(outcome(
@@ -546,7 +546,7 @@ impl GovernedProgramExecutor<'_> {
                         VerificationOutcome::Verified => {
                             values.insert(node.id.clone(), NodeValue::Json(json!({"verified": true})));
                             trace.push(step(&node, "verification passed"));
-                            current = next_or_complete(&node, &values, trace, decision_calls, capability_calls)?;
+                            current = next_or_complete(&node)?;
                         }
                         VerificationOutcome::RequiresReview { reason } => {
                             return Ok(outcome(
@@ -954,7 +954,7 @@ fn select_gate_target(
     };
     let default = branches
         .iter()
-        .find(|branch| matches!(branch.condition, GateCondition::Default))
+        .find(|branch| matches!(&branch.condition, GateCondition::Default))
         .context("gate has no default branch")?;
     for branch in branches {
         let matched = match &branch.condition {
@@ -1021,17 +1021,10 @@ fn step(node: &GraphNode, summary: impl Into<String>) -> GovernedProgramTraceSte
     }
 }
 
-fn next_or_complete(
-    node: &GraphNode,
-    values: &HashMap<String, NodeValue>,
-    trace: Vec<GovernedProgramTraceStep>,
-    decision_calls: u32,
-    capability_calls: u32,
-) -> Result<String> {
+fn next_or_complete(node: &GraphNode) -> Result<String> {
     if let Some(next) = &node.next {
         return Ok(next.clone());
     }
-    let _ = (values, trace, decision_calls, capability_calls);
     bail!("terminal node '{}' must be Generate, EarlyStop, or have a next successor", node.id)
 }
 
