@@ -669,6 +669,21 @@ impl DecisionPatternRecorder for StdbDecisionPatternRecorder<'_> {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum DecisionExecutionMode {
+    ModelPrimary,
+    DeterministicShadow,
+    DeterministicPrimaryModelShadow,
+    DeterministicOnly,
+}
+
+impl Default for DecisionExecutionMode {
+    fn default() -> Self {
+        Self::ModelPrimary
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct GraduationPolicy {
@@ -686,6 +701,8 @@ pub(super) struct GraduationPolicy {
     pub minimum_shadow_cases: u64,
     #[serde(default = "default_minimum_shadow_conformance_rate")]
     pub minimum_shadow_conformance_rate: f64,
+    #[serde(default)]
+    pub execution_mode: DecisionExecutionMode,
 }
 
 fn default_minimum_shadow_conformance_rate() -> f64 { 0.98 }
@@ -705,6 +722,7 @@ impl GraduationPolicy {
             minimum_candidate_set_stability: Some(0.95),
             minimum_shadow_cases: 15,
             minimum_shadow_conformance_rate: 0.98,
+            execution_mode: DecisionExecutionMode::ModelPrimary,
         }
     }
 
@@ -922,6 +940,308 @@ impl StdbConformanceAggregator<'_> {
             }
         }
         Ok(aggregate)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct DecisionResolutionContext {
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub run_id: u64,
+    pub program_ref: String,
+    pub step_id: String,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct PromotedDeterministicResolution {
+    pub mode: DecisionExecutionMode,
+    pub pattern_ref: String,
+    pub implementation_ref: String,
+}
+
+#[async_trait]
+pub(super) trait DecisionResolutionPolicy: Send + Sync {
+    async fn resolve(
+        &self,
+        context: &DecisionResolutionContext,
+        request: &DecisionRequest,
+    ) -> Result<Option<PromotedDeterministicResolution>>;
+}
+
+pub(super) struct StdbDecisionResolutionPolicy<'a> {
+    pub reader: &'a StdbClient,
+}
+
+#[async_trait]
+impl DecisionResolutionPolicy for StdbDecisionResolutionPolicy<'_> {
+    async fn resolve(
+        &self,
+        context: &DecisionResolutionContext,
+        request: &DecisionRequest,
+    ) -> Result<Option<PromotedDeterministicResolution>> {
+        if context.organization_id == 0 || context.company_id == 0 || context.run_id == 0 {
+            bail!("decision resolution requires nonzero organization/company/run ids");
+        }
+        request.validate()?;
+
+        let policy_store = StdbGraduationPolicyStore {
+            reader: self.reader,
+            organization_id: context.organization_id,
+        };
+        let graduation = policy_store.policy_for(&request.decision_type).await?;
+        match graduation.execution_mode {
+            DecisionExecutionMode::ModelPrimary => return Ok(None),
+            DecisionExecutionMode::DeterministicShadow => return Ok(None),
+            DecisionExecutionMode::DeterministicPrimaryModelShadow
+            | DecisionExecutionMode::DeterministicOnly => {}
+        }
+
+        let rows = self
+            .reader
+            .query_sql(&format!(
+                "SELECT * FROM ai_decision_pattern WHERE organization_id = {} \
+                 AND decision_type_name = '{}' AND decision_type_version = {} \
+                 AND status = 'promoted' LIMIT 100",
+                context.organization_id,
+                sql_escape(&request.decision_type.name),
+                request.decision_type.version
+            ))
+            .await
+            .context("query promoted deterministic decision patterns")?;
+
+        let current_context_fingerprint = json_fingerprint(&request.bounded_state)?;
+        let current_candidate_set_hash = canonical_string_list(&request.candidates.iter().map(|v| Value::String(v.clone())).collect::<Vec<_>>());
+        let current_evidence_shape = value_shape(&request.bounded_state);
+
+        let mut matches = Vec::new();
+        for row in rows {
+            let applicability_raw = row_string(&row, "applicabilityJson")
+                .context("promoted pattern applicability_json missing")?;
+            let applicability: PatternApplicabilityEvidence =
+                serde_json::from_str(&applicability_raw)
+                    .context("decode promoted pattern applicability")?;
+            if applicability.company_id != context.company_id
+                || applicability.program_ref != context.program_ref
+                || applicability.step_id != context.step_id
+                || applicability.context_fingerprint != current_context_fingerprint
+                || applicability.candidate_set_hash != current_candidate_set_hash
+                || applicability.evidence_shape != current_evidence_shape
+            {
+                continue;
+            }
+
+            let promotion_raw = row_string(&row, "reviewedNote")
+                .context("promoted pattern is missing promotion evidence")?;
+            let promotion: Value =
+                serde_json::from_str(&promotion_raw).context("decode promotion evidence")?;
+            let implementation_ref = promotion
+                .get("implementation_ref")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .context("promotion evidence missing implementation_ref")?
+                .to_string();
+            let pattern_ref = row_string(&row, "patternKey")
+                .context("promoted pattern key missing")?;
+            matches.push(PromotedDeterministicResolution {
+                mode: graduation.execution_mode,
+                pattern_ref,
+                implementation_ref,
+            });
+        }
+
+        match matches.len() {
+            0 => bail!(
+                "deterministic execution mode is enabled but no promoted pattern matches the current decision partition"
+            ),
+            1 => Ok(matches.pop()),
+            _ => bail!(
+                "multiple promoted deterministic patterns match the current decision partition"
+            ),
+        }
+    }
+}
+
+#[async_trait]
+pub(super) trait ModelShadowRecorder: Send + Sync {
+    async fn record_model_shadow(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        run_id: u64,
+        request: &DecisionRequest,
+        response: Result<&DecisionResponse, &str>,
+    ) -> Result<()>;
+}
+
+pub(super) struct StdbModelShadowRecorder<'a> {
+    pub writer: &'a StdbClient,
+}
+
+#[async_trait]
+impl ModelShadowRecorder for StdbModelShadowRecorder<'_> {
+    async fn record_model_shadow(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        run_id: u64,
+        request: &DecisionRequest,
+        response: Result<&DecisionResponse, &str>,
+    ) -> Result<()> {
+        let request_hash = decision_request_hash(request)?;
+        let request_json = serde_json::to_string(request)?;
+        let params = match response {
+            Ok(response) => json!({
+                "shadow_profile_ref": format!("model-shadow:{}:{}", response.provider, response.model),
+                "decision_type_name": request.decision_type.name,
+                "decision_type_version": request.decision_type.version,
+                "request_hash": request_hash,
+                "request_json": request_json,
+                "outcome_kind": decision_kind_label(request.kind),
+                "output_json": serde_json::to_string(response)?,
+                "confidence": response.confidence,
+                "provider": response.provider,
+                "model": response.model,
+                "input_tokens": response.input_tokens,
+                "output_tokens": response.output_tokens,
+                "shadow_error": null,
+            }),
+            Err(error) => json!({
+                "shadow_profile_ref": "model-shadow:error",
+                "decision_type_name": request.decision_type.name,
+                "decision_type_version": request.decision_type.version,
+                "request_hash": request_hash,
+                "request_json": request_json,
+                "outcome_kind": null,
+                "output_json": null,
+                "confidence": null,
+                "provider": "model-shadow",
+                "model": "unavailable",
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "shadow_error": error,
+            }),
+        };
+        self.writer
+            .call_reducer(ReducerCall::from_name(
+                "record_ai_decision_shadow_event",
+                json!([organization_id, company_id, run_id, params]),
+            ))
+            .await
+            .context("record model shadow for deterministic-primary decision")
+    }
+}
+
+pub(super) struct GovernedDecisionResolver<'a> {
+    pub policy: &'a dyn DecisionResolutionPolicy,
+    pub candidates: &'a DeterministicCandidateRegistry,
+    pub model: &'a dyn super::intelligence::DecisionProvider,
+    pub model_shadow_recorder: &'a dyn ModelShadowRecorder,
+}
+
+impl GovernedDecisionResolver<'_> {
+    pub async fn decide(
+        &self,
+        context: &DecisionResolutionContext,
+        request: DecisionRequest,
+    ) -> Result<DecisionResponse> {
+        let resolution = self.policy.resolve(context, &request).await?;
+        let Some(resolution) = resolution else {
+            return self.model.decide(request).await;
+        };
+
+        let candidate = self
+            .candidates
+            .get(&resolution.implementation_ref)
+            .with_context(|| {
+                format!(
+                    "promoted deterministic implementation '{}' is not registered",
+                    resolution.implementation_ref
+                )
+            })?;
+        if candidate.decision_type() != request.decision_type {
+            bail!("promoted deterministic candidate DecisionType does not match request");
+        }
+
+        match resolution.mode {
+            DecisionExecutionMode::DeterministicPrimaryModelShadow => {
+                let deterministic = candidate.evaluate(&request).await?;
+                deterministic.validate_against(&request)?;
+                let model_result = self.model.decide(request.clone()).await;
+                match &model_result {
+                    Ok(response) => {
+                        if let Err(error) = self
+                            .model_shadow_recorder
+                            .record_model_shadow(
+                                context.organization_id,
+                                context.company_id,
+                                context.run_id,
+                                &request,
+                                Ok(response),
+                            )
+                            .await
+                        {
+                            tracing::warn!("failed to record deterministic-primary model shadow: {error:#}");
+                        }
+                    }
+                    Err(error) => {
+                        if let Err(record_error) = self
+                            .model_shadow_recorder
+                            .record_model_shadow(
+                                context.organization_id,
+                                context.company_id,
+                                context.run_id,
+                                &request,
+                                Err(error.to_string().as_str()),
+                            )
+                            .await
+                        {
+                            tracing::warn!("failed to record model-shadow error: {record_error:#}");
+                        }
+                    }
+                }
+                Ok(deterministic_to_decision_response(
+                    deterministic,
+                    &resolution.implementation_ref,
+                ))
+            }
+            DecisionExecutionMode::DeterministicOnly => {
+                let deterministic = candidate.evaluate(&request).await?;
+                deterministic.validate_against(&request)?;
+                Ok(deterministic_to_decision_response(
+                    deterministic,
+                    &resolution.implementation_ref,
+                ))
+            }
+            DecisionExecutionMode::ModelPrimary | DecisionExecutionMode::DeterministicShadow => {
+                self.model.decide(request).await
+            }
+        }
+    }
+}
+
+fn deterministic_to_decision_response(
+    response: DeterministicDecisionResponse,
+    implementation_ref: &str,
+) -> DecisionResponse {
+    DecisionResponse {
+        kind: response.kind,
+        choice: response.choice,
+        score: response.score,
+        probability: response.probability,
+        confidence: None,
+        rationale: response.rationale,
+        model: implementation_ref.to_string(),
+        provider: "deterministic".to_string(),
+        input_tokens: 0,
+        output_tokens: 0,
+    }
+}
+
+fn decision_kind_label(kind: DecisionKind) -> &'static str {
+    match kind {
+        DecisionKind::Choice => "choice",
+        DecisionKind::Score => "score",
+        DecisionKind::Probability => "probability",
     }
 }
 
@@ -1292,6 +1612,13 @@ fn expression_kind(events: &[&DecisionEventRow]) -> DeterministicExpressionKind 
         Some("score" | "probability") => DeterministicExpressionKind::ThresholdPolicy,
         _ => DeterministicExpressionKind::NotExpressible,
     }
+}
+
+fn json_fingerprint(value: &Value) -> Result<String> {
+    let canonical = canonical_json(value)?;
+    let mut hasher = Sha256::new();
+    hasher.update(canonical.as_bytes());
+    Ok(format!("sha256:{:x}", hasher.finalize()))
 }
 
 fn applicability_fingerprint(
@@ -1862,6 +2189,82 @@ mod tests {
         .unwrap();
         assert_eq!(comparison.gate_disposition_match, Some(true));
         assert!(comparison.conformant);
+    }
+
+    struct NoopModelShadowRecorder;
+
+    #[async_trait]
+    impl ModelShadowRecorder for NoopModelShadowRecorder {
+        async fn record_model_shadow(
+            &self,
+            _organization_id: u64,
+            _company_id: u64,
+            _run_id: u64,
+            _request: &DecisionRequest,
+            _response: Result<&DecisionResponse, &str>,
+        ) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    struct FixedResolutionPolicy {
+        resolution: Option<PromotedDeterministicResolution>,
+    }
+
+    #[async_trait]
+    impl DecisionResolutionPolicy for FixedResolutionPolicy {
+        async fn resolve(
+            &self,
+            _context: &DecisionResolutionContext,
+            _request: &DecisionRequest,
+        ) -> Result<Option<PromotedDeterministicResolution>> {
+            Ok(self.resolution.clone())
+        }
+    }
+
+    struct FailingModel;
+
+    #[async_trait]
+    impl super::super::intelligence::DecisionProvider for FailingModel {
+        async fn decide(&self, _request: DecisionRequest) -> Result<DecisionResponse> {
+            bail!("model shadow failed")
+        }
+    }
+
+    #[tokio::test]
+    async fn deterministic_primary_remains_live_when_model_shadow_fails() {
+        let registry = DeterministicCandidateRegistry::default();
+        registry
+            .register(Arc::new(FixedDeterministicCandidate))
+            .unwrap();
+        let policy = FixedResolutionPolicy {
+            resolution: Some(PromotedDeterministicResolution {
+                mode: DecisionExecutionMode::DeterministicPrimaryModelShadow,
+                pattern_ref: "pattern:test@1".into(),
+                implementation_ref: "deterministic:test@1".into(),
+            }),
+        };
+        let resolver = GovernedDecisionResolver {
+            policy: &policy,
+            candidates: &registry,
+            model: &FailingModel,
+            model_shadow_recorder: &NoopModelShadowRecorder,
+        };
+        let response = resolver
+            .decide(
+                &DecisionResolutionContext {
+                    organization_id: 1,
+                    company_id: 2,
+                    run_id: 3,
+                    program_ref: "skill:test@1".into(),
+                    step_id: "decision".into(),
+                },
+                shadow_request(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.provider, "deterministic");
+        assert_eq!(response.choice.as_deref(), Some("a"));
     }
 
     #[test]
