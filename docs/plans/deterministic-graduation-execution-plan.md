@@ -451,6 +451,12 @@ Savings are observability outputs, never promotion criteria by themselves.
 
 ## 18. Implementation sequence
 
+**Current implementation status (PR #45):**
+
+- **DG-01 foundation implemented:** typed metrics/candidate contracts, structural cohort fingerprinting, STDB case/event analysis, entropy/correction/outcome/evidence-shape/candidate-set metrics, provider-shadow disagreement, and spend/latency aggregation.
+- **DG-02 foundation implemented:** typed validated `GraduationPolicy`, fail-closed eligibility evaluation, and optional policy persistence inside the existing immutable organization-scoped `DecisionTypeDefinition.precedent_policy_json` envelope under `graduation`. Existing definitions without the field remain backward-compatible and graduation-disabled.
+- Policy stability remains intentionally `None` until DG-03 persists materially relevant policy/version refs on pattern/case evidence; missing required metrics fail eligibility rather than being inferred.
+
 ### DG-01 — metrics foundation
 
 - define `GraduationMetrics`, `GraduationQuery`, `GraduationCandidate`;
