@@ -716,6 +716,15 @@ pub(super) fn admit_decision(
 /// Starter catalog matching architecture §6's named examples. Not
 /// exhaustive; each is a reasonable, illustrative default, not a fixed
 /// business rule — organizations register/override their own.
+pub(super) async fn register_builtin_decision_types(
+    registry: &dyn DecisionTypeRegistry,
+) -> Result<()> {
+    for definition in builtin_definitions() {
+        registry.register(definition).await?;
+    }
+    Ok(())
+}
+
 fn builtin_definitions() -> Vec<DecisionTypeDefinition> {
     vec![
         DecisionTypeDefinition {
@@ -802,6 +811,33 @@ fn builtin_definitions() -> Vec<DecisionTypeDefinition> {
                 always_escalate_risk_classes: vec![RiskClass::Critical],
             },
         },
+        DecisionTypeDefinition {
+            decision_type: DecisionTypeRef {
+                name: "ReportAttentionNeed".to_string(),
+                version: 1,
+            },
+            description: "Estimate whether an approved analytics summary warrants focused human follow-up.".to_string(),
+            kind: DecisionKind::Probability,
+            input_schema: StructuralSchema {
+                fields: vec![FieldSchema::required("data", FieldKind::Object)],
+            },
+            output_schema: StructuralSchema::default(),
+            required_evidence_kinds: vec![],
+            risk_class: RiskClass::Low,
+            precedent_policy: PrecedentPolicy {
+                enabled: true,
+                max_cases: 10,
+                minimum_status: DecisionCaseStatus::Verified,
+                require_same_program_step: true,
+                include_patterns: true,
+            },
+            verification_policy: VerificationPolicy { required: false },
+            escalation_policy: EscalationPolicy {
+                min_confidence: Some(0.35),
+                always_escalate_risk_classes: vec![],
+            },
+        },
+
     ]
 }
 
