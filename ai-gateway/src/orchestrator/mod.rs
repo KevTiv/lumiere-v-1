@@ -6,6 +6,7 @@ mod governed_services;
 pub mod intelligence;
 mod intelligence_adapters;
 mod invocation_policy;
+mod precedent;
 mod progress;
 mod proposal_loop;
 pub mod run;
