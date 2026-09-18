@@ -38,6 +38,7 @@ pub(super) struct GraduationMetrics {
     pub correction_rate: f64,
     pub verified_outcome_rate: f64,
     pub provider_disagreement_rate: Option<f64>,
+    pub shadow_cases: u64,
     pub decision_entropy: f64,
     pub precedent_consistency: f64,
     /// None means the durable case/event model cannot establish this metric yet.
@@ -155,7 +156,7 @@ impl GraduationPolicy {
         Ok(())
     }
 
-    pub fn evaluate(&self, metrics: &GraduationMetrics, shadow_cases: u64) -> GraduationEligibility {
+    pub fn evaluate(&self, metrics: &GraduationMetrics) -> GraduationEligibility {
         if let Err(error) = self.validate() {
             return GraduationEligibility::ineligible(vec![format!("invalid policy: {error}")]);
         }
@@ -206,9 +207,9 @@ impl GraduationPolicy {
             self.minimum_candidate_set_stability,
             &mut reasons,
         );
-        if shadow_cases < self.minimum_shadow_cases {
+        if metrics.shadow_cases < self.minimum_shadow_cases {
             reasons.push(format!(
-                "shadow cases {shadow_cases} < {}",
+                "shadow cases {} < {}", metrics.shadow_cases,
                 self.minimum_shadow_cases
             ));
         }
@@ -281,6 +282,8 @@ struct CaseRow {
     id: u64,
     request_hash: String,
     context_fingerprint: String,
+    program_ref: String,
+    step_id: String,
     selected: Value,
     material_constraints: Value,
     status: String,
@@ -307,15 +310,22 @@ impl GraduationAnalyzer for StdbGraduationAnalyzer<'_> {
         let events = self.load_events(query).await?;
         let economics = self.load_provider_economics(query).await?;
 
+        let event_by_request = events
+            .iter()
+            .filter(|event| event.event_kind == "decision")
+            .map(|event| (event.request_hash.as_str(), event))
+            .collect::<HashMap<_, _>>();
         let mut by_fingerprint: BTreeMap<String, Vec<CaseRow>> = BTreeMap::new();
         for case in cases {
             if case.context_fingerprint.trim().is_empty() {
                 continue;
             }
-            by_fingerprint
-                .entry(case.context_fingerprint.clone())
-                .or_default()
-                .push(case);
+            let fingerprint = applicability_fingerprint(
+                &query.decision_type,
+                &case,
+                event_by_request.get(case.request_hash.as_str()).copied(),
+            )?;
+            by_fingerprint.entry(fingerprint).or_default().push(case);
         }
 
         let mut candidates = Vec::new();
@@ -516,7 +526,6 @@ fn compute_metrics(
         .filter_map(|id| economics.get(id).and_then(|value| value.latency_ms))
         .collect::<Vec<_>>();
 
-    let _ = shadow_cases; // exposed through helper for policy evaluation callers.
     Ok(GraduationMetrics {
         decision_type,
         applicability_fingerprint: fingerprint,
@@ -526,6 +535,7 @@ fn compute_metrics(
         correction_rate,
         verified_outcome_rate,
         provider_disagreement_rate,
+        shadow_cases,
         decision_entropy,
         precedent_consistency,
         // Decision cases currently do not persist a policy-version ref. Do not
@@ -538,15 +548,6 @@ fn compute_metrics(
     })
 }
 
-pub(super) fn shadow_case_count(events: &[DecisionEventSnapshot]) -> u64 {
-    events.iter().filter(|event| event.is_shadow).count() as u64
-}
-
-#[derive(Clone, Debug)]
-pub(super) struct DecisionEventSnapshot {
-    pub is_shadow: bool,
-}
-
 fn shadow_disagreement(events: &[&DecisionEventRow]) -> Result<(Option<f64>, u64)> {
     let mut primary = HashMap::<&str, String>::new();
     let mut shadows = Vec::<(&str, String)>::new();
@@ -556,7 +557,7 @@ fn shadow_disagreement(events: &[&DecisionEventRow]) -> Result<(Option<f64>, u64
             continue;
         }
         let Some(output) = &event.output else { continue };
-        let canonical = canonical_json(output)?;
+        let canonical = canonical_json(&decision_signal(output))?;
         match event.event_kind.as_str() {
             "decision" => {
                 primary.insert(event.request_hash.as_str(), canonical);
@@ -608,12 +609,50 @@ fn expression_kind(events: &[&DecisionEventRow]) -> DeterministicExpressionKind 
     }
 }
 
+fn applicability_fingerprint(
+    decision_type: &DecisionTypeRef,
+    case: &CaseRow,
+    event: Option<&DecisionEventRow>,
+) -> Result<String> {
+    let candidate_set_hash = event
+        .and_then(|event| event.request.get("candidates"))
+        .and_then(Value::as_array)
+        .map(|values| canonical_string_list(values))
+        .unwrap_or_else(|| "no-candidate-set".to_string());
+    let evidence_shape = value_shape(&case.material_constraints);
+    let material = format!(
+        "{}@{}\n{}\n{}\n{}\n{}\n{}",
+        decision_type.name,
+        decision_type.version,
+        case.program_ref,
+        case.step_id,
+        case.context_fingerprint,
+        candidate_set_hash,
+        evidence_shape,
+    );
+    let mut hasher = Sha256::new();
+    hasher.update(material.as_bytes());
+    Ok(format!("sha256:{:x}", hasher.finalize()))
+}
+
+fn decision_signal(output: &Value) -> Value {
+    let mut signal = serde_json::Map::new();
+    for key in ["kind", "choice", "score", "probability"] {
+        if let Some(value) = output.get(key) {
+            signal.insert(key.to_string(), value.clone());
+        }
+    }
+    Value::Object(signal)
+}
+
 fn decode_case(row: &Value) -> Result<CaseRow> {
     Ok(CaseRow {
         id: row_u64(row, "id").context("decision case id missing")?,
         request_hash: row_string(row, "requestHash").context("decision case request hash missing")?,
         context_fingerprint: row_string(row, "contextFingerprint")
             .context("decision case context fingerprint missing")?,
+        program_ref: row_string(row, "programRef").context("decision case program_ref missing")?,
+        step_id: row_string(row, "stepId").context("decision case step_id missing")?,
         selected: parse_json_string(row, "selectedJson")?,
         material_constraints: parse_json_string(row, "materialConstraintsJson")?,
         status: row_string(row, "status").unwrap_or_else(|| "observed".into()),
@@ -758,7 +797,8 @@ fn average_u64(values: &[u64]) -> Option<u64> {
     if values.is_empty() {
         return None;
     }
-    Some(values.iter().map(|value| u128::from(*value)).sum::<u128>() as u64 / values.len() as u64)
+    let total = values.iter().map(|value| u128::from(*value)).sum::<u128>();
+    Some((total / values.len() as u128).min(u128::from(u64::MAX)) as u64)
 }
 
 #[async_trait]
@@ -860,6 +900,7 @@ mod tests {
             correction_rate: 0.01,
             verified_outcome_rate: 0.9,
             provider_disagreement_rate: Some(0.02),
+            shadow_cases: 20,
             decision_entropy: 0.05,
             precedent_consistency: 0.98,
             policy_stability_rate: Some(1.0),
@@ -877,7 +918,7 @@ mod tests {
         policy.minimum_policy_stability = Some(0.95);
         let mut actual = metrics();
         actual.policy_stability_rate = None;
-        let result = policy.evaluate(&actual, 20);
+        let result = policy.evaluate(&actual);
         assert!(!result.eligible);
         assert!(result.reasons.iter().any(|reason| reason.contains("unavailable")));
     }
@@ -887,7 +928,7 @@ mod tests {
         let mut policy = GraduationPolicy::disabled();
         policy.enabled = true;
         policy.minimum_policy_stability = Some(0.95);
-        let result = policy.evaluate(&metrics(), 20);
+        let result = policy.evaluate(&metrics());
         assert!(result.eligible, "{:?}", result.reasons);
     }
 
