@@ -2,7 +2,6 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::sync::Arc;
-use stdb_client::ReducerCall;
 use uuid::Uuid;
 
 use crate::{
@@ -35,7 +34,8 @@ use super::{
     agent_loop_adapters::{
         run_finalization, run_recorded_loop, AuthorizedLoopTools, RunFinalization,
     },
-    decision_type::{register_builtin_decision_types, StdbDecisionTypeRegistry},
+    decision_graph::{DecisionGraph, DecisionNode, GateCondition},
+    decision_type::{DecisionTypeRegistry, StdbDecisionTypeRegistry},
     graduation::{
         production_deterministic_candidates, GovernedDecisionResolver,
         StdbAuthorityRollbackRecorder, StdbDecisionResolutionPolicy, StdbDriftMonitor,
@@ -60,7 +60,7 @@ use super::{
     invocation_policy::ReviewedInvocationPolicy,
     model_configuration::{IntelligenceRole, IntelligenceRouteResolver, StdbModelConfigurationStore},
     precedent::StdbPrecedentStore,
-    probabilistic::StdbCalibrationProfileStore,
+    probabilistic::{CalibrationProfileStore, StdbCalibrationProfileStore},
     run_review::{RunReviewDisposition, RunReviewProgram, RunReviewRecorder, StdbRunReviewRecorder},
     spend_admission::{spend_binding_from_agent, StdbSpendLedger},
 };
@@ -704,7 +704,6 @@ pub async fn run_skill_admitted(
             reader: tool_ctx.stdb.as_ref(),
             organization_id: req.org_id,
         };
-        register_builtin_decision_types(&decision_types).await?;
 
         let precedent = StdbPrecedentStore {
             writer: state.stdb.as_ref(),
@@ -749,27 +748,16 @@ pub async fn run_skill_admitted(
         let verification = ShapeOnlyVerificationService;
         let answer_admission = DeterministicFinalAnswerAdmission;
         let compute = BuiltinComputeService;
-        if skill_key == "report_analysis" {
-            state
-                .stdb
-                .call_reducer(ReducerCall::from_name(
-                    "register_ai_calibration_profile",
-                    json!([
-                        req.org_id,
-                        {
-                            "profile_name": "report-attention",
-                            "profile_version": 1,
-                            "description": "Initial reviewed calibration profile for ReportAttentionNeed@1; versioned explicitly so routing never gates on unlabelled raw confidence.",
-                            "breakpoints_json": "[[0.0,0.0],[0.35,0.35],[0.65,0.65],[1.0,1.0]]"
-                        }
-                    ]),
-                ))
-                .await
-                .context("register report attention calibration profile")?;
-        }
         let calibration = StdbCalibrationProfileStore {
             reader: tool_ctx.stdb.as_ref(),
         };
+        validate_governed_runtime_configuration(
+            req.org_id,
+            &graph,
+            &decision_types,
+            &calibration,
+        )
+        .await?;
         let deterministic_candidates = production_deterministic_candidates();
         let decision_resolution_policy = StdbDecisionResolutionPolicy {
             reader: tool_ctx.stdb.as_ref(),
@@ -1084,6 +1072,54 @@ async fn validate_resume_identity(
         serde_json::from_str(expected_inputs_json).context("decode expected resume inputs")?;
     if stored_value != expected_value {
         anyhow::bail!("resume run inputs do not match the original bounded state");
+    }
+    Ok(())
+}
+
+async fn validate_governed_runtime_configuration(
+    organization_id: u64,
+    graph: &DecisionGraph,
+    decision_types: &dyn DecisionTypeRegistry,
+    calibration: &dyn CalibrationProfileStore,
+) -> Result<()> {
+    for node in &graph.nodes {
+        let decision_type = match &node.kind {
+            DecisionNode::Choice(node) => Some(&node.decision_type),
+            DecisionNode::Score(node) => Some(&node.decision_type),
+            DecisionNode::Probability(node) => Some(&node.decision_type),
+            _ => None,
+        };
+        if let Some(reference) = decision_type {
+            decision_types
+                .get(&reference.name, reference.version)
+                .await?
+                .with_context(|| {
+                    format!(
+                        "governed DecisionType '{}@{}' is not provisioned; run governed bootstrap first",
+                        reference.name, reference.version
+                    )
+                })?;
+        }
+
+        if let DecisionNode::Gate(gate) = &node.kind {
+            for branch in &gate.branches {
+                if let GateCondition::ThresholdPolicy {
+                    calibration_profile: Some(reference),
+                    ..
+                } = &branch.condition
+                {
+                    calibration
+                        .get(organization_id, reference)
+                        .await?
+                        .with_context(|| {
+                            format!(
+                                "calibration profile '{}@{}' is not provisioned; run governed bootstrap first",
+                                reference.name, reference.version
+                            )
+                        })?;
+                }
+            }
+        }
     }
     Ok(())
 }
