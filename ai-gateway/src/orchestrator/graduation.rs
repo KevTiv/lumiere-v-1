@@ -9,9 +9,9 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use stdb_client::StdbClient;
+use stdb_client::{ReducerCall, StdbClient};
 
 use super::intelligence::DecisionTypeRef;
 
@@ -81,8 +81,139 @@ pub(super) struct GraduationCandidate {
     pub applicability_fingerprint: String,
     pub supporting_case_ids: Vec<u64>,
     pub dominant_selected: Value,
+    pub applicability: PatternApplicabilityEvidence,
     pub metrics: GraduationMetrics,
     pub proposed_expression_kind: DeterministicExpressionKind,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct PatternApplicabilityEvidence {
+    pub schema_version: u32,
+    pub applicability_fingerprint: String,
+    pub company_id: u64,
+    pub program_ref: String,
+    pub step_id: String,
+    pub context_fingerprint: String,
+    pub candidate_set_hash: String,
+    pub evidence_shape: String,
+    pub graduation_policy_ref: String,
+    pub material_policy_refs: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct PatternMetricsSnapshot {
+    pub schema_version: u32,
+    pub observed_cases: u64,
+    pub verified_cases: u64,
+    pub reviewed_cases: u64,
+    pub correction_rate: f64,
+    pub verified_outcome_rate: f64,
+    pub provider_disagreement_rate: Option<f64>,
+    pub shadow_cases: u64,
+    pub decision_entropy: f64,
+    pub precedent_consistency: f64,
+    pub policy_stability_rate: Option<f64>,
+    pub evidence_shape_stability: f64,
+    pub candidate_set_stability: Option<f64>,
+    pub average_cost_microunits: Option<u64>,
+    pub average_latency_ms: Option<u64>,
+    pub proposed_expression_kind: DeterministicExpressionKind,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct DecisionPatternProposal {
+    pub pattern_key: String,
+    pub decision_type: DecisionTypeRef,
+    pub supporting_case_ids: Vec<u64>,
+    pub applicability: PatternApplicabilityEvidence,
+    pub metrics: PatternMetricsSnapshot,
+}
+
+impl DecisionPatternProposal {
+    pub fn from_candidate(
+        pattern_key: impl Into<String>,
+        candidate: &GraduationCandidate,
+        applicability: PatternApplicabilityEvidence,
+    ) -> Result<Self> {
+        let pattern_key = pattern_key.into();
+        if pattern_key.trim().is_empty() {
+            bail!("pattern_key must be nonempty");
+        }
+        if candidate.applicability_fingerprint != applicability.applicability_fingerprint {
+            bail!("candidate and applicability fingerprints disagree");
+        }
+        if applicability.schema_version != 1 {
+            bail!("pattern applicability schema_version must be 1");
+        }
+        if applicability.graduation_policy_ref.trim().is_empty() {
+            bail!("graduation_policy_ref must be nonempty");
+        }
+        let metrics = PatternMetricsSnapshot {
+            schema_version: 1,
+            observed_cases: candidate.metrics.observed_cases,
+            verified_cases: candidate.metrics.verified_cases,
+            reviewed_cases: candidate.metrics.reviewed_cases,
+            correction_rate: candidate.metrics.correction_rate,
+            verified_outcome_rate: candidate.metrics.verified_outcome_rate,
+            provider_disagreement_rate: candidate.metrics.provider_disagreement_rate,
+            shadow_cases: candidate.metrics.shadow_cases,
+            decision_entropy: candidate.metrics.decision_entropy,
+            precedent_consistency: candidate.metrics.precedent_consistency,
+            policy_stability_rate: candidate.metrics.policy_stability_rate,
+            evidence_shape_stability: candidate.metrics.evidence_shape_stability,
+            candidate_set_stability: candidate.metrics.candidate_set_stability,
+            average_cost_microunits: candidate.metrics.average_cost_microunits,
+            average_latency_ms: candidate.metrics.average_latency_ms,
+            proposed_expression_kind: candidate.proposed_expression_kind,
+        };
+        Ok(Self {
+            pattern_key,
+            decision_type: candidate.decision_type.clone(),
+            supporting_case_ids: candidate.supporting_case_ids.clone(),
+            applicability,
+            metrics,
+        })
+    }
+}
+
+#[async_trait]
+pub(super) trait DecisionPatternRecorder: Send + Sync {
+    async fn propose(&self, proposal: &DecisionPatternProposal) -> Result<()>;
+}
+
+pub(super) struct StdbDecisionPatternRecorder<'a> {
+    pub writer: &'a StdbClient,
+    pub organization_id: u64,
+}
+
+#[async_trait]
+impl DecisionPatternRecorder for StdbDecisionPatternRecorder<'_> {
+    async fn propose(&self, proposal: &DecisionPatternProposal) -> Result<()> {
+        proposal.decision_type.validate()?;
+        if self.organization_id == 0 {
+            bail!("pattern recorder requires nonzero organization_id");
+        }
+        self.writer
+            .call_reducer(ReducerCall::from_name(
+                "propose_ai_decision_pattern",
+                json!([
+                    self.organization_id,
+                    {
+                        "pattern_key": proposal.pattern_key,
+                        "decision_type_name": proposal.decision_type.name,
+                        "decision_type_version": proposal.decision_type.version,
+                        "applicability_json": serde_json::to_string(&proposal.applicability)?,
+                        "supporting_case_ids": proposal.supporting_case_ids,
+                        "outcome_metrics_json": serde_json::to_string(&proposal.metrics)?,
+                        "correction_rate": proposal.metrics.correction_rate,
+                    }
+                ]),
+            ))
+            .await
+            .context("propose hardened deterministic graduation pattern")
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -350,11 +481,39 @@ impl GraduationAnalyzer for StdbGraduationAnalyzer<'_> {
             )?;
             let dominant_selected = dominant_value(cohort.iter().map(|case| &case.selected))
                 .unwrap_or(Value::Null);
+            let first = cohort.first().context("graduation cohort unexpectedly empty")?;
+            let primary_event = cohort_events
+                .iter()
+                .copied()
+                .find(|event| event.event_kind == "decision");
+            let candidate_set_hash = primary_event
+                .and_then(|event| event.request.get("candidates"))
+                .and_then(Value::as_array)
+                .map(|values| canonical_string_list(values))
+                .unwrap_or_else(|| "no-candidate-set".to_string());
+            let applicability = PatternApplicabilityEvidence {
+                schema_version: 1,
+                applicability_fingerprint: fingerprint.clone(),
+                company_id: query.company_id,
+                program_ref: first.program_ref.clone(),
+                step_id: first.step_id.clone(),
+                context_fingerprint: first.context_fingerprint.clone(),
+                candidate_set_hash,
+                evidence_shape: value_shape(&first.material_constraints),
+                graduation_policy_ref: format!(
+                    "decision-type:{}@{}/graduation",
+                    query.decision_type.name, query.decision_type.version
+                ),
+                // Decision cases do not yet persist current operational policy refs.
+                // Keep this explicit rather than inventing stability evidence.
+                material_policy_refs: Vec::new(),
+            };
             candidates.push(GraduationCandidate {
                 decision_type: query.decision_type.clone(),
                 applicability_fingerprint: fingerprint,
                 supporting_case_ids: cohort.iter().map(|case| case.id).collect(),
                 dominant_selected,
+                applicability,
                 proposed_expression_kind: expression_kind(&cohort_events),
                 metrics,
             });
@@ -930,6 +1089,36 @@ mod tests {
         policy.minimum_policy_stability = Some(0.95);
         let result = policy.evaluate(&metrics());
         assert!(result.eligible, "{:?}", result.reasons);
+    }
+
+    #[test]
+    fn pattern_proposal_requires_matching_fingerprint_and_keeps_metric_snapshot() {
+        let applicability = PatternApplicabilityEvidence {
+            schema_version: 1,
+            applicability_fingerprint: "fp".into(),
+            company_id: 2,
+            program_ref: "skill:test@1".into(),
+            step_id: "decision".into(),
+            context_fingerprint: "context".into(),
+            candidate_set_hash: "candidates".into(),
+            evidence_shape: "amount:number".into(),
+            graduation_policy_ref: "decision-type:Test@1/graduation".into(),
+            material_policy_refs: vec![],
+        };
+        let candidate = GraduationCandidate {
+            decision_type: metrics().decision_type.clone(),
+            applicability_fingerprint: "fp".into(),
+            supporting_case_ids: vec![1, 2],
+            dominant_selected: serde_json::json!("a"),
+            applicability: applicability.clone(),
+            proposed_expression_kind: DeterministicExpressionKind::LookupPolicy,
+            metrics: metrics(),
+        };
+        let proposal =
+            DecisionPatternProposal::from_candidate("test-pattern", &candidate, applicability)
+                .unwrap();
+        assert_eq!(proposal.metrics.observed_cases, 50);
+        assert_eq!(proposal.metrics.correction_rate, 0.01);
     }
 
     #[test]
