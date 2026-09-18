@@ -18,19 +18,41 @@ use crate::{
         skill_registry::SkillRegistry,
         ActorCredentials,
     },
-    orchestrator::skill_loader::{complete_run, create_run, load_skill, LoadedSkill},
+    orchestrator::skill_loader::{
+        complete_run, create_run, load_skill, set_run_wait_state, LoadedSkill,
+    },
     providers::llm::{LlmMessage, LlmRequest},
     state::AppState,
     tools::{
+        generated_read::GeneratedReadTools,
         registry::ToolRegistry,
         types::{SkillCitation, ToolContext},
     },
 };
 use super::{
     agent_loop::{LoopLimits, LoopStop},
-    agent_loop_adapters::{run_finalization, run_recorded_loop, RunFinalization},
+    agent_loop_adapters::{
+        run_finalization, run_recorded_loop, AuthorizedLoopTools, RunFinalization,
+    },
+    decision_type::{register_builtin_decision_types, StdbDecisionTypeRegistry},
+    governed_program::{
+        BuiltinComputeService, GovernedProgramContext, GovernedProgramExecutor,
+        GovernedProgramStop, StdbIntelligenceEventRecorder,
+    },
+    governed_programs::{report_analysis_graph, REPORT_ANALYSIS_PROGRAM_REF},
+    governed_services::{
+        GovernedCapabilityService, InMemoryExecutionRecovery,
+        PolicyBackedCapabilityAdmission, RecordingApprovalCoordinator,
+        ShapeOnlyFinalAnswerAdmission, ShapeOnlyVerificationService,
+        ToolsBackedCapabilityExecutor,
+    },
+    intelligence::EvidenceRef,
+    intelligence_adapters::{AgentLoopReasoner, LlmDecisionAdapter, LlmGenerationAdapter},
     invocation_policy::ReviewedInvocationPolicy,
-    spend_admission::{spend_binding_from_agent, StdbSpendLedger},
+    precedent::StdbPrecedentStore,
+    spend_admission::{
+        spend_binding_from_agent, SpendAdmittedLlm, StdbSpendLedger,
+    },
 };
 
 const DEFAULT_MAX_STEPS: u32 = 5;
@@ -577,6 +599,190 @@ pub async fn run_skill_admitted(
         allowed_action_drafts: skill.allowed_action_drafts.clone(),
         actor,
     };
+
+    if skill_key == "report_analysis" {
+        let admitted_llm = SpendAdmittedLlm::new(
+            state.providers.llm.as_ref(),
+            &ledger,
+            binding.clone(),
+        )?;
+        let decision_provider = LlmDecisionAdapter::new(
+            &admitted_llm,
+            binding.provider.clone(),
+            binding.model.clone(),
+        );
+        let generation_provider = LlmGenerationAdapter::new(
+            &admitted_llm,
+            binding.provider.clone(),
+            binding.model.clone(),
+            binding.agent_max_tokens.min(2048).max(256),
+        );
+        let reasoning_provider = AgentLoopReasoner::new(
+            &admitted_llm,
+            binding.provider.clone(),
+            binding.model.clone(),
+        );
+
+        let decision_types = StdbDecisionTypeRegistry {
+            writer: state.stdb.as_ref(),
+            reader: tool_ctx.stdb.as_ref(),
+            organization_id: req.org_id,
+        };
+        register_builtin_decision_types(&decision_types).await?;
+
+        let precedent = StdbPrecedentStore {
+            writer: state.stdb.as_ref(),
+            reader: tool_ctx.stdb.as_ref(),
+        };
+        let recorder = StdbIntelligenceEventRecorder {
+            writer: state.stdb.as_ref(),
+        };
+
+        let generated_grants = Vec::new();
+        let loop_tools = AuthorizedLoopTools {
+            view: &view,
+            generated: GeneratedReadTools::new(&generated_grants),
+            context: &tool_ctx,
+        };
+        let capability_admission = PolicyBackedCapabilityAdmission::new(&policy);
+        let capability_executor = ToolsBackedCapabilityExecutor::new(&loop_tools);
+        let recovery = InMemoryExecutionRecovery::new();
+        let approvals = RecordingApprovalCoordinator;
+        let capabilities = GovernedCapabilityService::new(
+            &capability_admission,
+            &capability_executor,
+            &recovery,
+            &approvals,
+        );
+        let verification = ShapeOnlyVerificationService;
+        let answer_admission = ShapeOnlyFinalAnswerAdmission;
+        let compute = BuiltinComputeService;
+        let executor = GovernedProgramExecutor {
+            decision_provider: &decision_provider,
+            generation_provider: &generation_provider,
+            reasoning_provider: &reasoning_provider,
+            decision_types: &decision_types,
+            precedent: &precedent,
+            capabilities: &capabilities,
+            verification: &verification,
+            answer_admission: &answer_admission,
+            compute: &compute,
+            recorder: &recorder,
+        };
+        let program_context = GovernedProgramContext {
+            organization_id: req.org_id,
+            company_id: req.company_id,
+            run_id,
+            program_ref: REPORT_ANALYSIS_PROGRAM_REF.to_string(),
+            objective: skill.prompt_template.clone(),
+            bounded_state: req.inputs.clone(),
+            evidence: vec![EvidenceRef {
+                kind: "governed_run_step".to_string(),
+                id: format!("run:{run_id}:analytics"),
+            }],
+        };
+        let program = executor
+            .run(&report_analysis_graph(), &program_context)
+            .await?;
+
+        let (status, summary, terminal_error) = match &program.stop {
+            GovernedProgramStop::Completed => (
+                "completed".to_string(),
+                program
+                    .final_content
+                    .clone()
+                    .unwrap_or_else(|| "governed report analysis completed".to_string()),
+                None,
+            ),
+            GovernedProgramStop::EarlyStop(reason) => (
+                "completed".to_string(),
+                format!("governed program stopped deterministically: {reason:?}"),
+                None,
+            ),
+            GovernedProgramStop::PendingApproval { capability, reason } => {
+                set_run_wait_state(
+                    state.stdb.as_ref(),
+                    req.org_id,
+                    req.company_id,
+                    run_id,
+                    "awaiting_approval",
+                )
+                .await?;
+                (
+                    "awaiting_approval".to_string(),
+                    format!("{capability} awaits approval: {reason}"),
+                    None,
+                )
+            }
+            GovernedProgramStop::Clarification { prompt, .. } => {
+                set_run_wait_state(
+                    state.stdb.as_ref(),
+                    req.org_id,
+                    req.company_id,
+                    run_id,
+                    "agent_settled",
+                )
+                .await?;
+                ("agent_settled".to_string(), prompt.clone(), None)
+            }
+            GovernedProgramStop::ReviewRequired(reason) => {
+                set_run_wait_state(
+                    state.stdb.as_ref(),
+                    req.org_id,
+                    req.company_id,
+                    run_id,
+                    "agent_settled",
+                )
+                .await?;
+                ("agent_settled".to_string(), reason.clone(), None)
+            }
+            GovernedProgramStop::Denied(reason)
+            | GovernedProgramStop::UnableToProgress(reason) => (
+                "failed".to_string(),
+                reason.clone(),
+                Some(reason.clone()),
+            ),
+        };
+
+        if matches!(status.as_str(), "completed" | "failed") {
+            complete_run(
+                state.stdb.as_ref(),
+                req.org_id,
+                req.company_id,
+                run_id,
+                &status,
+                Some(summary.clone()),
+                None,
+                None,
+                program.trace.len() as u32,
+                0,
+                terminal_error,
+            )
+            .await?;
+        }
+
+        return Ok(RunSkillResponse {
+            run_id,
+            run_key,
+            status,
+            summary,
+            artifacts: Vec::new(),
+            citations: Vec::new(),
+            steps: program
+                .trace
+                .into_iter()
+                .enumerate()
+                .map(|(index, step)| RunSkillStepSummary {
+                    step_no: (index + 1) as u32,
+                    tool: step.kind.to_string(),
+                    duration_ms: 0,
+                    summary: step.summary,
+                })
+                .collect(),
+            agent_id: agent.agent_id,
+            skill_key: skill.skill_key,
+        });
+    }
 
     let limits = LoopLimits {
         max_rounds: max_steps.max(1),
