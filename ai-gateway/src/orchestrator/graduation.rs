@@ -1346,15 +1346,35 @@ impl DriftMonitor for StdbDriftMonitor<'_> {
             reasons.push(DriftReason::PolicyDrift);
         }
 
-        let review_rows = self.reader.query_sql(&format!(
-            "SELECT disposition FROM ai_run_review WHERE organization_id = {} AND company_id = {} LIMIT {}",
-            context.organization_id, context.company_id, MAX_ANALYSIS_ROWS
-        )).await.context("check run-review drift")?;
-        if review_rows.iter().any(|row| {
-            row_string(row, "disposition")
-                .is_some_and(|d| matches!(d.as_str(), "defect" | "incident_candidate"))
-        }) {
-            reasons.push(DriftReason::ReviewDefect);
+        let (live_shadow_samples, live_shadow_disagreement_rate, exercised_run_ids) =
+            post_promotion_model_shadow_disagreement(
+                self.reader,
+                context.organization_id,
+                context.company_id,
+                &request.decision_type,
+                &resolution.implementation_ref,
+            )
+            .await?;
+        if let Some(maximum) = policy.maximum_provider_disagreement_rate {
+            if live_shadow_samples >= policy.minimum_shadow_cases
+                && live_shadow_disagreement_rate.is_some_and(|rate| rate > maximum)
+            {
+                reasons.push(DriftReason::ConformanceBelowThreshold);
+            }
+        }
+
+        if !exercised_run_ids.is_empty() {
+            let review_rows = self.reader.query_sql(&format!(
+                "SELECT * FROM ai_run_review WHERE organization_id = {} AND company_id = {} LIMIT {}",
+                context.organization_id, context.company_id, MAX_ANALYSIS_ROWS
+            )).await.context("check run-review drift")?;
+            if review_rows.iter().any(|row| {
+                row_u64(row, "runId").is_some_and(|run_id| exercised_run_ids.contains(&run_id))
+                    && row_string(row, "disposition")
+                        .is_some_and(|d| matches!(d.as_str(), "defect" | "incident_candidate"))
+            }) {
+                reasons.push(DriftReason::ReviewDefect);
+            }
         }
 
         reasons.sort_by_key(|reason| format!("{reason:?}"));
@@ -1367,6 +1387,79 @@ impl DriftMonitor for StdbDriftMonitor<'_> {
             reasons,
         }))
     }
+}
+
+async fn post_promotion_model_shadow_disagreement(
+    reader: &StdbClient,
+    organization_id: u64,
+    company_id: u64,
+    decision_type: &DecisionTypeRef,
+    implementation_ref: &str,
+) -> Result<(u64, Option<f64>, HashSet<u64>)> {
+    let rows = reader
+        .query_sql(&format!(
+            "SELECT * FROM ai_intelligence_event WHERE organization_id = {} AND company_id = {} \
+             AND decision_type_name = '{}' AND decision_type_version = {} LIMIT {}",
+            organization_id,
+            company_id,
+            sql_escape(&decision_type.name),
+            decision_type.version,
+            MAX_ANALYSIS_ROWS
+        ))
+        .await
+        .context("query post-promotion model shadow drift")?;
+
+    let mut deterministic_by_hash = HashMap::<String, (String, u64)>::new();
+    let mut model_shadows = Vec::<(String, String, u64)>::new();
+
+    for row in rows {
+        let request_hash = row_string(&row, "requestHash").unwrap_or_default();
+        let run_id = row_u64(&row, "runId").unwrap_or_default();
+        let event_kind = row_string(&row, "eventKind").unwrap_or_default();
+        if event_kind == "decision"
+            && row_string(&row, "provider").as_deref() == Some("deterministic")
+            && row_string(&row, "model").as_deref() == Some(implementation_ref)
+        {
+            if let Some(raw) = row_string(&row, "outputJson") {
+                if let Ok(value) = serde_json::from_str::<Value>(&raw) {
+                    deterministic_by_hash
+                        .insert(request_hash, (canonical_json(&decision_signal(&value))?, run_id));
+                }
+            }
+        } else if event_kind == "decision_shadow"
+            && row_string(&row, "shadowProfileRef")
+                .is_some_and(|value| value.starts_with("model-shadow:"))
+        {
+            if let Some(raw) = row_string(&row, "outputJson") {
+                if let Ok(value) = serde_json::from_str::<Value>(&raw) {
+                    model_shadows.push((
+                        request_hash,
+                        canonical_json(&decision_signal(&value))?,
+                        run_id,
+                    ));
+                }
+            }
+        }
+    }
+
+    let mut comparable = 0_u64;
+    let mut disagreements = 0_u64;
+    let mut run_ids = HashSet::new();
+    for (hash, shadow, shadow_run_id) in model_shadows {
+        if let Some((production, production_run_id)) = deterministic_by_hash.get(&hash) {
+            comparable += 1;
+            if production != &shadow {
+                disagreements += 1;
+            }
+            run_ids.insert(*production_run_id);
+            run_ids.insert(shadow_run_id);
+        }
+    }
+    Ok((
+        comparable,
+        (comparable > 0).then(|| disagreements as f64 / comparable as f64),
+        run_ids,
+    ))
 }
 
 #[async_trait]
