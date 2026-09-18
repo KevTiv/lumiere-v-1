@@ -11,6 +11,7 @@ use super::{
     intelligence::{
         DecisionTypeRef, PROPOSAL_KIND_CLARIFICATION, PROPOSAL_KIND_FINAL_DRAFT,
     },
+    probabilistic::{CalibrationProfileRef, GateDecision, ThresholdGatePolicy},
 };
 
 pub(super) const REPORT_ANALYSIS_PROGRAM_REF: &str = "skill:report_analysis@1";
@@ -55,11 +56,35 @@ pub(super) fn report_analysis_graph() -> DecisionGraph {
                     source: "attention_need".to_string(),
                     branches: vec![
                         GateBranch {
-                            condition: GateCondition::ProbabilityAtLeast(0.65),
+                            condition: GateCondition::ThresholdPolicy {
+                                policy: ThresholdGatePolicy {
+                                    name: "report-attention-routing".to_string(),
+                                    hard_stop_at_least: Some(0.65),
+                                    continue_below: Some(0.35),
+                                    require_calibrated: true,
+                                },
+                                calibration_profile: Some(CalibrationProfileRef {
+                                    name: "report-attention".to_string(),
+                                    version: 1,
+                                }),
+                                on: GateDecision::Escalate,
+                            },
                             target: "generate_attention".to_string(),
                         },
                         GateBranch {
-                            condition: GateCondition::ProbabilityBelow(0.35),
+                            condition: GateCondition::ThresholdPolicy {
+                                policy: ThresholdGatePolicy {
+                                    name: "report-attention-routing".to_string(),
+                                    hard_stop_at_least: Some(0.65),
+                                    continue_below: Some(0.35),
+                                    require_calibrated: true,
+                                },
+                                calibration_profile: Some(CalibrationProfileRef {
+                                    name: "report-attention".to_string(),
+                                    version: 1,
+                                }),
+                                on: GateDecision::Continue,
+                            },
                             target: "generate_summary".to_string(),
                         },
                         GateBranch {
