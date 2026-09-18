@@ -13,7 +13,7 @@ use chrono::Utc;
 use futures::future::join_all;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use stdb_client::StdbClient;
+use stdb_client::{ReducerCall, StdbClient};
 
 use crate::tools::types::ToolOutput;
 
@@ -184,9 +184,7 @@ impl IntelligenceEventRecorder for StdbIntelligenceEventRecorder<'_> {
         response: &DecisionResponse,
     ) -> Result<()> {
         self.writer
-            .call_reducer(stdb_client::reducer_call!(
-                record_ai_decision_event,
-                json!([
+            .call_reducer(ReducerCall::from_name("record_ai_decision_event", json!([
                     context.organization_id,
                     context.company_id,
                     context.run_id,
@@ -205,8 +203,7 @@ impl IntelligenceEventRecorder for StdbIntelligenceEventRecorder<'_> {
                         "input_tokens": response.input_tokens,
                         "output_tokens": response.output_tokens,
                     }
-                ])
-            ))
+                ])))
             .await
             .context("record durable decision event")
     }
