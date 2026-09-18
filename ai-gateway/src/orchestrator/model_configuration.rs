@@ -167,6 +167,10 @@ struct DecisionTypeOverrideWire {
     review: Option<String>,
     #[serde(default)]
     shadows: Vec<String>,
+    #[serde(default, rename = "requireDistinctReviewProfile")]
+    require_distinct_review_profile: bool,
+    #[serde(default, rename = "preferDistinctReviewProvider")]
+    prefer_distinct_review_provider: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -174,6 +178,8 @@ struct DecisionTypeOverride {
     primary: Option<ModelProfileRef>,
     review: Option<ModelProfileRef>,
     shadows: Vec<ModelProfileRef>,
+    require_distinct_review_profile: bool,
+    prefer_distinct_review_provider: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -371,6 +377,48 @@ impl<'a> IntelligenceRouteResolver<'a> {
         })
     }
 
+    pub async fn validate_review_independence(
+        &self,
+        decision_type: &str,
+    ) -> Result<()> {
+        let policy_key = self
+            .policy_key
+            .as_deref()
+            .context("governed review independence requires a policy")?;
+        let policy = self
+            .store
+            .policy(self.organization_id, policy_key, self.policy_version)
+            .await?
+            .context("governed review independence policy not found")?;
+        let (require_distinct_profile, prefer_distinct_provider) =
+            policy.review_independence(Some(decision_type));
+        if !require_distinct_profile && !prefer_distinct_provider {
+            return Ok(());
+        }
+
+        let decision_ref = policy.primary_ref(IntelligenceRole::Decision, Some(decision_type))?;
+        let review_ref = policy.primary_ref(IntelligenceRole::Review, Some(decision_type))?;
+        let decision = self.load_profile(&decision_ref, IntelligenceRole::Decision).await?;
+        let review = self.load_profile(&review_ref, IntelligenceRole::Review).await?;
+
+        if require_distinct_profile && decision.reference == review.reference {
+            bail!(
+                "review profile must be distinct from decision profile for '{}'",
+                decision_type
+            );
+        }
+        if prefer_distinct_provider
+            && normalize_provider(&decision.provider) == normalize_provider(&review.provider)
+        {
+            tracing::warn!(
+                decision_type,
+                provider = %decision.provider,
+                "review policy prefers a distinct provider but only a distinct profile is configured"
+            );
+        }
+        Ok(())
+    }
+
     async fn load_profile(
         &self,
         reference: &ModelProfileRef,
@@ -428,6 +476,21 @@ impl IntelligencePolicy {
 
     fn fallback_refs(&self, role: IntelligenceRole) -> &[ModelProfileRef] {
         self.fallbacks.get(&role).map(Vec::as_slice).unwrap_or(&[])
+    }
+
+    fn review_independence(
+        &self,
+        decision_type: Option<&str>,
+    ) -> (bool, bool) {
+        decision_type
+            .and_then(|name| self.overrides.get(name))
+            .map(|override_| {
+                (
+                    override_.require_distinct_review_profile,
+                    override_.prefer_distinct_review_provider,
+                )
+            })
+            .unwrap_or((false, false))
     }
 
     fn shadow_refs(&self, decision_type: Option<&str>) -> Vec<&ModelProfileRef> {
@@ -502,6 +565,8 @@ fn decode_policy(row: &Value) -> Result<IntelligencePolicy> {
                     .iter()
                     .map(|value| ModelProfileRef::parse(value))
                     .collect::<Result<Vec<_>>>()?,
+                require_distinct_review_profile: wire.require_distinct_review_profile,
+                prefer_distinct_review_provider: wire.prefer_distinct_review_provider,
             },
         );
     }
