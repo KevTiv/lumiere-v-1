@@ -390,8 +390,12 @@ impl<'a> IntelligenceRouteResolver<'a> {
             .policy(self.organization_id, policy_key, self.policy_version)
             .await?
             .context("governed review independence policy not found")?;
-        let (require_distinct_profile, prefer_distinct_provider) =
+        let (mut require_distinct_profile, mut prefer_distinct_provider) =
             policy.review_independence(Some(decision_type));
+        if self.require_policy && !require_distinct_profile && !prefer_distinct_provider {
+            require_distinct_profile = true;
+            prefer_distinct_provider = true;
+        }
         if !require_distinct_profile && !prefer_distinct_provider {
             return Ok(());
         }
