@@ -1044,8 +1044,17 @@ impl DecisionResolutionPolicy for StdbDecisionResolutionPolicy<'_> {
                 .to_string();
             let pattern_ref = row_string(&row, "patternKey")
                 .context("promoted pattern key missing")?;
+            let rollback_mode = latest_persisted_rollback_mode(
+                self.reader,
+                context.organization_id,
+                context.company_id,
+                &request.decision_type,
+                &pattern_ref,
+                &implementation_ref,
+            )
+            .await?;
             matches.push(PromotedDeterministicResolution {
-                mode: graduation.execution_mode,
+                mode: lower_authority(graduation.execution_mode, rollback_mode),
                 pattern_ref,
                 implementation_ref,
             });
@@ -1061,6 +1070,74 @@ impl DecisionResolutionPolicy for StdbDecisionResolutionPolicy<'_> {
             ),
         }
     }
+}
+
+fn authority_rank(mode: DecisionExecutionMode) -> u8 {
+    match mode {
+        DecisionExecutionMode::ModelPrimary => 0,
+        DecisionExecutionMode::DeterministicShadow => 0,
+        DecisionExecutionMode::DeterministicPrimaryModelShadow => 1,
+        DecisionExecutionMode::DeterministicOnly => 2,
+    }
+}
+
+fn lower_authority(
+    configured: DecisionExecutionMode,
+    persisted: Option<DecisionExecutionMode>,
+) -> DecisionExecutionMode {
+    match persisted {
+        Some(persisted) if authority_rank(persisted) < authority_rank(configured) => persisted,
+        _ => configured,
+    }
+}
+
+async fn latest_persisted_rollback_mode(
+    reader: &StdbClient,
+    organization_id: u64,
+    company_id: u64,
+    decision_type: &DecisionTypeRef,
+    pattern_ref: &str,
+    implementation_ref: &str,
+) -> Result<Option<DecisionExecutionMode>> {
+    let rows = reader
+        .query_sql(&format!(
+            "SELECT * FROM ai_intelligence_event WHERE organization_id = {} AND company_id = {} \
+             AND event_kind = 'graduation_rollback' AND decision_type_name = '{}' \
+             AND decision_type_version = {} AND model = '{}' LIMIT {}",
+            organization_id,
+            company_id,
+            sql_escape(&decision_type.name),
+            decision_type.version,
+            sql_escape(implementation_ref),
+            MAX_ANALYSIS_ROWS
+        ))
+        .await
+        .context("load persisted deterministic authority rollbacks")?;
+
+    let mut lowest: Option<DecisionExecutionMode> = None;
+    for row in rows {
+        if row_string(&row, "shadowProfileRef").as_deref() != Some(pattern_ref) {
+            continue;
+        }
+        let output = row_string(&row, "outputJson").context("rollback output_json missing")?;
+        let value: Value = serde_json::from_str(&output).context("decode rollback evidence")?;
+        let Some(to_mode) = value.get("to_mode").and_then(Value::as_str) else {
+            continue;
+        };
+        let parsed = match to_mode {
+            "model_primary" => DecisionExecutionMode::ModelPrimary,
+            "deterministic_primary_model_shadow" => {
+                DecisionExecutionMode::DeterministicPrimaryModelShadow
+            }
+            "deterministic_only" => DecisionExecutionMode::DeterministicOnly,
+            _ => continue,
+        };
+        lowest = Some(match lowest {
+            Some(current) if authority_rank(current) <= authority_rank(parsed) => current,
+            _ => parsed,
+        });
+    }
+    Ok(lowest)
 }
 
 #[async_trait]
@@ -2442,6 +2519,31 @@ mod tests {
         async fn decide(&self, _request: DecisionRequest) -> Result<DecisionResponse> {
             bail!("model shadow failed")
         }
+    }
+
+    #[test]
+    fn persisted_rollback_can_only_lower_authority() {
+        assert_eq!(
+            lower_authority(
+                DecisionExecutionMode::DeterministicOnly,
+                Some(DecisionExecutionMode::DeterministicPrimaryModelShadow),
+            ),
+            DecisionExecutionMode::DeterministicPrimaryModelShadow
+        );
+        assert_eq!(
+            lower_authority(
+                DecisionExecutionMode::DeterministicPrimaryModelShadow,
+                Some(DecisionExecutionMode::ModelPrimary),
+            ),
+            DecisionExecutionMode::ModelPrimary
+        );
+        assert_eq!(
+            lower_authority(
+                DecisionExecutionMode::ModelPrimary,
+                Some(DecisionExecutionMode::DeterministicOnly),
+            ),
+            DecisionExecutionMode::ModelPrimary
+        );
     }
 
     #[tokio::test]
