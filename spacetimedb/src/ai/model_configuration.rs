@@ -343,6 +343,49 @@ fn validate_policy_params(
     for profile_ref in &params.shadow_profiles {
         validate_profile_ref(ctx, organization_id, profile_ref, "shadow")?;
     }
+
+    let overrides: serde_json::Value = serde_json::from_str(&params.decision_type_overrides_json)
+        .map_err(|_| "decision_type_overrides_json is invalid JSON")?;
+    if let Some(entries) = overrides.as_object() {
+        for value in entries.values() {
+            let object = value
+                .as_object()
+                .ok_or("decision type override must be an object")?;
+            if let Some(primary) = object.get("primary").and_then(|value| value.as_str()) {
+                validate_profile_ref(ctx, organization_id, primary, "decision")?;
+            }
+            if let Some(review) = object.get("review").and_then(|value| value.as_str()) {
+                validate_profile_ref(ctx, organization_id, review, "review")?;
+            }
+            if let Some(shadows) = object.get("shadows").and_then(|value| value.as_array()) {
+                for shadow in shadows {
+                    let profile_ref = shadow
+                        .as_str()
+                        .ok_or("decision type shadow override must be a string")?;
+                    validate_profile_ref(ctx, organization_id, profile_ref, "shadow")?;
+                }
+            }
+        }
+    }
+
+    let fallbacks: serde_json::Value = serde_json::from_str(&params.fallback_profiles_json)
+        .map_err(|_| "fallback_profiles_json is invalid JSON")?;
+    if let Some(entries) = fallbacks.as_object() {
+        for (role, value) in entries {
+            if !INTELLIGENCE_ROLES.contains(&role.as_str()) || role == "shadow" {
+                return Err("fallback role must be decision, reasoning, generation, or review".to_string());
+            }
+            let refs = value
+                .as_array()
+                .ok_or("fallback profile list must be an array")?;
+            for profile_ref in refs {
+                let profile_ref = profile_ref
+                    .as_str()
+                    .ok_or("fallback profile ref must be a string")?;
+                validate_profile_ref(ctx, organization_id, profile_ref, role)?;
+            }
+        }
+    }
     Ok(())
 }
 
@@ -391,9 +434,9 @@ fn find_model_profile(
 ) -> Option<AiModelProfile> {
     ctx.db
         .ai_model_profile()
-        .ai_model_profile_by_key()
-        .filter(&(organization_id, key.to_string()))
-        .find(|row| row.profile_version == version)
+        .ai_model_profile_by_org()
+        .filter(&organization_id)
+        .find(|row| row.profile_key == key && row.profile_version == version)
 }
 
 fn find_policy(
@@ -404,9 +447,9 @@ fn find_policy(
 ) -> Option<AiIntelligencePolicy> {
     ctx.db
         .ai_intelligence_policy()
-        .ai_intelligence_policy_by_key()
-        .filter(&(organization_id, key.to_string()))
-        .find(|row| row.policy_version == version)
+        .ai_intelligence_policy_by_org()
+        .filter(&organization_id)
+        .find(|row| row.policy_key == key && row.policy_version == version)
 }
 
 fn model_profile_matches(existing: &AiModelProfile, params: &RegisterAiModelProfileParams) -> bool {
