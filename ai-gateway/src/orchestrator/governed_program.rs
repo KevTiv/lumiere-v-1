@@ -366,40 +366,44 @@ impl GovernedProgramExecutor<'_> {
                         ensure_dependencies(&member, &values)?;
                         event_step += 1;
                         let step_no = event_step;
-                        let future = match &member.kind {
-                            DecisionNode::Choice(decision) => self.execute_decision(
-                                context,
-                                &member,
+                        let (decision_type, kind, question, candidates) = match &member.kind {
+                            DecisionNode::Choice(decision) => (
                                 decision.decision_type.clone(),
                                 DecisionKind::Choice,
                                 decision.question.clone(),
                                 decision.candidates.clone(),
-                                step_no,
-                                &values,
                             ),
-                            DecisionNode::Score(decision) => self.execute_decision(
-                                context,
-                                &member,
+                            DecisionNode::Score(decision) => (
                                 decision.decision_type.clone(),
                                 DecisionKind::Score,
                                 decision.question.clone(),
                                 Vec::new(),
-                                step_no,
-                                &values,
                             ),
-                            DecisionNode::Probability(decision) => self.execute_decision(
-                                context,
-                                &member,
+                            DecisionNode::Probability(decision) => (
                                 decision.decision_type.clone(),
                                 DecisionKind::Probability,
                                 decision.question.clone(),
                                 Vec::new(),
-                                step_no,
-                                &values,
                             ),
                             _ => bail!("batch member '{member_id}' is not a decision node"),
                         };
-                        work.push(async move { (member_id.clone(), future.await) });
+                        let member_id = member_id.clone();
+                        let values_ref = &values;
+                        work.push(async move {
+                            let result = self
+                                .execute_decision(
+                                    context,
+                                    &member,
+                                    decision_type,
+                                    kind,
+                                    question,
+                                    candidates,
+                                    step_no,
+                                    values_ref,
+                                )
+                                .await;
+                            (member_id, result)
+                        });
                     }
                     let results = join_all(work)
                         .await
