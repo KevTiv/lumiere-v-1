@@ -210,6 +210,23 @@ fn capability_recovery_key(run_id: u64, proposal: &CapabilityProposal) -> Result
     Ok(format!("gp03:capability:{digest:x}"))
 }
 
+/// Deterministic, run-scoped idempotency key for one capability's durable
+/// approval draft, so a proposal repeated by model retry or a resumed run
+/// resolves the same `AiActionDraft` instead of creating another. Shares
+/// `ai_spend::input_request_key`'s scheme (`h5:draft:run:<id>:input:<hex>`)
+/// so it round-trips through the same `SpendReader::draft_request` lookup
+/// `tools::action_draft`'s run-correlated path already uses.
+fn approval_request_key(run_id: u64, proposal: &CapabilityProposal) -> Result<String> {
+    crate::ai_spend::input_request_key(
+        crate::ai_spend::RequestKind::Draft,
+        run_id,
+        &serde_json::json!({
+            "capability": proposal.capability,
+            "arguments": proposal.arguments,
+        }),
+    )
+}
+
 /// Reference implementation used in tests and by any caller that does not
 /// require durability across process restarts. `StdbExecutionRecovery`
 /// below is the production implementation.
@@ -423,14 +440,15 @@ fn decode_capability_execution_row(row: &Value) -> Result<CapabilityExecutionRow
     })
 }
 
-/// Names the seam a `DraftOnly` admission decision routes through. Binding
-/// this to the existing H5 action-draft reducer path is a GP-04 wiring
-/// step; this trait only makes the seam explicit and shared, rather than
-/// leaving each caller to re-derive its own draft-creation call.
+/// Names the seam a `DraftOnly` admission decision routes through.
+/// `StdbApprovalCoordinator` binds it to the existing H5 action-draft
+/// reducer path so approval is a real, human-actionable durable record
+/// rather than only an in-memory value.
 #[async_trait]
 pub(super) trait ApprovalCoordinator: Send + Sync {
     async fn request_approval(
         &self,
+        run_id: u64,
         proposal: &CapabilityProposal,
         decision: &PolicyDecision,
     ) -> Result<ApprovalRequest>;
@@ -440,22 +458,117 @@ pub(super) trait ApprovalCoordinator: Send + Sync {
 pub(super) struct ApprovalRequest {
     pub capability: String,
     pub reason: String,
+    /// The durable `AiActionDraft` id a human reviews/approves, when the
+    /// coordinator created one. `None` for `RecordingApprovalCoordinator`.
+    pub draft_id: Option<u64>,
 }
 
 /// Records the approval requirement without creating a durable draft.
-/// Placeholder until GP-04 binds this to the H5 action-draft reducer.
+/// Reference/test implementation; `StdbApprovalCoordinator` is production.
 pub(super) struct RecordingApprovalCoordinator;
 
 #[async_trait]
 impl ApprovalCoordinator for RecordingApprovalCoordinator {
     async fn request_approval(
         &self,
+        _run_id: u64,
         proposal: &CapabilityProposal,
         decision: &PolicyDecision,
     ) -> Result<ApprovalRequest> {
         Ok(ApprovalRequest {
             capability: proposal.capability.clone(),
             reason: reason_summary(decision),
+            draft_id: None,
+        })
+    }
+}
+
+/// Production implementation. Binds `ApprovalCoordinator` to the durable H5
+/// action-draft path (`create_ai_run_action_draft`,
+/// `spacetimedb/src/ai/action_drafts.rs`) so a `DraftOnly` policy decision
+/// produces a real `AiActionDraft` row a human can review, rather than only
+/// an in-memory `ApprovalRequest`. Approving that row directly executes
+/// `proposal.capability` (as `reducer_name`) with `proposal.arguments` (as
+/// `params_json`), so this only ever succeeds for a capability already
+/// present in the organization's `ai_reducer_allowlist` — a capability
+/// outside it fails closed with a clear "reducer not allowed" error at
+/// draft-creation time (`create_ai_action_draft_inner` checks the
+/// allowlist immediately, not only at approval), never a misleading or
+/// inert draft.
+///
+/// `elevated` is always false here: the drafts library's elevated path
+/// requires governance metadata (source/diff hashes, a correction plan)
+/// this call site has no basis to fabricate. A `DraftOnly` policy decision
+/// is already the approval gate; claiming `elevated` on top of it without
+/// real data would misrepresent the audit trail rather than strengthen it.
+///
+/// Uses the same request-key idempotency and `AI_SPEND_READ_STDB_TOKEN`
+/// read-back pattern as `tools::action_draft`'s run-correlated path
+/// (`ai_spend::input_request_key`/`create_run_action_draft`/`SpendReader`),
+/// so a repeated proposal (model retry, resumed run) resolves the same
+/// draft id instead of creating another.
+pub(super) struct StdbApprovalCoordinator<'a> {
+    pub writer: &'a stdb_client::StdbClient,
+    pub reader: &'a stdb_client::StdbClient,
+    pub organization_id: u64,
+    pub company_id: u64,
+}
+
+#[async_trait]
+impl ApprovalCoordinator for StdbApprovalCoordinator<'_> {
+    async fn request_approval(
+        &self,
+        run_id: u64,
+        proposal: &CapabilityProposal,
+        decision: &PolicyDecision,
+    ) -> Result<ApprovalRequest> {
+        if self.organization_id == 0 || self.company_id == 0 {
+            bail!("durable approval requires organization and company context");
+        }
+        let reason = reason_summary(decision);
+        let params_json =
+            serde_json::to_string(&proposal.arguments).context("serialize capability arguments")?;
+        let summary = proposal
+            .rationale
+            .clone()
+            .unwrap_or_else(|| format!("{} requires approval", proposal.capability));
+        let metadata = serde_json::to_string(&serde_json::json!({
+            "run_id": run_id,
+            "reason": reason,
+        }))
+        .ok();
+        let draft_params = serde_json::json!({
+            "reducer_name": proposal.capability,
+            "params_json": params_json,
+            "summary": summary,
+            "confidence": 1.0,
+            "elevated": false,
+            "warnings_json": Value::Null,
+            "source_query": Value::Null,
+            "ui_context_json": Value::Null,
+            "expires_at": Value::Null,
+            "metadata": metadata,
+        });
+        let request_key = approval_request_key(run_id, proposal)?;
+        crate::ai_spend::create_run_action_draft(
+            self.writer,
+            self.organization_id,
+            self.company_id,
+            run_id,
+            &request_key,
+            draft_params,
+        )
+        .await
+        .context("create durable approval draft for capability proposal")?;
+        let draft_id = crate::ai_spend::SpendReader::new(self.reader)
+            .draft_request(self.organization_id, self.company_id, run_id, &request_key)
+            .await
+            .context("resolve durable approval draft id")?
+            .map(|request| request.draft_id);
+        Ok(ApprovalRequest {
+            capability: proposal.capability.clone(),
+            reason,
+            draft_id,
         })
     }
 }
@@ -601,7 +714,10 @@ impl<'a> GovernedCapabilityService<'a> {
                 return Ok(CapabilityStepOutcome::Denied(reason_summary(&decision)));
             }
             DecisionOutcome::DraftOnly => {
-                let request = self.approvals.request_approval(proposal, &decision).await?;
+                let request = self
+                    .approvals
+                    .request_approval(run_id, proposal, &decision)
+                    .await?;
                 return Ok(CapabilityStepOutcome::PendingApproval(request));
             }
             DecisionOutcome::Allow => {}
@@ -969,6 +1085,25 @@ mod tests {
         assert_ne!(a, c);
 
         assert!(capability_recovery_key(0, &proposal()).is_err());
+    }
+
+    #[test]
+    fn approval_request_key_is_stable_and_argument_sensitive() {
+        let a = approval_request_key(1, &proposal()).unwrap();
+        let b = approval_request_key(1, &proposal()).unwrap();
+        assert_eq!(a, b);
+
+        let mut other = proposal();
+        other.arguments = json!({"q": "different"});
+        let c = approval_request_key(1, &other).unwrap();
+        assert_ne!(a, c);
+
+        // Distinct from the execution recovery key for the same proposal —
+        // approval and recovery are two different durable stores, never
+        // sharing a key namespace by coincidence.
+        assert_ne!(a, capability_recovery_key(1, &proposal()).unwrap());
+
+        assert!(approval_request_key(0, &proposal()).is_err());
     }
 
     #[test]

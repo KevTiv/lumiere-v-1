@@ -41,9 +41,8 @@ use super::{
     },
     governed_programs::{report_analysis_graph, REPORT_ANALYSIS_PROGRAM_REF},
     governed_services::{
-        GovernedCapabilityService, StdbExecutionRecovery,
-        PolicyBackedCapabilityAdmission, RecordingApprovalCoordinator,
-        ShapeOnlyFinalAnswerAdmission, ShapeOnlyVerificationService,
+        GovernedCapabilityService, PolicyBackedCapabilityAdmission, ShapeOnlyFinalAnswerAdmission,
+        ShapeOnlyVerificationService, StdbApprovalCoordinator, StdbExecutionRecovery,
         ToolsBackedCapabilityExecutor,
     },
     intelligence::EvidenceRef,
@@ -692,7 +691,12 @@ pub async fn run_skill_admitted(
             organization_id: req.org_id,
             company_id: req.company_id,
         };
-        let approvals = RecordingApprovalCoordinator;
+        let approvals = StdbApprovalCoordinator {
+            writer: state.stdb.as_ref(),
+            reader: spend_reader,
+            organization_id: req.org_id,
+            company_id: req.company_id,
+        };
         let capabilities = GovernedCapabilityService::new(
             &capability_admission,
             &capability_executor,
@@ -792,7 +796,11 @@ pub async fn run_skill_admitted(
                 format!("governed program stopped deterministically: {reason:?}"),
                 None,
             ),
-            GovernedProgramStop::PendingApproval { capability, reason } => {
+            GovernedProgramStop::PendingApproval {
+                capability,
+                reason,
+                draft_id,
+            } => {
                 set_run_wait_state(
                     state.stdb.as_ref(),
                     req.org_id,
@@ -801,11 +809,11 @@ pub async fn run_skill_admitted(
                     "awaiting_approval",
                 )
                 .await?;
-                (
-                    "awaiting_approval".to_string(),
-                    format!("{capability} awaits approval: {reason}"),
-                    None,
-                )
+                let summary = match draft_id {
+                    Some(id) => format!("{capability} awaits approval (draft #{id}): {reason}"),
+                    None => format!("{capability} awaits approval: {reason}"),
+                };
+                ("awaiting_approval".to_string(), summary, None)
             }
             GovernedProgramStop::Clarification { prompt, .. } => {
                 set_run_wait_state(

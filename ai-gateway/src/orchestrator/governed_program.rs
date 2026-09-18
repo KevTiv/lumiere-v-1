@@ -68,7 +68,11 @@ pub(super) enum GovernedProgramStop {
     Completed,
     EarlyStop(StopReason),
     Denied(String),
-    PendingApproval { capability: String, reason: String },
+    PendingApproval {
+        capability: String,
+        reason: String,
+        draft_id: Option<u64>,
+    },
     Clarification { prompt: String, options: Vec<String> },
     ReviewRequired(String),
     UnableToProgress(String),
@@ -481,6 +485,7 @@ impl GovernedProgramExecutor<'_> {
                                 GovernedProgramStop::PendingApproval {
                                     capability: request.capability,
                                     reason: request.reason,
+                                    draft_id: request.draft_id,
                                 },
                                 None,
                                 values,
@@ -529,6 +534,7 @@ impl GovernedProgramExecutor<'_> {
                                 GovernedProgramStop::PendingApproval {
                                     capability: request.capability,
                                     reason: request.reason,
+                                    draft_id: request.draft_id,
                                 },
                                 None,
                                 values,
@@ -674,6 +680,7 @@ impl GovernedProgramExecutor<'_> {
                                         GovernedProgramStop::PendingApproval {
                                             capability: request.capability,
                                             reason: request.reason,
+                                            draft_id: request.draft_id,
                                         },
                                         None,
                                         values,
