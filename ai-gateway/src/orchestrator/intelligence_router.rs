@@ -7,7 +7,31 @@
 use anyhow::Result;
 use futures::future::join_all;
 
-use super::intelligence::{DecisionProvider, DecisionRequest, DecisionResponse};
+use super::{
+    intelligence::{DecisionProvider, DecisionRequest, DecisionResponse},
+    model_configuration::{
+        IntelligenceRole, IntelligenceRoute, IntelligenceRouteResolver,
+    },
+};
+
+/// The only model/profile selection surface intended for governed runtime code.
+pub(super) struct ConfiguredIntelligenceRouter<'a> {
+    resolver: IntelligenceRouteResolver<'a>,
+}
+
+impl<'a> ConfiguredIntelligenceRouter<'a> {
+    pub fn new(resolver: IntelligenceRouteResolver<'a>) -> Self {
+        Self { resolver }
+    }
+
+    pub async fn route(
+        &self,
+        role: IntelligenceRole,
+        decision_type: Option<&str>,
+    ) -> Result<IntelligenceRoute> {
+        self.resolver.resolve(role, decision_type).await
+    }
+}
 
 pub(super) struct ShadowDecisionProvider<'a> {
     pub profile: String,
