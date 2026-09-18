@@ -60,7 +60,7 @@ const ACCEPTANCE_STATUSES: [&str; 3] = ["pending", "accepted", "rejected"];
 
 /// One durable `decide()`/`reason()` call and, once known, what happened to
 /// its output afterward.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[spacetimedb::table(
     accessor = ai_intelligence_event,
     public,
