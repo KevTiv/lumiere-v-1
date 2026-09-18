@@ -339,7 +339,7 @@ impl DecisionTypeRegistry for StdbDecisionTypeRegistry<'_> {
         definition.validate()?;
         self.writer
             .call_reducer(stdb_client::reducer_call!(
-                "register_ai_decision_type",
+                register_ai_decision_type,
                 json!([
                     self.organization_id,
                     {
