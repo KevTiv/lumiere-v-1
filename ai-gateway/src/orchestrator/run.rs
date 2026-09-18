@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::sync::Arc;
+use stdb_client::ReducerCall;
 use uuid::Uuid;
 
 use crate::{
@@ -718,6 +719,22 @@ pub async fn run_skill_admitted(
         let verification = ShapeOnlyVerificationService;
         let answer_admission = DeterministicFinalAnswerAdmission;
         let compute = BuiltinComputeService;
+        state
+            .stdb
+            .call_reducer(ReducerCall::from_name(
+                "register_ai_calibration_profile",
+                json!([
+                    req.org_id,
+                    {
+                        "profile_name": "report-attention",
+                        "profile_version": 1,
+                        "description": "Initial reviewed calibration profile for ReportAttentionNeed@1; versioned explicitly so routing never gates on unlabelled raw confidence.",
+                        "breakpoints_json": "[[0.0,0.0],[0.35,0.35],[0.65,0.65],[1.0,1.0]]"
+                    }
+                ]),
+            ))
+            .await
+            .context("register report attention calibration profile")?;
         let calibration = StdbCalibrationProfileStore {
             reader: tool_ctx.stdb.as_ref(),
         };
