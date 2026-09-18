@@ -1310,4 +1310,46 @@ mod graduation_pattern_tests {
     fn hardened_metrics_reject_top_level_correction_rate_drift() {
         assert!(validate_pattern_metrics(&metrics(), 0.1).is_err());
     }
+
+    #[test]
+    fn promotion_policy_fails_closed_on_missing_required_policy_stability() {
+        let policy = GraduationPromotionPolicy {
+            enabled: true,
+            minimum_cases: 2,
+            minimum_verified_cases: 1,
+            maximum_correction_rate: 0.1,
+            maximum_provider_disagreement_rate: Some(0.1),
+            maximum_entropy: 0.2,
+            minimum_precedent_consistency: 0.9,
+            minimum_policy_stability: Some(0.95),
+            minimum_evidence_shape_stability: 0.9,
+            minimum_candidate_set_stability: Some(0.9),
+            minimum_shadow_cases: 2,
+            minimum_shadow_conformance_rate: 0.98,
+        };
+        let mut snapshot = metrics();
+        snapshot.policy_stability_rate = None;
+        assert!(validate_metrics_against_promotion_policy(&snapshot, &policy).is_err());
+    }
+
+    #[test]
+    fn promotion_policy_accepts_metrics_that_meet_reviewed_thresholds() {
+        let policy = GraduationPromotionPolicy {
+            enabled: true,
+            minimum_cases: 2,
+            minimum_verified_cases: 2,
+            maximum_correction_rate: 0.01,
+            maximum_provider_disagreement_rate: Some(0.05),
+            maximum_entropy: 0.05,
+            minimum_precedent_consistency: 0.95,
+            minimum_policy_stability: None,
+            minimum_evidence_shape_stability: 0.95,
+            minimum_candidate_set_stability: Some(0.95),
+            minimum_shadow_cases: 2,
+            minimum_shadow_conformance_rate: 0.98,
+        };
+        assert!(validate_promotion_policy(&policy).is_ok());
+        assert!(validate_metrics_against_promotion_policy(&metrics(), &policy).is_ok());
+    }
+
 }
