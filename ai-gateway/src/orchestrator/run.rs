@@ -552,6 +552,16 @@ pub async fn run_skill_admitted(
         .unwrap_or("0000000000000000000000000000000000000000000000000000000000000000")
         .to_string();
     let (run_id, run_key) = if let Some(resume_run_id) = req.resume_run_id {
+        validate_resume_identity(
+            &stdb,
+            req.org_id,
+            req.company_id,
+            resume_run_id,
+            skill.id,
+            agent.agent_id,
+            &inputs_json,
+        )
+        .await?;
         let run_key =
             load_run_key(&stdb, req.org_id, req.company_id, resume_run_id).await?;
         resume_run(&stdb, req.org_id, req.company_id, resume_run_id).await?;
@@ -1029,6 +1039,53 @@ pub async fn run_skill_admitted(
         agent_id: agent.agent_id,
         skill_key: skill.skill_key,
     })
+}
+
+async fn validate_resume_identity(
+    stdb: &stdb_client::StdbClient,
+    org_id: u64,
+    company_id: u64,
+    run_id: u64,
+    skill_id: u64,
+    agent_id: u64,
+    expected_inputs_json: &str,
+) -> Result<()> {
+    let rows = stdb
+        .query_sql(&format!(
+            "SELECT * FROM ai_agent_run WHERE organization_id = {org_id}              AND company_id = {company_id} AND id = {run_id} LIMIT 1"
+        ))
+        .await
+        .context("load governed run resume identity")?;
+    let row = rows.first().context("governed run to resume was not found")?;
+    let stored_skill_id = row
+        .get("skillId")
+        .or_else(|| row.get("skill_id"))
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+    let stored_agent_id = row
+        .get("agentId")
+        .or_else(|| row.get("agent_id"))
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+    let stored_inputs = row
+        .get("inputsJson")
+        .or_else(|| row.get("inputs_json"))
+        .and_then(Value::as_str)
+        .context("resumable run inputs missing")?;
+    if skill_id > 0 && stored_skill_id != skill_id {
+        anyhow::bail!("resume run skill identity does not match current skill");
+    }
+    if stored_agent_id != agent_id {
+        anyhow::bail!("resume run agent identity does not match current agent");
+    }
+    let stored_value: Value =
+        serde_json::from_str(stored_inputs).context("decode stored resume inputs")?;
+    let expected_value: Value =
+        serde_json::from_str(expected_inputs_json).context("decode expected resume inputs")?;
+    if stored_value != expected_value {
+        anyhow::bail!("resume run inputs do not match the original bounded state");
+    }
+    Ok(())
 }
 
 fn resolve_allowed_tools(
