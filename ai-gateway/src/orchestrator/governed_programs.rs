@@ -291,6 +291,7 @@ pub(super) fn consequential_mutation_reference_graph() -> DecisionGraph {
                 next: Some("mutate".to_string()),
                 kind: DecisionNode::RequireApproval(RequireApprovalNode {
                     source: "mutation_decision".to_string(),
+                    capability: "post_payment".to_string(),
                 }),
             },
             GraphNode {
