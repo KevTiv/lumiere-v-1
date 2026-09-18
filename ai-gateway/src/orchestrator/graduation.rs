@@ -1956,7 +1956,7 @@ fn shadow_disagreement(events: &[&DecisionEventRow]) -> Result<(Option<f64>, u64
     }
     let comparable = shadows
         .iter()
-        .filter_map(|(hash, shadow)| primary.get(hash).map(|production| (*production, shadow)))
+        .filter_map(|(hash, shadow)| primary.get(hash).map(|production| (production, shadow)))
         .collect::<Vec<_>>();
     if comparable.is_empty() {
         return Ok((None, 0));
