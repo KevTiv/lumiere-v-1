@@ -19,9 +19,10 @@
 
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 
 use super::intelligence::{DecisionKind, DecisionTypeRef};
+use super::probabilistic::{CalibrationProfileRef, GateDecision, ThresholdGatePolicy};
 
 pub(super) type NodeId = String;
 
@@ -80,6 +81,22 @@ pub(super) enum GateCondition {
     ScoreAtLeast(f64),
     ScoreBelow(f64),
     ChoiceEquals(String),
+    /// Routes through GP-09's typed `Confidence`/`ThresholdGatePolicy`
+    /// instead of comparing a raw provider probability/score literal
+    /// directly (what every other non-`Default` variant above still
+    /// does): reads the gate source's `confidence` — never `probability`/
+    /// `score`, which stay untouched provider metadata — as
+    /// `Confidence::Raw`, calibrates it through `calibration_profile`
+    /// first when one is named, evaluates `policy`, and matches this
+    /// branch when the resulting `GateDecision` equals `on`. `policy` is
+    /// program/policy-owned data the graph author writes, exactly like
+    /// the literal thresholds elsewhere in this enum — never provider
+    /// state.
+    ThresholdPolicy {
+        policy: ThresholdGatePolicy,
+        calibration_profile: Option<CalibrationProfileRef>,
+        on: GateDecision,
+    },
     /// Matches when no other branch does. A gate must have exactly one.
     Default,
 }
@@ -495,6 +512,23 @@ fn validate_gates(graph: &DecisionGraph) -> Result<()> {
                 default_count
             );
         }
+        for branch in &gate.branches {
+            if let GateCondition::ThresholdPolicy {
+                policy,
+                calibration_profile,
+                ..
+            } = &branch.condition
+            {
+                policy
+                    .validate()
+                    .with_context(|| format!("gate '{}' threshold policy invalid", node.id))?;
+                if let Some(profile_ref) = calibration_profile {
+                    profile_ref.validate().with_context(|| {
+                        format!("gate '{}' calibration profile ref invalid", node.id)
+                    })?;
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -787,6 +821,119 @@ mod tests {
             "facts",
         );
         assert!(validate_graph(&g).is_err());
+    }
+
+    #[test]
+    fn threshold_policy_gate_with_valid_policy_passes() {
+        let g = graph(
+            vec![
+                compute("facts", &[]),
+                probability("risk", &["facts"]),
+                gate(
+                    "route",
+                    "risk",
+                    vec![
+                        GateBranch {
+                            condition: GateCondition::ThresholdPolicy {
+                                policy: ThresholdGatePolicy {
+                                    name: "fraud-review".to_string(),
+                                    hard_stop_at_least: Some(0.8),
+                                    continue_below: Some(0.2),
+                                    require_calibrated: true,
+                                },
+                                calibration_profile: Some(CalibrationProfileRef {
+                                    name: "fraud-model".to_string(),
+                                    version: 1,
+                                }),
+                                on: GateDecision::Escalate,
+                            },
+                            target: "risk".to_string(),
+                        },
+                        GateBranch {
+                            condition: GateCondition::Default,
+                            target: "risk".to_string(),
+                        },
+                    ],
+                ),
+            ],
+            "facts",
+        );
+        assert!(validate_graph(&g).is_ok());
+    }
+
+    #[test]
+    fn threshold_policy_gate_rejects_an_invalid_policy() {
+        let g = graph(
+            vec![
+                compute("facts", &[]),
+                probability("risk", &["facts"]),
+                gate(
+                    "route",
+                    "risk",
+                    vec![
+                        GateBranch {
+                            condition: GateCondition::ThresholdPolicy {
+                                policy: ThresholdGatePolicy {
+                                    name: String::new(),
+                                    hard_stop_at_least: Some(0.8),
+                                    continue_below: Some(0.2),
+                                    require_calibrated: false,
+                                },
+                                calibration_profile: None,
+                                on: GateDecision::Escalate,
+                            },
+                            target: "risk".to_string(),
+                        },
+                        GateBranch {
+                            condition: GateCondition::Default,
+                            target: "risk".to_string(),
+                        },
+                    ],
+                ),
+            ],
+            "facts",
+        );
+        let err = validate_graph(&g).unwrap_err().to_string();
+        assert!(err.contains("threshold policy invalid"), "{err}");
+    }
+
+    #[test]
+    fn threshold_policy_gate_rejects_an_invalid_calibration_profile_ref() {
+        let g = graph(
+            vec![
+                compute("facts", &[]),
+                probability("risk", &["facts"]),
+                gate(
+                    "route",
+                    "risk",
+                    vec![
+                        GateBranch {
+                            condition: GateCondition::ThresholdPolicy {
+                                policy: ThresholdGatePolicy {
+                                    name: "fraud-review".to_string(),
+                                    hard_stop_at_least: Some(0.8),
+                                    continue_below: Some(0.2),
+                                    require_calibrated: true,
+                                },
+                                calibration_profile: Some(CalibrationProfileRef {
+                                    name: "fraud-model".to_string(),
+                                    version: 0,
+                                }),
+                                on: GateDecision::Escalate,
+                            },
+                            target: "risk".to_string(),
+                        },
+                        GateBranch {
+                            condition: GateCondition::Default,
+                            target: "risk".to_string(),
+                        },
+                    ],
+                ),
+            ],
+            "facts",
+        );
+        let err = validate_graph(&g).unwrap_err().to_string();
+        assert!(err.contains("calibration profile ref invalid"), "{err}");
     }
 
     #[test]

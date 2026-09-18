@@ -12,7 +12,15 @@
 //! through GP-07's tables. `organization_id` always identifies a real
 //! organization row (no sentinel values — see the GP-07 fix).
 //!
-//! Additive only: no reducer here is called by production code yet.
+//! Read (not written) by production code: `ai-gateway`'s
+//! `StdbCalibrationProfileStore` queries this table directly via SQL (it
+//! is `public`, unlike the ledger-style private tables elsewhere in this
+//! module tree) to resolve a `CalibrationProfileRef` a `GateCondition::
+//! ThresholdPolicy` branch names. `register_ai_calibration_profile`
+//! itself is not yet called by any production reducer — profiles are
+//! registered out of band (e.g. an admin script or a future
+//! calibration-management surface), the same way model profiles and
+//! intelligence policies are.
 
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 

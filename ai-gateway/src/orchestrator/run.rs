@@ -53,6 +53,7 @@ use super::{
     invocation_policy::ReviewedInvocationPolicy,
     model_configuration::{IntelligenceRole, IntelligenceRouteResolver, StdbModelConfigurationStore},
     precedent::StdbPrecedentStore,
+    probabilistic::StdbCalibrationProfileStore,
     run_review::{RunReviewDisposition, RunReviewProgram},
     spend_admission::{spend_binding_from_agent, StdbSpendLedger},
 };
@@ -706,6 +707,9 @@ pub async fn run_skill_admitted(
         let verification = ShapeOnlyVerificationService;
         let answer_admission = ShapeOnlyFinalAnswerAdmission;
         let compute = BuiltinComputeService;
+        let calibration = StdbCalibrationProfileStore {
+            reader: tool_ctx.stdb.as_ref(),
+        };
         let executor = GovernedProgramExecutor {
             decision_provider: &decision_provider,
             generation_provider: &generation_provider,
@@ -717,6 +721,7 @@ pub async fn run_skill_admitted(
             answer_admission: &answer_admission,
             compute: &compute,
             recorder: &recorder,
+            calibration: &calibration,
         };
         let program_context = GovernedProgramContext {
             organization_id: req.org_id,

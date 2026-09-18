@@ -32,6 +32,7 @@ use super::{
         GenerationRequest, ReasoningOutcome, ReasoningProvider, ReasoningRequest,
     },
     precedent::{summarize, DecisionCaseRecord, DecisionCaseStatus, PrecedentQuery, PrecedentStore},
+    probabilistic::{CalibrationProfileStore, Confidence, GateDecision},
 };
 
 #[derive(Clone, Debug)]
@@ -224,6 +225,7 @@ pub(super) struct GovernedProgramExecutor<'a> {
     pub answer_admission: &'a dyn FinalAnswerAdmission,
     pub compute: &'a dyn ComputeService,
     pub recorder: &'a dyn IntelligenceEventRecorder,
+    pub calibration: &'a dyn CalibrationProfileStore,
 }
 
 struct DecisionExecution {
@@ -441,7 +443,9 @@ impl GovernedProgramExecutor<'_> {
                     let source = values
                         .get(&gate.source)
                         .with_context(|| format!("gate source '{}' has no output", gate.source))?;
-                    let target = select_gate_target(&gate.branches, source)?;
+                    let target = self
+                        .select_gate_target(context.organization_id, &gate.branches, source)
+                        .await?;
                     values.insert(
                         node.id.clone(),
                         NodeValue::Json(json!({"selected_target": target})),
@@ -955,42 +959,78 @@ fn arguments_for_node(
     }
 }
 
-fn select_gate_target(
-    branches: &[super::decision_graph::GateBranch],
-    source: &NodeValue,
-) -> Result<String> {
-    let decision = match source {
-        NodeValue::Decision(decision) => decision,
-        _ => bail!("gate source must be a typed decision output"),
-    };
-    let default = branches
-        .iter()
-        .find(|branch| matches!(&branch.condition, GateCondition::Default))
-        .context("gate has no default branch")?;
-    for branch in branches {
-        let matched = match &branch.condition {
-            GateCondition::ProbabilityAtLeast(threshold) => decision
-                .probability
-                .is_some_and(|value| value >= *threshold),
-            GateCondition::ProbabilityBelow(threshold) => decision
-                .probability
-                .is_some_and(|value| value < *threshold),
-            GateCondition::ScoreAtLeast(threshold) => {
-                decision.score.is_some_and(|value| value >= *threshold)
-            }
-            GateCondition::ScoreBelow(threshold) => {
-                decision.score.is_some_and(|value| value < *threshold)
-            }
-            GateCondition::ChoiceEquals(expected) => {
-                decision.choice.as_deref() == Some(expected.as_str())
-            }
-            GateCondition::Default => false,
+impl GovernedProgramExecutor<'_> {
+    /// Selects the branch target for one `Gate` node. `ThresholdPolicy`
+    /// branches are the only ones that can require I/O (a calibration
+    /// profile lookup), which is why this — unlike every other branch
+    /// condition — needs `&self`/`.await` rather than being a pure
+    /// function of `(branches, source)`.
+    async fn select_gate_target(
+        &self,
+        organization_id: u64,
+        branches: &[super::decision_graph::GateBranch],
+        source: &NodeValue,
+    ) -> Result<String> {
+        let decision = match source {
+            NodeValue::Decision(decision) => decision,
+            _ => bail!("gate source must be a typed decision output"),
         };
-        if matched {
-            return Ok(branch.target.clone());
+        let default = branches
+            .iter()
+            .find(|branch| matches!(&branch.condition, GateCondition::Default))
+            .context("gate has no default branch")?;
+        for branch in branches {
+            let matched = match &branch.condition {
+                GateCondition::ProbabilityAtLeast(threshold) => decision
+                    .probability
+                    .is_some_and(|value| value >= *threshold),
+                GateCondition::ProbabilityBelow(threshold) => decision
+                    .probability
+                    .is_some_and(|value| value < *threshold),
+                GateCondition::ScoreAtLeast(threshold) => {
+                    decision.score.is_some_and(|value| value >= *threshold)
+                }
+                GateCondition::ScoreBelow(threshold) => {
+                    decision.score.is_some_and(|value| value < *threshold)
+                }
+                GateCondition::ChoiceEquals(expected) => {
+                    decision.choice.as_deref() == Some(expected.as_str())
+                }
+                GateCondition::ThresholdPolicy {
+                    policy,
+                    calibration_profile,
+                    on,
+                } => {
+                    // No confidence signal at all: this branch cannot
+                    // match — try the remaining branches rather than
+                    // failing the whole gate.
+                    let Some(raw) = decision.confidence else {
+                        continue;
+                    };
+                    let mut confidence = Confidence::Raw(raw);
+                    if let Some(profile_ref) = calibration_profile {
+                        let profile = self
+                            .calibration
+                            .get(organization_id, profile_ref)
+                            .await?
+                            .with_context(|| {
+                                format!(
+                                    "calibration profile '{}' v{} not found",
+                                    profile_ref.name, profile_ref.version
+                                )
+                            })?;
+                        confidence = profile.calibrate(confidence)?;
+                    }
+                    policy.evaluate(confidence)? == *on
+                }
+                GateCondition::Default => false,
+            };
+            if matched {
+                return Ok(branch.target.clone());
+            }
         }
+        Ok(default.target.clone())
     }
-    Ok(default.target.clone())
 }
 
 fn decision_value(response: &DecisionResponse) -> Result<Value> {
@@ -1179,5 +1219,316 @@ fn outcome(
         trace,
         decision_calls,
         capability_calls,
+    }
+}
+
+#[cfg(test)]
+mod threshold_gate_tests {
+    //! End-to-end coverage for GP-09's raw-vs-calibrated confidence
+    //! invariant actually reaching `GovernedProgramExecutor::run` — the
+    //! gap this module's docs used to describe as "GP-08's
+    //! `GateCondition::ProbabilityAtLeast(f64)` still does that [hardcodes
+    //! a literal] today" (`probabilistic.rs`). A `Gate` node with a
+    //! `GateCondition::ThresholdPolicy` branch must read `confidence`
+    //! (never `probability`), and `require_calibrated` must actually
+    //! block an uncalibrated value from reaching a consequential branch,
+    //! not just type-check in isolation the way `probabilistic.rs`'s own
+    //! unit tests already proved before this module wired it in.
+
+    use super::*;
+    use crate::orchestrator::decision_graph::{
+        DecisionGraph, GateBranch, GateNode, ProbabilityDecisionNode,
+    };
+    use crate::orchestrator::decision_type::InMemoryDecisionTypeRegistry;
+    use crate::orchestrator::governed_services::{
+        CapabilityAdmission, CapabilityExecutor, InMemoryExecutionRecovery,
+        RecordingApprovalCoordinator, ShapeOnlyFinalAnswerAdmission, ShapeOnlyVerificationService,
+    };
+    use crate::orchestrator::intelligence::{
+        DecisionRequest, DecisionResponse, GenerationRequest, GenerationResponse,
+        ReasoningOutcome, ReasoningRequest,
+    };
+    use crate::orchestrator::precedent::InMemoryPrecedentStore;
+    use crate::orchestrator::probabilistic::{
+        CalibrationProfile, CalibrationProfileRef, GateDecision, InMemoryCalibrationProfileStore,
+        ThresholdGatePolicy,
+    };
+    use crate::tools::types::ToolOutput;
+
+    struct FixedDecisionProvider(DecisionResponse);
+
+    #[async_trait]
+    impl DecisionProvider for FixedDecisionProvider {
+        async fn decide(&self, _request: DecisionRequest) -> Result<DecisionResponse> {
+            Ok(self.0.clone())
+        }
+    }
+
+    struct UnreachableGenerationProvider;
+
+    #[async_trait]
+    impl GenerationProvider for UnreachableGenerationProvider {
+        async fn generate(&self, _request: GenerationRequest) -> Result<GenerationResponse> {
+            bail!("generation provider must not be called by a gate-only test graph")
+        }
+    }
+
+    struct UnreachableReasoningProvider;
+
+    #[async_trait]
+    impl ReasoningProvider for UnreachableReasoningProvider {
+        async fn reason(&self, _request: ReasoningRequest) -> Result<ReasoningOutcome> {
+            bail!("reasoning provider must not be called by a gate-only test graph")
+        }
+    }
+
+    struct UnreachableCapabilityAdmission;
+
+    #[async_trait]
+    impl CapabilityAdmission for UnreachableCapabilityAdmission {
+        async fn admit(
+            &self,
+            _proposal: &CapabilityProposal,
+            _completed_calls: u32,
+        ) -> Result<crate::harness::audit::PolicyDecision> {
+            bail!("capability admission must not be called by a gate-only test graph")
+        }
+
+        async fn protect_output(
+            &self,
+            _proposal: &CapabilityProposal,
+            _completed_calls: u32,
+            _output: ToolOutput,
+        ) -> Result<ToolOutput> {
+            bail!("capability admission must not be called by a gate-only test graph")
+        }
+    }
+
+    struct UnreachableCapabilityExecutor;
+
+    #[async_trait]
+    impl CapabilityExecutor for UnreachableCapabilityExecutor {
+        async fn execute(&self, _proposal: &CapabilityProposal) -> Result<ToolOutput> {
+            bail!("capability executor must not be called by a gate-only test graph")
+        }
+    }
+
+    /// `risk` (Probability, StockReorderPriority builtin) -> `gate` (the
+    /// `ThresholdPolicy` branch under test, escalate vs default) ->
+    /// `stop_escalate` | `stop_continue` (distinguishable `EarlyStop`
+    /// reasons standing in for whatever real downstream nodes would do).
+    fn graph(condition: super::super::decision_graph::GateCondition) -> DecisionGraph {
+        DecisionGraph {
+            entry: "risk".to_string(),
+            nodes: vec![
+                GraphNode {
+                    id: "risk".to_string(),
+                    depends_on: Vec::new(),
+                    next: Some("gate".to_string()),
+                    kind: DecisionNode::Probability(ProbabilityDecisionNode {
+                        decision_type: super::super::intelligence::DecisionTypeRef {
+                            name: "StockReorderPriority".to_string(),
+                            version: 1,
+                        },
+                        question: "how urgent is this reorder?".to_string(),
+                    }),
+                },
+                GraphNode {
+                    id: "gate".to_string(),
+                    depends_on: vec!["risk".to_string()],
+                    next: None,
+                    kind: DecisionNode::Gate(GateNode {
+                        source: "risk".to_string(),
+                        branches: vec![
+                            GateBranch {
+                                condition,
+                                target: "stop_escalate".to_string(),
+                            },
+                            GateBranch {
+                                condition: super::super::decision_graph::GateCondition::Default,
+                                target: "stop_continue".to_string(),
+                            },
+                        ],
+                    }),
+                },
+                GraphNode {
+                    id: "stop_escalate".to_string(),
+                    depends_on: Vec::new(),
+                    next: None,
+                    kind: DecisionNode::EarlyStop(super::super::decision_graph::EarlyStopNode {
+                        source: "gate".to_string(),
+                        reason: StopReason::PolicyViolation,
+                    }),
+                },
+                GraphNode {
+                    id: "stop_continue".to_string(),
+                    depends_on: Vec::new(),
+                    next: None,
+                    kind: DecisionNode::EarlyStop(super::super::decision_graph::EarlyStopNode {
+                        source: "gate".to_string(),
+                        reason: StopReason::AlreadySettled,
+                    }),
+                },
+            ],
+        }
+    }
+
+    fn context() -> GovernedProgramContext {
+        GovernedProgramContext {
+            organization_id: 9,
+            company_id: 3,
+            run_id: 42,
+            program_ref: "test-threshold-gate".to_string(),
+            objective: "decide reorder urgency".to_string(),
+            bounded_state: json!({"sku": "SKU-1"}),
+            evidence: Vec::new(),
+        }
+    }
+
+    fn probability_response(confidence: f64) -> DecisionResponse {
+        DecisionResponse {
+            kind: DecisionKind::Probability,
+            choice: None,
+            score: None,
+            probability: Some(0.5),
+            confidence: Some(confidence),
+            rationale: None,
+            model: "test-model".to_string(),
+            provider: "test-provider".to_string(),
+            input_tokens: 1,
+            output_tokens: 1,
+        }
+    }
+
+    async fn run_graph(
+        condition: super::super::decision_graph::GateCondition,
+        confidence: f64,
+        calibration: &dyn super::super::probabilistic::CalibrationProfileStore,
+    ) -> Result<GovernedProgramOutcome> {
+        let decision_provider = FixedDecisionProvider(probability_response(confidence));
+        let generation_provider = UnreachableGenerationProvider;
+        let reasoning_provider = UnreachableReasoningProvider;
+        let decision_types = InMemoryDecisionTypeRegistry::with_builtins();
+        let precedent = InMemoryPrecedentStore::new();
+        let admission = UnreachableCapabilityAdmission;
+        let executor_svc = UnreachableCapabilityExecutor;
+        let recovery = InMemoryExecutionRecovery::new();
+        let approvals = RecordingApprovalCoordinator;
+        let capabilities =
+            GovernedCapabilityService::new(&admission, &executor_svc, &recovery, &approvals);
+        let verification = ShapeOnlyVerificationService;
+        let answer_admission = ShapeOnlyFinalAnswerAdmission;
+        let compute = BuiltinComputeService;
+        let recorder = NoopIntelligenceEventRecorder;
+        let executor = GovernedProgramExecutor {
+            decision_provider: &decision_provider,
+            generation_provider: &generation_provider,
+            reasoning_provider: &reasoning_provider,
+            decision_types: &decision_types,
+            precedent: &precedent,
+            capabilities: &capabilities,
+            verification: &verification,
+            answer_admission: &answer_admission,
+            compute: &compute,
+            recorder: &recorder,
+            calibration,
+        };
+        executor.run(&graph(condition), &context()).await
+    }
+
+    #[tokio::test]
+    async fn raw_confidence_above_hard_stop_escalates() {
+        let calibration = InMemoryCalibrationProfileStore::new();
+        let condition = super::super::decision_graph::GateCondition::ThresholdPolicy {
+            policy: ThresholdGatePolicy {
+                name: "reorder-urgency".to_string(),
+                hard_stop_at_least: Some(0.8),
+                continue_below: Some(0.2),
+                require_calibrated: false,
+            },
+            calibration_profile: None,
+            on: GateDecision::Escalate,
+        };
+        let outcome = run_graph(condition, 0.9, &calibration).await.unwrap();
+        assert!(matches!(
+            outcome.stop,
+            GovernedProgramStop::EarlyStop(StopReason::PolicyViolation)
+        ));
+    }
+
+    #[tokio::test]
+    async fn require_calibrated_blocks_a_qualifying_raw_confidence() {
+        // Same 0.9 raw confidence, same 0.8 hard-stop threshold as the
+        // test above — the only difference is require_calibrated: true
+        // with no calibration profile. If this escalated, GP-09's core
+        // invariant ("raw confidence never gates a consequential
+        // decision") would be violated by the actual executor, not just
+        // unenforced in probabilistic.rs's orphaned types.
+        let calibration = InMemoryCalibrationProfileStore::new();
+        let condition = super::super::decision_graph::GateCondition::ThresholdPolicy {
+            policy: ThresholdGatePolicy {
+                name: "reorder-urgency".to_string(),
+                hard_stop_at_least: Some(0.8),
+                continue_below: Some(0.2),
+                require_calibrated: true,
+            },
+            calibration_profile: None,
+            on: GateDecision::Escalate,
+        };
+        let outcome = run_graph(condition, 0.9, &calibration).await.unwrap();
+        assert!(matches!(
+            outcome.stop,
+            GovernedProgramStop::EarlyStop(StopReason::AlreadySettled)
+        ));
+    }
+
+    #[tokio::test]
+    async fn calibrated_confidence_from_a_registered_profile_can_escalate() {
+        let calibration = InMemoryCalibrationProfileStore::new();
+        let profile_ref = CalibrationProfileRef {
+            name: "reorder-identity".to_string(),
+            version: 1,
+        };
+        calibration
+            .register(CalibrationProfile {
+                profile_ref: profile_ref.clone(),
+                breakpoints: vec![(0.0, 0.0), (1.0, 1.0)],
+            })
+            .unwrap();
+        let condition = super::super::decision_graph::GateCondition::ThresholdPolicy {
+            policy: ThresholdGatePolicy {
+                name: "reorder-urgency".to_string(),
+                hard_stop_at_least: Some(0.8),
+                continue_below: Some(0.2),
+                require_calibrated: true,
+            },
+            calibration_profile: Some(profile_ref),
+            on: GateDecision::Escalate,
+        };
+        let outcome = run_graph(condition, 0.9, &calibration).await.unwrap();
+        assert!(matches!(
+            outcome.stop,
+            GovernedProgramStop::EarlyStop(StopReason::PolicyViolation)
+        ));
+    }
+
+    #[tokio::test]
+    async fn unresolvable_calibration_profile_fails_closed_rather_than_silently_proceeding() {
+        let calibration = InMemoryCalibrationProfileStore::new();
+        let condition = super::super::decision_graph::GateCondition::ThresholdPolicy {
+            policy: ThresholdGatePolicy {
+                name: "reorder-urgency".to_string(),
+                hard_stop_at_least: Some(0.8),
+                continue_below: Some(0.2),
+                require_calibrated: true,
+            },
+            calibration_profile: Some(CalibrationProfileRef {
+                name: "does-not-exist".to_string(),
+                version: 1,
+            }),
+            on: GateDecision::Escalate,
+        };
+        let error = run_graph(condition, 0.9, &calibration).await.unwrap_err();
+        assert!(error.to_string().contains("not found"));
     }
 }

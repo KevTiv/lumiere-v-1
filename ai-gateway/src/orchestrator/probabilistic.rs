@@ -25,18 +25,35 @@
 //!   type can be a `GateDecision`, and no `GateDecision` variant carries a
 //!   raw model utterance.
 //!
-//! This module does not itself gate a `DecisionGraph` node (GP-08) or
-//! execute anything — `ThresholdGatePolicy::evaluate` is a pure function
-//! callers can use once GP-12 builds a real executor. It replaces the
-//! *idea* of hardcoding a threshold literal directly in a `GateCondition`
-//! (GP-08's `GateCondition::ProbabilityAtLeast(f64)` still does that
-//! today) with a policy object; wiring `GateCondition` to reference a
-//! `ThresholdGatePolicy` by name instead of a literal is a natural
-//! follow-up, not done here to avoid reopening already-committed,
-//! already-tested GP-08 code in the same pass.
+//! `ThresholdGatePolicy::evaluate` is wired into `DecisionGraph` execution
+//! via `decision_graph::GateCondition::ThresholdPolicy` and
+//! `governed_program::GovernedProgramExecutor::select_gate_target`: a
+//! branch names a policy and (optionally) a `CalibrationProfileRef`
+//! instead of a raw threshold literal, and the executor reads the gate
+//! source's `confidence` — never `probability`/`score`, which stay
+//! provider metadata other `GateCondition` variants still compare
+//! directly — calibrates it when a profile is named, and matches the
+//! branch whose `on: GateDecision` equals the policy's result. The other,
+//! older `GateCondition` variants (`ProbabilityAtLeast` etc.) are
+//! untouched; `ThresholdPolicy` is an additional, stricter option a graph
+//! author opts into per branch, not a replacement.
+//!
+//! `CalibrationProfileStore` closes a second, narrower gap: a
+//! `CalibrationProfile`'s breakpoints have to come from *somewhere*
+//! resolvable by `CalibrationProfileRef`. `StdbCalibrationProfileStore`
+//! reads the durable `ai_calibration_profile` table
+//! (`spacetimedb/src/ai/calibration_profile.rs`), mirroring
+//! `decision_type::StdbDecisionTypeRegistry`'s trait/in-memory/durable
+//! split; `governed_program.rs`'s production `GovernedProgramExecutor`
+//! construction binds it.
+
+use std::collections::HashMap;
+use std::sync::RwLock;
 
 use anyhow::{bail, Context, Result};
+use async_trait::async_trait;
 use serde_json::Value;
+use stdb_client::StdbClient;
 
 use super::intelligence::EvidenceRef;
 
@@ -256,9 +273,149 @@ impl ThresholdGatePolicy {
     }
 }
 
+/// Resolves a `CalibrationProfileRef` to the `CalibrationProfile` that
+/// produced it. Provider-neutral, versioned, immutable-once-registered —
+/// same posture as `DecisionTypeRegistry`.
+#[async_trait]
+pub(super) trait CalibrationProfileStore: Send + Sync {
+    async fn get(
+        &self,
+        organization_id: u64,
+        reference: &CalibrationProfileRef,
+    ) -> Result<Option<CalibrationProfile>>;
+}
+
+/// Reference implementation for tests. Production wiring binds to
+/// `StdbCalibrationProfileStore` instead.
+pub(super) struct InMemoryCalibrationProfileStore {
+    profiles: RwLock<HashMap<(String, u32), CalibrationProfile>>,
+}
+
+impl InMemoryCalibrationProfileStore {
+    pub fn new() -> Self {
+        Self {
+            profiles: RwLock::new(HashMap::new()),
+        }
+    }
+
+    pub fn register(&self, profile: CalibrationProfile) -> Result<()> {
+        profile.validate()?;
+        let key = (profile.profile_ref.name.clone(), profile.profile_ref.version);
+        self.profiles.write().unwrap().insert(key, profile);
+        Ok(())
+    }
+}
+
+impl Default for InMemoryCalibrationProfileStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[async_trait]
+impl CalibrationProfileStore for InMemoryCalibrationProfileStore {
+    async fn get(
+        &self,
+        _organization_id: u64,
+        reference: &CalibrationProfileRef,
+    ) -> Result<Option<CalibrationProfile>> {
+        Ok(self
+            .profiles
+            .read()
+            .unwrap()
+            .get(&(reference.name.clone(), reference.version))
+            .cloned())
+    }
+}
+
+/// Production implementation, reading the durable `ai_calibration_profile`
+/// table (`spacetimedb/src/ai/calibration_profile.rs`) a
+/// `register_ai_calibration_profile` call populates. The table is public,
+/// so any connected reader can query it — unlike the ledger-style private
+/// tables elsewhere in this module tree, no dedicated read principal is
+/// needed.
+pub(super) struct StdbCalibrationProfileStore<'a> {
+    pub reader: &'a StdbClient,
+}
+
+#[async_trait]
+impl CalibrationProfileStore for StdbCalibrationProfileStore<'_> {
+    async fn get(
+        &self,
+        organization_id: u64,
+        reference: &CalibrationProfileRef,
+    ) -> Result<Option<CalibrationProfile>> {
+        if organization_id == 0 {
+            bail!("organization_id must be nonzero");
+        }
+        reference.validate()?;
+        let name = reference.name.replace('\'', "''");
+        let rows = self
+            .reader
+            .query_sql(&format!(
+                "SELECT * FROM ai_calibration_profile WHERE organization_id = {organization_id} \
+                 AND profile_name = '{name}' AND profile_version = {} \
+                 AND is_active = true LIMIT 1",
+                reference.version
+            ))
+            .await
+            .context("query durable calibration profile")?;
+        rows.first().map(decode_calibration_profile).transpose()
+    }
+}
+
+fn decode_calibration_profile(row: &Value) -> Result<CalibrationProfile> {
+    let name = calibration_row_string(row, "profileName")
+        .context("calibration profile row missing profileName")?;
+    let version = calibration_row_u64(row, "profileVersion")
+        .context("calibration profile row missing profileVersion")? as u32;
+    let breakpoints_json = calibration_row_string(row, "breakpointsJson")
+        .context("calibration profile row missing breakpointsJson")?;
+    let raw_pairs: Vec<(f64, f64)> = serde_json::from_str(&breakpoints_json)
+        .context("decode calibration profile breakpoints_json")?;
+    let profile = CalibrationProfile {
+        profile_ref: CalibrationProfileRef { name, version },
+        breakpoints: raw_pairs,
+    };
+    profile.validate()?;
+    Ok(profile)
+}
+
+fn calibration_row_field<'a>(row: &'a Value, key: &str) -> Option<&'a Value> {
+    row.get(key).or_else(|| row.get(snake_case(key)))
+}
+
+fn snake_case(key: &str) -> String {
+    let mut out = String::with_capacity(key.len() + 4);
+    for ch in key.chars() {
+        if ch.is_ascii_uppercase() {
+            out.push('_');
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+fn calibration_row_string(row: &Value, key: &str) -> Option<String> {
+    calibration_row_field(row, key)
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+fn calibration_row_u64(row: &Value, key: &str) -> Option<u64> {
+    calibration_row_field(row, key).and_then(|value| {
+        value
+            .as_u64()
+            .or_else(|| value.as_str().and_then(|raw| raw.parse().ok()))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     fn profile_ref() -> CalibrationProfileRef {
         CalibrationProfileRef {
@@ -448,5 +605,72 @@ mod tests {
             require_calibrated: false,
         };
         assert!(policy.evaluate(Confidence::Raw(0.5)).is_err());
+    }
+
+    #[tokio::test]
+    async fn in_memory_calibration_store_round_trips_a_registered_profile() {
+        let store = InMemoryCalibrationProfileStore::new();
+        let profile = CalibrationProfile {
+            profile_ref: profile_ref(),
+            breakpoints: vec![(0.0, 0.0), (1.0, 1.0)],
+        };
+        store.register(profile.clone()).unwrap();
+
+        let found = store.get(9, &profile_ref()).await.unwrap().unwrap();
+        assert_eq!(found.breakpoints, profile.breakpoints);
+
+        let missing = store
+            .get(
+                9,
+                &CalibrationProfileRef {
+                    name: "does-not-exist".to_string(),
+                    version: 1,
+                },
+            )
+            .await
+            .unwrap();
+        assert!(missing.is_none());
+    }
+
+    #[test]
+    fn in_memory_calibration_store_rejects_registering_an_invalid_profile() {
+        let store = InMemoryCalibrationProfileStore::new();
+        let mut invalid = identity_profile();
+        invalid.breakpoints = vec![(0.1, 0.1)];
+        assert!(store.register(invalid).is_err());
+    }
+
+    #[test]
+    fn decode_calibration_profile_reads_camel_case_fields() {
+        let row = json!({
+            "profileName": "fraud-model-v1",
+            "profileVersion": 1,
+            "breakpointsJson": "[[0.0,0.0],[1.0,1.0]]",
+        });
+        let profile = decode_calibration_profile(&row).unwrap();
+        assert_eq!(profile.profile_ref, profile_ref());
+        assert_eq!(profile.breakpoints, vec![(0.0, 0.0), (1.0, 1.0)]);
+    }
+
+    #[test]
+    fn decode_calibration_profile_falls_back_to_snake_case_fields() {
+        let row = json!({
+            "profile_name": "fraud-model-v1",
+            "profile_version": 1,
+            "breakpoints_json": "[[0.0,0.0],[1.0,1.0]]",
+        });
+        let profile = decode_calibration_profile(&row).unwrap();
+        assert_eq!(profile.profile_ref, profile_ref());
+    }
+
+    #[test]
+    fn decode_calibration_profile_rejects_invalid_breakpoints() {
+        let row = json!({
+            "profileName": "fraud-model-v1",
+            "profileVersion": 1,
+            // Doesn't cover raw = 1.0 — CalibrationProfile::validate rejects it.
+            "breakpointsJson": "[[0.0,0.0],[0.5,0.5]]",
+        });
+        assert!(decode_calibration_profile(&row).is_err());
     }
 }
