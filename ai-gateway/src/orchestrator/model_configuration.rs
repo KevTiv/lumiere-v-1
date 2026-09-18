@@ -767,6 +767,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn resolves_shadow_profiles_only_for_decision_role() {
+        let store = FakeStore::new();
+        store.insert_profile(9, profile("decision", IntelligenceRole::Decision, "decision-model"));
+        store.insert_profile(9, profile("reasoning", IntelligenceRole::Reasoning, "reasoning-model"));
+        store.insert_profile(9, profile("shadow-a", IntelligenceRole::Shadow, "shadow-a-model"));
+        let mut with_shadows = policy();
+        with_shadows.shadows = vec![ModelProfileRef {
+            key: "shadow-a".to_string(),
+            version: 1,
+        }];
+        store.insert_policy(9, with_shadows);
+
+        let resolver = IntelligenceRouteResolver::new(&store, 9, &agent(), None).unwrap();
+
+        let decision_route = resolver
+            .resolve(IntelligenceRole::Decision, Some("PaymentDisposition"))
+            .await
+            .unwrap();
+        assert_eq!(decision_route.shadows.len(), 1);
+        assert_eq!(decision_route.shadows[0].model, "shadow-a-model");
+
+        // Shadows are a decision-only concept: no other role resolves them,
+        // even though the same policy carries `shadow_profiles`.
+        let reasoning_route = resolver
+            .resolve(IntelligenceRole::Reasoning, None)
+            .await
+            .unwrap();
+        assert!(reasoning_route.shadows.is_empty());
+    }
+
+    #[tokio::test]
     async fn decision_type_override_changes_profile_not_program_semantics() {
         let store = FakeStore::new();
         store.insert_profile(9, profile("decision", IntelligenceRole::Decision, "decision-model"));

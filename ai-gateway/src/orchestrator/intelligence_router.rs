@@ -6,14 +6,16 @@
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use futures::future::join_all;
+use serde_json::json;
+use stdb_client::{ReducerCall, StdbClient};
 
 use super::{
     intelligence::{
-        DecisionProvider, DecisionRequest, DecisionResponse, GenerationProvider,
-        GenerationRequest, GenerationResponse, ReasoningOutcome, ReasoningProvider,
-        ReasoningRequest,
+        decision_request_hash, DecisionProvider, DecisionRequest, DecisionResponse,
+        DecisionTypeRef, GenerationProvider, GenerationRequest, GenerationResponse,
+        ReasoningOutcome, ReasoningProvider, ReasoningRequest,
     },
     intelligence_adapters::{AgentLoopReasoner, LlmDecisionAdapter, LlmGenerationAdapter},
     model_configuration::{
@@ -22,6 +24,112 @@ use super::{
     spend_admission::{spend_binding_for_profile, SpendAdmittedLlm, SpendLedger},
 };
 use crate::{ai_agent::ResolvedAgentConfig, providers::llm::LlmCompletion};
+
+/// Durable sink for GP-15 zero-authority shadow decision attempts. A shadow
+/// result is recorded regardless of success/failure but never fed back into
+/// the production decision — see `record_ai_decision_shadow_event` in
+/// `spacetimedb/src/ai/decision_events.rs`.
+#[async_trait::async_trait]
+pub(super) trait ShadowDecisionRecorder: Send + Sync {
+    #[allow(clippy::too_many_arguments)]
+    async fn record(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        run_id: u64,
+        shadow_profile_ref: &str,
+        decision_type: &DecisionTypeRef,
+        request_hash: &str,
+        request_json: &str,
+        attempt: Result<&DecisionResponse, &str>,
+    ) -> Result<()>;
+}
+
+pub(super) struct NoopShadowDecisionRecorder;
+
+#[async_trait::async_trait]
+impl ShadowDecisionRecorder for NoopShadowDecisionRecorder {
+    async fn record(
+        &self,
+        _organization_id: u64,
+        _company_id: u64,
+        _run_id: u64,
+        _shadow_profile_ref: &str,
+        _decision_type: &DecisionTypeRef,
+        _request_hash: &str,
+        _request_json: &str,
+        _attempt: Result<&DecisionResponse, &str>,
+    ) -> Result<()> {
+        Ok(())
+    }
+}
+
+pub(super) struct StdbShadowDecisionRecorder<'a> {
+    pub writer: &'a StdbClient,
+}
+
+#[async_trait::async_trait]
+impl ShadowDecisionRecorder for StdbShadowDecisionRecorder<'_> {
+    async fn record(
+        &self,
+        organization_id: u64,
+        company_id: u64,
+        run_id: u64,
+        shadow_profile_ref: &str,
+        decision_type: &DecisionTypeRef,
+        request_hash: &str,
+        request_json: &str,
+        attempt: Result<&DecisionResponse, &str>,
+    ) -> Result<()> {
+        let params = match attempt {
+            Ok(response) => json!({
+                "shadow_profile_ref": shadow_profile_ref,
+                "decision_type_name": decision_type.name,
+                "decision_type_version": decision_type.version,
+                "request_hash": request_hash,
+                "request_json": request_json,
+                "outcome_kind": decision_kind_label(response.kind),
+                "output_json": serde_json::to_string(response)?,
+                "confidence": response.confidence,
+                "provider": response.provider,
+                "model": response.model,
+                "input_tokens": response.input_tokens,
+                "output_tokens": response.output_tokens,
+                "shadow_error": null,
+            }),
+            Err(error) => json!({
+                "shadow_profile_ref": shadow_profile_ref,
+                "decision_type_name": decision_type.name,
+                "decision_type_version": decision_type.version,
+                "request_hash": request_hash,
+                "request_json": request_json,
+                "outcome_kind": null,
+                "output_json": null,
+                "confidence": null,
+                "provider": "",
+                "model": "",
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "shadow_error": error,
+            }),
+        };
+        self.writer
+            .call_reducer(ReducerCall::from_name(
+                "record_ai_decision_shadow_event",
+                json!([organization_id, company_id, run_id, params]),
+            ))
+            .await
+            .context("record durable shadow decision event")
+    }
+}
+
+fn decision_kind_label(kind: super::intelligence::DecisionKind) -> &'static str {
+    match kind {
+        super::intelligence::DecisionKind::Choice => "choice",
+        super::intelligence::DecisionKind::Score => "score",
+        super::intelligence::DecisionKind::Probability => "probability",
+    }
+}
 
 /// The only model/profile selection surface intended for governed runtime code.
 pub(super) struct ConfiguredIntelligenceRouter<'a> {
@@ -70,6 +178,7 @@ pub(super) struct RoutedDecisionProvider<'a> {
     company_id: u64,
     run_id: u64,
     role: IntelligenceRole,
+    shadow_recorder: &'a dyn ShadowDecisionRecorder,
     next_scope: AtomicU32,
 }
 
@@ -83,6 +192,7 @@ impl<'a> RoutedDecisionProvider<'a> {
         company_id: u64,
         run_id: u64,
         role: IntelligenceRole,
+        shadow_recorder: &'a dyn ShadowDecisionRecorder,
     ) -> Result<Self> {
         if !matches!(role, IntelligenceRole::Decision | IntelligenceRole::Review) {
             bail!("RoutedDecisionProvider requires decision or review role");
@@ -96,8 +206,69 @@ impl<'a> RoutedDecisionProvider<'a> {
             company_id,
             run_id,
             role,
+            shadow_recorder,
             next_scope: AtomicU32::new(1),
         })
+    }
+
+    /// Evaluate every resolved shadow profile against the exact same
+    /// request the production decision received. Zero live authority: a
+    /// shadow's response or failure is only ever recorded, never returned
+    /// to the caller or allowed to influence `decide`'s result.
+    async fn run_shadows(&self, shadows: &[ModelProfile], request: &DecisionRequest) {
+        if shadows.is_empty() {
+            return;
+        }
+        let Ok(request_hash) = decision_request_hash(request) else {
+            return;
+        };
+        let Ok(request_json) = serde_json::to_string(request) else {
+            return;
+        };
+        let attempts = shadows.iter().map(|profile| {
+            let request_hash = request_hash.clone();
+            let request_json = request_json.clone();
+            async move {
+                let result = match next_call_scope(IntelligenceRole::Shadow, &self.next_scope) {
+                    Ok(scope) => self.attempt(profile, request.clone(), scope).await,
+                    Err(error) => Err(error),
+                };
+                let record_result = match &result {
+                    Ok(response) => {
+                        self.shadow_recorder
+                            .record(
+                                self.organization_id,
+                                self.company_id,
+                                self.run_id,
+                                &profile.reference.stable_ref(),
+                                &request.decision_type,
+                                &request_hash,
+                                &request_json,
+                                Ok(response),
+                            )
+                            .await
+                    }
+                    Err(error) => {
+                        self.shadow_recorder
+                            .record(
+                                self.organization_id,
+                                self.company_id,
+                                self.run_id,
+                                &profile.reference.stable_ref(),
+                                &request.decision_type,
+                                &request_hash,
+                                &request_json,
+                                Err(error.to_string().as_str()),
+                            )
+                            .await
+                    }
+                };
+                if let Err(error) = record_result {
+                    tracing::warn!("failed to record shadow decision event: {error:#}");
+                }
+            }
+        });
+        join_all(attempts).await;
     }
 
     async fn attempt(
@@ -128,6 +299,7 @@ impl DecisionProvider for RoutedDecisionProvider<'_> {
             .router
             .route(self.role, Some(&request.decision_type.name))
             .await?;
+        let shadows = route.shadows;
         let mut profiles = Vec::with_capacity(1 + route.fallbacks.len());
         profiles.push(route.primary);
         profiles.extend(route.fallbacks);
@@ -137,7 +309,10 @@ impl DecisionProvider for RoutedDecisionProvider<'_> {
             for attempt_no in 0..=profile.max_retries {
                 let scope = next_call_scope(self.role, &self.next_scope)?;
                 match self.attempt(&profile, request.clone(), scope).await {
-                    Ok(response) => return Ok(response),
+                    Ok(response) => {
+                        self.run_shadows(&shadows, &request).await;
+                        return Ok(response);
+                    }
                     Err(error) => failures.push(format!(
                         "{} attempt {}: {}",
                         profile.reference.stable_ref(),

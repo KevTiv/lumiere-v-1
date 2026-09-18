@@ -48,8 +48,8 @@ use super::{
     },
     intelligence::EvidenceRef,
     intelligence_router::{
-        ConfiguredIntelligenceRouter, RoutedDecisionProvider, RoutedGenerationProvider,
-        RoutedReasoningProvider,
+        ConfiguredIntelligenceRouter, NoopShadowDecisionRecorder, RoutedDecisionProvider,
+        RoutedGenerationProvider, RoutedReasoningProvider, StdbShadowDecisionRecorder,
     },
     invocation_policy::ReviewedInvocationPolicy,
     model_configuration::{IntelligenceRole, IntelligenceRouteResolver, StdbModelConfigurationStore},
@@ -619,6 +619,9 @@ pub async fn run_skill_admitted(
             intelligence_policy_ref,
         )?;
         let intelligence_router = ConfiguredIntelligenceRouter::new(route_resolver);
+        let shadow_recorder = StdbShadowDecisionRecorder {
+            writer: state.stdb.as_ref(),
+        };
         let decision_provider = RoutedDecisionProvider::new(
             &intelligence_router,
             state.providers.llm.as_ref(),
@@ -628,6 +631,7 @@ pub async fn run_skill_admitted(
             req.company_id,
             run_id,
             IntelligenceRole::Decision,
+            &shadow_recorder,
         )?;
         let review_provider = RoutedDecisionProvider::new(
             &intelligence_router,
@@ -638,6 +642,7 @@ pub async fn run_skill_admitted(
             req.company_id,
             run_id,
             IntelligenceRole::Review,
+            &NoopShadowDecisionRecorder,
         )?;
         let generation_provider = RoutedGenerationProvider::new(
             &intelligence_router,

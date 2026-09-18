@@ -57,6 +57,12 @@ pub fn run_ai_intelligence_events_tests(ctx: &ReducerContext) -> Result<(), Stri
         .map_err(|e| {
             format!("record_reasoning_event_clarification_escalates_automatically: {e}")
         })?;
+    decision_events_test::test_record_decision_shadow_event_persists(ctx)
+        .map_err(|e| format!("record_decision_shadow_event_persists: {e}"))?;
+    decision_events_test::test_record_decision_shadow_event_records_failure_and_is_idempotent(ctx)
+        .map_err(|e| format!("record_decision_shadow_event_records_failure_and_is_idempotent: {e}"))?;
+    decision_events_test::test_record_decision_shadow_event_distinct_profiles_do_not_collide(ctx)
+        .map_err(|e| format!("record_decision_shadow_event_distinct_profiles_do_not_collide: {e}"))?;
     decision_events_test::test_intelligence_event_status_fields_are_independent(ctx)
         .map_err(|e| format!("intelligence_event_status_fields_are_independent: {e}"))?;
     decision_events_test::test_intelligence_event_org_scope_enforced(ctx)

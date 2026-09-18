@@ -5,10 +5,10 @@ use spacetimedb::ReducerContext;
 
 use crate::ai::agents::{ai_agent, create_ai_agent, CreateAiAgentParams};
 use crate::ai::decision_events::{
-    ai_intelligence_event, record_ai_decision_event, record_ai_reasoning_event,
-    set_ai_intelligence_event_acceptance, set_ai_intelligence_event_escalation,
-    set_ai_intelligence_event_verification, RecordAiDecisionEventParams,
-    RecordAiReasoningEventParams,
+    ai_intelligence_event, record_ai_decision_event, record_ai_decision_shadow_event,
+    record_ai_reasoning_event, set_ai_intelligence_event_acceptance,
+    set_ai_intelligence_event_escalation, set_ai_intelligence_event_verification,
+    RecordAiDecisionEventParams, RecordAiDecisionShadowEventParams, RecordAiReasoningEventParams,
 };
 use crate::ai::skills::{
     ai_agent_run, ai_skill, create_ai_agent_run, create_ai_skill, CreateAiAgentRunParams,
@@ -132,6 +132,181 @@ fn decision_params(step_no: u32, request_hash: &str) -> RecordAiDecisionEventPar
         input_tokens: 12,
         output_tokens: 8,
     }
+}
+
+fn shadow_success_params(request_hash: &str, shadow_profile_ref: &str) -> RecordAiDecisionShadowEventParams {
+    RecordAiDecisionShadowEventParams {
+        shadow_profile_ref: shadow_profile_ref.to_string(),
+        decision_type_name: "PaymentDisposition".to_string(),
+        decision_type_version: 1,
+        request_hash: request_hash.to_string(),
+        request_json: r#"{"question":"flag or clear?"}"#.to_string(),
+        outcome_kind: Some("choice".to_string()),
+        output_json: Some(r#"{"choice":"clear"}"#.to_string()),
+        confidence: Some(0.6),
+        provider: "gemini".to_string(),
+        model: "gemini-shadow".to_string(),
+        input_tokens: 10,
+        output_tokens: 6,
+        shadow_error: None,
+    }
+}
+
+fn shadow_failure_params(request_hash: &str, shadow_profile_ref: &str) -> RecordAiDecisionShadowEventParams {
+    RecordAiDecisionShadowEventParams {
+        shadow_profile_ref: shadow_profile_ref.to_string(),
+        decision_type_name: "PaymentDisposition".to_string(),
+        decision_type_version: 1,
+        request_hash: request_hash.to_string(),
+        request_json: r#"{"question":"flag or clear?"}"#.to_string(),
+        outcome_kind: None,
+        output_json: None,
+        confidence: None,
+        provider: "gemini".to_string(),
+        model: "gemini-shadow".to_string(),
+        input_tokens: 0,
+        output_tokens: 0,
+        shadow_error: Some("provider timeout".to_string()),
+    }
+}
+
+/// AI-IE-010: a successful shadow decision event round-trips with zero
+/// live authority — `acceptance_status` is always "rejected" — and is
+/// correlated to the production event only by `request_hash`, not a
+/// shared `step_no`.
+pub fn test_record_decision_shadow_event_persists(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let run_id = seed_run(ctx, fixture.organization_id, fixture.company_id, "ie010")?;
+
+    record_ai_decision_event(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        run_id,
+        decision_params(1, "hash-ie010"),
+    )?;
+    record_ai_decision_shadow_event(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        run_id,
+        shadow_success_params("hash-ie010", "shadow-profile@1"),
+    )?;
+
+    let event = ctx
+        .db
+        .ai_intelligence_event()
+        .ai_intelligence_event_by_run()
+        .filter(&run_id)
+        .find(|e| e.event_kind == "decision_shadow")
+        .ok_or("AI-IE-010: shadow event not found after record")?;
+
+    if event.request_hash != "hash-ie010"
+        || event.shadow_profile_ref.as_deref() != Some("shadow-profile@1")
+        || event.shadow_error.is_some()
+        || event.outcome_kind != "choice"
+        || event.acceptance_status != "rejected"
+    {
+        return Err(format!("AI-IE-010: unexpected persisted shadow event {event:?}"));
+    }
+    let production_count = ctx
+        .db
+        .ai_intelligence_event()
+        .ai_intelligence_event_by_run()
+        .filter(&run_id)
+        .filter(|e| e.event_kind == "decision")
+        .count();
+    if production_count != 1 {
+        return Err("AI-IE-010: shadow event must never mutate the production event".to_string());
+    }
+    Ok(())
+}
+
+/// AI-IE-011: a failed shadow attempt is recorded with `shadow_error` set
+/// and no `outcome_kind`/`output_json`, and replaying the identical
+/// failure payload is idempotent rather than a duplicate row.
+pub fn test_record_decision_shadow_event_records_failure_and_is_idempotent(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let run_id = seed_run(ctx, fixture.organization_id, fixture.company_id, "ie011")?;
+
+    let params = shadow_failure_params("hash-ie011", "shadow-profile@1");
+    record_ai_decision_shadow_event(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        run_id,
+        params.clone(),
+    )?;
+    record_ai_decision_shadow_event(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        run_id,
+        params,
+    )?;
+
+    let matches: Vec<_> = ctx
+        .db
+        .ai_intelligence_event()
+        .ai_intelligence_event_by_run()
+        .filter(&run_id)
+        .filter(|e| e.event_kind == "decision_shadow")
+        .collect();
+    if matches.len() != 1 {
+        return Err(format!(
+            "AI-IE-011: expected exactly one shadow row, got {}",
+            matches.len()
+        ));
+    }
+    let event = &matches[0];
+    if event.shadow_error.as_deref() != Some("provider timeout") || event.outcome_kind != "failed" {
+        return Err(format!("AI-IE-011: unexpected failed shadow event {event:?}"));
+    }
+    Ok(())
+}
+
+/// AI-IE-012: two shadow profiles evaluating the same production request
+/// (same `request_hash`) each persist their own row rather than
+/// colliding on idempotency.
+pub fn test_record_decision_shadow_event_distinct_profiles_do_not_collide(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let run_id = seed_run(ctx, fixture.organization_id, fixture.company_id, "ie012")?;
+
+    record_ai_decision_shadow_event(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        run_id,
+        shadow_success_params("hash-ie012", "shadow-a@1"),
+    )?;
+    record_ai_decision_shadow_event(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        run_id,
+        shadow_success_params("hash-ie012", "shadow-b@1"),
+    )?;
+
+    let count = ctx
+        .db
+        .ai_intelligence_event()
+        .ai_intelligence_event_by_run()
+        .filter(&run_id)
+        .filter(|e| e.event_kind == "decision_shadow")
+        .count();
+    if count != 2 {
+        return Err(format!(
+            "AI-IE-012: expected two independent shadow rows, got {count}"
+        ));
+    }
+    Ok(())
 }
 
 /// AI-IE-001: a decision event round-trips through the durable table with
