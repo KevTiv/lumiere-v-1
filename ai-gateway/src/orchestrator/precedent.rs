@@ -295,17 +295,17 @@ impl PrecedentStore for StdbPrecedentStore<'_> {
                     {
                         "run_id": case.run_id,
                         "step_no": case.step_no,
-                        "decision_type_name": case.decision_type.name,
+                        "decision_type_name": case.decision_type.name.clone(),
                         "decision_type_version": case.decision_type.version,
-                        "program_ref": case.program_ref,
-                        "step_id": case.step_id,
-                        "request_hash": case.request_hash,
-                        "context_fingerprint": case.context_fingerprint,
+                        "program_ref": case.program_ref.clone(),
+                        "step_id": case.step_id.clone(),
+                        "request_hash": case.request_hash.clone(),
+                        "context_fingerprint": case.context_fingerprint.clone(),
                         "material_constraints_json": serde_json::to_string(&case.material_constraints)?,
                         "selected_json": serde_json::to_string(&case.selected)?,
                         "confidence": case.confidence,
                         "provider_attempt_id": case.provider_attempt_id,
-                        "precedent_refs": case.precedent_refs,
+                        "precedent_refs": case.precedent_refs.clone(),
                     }
                 ])
             ))
