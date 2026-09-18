@@ -101,9 +101,8 @@ impl ModelProfile {
         if self.provider.trim().is_empty() || self.model.trim().is_empty() {
             bail!("model profile must define provider and model");
         }
-        match normalize_provider(&self.provider).as_str() {
-            "mistral" | "gemini" | "ollama" => {}
-            other => bail!("unsupported configured LLM provider '{other}'"),
+        if normalize_provider(&self.provider).trim().is_empty() {
+            bail!("model profile provider must be nonempty");
         }
         if !self.allowed_roles.contains(&role) {
             bail!(
