@@ -450,6 +450,13 @@ fn decode_capability_execution_row(row: &Value) -> Result<CapabilityExecutionRow
 /// `StdbApprovalCoordinator` binds it to the existing H5 action-draft
 /// reducer path so approval is a real, human-actionable durable record
 /// rather than only an in-memory value.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum ApprovalStatus {
+    Pending,
+    Approved,
+    Rejected(String),
+}
+
 #[async_trait]
 pub(super) trait ApprovalCoordinator: Send + Sync {
     async fn request_approval(
@@ -458,6 +465,8 @@ pub(super) trait ApprovalCoordinator: Send + Sync {
         proposal: &CapabilityProposal,
         decision: &PolicyDecision,
     ) -> Result<ApprovalRequest>;
+
+    async fn approval_status(&self, draft_id: u64) -> Result<ApprovalStatus>;
 }
 
 #[derive(Clone, Debug)]
@@ -486,6 +495,10 @@ impl ApprovalCoordinator for RecordingApprovalCoordinator {
             reason: reason_summary(decision),
             draft_id: None,
         })
+    }
+
+    async fn approval_status(&self, _draft_id: u64) -> Result<ApprovalStatus> {
+        Ok(ApprovalStatus::Pending)
     }
 }
 
@@ -575,6 +588,45 @@ impl ApprovalCoordinator for StdbApprovalCoordinator<'_> {
             capability: proposal.capability.clone(),
             reason,
             draft_id,
+        })
+    }
+
+    async fn approval_status(&self, draft_id: u64) -> Result<ApprovalStatus> {
+        if draft_id == 0 {
+            bail!("approval draft id must be nonzero");
+        }
+        let rows = self
+            .reader
+            .query_sql(&format!(
+                "SELECT * FROM ai_action_draft WHERE organization_id = {}                  AND company_id = {} AND id = {} LIMIT 1",
+                self.organization_id, self.company_id, draft_id
+            ))
+            .await
+            .context("load durable approval draft status")?;
+        let row = rows.first().context("approval draft not found")?;
+        let status = row
+            .get("status")
+            .and_then(Value::as_str)
+            .context("approval draft status missing")?;
+        Ok(match status {
+            "pending" => ApprovalStatus::Pending,
+            "approved" => ApprovalStatus::Approved,
+            "rejected" => ApprovalStatus::Rejected(
+                row.get("rejectReason")
+                    .or_else(|| row.get("reject_reason"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("approval was rejected")
+                    .to_string(),
+            ),
+            "failed" => ApprovalStatus::Rejected(
+                row.get("executionError")
+                    .or_else(|| row.get("execution_error"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("approved action execution failed")
+                    .to_string(),
+            ),
+            "expired" => ApprovalStatus::Rejected("approval draft expired".to_string()),
+            other => bail!("unknown approval draft status '{other}'"),
         })
     }
 }
@@ -789,6 +841,29 @@ impl<'a> GovernedCapabilityService<'a> {
             recovery,
             approvals,
         }
+    }
+
+    pub async fn request_explicit_approval(
+        &self,
+        run_id: u64,
+        proposal: &CapabilityProposal,
+        completed_calls: u32,
+    ) -> Result<Result<ApprovalRequest, String>> {
+        proposal.validate().context("invalid approval capability proposal")?;
+        let mut decision = self.admission.admit(proposal, completed_calls).await?;
+        if decision.outcome == DecisionOutcome::Deny {
+            return Ok(Err(reason_summary(&decision)));
+        }
+        decision.outcome = DecisionOutcome::DraftOnly;
+        let request = self
+            .approvals
+            .request_approval(run_id, proposal, &decision)
+            .await?;
+        Ok(Ok(request))
+    }
+
+    pub async fn approval_status(&self, draft_id: u64) -> Result<ApprovalStatus> {
+        self.approvals.approval_status(draft_id).await
     }
 
     pub async fn run(
