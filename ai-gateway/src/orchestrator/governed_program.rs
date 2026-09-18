@@ -218,17 +218,26 @@ impl ProgramCheckpointStore for StdbProgramCheckpointStore<'_> {
         let checkpoint_hash = format!("{:x}", Sha256::digest(checkpoint_json.as_bytes()));
         self.writer
             .call_reducer(ReducerCall::from_name(
-                "record_ai_program_checkpoint",
+                "record_ai_reasoning_event",
                 json!([
                     context.organization_id,
                     context.company_id,
                     context.run_id,
                     {
-                        "program_ref": context.program_ref,
-                        "graph_hash": checkpoint.graph_hash,
-                        "checkpoint_hash": checkpoint_hash,
-                        "checkpoint_json": checkpoint_json,
-                        "status": status,
+                        "step_no": checkpoint.event_step,
+                        "request_hash": checkpoint_hash,
+                        "request_json": serde_json::to_string(&json!({
+                            "program_ref": context.program_ref,
+                            "graph_hash": checkpoint.graph_hash,
+                            "status": status,
+                        }))?,
+                        "outcome_kind": "program_checkpoint",
+                        "output_json": checkpoint_json,
+                        "provider": "governed-runtime",
+                        "model": checkpoint.graph_hash,
+                        "provider_attempt_id": null,
+                        "input_tokens": 0,
+                        "output_tokens": 0,
                     }
                 ]),
             ))
