@@ -145,6 +145,43 @@ pub struct AiDecisionPattern {
     pub write_date: Timestamp,
 }
 
+#[derive(Clone, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PatternApplicabilityEvidence {
+    schema_version: u32,
+    applicability_fingerprint: String,
+    company_id: u64,
+    program_ref: String,
+    step_id: String,
+    context_fingerprint: String,
+    candidate_set_hash: String,
+    evidence_shape: String,
+    graduation_policy_ref: String,
+    #[serde(default)]
+    material_policy_refs: Vec<String>,
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PatternMetricsSnapshot {
+    schema_version: u32,
+    observed_cases: u64,
+    verified_cases: u64,
+    reviewed_cases: u64,
+    correction_rate: f64,
+    verified_outcome_rate: f64,
+    provider_disagreement_rate: Option<f64>,
+    shadow_cases: u64,
+    decision_entropy: f64,
+    precedent_consistency: f64,
+    policy_stability_rate: Option<f64>,
+    evidence_shape_stability: f64,
+    candidate_set_stability: Option<f64>,
+    average_cost_microunits: Option<u64>,
+    average_latency_ms: Option<u64>,
+    proposed_expression_kind: String,
+}
+
 // ── Input params ─────────────────────────────────────────────────────────────
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -453,7 +490,30 @@ pub fn propose_ai_decision_pattern(
     {
         return Err("applicability_json/outcome_metrics_json is too long".to_string());
     }
+
+    let applicability: PatternApplicabilityEvidence =
+        serde_json::from_str(&params.applicability_json).map_err(|_| {
+            "applicability_json must match the deterministic graduation evidence schema"
+                .to_string()
+        })?;
+    validate_pattern_applicability(&applicability)?;
+
+    let metrics: PatternMetricsSnapshot =
+        serde_json::from_str(&params.outcome_metrics_json).map_err(|_| {
+            "outcome_metrics_json must match the deterministic graduation metrics schema"
+                .to_string()
+        })?;
+    validate_pattern_metrics(&metrics, params.correction_rate)?;
+
+    if metrics.observed_cases != params.supporting_case_ids.len() as u64 {
+        return Err("metrics observed_cases must equal supporting_case_ids length".to_string());
+    }
+
+    let mut seen_case_ids = std::collections::BTreeSet::new();
     for case_id in &params.supporting_case_ids {
+        if !seen_case_ids.insert(*case_id) {
+            return Err("supporting_case_ids must be unique".to_string());
+        }
         let case = ctx
             .db
             .ai_decision_case()
@@ -463,10 +523,26 @@ pub fn propose_ai_decision_pattern(
         if case.organization_id != organization_id {
             return Err("supporting_case_ids must belong to this organization".to_string());
         }
+        if case.company_id != applicability.company_id {
+            return Err("supporting_case_ids must match applicability company_id".to_string());
+        }
         if case.decision_type_name != params.decision_type_name
             || case.decision_type_version != params.decision_type_version
         {
             return Err("supporting_case_ids must match the pattern's decision type".to_string());
+        }
+        if matches!(case.status.as_str(), "rejected" | "superseded") {
+            return Err(
+                "rejected or superseded cases cannot be positive pattern support".to_string(),
+            );
+        }
+        if case.program_ref != applicability.program_ref
+            || case.step_id != applicability.step_id
+            || case.context_fingerprint != applicability.context_fingerprint
+        {
+            return Err(
+                "supporting_case_ids must share the declared applicability partition".to_string(),
+            );
         }
     }
     if pattern_key_exists(ctx, organization_id, &params.pattern_key) {
@@ -547,6 +623,95 @@ pub fn set_ai_decision_pattern_status(
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+fn validate_pattern_applicability(
+    applicability: &PatternApplicabilityEvidence,
+) -> Result<(), String> {
+    if applicability.schema_version != 1 {
+        return Err("pattern applicability schema_version must be 1".to_string());
+    }
+    if applicability.applicability_fingerprint.trim().is_empty()
+        || applicability.program_ref.trim().is_empty()
+        || applicability.step_id.trim().is_empty()
+        || applicability.context_fingerprint.trim().is_empty()
+        || applicability.candidate_set_hash.trim().is_empty()
+        || applicability.evidence_shape.trim().is_empty()
+        || applicability.graduation_policy_ref.trim().is_empty()
+    {
+        return Err("pattern applicability evidence contains an empty required field".to_string());
+    }
+    if applicability.company_id == 0 {
+        return Err("pattern applicability company_id must be nonzero".to_string());
+    }
+    if !applicability
+        .graduation_policy_ref
+        .starts_with("decision-type:")
+        || !applicability.graduation_policy_ref.ends_with("/graduation")
+    {
+        return Err(
+            "graduation_policy_ref must reference the immutable DecisionType graduation policy"
+                .to_string(),
+        );
+    }
+    if applicability
+        .material_policy_refs
+        .iter()
+        .any(|value| value.trim().is_empty())
+    {
+        return Err("material_policy_refs must not contain empty refs".to_string());
+    }
+    Ok(())
+}
+
+fn validate_pattern_metrics(
+    metrics: &PatternMetricsSnapshot,
+    correction_rate: f64,
+) -> Result<(), String> {
+    if metrics.schema_version != 1 {
+        return Err("pattern metrics schema_version must be 1".to_string());
+    }
+    if metrics.observed_cases < 2
+        || metrics.verified_cases > metrics.observed_cases
+        || metrics.reviewed_cases > metrics.observed_cases
+    {
+        return Err("pattern metrics case counts are incoherent".to_string());
+    }
+    if (metrics.correction_rate - correction_rate).abs() > f64::EPSILON {
+        return Err("pattern correction_rate must match metrics snapshot".to_string());
+    }
+    for (name, value) in [
+        ("correction_rate", Some(metrics.correction_rate)),
+        ("verified_outcome_rate", Some(metrics.verified_outcome_rate)),
+        (
+            "provider_disagreement_rate",
+            metrics.provider_disagreement_rate,
+        ),
+        ("decision_entropy", Some(metrics.decision_entropy)),
+        (
+            "precedent_consistency",
+            Some(metrics.precedent_consistency),
+        ),
+        ("policy_stability_rate", metrics.policy_stability_rate),
+        (
+            "evidence_shape_stability",
+            Some(metrics.evidence_shape_stability),
+        ),
+        (
+            "candidate_set_stability",
+            metrics.candidate_set_stability,
+        ),
+    ] {
+        if let Some(value) = value {
+            if !(0.0..=1.0).contains(&value) {
+                return Err(format!("{name} must be within [0, 1]"));
+            }
+        }
+    }
+    if metrics.proposed_expression_kind.trim().is_empty() {
+        return Err("proposed_expression_kind is required".to_string());
+    }
+    Ok(())
+}
 
 fn load_active_run(
     ctx: &ReducerContext,
