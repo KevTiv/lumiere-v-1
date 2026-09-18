@@ -224,7 +224,7 @@ pub fn record_ai_decision_case(
         }
     }
 
-    if let Some(existing) = find_case_by_hash(ctx, organization_id, &params.request_hash) {
+    if let Some(existing) = find_case_by_hash(ctx, organization_id, params.run_id, &params.request_hash) {
         if case_payload_matches(&existing, &params) {
             return Ok(());
         }
@@ -592,13 +592,14 @@ fn load_case(
 fn find_case_by_hash(
     ctx: &ReducerContext,
     organization_id: u64,
+    run_id: u64,
     request_hash: &str,
 ) -> Option<AiDecisionCase> {
     ctx.db
         .ai_decision_case()
         .ai_decision_case_by_org()
         .filter(&organization_id)
-        .find(|case| case.request_hash == request_hash)
+        .find(|case| case.run_id == run_id && case.request_hash == request_hash)
 }
 
 fn pattern_key_exists(ctx: &ReducerContext, organization_id: u64, pattern_key: &str) -> bool {
