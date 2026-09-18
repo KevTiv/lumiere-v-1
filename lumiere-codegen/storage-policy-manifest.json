@@ -1260,35 +1260,6 @@
       "postgres_access_path": "organization_index"
     },
     {
-      "table": "ai_capability_role_grant",
-      "module": "ai",
-      "rationale": "Organization-owned authorization policy; role grants must remain durable and immediately available for execution admission.",
-      "authoritative_resources": [],
-      "durability_class": "durable_business_record",
-      "organization_ownership": "direct",
-      "organization_column": "organization_id",
-      "company_ownership": "none",
-      "company_column_path": null,
-      "company_column_nullable": null,
-      "aggregate": {
-        "kind": "root",
-        "parent": null
-      },
-      "primary_key": {
-        "strategy": "auto_increment",
-        "column": "id",
-        "version_strategy": "none"
-      },
-      "projection_mode": "upsert-current",
-      "hot_retention": "always",
-      "cooling_eligibility": "never",
-      "cooling_eligibility_source": "reviewed:ai-harness/role-capability-grant/authorization-policy",
-      "dependency_behavior": "independent",
-      "hydration_policy": "not_applicable",
-      "delete_behavior": "tombstone",
-      "postgres_access_path": "organization_index"
-    },
-    {
       "table": "ai_agent_run",
       "module": "ai",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
@@ -1391,6 +1362,35 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "ai_capability_role_grant",
+      "module": "ai",
+      "rationale": "Organization-owned authorization policy; role grants must remain durable and immediately available for execution admission.",
+      "authoritative_resources": [],
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "none",
+      "company_column_path": null,
+      "company_column_nullable": null,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:ai-harness/role-capability-grant/authorization-policy",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
       "table": "ai_chat_message",
       "module": "ai",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
@@ -1447,6 +1447,99 @@
       "hot_retention": "always",
       "cooling_eligibility": "never",
       "cooling_eligibility_source": "reviewed:c5/people-platform/always-hot/missing-semantic-safety-contract",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_decision_case",
+      "module": "ai",
+      "rationale": "Immutable governed decision history for one durable run; retained as append-only organizational evidence.",
+      "authoritative_resources": [],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "ai_agent_run",
+          "child_column": "run_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:governed-intelligence/decision-precedent/append-only",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "append_only",
+      "postgres_access_path": "organization_partition"
+    },
+    {
+      "table": "ai_decision_pattern",
+      "module": "ai",
+      "rationale": "Reviewed organization-scoped decision-pattern state used for deterministic-graduation candidates; no company ownership is stored on the row.",
+      "authoritative_resources": [],
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "none",
+      "company_column_path": null,
+      "company_column_nullable": null,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:governed-intelligence/decision-pattern/organizational-memory",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_decision_type_definition",
+      "module": "ai",
+      "rationale": "Versioned organization-scoped decision vocabulary and policy metadata required for governed decision admission.",
+      "authoritative_resources": [],
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "none",
+      "company_column_path": null,
+      "company_column_nullable": null,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:governed-intelligence/decision-type/versioned-policy",
       "dependency_behavior": "independent",
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",
@@ -1517,6 +1610,41 @@
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",
       "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_intelligence_event",
+      "module": "ai",
+      "rationale": "Append-only durable record of typed decision and reasoning calls linked to a governed run.",
+      "authoritative_resources": [],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "ai_agent_run",
+          "child_column": "run_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:governed-intelligence/intelligence-event/append-only",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "append_only",
+      "postgres_access_path": "organization_partition"
     },
     {
       "table": "ai_price_snapshot",
