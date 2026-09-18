@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use stdb_client::{ReducerCall, StdbClient};
 
-use super::governed_program::GovernedProgramOutcome;
+use super::governed_program::{GovernedProgramOutcome, GovernedProgramStop};
 use super::intelligence::{
     DecisionKind, DecisionProvider, DecisionRequest, DecisionTypeRef,
 };
@@ -74,6 +74,9 @@ impl<'a> RunReviewProgram<'a> {
         if objective.trim().is_empty() {
             bail!("run review objective must be nonempty");
         }
+        if let Some(result) = deterministic_pre_review(outcome) {
+            return Ok(result);
+        }
         let trace = outcome
             .trace
             .iter()
@@ -125,6 +128,54 @@ impl<'a> RunReviewProgram<'a> {
             model: response.model,
         })
     }
+}
+
+fn deterministic_pre_review(outcome: &GovernedProgramOutcome) -> Option<RunReviewResult> {
+    let defect = |rationale: String| RunReviewResult {
+        disposition: RunReviewDisposition::Defect,
+        rationale: Some(rationale),
+        provider: "deterministic-review".to_string(),
+        model: "trace-invariants@1".to_string(),
+    };
+
+    if outcome.trace.is_empty() {
+        return Some(defect("governed run has an empty observable trace".to_string()));
+    }
+    if matches!(outcome.stop, GovernedProgramStop::Completed)
+        && outcome
+            .final_content
+            .as_deref()
+            .is_none_or(|content| content.trim().is_empty())
+    {
+        return Some(defect(
+            "completed governed run has no admitted final content".to_string(),
+        ));
+    }
+
+    let traced_capabilities = outcome
+        .trace
+        .iter()
+        .filter(|step| step.kind == "capability")
+        .count() as u32;
+    if outcome.capability_calls > traced_capabilities {
+        return Some(defect(format!(
+            "capability call count {} exceeds observable capability trace count {}",
+            outcome.capability_calls, traced_capabilities
+        )));
+    }
+
+    let traced_decisions = outcome
+        .trace
+        .iter()
+        .filter(|step| matches!(step.kind, "choice" | "score" | "probability"))
+        .count() as u32;
+    if outcome.decision_calls > traced_decisions {
+        return Some(defect(format!(
+            "decision call count {} exceeds observable decision trace count {}",
+            outcome.decision_calls, traced_decisions
+        )));
+    }
+    None
 }
 
 /// Durable evidence for one `RunReviewProgram::review` result. Separate
@@ -222,6 +273,25 @@ mod tests {
                 output_tokens: 1,
             })
         }
+    }
+
+    #[test]
+    fn deterministic_review_rejects_completed_run_without_final_content() {
+        let outcome = GovernedProgramOutcome {
+            stop: GovernedProgramStop::Completed,
+            final_content: None,
+            outputs: std::collections::HashMap::new(),
+            trace: vec![super::super::governed_program::GovernedProgramTraceStep {
+                node_id: "generate".into(),
+                kind: "generate",
+                summary: "generation attempted".into(),
+            }],
+            decision_calls: 0,
+            capability_calls: 0,
+        };
+        let result = deterministic_pre_review(&outcome).unwrap();
+        assert_eq!(result.disposition, RunReviewDisposition::Defect);
+        assert_eq!(result.provider, "deterministic-review");
     }
 
     #[tokio::test]
