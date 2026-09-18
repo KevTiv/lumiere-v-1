@@ -7,14 +7,12 @@
 //! Nothing in this module executes anything — it only ranks and summarizes
 //! prior `DecisionCase` records into `intelligence::PrecedentSummaryRef`
 //! values, the same type `DecisionRequest`/`ReasoningRequest` (GP-01)
-//! already carry (today always empty — this module is what will fill it,
-//! once wired).
+//! already carry. The governed program runtime now fills these summaries
+//! from the production STDB-backed store.
 //!
-//! `PrecedentStore` is provider-neutral; `InMemoryPrecedentStore` is a
-//! reference implementation for tests. Production wiring binds this to the
-//! durable `AiDecisionCase`/`AiDecisionPattern` tables (`spacetimedb/src/ai/
-//! decision_precedent.rs`) — not done in this pass, consistent with every
-//! prior GP step: additive only, no production route switch.
+//! `PrecedentStore` is provider-neutral; `InMemoryPrecedentStore` remains a
+//! test reference implementation while `StdbPrecedentStore` is the production
+//! adapter over the durable `AiDecisionCase` state.
 //!
 //! Retrieval is hybrid, not embedding-only (no embedding provider is wired
 //! here): it filters hard on tenant scope and decision type, excludes
@@ -173,8 +171,7 @@ pub(super) trait PrecedentStore: Send + Sync {
     async fn record(&self, case: DecisionCaseRecord) -> Result<u64>;
 }
 
-/// Reference implementation for tests. Production wiring binds to the
-/// durable STDB tables instead (see module docs).
+/// Reference implementation retained for isolated unit tests.
 pub(super) struct InMemoryPrecedentStore {
     cases: std::sync::Mutex<Vec<DecisionCaseRecord>>,
     next_id: std::sync::atomic::AtomicU64,
