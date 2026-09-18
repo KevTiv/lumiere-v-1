@@ -284,6 +284,48 @@ pub async fn complete_run(
 /// Park an open run in a non-terminal wait state. `status` must be a wait state
 /// the module accepts (`awaiting_approval` or `agent_settled`); a run already in
 /// that state replays without change.
+pub async fn resume_run(
+    stdb: &StdbClient,
+    org_id: u64,
+    company_id: u64,
+    run_id: u64,
+) -> Result<()> {
+    stdb.call_reducer(stdb_client::reducer_call!(
+        "resume_ai_agent_run",
+        serde_json::json!([org_id, company_id, run_id]),
+    ))
+    .await
+    .context("resume_ai_agent_run")?;
+    Ok(())
+}
+
+pub async fn load_run_key(
+    stdb: &StdbClient,
+    org_id: u64,
+    company_id: u64,
+    run_id: u64,
+) -> Result<String> {
+    let rows = stdb
+        .query_sql(&format!(
+            "SELECT run_key, status FROM ai_agent_run WHERE organization_id = {org_id}              AND company_id = {company_id} AND id = {run_id} LIMIT 1"
+        ))
+        .await
+        .context("load resumable ai_agent_run")?;
+    let row = rows.first().context("resumable run not found")?;
+    let status = row
+        .get("status")
+        .and_then(Value::as_str)
+        .context("resumable run status missing")?;
+    if !matches!(status, "running" | "awaiting_approval" | "agent_settled") {
+        anyhow::bail!("run status '{status}' is not resumable");
+    }
+    row.get("runKey")
+        .or_else(|| row.get("run_key"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .context("resumable run key missing")
+}
+
 pub async fn set_run_wait_state(
     stdb: &StdbClient,
     org_id: u64,
