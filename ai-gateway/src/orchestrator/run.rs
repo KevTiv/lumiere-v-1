@@ -83,8 +83,6 @@ pub struct RunSkillRequest {
 #[derive(Debug, Deserialize, Default)]
 pub struct RunSkillOverrides {
     pub max_steps: Option<u32>,
-    /// Resume an existing governed run/checkpoint instead of creating a new run.
-    pub resume_run_id: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -482,6 +480,8 @@ pub struct AdmittedRunRequest {
     pub reviewed_calls: Vec<PlannedToolCall>,
     pub llm_request: LlmRequest,
     pub max_steps: Option<u32>,
+    /// Resume an existing governed run/checkpoint instead of creating a new run.
+    pub resume_run_id: Option<u64>,
 }
 
 /// Execute a skill run through the full H5b admission stack.
