@@ -288,26 +288,18 @@ pub(super) fn consequential_mutation_reference_graph() -> DecisionGraph {
             GraphNode {
                 id: "approval".to_string(),
                 depends_on: vec!["mutation_decision".to_string()],
-                next: Some("mutate".to_string()),
+                next: Some("verify_mutation".to_string()),
                 kind: DecisionNode::RequireApproval(RequireApprovalNode {
                     source: "mutation_decision".to_string(),
                     capability: "post_payment".to_string(),
                 }),
             },
             GraphNode {
-                id: "mutate".to_string(),
-                depends_on: vec!["approval".to_string()],
-                next: Some("verify_mutation".to_string()),
-                kind: DecisionNode::Capability(CapabilityNode {
-                    capability: "post_payment".to_string(),
-                }),
-            },
-            GraphNode {
                 id: "verify_mutation".to_string(),
-                depends_on: vec!["mutate".to_string()],
+                depends_on: vec!["approval".to_string()],
                 next: Some("receipt".to_string()),
                 kind: DecisionNode::Verify(VerifyNode {
-                    source: "mutate".to_string(),
+                    source: "approval".to_string(),
                 }),
             },
             GraphNode {
