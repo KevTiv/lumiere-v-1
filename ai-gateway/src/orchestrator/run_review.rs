@@ -167,7 +167,7 @@ fn deterministic_pre_review(outcome: &GovernedProgramOutcome) -> Option<RunRevie
     let traced_decisions = outcome
         .trace
         .iter()
-        .filter(|step| matches!(step.kind, "choice" | "score" | "probability"))
+        .filter(|step| matches!(step.kind.as_str(), "choice" | "score" | "probability"))
         .count() as u32;
     if outcome.decision_calls > traced_decisions {
         return Some(defect(format!(
@@ -283,7 +283,7 @@ mod tests {
             outputs: std::collections::HashMap::new(),
             trace: vec![super::super::governed_program::GovernedProgramTraceStep {
                 node_id: "generate".into(),
-                kind: "generate",
+                kind: "generate".to_string(),
                 summary: "generation attempted".into(),
             }],
             decision_calls: 0,
@@ -300,11 +300,23 @@ mod tests {
             stop: GovernedProgramStop::Completed,
             final_content: Some("done".to_string()),
             outputs: Default::default(),
-            trace: vec![GovernedProgramTraceStep {
-                node_id: "generate".to_string(),
-                kind: "generate",
-                summary: "generated answer admitted".to_string(),
-            }],
+            trace: vec![
+                GovernedProgramTraceStep {
+                    node_id: "decide".to_string(),
+                    kind: "choice".to_string(),
+                    summary: "decision executed".to_string(),
+                },
+                GovernedProgramTraceStep {
+                    node_id: "act".to_string(),
+                    kind: "capability".to_string(),
+                    summary: "capability executed".to_string(),
+                },
+                GovernedProgramTraceStep {
+                    node_id: "generate".to_string(),
+                    kind: "generate".to_string(),
+                    summary: "generated answer admitted".to_string(),
+                },
+            ],
             decision_calls: 1,
             capability_calls: 1,
         };
@@ -360,7 +372,11 @@ mod tests {
             stop: GovernedProgramStop::Completed,
             final_content: Some("done".to_string()),
             outputs: Default::default(),
-            trace: vec![],
+            trace: vec![GovernedProgramTraceStep {
+                node_id: "generate".to_string(),
+                kind: "generate".to_string(),
+                summary: "generated answer admitted".to_string(),
+            }],
             decision_calls: 0,
             capability_calls: 0,
         };

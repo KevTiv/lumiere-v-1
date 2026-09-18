@@ -1001,7 +1001,7 @@ mod tests {
 
     #[tokio::test]
     async fn governed_resolver_fails_closed_when_default_policy_is_absent() {
-        let store = InMemoryModelConfigurationStore::new();
+        let store = FakeStore::new();
         let resolver =
             IntelligenceRouteResolver::new_governed(&store, 9, &agent(), None).unwrap();
         let error = resolver

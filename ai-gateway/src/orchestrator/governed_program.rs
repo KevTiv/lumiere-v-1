@@ -85,7 +85,7 @@ pub(super) enum GovernedProgramStop {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(super) struct GovernedProgramTraceStep {
     pub node_id: String,
-    pub kind: &'static str,
+    pub kind: String,
     pub summary: String,
 }
 
@@ -174,7 +174,7 @@ impl ProgramCheckpointStore for StdbProgramCheckpointStore<'_> {
         context: &GovernedProgramContext,
         graph_hash: &str,
     ) -> Result<Option<GovernedProgramCheckpoint>> {
-        let program_ref = context.program_ref.replace(''', "''");
+        let program_ref = context.program_ref.replace('\'', "''");
         let rows = self
             .reader
             .query_sql(&format!(
@@ -760,7 +760,7 @@ impl GovernedProgramExecutor<'_> {
                     );
                     trace.push(GovernedProgramTraceStep {
                         node_id: pending.node_id,
-                        kind: "require_approval",
+                        kind: "require_approval".to_string(),
                         summary: "human approval completed; resuming governed program".to_string(),
                     });
                     current = pending.next_node;
@@ -961,6 +961,7 @@ impl GovernedProgramExecutor<'_> {
                         };
                         let member_id = member_id.clone();
                         let values_ref = &values;
+                        let overlays_ref = &evidence_overlays;
                         work.push(async move {
                             let result = self
                                 .execute_decision(
@@ -972,6 +973,7 @@ impl GovernedProgramExecutor<'_> {
                                     candidates,
                                     step_no,
                                     values_ref,
+                                    overlays_ref,
                                 )
                                 .await;
                             (member_id, result)
@@ -1143,7 +1145,7 @@ impl GovernedProgramExecutor<'_> {
                             }
                             trace.push(GovernedProgramTraceStep {
                                 node_id: node.id.clone(),
-                                kind: "acquire_evidence",
+                                kind: "acquire_evidence".to_string(),
                                 summary: format!(
                                     "invalidated {} affected/downstream node(s) for bounded re-evaluation",
                                     invalidated.len()
@@ -2199,7 +2201,7 @@ fn decision_kind_label(kind: DecisionKind) -> &'static str {
 fn step(node: &GraphNode, summary: impl Into<String>) -> GovernedProgramTraceStep {
     GovernedProgramTraceStep {
         node_id: node.id.clone(),
-        kind: node.kind.label(),
+        kind: node.kind.label().to_string(),
         summary: summary.into(),
     }
 }
