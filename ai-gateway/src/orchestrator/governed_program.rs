@@ -1354,6 +1354,82 @@ fn evidence_for_node(
     evidence
 }
 
+/// Whether any `Capability`/`AcquireEvidence` node in `graph` names a
+/// capability the embedded generated-capability catalog advertises.
+/// Mirrors `agent_loop_adapters::run_recorded_loop`'s `generated_requested`
+/// check for the direct-execution loop — same reason: resolving actor
+/// grants (`generated_read::resolve_actor_grants`) requires real actor
+/// credentials and a live HTTP round-trip to the API server, so a graph
+/// that never touches a generated capability should not have to pay for
+/// (or require) either.
+pub(super) fn graph_requests_generated_capabilities(graph: &DecisionGraph) -> Result<bool> {
+    let catalog = crate::tools::generated::embedded_catalog()?;
+    Ok(graph.nodes.iter().any(|node| match &node.kind {
+        DecisionNode::Capability(capability) => catalog.advertises(&capability.capability),
+        DecisionNode::AcquireEvidence(acquire) => catalog.advertises(&acquire.capability),
+        _ => false,
+    }))
+}
+
+#[cfg(test)]
+mod generated_capability_detection_tests {
+    use super::*;
+    use crate::orchestrator::decision_graph::{AcquireEvidenceNode, CapabilityNode};
+
+    fn graph_with(node: GraphNode) -> DecisionGraph {
+        DecisionGraph {
+            entry: node.id.clone(),
+            nodes: vec![node],
+        }
+    }
+
+    #[test]
+    fn a_built_in_tool_name_does_not_request_generated_capabilities() {
+        // report_analysis_graph()'s real "analytics_summary" node — a
+        // ToolRegistry built-in, not a catalog entry.
+        let graph = graph_with(GraphNode {
+            id: "analytics".to_string(),
+            depends_on: Vec::new(),
+            next: None,
+            kind: DecisionNode::Capability(CapabilityNode {
+                capability: "analytics_summary".to_string(),
+            }),
+        });
+        assert!(!graph_requests_generated_capabilities(&graph).unwrap());
+    }
+
+    #[test]
+    fn a_catalog_advertised_capability_key_requests_generated_capabilities() {
+        // A real entry's tool.name from the embedded generated-capability
+        // catalog — `advertises` checks the reviewed tool name (what a
+        // CapabilityProposal/ToolCallRequest actually carries), not the
+        // dotted capability_key.
+        let graph = graph_with(GraphNode {
+            id: "products".to_string(),
+            depends_on: Vec::new(),
+            next: None,
+            kind: DecisionNode::Capability(CapabilityNode {
+                capability: "inventory_products_read".to_string(),
+            }),
+        });
+        assert!(graph_requests_generated_capabilities(&graph).unwrap());
+    }
+
+    #[test]
+    fn an_acquire_evidence_node_is_also_checked() {
+        let graph = graph_with(GraphNode {
+            id: "evidence".to_string(),
+            depends_on: Vec::new(),
+            next: None,
+            kind: DecisionNode::AcquireEvidence(AcquireEvidenceNode {
+                capability: "inventory_stock_quants_read".to_string(),
+                max_rows: 10,
+                affects: Vec::new(),
+            }),
+        });
+        assert!(graph_requests_generated_capabilities(&graph).unwrap());
+    }
+}
 
 pub(super) fn report_analysis_graph() -> DecisionGraph {
     use super::decision_graph::{

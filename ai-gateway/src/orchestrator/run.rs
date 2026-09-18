@@ -24,7 +24,7 @@ use crate::{
     providers::llm::{LlmMessage, LlmRequest},
     state::AppState,
     tools::{
-        generated_read::GeneratedReadTools,
+        generated_read::{resolve_actor_grants, GeneratedReadTools},
         registry::ToolRegistry,
         types::{SkillCitation, ToolContext},
     },
@@ -36,8 +36,8 @@ use super::{
     },
     decision_type::{register_builtin_decision_types, StdbDecisionTypeRegistry},
     governed_program::{
-        BuiltinComputeService, GovernedProgramContext, GovernedProgramExecutor,
-        GovernedProgramStop, StdbIntelligenceEventRecorder,
+        graph_requests_generated_capabilities, BuiltinComputeService, GovernedProgramContext,
+        GovernedProgramExecutor, GovernedProgramStop, StdbIntelligenceEventRecorder,
     },
     governed_programs::{report_analysis_graph, REPORT_ANALYSIS_PROGRAM_REF},
     governed_services::{
@@ -679,7 +679,12 @@ pub async fn run_skill_admitted(
             reader: tool_ctx.stdb.as_ref(),
         };
 
-        let generated_grants = Vec::new();
+        let graph = report_analysis_graph();
+        let generated_grants = if graph_requests_generated_capabilities(&graph)? {
+            resolve_actor_grants(&tool_ctx).await?
+        } else {
+            Vec::new()
+        };
         let loop_tools = AuthorizedLoopTools {
             view: &view,
             generated: GeneratedReadTools::new(&generated_grants),
@@ -736,9 +741,7 @@ pub async fn run_skill_admitted(
                 id: format!("run:{run_id}:analytics"),
             }],
         };
-        let program = executor
-            .run(&report_analysis_graph(), &program_context)
-            .await?;
+        let program = executor.run(&graph, &program_context).await?;
 
         let review = if matches!(&program.stop, GovernedProgramStop::Completed) {
             let result = RunReviewProgram::new(&review_provider)
