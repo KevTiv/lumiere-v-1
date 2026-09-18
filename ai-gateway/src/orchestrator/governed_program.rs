@@ -127,9 +127,9 @@ pub(super) trait ComputeService: Send + Sync {
     ) -> Result<Value>;
 }
 
-/// Small deterministic registry used by the first production-shaped program.
-/// Domain-specific computations should be added here (or delegated to a
-/// dedicated registry), never inferred by a provider.
+/// Small provider-free deterministic compute registry shared by governed
+/// programs. Keep generic structural functions here; domain business rules
+/// remain in STDB/native ERP services and should be referenced, not copied.
 pub(super) struct BuiltinComputeService;
 
 #[async_trait]
@@ -143,6 +143,37 @@ impl ComputeService for BuiltinComputeService {
         match function_ref {
             "program_input" => Ok(program_state.clone()),
             "dependency_object" => Ok(serde_json::to_value(dependencies)?),
+            "dependency_count" => Ok(Value::from(dependencies.len() as u64)),
+            "dependency_keys" => {
+                let mut keys = dependencies.keys().cloned().collect::<Vec<_>>();
+                keys.sort();
+                Ok(serde_json::to_value(keys)?)
+            }
+            "merge_object_dependencies" => {
+                let mut keys = dependencies.keys().cloned().collect::<Vec<_>>();
+                keys.sort();
+                let mut merged = serde_json::Map::new();
+                for key in keys {
+                    let value = dependencies
+                        .get(&key)
+                        .context("dependency disappeared during deterministic merge")?;
+                    let object = value.as_object().with_context(|| {
+                        format!("dependency '{key}' must be an object for merge_object_dependencies")
+                    })?;
+                    for (field, value) in object {
+                        if let Some(existing) = merged.get(field) {
+                            if existing != value {
+                                bail!(
+                                    "merge_object_dependencies conflict for field '{field}'"
+                                );
+                            }
+                        } else {
+                            merged.insert(field.clone(), value.clone());
+                        }
+                    }
+                }
+                Ok(Value::Object(merged))
+            }
             other => bail!("unknown deterministic compute function '{other}'"),
         }
     }
