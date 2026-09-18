@@ -271,6 +271,7 @@ pub(super) struct IntelligenceRouteResolver<'a> {
     policy_key: Option<String>,
     policy_version: Option<u32>,
     explicit_policy: bool,
+    require_policy: bool,
     legacy_profile: ModelProfile,
 }
 
@@ -280,6 +281,25 @@ impl<'a> IntelligenceRouteResolver<'a> {
         organization_id: u64,
         agent: &ResolvedAgentConfig,
         policy_ref: Option<&str>,
+    ) -> Result<Self> {
+        Self::new_with_mode(store, organization_id, agent, policy_ref, false)
+    }
+
+    pub fn new_governed(
+        store: &'a dyn ModelConfigurationStore,
+        organization_id: u64,
+        agent: &ResolvedAgentConfig,
+        policy_ref: Option<&str>,
+    ) -> Result<Self> {
+        Self::new_with_mode(store, organization_id, agent, policy_ref, true)
+    }
+
+    fn new_with_mode(
+        store: &'a dyn ModelConfigurationStore,
+        organization_id: u64,
+        agent: &ResolvedAgentConfig,
+        policy_ref: Option<&str>,
+        require_policy: bool,
     ) -> Result<Self> {
         let explicit_policy = policy_ref.is_some_and(|value| !value.trim().is_empty());
         let (policy_key, policy_version) = match policy_ref {
@@ -296,6 +316,7 @@ impl<'a> IntelligenceRouteResolver<'a> {
             policy_key,
             policy_version,
             explicit_policy,
+            require_policy,
             legacy_profile: ModelProfile::legacy(agent),
         })
     }
@@ -313,9 +334,9 @@ impl<'a> IntelligenceRouteResolver<'a> {
             .policy(self.organization_id, policy_key, self.policy_version)
             .await?
         else {
-            if self.explicit_policy {
+            if self.explicit_policy || self.require_policy {
                 bail!(
-                    "explicit intelligence policy '{}{}' was not found",
+                    "governed intelligence policy '{}{}' was not found",
                     policy_key,
                     self.policy_version
                         .map(|version| format!("@{version}"))
@@ -826,6 +847,18 @@ mod tests {
             .unwrap_err();
 
         assert!(error.to_string().contains("explicit intelligence policy"));
+    }
+
+    #[tokio::test]
+    async fn governed_resolver_fails_closed_when_default_policy_is_absent() {
+        let store = InMemoryModelConfigurationStore::new();
+        let resolver =
+            IntelligenceRouteResolver::new_governed(&store, 9, &agent(), None).unwrap();
+        let error = resolver
+            .resolve(IntelligenceRole::Decision, Some("ReportAttentionNeed"))
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("governed intelligence policy"));
     }
 
     #[tokio::test]
