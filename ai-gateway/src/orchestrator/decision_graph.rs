@@ -390,6 +390,24 @@ fn validate_node_contract(node: &GraphNode) -> Result<()> {
                 bail!("probability node '{}' must define a question", node.id);
             }
         }
+        DecisionNode::AcquireEvidence(acquire) => {
+            if acquire.capability.trim().is_empty() {
+                bail!("acquire evidence node '{}' must name a capability", node.id);
+            }
+            if acquire.max_rows == 0 {
+                bail!("acquire evidence node '{}' max_rows must be positive", node.id);
+            }
+            if acquire.affects.is_empty() {
+                bail!("acquire evidence node '{}' must declare at least one affected node", node.id);
+            }
+            let unique = acquire.affects.iter().collect::<HashSet<_>>();
+            if unique.len() != acquire.affects.len() {
+                bail!("acquire evidence node '{}' affects must be unique", node.id);
+            }
+            if acquire.affects.iter().any(|affected| affected == &node.id) {
+                bail!("acquire evidence node '{}' cannot affect itself", node.id);
+            }
+        }
         _ => {}
     }
     Ok(())
