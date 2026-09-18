@@ -553,10 +553,11 @@ fn validate_gates(graph: &DecisionGraph) -> Result<()> {
     Ok(())
 }
 
-/// Any cycle formed purely by `Gate` branch targets is rejected unless the
-/// cycle passes through at least one `Reason` node with `max_iterations >
-/// 0` — the only construct allowed to reintroduce a loop, and only a
-/// bounded one.
+/// Any control-flow cycle is rejected unless it passes through an explicitly
+/// bounded construct: a `Reason` node with `max_iterations > 0`, or an
+/// `AcquireEvidence` node. Evidence acquisition is runtime-bounded to one
+/// successful acquisition per node before it hard-stops as insufficient
+/// evidence, so re-evaluation loops cannot spin indefinitely.
 fn validate_control_flow_cycles_are_bounded(graph: &DecisionGraph) -> Result<()> {
     #[derive(Clone, Copy, PartialEq)]
     enum Mark {
@@ -565,10 +566,13 @@ fn validate_control_flow_cycles_are_bounded(graph: &DecisionGraph) -> Result<()>
     }
     let mut marks: HashMap<&str, Mark> = HashMap::new();
 
-    fn is_bounded_reason(graph: &DecisionGraph, id: &str) -> bool {
+    fn is_bounded_cycle_node(graph: &DecisionGraph, id: &str) -> bool {
         matches!(
             graph.get(id).map(|n| &n.kind),
             Some(DecisionNode::Reason(r)) if r.max_iterations > 0
+        ) || matches!(
+            graph.get(id).map(|n| &n.kind),
+            Some(DecisionNode::AcquireEvidence(a)) if !a.affects.is_empty()
         )
     }
 
@@ -584,7 +588,7 @@ fn validate_control_flow_cycles_are_bounded(graph: &DecisionGraph) -> Result<()>
                 stack.push(id);
                 let cycle_has_bounded_reason = stack
                     .iter()
-                    .any(|node_id| is_bounded_reason(graph, node_id));
+                    .any(|node_id| is_bounded_cycle_node(graph, node_id));
                 if !cycle_has_bounded_reason {
                     bail!(
                         "unbounded control-flow cycle: {} (add a Reason node with max_iterations > 0 to the cycle to make it explicit and bounded)",
