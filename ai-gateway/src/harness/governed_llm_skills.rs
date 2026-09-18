@@ -286,6 +286,7 @@ pub async fn run_governed_llm_skill(
                 tools: Vec::new(),
             },
             max_steps: input.max_steps,
+            resume_run_id: None,
         },
     )
     .await
