@@ -4,15 +4,24 @@
 //! Its response is captured for evaluation only and can never alter the
 //! production return value or invoke a capability.
 
-use anyhow::Result;
+use std::sync::atomic::{AtomicU32, Ordering};
+
+use anyhow::{bail, Result};
 use futures::future::join_all;
 
 use super::{
-    intelligence::{DecisionProvider, DecisionRequest, DecisionResponse},
-    model_configuration::{
-        IntelligenceRole, IntelligenceRoute, IntelligenceRouteResolver,
+    intelligence::{
+        DecisionProvider, DecisionRequest, DecisionResponse, GenerationProvider,
+        GenerationRequest, GenerationResponse, ReasoningOutcome, ReasoningProvider,
+        ReasoningRequest,
     },
+    intelligence_adapters::{AgentLoopReasoner, LlmDecisionAdapter, LlmGenerationAdapter},
+    model_configuration::{
+        IntelligenceRole, IntelligenceRoute, IntelligenceRouteResolver, ModelProfile,
+    },
+    spend_admission::{spend_binding_for_profile, SpendAdmittedLlm, SpendLedger},
 };
+use crate::{ai_agent::ResolvedAgentConfig, providers::llm::LlmCompletion};
 
 /// The only model/profile selection surface intended for governed runtime code.
 pub(super) struct ConfiguredIntelligenceRouter<'a> {
@@ -30,6 +39,260 @@ impl<'a> ConfiguredIntelligenceRouter<'a> {
         decision_type: Option<&str>,
     ) -> Result<IntelligenceRoute> {
         self.resolver.resolve(role, decision_type).await
+    }
+}
+
+
+fn role_scope(role: IntelligenceRole) -> u32 {
+    match role {
+        IntelligenceRole::Decision => 1,
+        IntelligenceRole::Reasoning => 2,
+        IntelligenceRole::Generation => 3,
+        IntelligenceRole::Review => 4,
+        IntelligenceRole::Shadow => 5,
+    }
+}
+
+fn next_call_scope(role: IntelligenceRole, counter: &AtomicU32) -> Result<u32> {
+    let call = counter.fetch_add(1, Ordering::SeqCst);
+    if call >= 1_000 {
+        bail!("intelligence role call scope exhausted");
+    }
+    Ok(role_scope(role) * 1_000 + call)
+}
+
+pub(super) struct RoutedDecisionProvider<'a> {
+    router: &'a ConfiguredIntelligenceRouter<'a>,
+    transport: &'a dyn LlmCompletion,
+    ledger: &'a dyn SpendLedger,
+    agent: &'a ResolvedAgentConfig,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    role: IntelligenceRole,
+    next_scope: AtomicU32,
+}
+
+impl<'a> RoutedDecisionProvider<'a> {
+    pub fn new(
+        router: &'a ConfiguredIntelligenceRouter<'a>,
+        transport: &'a dyn LlmCompletion,
+        ledger: &'a dyn SpendLedger,
+        agent: &'a ResolvedAgentConfig,
+        organization_id: u64,
+        company_id: u64,
+        run_id: u64,
+        role: IntelligenceRole,
+    ) -> Result<Self> {
+        if !matches!(role, IntelligenceRole::Decision | IntelligenceRole::Review) {
+            bail!("RoutedDecisionProvider requires decision or review role");
+        }
+        Ok(Self {
+            router,
+            transport,
+            ledger,
+            agent,
+            organization_id,
+            company_id,
+            run_id,
+            role,
+            next_scope: AtomicU32::new(1),
+        })
+    }
+
+    async fn attempt(
+        &self,
+        profile: &ModelProfile,
+        request: DecisionRequest,
+        call_scope: u32,
+    ) -> Result<DecisionResponse> {
+        let binding = spend_binding_for_profile(
+            self.agent,
+            profile,
+            self.organization_id,
+            self.company_id,
+            self.run_id,
+        )?;
+        let admitted =
+            SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, call_scope)?;
+        LlmDecisionAdapter::from_profile(&admitted, profile)
+            .decide(request)
+            .await
+    }
+}
+
+#[async_trait::async_trait]
+impl DecisionProvider for RoutedDecisionProvider<'_> {
+    async fn decide(&self, request: DecisionRequest) -> Result<DecisionResponse> {
+        let route = self
+            .router
+            .route(self.role, Some(&request.decision_type.name))
+            .await?;
+        let mut profiles = Vec::with_capacity(1 + route.fallbacks.len());
+        profiles.push(route.primary);
+        profiles.extend(route.fallbacks);
+
+        let mut failures = Vec::new();
+        for profile in profiles {
+            let scope = next_call_scope(self.role, &self.next_scope)?;
+            match self.attempt(&profile, request.clone(), scope).await {
+                Ok(response) => return Ok(response),
+                Err(error) => failures.push(format!(
+                    "{}: {}",
+                    profile.reference.stable_ref(),
+                    error
+                )),
+            }
+        }
+        bail!(
+            "all configured '{}' model profiles failed: {}",
+            self.role.label(),
+            failures.join(" | ")
+        )
+    }
+}
+
+pub(super) struct RoutedReasoningProvider<'a> {
+    router: &'a ConfiguredIntelligenceRouter<'a>,
+    transport: &'a dyn LlmCompletion,
+    ledger: &'a dyn SpendLedger,
+    agent: &'a ResolvedAgentConfig,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    next_scope: AtomicU32,
+}
+
+impl<'a> RoutedReasoningProvider<'a> {
+    pub fn new(
+        router: &'a ConfiguredIntelligenceRouter<'a>,
+        transport: &'a dyn LlmCompletion,
+        ledger: &'a dyn SpendLedger,
+        agent: &'a ResolvedAgentConfig,
+        organization_id: u64,
+        company_id: u64,
+        run_id: u64,
+    ) -> Self {
+        Self {
+            router,
+            transport,
+            ledger,
+            agent,
+            organization_id,
+            company_id,
+            run_id,
+            next_scope: AtomicU32::new(1),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl ReasoningProvider for RoutedReasoningProvider<'_> {
+    async fn reason(&self, request: ReasoningRequest) -> Result<ReasoningOutcome> {
+        let route = self
+            .router
+            .route(IntelligenceRole::Reasoning, None)
+            .await?;
+        let mut profiles = Vec::with_capacity(1 + route.fallbacks.len());
+        profiles.push(route.primary);
+        profiles.extend(route.fallbacks);
+        let mut failures = Vec::new();
+        for profile in profiles {
+            let binding = spend_binding_for_profile(
+                self.agent,
+                &profile,
+                self.organization_id,
+                self.company_id,
+                self.run_id,
+            )?;
+            let scope = next_call_scope(IntelligenceRole::Reasoning, &self.next_scope)?;
+            let admitted =
+                SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?;
+            match AgentLoopReasoner::from_profile(&admitted, &profile)
+                .reason(request.clone())
+                .await
+            {
+                Ok(response) => return Ok(response),
+                Err(error) => failures.push(format!(
+                    "{}: {}",
+                    profile.reference.stable_ref(),
+                    error
+                )),
+            }
+        }
+        bail!("all configured reasoning profiles failed: {}", failures.join(" | "))
+    }
+}
+
+pub(super) struct RoutedGenerationProvider<'a> {
+    router: &'a ConfiguredIntelligenceRouter<'a>,
+    transport: &'a dyn LlmCompletion,
+    ledger: &'a dyn SpendLedger,
+    agent: &'a ResolvedAgentConfig,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    next_scope: AtomicU32,
+}
+
+impl<'a> RoutedGenerationProvider<'a> {
+    pub fn new(
+        router: &'a ConfiguredIntelligenceRouter<'a>,
+        transport: &'a dyn LlmCompletion,
+        ledger: &'a dyn SpendLedger,
+        agent: &'a ResolvedAgentConfig,
+        organization_id: u64,
+        company_id: u64,
+        run_id: u64,
+    ) -> Self {
+        Self {
+            router,
+            transport,
+            ledger,
+            agent,
+            organization_id,
+            company_id,
+            run_id,
+            next_scope: AtomicU32::new(1),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl GenerationProvider for RoutedGenerationProvider<'_> {
+    async fn generate(&self, request: GenerationRequest) -> Result<GenerationResponse> {
+        let route = self
+            .router
+            .route(IntelligenceRole::Generation, None)
+            .await?;
+        let mut profiles = Vec::with_capacity(1 + route.fallbacks.len());
+        profiles.push(route.primary);
+        profiles.extend(route.fallbacks);
+        let mut failures = Vec::new();
+        for profile in profiles {
+            let binding = spend_binding_for_profile(
+                self.agent,
+                &profile,
+                self.organization_id,
+                self.company_id,
+                self.run_id,
+            )?;
+            let scope = next_call_scope(IntelligenceRole::Generation, &self.next_scope)?;
+            let admitted =
+                SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?;
+            match LlmGenerationAdapter::from_profile(&admitted, &profile)
+                .generate(request.clone())
+                .await
+            {
+                Ok(response) => return Ok(response),
+                Err(error) => failures.push(format!(
+                    "{}: {}",
+                    profile.reference.stable_ref(),
+                    error
+                )),
+            }
+        }
+        bail!("all configured generation profiles failed: {}", failures.join(" | "))
     }
 }
 
