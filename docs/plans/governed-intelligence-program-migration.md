@@ -326,6 +326,28 @@ When Jev API access/stability is sufficient:
 
 ## Review gate
 
+### Governed configuration provisioning
+
+Governed runtime execution is resolve-only. Request handling must not create or mutate model profiles, intelligence policies, calibration profiles, or DecisionType definitions.
+
+Provisioning order:
+
+```text
+admin/deployment
+  -> register immutable ModelProfile versions
+  -> register immutable IntelligencePolicy version
+  -> POST /v1/harness/governed/bootstrap
+       -> verify active policy exists
+       -> idempotently register Lumiere-owned DecisionTypes
+       -> idempotently register reviewed calibration profiles
+
+runtime
+  -> resolve policy/profile/DecisionType/calibration only
+  -> missing configuration fails closed with an explicit bootstrap/provisioning error
+```
+
+The bootstrap endpoint is protected by the gateway's existing internal-secret middleware. It never fabricates provider/model policy from the active legacy agent configuration because provider identity is deployment-specific and must remain an explicit administrative choice.
+
 No new harness feature should add provider-specific orchestration when it can be expressed as:
 
 ```text
