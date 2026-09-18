@@ -239,6 +239,14 @@ Review checks objective satisfaction, unsupported claims, branch/capability erro
 
 Where practical, route review through a different provider/profile from execution.
 
+Review isolation is policy-owned and supports three levels through DecisionType override JSON:
+
+- `requireDistinctReviewProfile`: fail closed if Decision and Review resolve to the same immutable profile ref;
+- `requireDistinctReviewProvider`: fail closed if the resolved profiles normalize to the same provider (and therefore also requires distinct profiles);
+- `preferDistinctReviewProvider`: allow same-provider operation but emit a runtime warning.
+
+Governed mode defaults to requiring a distinct profile and preferring a distinct provider when no explicit isolation flags are supplied. High-risk DecisionTypes can opt into the hard distinct-provider requirement. STDB validates these constraints at policy registration and the gateway validates the resolved routes again before execution.
+
 ### GP-15 — intelligence router + shadow paths
 
 Route `decide` / `generate` / `reason` independently by eval profile.
