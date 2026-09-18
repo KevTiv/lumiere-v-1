@@ -53,6 +53,8 @@ pub struct GovernedLlmSkillInput {
     pub team_member_id: Option<u64>,
     #[serde(default)]
     pub max_steps: Option<u32>,
+    #[serde(default)]
+    pub resume_run_id: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -286,7 +288,7 @@ pub async fn run_governed_llm_skill(
                 tools: Vec::new(),
             },
             max_steps: input.max_steps,
-            resume_run_id: None,
+            resume_run_id: input.resume_run_id,
         },
     )
     .await
