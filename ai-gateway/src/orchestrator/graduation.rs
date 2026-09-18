@@ -684,7 +684,11 @@ pub(super) struct GraduationPolicy {
     pub minimum_evidence_shape_stability: f64,
     pub minimum_candidate_set_stability: Option<f64>,
     pub minimum_shadow_cases: u64,
+    #[serde(default = "default_minimum_shadow_conformance_rate")]
+    pub minimum_shadow_conformance_rate: f64,
 }
+
+fn default_minimum_shadow_conformance_rate() -> f64 { 0.98 }
 
 impl GraduationPolicy {
     pub fn disabled() -> Self {
@@ -700,6 +704,7 @@ impl GraduationPolicy {
             minimum_evidence_shape_stability: 0.95,
             minimum_candidate_set_stability: Some(0.95),
             minimum_shadow_cases: 15,
+            minimum_shadow_conformance_rate: 0.98,
         }
     }
 
@@ -729,6 +734,10 @@ impl GraduationPolicy {
             (
                 "minimum_candidate_set_stability",
                 self.minimum_candidate_set_stability,
+            ),
+            (
+                "minimum_shadow_conformance_rate",
+                Some(self.minimum_shadow_conformance_rate),
             ),
         ] {
             if let Some(value) = value {
