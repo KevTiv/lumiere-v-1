@@ -847,7 +847,8 @@ impl GovernedProgramExecutor<'_> {
                         content: response.content.clone(),
                         citations: evidence_for_node(&node, &values, &context.evidence),
                     };
-                    match self.answer_admission.admit(&draft).await? {
+                    let known_evidence = known_evidence_for_run(context, &values);
+                    match self.answer_admission.admit(&draft, &known_evidence).await? {
                         AnswerAdmissionOutcome::Admitted => {
                             values.insert(node.id.clone(), NodeValue::Text(response.content.clone()));
                             trace.push(step(&node, "generated answer admitted"));
@@ -903,7 +904,8 @@ impl GovernedProgramExecutor<'_> {
                     event_step += 1;
                     let reasoning_request_hash = reasoning_request_hash(&request)?;
                     let reasoning_outcome = self.reasoning_provider.reason(request.clone()).await?;
-                    self.recorder
+                    let reasoning_event_id = self
+                        .recorder
                         .record_reasoning(
                             context,
                             event_step,
@@ -987,7 +989,26 @@ impl GovernedProgramExecutor<'_> {
                             ));
                         }
                         ReasoningOutcome::FinalDraft(draft) => {
-                            match self.answer_admission.admit(&draft).await? {
+                            let known_evidence = known_evidence_for_run(context, &values);
+                            let admission = self.answer_admission.admit(&draft, &known_evidence).await?;
+                            let (verification_status, verification_reason) = match &admission {
+                                AnswerAdmissionOutcome::Admitted => ("verified", None),
+                                AnswerAdmissionOutcome::RequiresReview { reason } => {
+                                    ("requires_review", Some(reason.clone()))
+                                }
+                                AnswerAdmissionOutcome::Blocked { reason } => {
+                                    ("failed", Some(reason.clone()))
+                                }
+                            };
+                            self.recorder
+                                .set_verification(
+                                    context,
+                                    reasoning_event_id,
+                                    verification_status,
+                                    verification_reason,
+                                )
+                                .await?;
+                            match admission {
                                 AnswerAdmissionOutcome::Admitted => {
                                     return Ok(outcome(
                                         GovernedProgramStop::Completed,
@@ -1352,6 +1373,32 @@ fn evidence_for_node(
         }
     }
     evidence
+}
+
+/// Every `EvidenceRef` the server has actually established for this run so
+/// far: the run's baseline authorized evidence (`context.evidence`) plus a
+/// `"capability_output"` ref for every node currently holding a real tool
+/// output — a strict superset of what any single node's `evidence_for_node`
+/// call would produce, since a model-authored `FinalDraft` (unlike a
+/// `Generate` node's server-built citations) may legitimately cite any
+/// earlier tool-backed node's output, not only its own declared
+/// dependencies. `DeterministicFinalAnswerAdmission` checks every citation
+/// against exactly this set — see its docs for why.
+fn known_evidence_for_run(
+    context: &GovernedProgramContext,
+    values: &HashMap<String, NodeValue>,
+) -> std::collections::HashSet<EvidenceRef> {
+    let mut known: std::collections::HashSet<EvidenceRef> =
+        context.evidence.iter().cloned().collect();
+    for (node_id, value) in values {
+        if matches!(value, NodeValue::Tool(_)) {
+            known.insert(EvidenceRef {
+                kind: "capability_output".to_string(),
+                id: node_id.clone(),
+            });
+        }
+    }
+    known
 }
 
 /// Whether any `Capability`/`AcquireEvidence` node in `graph` names a

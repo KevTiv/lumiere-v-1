@@ -48,13 +48,19 @@
 //!   seam so `GovernedCapabilityService` can surface it uniformly; binding
 //!   it to the H5 draft-creation reducer is a GP-04 wiring step; a draft
 //!   is not fabricated here.
-//! - `VerificationService` / `FinalAnswerAdmission`: new, intentionally
-//!   minimal placeholders. The full evidence/answer gate is AIH-15's
-//!   dedicated scope (§7.3 of the completion plan) — citation resolution,
-//!   applicability checks, arithmetic verification. These traits exist so
-//!   later steps route through *a* gate rather than none; the bundled
-//!   implementations only enforce shape, not domain correctness, and say
-//!   so in their own docs.
+//! - `VerificationService` / `FinalAnswerAdmission`: the full evidence/
+//!   answer gate remains AIH-15's dedicated scope (§7.3 of the completion
+//!   plan) — passage/source-version matching, applicability/effective-date
+//!   checks, arithmetic verification, and model-assisted claim-coverage /
+//!   prose-to-evidence consistency are not implemented here.
+//!   `DeterministicFinalAnswerAdmission` does perform one real §7.3 check
+//!   deterministically: every citation a `FinalDraft` carries must resolve
+//!   against evidence the server actually produced for this run, or the
+//!   draft is blocked — "resolve citations server-side... fabricated IDs
+//!   ... cannot produce a validated unsupported claim" applied literally,
+//!   not just structural shape. `VerificationMethod` records which kind of
+//!   check produced an outcome, per §7.3's "record whether that check was
+//!   deterministic, model-assisted, or human-reviewed."
 //!
 //! `GovernedCapabilityService::run` is the composed entry point: admission
 //! -> recovery lookup -> execution -> output protection -> recovery
@@ -632,21 +638,71 @@ pub(super) enum AnswerAdmissionOutcome {
     Blocked { reason: String },
 }
 
-/// Gate a `FinalDraft` must pass before it is presented as complete. This
-/// is a **shape-only placeholder** for the same reason as
-/// `VerificationService`: it checks structural validity and citation
-/// presence, not claim coverage or prose-to-evidence consistency, which
-/// remain AIH-15's scope.
-#[async_trait]
-pub(super) trait FinalAnswerAdmission: Send + Sync {
-    async fn admit(&self, draft: &FinalDraft) -> Result<AnswerAdmissionOutcome>;
+/// Which kind of check produced a `VerificationOutcome`/
+/// `AnswerAdmissionOutcome` — §7.3 requires this be recorded, since
+/// "a model-assisted semantic check is fallible and cannot confer domain
+/// approval." `Deterministic` is a plain mechanical check (citation
+/// existence, shape, arithmetic); `ModelAssisted` used a provider call and
+/// is therefore fallible; `HumanReviewed` means a person, not code, made
+/// the call. Nothing in this module produces `ModelAssisted` or
+/// `HumanReviewed` today — both are real AIH-15 scope, not implemented
+/// here — but the type exists now so a caller records which kind of
+/// evidence it is holding rather than treating every outcome as
+/// equally authoritative.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum VerificationMethod {
+    Deterministic,
+    ModelAssisted,
+    HumanReviewed,
 }
 
-pub(super) struct ShapeOnlyFinalAnswerAdmission;
+impl VerificationMethod {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Deterministic => "deterministic",
+            Self::ModelAssisted => "model_assisted",
+            Self::HumanReviewed => "human_reviewed",
+        }
+    }
+}
+
+/// Gate a `FinalDraft` must pass before it is presented as complete.
+///
+/// `known_evidence` is the set of `EvidenceRef`s the *server* actually
+/// produced for this run — `context.evidence` plus every
+/// `"capability_output"` ref a real tool-backed node produced (see
+/// `evidence_for_node`/`known_evidence_for_run` in `governed_program.rs`).
+/// `DeterministicFinalAnswerAdmission` checks every citation in the draft
+/// against that set: §7.3's "resolve citations server-side, never a
+/// model-invented URL" applied literally, since `draft` itself comes
+/// straight from provider output (`ReasoningOutcome::FinalDraft`) and
+/// nothing about `EvidenceRef`'s shape alone proves the model didn't just
+/// invent a plausible-looking kind/id pair.
+///
+/// What this still does **not** do, and is real remaining AIH-15/§7.3
+/// scope: passage/source-version matching within a resolved citation,
+/// applicability/effective-date checks, arithmetic verification, and
+/// claim-coverage / prose-to-evidence consistency (which needs a
+/// model-assisted semantic check — `VerificationMethod::ModelAssisted` —
+/// since it cannot be done by citation-existence alone).
+#[async_trait]
+pub(super) trait FinalAnswerAdmission: Send + Sync {
+    async fn admit(
+        &self,
+        draft: &FinalDraft,
+        known_evidence: &std::collections::HashSet<EvidenceRef>,
+    ) -> Result<AnswerAdmissionOutcome>;
+}
+
+pub(super) struct DeterministicFinalAnswerAdmission;
 
 #[async_trait]
-impl FinalAnswerAdmission for ShapeOnlyFinalAnswerAdmission {
-    async fn admit(&self, draft: &FinalDraft) -> Result<AnswerAdmissionOutcome> {
+impl FinalAnswerAdmission for DeterministicFinalAnswerAdmission {
+    async fn admit(
+        &self,
+        draft: &FinalDraft,
+        known_evidence: &std::collections::HashSet<EvidenceRef>,
+    ) -> Result<AnswerAdmissionOutcome> {
         if let Err(error) = draft.validate() {
             return Ok(AnswerAdmissionOutcome::Blocked {
                 reason: error.to_string(),
@@ -655,6 +711,18 @@ impl FinalAnswerAdmission for ShapeOnlyFinalAnswerAdmission {
         if draft.citations.is_empty() {
             return Ok(AnswerAdmissionOutcome::RequiresReview {
                 reason: "final draft carries no evidence citations".to_string(),
+            });
+        }
+        if let Some(fabricated) = draft
+            .citations
+            .iter()
+            .find(|citation| !known_evidence.contains(citation))
+        {
+            return Ok(AnswerAdmissionOutcome::Blocked {
+                reason: format!(
+                    "citation '{}:{}' does not correspond to evidence this run actually produced",
+                    fabricated.kind, fabricated.id
+                ),
             });
         }
         Ok(AnswerAdmissionOutcome::Admitted)

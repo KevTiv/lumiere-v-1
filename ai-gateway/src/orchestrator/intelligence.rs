@@ -38,7 +38,7 @@ impl DecisionTypeRef {
 
 /// Reference to authorized evidence already resolved server-side. Never a
 /// model-invented URL or free-text citation.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EvidenceRef {
     pub kind: String,
     pub id: String,
