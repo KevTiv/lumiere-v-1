@@ -719,13 +719,16 @@ impl GovernedProgramExecutor<'_> {
                 ));
             };
             match self.capabilities.approval_status(draft_id).await? {
-                super::governed_services::ApprovalStatus::Approved => {
+                super::governed_services::ApprovalStatus::Approved {
+                    execution_record_id,
+                } => {
                     values.insert(
                         pending.node_id.clone(),
                         NodeValue::Json(json!({
                             "approved": true,
                             "draft_id": draft_id,
                             "capability": pending.capability,
+                            "execution_record_id": execution_record_id,
                         })),
                     );
                     trace.push(GovernedProgramTraceStep {
