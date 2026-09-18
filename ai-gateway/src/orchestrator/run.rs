@@ -37,7 +37,8 @@ use super::{
     decision_type::{register_builtin_decision_types, StdbDecisionTypeRegistry},
     graduation::{
         DeterministicCandidateRegistry, GovernedDecisionResolver,
-        StdbDecisionResolutionPolicy, StdbModelShadowRecorder,
+        StdbAuthorityRollbackRecorder, StdbDecisionResolutionPolicy, StdbDriftMonitor,
+        StdbModelShadowRecorder,
     },
     governed_program::{
         graph_requests_generated_capabilities, BuiltinComputeService, GovernedProgramContext,
@@ -727,11 +728,19 @@ pub async fn run_skill_admitted(
         let model_shadow_recorder = StdbModelShadowRecorder {
             writer: state.stdb.as_ref(),
         };
+        let drift_monitor = StdbDriftMonitor {
+            reader: tool_ctx.stdb.as_ref(),
+        };
+        let rollback_recorder = StdbAuthorityRollbackRecorder {
+            writer: state.stdb.as_ref(),
+        };
         let decision_resolver = GovernedDecisionResolver {
             policy: &decision_resolution_policy,
             candidates: &deterministic_candidates,
             model: &decision_provider,
             model_shadow_recorder: &model_shadow_recorder,
+            drift_monitor: Some(&drift_monitor),
+            rollback_recorder: Some(&rollback_recorder),
         };
         let executor = GovernedProgramExecutor {
             decision_provider: &decision_provider,
