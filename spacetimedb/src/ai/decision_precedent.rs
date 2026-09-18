@@ -769,6 +769,270 @@ pub fn promote_ai_decision_pattern(
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+fn load_graduation_promotion_policy(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    decision_type_name: &str,
+    decision_type_version: u32,
+) -> Result<GraduationPromotionPolicy, String> {
+    let definition = ctx
+        .db
+        .ai_decision_type_definition()
+        .ai_decision_type_by_org()
+        .filter(&organization_id)
+        .find(|definition| {
+            definition.decision_type_name == decision_type_name
+                && definition.decision_type_version == decision_type_version
+        })
+        .ok_or("DecisionType definition not found for pattern promotion")?;
+    if !definition.is_active {
+        return Err("DecisionType definition is inactive".to_string());
+    }
+
+    let envelope: serde_json::Value = serde_json::from_str(&definition.precedent_policy_json)
+        .map_err(|_| "DecisionType policy envelope is invalid JSON".to_string())?;
+    let graduation = envelope
+        .get("graduation")
+        .ok_or("DecisionType has no graduation policy")?;
+    serde_json::from_value(graduation.clone())
+        .map_err(|_| "DecisionType graduation policy is invalid".to_string())
+}
+
+fn validate_promotion_policy(policy: &GraduationPromotionPolicy) -> Result<(), String> {
+    if !policy.enabled {
+        return Err("graduation policy is disabled".to_string());
+    }
+    if policy.minimum_cases < 2 || policy.minimum_verified_cases > policy.minimum_cases {
+        return Err("graduation policy case thresholds are invalid".to_string());
+    }
+    for (name, value) in [
+        ("maximum_correction_rate", Some(policy.maximum_correction_rate)),
+        (
+            "maximum_provider_disagreement_rate",
+            policy.maximum_provider_disagreement_rate,
+        ),
+        ("maximum_entropy", Some(policy.maximum_entropy)),
+        (
+            "minimum_precedent_consistency",
+            Some(policy.minimum_precedent_consistency),
+        ),
+        ("minimum_policy_stability", policy.minimum_policy_stability),
+        (
+            "minimum_evidence_shape_stability",
+            Some(policy.minimum_evidence_shape_stability),
+        ),
+        (
+            "minimum_candidate_set_stability",
+            policy.minimum_candidate_set_stability,
+        ),
+        (
+            "minimum_shadow_conformance_rate",
+            Some(policy.minimum_shadow_conformance_rate),
+        ),
+    ] {
+        if let Some(value) = value {
+            if !(0.0..=1.0).contains(&value) {
+                return Err(format!("{name} must be within [0, 1]"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_metrics_against_promotion_policy(
+    metrics: &PatternMetricsSnapshot,
+    policy: &GraduationPromotionPolicy,
+) -> Result<(), String> {
+    if metrics.observed_cases < policy.minimum_cases {
+        return Err("pattern does not meet graduation minimum_cases".to_string());
+    }
+    if metrics.verified_cases < policy.minimum_verified_cases {
+        return Err("pattern does not meet graduation minimum_verified_cases".to_string());
+    }
+    if metrics.correction_rate > policy.maximum_correction_rate {
+        return Err("pattern correction rate exceeds graduation policy".to_string());
+    }
+    if metrics.decision_entropy > policy.maximum_entropy {
+        return Err("pattern decision entropy exceeds graduation policy".to_string());
+    }
+    if metrics.precedent_consistency < policy.minimum_precedent_consistency {
+        return Err("pattern precedent consistency is below graduation policy".to_string());
+    }
+    if metrics.evidence_shape_stability < policy.minimum_evidence_shape_stability {
+        return Err("pattern evidence-shape stability is below graduation policy".to_string());
+    }
+    validate_optional_maximum(
+        "provider disagreement",
+        metrics.provider_disagreement_rate,
+        policy.maximum_provider_disagreement_rate,
+    )?;
+    validate_optional_minimum(
+        "policy stability",
+        metrics.policy_stability_rate,
+        policy.minimum_policy_stability,
+    )?;
+    validate_optional_minimum(
+        "candidate-set stability",
+        metrics.candidate_set_stability,
+        policy.minimum_candidate_set_stability,
+    )?;
+    Ok(())
+}
+
+fn validate_optional_maximum(
+    name: &str,
+    actual: Option<f64>,
+    required: Option<f64>,
+) -> Result<(), String> {
+    let Some(required) = required else {
+        return Ok(());
+    };
+    match actual {
+        Some(actual) if actual <= required => Ok(()),
+        Some(_) => Err(format!("{name} exceeds graduation policy")),
+        None => Err(format!("{name} evidence is unavailable")),
+    }
+}
+
+fn validate_optional_minimum(
+    name: &str,
+    actual: Option<f64>,
+    required: Option<f64>,
+) -> Result<(), String> {
+    let Some(required) = required else {
+        return Ok(());
+    };
+    match actual {
+        Some(actual) if actual >= required => Ok(()),
+        Some(_) => Err(format!("{name} is below graduation policy")),
+        None => Err(format!("{name} evidence is unavailable")),
+    }
+}
+
+fn revalidate_supporting_cases(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    pattern: &AiDecisionPattern,
+    applicability: &PatternApplicabilityEvidence,
+) -> Result<(), String> {
+    for case_id in &pattern.supporting_case_ids {
+        let case = ctx
+            .db
+            .ai_decision_case()
+            .id()
+            .find(case_id)
+            .ok_or("pattern supporting case no longer exists")?;
+        if case.organization_id != organization_id
+            || case.company_id != applicability.company_id
+            || case.decision_type_name != pattern.decision_type_name
+            || case.decision_type_version != pattern.decision_type_version
+            || case.program_ref != applicability.program_ref
+            || case.step_id != applicability.step_id
+            || case.context_fingerprint != applicability.context_fingerprint
+        {
+            return Err("pattern supporting case no longer matches applicability".to_string());
+        }
+        if matches!(case.status.as_str(), "rejected" | "superseded") {
+            return Err("pattern has a rejected or superseded supporting case".to_string());
+        }
+    }
+    Ok(())
+}
+
+fn deterministic_shadow_conformance(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    pattern: &AiDecisionPattern,
+    implementation_ref: &str,
+) -> Result<(u64, u64), String> {
+    let mut total = 0_u64;
+    let mut conformant = 0_u64;
+    for event in ctx
+        .db
+        .ai_intelligence_event()
+        .ai_intelligence_event_by_org()
+        .filter(&organization_id)
+    {
+        if event.company_id != company_id
+            || event.event_kind != "deterministic_shadow"
+            || event.decision_type_name.as_deref() != Some(pattern.decision_type_name.as_str())
+            || event.decision_type_version != Some(pattern.decision_type_version)
+            || event.model != implementation_ref
+        {
+            continue;
+        }
+
+        let evidence: DeterministicShadowPromotionEvidence =
+            serde_json::from_str(&event.output_json)
+                .map_err(|_| "deterministic shadow evidence is invalid".to_string())?;
+        if evidence.schema_version != 2
+            || evidence.pattern_ref != pattern.pattern_key
+            || evidence.implementation_ref != implementation_ref
+            || evidence.request_hash != event.request_hash
+        {
+            continue;
+        }
+        if evidence.evaluation_error.is_some() {
+            continue;
+        }
+        total += 1;
+        if evidence.conformant == Some(true) {
+            conformant += 1;
+        }
+    }
+    Ok((total, conformant))
+}
+
+fn reject_review_defects_for_shadow_runs(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    pattern: &AiDecisionPattern,
+    implementation_ref: &str,
+) -> Result<(), String> {
+    let shadow_run_ids = ctx
+        .db
+        .ai_intelligence_event()
+        .ai_intelligence_event_by_org()
+        .filter(&organization_id)
+        .filter_map(|event| {
+            if event.company_id != company_id
+                || event.event_kind != "deterministic_shadow"
+                || event.decision_type_name.as_deref() != Some(pattern.decision_type_name.as_str())
+                || event.decision_type_version != Some(pattern.decision_type_version)
+                || event.model != implementation_ref
+            {
+                return None;
+            }
+            let evidence: DeterministicShadowPromotionEvidence =
+                serde_json::from_str(&event.output_json).ok()?;
+            (evidence.schema_version == 2
+                && evidence.pattern_ref == pattern.pattern_key
+                && evidence.implementation_ref == implementation_ref)
+                .then_some(event.run_id)
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+
+    for review in ctx
+        .db
+        .ai_run_review()
+        .ai_run_review_by_org()
+        .filter(&organization_id)
+    {
+        if review.company_id == company_id
+            && shadow_run_ids.contains(&review.run_id)
+            && matches!(review.disposition.as_str(), "defect" | "incident_candidate")
+        {
+            return Err(
+                "promotion blocked by defect/incident review in deterministic shadow sample"
+                    .to_string(),
+            );
+        }
+    }
+    Ok(())
+}
+
 fn validate_pattern_applicability(
     applicability: &PatternApplicabilityEvidence,
 ) -> Result<(), String> {
