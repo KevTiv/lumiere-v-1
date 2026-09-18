@@ -4,12 +4,19 @@
 //! typed decision/reasoning requests, outputs, verification, escalation,
 //! acceptance/rejection, and provider-attempt links — durable evidence a
 //! `DecisionProvider`/`ReasoningProvider` call actually happened, what it
-//! returned, and what the governed program later did with it. This module
-//! is additive: no reducer here is called by production code yet. The
-//! ai-gateway `DecisionProvider`/`ReasoningProvider` adapters (GP-02) and
-//! `GovernedCapabilityService` (GP-03) construct and validate these values
-//! today without persisting them; wiring these reducers into that flow is
-//! deferred until client bindings are regenerated for this schema.
+//! returned, and what the governed program later did with it. All eight
+//! reducers here are called by production code:
+//! `governed_program::GovernedProgramExecutor` (via its
+//! `IntelligenceEventRecorder` seam, `StdbIntelligenceEventRecorder` in
+//! production) calls `record_ai_decision_event`/`record_ai_reasoning_event`
+//! for every `DecisionProvider::decide`/`ReasoningProvider::reason` call,
+//! and — for decisions — `set_ai_intelligence_event_verification`/
+//! `_escalation`/`_acceptance` once `admit_decision` (GP-07) and the
+//! graph's own control flow settle what happened next. Reasoning events
+//! are recorded but do not yet get the same verification/escalation/
+//! acceptance follow-up (escalation for `"clarification_request"`/
+//! `"unable_to_progress"` is still only the automatic one this module
+//! derives at insert time below).
 //!
 //! One event kind, one table (`AiIntelligenceEvent`), distinguished by
 //! `event_kind`:

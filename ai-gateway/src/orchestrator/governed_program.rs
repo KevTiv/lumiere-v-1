@@ -27,9 +27,10 @@ use super::{
         GovernedCapabilityService, VerificationOutcome, VerificationService,
     },
     intelligence::{
-        decision_request_hash, CapabilityProposal, DecisionKind, DecisionProvider,
-        DecisionRequest, DecisionResponse, EvidenceRef, FinalDraft, GenerationProvider,
-        GenerationRequest, ReasoningOutcome, ReasoningProvider, ReasoningRequest,
+        decision_request_hash, reasoning_request_hash, CapabilityProposal, DecisionKind,
+        DecisionProvider, DecisionRequest, DecisionResponse, EvidenceRef, FinalDraft,
+        GenerationProvider, GenerationRequest, ReasoningOutcome, ReasoningProvider,
+        ReasoningRequest,
     },
     precedent::{summarize, DecisionCaseRecord, DecisionCaseStatus, PrecedentQuery, PrecedentStore},
     probabilistic::{CalibrationProfileStore, Confidence, GateDecision},
@@ -146,6 +147,16 @@ impl ComputeService for BuiltinComputeService {
     }
 }
 
+/// Durable evidence for one `decide()`/`reason()` call and, once known,
+/// what the governed program did with it (GP-05). `record_decision`/
+/// `record_reasoning` return the durable event id so a caller can later
+/// settle `verification`/`escalation`/`acceptance` on that exact row —
+/// three independently-settable fields (decision_events.rs's module
+/// docs): verification is whether the decision type's required check
+/// happened, escalation is whether the outcome required review, and
+/// acceptance is whether the governed program ultimately acted on the
+/// judgment. None of the three implies the others, so none of the three
+/// setters implies the other two either.
 #[async_trait]
 pub(super) trait IntelligenceEventRecorder: Send + Sync {
     async fn record_decision(
@@ -155,6 +166,39 @@ pub(super) trait IntelligenceEventRecorder: Send + Sync {
         request_hash: &str,
         request: &DecisionRequest,
         response: &DecisionResponse,
+    ) -> Result<u64>;
+
+    async fn record_reasoning(
+        &self,
+        context: &GovernedProgramContext,
+        step_no: u32,
+        request_hash: &str,
+        request: &ReasoningRequest,
+        outcome: &ReasoningOutcome,
+    ) -> Result<u64>;
+
+    async fn set_verification(
+        &self,
+        context: &GovernedProgramContext,
+        event_id: u64,
+        status: &str,
+        reason: Option<String>,
+    ) -> Result<()>;
+
+    async fn set_escalation(
+        &self,
+        context: &GovernedProgramContext,
+        event_id: u64,
+        status: &str,
+        reason: Option<String>,
+    ) -> Result<()>;
+
+    async fn set_acceptance(
+        &self,
+        context: &GovernedProgramContext,
+        event_id: u64,
+        status: &str,
+        reason: Option<String>,
     ) -> Result<()>;
 }
 
@@ -169,13 +213,99 @@ impl IntelligenceEventRecorder for NoopIntelligenceEventRecorder {
         _request_hash: &str,
         _request: &DecisionRequest,
         _response: &DecisionResponse,
+    ) -> Result<u64> {
+        Ok(0)
+    }
+
+    async fn record_reasoning(
+        &self,
+        _context: &GovernedProgramContext,
+        _step_no: u32,
+        _request_hash: &str,
+        _request: &ReasoningRequest,
+        _outcome: &ReasoningOutcome,
+    ) -> Result<u64> {
+        Ok(0)
+    }
+
+    async fn set_verification(
+        &self,
+        _context: &GovernedProgramContext,
+        _event_id: u64,
+        _status: &str,
+        _reason: Option<String>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    async fn set_escalation(
+        &self,
+        _context: &GovernedProgramContext,
+        _event_id: u64,
+        _status: &str,
+        _reason: Option<String>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    async fn set_acceptance(
+        &self,
+        _context: &GovernedProgramContext,
+        _event_id: u64,
+        _status: &str,
+        _reason: Option<String>,
     ) -> Result<()> {
         Ok(())
     }
 }
 
+/// Production implementation. `reader` resolves the durable event id a
+/// `record_*` reducer cannot return directly (reducers return no data) —
+/// the table is public, so, like `StdbCalibrationProfileStore`, no
+/// dedicated read principal is needed; `writer` and `reader` may be the
+/// same client.
 pub(super) struct StdbIntelligenceEventRecorder<'a> {
     pub writer: &'a StdbClient,
+    pub reader: &'a StdbClient,
+}
+
+impl StdbIntelligenceEventRecorder<'_> {
+    async fn resolve_event_id(
+        &self,
+        context: &GovernedProgramContext,
+        step_no: u32,
+        event_kind: &str,
+    ) -> Result<u64> {
+        let rows = self
+            .reader
+            .query_sql(&format!(
+                "SELECT id FROM ai_intelligence_event WHERE organization_id = {} \
+                 AND run_id = {} AND step_no = {step_no} AND event_kind = '{event_kind}' LIMIT 1",
+                context.organization_id, context.run_id
+            ))
+            .await
+            .context("resolve durable intelligence event id")?;
+        rows.first()
+            .and_then(|row| row.get("id").and_then(Value::as_u64))
+            .context("intelligence event not found immediately after recording it")
+    }
+
+    async fn set_status(
+        &self,
+        reducer_name: &'static str,
+        organization_id: u64,
+        event_id: u64,
+        status: &str,
+        reason: Option<String>,
+    ) -> Result<()> {
+        self.writer
+            .call_reducer(ReducerCall::from_name(
+                reducer_name,
+                json!([organization_id, event_id, status, reason]),
+            ))
+            .await
+            .with_context(|| format!("{reducer_name} for durable intelligence event"))
+    }
 }
 
 #[async_trait]
@@ -187,7 +317,7 @@ impl IntelligenceEventRecorder for StdbIntelligenceEventRecorder<'_> {
         request_hash: &str,
         request: &DecisionRequest,
         response: &DecisionResponse,
-    ) -> Result<()> {
+    ) -> Result<u64> {
         self.writer
             .call_reducer(ReducerCall::from_name("record_ai_decision_event", json!([
                     context.organization_id,
@@ -210,8 +340,126 @@ impl IntelligenceEventRecorder for StdbIntelligenceEventRecorder<'_> {
                     }
                 ])))
             .await
-            .context("record durable decision event")
+            .context("record durable decision event")?;
+        self.resolve_event_id(context, step_no, "decision").await
     }
+
+    async fn record_reasoning(
+        &self,
+        context: &GovernedProgramContext,
+        step_no: u32,
+        request_hash: &str,
+        request: &ReasoningRequest,
+        outcome: &ReasoningOutcome,
+    ) -> Result<u64> {
+        self.writer
+            .call_reducer(ReducerCall::from_name("record_ai_reasoning_event", json!([
+                    context.organization_id,
+                    context.company_id,
+                    context.run_id,
+                    {
+                        "step_no": step_no,
+                        "request_hash": request_hash,
+                        "request_json": serde_json::to_string(request)?,
+                        "outcome_kind": reasoning_outcome_kind_label(outcome),
+                        "output_json": serde_json::to_string(outcome)?,
+                        "provider": reasoning_outcome_provider(outcome),
+                        "model": reasoning_outcome_model(outcome),
+                        "provider_attempt_id": null,
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                    }
+                ])))
+            .await
+            .context("record durable reasoning event")?;
+        self.resolve_event_id(context, step_no, "reasoning").await
+    }
+
+    async fn set_verification(
+        &self,
+        context: &GovernedProgramContext,
+        event_id: u64,
+        status: &str,
+        reason: Option<String>,
+    ) -> Result<()> {
+        self.set_status(
+            "set_ai_intelligence_event_verification",
+            context.organization_id,
+            event_id,
+            status,
+            reason,
+        )
+        .await
+    }
+
+    async fn set_escalation(
+        &self,
+        context: &GovernedProgramContext,
+        event_id: u64,
+        status: &str,
+        reason: Option<String>,
+    ) -> Result<()> {
+        self.set_status(
+            "set_ai_intelligence_event_escalation",
+            context.organization_id,
+            event_id,
+            status,
+            reason,
+        )
+        .await
+    }
+
+    async fn set_acceptance(
+        &self,
+        context: &GovernedProgramContext,
+        event_id: u64,
+        status: &str,
+        reason: Option<String>,
+    ) -> Result<()> {
+        self.set_status(
+            "set_ai_intelligence_event_acceptance",
+            context.organization_id,
+            event_id,
+            status,
+            reason,
+        )
+        .await
+    }
+}
+
+/// `ReasoningOutcome`'s own `kind_label()` returns the GP-01 proposal-kind
+/// vocabulary (`"decision"`, `"capability"`, ...) used for
+/// `allowed_proposal_kinds` matching; durable recording uses
+/// decision_events.rs's distinct `REASONING_KINDS` vocabulary
+/// (`"decision_proposal"`, `"capability_proposal"`, ...) instead, so the
+/// two are not interchangeable despite describing the same outcome.
+fn reasoning_outcome_kind_label(outcome: &ReasoningOutcome) -> &'static str {
+    match outcome {
+        ReasoningOutcome::DecisionProposal(_) => "decision_proposal",
+        ReasoningOutcome::CapabilityProposal(_) => "capability_proposal",
+        ReasoningOutcome::ProgramPatchProposal(_) => "program_patch_proposal",
+        ReasoningOutcome::ClarificationRequest(_) => "clarification_request",
+        ReasoningOutcome::FinalDraft(_) => "final_draft",
+        ReasoningOutcome::UnableToProgress(_) => "unable_to_progress",
+    }
+}
+
+/// A `ReasoningOutcome` is a runtime-produced proposal, not itself a
+/// provider/model attribution — none of its variants carry one. Durable
+/// recording still requires nonempty `provider`/`model` strings
+/// (`decision_events.rs`'s `validate_common`), so these name the
+/// governed-program runtime itself as the origin of the *outcome record*,
+/// distinct from whichever `ReasoningProvider` produced it (that
+/// attribution lives in the provider-attempt/spend trail instead).
+const REASONING_OUTCOME_PROVIDER: &str = "governed_program";
+const REASONING_OUTCOME_MODEL: &str = "n/a";
+
+fn reasoning_outcome_provider(_outcome: &ReasoningOutcome) -> &'static str {
+    REASONING_OUTCOME_PROVIDER
+}
+
+fn reasoning_outcome_model(_outcome: &ReasoningOutcome) -> &'static str {
+    REASONING_OUTCOME_MODEL
 }
 
 pub(super) struct GovernedProgramExecutor<'a> {
@@ -652,7 +900,19 @@ impl GovernedProgramExecutor<'_> {
                         allowed_proposal_kinds: reason.allowed_proposal_kinds.clone(),
                         remaining_rounds: reason.max_iterations - *count + 1,
                     };
-                    match self.reasoning_provider.reason(request).await? {
+                    event_step += 1;
+                    let reasoning_request_hash = reasoning_request_hash(&request)?;
+                    let reasoning_outcome = self.reasoning_provider.reason(request.clone()).await?;
+                    self.recorder
+                        .record_reasoning(
+                            context,
+                            event_step,
+                            &reasoning_request_hash,
+                            &request,
+                            &reasoning_outcome,
+                        )
+                        .await?;
+                    match reasoning_outcome {
                         ReasoningOutcome::CapabilityProposal(proposal) => {
                             capability_calls += 1;
                             match self
@@ -857,7 +1117,8 @@ impl GovernedProgramExecutor<'_> {
         response.validate_against(&request)?;
         let admission = admit_decision(&definition, &request, &response)?;
 
-        self.recorder
+        let event_id = self
+            .recorder
             .record_decision(context, step_no, &request_hash, &request, &response)
             .await?;
 
@@ -890,17 +1151,36 @@ impl GovernedProgramExecutor<'_> {
             })
             .await?;
 
+        if admission.verification_required {
+            self.recorder
+                .set_verification(
+                    context,
+                    event_id,
+                    "requires_review",
+                    Some("decision type requires independent verification".to_string()),
+                )
+                .await?;
+        }
         let review_reason = if admission.escalation_required {
-            Some(
-                admission
-                    .escalation_reason
-                    .unwrap_or_else(|| "decision requires escalation".to_string()),
-            )
+            let reason = admission
+                .escalation_reason
+                .unwrap_or_else(|| "decision requires escalation".to_string());
+            self.recorder
+                .set_escalation(context, event_id, "review_required", Some(reason.clone()))
+                .await?;
+            Some(reason)
         } else if admission.verification_required {
             Some("decision type requires independent verification".to_string())
         } else {
             None
         };
+        if review_reason.is_none() {
+            // Nothing stopped the graph from proceeding on this decision's
+            // output — the governed program is about to act on it.
+            self.recorder
+                .set_acceptance(context, event_id, "accepted", None)
+                .await?;
+        }
         Ok(DecisionExecution {
             value: response,
             review_reason,
@@ -1530,5 +1810,200 @@ mod threshold_gate_tests {
         };
         let error = run_graph(condition, 0.9, &calibration).await.unwrap_err();
         assert!(error.to_string().contains("not found"));
+    }
+
+    /// GP-05: durable evidence for the *lifecycle* around a recorded
+    /// decision event — verification/escalation/acceptance — not just the
+    /// initial `record_decision` call. Captures every `IntelligenceEventRecorder`
+    /// call instead of a real `StdbClient`, since none of these tests need
+    /// the SQL round-trip `StdbIntelligenceEventRecorder::resolve_event_id`
+    /// performs against a live server.
+    #[derive(Default)]
+    struct RecordingIntelligenceRecorder {
+        next_id: std::sync::atomic::AtomicU64,
+        decisions: std::sync::Mutex<Vec<DecisionResponse>>,
+        reasonings: std::sync::Mutex<Vec<String>>,
+        verifications: std::sync::Mutex<Vec<(u64, String, Option<String>)>>,
+        escalations: std::sync::Mutex<Vec<(u64, String, Option<String>)>>,
+        acceptances: std::sync::Mutex<Vec<(u64, String, Option<String>)>>,
+    }
+
+    #[async_trait]
+    impl IntelligenceEventRecorder for RecordingIntelligenceRecorder {
+        async fn record_decision(
+            &self,
+            _context: &GovernedProgramContext,
+            _step_no: u32,
+            _request_hash: &str,
+            _request: &DecisionRequest,
+            response: &DecisionResponse,
+        ) -> Result<u64> {
+            self.decisions.lock().unwrap().push(response.clone());
+            Ok(self.next_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1)
+        }
+
+        async fn record_reasoning(
+            &self,
+            _context: &GovernedProgramContext,
+            _step_no: u32,
+            _request_hash: &str,
+            _request: &ReasoningRequest,
+            outcome: &ReasoningOutcome,
+        ) -> Result<u64> {
+            self.reasonings
+                .lock()
+                .unwrap()
+                .push(reasoning_outcome_kind_label(outcome).to_string());
+            Ok(self.next_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1)
+        }
+
+        async fn set_verification(
+            &self,
+            _context: &GovernedProgramContext,
+            event_id: u64,
+            status: &str,
+            reason: Option<String>,
+        ) -> Result<()> {
+            self.verifications
+                .lock()
+                .unwrap()
+                .push((event_id, status.to_string(), reason));
+            Ok(())
+        }
+
+        async fn set_escalation(
+            &self,
+            _context: &GovernedProgramContext,
+            event_id: u64,
+            status: &str,
+            reason: Option<String>,
+        ) -> Result<()> {
+            self.escalations
+                .lock()
+                .unwrap()
+                .push((event_id, status.to_string(), reason));
+            Ok(())
+        }
+
+        async fn set_acceptance(
+            &self,
+            _context: &GovernedProgramContext,
+            event_id: u64,
+            status: &str,
+            reason: Option<String>,
+        ) -> Result<()> {
+            self.acceptances
+                .lock()
+                .unwrap()
+                .push((event_id, status.to_string(), reason));
+            Ok(())
+        }
+    }
+
+    /// A single Probability decision node followed by an EarlyStop — just
+    /// enough graph to exercise `execute_decision`'s recorder lifecycle
+    /// without a Gate in the way.
+    fn single_decision_graph() -> DecisionGraph {
+        DecisionGraph {
+            entry: "risk".to_string(),
+            nodes: vec![
+                GraphNode {
+                    id: "risk".to_string(),
+                    depends_on: Vec::new(),
+                    next: Some("stop".to_string()),
+                    kind: DecisionNode::Probability(ProbabilityDecisionNode {
+                        decision_type: super::super::intelligence::DecisionTypeRef {
+                            name: "StockReorderPriority".to_string(),
+                            version: 1,
+                        },
+                        question: "how urgent is this reorder?".to_string(),
+                    }),
+                },
+                GraphNode {
+                    id: "stop".to_string(),
+                    depends_on: Vec::new(),
+                    next: None,
+                    kind: DecisionNode::EarlyStop(super::super::decision_graph::EarlyStopNode {
+                        source: "risk".to_string(),
+                        reason: StopReason::AlreadySettled,
+                    }),
+                },
+            ],
+        }
+    }
+
+    async fn run_single_decision(
+        confidence: f64,
+        recorder: &RecordingIntelligenceRecorder,
+    ) -> GovernedProgramOutcome {
+        let decision_provider = FixedDecisionProvider(probability_response(confidence));
+        let generation_provider = UnreachableGenerationProvider;
+        let reasoning_provider = UnreachableReasoningProvider;
+        let decision_types = InMemoryDecisionTypeRegistry::with_builtins();
+        let precedent = InMemoryPrecedentStore::new();
+        let admission = UnreachableCapabilityAdmission;
+        let executor_svc = UnreachableCapabilityExecutor;
+        let recovery = InMemoryExecutionRecovery::new();
+        let approvals = RecordingApprovalCoordinator;
+        let capabilities =
+            GovernedCapabilityService::new(&admission, &executor_svc, &recovery, &approvals);
+        let verification = ShapeOnlyVerificationService;
+        let answer_admission = ShapeOnlyFinalAnswerAdmission;
+        let compute = BuiltinComputeService;
+        let calibration = InMemoryCalibrationProfileStore::new();
+        let executor = GovernedProgramExecutor {
+            decision_provider: &decision_provider,
+            generation_provider: &generation_provider,
+            reasoning_provider: &reasoning_provider,
+            decision_types: &decision_types,
+            precedent: &precedent,
+            capabilities: &capabilities,
+            verification: &verification,
+            answer_admission: &answer_admission,
+            compute: &compute,
+            recorder,
+            calibration: &calibration,
+        };
+        executor
+            .run(&single_decision_graph(), &context())
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_decision_the_program_proceeds_on_is_marked_accepted() {
+        // StockReorderPriority's escalation_policy.min_confidence is 0.4;
+        // 0.9 clears it, so admit_decision never sets escalation_required
+        // and the graph proceeds straight to the EarlyStop.
+        let recorder = RecordingIntelligenceRecorder::default();
+        let outcome = run_single_decision(0.9, &recorder).await;
+        assert!(matches!(
+            outcome.stop,
+            GovernedProgramStop::EarlyStop(StopReason::AlreadySettled)
+        ));
+        assert_eq!(recorder.decisions.lock().unwrap().len(), 1);
+        let acceptances = recorder.acceptances.lock().unwrap();
+        assert_eq!(acceptances.len(), 1);
+        assert_eq!(acceptances[0].1, "accepted");
+        assert!(recorder.escalations.lock().unwrap().is_empty());
+        assert!(recorder.verifications.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_decision_below_the_confidence_floor_is_escalated_not_accepted() {
+        // 0.1 < StockReorderPriority's 0.4 floor: admit_decision sets
+        // escalation_required, so the run stops for review before ever
+        // reaching the EarlyStop node.
+        let recorder = RecordingIntelligenceRecorder::default();
+        let outcome = run_single_decision(0.1, &recorder).await;
+        assert!(matches!(outcome.stop, GovernedProgramStop::ReviewRequired(_)));
+        let escalations = recorder.escalations.lock().unwrap();
+        assert_eq!(escalations.len(), 1);
+        assert_eq!(escalations[0].1, "review_required");
+        assert!(escalations[0].2.is_some());
+        assert!(
+            recorder.acceptances.lock().unwrap().is_empty(),
+            "a decision requiring escalation must not also be marked accepted"
+        );
     }
 }

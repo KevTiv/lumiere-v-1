@@ -676,6 +676,7 @@ pub async fn run_skill_admitted(
         };
         let recorder = StdbIntelligenceEventRecorder {
             writer: state.stdb.as_ref(),
+            reader: tool_ctx.stdb.as_ref(),
         };
 
         let generated_grants = Vec::new();
