@@ -953,6 +953,21 @@ mod tests {
     }
 
     #[test]
+    fn graduation_policy_round_trips_inside_existing_decision_policy_envelope() {
+        let mut policy = GraduationPolicy::disabled();
+        policy.enabled = true;
+        let precedent = choice_definition().precedent_policy;
+        let encoded = encode_decision_policy_envelope(&precedent, Some(&policy));
+        let decoded = decode_graduation_policy(&encoded).unwrap().unwrap();
+        assert_eq!(decoded, policy);
+
+        // Backward compatibility: existing v1 definitions do not gain a
+        // graduation policy merely by being decoded by the new harness.
+        let legacy = encode_precedent_policy(&precedent);
+        assert!(decode_graduation_policy(&legacy).unwrap().is_none());
+    }
+
+    #[test]
     fn structural_schema_rejects_missing_required_field() {
         let schema = StructuralSchema {
             fields: vec![FieldSchema::required("amount", FieldKind::Number)],
