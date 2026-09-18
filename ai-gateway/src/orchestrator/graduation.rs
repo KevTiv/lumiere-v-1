@@ -2615,6 +2615,22 @@ mod tests {
     }
 
     #[test]
+    fn authority_downgrade_is_stepwise_and_never_promotes() {
+        assert_eq!(
+            next_lower_authority(DecisionExecutionMode::DeterministicOnly),
+            Some(DecisionExecutionMode::DeterministicPrimaryModelShadow)
+        );
+        assert_eq!(
+            next_lower_authority(DecisionExecutionMode::DeterministicPrimaryModelShadow),
+            Some(DecisionExecutionMode::ModelPrimary)
+        );
+        assert_eq!(
+            next_lower_authority(DecisionExecutionMode::ModelPrimary),
+            None
+        );
+    }
+
+    #[test]
     fn persisted_rollback_can_only_lower_authority() {
         assert_eq!(
             lower_authority(
